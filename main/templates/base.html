@@ -1,0 +1,23 @@
+{% load static render_bundle js_interop %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% spaceless %}
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="{% static 'images/favicon.ico' %}" />
+    {% js_settings %}
+    {% render_bundle 'style' %}
+    <title>{% block title %}{% endblock %}</title>
+    <meta name="description" content="{% block description %}{% endblock %}">
+    <meta name="keywords" content="{% block keywords %}{% endblock %}">
+    {% block extrahead %}
+    {% endblock %}
+    {% endspaceless %}
+  </head>
+  <body class="{% block bodyclass %}{% endblock %}">
+    {% block content %}
+    {% endblock %}
+  </body>
+</html>

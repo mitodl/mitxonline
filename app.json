@@ -1,0 +1,230 @@
+{
+  "addons": [
+    "heroku-postgresql:hobby-dev",
+    "newrelic:wayne",
+    "rediscloud:30"
+  ],
+  "buildpacks": [
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-apt"
+    },
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-nodejs"
+    },
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-python"
+    },
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-pgbouncer"
+    },
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-nginx"
+    }
+  ],
+  "description": "mitX Online",
+  "env": {
+    "AWS_ACCESS_KEY_ID": {
+      "description": "AWS Access Key for S3 storage.",
+      "required": false
+    },
+    "AWS_QUERYSTRING_AUTH": {
+      "description": "Enables querystring auth for S3 urls",
+      "required": false
+    },
+    "AWS_SECRET_ACCESS_KEY": {
+      "description": "AWS Secret Key for S3 storage.",
+      "required": false
+    },
+    "AWS_STORAGE_BUCKET_NAME": {
+      "description": "S3 Bucket name.",
+      "required": false
+    },
+    "CELERY_BROKER_URL": {
+      "description": "Where celery should get tasks, default is Redis URL",
+      "required": false
+    },
+    "CELERY_RESULT_BACKEND": {
+      "description": "Where celery should put task results, default is Redis URL",
+      "required": false
+    },
+    "CELERY_TASK_EAGER_PROPAGATES": {
+      "description": "Early executed tasks propagate exceptions",
+      "required": false
+    },
+    "CSRF_TRUSTED_ORIGINS": {
+      "description": "Comma separated string of trusted domains that should be CSRF exempt",
+      "required": false
+    },
+    "DJANGO_LOG_LEVEL": {
+      "description": "The log level for django",
+      "required": false
+    },
+    "GA_TRACKING_ID": {
+      "description": "Google analytics tracking ID",
+      "required": false
+    },
+    "HEROKU_APP_NAME": {
+      "description": "The name of the review app",
+      "required": false
+    },
+    "HOST_IP": {
+      "description": "This server's host IP",
+      "required": false
+    },
+    "MAILGUN_KEY": {
+      "description": "The token for authenticating against the Mailgun API",
+      "required": true
+    },
+    "MAILGUN_SENDER_DOMAIN": {
+      "description": "The domain to send mailgun email through",
+      "required": true
+    },
+    "MEDIA_ROOT": {
+      "description": "The root directory for locally stored media. Typically not used.",
+      "required": false
+    },
+    "MITX_ONLINE_ADMIN_EMAIL": {
+      "description": "E-mail to send 500 reports to.",
+      "required": true
+    },
+    "MITX_ONLINE_BASE_URL": {
+      "description": "Base url for the application in the format PROTOCOL://HOSTNAME[:PORT]",
+      "required": true
+    },
+    "MITX_ONLINE_DB_CONN_MAX_AGE": {
+      "description": "Maximum age of connection to Postgres in seconds",
+      "required": false
+    },
+    "MITX_ONLINE_DB_DISABLE_SSL": {
+      "description": "Disables SSL to postgres if set to True",
+      "required": false
+    },
+    "MITX_ONLINE_DB_DISABLE_SS_CURSORS": {
+      "description": "Disables Postgres server side cursors",
+      "required": false
+    },
+    "MITX_ONLINE_EMAIL_BACKEND": {
+      "description": "The default email backend to use for outgoing email. This is used in some places by django itself. See `NOTIFICATION_EMAIL_BACKEND` for the backend used for most application emails.",
+      "required": false
+    },
+    "MITX_ONLINE_EMAIL_HOST": {
+      "description": "Outgoing e-mail hostname",
+      "required": false
+    },
+    "MITX_ONLINE_EMAIL_PASSWORD": {
+      "description": "Outgoing e-mail auth password",
+      "required": false
+    },
+    "MITX_ONLINE_EMAIL_PORT": {
+      "description": "Outgoing e-mail port",
+      "required": false
+    },
+    "MITX_ONLINE_EMAIL_TLS": {
+      "description": "Outgoing e-mail TLS setting",
+      "required": false
+    },
+    "MITX_ONLINE_EMAIL_USER": {
+      "description": "Outgoing e-mail auth username",
+      "required": false
+    },
+    "MITX_ONLINE_ENVIRONMENT": {
+      "description": "The execution environment that the app is in (e.g. dev, staging, prod)",
+      "required": true
+    },
+    "MITX_ONLINE_FROM_EMAIL": {
+      "description": "E-mail to use for the from field",
+      "required": false
+    },
+    "MITX_ONLINE_LOG_HOST": {
+      "description": "Remote syslog server hostname",
+      "required": false
+    },
+    "MITX_ONLINE_LOG_HOST_PORT": {
+      "description": "Remote syslog server port",
+      "required": false
+    },
+    "MITX_ONLINE_LOG_LEVEL": {
+      "description": "The log level default",
+      "required": false
+    },
+    "MITX_ONLINE_SECURE_SSL_HOST": {
+      "description": "Hostame to redirect non-secure requests to. Overrides value from HOST header.",
+      "required": false
+    },
+    "MITX_ONLINE_SECURE_SSL_REDIRECT": {
+      "description": "Application-level SSL redirect setting.",
+      "required": false
+    },
+    "MITX_ONLINE_SITE_ID": {
+      "description": "The default site id for django sites framework",
+      "required": false
+    },
+    "MITX_ONLINE_SUPPORT_EMAIL": {
+      "description": "Email address listed for customer support",
+      "required": false
+    },
+    "MITX_ONLINE_USE_S3": {
+      "description": "Use S3 for storage backend (required on Heroku)",
+      "required": false
+    },
+    "NEW_RELIC_APP_NAME": {
+      "description": "Application identifier in New Relic."
+    },
+    "NODE_MODULES_CACHE": {
+      "description": "If false, disables the node_modules cache to fix yarn install",
+      "value": "false"
+    },
+    "PGBOUNCER_DEFAULT_POOL_SIZE": {
+      "value": "50"
+    },
+    "PGBOUNCER_MIN_POOL_SIZE": {
+      "value": "5"
+    },
+    "REDISCLOUD_URL": {
+      "description": "RedisCloud connection url",
+      "required": false
+    },
+    "REDIS_URL": {
+      "description": "Redis URL for non-production use",
+      "required": false
+    },
+    "ROBOTS_CACHE_TIMEOUT": {
+      "description": "How long the robots.txt file should be cached",
+      "required": false
+    },
+    "SECRET_KEY": {
+      "description": "Django secret key.",
+      "generator": "secret",
+      "required": true
+    },
+    "SENTRY_DSN": {
+      "description": "The connection settings for Sentry",
+      "required": false
+    },
+    "SENTRY_LOG_LEVEL": {
+      "description": "The log level for Sentry",
+      "required": false
+    },
+    "SITE_NAME": {
+      "description": "Site name",
+      "required": false
+    },
+    "STATUS_TOKEN": {
+      "description": "Token to access the status API.",
+      "required": false
+    }
+  },
+  "keywords": [
+    "Django",
+    "Python",
+    "MIT",
+    "Office of Digital Learning"
+  ],
+  "name": "mitx_online",
+  "repository": "https://github.com/mitodl/mitx-online",
+  "scripts": {
+    "postdeploy": "./manage.py migrate --noinput"
+  },
+  "success_url": "/",
+  "website": "https://github.com/mitodl/mitx-online"
+}
