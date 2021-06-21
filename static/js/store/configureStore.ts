@@ -1,15 +1,18 @@
-import { prop } from "ramda"
 import { compose, createStore, applyMiddleware } from "redux"
 import { createLogger } from "redux-logger"
 import { queryMiddleware } from "redux-query"
 
 import { makeRequest } from "./network_interface"
-import rootReducer from "../reducers"
+import rootReducer, { ReduxState } from "../reducers"
+import { getQueries, getEntities } from "../lib/redux_query"
+
+export type Store = ReturnType<typeof configureStore>
 
 // Setup middleware
-export default function configureStore(initialState) {
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+export default function configureStore(initialState?: ReduxState) {
   const COMMON_MIDDLEWARE = [
-    queryMiddleware(makeRequest, prop("queries"), prop("entities"))
+    queryMiddleware(makeRequest, getQueries, getEntities)
   ]
 
   // Store factory configuration
@@ -19,7 +22,8 @@ export default function configureStore(initialState) {
       applyMiddleware(...COMMON_MIDDLEWARE, createLogger()),
       window.__REDUX_DEVTOOLS_EXTENSION__ ?
         window.__REDUX_DEVTOOLS_EXTENSION__() :
-        f => f
+        (f: any) => f
+      // @ts-ignore
     )(createStore)
   } else {
     createStoreWithMiddleware = compose(applyMiddleware(...COMMON_MIDDLEWARE))(
@@ -29,9 +33,10 @@ export default function configureStore(initialState) {
 
   const store = createStoreWithMiddleware(rootReducer, initialState)
 
-  if (module.hot) {
+  if ((module as any).hot) {
     // Enable Webpack hot module replacement for reducers
-    module.hot.accept("../reducers", () => {
+    (module as any).hot.accept("../reducers", () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const nextRootReducer = require("../reducers")
 
       store.replaceReducer(nextRootReducer)
