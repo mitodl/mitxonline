@@ -22,12 +22,12 @@ services:
       - "5432"
 
   redis:
-    image: redis:3.0.3
+    image: redis:6.0.5
     ports:
       - "6379"
 
   nginx:
-    image: nginx:1.9.5
+    image: nginx:1.21
     ports:
       - "8013:8013"
     links:

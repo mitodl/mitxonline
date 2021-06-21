@@ -7,9 +7,15 @@ import platform
 
 import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
-from mitol.common.envs import (get_bool, get_delimited_list, get_features,
-                               get_int, get_string, import_settings_modules,
-                               init_app_settings)
+from mitol.common.envs import (
+    get_bool,
+    get_delimited_list,
+    get_features,
+    get_int,
+    get_string,
+    import_settings_modules,
+    init_app_settings,
+)
 
 from main.sentry import init_sentry
 

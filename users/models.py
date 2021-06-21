@@ -1,6 +1,9 @@
 """Models for users"""
-from django.contrib.auth.models import (AbstractBaseUser, BaseUserManager,
-                                        PermissionsMixin)
+from django.contrib.auth.models import (
+    AbstractBaseUser,
+    BaseUserManager,
+    PermissionsMixin,
+)
 from django.db import models, transaction
 from mitol.common.models import TimestampedModel
 
