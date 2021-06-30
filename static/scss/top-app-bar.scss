@@ -1,0 +1,134 @@
+// sass-lint:disable mixins-before-declarations
+
+.header-holder {
+  padding: 20px 0px;
+
+  @include media-breakpoint-down(md) {
+    max-width: 100%;
+  }
+
+  .navbar {
+    padding: 0;
+  }
+
+  .nowrap {
+    flex-wrap: unset;
+  }
+}
+
+.link-section.nowrap.login {
+  ul {
+    @include media-breakpoint-down(md) {
+      margin: 0;
+      text-align: right;
+
+      li {
+        padding: 0;
+
+        a {
+          padding: 5px 0;
+        }
+
+        .dropdown-toggle {
+          padding-right: 0;
+        }
+      }
+    }
+  }
+}
+
+.navbar-collapse {
+
+  li {
+    letter-spacing: normal;
+    display: inline-block;
+    vertical-align: top;
+    font-size: 18px;
+    line-height: 25px;
+    font-weight: 500;
+    padding: 0 0 0 10px;
+
+    a {
+      padding: 5px 10px;
+      color: black;
+      text-decoration: none;
+      display: block;
+
+      &:hover {
+        color: $primary;
+      }
+
+      &.button {
+        background: $primary;
+        color: white;
+
+        &:hover {
+          background: black;
+        }
+      }
+    }
+  }
+}
+
+.navbar-collapse.collapsing,
+.navbar-collapse.show {
+  display: flex;
+}
+
+.site-logo {
+  width: 154px;
+  height: 47.5px;
+}
+
+.navbar-brand {
+  position: relative;
+
+  .mit-link, .mitx-online-link {
+    position: absolute;
+    z-index: 2;
+    opacity: .5;
+  }
+
+  .mit-link {
+    left: 0;
+    top: 11px;
+    width: 64px;
+    height: 35px;
+  }
+
+  .mitx-online-link {
+    left: 93px;
+    top: 19px;
+    width: 60px;
+    height: 21px;
+  }
+}
+
+.navbar-toggler.nav-opener {
+  border: 1px solid $primary;
+  border-radius: 2px;
+  color: $primary;
+  margin: 5px 0 0;
+  padding: 8px 6px 6px;
+
+  .navbar-toggler-icon {
+    width: 18px;
+    height: 15px;
+    display: inline-block;
+    border: 1px solid $primary;
+    border-width: 2px 0;
+    position: relative;
+    margin: -2px 5px 0 0;
+    vertical-align: top;
+
+    &:after {
+      position: absolute;
+      left: 0;
+      right: 0;
+      content: "";
+      top: 50%;
+      border-top: 2px solid $primary;
+      margin: -1px 0 0;
+    }
+  }
+}

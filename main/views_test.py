@@ -15,7 +15,6 @@ def test_index_view(client):
     """Verify the index view is as expected"""
     response = client.get(reverse("main-index"))
     assert response.status_code == 200
-    assert b"Hi, I'm mitx_online" in response.content
 
 
 def test_json_settings(mocker, settings, client):
@@ -31,6 +30,7 @@ def test_json_settings(mocker, settings, client):
 
     bundles = [bundle[0][1] for bundle in get_bundle.call_args_list]
     assert set(bundles) == {
+        "django",
         "root",
         "style",
     }

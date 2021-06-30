@@ -16,9 +16,8 @@ from mitol.common import envs, pytest_utils
 REQUIRED_SETTINGS = {
     "MAILGUN_SENDER_DOMAIN": "mailgun.fake.domain",
     "MAILGUN_KEY": "fake_mailgun_key",
-    "MITX_ONLINE_BASE_URL": "http://localhost:8053",
+    "MITX_ONLINE_BASE_URL": "http://localhost:8013",
 }
-
 
 # this is a test, but pylint thinks it ends up being unused
 # hence we import the entire module and assign it here
@@ -29,9 +28,6 @@ def cleanup_settings():
     """Cleanup settings after a test"""
     envs.env.reload()
     importlib.reload(sys.modules["main.settings"])
-    importlib.reload(sys.modules["mitol.common.settings.base"])
-    importlib.reload(sys.modules["mitol.common.settings.webpack"])
-    importlib.reload(sys.modules["mitol.mail.settings.email"])
 
 
 class TestSettings(TestCase):
@@ -105,6 +101,24 @@ class TestSettings(TestCase):
         mail.mail_admins("Test", "message")
         self.assertIn(test_admin_email, mail.outbox[0].to)
 
+    def test_csrf_trusted_origins(self):
+        """Verify that we can configure CSRF_TRUSTED_ORIGINS with a var"""
+        # Test the default
+        settings_vars = self.patch_settings(REQUIRED_SETTINGS)
+        self.assertEqual(settings_vars.get("CSRF_TRUSTED_ORIGINS"), [])
+
+        # Verify the env var works
+        settings_vars = self.patch_settings(
+            {
+                **REQUIRED_SETTINGS,
+                "CSRF_TRUSTED_ORIGINS": "some.domain.com, some.other.domain.org",
+            }
+        )
+        self.assertEqual(
+            settings_vars.get("CSRF_TRUSTED_ORIGINS"),
+            ["some.domain.com", "some.other.domain.org"],
+        )
+
     def test_db_ssl_enable(self):
         """Verify that we can enable/disable database SSL with a var"""
 
@@ -144,7 +158,7 @@ class TestSettings(TestCase):
         )
 
     def test_server_side_cursors_enabled(self):
-        """DISABLE_SERVER_SIDE_CURSORS should be false if ocw_studio_DB_DISABLE_SS_CURSORS is false"""
+        """DISABLE_SERVER_SIDE_CURSORS should be false if MITX_ONLINE_DB_DISABLE_SS_CURSORS is false"""
         settings_vars = self.patch_settings(
             {**REQUIRED_SETTINGS, "MITX_ONLINE_DB_DISABLE_SS_CURSORS": "False"}
         )

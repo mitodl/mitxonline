@@ -1,0 +1,188 @@
+body {
+  line-height: 28px;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+h1 {
+  font-size: 40px;
+  line-height: 44px;
+  font-weight: 600;
+}
+
+h2 {
+  font-size: 28px;
+  line-height: 38px;
+  font-weight: 500;
+}
+
+h3 {
+  font-size: 26px;
+  line-height: 26px;
+  font-weight: 600;
+}
+
+h4 {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 500;
+}
+
+a.link-button {
+  display: inline-block;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+
+  &:hover, &:visited {
+    text-decoration: none;
+  }
+
+  &.red {
+    border-radius: 5px;
+    background-color: rgb(163, 31, 52);
+    color: #ffffff;
+  }
+
+  &.light-blue {
+    border-radius: 5px;
+    background-color: $light-blue;
+    color: #ffffff;
+  }
+}
+
+.form-error {
+  color: $primary;
+}
+
+.align-text-right {
+  text-align: right;
+}
+
+.gray-text {
+  color: $gray;
+}
+
+.light-gray-text {
+  color: $light-gray;
+}
+
+.btn-light-blue {
+  background-color: $light-blue !important;
+  border-color: $light-blue !important;
+  font-size: 20px;
+
+  &.btn-profile-submit {
+    margin-top: 12px;
+  }
+}
+
+.btn-denim-blue {
+  background-color: $denim-blue;
+  border-color: $denim-blue;
+  color: white;
+
+  &:hover {
+    color: white !important;
+  }
+}
+
+
+.link-light-blue {
+  &, &:hover, &:visited, &:active {
+    color: $light-blue;
+  }
+}
+
+.text-ribbon {
+  position: relative;
+  width: 160px;
+  height: 40px;
+
+  svg {
+    width: 160px;
+    height: 40px;
+    -webkit-filter: drop-shadow(-1px 2px 2px rgba(0, 0, 0, 0.4)); // sass-lint:disable-line no-vendor-prefixes
+    filter: drop-shadow(-1px 2px 2px rgba(0, 0, 0, 0.4));
+    fill: black;
+  }
+
+  .text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    line-height: 40px;
+    text-align: center;
+    color: white;
+  }
+}
+
+.card-shadow {
+  -webkit-box-shadow: -4px 5px 8px 0px rgba(204,204,204,0.8); // sass-lint:disable-line no-vendor-prefixes
+  -moz-box-shadow: -4px 5px 8px 0px rgba(204,204,204,0.8); // sass-lint:disable-line no-vendor-prefixes
+  box-shadow: -4px 5px 8px 0px rgba(204,204,204,0.8);
+}
+
+.profile-container {
+  @include media-breakpoint-down(sm)  {
+    padding: 20px 40px;
+  }
+
+  @include media-breakpoint-down(xs)  {
+    padding: 20px 20px;
+  }
+
+  background-color: $very-light-gray;
+  max-width: 840px;
+  margin: auto;
+
+  .auth-form {
+    .row {
+      margin-top: 20px;
+    }
+  }
+}
+
+.profile {
+  background: url(/static/images/user.svg) left no-repeat;
+  height: 120px;
+  width: 120px;
+}
+
+.dotted {
+  border-bottom: 2px dashed #8a8b8c;
+  margin-top: 25px;
+}
+
+.page {
+  margin: 0 auto;
+  max-width: 1000px;
+  background-color: #f5f5f5;
+  font-weight: 600;
+  padding-top: 50px;
+  padding-bottom: 50px;
+}
+
+.page-loader {
+  position: fixed;
+  width: 100%;
+  top: 90px;
+  left: 0;
+  height: calc(100vh - 90px);
+  z-index: 9;
+  right: 0;
+  max-width: initial;
+  display: flex;
+  flex-flow: wrap;
+  align-content: center;
+  padding-top: 0;
+
+  .loader-area {
+    width: 100%;
+
+    img {
+      margin-bottom: 15px;
+    }
+  }
+}

@@ -1,8 +1,26 @@
-// Layout goes here
+@import "variables";
+@import "node_modules/@material/layout-grid/dist/mdc.layout-grid";
+@import "node_modules/@material/top-app-bar/dist/mdc.top-app-bar";
+@import "node_modules/react-picky/dist/picky";
+@import "node_modules/react-day-picker/lib/style";
+@import "node_modules/bootstrap/scss/bootstrap";
+@import "auth";
+@import "common";
+@import "top-app-bar";
+@import "collapsible";
+@import "footer";
+@import "slick";
+@import "resource";
+@import "notification";
+@import "user-menu";
+@import "error";
+@import "expandable";
 
-// Fake style to confirm that webpack dev server works
-h1 {
-  border-radius: 25px;
-  border: 2px solid blue;
-  padding: 2px;
+body {
+  font-family: Rajdhani, "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  margin: 0;
+
+  .main-panel {
+    min-height: calc(100vh - 351px);
+  }
 }

@@ -1,0 +1,22 @@
+// Adapted from an example on alligator.io (https://alligator.io/css/collapsible/)
+
+input[type='checkbox'].toggle {
+  display: none;
+}
+
+.lbl-toggle {
+  display: block;
+  cursor: pointer;
+  transition: all 0.25s ease-out;
+}
+
+.lbl-toggle::before {
+  content: "\FF0B";
+  display: inline-block;
+  vertical-align: middle;
+  padding-bottom: 2px;
+}
+
+.toggle:checked + .lbl-toggle::before {
+  content: "\FF0D";
+}
