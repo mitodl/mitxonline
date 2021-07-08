@@ -30,7 +30,7 @@ class Command(BaseCommand):
             help="Retry edX enrollment even if the target users enrollments indicate edx_enrolled=True",
         )
         parser.add_argument(
-            "--run", type=str, help="The 'openedx_id' value for a target CourseRun"
+            "--run", type=str, help="The 'courseware_id' value for a target CourseRun"
         )
         parser.add_argument(
             "uservalues",
@@ -49,7 +49,7 @@ class Command(BaseCommand):
         if not options["force"]:
             enrollment_filter["edx_enrolled"] = False
         if options["run"]:
-            enrollment_filter["run__openedx_id"] = options["run"]
+            enrollment_filter["run__courseware_id"] = options["run"]
         if options["uservalues"]:
             enrollment_filter["user__in"] = fetch_users(options["uservalues"])
         course_run_enrollments = CourseRunEnrollment.objects.filter(**enrollment_filter)
@@ -77,7 +77,7 @@ class Command(BaseCommand):
                 self.stdout.write(
                     self.style.SUCCESS(
                         "Successfully enrolled user {} ({}) in course run '{}'".format(
-                            user.username, user.email, course_run.openedx_id
+                            user.username, user.email, course_run.courseware_id
                         )
                     )
                 )

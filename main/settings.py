@@ -157,7 +157,7 @@ INSTALLED_APPS = (
     # Put our apps after this point
     "main",
     "authentication",
-    # "courses",
+    "courses",
     "mail.apps.MailApp",
     "users",
     "cms",
@@ -820,9 +820,9 @@ MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the leg
 )
 
 # mitol-django-digital-credentials
-MITOL_DIGITAL_CREDENTIALS_BUILD_CREDENTIAL_FUNC = (
-    "courses.credentials.build_digital_credential"
-)
+# MITOL_DIGITAL_CREDENTIALS_BUILD_CREDENTIAL_FUNC = (
+#     "courses.credentials.build_digital_credential"
+# )
 
 
 MITX_ONLINE_OAUTH_PROVIDER = "mitxpro-oauth2"

@@ -35,7 +35,7 @@ class EdxApiEnrollErrorException(Exception):
             msg = "EdX API error enrolling user {} ({}) in course run '{}'.\n{}".format(
                 self.user.username,
                 self.user.email,
-                self.course_run.openedx_id,
+                self.course_run.courseware_id,
                 get_error_response_summary(self.http_error.response),
             )
         super().__init__(msg)
@@ -60,7 +60,7 @@ class UnknownEdxApiEnrollException(Exception):
             msg = "Unexpected error enrolling user {} ({}) in course run '{}' ({}: {})".format(
                 self.user.username,
                 self.user.email,
-                self.course_run.openedx_id,
+                self.course_run.courseware_id,
                 type(base_exc).__name__,
                 str(base_exc),
             )

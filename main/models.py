@@ -2,64 +2,22 @@
 Common model classes
 """
 from django.conf import settings
-from django.contrib.postgres.fields import JSONField
 from django.db import transaction
-from django.db.models import PROTECT, DateTimeField, ForeignKey, Manager, Model
-from django.db.models.query import QuerySet
-from django.utils import timezone
-
-
-class TimestampedModelQuerySet(QuerySet):
-    """
-    Subclassed QuerySet for TimestampedModelManager
-    """
-
-    def update(self, **kwargs):
-        """
-        Automatically update updated_on timestamp when .update(). This is because .update()
-        does not go through .save(), thus will not auto_now, because it happens on the
-        database level without loading objects into memory.
-        """
-        if "updated_on" not in kwargs:
-            kwargs["updated_on"] = timezone.now()
-        return super().update(**kwargs)
-
-
-class TimestampedModelManager(Manager):
-    """
-    Subclassed manager for TimestampedModel
-    """
-
-    def update(self, **kwargs):
-        """
-        Allows access to TimestampedModelQuerySet's update method on the manager
-        """
-        return self.get_queryset().update(**kwargs)
-
-    def get_queryset(self):
-        """
-        Returns custom queryset
-        """
-        return TimestampedModelQuerySet(self.model, using=self._db)
-
-
-class TimestampedModel(Model):
-    """
-    Base model for create/update timestamps
-    """
-
-    objects = TimestampedModelManager()
-    created_on = DateTimeField(auto_now_add=True)  # UTC
-    updated_on = DateTimeField(auto_now=True)  # UTC
-
-    class Meta:
-        abstract = True
+from django.db.models import (
+    CASCADE,
+    DateTimeField,
+    ForeignKey,
+    JSONField,
+    Manager,
+    Model,
+)
+from mitol.common.models import TimestampedModel
 
 
 class AuditModel(TimestampedModel):
     """An abstract base class for audit models"""
 
-    acting_user = ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=PROTECT)
+    acting_user = ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=CASCADE)
     data_before = JSONField(blank=True, null=True)
     data_after = JSONField(blank=True, null=True)
 
@@ -132,3 +90,17 @@ class AuditableModel(Model):
         audit_class = self.get_audit_class()
         audit_kwargs[audit_class.get_related_field_name()] = self
         audit_class.objects.create(**audit_kwargs)
+
+
+class ValidateOnSaveMixin(Model):
+    """Mixin that calls field/model validation methods before saving a model object"""
+
+    class Meta:
+        abstract = True
+
+    def save(
+        self, force_insert=False, force_update=False, **kwargs
+    ):  # pylint: disable=arguments-differ
+        if not (force_insert or force_update):
+            self.full_clean()
+        super().save(force_insert=force_insert, force_update=force_update, **kwargs)

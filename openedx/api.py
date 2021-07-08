@@ -468,12 +468,12 @@ def get_edx_grades_with_users(course_run, user=None):
     grades_client = get_edx_api_grades_client()
     if user:
         edx_grade = grades_client.get_student_current_grade(
-            user.username, course_run.openedx_id
+            user.username, course_run.courseware_id
         )
         yield edx_grade, user
     else:
         edx_course_grades = grades_client.get_course_current_grades(
-            course_run.openedx_id
+            course_run.courseware_id
         )
         all_grades = list(edx_course_grades.all_current_grades)
         for edx_grade in all_grades:
@@ -506,7 +506,7 @@ def enroll_in_edx_course_runs(user, course_runs):
     for course_run in course_runs:
         try:
             result = edx_client.enrollments.create_student_enrollment(
-                course_run.openedx_id, mode=EDX_ENROLLMENT_PRO_MODE
+                course_run.courseware_id, mode=EDX_ENROLLMENT_PRO_MODE
             )
             results.append(result)
         except HTTPError as exc:
@@ -523,14 +523,14 @@ def enroll_in_edx_course_runs(user, course_runs):
             log.error(
                 "Failed to enroll user in %s with '%s' mode. Attempting to enroll with '%s' mode instead. "
                 "(%s)",
-                course_run.openedx_id,
+                course_run.courseware_id,
                 EDX_ENROLLMENT_PRO_MODE,
                 EDX_ENROLLMENT_AUDIT_MODE,
                 get_error_response_summary(exc.response),
             )
             try:
                 result = edx_client.enrollments.create_student_enrollment(
-                    course_run.openedx_id, mode=EDX_ENROLLMENT_AUDIT_MODE
+                    course_run.courseware_id, mode=EDX_ENROLLMENT_AUDIT_MODE
                 )
             except HTTPError as inner_exc:
                 raise EdxApiEnrollErrorException(
@@ -597,7 +597,7 @@ def unenroll_edx_course_run(run_enrollment):
     edx_client = get_edx_api_client(run_enrollment.user)
     try:
         deactivated_enrollment = edx_client.enrollments.deactivate_enrollment(
-            run_enrollment.run.openedx_id
+            run_enrollment.run.courseware_id
         )
     except HTTPError as exc:
         raise EdxApiEnrollErrorException(run_enrollment.user, run_enrollment.run, exc)
