@@ -39,6 +39,7 @@ urlpatterns = [
     path("", include("openedx.urls")),
     path("", include("mail.urls")),
     path("", include("users.urls")),
+    path("", include("courses.urls")),
     # social django needs to be here to preempt the login
     path("", include("social_django.urls", namespace="social")),
     path("signin/", index, name="login"),

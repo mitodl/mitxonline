@@ -24,7 +24,7 @@ def retry_failed_edx_enrollments():
     """Retries failed edX enrollments"""
     successful_enrollments = api.retry_failed_edx_enrollments()
     return [
-        (enrollment.user.email, enrollment.run.openedx_id)
+        (enrollment.user.email, enrollment.run.courseware_id)
         for enrollment in successful_enrollments
     ]
 

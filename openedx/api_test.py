@@ -316,10 +316,10 @@ def test_get_edx_api_client(mocker, settings, user):
 #     course_runs = CourseRunFactory.build_batch(2)
 #     enroll_results = enroll_in_edx_course_runs(user, course_runs)
 #     mock_client.enrollments.create_student_enrollment.assert_any_call(
-#         course_runs[0].openedx_id, mode=EDX_ENROLLMENT_PRO_MODE
+#         course_runs[0].courseware_id, mode=EDX_ENROLLMENT_PRO_MODE
 #     )
 #     mock_client.enrollments.create_student_enrollment.assert_any_call(
-#         course_runs[1].openedx_id, mode=EDX_ENROLLMENT_PRO_MODE
+#         course_runs[1].courseware_id, mode=EDX_ENROLLMENT_PRO_MODE
 #     )
 #     assert enroll_results == enroll_return_values
 
@@ -340,10 +340,10 @@ def test_get_edx_api_client(mocker, settings, user):
 #     results = enroll_in_edx_course_runs(user, [course_run])
 #     assert mock_client.enrollments.create_student_enrollment.call_count == 2
 #     mock_client.enrollments.create_student_enrollment.assert_any_call(
-#         course_run.openedx_id, mode=EDX_ENROLLMENT_PRO_MODE
+#         course_run.courseware_id, mode=EDX_ENROLLMENT_PRO_MODE
 #     )
 #     mock_client.enrollments.create_student_enrollment.assert_any_call(
-#         course_run.openedx_id, mode=EDX_ENROLLMENT_AUDIT_MODE
+#         course_run.courseware_id, mode=EDX_ENROLLMENT_AUDIT_MODE
 #     )
 #     assert results == [audit_result]
 #     patched_log_error.assert_called_once()
@@ -525,15 +525,15 @@ def test_retry_users_grace_period(mocker):
 #     """Tests that unenroll_edx_course_run makes a call to unenroll in edX via the API client"""
 #     mock_client = mocker.MagicMock()
 #     run_enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
-#     openedx_id = run_enrollment.run.openedx_id
-#     enroll_return_value = mocker.Mock(json={"course_id": openedx_id})
+#     courseware_id = run_enrollment.run.courseware_id
+#     enroll_return_value = mocker.Mock(json={"course_id": courseware_id})
 #     mock_client.enrollments.deactivate_enrollment = mocker.Mock(
 #         return_value=enroll_return_value
 #     )
 #     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
 #     deactivated_enrollment = unenroll_edx_course_run(run_enrollment)
 #
-#     mock_client.enrollments.deactivate_enrollment.assert_called_once_with(openedx_id)
+#     mock_client.enrollments.deactivate_enrollment.assert_called_once_with(courseware_id)
 #     assert deactivated_enrollment == enroll_return_value
 
 
