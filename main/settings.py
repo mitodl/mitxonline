@@ -1,11 +1,16 @@
+# pylint: disable=too-many-lines
 """
-Django settings for mitx_online.
+Django settings for main.
 """
 import logging
 import os
 import platform
+from datetime import timedelta
+from urllib.parse import urljoin, urlparse
 
 import dj_database_url
+import pytz
+from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common.envs import (
     get_bool,
@@ -13,22 +18,18 @@ from mitol.common.envs import (
     get_features,
     get_int,
     get_string,
-    import_settings_modules,
-    init_app_settings,
 )
 
+# wildcard import boilerplate digital credentials settings
+# from mitol.digitalcredentials.settings import *  # pylint: disable=wildcard-import,unused-wildcard-import
+from mitol.common.settings.webpack import *  # pylint: disable=wildcard-import,unused-wildcard-import
+from redbeat import RedBeatScheduler
+
+from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 
 VERSION = "0.0.0"
 
-SITE_ID = get_string(
-    name="MITX_ONLINE_SITE_ID",
-    default=1,
-    description="The default site id for django sites framework",
-)
-SITE_NAME = "mitX Online"
-
-# Sentry
 ENVIRONMENT = get_string(
     name="MITX_ONLINE_ENVIRONMENT",
     default="dev",
@@ -55,16 +56,15 @@ init_sentry(
     heroku_app_name=HEROKU_APP_NAME,
 )
 
-init_app_settings(namespace="MITX_ONLINE", site_name=SITE_NAME)
-import_settings_modules(
-    globals(),
-    "mitol.common.settings.base",
-    "mitol.common.settings.webpack",
-    "mitol.mail.settings.email",
-)
-
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+SITE_BASE_URL = get_string(
+    name="MITX_ONLINE_BASE_URL",
+    default=None,
+    description="Base url for the application in the format PROTOCOL://HOSTNAME[:PORT]",
+    required=True,
+)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = get_string(
@@ -78,6 +78,7 @@ DEBUG = get_bool(
     dev_only=True,
     description="Set to True to enable DEBUG mode. Don't turn on in production.",
 )
+
 
 ALLOWED_HOSTS = ["*"]
 
@@ -111,6 +112,11 @@ WEBPACK_LOADER = {
     }
 }
 
+SITE_ID = get_string(
+    name="MITX_ONLINE_SITE_ID",
+    default=1,
+    description="The default site id for django sites framework",
+)
 
 # configure a custom user model
 AUTH_USER_MODEL = "users.User"
@@ -123,21 +129,58 @@ INSTALLED_APPS = (
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.humanize",
     "django.contrib.sites",
+    "django_user_agents",
+    "social_django",
     "server_status",
+    "oauth2_provider",
+    "rest_framework",
+    "anymail",
+    "django_filters",
+    # WAGTAIL
+    # "wagtail.contrib.forms",
+    # "wagtail.contrib.redirects",
+    # "wagtail.contrib.table_block",
+    # "wagtail.contrib.routable_page",
+    # "wagtail.embeds",
+    # "wagtail.sites",
+    # "wagtail.users",
+    # "wagtail.snippets",
+    # "wagtail.documents",
+    # "wagtail.images",
+    # "wagtail.search",
+    # "wagtail.admin",
+    # "wagtail.core",
+    # "wagtailmetadata",
+    # "modelcluster",
+    # "taggit",
     # django-robots
     "robots",
     # Put our apps after this point
     "main",
+    "authentication",
+    # "courses",
+    "mail.apps.MailApp",
     "users",
+    # "cms",
+    # "compliance",
+    "openedx",
     # must be after "users" to pick up custom user model
     "compat",
     "hijack",
     "hijack_admin",
+    # "ecommerce",
     # ol-dango apps, must be after this project's apps for template precedence
     "mitol.common.apps.CommonApp",
+    # "mitol.digitalcredentials.apps.DigitalCredentialsApp",
     "mitol.mail.apps.MailApp",
+    # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
 )
+# Only include the seed data app if this isn't running in prod
+# if ENVIRONMENT not in ("production", "prod"):
+#     INSTALLED_APPS += ("localdev.seed",)
+
 
 DISABLE_WEBPACK_LOADER_STATS = get_bool(
     name="DISABLE_WEBPACK_LOADER_STATS",
@@ -151,13 +194,15 @@ if not DISABLE_WEBPACK_LOADER_STATS:
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "oauth2_provider.middleware.OAuth2TokenMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
-    "main.middleware.CachelessAPIMiddleware",
+    "django_user_agents.middleware.UserAgentMiddleware",
+    # "wagtail.contrib.redirects.middleware.RedirectMiddleware",
 )
 
 # enable the nplusone profiler only in debug mode
@@ -168,15 +213,20 @@ if DEBUG:
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
 LOGIN_REDIRECT_URL = "/"
-LOGIN_URL = "/"
-LOGIN_ERROR_URL = "/"
+LOGIN_URL = "/signin"
+LOGIN_ERROR_URL = "/signin"
+LOGOUT_REDIRECT_URL = get_string(
+    name="LOGOUT_REDIRECT_URL",
+    default="/",
+    description="Url to redirect to after logout, typically Open edX's own logout url",
+)
 
 ROOT_URLCONF = "main.urls"
 
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [os.path.join(BASE_DIR, "templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -184,9 +234,11 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-            ],
+                "social_django.context_processors.backends",
+                "social_django.context_processors.login_redirect",
+            ]
         },
-    },
+    }
 ]
 
 WSGI_APPLICATION = "main.wsgi.application"
@@ -214,6 +266,7 @@ DEFAULT_DATABASE_CONFIG["DISABLE_SERVER_SIDE_CURSORS"] = get_bool(
     default=True,
     description="Disables Postgres server side cursors",
 )
+
 
 if get_bool(
     name="MITX_ONLINE_DB_DISABLE_SSL",
@@ -247,11 +300,102 @@ ROBOTS_CACHE_TIMEOUT = get_int(
     description="How long the robots.txt file should be cached",
 )
 
+SOCIAL_AUTH_LOGIN_ERROR_URL = "login"
+SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = [urlparse(SITE_BASE_URL).netloc]
+
+# Email backend settings
+SOCIAL_AUTH_EMAIL_FORM_URL = "login"
+SOCIAL_AUTH_EMAIL_FORM_HTML = "login.html"
+
+SOCIAL_AUTH_EMAIL_USER_FIELDS = ["username", "email", "name", "password"]
+
+
+# Only validate emails for the email backend
+SOCIAL_AUTH_EMAIL_FORCE_EMAIL_VALIDATION = True
+
+# Configure social_core.pipeline.mail.mail_validation
+SOCIAL_AUTH_EMAIL_VALIDATION_FUNCTION = "mail.verification_api.send_verification_email"
+SOCIAL_AUTH_EMAIL_VALIDATION_URL = "/"
+
+SOCIAL_AUTH_PIPELINE = (
+    # Checks if an admin user attempts to login/register while hijacking another user.
+    "authentication.pipeline.user.forbid_hijack",
+    # Get the information we can about the user and return it in a simple
+    # format to create the user instance later. On some cases the details are
+    # already part of the auth response from the provider, but sometimes this
+    # could hit a provider API.
+    "social_core.pipeline.social_auth.social_details",
+    # Get the social uid from whichever service we're authing thru. The uid is
+    # the unique identifier of the given user in the provider.
+    "social_core.pipeline.social_auth.social_uid",
+    # Verifies that the current auth process is valid within the current
+    # project, this is where emails and domains whitelists are applied (if
+    # defined).
+    "social_core.pipeline.social_auth.auth_allowed",
+    # Checks if the current social-account is already associated in the site.
+    "social_core.pipeline.social_auth.social_user",
+    # Associates the current social details with another user account with the same email address.
+    "social_core.pipeline.social_auth.associate_by_email",
+    # validate an incoming email auth request
+    "authentication.pipeline.user.validate_email_auth_request",
+    # validate the user's email either it is blocked or not.
+    "authentication.pipeline.user.validate_email",
+    # require a password and profile if they're not set
+    "authentication.pipeline.user.validate_password",
+    # Send a validation email to the user to verify its email address.
+    # Disabled by default.
+    "social_core.pipeline.mail.mail_validation",
+    # Send the email address and hubspot cookie if it exists to hubspot.
+    # "authentication.pipeline.user.send_user_to_hubspot",
+    # Generate a username for the user
+    # NOTE: needs to be right before create_user so nothing overrides the username
+    "authentication.pipeline.user.get_username",
+    # Create a user if one doesn't exist, and require a password and name
+    "authentication.pipeline.user.create_user_via_email",
+    # verify the user against export compliance
+    # "authentication.pipeline.compliance.verify_exports_compliance",
+    # Create the record that associates the social account with the user.
+    "social_core.pipeline.social_auth.associate_user",
+    # activate the user
+    "authentication.pipeline.user.activate_user",
+    # create the user's edx user and auth
+    "authentication.pipeline.user.create_openedx_user",
+    # Create a profile
+    # NOTE: must be after all user records are created and the user is activated
+    "authentication.pipeline.user.create_profile",
+    # Populate the extra_data field in the social record with the values
+    # specified by settings (and the default ones like access_token, etc).
+    "social_core.pipeline.social_auth.load_extra_data",
+    # Update the user record with any changed info from the auth service.
+    "social_core.pipeline.user.user_details",
+)
+
+AUTH_CHANGE_EMAIL_TTL_IN_MINUTES = get_int(
+    name="AUTH_CHANGE_EMAIL_TTL_IN_MINUTES",
+    default=60 * 24,
+    description="Expiry time for a change email request, default is 1440 minutes(1 day)",
+)
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.8/howto/static-files/
 
 # Serve static files with dj-static
 STATIC_URL = "/static/"
+CLOUDFRONT_DIST = get_string(
+    name="CLOUDFRONT_DIST",
+    default=None,
+    description="The Cloundfront distribution to use for static assets",
+)
+if CLOUDFRONT_DIST:
+    STATIC_URL = urljoin(
+        "https://{dist}.cloudfront.net".format(dist=CLOUDFRONT_DIST), STATIC_URL
+    )
+
+STATICFILES_FINDERS = [
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+]
+
 STATIC_ROOT = "staticfiles"
 STATICFILES_DIRS = (os.path.join(BASE_DIR, "static"),)
 
@@ -263,6 +407,48 @@ INTERNAL_IPS = (
 )
 
 # Configure e-mail settings
+EMAIL_BACKEND = get_string(
+    name="MITX_ONLINE_EMAIL_BACKEND",
+    default="django.core.mail.backends.smtp.EmailBackend",
+    description="The default email backend to use for outgoing email. This is used in some places by django itself. See `NOTIFICATION_EMAIL_BACKEND` for the backend used for most application emails.",
+)
+EMAIL_HOST = get_string(
+    name="MITX_ONLINE_EMAIL_HOST",
+    default="localhost",
+    description="Outgoing e-mail hostname",
+)
+EMAIL_PORT = get_int(
+    name="MITX_ONLINE_EMAIL_PORT", default=25, description="Outgoing e-mail port"
+)
+EMAIL_HOST_USER = get_string(
+    name="MITX_ONLINE_EMAIL_USER",
+    default="",
+    description="Outgoing e-mail auth username",
+)
+EMAIL_HOST_PASSWORD = get_string(
+    name="MITX_ONLINE_EMAIL_PASSWORD",
+    default="",
+    description="Outgoing e-mail auth password",
+)
+EMAIL_USE_TLS = get_bool(
+    name="MITX_ONLINE_EMAIL_TLS",
+    default=False,
+    description="Outgoing e-mail TLS setting",
+)
+
+MITX_ONLINE_REPLY_TO_ADDRESS = get_string(
+    name="MITX_ONLINE_REPLY_TO_ADDRESS",
+    default="webmaster@localhost",
+    description="E-mail to use for reply-to address of emails",
+)
+
+
+DEFAULT_FROM_EMAIL = get_string(
+    name="MITX_ONLINE_FROM_EMAIL",
+    default="webmaster@localhost",
+    description="E-mail to use for the from field",
+)
+
 MAILGUN_SENDER_DOMAIN = get_string(
     name="MAILGUN_SENDER_DOMAIN",
     default=None,
@@ -275,12 +461,39 @@ MAILGUN_KEY = get_string(
     description="The token for authenticating against the Mailgun API",
     required=True,
 )
+MAILGUN_BATCH_CHUNK_SIZE = get_int(
+    name="MAILGUN_BATCH_CHUNK_SIZE",
+    default=1000,
+    description="Maximum number of emails to send in a batch",
+)
+MAILGUN_RECIPIENT_OVERRIDE = get_string(
+    name="MAILGUN_RECIPIENT_OVERRIDE",
+    default=None,
+    dev_only=True,
+    description="Override the recipient for outgoing email, development only",
+)
+MAILGUN_FROM_EMAIL = get_string(
+    name="MAILGUN_FROM_EMAIL",
+    default="no-reply@localhost",
+    description="Email which mail comes from",
+)
+
+EMAIL_SUPPORT = get_string(
+    name="MITX_ONLINE_SUPPORT_EMAIL",
+    default=MAILGUN_RECIPIENT_OVERRIDE or "support@localhost",
+    description="Email address listed for customer support",
+)
+
+NOTIFICATION_EMAIL_BACKEND = get_string(
+    name="MITX_ONLINE_NOTIFICATION_EMAIL_BACKEND",
+    default="anymail.backends.mailgun.EmailBackend",
+    description="The email backend to use for application emails",
+)
 
 ANYMAIL = {
     "MAILGUN_API_KEY": MAILGUN_KEY,
     "MAILGUN_SENDER_DOMAIN": MAILGUN_SENDER_DOMAIN,
 }
-
 
 # e-mail configurable admins
 ADMIN_EMAIL = get_string(
@@ -323,11 +536,7 @@ NPLUSONE_LOG_LEVEL = logging.ERROR
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "filters": {
-        "require_debug_false": {
-            "()": "django.utils.log.RequireDebugFalse",
-        }
-    },
+    "filters": {"require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}},
     "formatters": {
         "verbose": {
             "format": (
@@ -368,15 +577,9 @@ LOGGING = {
             "level": DJANGO_LOG_LEVEL,
             "propagate": True,
         },
-        "nplusone": {
-            "handlers": ["console"],
-            "level": "ERROR",
-        },
+        "nplusone": {"handlers": ["console"], "level": "ERROR"},
     },
-    "root": {
-        "handlers": ["console", "syslog"],
-        "level": LOG_LEVEL,
-    },
+    "root": {"handlers": ["console", "syslog"], "level": LOG_LEVEL},
 }
 
 # server-status
@@ -385,6 +588,9 @@ STATUS_TOKEN = get_string(
 )
 HEALTH_CHECK = ["CELERY", "REDIS", "POSTGRES"]
 
+GTM_TRACKING_ID = get_string(
+    name="GTM_TRACKING_ID", default="", description="Google Tag Manager container ID"
+)
 GA_TRACKING_ID = get_string(
     name="GA_TRACKING_ID", default="", description="Google analytics tracking ID"
 )
@@ -394,6 +600,25 @@ REACT_GA_DEBUG = get_bool(
     dev_only=True,
     description="Enable debug for react-ga, development only",
 )
+
+RECAPTCHA_SITE_KEY = get_string(
+    name="RECAPTCHA_SITE_KEY", default="", description="The ReCaptcha site key"
+)
+RECAPTCHA_SECRET_KEY = get_string(
+    name="RECAPTCHA_SECRET_KEY", default="", description="The ReCaptcha secret key"
+)
+
+USE_X_FORWARDED_HOST = get_bool(
+    name="USE_X_FORWARDED_HOST",
+    default=False,
+    description="Set HOST header to original domain accessed by user",
+)
+SITE_NAME = get_string(
+    name="SITE_NAME",
+    default="mitX Online",
+    description="Name of the site. e.g MIT mitX Online",
+)
+WAGTAIL_SITE_NAME = SITE_NAME
 
 MEDIA_ROOT = get_string(
     name="MEDIA_ROOT",
@@ -406,6 +631,7 @@ MITX_ONLINE_USE_S3 = get_bool(
     default=False,
     description="Use S3 for storage backend (required on Heroku)",
 )
+
 AWS_ACCESS_KEY_ID = get_string(
     name="AWS_ACCESS_KEY_ID", default=None, description="AWS Access Key for S3 storage."
 )
@@ -432,9 +658,13 @@ if MITX_ONLINE_USE_S3 and (
         "AWS_STORAGE_BUCKET_NAME"
     )
 if MITX_ONLINE_USE_S3:
+    if CLOUDFRONT_DIST:
+        AWS_S3_CUSTOM_DOMAIN = "{dist}.cloudfront.net".format(dist=CLOUDFRONT_DIST)
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
-# Celery
+FEATURES = get_features()
+
+# Redis
 REDISCLOUD_URL = get_string(
     name="REDISCLOUD_URL", default=None, description="RedisCloud connection url"
 )
@@ -445,6 +675,8 @@ else:
         name="REDIS_URL", default=None, description="Redis URL for non-production use"
     )
 
+# Celery
+USE_CELERY = True
 CELERY_BROKER_URL = get_string(
     name="CELERY_BROKER_URL",
     default=_redis_url,
@@ -455,6 +687,8 @@ CELERY_RESULT_BACKEND = get_string(
     default=_redis_url,
     description="Where celery should put task results, default is Redis URL",
 )
+CELERY_BEAT_SCHEDULER = RedBeatScheduler
+CELERY_REDBEAT_REDIS_URL = _redis_url
 CELERY_TASK_ALWAYS_EAGER = get_bool(
     name="CELERY_TASK_ALWAYS_EAGER",
     default=False,
@@ -466,12 +700,40 @@ CELERY_TASK_EAGER_PROPAGATES = get_bool(
     default=True,
     description="Early executed tasks propagate exceptions",
 )
-
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TIMEZONE = "UTC"
+RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY = get_int(
+    name="RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY",
+    default=60 * 30,
+    description="How many seconds between retrying failed edX enrollments",
+)
+REPAIR_OPENEDX_USERS_FREQUENCY = get_int(
+    name="REPAIR_OPENEDX_USERS_FREQUENCY",
+    default=60 * 30,
+    description="How many seconds between repairing openedx records for faulty users",
+)
+REPAIR_OPENEDX_USERS_OFFSET = int(REPAIR_OPENEDX_USERS_FREQUENCY / 2)
 
+CELERY_BEAT_SCHEDULE = {
+    "retry-failed-edx-enrollments": {
+        "task": "openedx.tasks.retry_failed_edx_enrollments",
+        "schedule": RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY,
+    },
+    "repair-faulty-edx-users": {
+        "task": "openedx.tasks.repair_faulty_openedx_users",
+        "schedule": OffsettingSchedule(
+            run_every=timedelta(seconds=REPAIR_OPENEDX_USERS_FREQUENCY),
+            offset=timedelta(seconds=REPAIR_OPENEDX_USERS_OFFSET),
+        ),
+    },
+}
+
+# Hijack
+HIJACK_ALLOW_GET_REQUESTS = True
+HIJACK_LOGOUT_REDIRECT_URL = "/admin/users/user"
+HIJACK_REGISTER_ADMIN = False
 
 # django cache back-ends
 CACHES = {
@@ -486,22 +748,152 @@ CACHES = {
     },
 }
 
-FEATURES = get_features()
+AUTHENTICATION_BACKENDS = (
+    "social_core.backends.email.EmailAuth",
+    "oauth2_provider.backends.OAuth2Backend",
+    "django.contrib.auth.backends.ModelBackend",
+)
+
+
+# required for migrations
+OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = "oauth2_provider.AccessToken"
+OAUTH2_PROVIDER_APPLICATION_MODEL = "oauth2_provider.Application"
+OAUTH2_PROVIDER_REFRESH_TOKEN_MODEL = "oauth2_provider.RefreshToken"
+
+OAUTH2_PROVIDER = {
+    # this is the list of available scopes
+    "SCOPES": {
+        "read": "Read scope",
+        "write": "Write scope",
+        "user:read": "Can read user and profile data",
+        # "digitalcredentials": "Can read and write Digital Credentials data",
+    },
+    "DEFAULT_SCOPES": ["user:read"],
+    # "SCOPES_BACKEND_CLASS": "mitol.oauth_toolkit_extensions.backends.ApplicationAccessOrSettingsScopes",
+    "ERROR_RESPONSE_WITH_SCOPES": DEBUG,
+    "ALLOWED_REDIRECT_URI_SCHEMES": get_delimited_list(
+        name="OAUTH2_PROVIDER_ALLOWED_REDIRECT_URI_SCHEMES",
+        default=["http", "https"],
+        description="List of schemes allowed for oauth2 redirect URIs",
+    ),
+}
+
+
+# DRF configuration
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework.authentication.SessionAuthentication",
+        "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    "EXCEPTION_HANDLER": "main.exceptions.exception_handler",
+    "TEST_REQUEST_DEFAULT_FORMAT": "json",
+}
+
+# Relative URL to be used by Djoser for the link in the password reset email
+# (see: http://djoser.readthedocs.io/en/stable/settings.html#password-reset-confirm-url)
+PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"
+
+# Djoser library settings (see: http://djoser.readthedocs.io/en/stable/settings.html)
+DJOSER = {
+    "PASSWORD_RESET_CONFIRM_URL": PASSWORD_RESET_CONFIRM_URL,
+    "SET_PASSWORD_RETYPE": False,
+    "LOGOUT_ON_PASSWORD_CHANGE": False,
+    "PASSWORD_RESET_CONFIRM_RETYPE": True,
+    "PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND": True,
+    "EMAIL": {"password_reset": "authentication.views.CustomPasswordResetEmail"},
+}
+
+# ol-django configuration
+
+# mitol-django-common
+MITOL_COMMON_USER_FACTORY = "users.factories.UserFactory"
+
+# mitol-django-mail
+MITOL_MAIL_FROM_EMAIL = MAILGUN_FROM_EMAIL
+MITOL_MAIL_REPLY_TO_ADDRESS = MITX_ONLINE_REPLY_TO_ADDRESS
+MITOL_MAIL_MESSAGE_CLASSES = []
+MITOL_MAIL_RECIPIENT_OVERRIDE = MAILGUN_RECIPIENT_OVERRIDE
+MITOL_MAIL_FORMAT_RECIPIENT_FUNC = "users.utils.format_recipient"
+MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the legacy mail debugger defined in this project
+    name="MITOL_MAIL_ENABLE_EMAIL_DEBUGGER",
+    default=False,
+    description="Enable the mitol-mail email debugger",
+    dev_only=True,
+)
+
+# mitol-django-digital-credentials
+MITOL_DIGITAL_CREDENTIALS_BUILD_CREDENTIAL_FUNC = (
+    "courses.credentials.build_digital_credential"
+)
+
+
+MITX_ONLINE_OAUTH_PROVIDER = "mitxpro-oauth2"
+OPENEDX_OAUTH_APP_NAME = get_string(
+    name="OPENEDX_OAUTH_APP_NAME",
+    default="edx-oauth-app",
+    required=True,
+    description="The 'name' value for the Open edX OAuth Application",
+)
+OPENEDX_API_BASE_URL = get_string(
+    name="OPENEDX_API_BASE_URL",
+    default="http://edx.odl.local:18000",
+    description="The base URL for the Open edX API",
+    required=True,
+)
+OPENEDX_BASE_REDIRECT_URL = get_string(
+    name="OPENEDX_BASE_REDIRECT_URL",
+    default=OPENEDX_API_BASE_URL,
+    description="The base redirect URL for an OAuth Application for the Open edX API",
+)
+OPENEDX_TOKEN_EXPIRES_HOURS = get_int(
+    name="OPENEDX_TOKEN_EXPIRES_HOURS",
+    default=1000,
+    description="The number of hours until an access token for the Open edX API expires",
+)
+OPENEDX_API_CLIENT_ID = get_string(
+    name="OPENEDX_API_CLIENT_ID",
+    default=None,
+    description="The OAuth2 client id to connect to Open edX with",
+    required=True,
+)
+OPENEDX_API_CLIENT_SECRET = get_string(
+    name="OPENEDX_API_CLIENT_SECRET",
+    default=None,
+    description="The OAuth2 client secret to connect to Open edX with",
+    required=True,
+)
+OPENEDX_API_KEY = get_string(
+    name="OPENEDX_API_KEY",
+    default=None,
+    description="edX API key (EDX_API_KEY setting in Open edX)",
+    required=True,
+)
+
+MITX_ONLINE_REGISTRATION_ACCESS_TOKEN = get_string(
+    name="MITX_ONLINE_REGISTRATION_ACCESS_TOKEN",
+    default=None,
+    description="Access token to secure Open edX registration API with",
+)
+
+OPENEDX_SERVICE_WORKER_API_TOKEN = get_string(
+    name="OPENEDX_SERVICE_WORKER_API_TOKEN",
+    default=None,
+    description="Active access token with staff level permissions to use with OpenEdX API client for service tasks",
+)
+OPENEDX_SERVICE_WORKER_USERNAME = get_string(
+    name="OPENEDX_SERVICE_WORKER_USERNAME",
+    default=None,
+    description="Username of the user whose token has been set in OPENEDX_SERVICE_WORKER_API_TOKEN",
+)
+EDX_API_CLIENT_TIMEOUT = get_int(
+    name="EDX_API_CLIENT_TIMEOUT",
+    default=60,
+    description="Timeout (in seconds) for requests made via the edX API client",
+)
 
 # django debug toolbar only in debug mode
 if DEBUG:
     INSTALLED_APPS += ("debug_toolbar",)
     # it needs to be enabled before other middlewares
     MIDDLEWARE = ("debug_toolbar.middleware.DebugToolbarMiddleware",) + MIDDLEWARE
-
-HIJACK_ALLOW_GET_REQUESTS = True
-HIJACK_LOGOUT_REDIRECT_URL = "/admin/users/user"
-HIJACK_REGISTER_ADMIN = False
-
-# List of mandatory settings. If any of these is not set, the app will not start
-# and will raise an ImproperlyConfigured exception
-MANDATORY_SETTINGS = [
-    "MAILGUN_URL",
-    "MAILGUN_KEY",
-    "SECRET_KEY",
-]

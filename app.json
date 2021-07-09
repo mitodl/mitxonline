@@ -23,6 +23,10 @@
   ],
   "description": "mitX Online",
   "env": {
+    "AUTH_CHANGE_EMAIL_TTL_IN_MINUTES": {
+      "description": "Expiry time for a change email request, default is 1440 minutes(1 day)",
+      "required": false
+    },
     "AWS_ACCESS_KEY_ID": {
       "description": "AWS Access Key for S3 storage.",
       "required": false
@@ -51,6 +55,10 @@
       "description": "Early executed tasks propagate exceptions",
       "required": false
     },
+    "CLOUDFRONT_DIST": {
+      "description": "The Cloundfront distribution to use for static assets",
+      "required": false
+    },
     "CSRF_TRUSTED_ORIGINS": {
       "description": "Comma separated string of trusted domains that should be CSRF exempt",
       "required": false
@@ -59,8 +67,16 @@
       "description": "The log level for django",
       "required": false
     },
+    "EDX_API_CLIENT_TIMEOUT": {
+      "description": "Timeout (in seconds) for requests made via the edX API client",
+      "required": false
+    },
     "GA_TRACKING_ID": {
       "description": "Google analytics tracking ID",
+      "required": false
+    },
+    "GTM_TRACKING_ID": {
+      "description": "Google Tag Manager container ID",
       "required": false
     },
     "HEROKU_APP_NAME": {
@@ -69,6 +85,18 @@
     },
     "HOST_IP": {
       "description": "This server's host IP",
+      "required": false
+    },
+    "LOGOUT_REDIRECT_URL": {
+      "description": "Url to redirect to after logout, typically Open edX's own logout url",
+      "required": false
+    },
+    "MAILGUN_BATCH_CHUNK_SIZE": {
+      "description": "Maximum number of emails to send in a batch",
+      "required": false
+    },
+    "MAILGUN_FROM_EMAIL": {
+      "description": "Email which mail comes from",
       "required": false
     },
     "MAILGUN_KEY": {
@@ -147,6 +175,18 @@
       "description": "The log level default",
       "required": false
     },
+    "MITX_ONLINE_NOTIFICATION_EMAIL_BACKEND": {
+      "description": "The email backend to use for application emails",
+      "required": false
+    },
+    "MITX_ONLINE_REGISTRATION_ACCESS_TOKEN": {
+      "description": "Access token to secure Open edX registration API with",
+      "required": false
+    },
+    "MITX_ONLINE_REPLY_TO_ADDRESS": {
+      "description": "E-mail to use for reply-to address of emails",
+      "required": false
+    },
     "MITX_ONLINE_SECURE_SSL_HOST": {
       "description": "Hostame to redirect non-secure requests to. Overrides value from HOST header.",
       "required": false
@@ -174,11 +214,59 @@
       "description": "If false, disables the node_modules cache to fix yarn install",
       "value": "false"
     },
+    "OAUTH2_PROVIDER_ALLOWED_REDIRECT_URI_SCHEMES": {
+      "description": "List of schemes allowed for oauth2 redirect URIs",
+      "required": false
+    },
+    "OPENEDX_API_BASE_URL": {
+      "description": "The base URL for the Open edX API",
+      "required": true
+    },
+    "OPENEDX_API_CLIENT_ID": {
+      "description": "The OAuth2 client id to connect to Open edX with",
+      "required": true
+    },
+    "OPENEDX_API_CLIENT_SECRET": {
+      "description": "The OAuth2 client secret to connect to Open edX with",
+      "required": true
+    },
+    "OPENEDX_API_KEY": {
+      "description": "edX API key (EDX_API_KEY setting in Open edX)",
+      "required": true
+    },
+    "OPENEDX_BASE_REDIRECT_URL": {
+      "description": "The base redirect URL for an OAuth Application for the Open edX API",
+      "required": false
+    },
+    "OPENEDX_OAUTH_APP_NAME": {
+      "description": "The 'name' value for the Open edX OAuth Application",
+      "required": true
+    },
+    "OPENEDX_SERVICE_WORKER_API_TOKEN": {
+      "description": "Active access token with staff level permissions to use with OpenEdX API client for service tasks",
+      "required": false
+    },
+    "OPENEDX_SERVICE_WORKER_USERNAME": {
+      "description": "Username of the user whose token has been set in OPENEDX_SERVICE_WORKER_API_TOKEN",
+      "required": false
+    },
+    "OPENEDX_TOKEN_EXPIRES_HOURS": {
+      "description": "The number of hours until an access token for the Open edX API expires",
+      "required": false
+    },
     "PGBOUNCER_DEFAULT_POOL_SIZE": {
       "value": "50"
     },
     "PGBOUNCER_MIN_POOL_SIZE": {
       "value": "5"
+    },
+    "RECAPTCHA_SECRET_KEY": {
+      "description": "The ReCaptcha secret key",
+      "required": false
+    },
+    "RECAPTCHA_SITE_KEY": {
+      "description": "The ReCaptcha site key",
+      "required": false
     },
     "REDISCLOUD_URL": {
       "description": "RedisCloud connection url",
@@ -186,6 +274,14 @@
     },
     "REDIS_URL": {
       "description": "Redis URL for non-production use",
+      "required": false
+    },
+    "REPAIR_OPENEDX_USERS_FREQUENCY": {
+      "description": "How many seconds between repairing openedx records for faulty users",
+      "required": false
+    },
+    "RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY": {
+      "description": "How many seconds between retrying failed edX enrollments",
       "required": false
     },
     "ROBOTS_CACHE_TIMEOUT": {
@@ -206,11 +302,15 @@
       "required": false
     },
     "SITE_NAME": {
-      "description": "Site name",
+      "description": "Name of the site. e.g MIT mitX Online",
       "required": false
     },
     "STATUS_TOKEN": {
       "description": "Token to access the status API.",
+      "required": false
+    },
+    "USE_X_FORWARDED_HOST": {
+      "description": "Set HOST header to original domain accessed by user",
       "required": false
     }
   },

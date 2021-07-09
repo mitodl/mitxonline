@@ -2,7 +2,7 @@ const webpack = require("webpack")
 const path = require("path")
 const R = require("ramda")
 const BundleTracker = require("webpack-bundle-tracker")
-const { config } = require(path.resolve(
+const { config, babelSharedLoader } = require(path.resolve(
   "./webpack.config.shared.js"
 ))
 
@@ -21,7 +21,6 @@ const insertHotReload = (host, port, entries) =>
 const devConfig = Object.assign({}, config, {
   context: __dirname,
   mode:    "development",
-  devtool: "inline-source-map",
   output:  {
     path:     path.resolve("./static/bundles/"),
     filename: "[name].js"
@@ -30,6 +29,7 @@ const devConfig = Object.assign({}, config, {
     new webpack.HotModuleReplacementPlugin(),
     new BundleTracker({ filename: "./webpack-stats.json" })
   ],
+  devtool:      "source-map",
   optimization: {
     namedModules: true,
     splitChunks:  {
@@ -41,6 +41,7 @@ const devConfig = Object.assign({}, config, {
 })
 
 devConfig.module.rules = [
+  babelSharedLoader,
   ...config.module.rules,
   {
     test: /\.css$|\.scss$/,

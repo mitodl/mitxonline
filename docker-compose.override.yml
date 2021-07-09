@@ -7,7 +7,7 @@ services:
     environment:
       DEBUG: 'True'
       NODE_ENV: 'development'
-      MITX_ONLINE_USE_WEBPACK_DEV_SERVER: 'True'
+      WEBPACK_USE_DEV_SERVER: 'True'
 
   celery:
     volumes:
@@ -16,7 +16,7 @@ services:
     environment:
       DEBUG: 'True'
       NODE_ENV: 'development'
-      MITX_ONLINE_USE_WEBPACK_DEV_SERVER: 'True'
+      WEBPACK_USE_DEV_SERVER: 'True'
 
   nginx:
     volumes:

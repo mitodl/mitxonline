@@ -1,23 +1,62 @@
-{% load static render_bundle js_interop %}
+{% load static hijack_tags render_bundle js_interop %}
 <!DOCTYPE html>
 <html lang="en">
   <head>
     {% spaceless %}
-    {% load static %}
+    {% block seohead %}
+    {% endblock %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" href="{% static 'images/favicon.ico' %}" />
+    {% include "partials/gtm_head.html" %}
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,600,700|Rajdhani:300,400,500,600,700&display=swap"
+          media="all" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons&display=swap"
+          media="none" onload="if(media!='all') media='all'">
     {% js_settings %}
     {% render_bundle 'style' %}
     <title>{% block title %}{% endblock %}</title>
     <meta name="description" content="{% block description %}{% endblock %}">
     <meta name="keywords" content="{% block keywords %}{% endblock %}">
+    {% if domain_verification_tag %}
+      <meta name="google-site-verification" content="{{ domain_verification_tag }}" />
+    {% endif %}
     {% block extrahead %}
     {% endblock %}
     {% endspaceless %}
   </head>
   <body class="{% block bodyclass %}{% endblock %}">
+  <div class="main-panel">
+    {% include "partials/gtm_body.html" %}
+    {% hijack_notification %}
+    {% block headercontent %}
+    {% endblock %}
     {% block content %}
+        {% block banner %}
+        {% endblock %}
+    {% endblock %}
+    {% block contact-us %}
+    {% endblock %}
+  </div>
+    {% block footer %}
+        {% include "footer.html" %}
+    {% endblock %}
+    {% render_bundle 'django' %}
+    {% block scripts %}
+      {# Script to defer youtube video rendering #}
+      <script type="text/javascript">
+        document.addEventListener('DOMContentLoaded', function () {
+          const iframes = Array.from(document.getElementsByTagName('iframe'));
+            iframes.forEach(function (iframe) {
+              const data_src = iframe.getAttribute('data-src')
+                /* Making sure that we only change attributes of those iframes that have youtube embed as a source url.
+                By replacing the src with data-src we let the iframe run the youtube scripts and load the video.*/
+              if (data_src && data_src.indexOf("youtube.com/embed") !== -1) {
+                iframe.setAttribute('src', data_src);
+              }
+          });
+        });
+        </script>
     {% endblock %}
   </body>
 </html>
