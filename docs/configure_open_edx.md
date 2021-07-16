@@ -1,14 +1,21 @@
-Configure Open edX
----
+# Configure Open edX
 
 In order to create user accounts in Open edX and permit authentication from mitX Online to Open edX, you need to configure mitX Online as an OAuth2 provider for Open edX.
 
+## Add `/etc/hosts` alias for Open edX
 
-#### Setup Open edX Devstack
+If one doesn't already exist, add an alias to `/etc/hosts` for Open edX. We have standardized this alias
+to `edx.odl.local`. Your `/etc/hosts` entry should look like this:
+
+```
+127.0.0.1       edx.odl.local
+```
+
+## Setup Open edX Devstack
 
 Following steps are inspired by [edx-devstack](https://github.com/edx/devstack).
 
-#### Clone edx/devstack
+### Clone edx/devstack
 
 ```
 $ git clone https://github.com/edx/devstack
@@ -19,60 +26,60 @@ $ export OPENEDX_RELEASE=ironwood.master
 $ make dev.clone
 ```
 
-#### Clone and checkout edx-platform (if not already).
+### Clone and checkout edx-platform (if not already).
 ```
 $ git clone https://github.com/mitodl/edx-platform
 $ git checkout xpro/ironwood
 ```
 
-#### Pull latest images and run provision
+### Pull latest images and run provision
 
 ```
 $ make pull
 $ make dev.provision
 ```
 
-#### Start your servers
+### Start your servers
 
 `make dev.up`
 
-#### Stop your servers
+### Stop your servers
 
 `make stop`
 
-### Setup social auth
+## Setup social auth
 
-#### Install `social-auth-mitxpro` in LMS
+### Install `social-auth-mitxpro` in LMS
 
 There are two options for this:
 
-##### Install via pip
+#### Install via pip
 
 - `pip install social-auth-mitxpro`
 
-##### Install from local Build
+#### Install from local Build
 
 - Checkout the [social-auth-mitxpro](https://github.com/mitodl/social-auth-mitxpro) project and build the package per the project instructions
 - Copy the `social-auth-mitxpro-$VERSION.tar.gz` file into devstack's `edx-platform` directory
 - In devstack, run `make lms-shell` and within that shell `pip install social-auth-mitxpro-$VERSION.tar.gz`
   - To update to a new development version without having to actually bump the package version, simply `pip uninstall social-auth-mitxpro`, then install again
 
-#### Install `mitxpro-openedx-extensions` in LMS
+### Install `mitxpro-openedx-extensions` in LMS
 
 There are two options for this:
 
-##### Install via pip
+#### Install via pip
 
 - `pip install mitxpro-openedx-extensions`
 
-##### Install from local Build
+#### Install from local Build
 
 - Checkout the [mitxpro-openedx-extensions](https://github.com/mitodl/mitxpro-openedx-extensions) project and build the package per the project instructions
 - Copy the `mitxpro-openedx-extensions-$VERSION.tar.gz` file into devstack's `edx-platform` directory
 - In devstack, run `make lms-shell` and within that shell `pip install mitxpro-openedx-extensions-$VERSION.tar.gz`
   - To update to a new development version without having to actually bump the package version, simply `pip uninstall -y mitxpro-openedx-extensions`, then install again
 
-#### Configure xPro as a OAuth provider for Open edX
+### Configure xPro as a OAuth provider for Open edX
 
 In xPro:
 
@@ -156,7 +163,7 @@ mitxpro-oauth2`
 
 
 
-#### Configure Open edX to support OAuth2 authentication from xPro
+### Configure Open edX to support OAuth2 authentication from xPro
 
   - In Open edX:
     - go to `/admin/oauth2_provider/application/` and verify that an application named 'edx-oauth-app' exists with these settings:
@@ -170,7 +177,7 @@ mitxpro-oauth2`
     - Set `OPENEDX_API_CLIENT_SECRET` to the client secret
 
 
-#### Configure Logout
+### Configure Logout
 
   - In Open edX, configure `settings.IDA_LOGOUT_URI_LIST` to be a list including the full url to `<protocol>://<hostname>[:<port>]/logout` in xPro
     - For devstack, this means modifying the value in `edx-platform/lms/envs/devstack.py` to include `http://xpro.odl.local:8053/logout`
@@ -181,6 +188,6 @@ mitxpro-oauth2`
       - For local development this will be `http://<EDX_HOSTNAME>:18000/logout`
 
 
-#### Configure Open edX user and token for use with xPro management commands
+### Configure Open edX user and token for use with xPro management commands
 
 - In Open edX, create a staff user and then under `/admin/oauth2_provider/accesstoken/` add access token. The value of said token needs to match the value set for the `OPENEDX_SERVICE_WORKER_API_TOKEN` key in the xPro app.
