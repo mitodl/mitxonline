@@ -1,20 +1,12 @@
 """
 Test end to end django views.
 """
-import json
-
 import pytest
 from django.urls import reverse
 
 pytestmark = [
     pytest.mark.django_db,
 ]
-
-
-def test_index_view(client):
-    """Verify the index view is as expected"""
-    response = client.get(reverse("main-index"))
-    assert response.status_code == 200
 
 
 def test_json_settings(mocker, settings, client):
@@ -26,7 +18,8 @@ def test_json_settings(mocker, settings, client):
 
     get_bundle = mocker.patch("mitol.common.templatetags.render_bundle._get_bundle")
 
-    response = client.get(reverse("main-index"))
+    # Use the login page just as an example of a page that should have bundles included
+    client.get(reverse("login"))
 
     bundles = [bundle[0][1] for bundle in get_bundle.call_args_list]
     assert set(bundles) == {
@@ -34,3 +27,12 @@ def test_json_settings(mocker, settings, client):
         "root",
         "style",
     }
+
+
+@pytest.mark.parametrize("url", ["/cms", "/cms/login"])
+def test_cms_signin_redirect_to_site_signin(client, url):
+    """
+    Test that the cms/login redirects users to site signin page.
+    """
+    response = client.get(url, follow=True)
+    assert response.request["PATH_INFO"] == "/signin/"

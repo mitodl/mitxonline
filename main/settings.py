@@ -139,22 +139,19 @@ INSTALLED_APPS = (
     "anymail",
     "django_filters",
     # WAGTAIL
-    # "wagtail.contrib.forms",
-    # "wagtail.contrib.redirects",
-    # "wagtail.contrib.table_block",
-    # "wagtail.contrib.routable_page",
-    # "wagtail.embeds",
-    # "wagtail.sites",
-    # "wagtail.users",
-    # "wagtail.snippets",
-    # "wagtail.documents",
-    # "wagtail.images",
-    # "wagtail.search",
-    # "wagtail.admin",
-    # "wagtail.core",
-    # "wagtailmetadata",
-    # "modelcluster",
-    # "taggit",
+    "wagtail.contrib.forms",
+    "wagtail.contrib.redirects",
+    "wagtail.embeds",
+    "wagtail.sites",
+    "wagtail.users",
+    "wagtail.snippets",
+    "wagtail.documents",
+    "wagtail.images",
+    "wagtail.search",
+    "wagtail.admin",
+    "wagtail.core",
+    "modelcluster",
+    "taggit",
     # django-robots
     "robots",
     # Put our apps after this point
@@ -163,7 +160,7 @@ INSTALLED_APPS = (
     # "courses",
     "mail.apps.MailApp",
     "users",
-    # "cms",
+    "cms",
     # "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
@@ -202,7 +199,7 @@ MIDDLEWARE = (
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
     "django_user_agents.middleware.UserAgentMiddleware",
-    # "wagtail.contrib.redirects.middleware.RedirectMiddleware",
+    "wagtail.contrib.redirects.middleware.RedirectMiddleware",
 )
 
 # enable the nplusone profiler only in debug mode

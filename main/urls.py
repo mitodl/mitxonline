@@ -15,11 +15,15 @@ Including another URLconf
 """
 from django.conf import settings
 from django.conf.urls import include
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, re_path
 from oauth2_provider.urls import base_urlpatterns
+from wagtail.admin import urls as wagtailadmin_urls
+from wagtail.core import urls as wagtail_urls
+from wagtail.documents import urls as wagtaildocs_urls
 
-from main.views import index
+from main.views import cms_signin_redirect_to_site_signin, index
 
 urlpatterns = [
     # NOTE: we only bring in base_urlpatterns so applications can only be created via django-admin
@@ -37,8 +41,6 @@ urlpatterns = [
     path("", include("users.urls")),
     # social django needs to be here to preempt the login
     path("", include("social_django.urls", namespace="social")),
-    # Example view
-    path("", index, name="main-index"),
     path("signin/", index, name="login"),
     path("signin/password/", index, name="login-password"),
     re_path(r"^signin/forgot-password/$", index, name="password-reset"),
@@ -56,7 +58,19 @@ urlpatterns = [
     path("account/inactive/", index, name="account-inactive"),
     path("account/confirm-email/", index, name="account-confirm-email-change"),
     re_path(r"^account-settings/", index, name="account-settings"),
-]
+    # Wagtail
+    re_path(
+        r"^cms/login", cms_signin_redirect_to_site_signin, name="wagtailadmin_login"
+    ),
+    re_path(r"^cms/", include(wagtailadmin_urls)),
+    re_path(r"^documents/", include(wagtaildocs_urls)),
+    path("", include(wagtail_urls)),
+    # Example view
+    path("", index, name="main-index"),
+] + (
+    static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+)
 
 if settings.DEBUG:
     import debug_toolbar  # pylint: disable=wrong-import-position, wrong-import-order
