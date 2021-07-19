@@ -1,4 +1,5 @@
 """User utils tests"""
+from email.utils import parseaddr
 from unittest.mock import patch
 
 import pytest
@@ -75,4 +76,6 @@ def test_ensure_active_user(mock_repair_faulty_edx_user, user):
 
 def test_format_recipient(user):
     """Verify that format_recipient correctly format's a user's name and email"""
-    assert format_recipient(user) == f"{user.name} <{user.email}>"
+    name, email = parseaddr(format_recipient(user))
+    assert name == user.name
+    assert email == user.email
