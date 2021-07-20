@@ -29,7 +29,7 @@ $ make dev.clone
 ### Clone and checkout edx-platform (if not already).
 ```
 $ git clone https://github.com/mitodl/edx-platform
-$ git checkout xpro/ironwood
+$ git checkout master
 ```
 
 ### Pull latest images and run provision
@@ -79,9 +79,9 @@ There are two options for this:
 - In devstack, run `make lms-shell` and within that shell `pip install mitxpro-openedx-extensions-$VERSION.tar.gz`
   - To update to a new development version without having to actually bump the package version, simply `pip uninstall -y mitxpro-openedx-extensions`, then install again
 
-### Configure xPro as a OAuth provider for Open edX
+### Configure mitX Online as a OAuth provider for Open edX
 
-In xPro:
+In mitX Online:
 
 - go to `/admin/oauth2_provider/application/` and create a new application with these settings selected:
   - `Redirect uris`: `http://<EDX_HOSTNAME>:18000/auth/complete/mitxpro-oauth2/`
@@ -90,7 +90,7 @@ In xPro:
     http://edx.odl.local:18000/auth/complete/mitxpro-oauth2/
     http://host.docker.internal:18000/auth/complete/mitxpro-oauth2/
     ```
-    - _[Linux users]_ You will need redirect uris for both the local edX host alias and for the gateway IP of the docker-compose networking setup for xPro as found via `docker network inspect mitx-online_default`
+    - _[Linux users]_ You will need redirect uris for both the local edX host alias and for the gateway IP of the docker-compose networking setup for mitX Online as found via `docker network inspect mitx-online_default`
     ```shell
     http://edx.odl.local:18000/auth/complete/mitxpro-oauth2/
     http://<GATEWAY_IP>:18000/auth/complete/mitxpro-oauth2/
@@ -132,7 +132,7 @@ In Open edX (derived from instructions [here](https://edx.readthedocs.io/project
     {
       ...
       "SOCIAL_AUTH_OAUTH_SECRETS": {
-        "mitxpro-oauth2": "<xpro_application_client_secret>"
+        "mitxpro-oauth2": "<mitx_online_application_client_secret>"
       },
       ...
     }
@@ -142,7 +142,7 @@ In Open edX (derived from instructions [here](https://edx.readthedocs.io/project
   - Select the default example site
   - The slug field **MUST** match the `Backend.name`, which for us is `
 mitxpro-oauth2`
-  - Client Id should be the client id from the xPro Django Oauth Toolkit Application
+  - Client Id should be the client id from the mitX Online Django Oauth Toolkit Application
   - Check the following checkboxes:
     - Skip hinted login dialog
     - Skip registration form
@@ -151,43 +151,43 @@ mitxpro-oauth2`
   - In "Other settings", put:
     ```
     {
-        "AUTHORIZATION_URL": "http://<LOCAL_XPRO_ALIAS>:8053/oauth2/authorize/",
-        "ACCESS_TOKEN_URL": "http://<EXTERNAL_XPRO_HOST>:8053/oauth2/token/",
-        "API_ROOT": "http://<EXTERNAL_XPRO_HOST>:8053/"
+        "AUTHORIZATION_URL": "http://<LOCAL_MITX_ONLINE_ALIAS>:8053/oauth2/authorize/",
+        "ACCESS_TOKEN_URL": "http://<EXTERNAL_MITX_ONLINE_HOST>:8053/oauth2/token/",
+        "API_ROOT": "http://<EXTERNAL_MITX_ONLINE_HOST>:8053/"
     }
     ```
-    - `LOCAL_XPRO_ALIAS` should be your `/etc/hosts` alias for the mitxpro app
-    - `EXTERNAL_XPRO_HOST` will depend on your OS, but it needs to be resolvable within the edx container
-          - Linux users: The gateway IP of the docker-compose networking setup for xPro as found via `docker network inspect mitx-online_default`
+    - `LOCAL_MITX_ONLINE_ALIAS` should be your `/etc/hosts` alias for the mitxonline app
+    - `EXTERNAL_XMITX_ONLINE_HOST` will depend on your OS, but it needs to be resolvable within the edx container
+          - Linux users: The gateway IP of the docker-compose networking setup for mitxonline as found via `docker network inspect mitx-online_default`
         - OSX users: Use `host.docker.internal`
 
 
 
-### Configure Open edX to support OAuth2 authentication from xPro
+### Configure Open edX to support OAuth2 authentication from mitX Online
 
   - In Open edX:
     - go to `/admin/oauth2_provider/application/` and verify that an application named 'edx-oauth-app' exists with these settings:
-      - `Redirect uris`: `http://xpro.odl.local:8053/login/_private/complete`
+      - `Redirect uris`: `http://mitxonline.odl.local:8053/login/_private/complete`
       - `Client type`: "Confidential"
       - `Authorization grant type`: "Authorization code"
       - `Skip authorization`: checked
       - Other values are arbitrary but be sure to fill them all out. Save the client id and secret for later
-  - In xPro:
+  - In mitX Online:
     - Set `OPENEDX_API_CLIENT_ID` to the client id
     - Set `OPENEDX_API_CLIENT_SECRET` to the client secret
 
 
 ### Configure Logout
 
-  - In Open edX, configure `settings.IDA_LOGOUT_URI_LIST` to be a list including the full url to `<protocol>://<hostname>[:<port>]/logout` in xPro
-    - For devstack, this means modifying the value in `edx-platform/lms/envs/devstack.py` to include `http://xpro.odl.local:8053/logout`
+  - In Open edX, configure `settings.IDA_LOGOUT_URI_LIST` to be a list including the full url to `<protocol>://<hostname>[:<port>]/logout` in mitX Online
+    - For devstack, this means modifying the value in `edx-platform/lms/envs/devstack.py` to include `http://mitxonline.odl.local:8053/logout`
     - For production, this setting can go in `lms.env.json` under the key `IDA_LOGOUT_URI_LIST` as a JSON array of with that string in it
 
-  - xPro:
+  - mitX Online:
     - Set `LOGOUT_REDIRECT_URL` to the full path to the edx `/logout` view.
       - For local development this will be `http://<EDX_HOSTNAME>:18000/logout`
 
 
-### Configure Open edX user and token for use with xPro management commands
+### Configure Open edX user and token for use with mitX Online management commands
 
-- In Open edX, create a staff user and then under `/admin/oauth2_provider/accesstoken/` add access token. The value of said token needs to match the value set for the `OPENEDX_SERVICE_WORKER_API_TOKEN` key in the xPro app.
+- In Open edX, create a staff user and then under `/admin/oauth2_provider/accesstoken/` add access token. The value of said token needs to match the value set for the `OPENEDX_SERVICE_WORKER_API_TOKEN` key in the mitX Online app.
