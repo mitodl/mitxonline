@@ -9,6 +9,7 @@ import pytest
 import pytz
 from django.contrib.auth.models import AnonymousUser
 
+from cms.factories import CoursePageFactory
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -144,6 +145,29 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
             "topics": [{"name": topic}],
         },
     )
+
+
+def test_serialize_course_with_page_fields(mocker, mock_context):
+    """ """
+    fake_image_src = "http://example.com/my.img"
+    patched_get_wagtail_src = mocker.patch(
+        "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
+    )
+    course_page = CoursePageFactory.create()
+    course = course_page.course
+    data = BaseCourseSerializer(
+        instance=course, context={**mock_context, "include_page_fields": True}
+    ).data
+    assert_drf_json_equal(
+        data,
+        {
+            "title": course.title,
+            "readable_id": course.readable_id,
+            "id": course.id,
+            "feature_image_src": fake_image_src,
+        },
+    )
+    patched_get_wagtail_src.assert_called_once_with(course_page.feature_image)
 
 
 def test_serialize_course_run():

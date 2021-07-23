@@ -1,7 +1,7 @@
 // @flow
 import { assert } from "chai"
 
-import enrollment from "./enrollment"
+import { enrollmentsSelector } from "./enrollment"
 
 describe("enrollment reducers", () => {
   describe("enrollmentsSelector", () => {
@@ -10,7 +10,7 @@ describe("enrollment reducers", () => {
         key: "value"
       }
       assert.equal(
-        enrollment.enrollmentsSelector({ entities: { enrollments } }),
+        enrollmentsSelector({ entities: { enrollments } }),
         enrollments
       )
     })

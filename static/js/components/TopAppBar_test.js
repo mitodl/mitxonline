@@ -38,29 +38,8 @@ describe("TopAppBar component", () => {
           .exists()
       )
     })
-
-    it("does not have a login/register on ecommerce bulk page", () => {
-      const location = { pathname: "/ecommerce/bulk/", hash: "", search: "" }
-      const wrapper = shallow(
-        <TopAppBar currentUser={user} location={location} />
-      )
-      assert.isNotOk(wrapper.find("UserMenu").exists())
-      assert.isNotOk(wrapper.find("MixedLink").exists())
-    })
-
-    it("does not have a login/register on ecommerce bulk receipt page", () => {
-      const location = {
-        pathname: "/ecommerce/bulk/receipt/",
-        hash:     "",
-        search:   ""
-      }
-      const wrapper = shallow(
-        <TopAppBar currentUser={user} location={location} />
-      )
-      assert.isNotOk(wrapper.find("UserMenu").exists())
-      assert.isNotOk(wrapper.find("MixedLink").exists())
-    })
   })
+
   describe("for logged in users", () => {
     const user = makeUser()
 
@@ -80,34 +59,12 @@ describe("TopAppBar component", () => {
       )
     })
 
-    it("does not have MixedLink's for login/registration", () => {
+    it("does not have MixedLinks for login/registration", () => {
       assert.isNotOk(
         shallow(<TopAppBar currentUser={user} location={null} />)
           .find("MixedLink")
           .exists()
       )
-    })
-
-    it("does not have a login/register on ecommerce bulk page", () => {
-      const location = { pathname: "/ecommerce/bulk/", hash: "", search: "" }
-      const wrapper = shallow(
-        <TopAppBar currentUser={user} location={location} />
-      )
-      assert.isNotOk(wrapper.find("UserMenu").exists())
-      assert.isNotOk(wrapper.find("MixedLink").exists())
-    })
-
-    it("does not have a login/register on ecommerce bulk receipt page", () => {
-      const location = {
-        pathname: "/ecommerce/bulk/receipt/",
-        hash:     "",
-        search:   ""
-      }
-      const wrapper = shallow(
-        <TopAppBar currentUser={user} location={location} />
-      )
-      assert.isNotOk(wrapper.find("UserMenu").exists())
-      assert.isNotOk(wrapper.find("MixedLink").exists())
     })
   })
 })

@@ -1,5 +1,5 @@
 """Course views verson 1"""
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, generics
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from courses.api import get_user_enrollments
-from courses.models import Course, CourseRun, Program
+from courses.models import Course, CourseRun, Program, CourseRunEnrollment
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
     CourseRunSerializer,
@@ -42,46 +42,18 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = CourseRun.objects.all()
 
 
-class UserEnrollmentsView(APIView):
-    """
-    View for user program/course enrollments
-    """
+class UserEnrollmentsView(generics.ListAPIView):
+    """API view for user enrollments"""
 
-    authentication_classes = (SessionAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    serializer_class = CourseRunEnrollmentSerializer
+    permission_classes = [IsAuthenticated]
 
-    def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
-        """Read-only access"""
-        user = request.user
-        user_enrollments = get_user_enrollments(user)
-        program_runs = list(user_enrollments.program_runs)
-
-        return Response(
-            status=status.HTTP_200_OK,
-            data={
-                "program_enrollments": self._serialize_program_enrollments(
-                    user_enrollments.programs, program_runs
-                ),
-                "course_run_enrollments": self._serialize_course_enrollments(
-                    user_enrollments.non_program_runs
-                ),
-                "past_course_run_enrollments": self._serialize_course_enrollments(
-                    user_enrollments.past_non_program_runs
-                ),
-                "past_program_enrollments": self._serialize_program_enrollments(
-                    user_enrollments.past_programs, program_runs
-                ),
-            },
+    def get_queryset(self):
+        return (
+            CourseRunEnrollment.objects.filter(user=self.request.user)
+            .select_related("run__course__page")
+            .all()
         )
 
-    def _serialize_course_enrollments(self, enrollments):
-        """Helper method to serialize course enrollments"""
-
-        return CourseRunEnrollmentSerializer(enrollments, many=True).data
-
-    def _serialize_program_enrollments(self, programs, program_runs):
-        """helper method to serialize program enrollments"""
-
-        return ProgramEnrollmentSerializer(
-            programs, many=True, context={"course_run_enrollments": list(program_runs)}
-        ).data
+    def get_serializer_context(self):
+        return {"include_page_fields": True}

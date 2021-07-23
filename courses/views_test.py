@@ -19,7 +19,13 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
-from courses.serializers import CourseRunSerializer, CourseSerializer, ProgramSerializer
+from courses.serializers import (
+    CourseRunSerializer,
+    CourseSerializer,
+    ProgramSerializer,
+    CourseRunEnrollmentSerializer,
+)
+from courses.views.v1 import UserEnrollmentsView
 from main.test_utils import assert_drf_json_equal
 
 pytestmark = [pytest.mark.django_db]
@@ -28,10 +34,7 @@ pytestmark = [pytest.mark.django_db]
 @pytest.fixture()
 def programs():
     """Fixture for a set of Programs in the database"""
-    programs = ProgramFactory.create_batch(3)
-    # for program in programs:
-    #     ProductVersionFactory.create(product=ProductFactory(content_object=program))
-    return programs
+    return ProgramFactory.create_batch(3)
 
 
 @pytest.fixture()
@@ -240,4 +243,21 @@ def test_course_runs_not_live_in_courses_api(client, live):
     assert resp.status_code == status.HTTP_200_OK
     assert_drf_json_equal(
         resp.json()[0]["courseruns"], [CourseRunSerializer(run).data] if live else []
+    )
+
+
+def test_user_enrollments_list(user_drf_client, user):
+    """The user enrollments view should return serialized enrollments for the logged-in user"""
+    assert UserEnrollmentsView.serializer_class == CourseRunEnrollmentSerializer
+    user_run_enrollment = CourseRunEnrollmentFactory.create(user=user)
+    CourseRunEnrollmentFactory.create()
+    resp = user_drf_client.get(reverse("user-enrollments"))
+    assert resp.status_code == status.HTTP_200_OK
+    assert_drf_json_equal(
+        resp.json(),
+        [
+            CourseRunEnrollmentSerializer(
+                user_run_enrollment, context={"include_page_fields": True}
+            ).data
+        ],
     )

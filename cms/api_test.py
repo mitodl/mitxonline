@@ -3,7 +3,8 @@ import pytest
 from django.contrib.contenttypes.models import ContentType
 from wagtail.core.models import Page
 
-from cms.api import ensure_home_page_and_site
+from cms.api import ensure_home_page_and_site, get_wagtail_img_src
+from cms.factories import HomePageFactory
 from cms.models import HomePage
 
 
@@ -28,3 +29,16 @@ def test_ensure_home_page_and_site():
     home_page_parents = home_page.get_ancestors()
     assert home_page_parents.count() == 1
     assert home_page_parents.first().is_root() is True
+
+
+@pytest.mark.django_db
+def test_get_wagtail_img_src(settings):
+    """get_wagtail_img_src should return the correct image URL"""
+    settings.MEDIA_URL = "/mediatest/"
+    img_path = "/path/to/my-image.jpg"
+    img_hash = "abc123"
+    home_page = HomePageFactory.build(
+        hero__file__filename=img_path, hero__file_hash=img_hash
+    )
+    img_src = get_wagtail_img_src(home_page.hero)
+    assert img_src == f"{img_path}?v={img_hash}"

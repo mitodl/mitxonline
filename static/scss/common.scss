@@ -1,13 +1,11 @@
 body {
-  line-height: 28px;
-  font-size: 20px;
-  font-weight: 500;
+  font-size: 16px;
 }
 
 h1 {
-  font-size: 40px;
-  line-height: 44px;
-  font-weight: 600;
+  font-size: 48px;
+  font-weight: bold;
+  margin: 15px 0;
 }
 
 h2 {
@@ -23,9 +21,8 @@ h3 {
 }
 
 h4 {
-  font-size: 18px;
-  line-height: 24px;
-  font-weight: 500;
+  font-size: 20px;
+  font-weight: 600;
 }
 
 a.link-button {
@@ -116,6 +113,12 @@ a.link-button {
     text-align: center;
     color: white;
   }
+}
+
+.card {
+  background-color: #ffffff;
+  border: 0;
+  box-shadow: 0 1px 0 0 rgba(0,0,0,0.23);
 }
 
 .card-shadow {

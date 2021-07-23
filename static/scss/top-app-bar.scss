@@ -1,7 +1,7 @@
 // sass-lint:disable mixins-before-declarations
 
 .header-holder {
-  padding: 20px 0px;
+  padding: 20px 1px;
 
   @include media-breakpoint-down(md) {
     max-width: 100%;
@@ -78,30 +78,6 @@
 .site-logo {
   width: 154px;
   height: 47.5px;
-}
-
-.navbar-brand {
-  position: relative;
-
-  .mit-link, .mitx-online-link {
-    position: absolute;
-    z-index: 2;
-    opacity: .5;
-  }
-
-  .mit-link {
-    left: 0;
-    top: 11px;
-    width: 64px;
-    height: 35px;
-  }
-
-  .mitx-online-link {
-    left: 93px;
-    top: 19px;
-    width: 60px;
-    height: 21px;
-  }
 }
 
 .navbar-toggler.nav-opener {

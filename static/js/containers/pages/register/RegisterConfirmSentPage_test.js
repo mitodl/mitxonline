@@ -57,9 +57,4 @@ describe("RegisterConfirmSentPage", () => {
       userEmail
     )
   })
-
-  it("displays a link to course catalog page", async () => {
-    const { inner } = await renderPage()
-    assert.equal(inner.find(".browse-courses > a").prop("href"), routes.catalog)
-  })
 })
