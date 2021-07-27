@@ -4,6 +4,7 @@ from wagtail.admin.edit_handlers import FieldPanel
 from wagtail.core.fields import RichTextField
 from wagtail.core.models import Page
 from wagtail.images.models import Image
+from wagtail.images.edit_handlers import ImageChooserPanel
 
 
 class HomePage(Page):
@@ -19,11 +20,26 @@ class HomePage(Page):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
-        help_text="Main image displayed at the top of the home page.",
+        help_text="Main image displayed at the top of the home page. (The recommended dimensions for hero image are "
+        "1920x400)",
+    )
+    hero_title = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="The title text to display in the hero section of the home page.",
+    )
+    hero_subtitle = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="The subtitle text to display in the hero section of the home page.",
     )
 
     content_panels = Page.content_panels + [
-        FieldPanel("hero"),
+        ImageChooserPanel("hero"),
+        FieldPanel("hero_title"),
+        FieldPanel("hero_subtitle"),
     ]
     parent_page_types = [Page]
     subpage_types = [

@@ -1,0 +1,61 @@
+// sass-lint:disable mixins-before-declarations
+
+.hero-content {
+  position: relative;
+}
+
+.hero-title {
+  background: rgba(black, 0.83);
+  max-width: 580px;
+
+  @include media-breakpoint-down(sm) {
+    max-width: 255px;
+  }
+
+  h1 {
+    color: white;
+    font-weight: 600;
+    font-family: Montserrat;
+    letter-spacing: 0;
+    font-size: 48px;
+    line-height: 48px;
+    padding: 40px 25px 12px 40px;
+
+    @include media-breakpoint-down(sm) {
+      font-size: 18px;
+      line-height: 18px;
+      padding: 22px 22px 0 22px;
+    }
+  }
+
+  h2 {
+    color: $subtitle-color;
+    font-family: Montserrat;
+    font-weight: 600;
+    letter-spacing: 0;
+    font-size: 36px;
+    line-height: 44px;
+    padding: 0 49px 26px 40px;
+
+    @include media-breakpoint-down(sm) {
+      font-size: 16px;
+      padding: 0 7px 18px 22px;
+      line-height: 24px;
+    }
+  }
+}
+
+.hero-container {
+  position: relative;
+  min-height: 400px;
+  padding-top: 50px;
+  padding-bottom: 50px;
+  display: flex;
+  align-items: flex-end;
+
+  @include media-breakpoint-down(sm) {
+    min-height: 210px;
+    padding-bottom: 28px;
+    padding-top: 28px;
+  }
+}

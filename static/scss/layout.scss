@@ -16,9 +16,10 @@
 @import "error";
 @import "expandable";
 @import "dashboard";
+@import "header";
 
 body {
-  font-family: Muli, "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: Montserrat, "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
   margin: 0;
   color: #000000;
   background: linear-gradient(#ffffff, #f5f5f5);
@@ -37,5 +38,10 @@ body {
         width: 100% !important;
       }
     }
+  }
+
+  .hero-background {
+    background-size: cover;
+    background-position: 50% 50%;
   }
 }
