@@ -16,34 +16,31 @@
 }
 
 .dropdown-menu {
-  background-color: $white-smoke;
-  box-shadow: -5px 5px 10px grey;
+  box-shadow: 0 2px 4px 0 rgba(0,0,0,0.5), 0 13px 11px 8px rgba(0,0,0,0.12);
   border-color: $white-smoke;
-  border-radius: 5px;
+  border-radius: 0px;
   right: 0px;
   left: unset;
-
-  .dropdown-divider {
-    border-top: 1px dashed $black;
-    margin: 16px 25px;
-  }
+  padding: 20px 25px;
+  margin-top: 22px;
 
   .dropdown-item {
     display: flex;
-    margin-top: 10px;
     align-items: center;
     font-family: Roboto;
     font-size: 14px;
     font-weight: 500;
     color: $black;
     line-height: 14px;
+    padding: 7px 0px;
 
     .dropdown-icon {
       margin-right: 20px;
     }
 
-    &:active {
-      background-color: $soft-light-gray;
+    &:active,
+    &:hover {
+      background-color: white;
     }
 
   }
@@ -58,9 +55,32 @@
   padding-left: 15px;
   padding-right: 15px;
 
+  &.show {
+    color: $primary;
+
+    .dropdown-toggle::after {
+      border-color: $primary;
+      transform: rotate(45deg);
+      margin-top: 5px;
+    }
+  }
+
   .dropdown-toggle {
     max-width: 100%;
     padding: 0px;
+
+    &:after {
+      border: 2px;
+      border-top: 2px solid black;
+      border-left: 2px solid black;
+      width: 10px;
+      height: 10px;
+      transform: rotate(225deg);
+      margin-left: 10px;
+      margin-top: -5px;
+      display: inline-block;
+      vertical-align: middle;
+    }
 
     &:hover {
       cursor: pointer;
