@@ -11,7 +11,11 @@ from wagtail.core.models import Page, Site
 from cms import models as cms_models
 
 log = logging.getLogger(__name__)
-DEFAULT_HOMEPAGE_PROPS = dict(title="Home Page")
+DEFAULT_HOMEPAGE_PROPS = dict(
+    title="Home Page",
+    hero_title="Lorem ipsum dolor",
+    hero_subtitle="Enim ad minim veniam, quis nostrud exercitation",
+)
 DEFAULT_SITE_PROPS = dict(hostname="localhost", port=80)
 
 
