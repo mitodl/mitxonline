@@ -50,6 +50,11 @@
 }
 
 .user-menu.dropdown {
+
+  @include media-breakpoint-down(sm) {
+    display: none;
+  }
+
   padding-left: 15px;
   padding-right: 15px;
 
