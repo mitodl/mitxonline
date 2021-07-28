@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% load static wagtail_img_src render_bundle %}
+{% load wagtailcore_tags wagtailembeds_tags %}
 
 {% block title %}{{ site_name }}{% endblock %}
 
@@ -10,16 +11,31 @@
 {% endblock %}
 
 {% block content %}
-    <div class="hero-container" style="background-image: url('{% wagtail_img_src page.hero%}')">
-      <div class="container hero-content">
-        <div class="hero-title">
-          {% if page.hero_title %}
-            <h1>{{ page.hero_title }}</h1>
-          {% endif %}
-          {% if page.hero_subtitle %}
-            <h2>{{ page.hero_subtitle }}</h2>
-          {% endif %}
+<div class="course-section">
+  <div class="container">
+    {% if product_cards_section_title %}
+      <h1>{{ product_cards_section_title }}</h1>
+    {% endif %}
+    <ul class="course-listing">
+      {% for product in products %}
+      <li>
+        <div class="course-card">
+          <img src="{% wagtail_img_src product.feature_image %}" alt="Featured course image">
+          <div class="course-info">
+            <h2 class="course-card-title">{{ product.title }}</h2>
+            <div class="course-card-description">
+              {{ product.description |richtext }}
+            </div>
+            {% if product.start_date %}
+              <span class="date">
+                Start date: {{ product.start_date | date:"F j, Y" }}
+              </span>
+            {% endif %}
+          </div>
         </div>
-      </div>
-    </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
 {% endblock %}
