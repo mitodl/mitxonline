@@ -7,6 +7,7 @@ from django.conf import settings
 from django.templatetags.static import static
 from rest_framework import serializers
 
+from cms.serializers import CoursePageSerializer
 from courses import models
 
 
@@ -34,6 +35,12 @@ def _get_thumbnail_url(page):
 
 class BaseCourseSerializer(serializers.ModelSerializer):
     """Basic course model serializer"""
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not self.context.get("include_page_fields") or not hasattr(instance, "page"):
+            return data
+        return {**data, **CoursePageSerializer(instance=instance.page).data}
 
     class Meta:
         model = models.Course
@@ -119,7 +126,7 @@ class CourseSerializer(serializers.ModelSerializer):
 class CourseRunDetailSerializer(serializers.ModelSerializer):
     """CourseRun model serializer - also serializes the parent Course"""
 
-    course = BaseCourseSerializer(read_only=True)
+    course = BaseCourseSerializer(read_only=True, context={"include_page_fields": True})
 
     class Meta:
         model = models.CourseRun

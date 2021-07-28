@@ -18,6 +18,7 @@ import LoginPages from "./pages/login/LoginPages"
 import RegisterPages from "./pages/register/RegisterPages"
 import AccountSettingsPage from "./pages/settings/AccountSettingsPage"
 import EmailConfirmPage from "./pages/settings/EmailConfirmPage"
+import DashboardPage from "./pages/DashboardPage"
 
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
@@ -40,24 +41,30 @@ export class App extends React.Component<Props, void> {
     return (
       <div className="app">
         <Header currentUser={currentUser} location={location} />
-        <Switch>
-          <Route
-            path={urljoin(match.url, String(routes.login))}
-            component={LoginPages}
-          />
-          <Route
-            path={urljoin(match.url, String(routes.register))}
-            component={RegisterPages}
-          />
-          <PrivateRoute
-            path={urljoin(match.url, String(routes.accountSettings))}
-            component={AccountSettingsPage}
-          />
-          <Route
-            path={urljoin(match.url, String(routes.account.confirmEmail))}
-            component={EmailConfirmPage}
-          />
-        </Switch>
+        <div className="main-page-content">
+          <Switch>
+            <Route
+              path={urljoin(match.url, String(routes.login))}
+              component={LoginPages}
+            />
+            <Route
+              path={urljoin(match.url, String(routes.register))}
+              component={RegisterPages}
+            />
+            <PrivateRoute
+              path={urljoin(match.url, String(routes.accountSettings))}
+              component={AccountSettingsPage}
+            />
+            <Route
+              path={urljoin(match.url, String(routes.account.confirmEmail))}
+              component={EmailConfirmPage}
+            />
+            <Route
+              path={urljoin(match.url, String(routes.dashboard))}
+              component={DashboardPage}
+            />
+          </Switch>
+        </div>
       </div>
     )
   }

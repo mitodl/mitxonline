@@ -14,13 +14,6 @@ type Props = {
   location: ?Location
 }
 
-const shouldShowLoginSignup = location =>
-  !location ||
-  !(
-    location.pathname === routes.ecommerceBulk.bulkPurchase ||
-    location.pathname === routes.ecommerceBulk.receipt
-  )
-
 const TopAppBar = ({ currentUser, location }: Props) => (
   <header className="header-holder">
     <div className="container">
@@ -60,34 +53,32 @@ const TopAppBar = ({ currentUser, location }: Props) => (
             currentUser.is_authenticated ? "" : "collapse"
           } navbar-collapse px-0 justify-content-end`}
         >
-          {shouldShowLoginSignup(location) ? (
-            currentUser.is_authenticated ? (
+          {currentUser.is_authenticated ? (
+            <li>
+              <UserMenu currentUser={currentUser} />
+            </li>
+          ) : (
+            <React.Fragment>
               <li>
-                <UserMenu currentUser={currentUser} />
+                <MixedLink
+                  dest={routes.login.begin}
+                  className="button"
+                  aria-label="Login"
+                >
+                  Sign In
+                </MixedLink>
               </li>
-            ) : (
-              <React.Fragment>
-                <li>
-                  <MixedLink
-                    dest={routes.login.begin}
-                    className="button"
-                    aria-label="Login"
-                  >
-                    Sign In
-                  </MixedLink>
-                </li>
-                <li>
-                  <MixedLink
-                    dest={routes.register.begin}
-                    className="button"
-                    aria-label="Login"
-                  >
-                    Create Account
-                  </MixedLink>
-                </li>
-              </React.Fragment>
-            )
-          ) : null}
+              <li>
+                <MixedLink
+                  dest={routes.register.begin}
+                  className="button"
+                  aria-label="Login"
+                >
+                  Create Account
+                </MixedLink>
+              </li>
+            </React.Fragment>
+          )}
         </ul>
       </nav>
     </div>

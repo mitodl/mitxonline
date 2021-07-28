@@ -1,0 +1,40 @@
+// sass-lint:disable mixins-before-declarations
+
+$featureImgWidth: 120px;
+$featureImgMobileWidth: 343px;
+
+.enrolled-items {
+  .card {
+    display: flex;
+    flex-direction: row;
+
+    h4 a {
+      text-decoration: underline;
+    }
+
+    .img-col {
+      min-width: $featureImgWidth;
+
+      @include media-breakpoint-down(xs)  {
+        min-width: inherit;
+      }
+    }
+
+    img {
+      width: $featureImgWidth;
+
+      @include media-breakpoint-down(xs)  {
+        width: inherit;
+        max-width: $featureImgMobileWidth;
+      }
+    }
+
+    .detail {
+      color: $gray;
+
+      strong {
+        color: $primary;
+      }
+    }
+  }
+}

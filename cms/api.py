@@ -1,6 +1,8 @@
 """API functionality for the CMS app"""
 import logging
+from urllib.parse import urljoin, urlencode
 
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from wagtail.core.models import Page, Site
 
@@ -50,3 +52,15 @@ def ensure_home_page_and_site():
     ).first()
     if wagtail_default_home_page is not None:
         wagtail_default_home_page.delete()
+
+
+def get_wagtail_img_src(image_obj):
+    """Returns the image source URL for a Wagtail Image object"""
+    return (
+        "{url}?{qs}".format(
+            url=urljoin(settings.MEDIA_URL, image_obj.file.name),
+            qs=urlencode({"v": image_obj.file_hash}),
+        )
+        if image_obj
+        else ""
+    )

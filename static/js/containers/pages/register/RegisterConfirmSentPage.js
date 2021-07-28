@@ -62,9 +62,6 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
                 {` ${SETTINGS.site_name} Customer Support Center`}.
               </a>
             </div>
-            <div className="browse-courses text-right">
-              <a href={routes.catalog}>Browse courses</a>
-            </div>
           </div>
         </div>
       </DocumentTitle>

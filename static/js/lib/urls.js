@@ -4,14 +4,8 @@ import qs from "query-string"
 
 export const getNextParam = (search: string) => qs.parse(search).next || "/"
 
-export const bulkReceiptCsvUrl = (hash: string) =>
-  `/api/b2b/orders/${hash}/codes/`
-export const bulkAssignmentCsvUrl = (bulkEnrollmentId: number) =>
-  `/api/bulk_assignments/${bulkEnrollmentId}/`
-
 export const routes = {
   root:            "/",
-  catalog:         "/catalog/",
   dashboard:       "/dashboard/",
   accountSettings: "/account-settings/",
   logout:          "/logout/",
@@ -40,20 +34,6 @@ export const routes = {
     view:   "",
     update: "edit/"
   }),
-
-  checkout: "/checkout/",
-
-  ecommerceAdmin: include("/ecommerce/admin/", {
-    index:      "",
-    bulkEnroll: "enroll/",
-    coupons:    "coupons/"
-  }),
-
-  ecommerceBulk: include("/ecommerce/bulk/", {
-    bulkPurchase: "",
-    receipt:      "receipt/"
-  }),
-  receipt: "receipt/:orderId/",
 
   account: include("/account/", {
     confirmEmail: "confirm-email"

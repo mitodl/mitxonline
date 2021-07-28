@@ -1,10 +1,11 @@
-FROM mitx_online_web
+FROM mitxonline_web
 
 USER root
 
 WORKDIR /tmp
 
 RUN pip install --force-reinstall jupyter
+
 
 USER mitodl
 WORKDIR /src
