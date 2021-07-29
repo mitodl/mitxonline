@@ -30,5 +30,12 @@ body {
 
   .main-panel {
     min-height: calc(100vh - 351px);
+
+    // TODO: temporary fix for home page iamge size, please remove it after home page design
+    p {
+      img {
+        width: 100% !important;
+      }
+    }
   }
 }
