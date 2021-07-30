@@ -1,14 +1,13 @@
 """CMS model definitions"""
-from django.conf import settings
 from django.db import models
-from wagtail.admin.edit_handlers import FieldPanel, StreamFieldPanel, PageChooserPanel
-from wagtail.core.fields import RichTextField
+from wagtail.admin.edit_handlers import FieldPanel, StreamFieldPanel
+from wagtail.core.blocks import StreamBlock
+from wagtail.core.fields import RichTextField, StreamField
 from wagtail.core.models import Page
 from wagtail.images.models import Image
 from wagtail.images.edit_handlers import ImageChooserPanel
-from wagtail.core.fields import StreamField
 
-from cms.blocks import ResourceBlock
+from cms.blocks import ResourceBlock, PriceBlock
 
 
 class HomePage(Page):
@@ -63,6 +62,39 @@ class ProductPage(Page):
     description = RichTextField(
         blank=True, help_text="The description shown on the product page"
     )
+
+    length = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="A short description indicating how long it takes to complete (e.g. '4 weeks').",
+    )
+
+    effort = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="A short description indicating how much effort is required (e.g. 1-3 hours per week).",
+    )
+
+    price = StreamField(
+        StreamBlock([("price_details", PriceBlock())], max_num=1),
+        blank=True,
+        help_text="Specify the product price details.",
+    )
+
+    prerequisites = RichTextField(
+        null=True,
+        blank=True,
+        help_text="A short description indicating prerequisites of this course.",
+    )
+
+    about = RichTextField(null=True, blank=True, help_text="About this course details.")
+
+    what_you_learn = RichTextField(
+        null=True, blank=True, help_text="What you will learn from this course."
+    )
+
     feature_image = models.ForeignKey(
         Image,
         null=True,
@@ -72,10 +104,14 @@ class ProductPage(Page):
         help_text="Image that will be used where the course is featured or linked.",
     )
 
-    template = "product_page.html"
-
     content_panels = Page.content_panels + [
         FieldPanel("description"),
+        FieldPanel("length"),
+        FieldPanel("effort"),
+        FieldPanel("price"),
+        FieldPanel("prerequisites"),
+        FieldPanel("about"),
+        FieldPanel("what_you_learn"),
         FieldPanel("feature_image"),
     ]
     parent_page_types = ["HomePage"]
@@ -90,6 +126,13 @@ class CoursePage(ProductPage):
     course = models.OneToOneField(
         "courses.Course", null=True, on_delete=models.SET_NULL, related_name="page"
     )
+
+    @property
+    def product(self):
+        """Gets the product associated with this page"""
+        return self.course
+
+    template = "product_page.html"
 
     content_panels = [FieldPanel("course")] + ProductPage.content_panels
 

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
-{% load static render_bundle %}
+{% load static render_bundle  %}
+{% load wagtailcore_tags wagtailembeds_tags %}
 
 {% block title %}{{ page.title }} | {{ site_name }}{% endblock %}
 
@@ -10,7 +11,72 @@
 {% endblock %}
 
 {% block content %}
-  <div class="course-catalog">
-    <h1>{{ page.title }}</h1>
-  </div>
+    <div id="wrapper">
+      <section class="hero-block">
+        <div class="container">
+          <div class="content-row">
+            <div class="content-col">
+              <div class="text">
+                <h1>{{ page.title }}</h1>
+                <p>{{ page.description |richtext }}</p>
+                <a href="#" class="btn btn-default">Enroll now</a>
+              </div>
+            </div>
+            <div class="content-col video">
+              <div class="video-holder">
+                <img src="{% static 'images/video.png' %}" alt="Video Holder">
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="info-block">
+        <div class="container">
+          <div class="stats-row">
+            <div class="stat-col">
+              <span class="title">start date</span>
+              <div class="text">
+                <strong>{{ page.product.first_unexpired_run.start_date|date:"F j, Y" }}</strong>
+              </div>
+            </div>
+            <div class="stat-col small">
+              <span class="title">length</span>
+              <div class="text">
+                <strong>{{ page.length }}</strong>
+              </div>
+            </div>
+            <div class="stat-col">
+              <span class="title">effort</span>
+              <div class="text">
+                <strong>{{ page.effort }}</strong>
+              </div>
+            </div>
+            <div class="stat-col small">
+              <span class="title">price</span>
+              <div class="text">
+                <strong><a target="_blank" href={{page.price.0.value.link}}>{{page.price.0.value.text}}</a></strong>
+              </div>
+            </div>  
+            <div class="stat-col large">
+              <span class="title">prerequisite</span>
+              <div class="text">
+                <div>{{ page.prerequisites | richtext }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="text-block">
+        <div class="container">
+          <div class="text-holder">
+            <div class="about-text">
+              <h2>About this course</h2>
+              <p>{{ page.about |richtext }}</p>
+            </div>
+            <h2>What you’ll learn</h2>
+            <p>{{ page.what_you_learn |richtext }}</p>
+          </div>
+        </div>
+      </section>
+    </div>
 {% endblock %}
