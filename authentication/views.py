@@ -169,7 +169,7 @@ class CustomPasswordResetEmail(DjoserPasswordResetEmail):
                 headers={"Reply-To": settings.MITX_ONLINE_REPLY_TO_ADDRESS},
             )
             msg.attach_alternative(html_body, "text/html")
-            send_messages([msg])
+            send_messages([msg], raise_errors=True)
 
     def get_context_data(self):
         """Adds base_url to the template context"""

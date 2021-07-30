@@ -17,6 +17,7 @@ import EmailForm from "../../../components/forms/EmailForm"
 
 import type { RouterHistory } from "react-router"
 import type { EmailFormValues } from "../../../components/forms/EmailForm"
+import { isSuccessResponse } from "../../../lib/util"
 
 type Props = {
   history: RouterHistory,
@@ -25,6 +26,7 @@ type Props = {
 
 type State = {
   forgotEmailSent: boolean,
+  isError: boolean,
   text: Object | null
 }
 
@@ -35,23 +37,44 @@ const passwordResetText = (email: string) => (
   </p>
 )
 
+const getCustomerSupportLayout = (isError: boolean) => {
+  return (
+    <div className="contact-support">
+      {isError ? (
+        <h3 className="error-label">
+          Sorry, there was an error sending the email.
+        </h3>
+      ) : (
+        <b>Still no password reset email? </b>
+      )}
+      Please {isError ? "try again or" : ""} contact our{" "}
+      {` ${SETTINGS.site_name} `}
+      <a href={`mailto:${SETTINGS.support_email}`}>Customer Support Center.</a>
+      <br />
+      <br />
+    </div>
+  )
+}
+
 export class LoginForgotPasswordPage extends React.Component<Props, State> {
   constructor(props: Props, state: State) {
     super(props, state)
-    this.state = { forgotEmailSent: false, text: null }
+    this.state = { forgotEmailSent: false, isError: false, text: null }
   }
+
   async onSubmit({ email }: EmailFormValues, { setSubmitting }: any) {
     const { forgotPassword, history } = this.props
 
     try {
-      await forgotPassword(email)
+      const resp = await forgotPassword(email)
+
       this.setState((state, props) => {
         return {
-          forgotEmailSent: true,
+          isError:         !isSuccessResponse(resp),
+          forgotEmailSent: isSuccessResponse(resp),
           text:            passwordResetText(email)
         }
       })
-
       history.push(routes.login.forgot)
     } finally {
       setSubmitting(false)
@@ -61,6 +84,7 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
   resetEmailLinkSent() {
     this.setState({
       forgotEmailSent: false,
+      isError:         false,
       text:            null
     })
   }
@@ -74,7 +98,12 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
           <div className="auth-header">
             <h1>Forgot Password</h1>
           </div>
-          {this.state.forgotEmailSent ? (
+          {this.state.isError ? (
+            <div className="auth-card card-shadow auth-form">
+              {getCustomerSupportLayout(true)}
+              <EmailForm onSubmit={this.onSubmit.bind(this)} />
+            </div>
+          ) : this.state.forgotEmailSent ? (
             <div className="card-shadow confirm-sent-page">
               <h3 className="text-center">Thank You!</h3>
               {this.state.text}
@@ -104,13 +133,7 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
                   again.
                 </li>
               </ol>
-              <div className="contact-support">
-                <b>Still no password reset email? </b>
-                Please contact our {` ${SETTINGS.site_name} `}
-                <a href={`mailto:${SETTINGS.support_email}`}>
-                  Customer Support Center.
-                </a>
-              </div>
+              {getCustomerSupportLayout(false)}
             </div>
           ) : (
             <div className="auth-card card-shadow auth-form">
