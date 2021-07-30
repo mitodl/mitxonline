@@ -6,7 +6,7 @@ from django.shortcuts import render
 from django.urls import reverse
 
 
-def index(request):
+def index(request, **kwargs):
     """
     The index view. Display available programs
     """

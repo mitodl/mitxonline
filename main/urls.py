@@ -47,7 +47,7 @@ urlpatterns = [
     path("signin/password/", index, name="login-password"),
     re_path(r"^signin/forgot-password/$", index, name="password-reset"),
     re_path(
-        r"^signin/forgot-password/confirm/(?P<uid>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,20})/$",
+        r"^signin/forgot-password/confirm/(?P<uid>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,32})/$",
         index,
         name="password-reset-confirm",
     ),

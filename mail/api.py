@@ -31,7 +31,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.template.loader import render_to_string
 
-from mail.exceptions import MultiEmailValidationError
+from mail.exceptions import MultiEmailValidationError, EmailSendFailureException
 
 log = logging.getLogger()
 
@@ -279,18 +279,31 @@ def build_message(connection, template_name, recipient, context, metadata=None):
     return msg
 
 
-def send_messages(messages):
+def send_messages(messages, raise_errors=False):
     """
     Sends the messages and logs any exceptions
 
     Args:
         messages (list of django.core.mail.EmailMultiAlternatives): list of messages to send
+        raise_errors (bool): flag specifying if this method should raise errors
+
+    Raises:
+        EmailSendFailureException: Raised if any of the email send is failed
     """
+    errored_emails = set()
+
     for msg in messages:
         try:
             msg.send()
         except:  # pylint: disable=bare-except
-            log.exception("Error sending email '%s' to %s", msg.subject, msg.to)
+            errored_emails.add(msg)
+    if errored_emails:
+        for email_msg in errored_emails:
+            log.error(
+                "Error sending email '%s' to %s", email_msg.subject, email_msg.to
+            )
+        if raise_errors:
+            raise EmailSendFailureException()
 
 
 def send_message(message):

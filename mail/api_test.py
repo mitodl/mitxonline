@@ -2,6 +2,7 @@
 from email.utils import formataddr
 
 import pytest
+from mail.exceptions import EmailSendFailureException
 from mitol.common.pytest_utils import any_instance_of
 
 from mail.api import (
@@ -269,8 +270,34 @@ def test_send_message_failure(mocker):
             "sample",
         )
     )
-
     send_messages(messages)
 
     assert sendmail.call_count == len(users)
-    assert patched_logger.exception.call_count == len(users)
+    assert patched_logger.error.call_count == len(users)
+
+
+def test_send_message_failure_raise_error(mocker):
+    """Tests that send_messages logs errors and than raises exception if raise_errors is True"""
+    sendmail = mocker.patch("mail.api.AnymailMessage.send", side_effect=ConnectionError)
+    patched_logger = mocker.patch("mail.api.log")
+    users = UserFactory.create_batch(2)
+
+    messages = list(
+        messages_for_recipients(
+            [
+                (
+                    recipient,
+                    context_for_user(
+                        user=user, extra_context={"url": "https://example.com"}
+                    ),
+                )
+                for recipient, user in safe_format_recipients(users)
+            ],
+            "sample",
+        )
+    )
+    with pytest.raises(EmailSendFailureException):
+        send_messages(messages, raise_errors=True)
+
+    assert sendmail.call_count == len(users)
+    assert patched_logger.error.call_count == len(users)

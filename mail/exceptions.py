@@ -14,3 +14,7 @@ class MultiEmailValidationError(Exception):
         """
         self.invalid_emails = invalid_emails
         super().__init__(msg)
+
+
+class EmailSendFailureException(Exception):
+    """Exception to mark the failure in sending an email"""
