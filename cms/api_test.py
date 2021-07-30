@@ -3,7 +3,11 @@ import pytest
 from django.contrib.contenttypes.models import ContentType
 from wagtail.core.models import Page
 
-from cms.api import ensure_home_page_and_site, get_wagtail_img_src, ensure_resource_pages
+from cms.api import (
+    ensure_home_page_and_site,
+    get_wagtail_img_src,
+    ensure_resource_pages,
+)
 from cms.factories import HomePageFactory
 from cms.models import HomePage, ResourcePage
 
@@ -60,7 +64,7 @@ def test_ensure_resource_pages():
     ensure_resource_pages()
     assert resource_page_qset.exists()
     assert resource_page_qset.count() == 4
-    assert ResourcePage.objects.filter(title='About Us').exists()
-    assert ResourcePage.objects.filter(title='Terms of Service').exists()
-    assert ResourcePage.objects.filter(title='Privacy Policy').exists()
-    assert ResourcePage.objects.filter(title='Honor Code').exists()
+    assert ResourcePage.objects.filter(title="About Us").exists()
+    assert ResourcePage.objects.filter(title="Terms of Service").exists()
+    assert ResourcePage.objects.filter(title="Privacy Policy").exists()
+    assert ResourcePage.objects.filter(title="Honor Code").exists()

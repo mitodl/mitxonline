@@ -93,7 +93,7 @@ class ResourcePage(Page):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
-        help_text="Upload a header image that will render in the resource page.",
+        help_text="Upload a header image that will render in the resource page. (The recommended dimensions for the image are 1920x300)",
     )
 
     content = StreamField(
