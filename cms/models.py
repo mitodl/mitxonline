@@ -81,7 +81,7 @@ class CoursePage(ProductPage):
 
 class ResourcePage(Page):
     """
-    Basic resource page for all resource page.
+    Basic resource page class for pages containing basic information (FAQ, etc.)
     """
 
     template = "resource_page.html"

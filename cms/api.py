@@ -15,7 +15,7 @@ DEFAULT_HOMEPAGE_PROPS = dict(title="Home Page")
 DEFAULT_SITE_PROPS = dict(hostname="localhost", port=80)
 
 
-def create_resource_page_under_parent(title, parent):
+def get_or_create_resource_page(title, parent):
     """Get/Create a resource page with the given title under the parent page"""
     resource = cms_models.ResourcePage.objects.filter(slug=slugify(title)).first()
     if not resource:
@@ -60,10 +60,10 @@ def ensure_resource_pages():
     home_page = Page.objects.filter(
         content_type=ContentType.objects.get_for_model(cms_models.HomePage)
     ).first()
-    create_resource_page_under_parent("About Us", home_page)
-    create_resource_page_under_parent("Terms of Service", home_page)
-    create_resource_page_under_parent("Privacy Policy", home_page)
-    create_resource_page_under_parent("Honor Code", home_page)
+    get_or_create_resource_page("About Us", parent=home_page)
+    get_or_create_resource_page("Terms of Service", parent=home_page)
+    get_or_create_resource_page("Privacy Policy", parent=home_page)
+    get_or_create_resource_page("Honor Code", parent=home_page)
 
 
 def ensure_home_page_and_site():
