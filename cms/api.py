@@ -4,6 +4,8 @@ from urllib.parse import urljoin, urlencode
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.utils.text import slugify
+from wagtail.core.blocks import StreamValue
 from wagtail.core.models import Page, Site
 
 from cms import models as cms_models
@@ -11,6 +13,31 @@ from cms import models as cms_models
 log = logging.getLogger(__name__)
 DEFAULT_HOMEPAGE_PROPS = dict(title="Home Page")
 DEFAULT_SITE_PROPS = dict(hostname="localhost", port=80)
+
+
+def get_or_create_resource_page(title, parent):
+    """Get/Create a resource page with the given title under the parent page"""
+    resource = cms_models.ResourcePage.objects.filter(slug=slugify(title)).first()
+    if not resource:
+        resource = cms_models.ResourcePage(
+            slug=slugify(title),
+            title=title,
+            content=StreamValue(
+                "content",
+                [
+                    {
+                        "type": "content",
+                        "value": {
+                            "heading": title,
+                            "detail": f"<p>Stock {title.lower()} page.</p>",
+                        },
+                    }
+                ],
+                is_lazy=True,
+            ),
+        )
+        parent.add_child(instance=resource)
+    return resource
 
 
 def get_home_page():
@@ -23,6 +50,20 @@ def get_home_page():
     return Page.objects.get(
         content_type=ContentType.objects.get_for_model(cms_models.HomePage)
     )
+
+
+def ensure_resource_pages():
+    """
+    Ensures that all the following resource pages exists
+    (About Us / Terms of Service / Privacy Policy / Honor Code)
+    """
+    home_page = Page.objects.filter(
+        content_type=ContentType.objects.get_for_model(cms_models.HomePage)
+    ).first()
+    get_or_create_resource_page("About Us", parent=home_page)
+    get_or_create_resource_page("Terms of Service", parent=home_page)
+    get_or_create_resource_page("Privacy Policy", parent=home_page)
+    get_or_create_resource_page("Honor Code", parent=home_page)
 
 
 def ensure_home_page_and_site():

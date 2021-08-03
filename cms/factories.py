@@ -3,7 +3,7 @@ import factory
 import wagtail_factories
 from factory import fuzzy
 
-from cms.models import HomePage, CoursePage
+from cms.models import HomePage, CoursePage, ResourcePage
 from courses.factories import CourseFactory
 
 
@@ -25,3 +25,12 @@ class CoursePageFactory(wagtail_factories.PageFactory):
 
     class Meta:
         model = CoursePage
+
+
+class ResourcePageFactory(wagtail_factories.PageFactory):
+    """ResourcePage factory"""
+
+    header_image = factory.SubFactory(wagtail_factories.ImageFactory)
+
+    class Meta:
+        model = ResourcePage
