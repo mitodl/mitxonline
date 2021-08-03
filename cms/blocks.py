@@ -20,8 +20,10 @@ class PriceBlock(blocks.StructBlock):
 
     text = blocks.CharBlock(
         max_length=150,
+        required=False,
         help="Displayed over the product detail page under the price tile.",
     )
     link = blocks.URLBlock(
-        help="Specify the URL to redirect the user for the product's price details page."
+        required=False,
+        help="Specify the URL to redirect the user for the product's price details page.",
     )
