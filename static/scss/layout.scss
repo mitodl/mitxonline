@@ -16,7 +16,7 @@
 @import "error";
 @import "expandable";
 @import "dashboard";
-@import "header";
+@import "home";
 
 body {
   font-family: Montserrat, "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -38,10 +38,5 @@ body {
         width: 100% !important;
       }
     }
-  }
-
-  .hero-background {
-    background-size: cover;
-    background-position: 50% 50%;
   }
 }

@@ -10,15 +10,7 @@
 {% endblock %}
 
 {% block content %}
-  <style>
-    {% if page.hero %}
-      .hero-background {
-        background-image: url('{% wagtail_img_src page.hero%}');
-      }
-    {% endif %}
-  </style>
-
-    <div class="hero-content hero-background">
+    <div class="hero-content" style="background-image: url('{% wagtail_img_src page.hero%}')">
       <div class="container hero-container">
         <div class="hero-title">
           {% if page.hero_title %}
