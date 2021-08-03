@@ -54,7 +54,13 @@
             <div class="stat-col small">
               <span class="title">price</span>
               <div class="text">
-                <strong><a target="_blank" href={{page.price.0.value.link}}>{{page.price.0.value.text}}</a></strong>
+                <strong>
+                  {% if page.price.0.value.link %}
+                    <a target="_blank" href={{page.price.0.value.link}}>{{page.price.0.value.text}}</a>
+                  {% else %}
+                  {{page.price.0.value.text}}
+                  {% endif %}
+                </strong>
               </div>
             </div>  
             <div class="stat-col large">

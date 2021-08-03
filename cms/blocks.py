@@ -20,7 +20,6 @@ class PriceBlock(blocks.StructBlock):
 
     text = blocks.CharBlock(
         max_length=150,
-        required=False,
         help="Displayed over the product detail page under the price tile.",
     )
     link = blocks.URLBlock(
