@@ -19,12 +19,11 @@
               <div class="text">
                 <h1>{{ page.title }}</h1>
                 <p>{{ page.description |richtext }}</p>
-                <a href="#" class="btn btn-default">Enroll now</a>
+                <a href="#" class="action-btn">Enroll now</a>
               </div>
             </div>
             <div class="content-col video">
               <div class="video-holder">
-                <img src="{% static 'images/video.png' %}" alt="Video Holder">
               </div>
             </div>
           </div>
@@ -33,26 +32,33 @@
       <section class="info-block">
         <div class="container">
           <div class="stats-row">
+            {% if start_date %}
             <div class="stat-col">
-              <span class="title">start date</span>
+              <div class="title">start date</div>
               <div class="text">
-                <strong>{{ page.product.first_unexpired_run.start_date|date:"F j, Y" }}</strong>
+                <strong>{{ start_date|date:"F j, Y" }}</strong>
               </div>
             </div>
+            {% endif %}
+            {% if page.length %}
             <div class="stat-col small">
-              <span class="title">length</span>
+              <div class="title">length</div>
               <div class="text">
                 <strong>{{ page.length }}</strong>
               </div>
             </div>
+            {% endif %}
+            {% if page.effort %}
             <div class="stat-col">
-              <span class="title">effort</span>
+              <div class="title">effort</div>
               <div class="text">
                 <strong>{{ page.effort }}</strong>
               </div>
             </div>
+            {% endif %}
+            {% if page.price %}
             <div class="stat-col small">
-              <span class="title">price</span>
+              <div class="title">price</div>
               <div class="text">
                 <strong>
                   {% if page.price.0.value.link %}
@@ -63,12 +69,15 @@
                 </strong>
               </div>
             </div>  
+            {% endif %}
+            {% if page.prerequisites %}
             <div class="stat-col large">
-              <span class="title">prerequisites</span>
+              <div class="title">prerequisites</div>
               <div class="text">
                 <div>{{ page.prerequisites | richtext }}</div>
               </div>
             </div>
+            {% endif %}
           </div>
         </div>
       </section>

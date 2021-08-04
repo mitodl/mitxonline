@@ -135,6 +135,15 @@ class CoursePage(ProductPage):
 
     template = "product_page.html"
 
+    def get_context(self, request, *args, **kwargs):
+        first_unexpired_run = self.product.first_unexpired_run
+        return {
+            **super().get_context(request, *args, **kwargs),
+            "start_date": first_unexpired_run.start_date
+            if first_unexpired_run
+            else None,
+        }
+
     content_panels = [FieldPanel("course")] + ProductPage.content_panels
 
 
