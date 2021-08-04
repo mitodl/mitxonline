@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.2.0
+-------------
+
+- fix the regex length issue for forgot-email api
+- Implement resource pages and links from site footer (#36)
+
 Version 0.1.0 (Released August 04, 2021)
 -------------
 
