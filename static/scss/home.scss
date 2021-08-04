@@ -1,0 +1,53 @@
+// sass-lint:disable mixins-before-declarations
+
+.hero-title {
+  background: rgba(black, 0.83);
+  max-width: 580px;
+  padding: 40px;
+
+  @include media-breakpoint-down(sm) {
+    max-width: 255px;
+    padding: 20px;
+  }
+
+  h1 {
+    color: white;
+    font-weight: 600;
+    font-size: 48px;
+    line-height: 48px;
+    margin: 0 0 15px 0;
+
+    @include media-breakpoint-down(sm) {
+      font-size: 18px;
+      line-height: 18px;
+    }
+  }
+
+  h2 {
+    color: $subtitle-color;
+    font-weight: 600;
+    font-size: 36px;
+    line-height: 44px;
+    margin: 0;
+
+    @include media-breakpoint-down(sm) {
+      font-size: 16px;
+      line-height: 24px;
+    }
+  }
+}
+
+.hero-container {
+  min-height: 400px;
+  padding-bottom: 50px;
+  display: flex;
+  align-items: flex-end;
+  background-size: cover;
+  background-position: 50% 50%;
+
+  @include media-breakpoint-down(sm) {
+    min-height: 210px;
+    padding-bottom: 28px;
+  }
+}
+
