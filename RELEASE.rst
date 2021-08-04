@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.1.0
+Version 0.1.0 (Released August 04, 2021)
 -------------
 
 - Implement basic site footer content (#41)
