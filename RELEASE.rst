@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.1.1
+-------------
+
+- Implement resource pages and links from site footer (#36)
+
 Version 0.1.0 (Released August 04, 2021)
 -------------
 
