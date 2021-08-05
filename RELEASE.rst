@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.1.1
+Version 0.1.1 (Released August 05, 2021)
 -------------
 
 - fix the regex length issue for forgot-email api
