@@ -14,12 +14,12 @@ import queries from "../../../lib/queries"
 import EditProfileForm from "../../../components/forms/EditProfileForm"
 
 import type { Response } from "redux-query"
-import type { Country, CurrentUser, User } from "../../../flow/authTypes"
+import type { Country, User } from "../../../flow/authTypes"
 import type { RouterHistory } from "react-router"
 
 type StateProps = {|
   countries: ?Array<Country>,
-  currentUser: CurrentUser
+  currentUser: User
 |}
 
 type DispatchProps = {|
@@ -41,29 +41,10 @@ export class EditProfilePage extends React.Component<Props> {
   async onSubmit(profileData: User, { setSubmitting, setErrors }: Object) {
     const { editProfile, history } = this.props
 
-    const payload = {
-      ...profileData,
-      ...(profileData.profile
-        ? {
-          profile: {
-            ...profileData.profile,
-            company_size:
-                profileData.profile.company_size === ""
-                  ? null
-                  : profileData.profile.company_size,
-            years_experience:
-                profileData.profile.years_experience === ""
-                  ? null
-                  : profileData.profile.years_experience
-          }
-        }
-        : {})
-    }
-
     try {
       const {
         body: { errors }
-      }: { body: Object } = await editProfile(payload)
+      }: { body: Object } = await editProfile(profileData)
 
       if (errors && errors.length > 0) {
         setErrors({
@@ -93,17 +74,11 @@ export class EditProfilePage extends React.Component<Props> {
             <div className="container">
               <div className="row">
                 <div className="col-12 auth-form">
-                  {currentUser.is_authenticated ? (
-                    <EditProfileForm
-                      countries={countries}
-                      user={currentUser}
-                      onSubmit={this.onSubmit.bind(this)}
-                    />
-                  ) : (
-                    <div className="row">
-                      You must be logged in to edit your profile.
-                    </div>
-                  )}
+                  <EditProfileForm
+                    countries={countries}
+                    user={currentUser}
+                    onSubmit={this.onSubmit.bind(this)}
+                  />
                 </div>
               </div>
             </div>

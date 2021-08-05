@@ -49,25 +49,8 @@ def mock_create_user_strategy(mocker):
         "legal_address": {
             "first_name": "Jane",
             "last_name": "Doe",
-            "street_address_1": "1 Main st",
-            "city": "Boston",
-            "state_or_territory": "US-MA",
             "country": "US",
-            "postal_code": "02101",
         },
-    }
-    return strategy
-
-
-@pytest.fixture
-def mock_create_profile_strategy(mocker):
-    """Fixture that returns a valid strategy for create_profile"""
-    strategy = mocker.Mock()
-    strategy.request_data.return_value = {
-        "gender": "f",
-        "birth_year": "2000",
-        "company": "MIT",
-        "job_title": "QA Tester",
     }
     return strategy
 
@@ -317,11 +300,7 @@ def test_create_user_via_email_with_shorter_name(mocker, mock_email_backend):
         "legal_address": {
             "first_name": "Jane",
             "last_name": "Doe",
-            "street_address_1": "1 Main st",
-            "city": "Boston",
-            "state_or_territory": "US-MA",
             "country": "US",
-            "postal_code": "02101",
         },
     }
 
@@ -379,46 +358,6 @@ def test_create_user_via_email_create_fail(
             flow=SocialAuthState.FLOW_REGISTER,
         )
     patched_create_user.assert_called_once()
-
-
-@pytest.mark.django_db
-def test_create_profile(
-    mock_email_backend, mock_create_profile_strategy, settings, mocker
-):  # pylint:disable=too-many-arguments
-    """
-    Tests that create_profile creates a profile
-    """
-    user = UserFactory.create(profile__incomplete=True)
-    response = user_actions.create_profile(
-        mock_create_profile_strategy,
-        mock_email_backend,
-        user=user,
-        pipeline_index=0,
-        flow=SocialAuthState.FLOW_REGISTER,
-    )
-    assert response == {}
-    assert user.profile.gender == mock_create_profile_strategy.request_data().get(
-        "gender"
-    )
-    assert user.profile.company == mock_create_profile_strategy.request_data().get(
-        "company"
-    )
-
-
-@pytest.mark.django_db
-def test_create_profile_no_data(mocker, mock_email_backend):
-    """Tests that create_profile raises an error if no data for name and password provided"""
-    user = UserFactory.create(profile__incomplete=True)
-    mock_strategy = mocker.Mock()
-    mock_strategy.request_data.return_value = {}
-    with pytest.raises(RequireProfileException):
-        user_actions.create_profile(
-            mock_strategy,
-            mock_email_backend,
-            user=user,
-            pipeline_index=0,
-            flow=SocialAuthState.FLOW_REGISTER,
-        )
 
 
 @pytest.mark.parametrize("hijacked", [True, False])

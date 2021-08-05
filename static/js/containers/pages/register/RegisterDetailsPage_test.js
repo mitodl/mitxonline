@@ -7,7 +7,6 @@ import RegisterDetailsPage, {
 } from "./RegisterDetailsPage"
 import IntegrationTestHelper from "../../../util/integration_test_helper"
 import {
-  STATE_REGISTER_EXTRA_DETAILS,
   STATE_USER_BLOCKED,
   STATE_ERROR,
   STATE_ERROR_TEMPORARY,
@@ -96,13 +95,7 @@ describe("RegisterDetailsPage", () => {
   //
   ;[
     [STATE_ERROR_TEMPORARY, [], routes.register.error, ""],
-    [STATE_ERROR, [], routes.register.error, ""], // cover the case with an error but no  messages
-    [
-      STATE_REGISTER_EXTRA_DETAILS,
-      [],
-      routes.register.extra,
-      "?partial_token=new_partial_token"
-    ],
+    [STATE_ERROR, [], routes.register.error, ""], // cover the case with an error but no messages
     [
       STATE_USER_BLOCKED,
       ["error_code"],

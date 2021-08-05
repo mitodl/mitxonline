@@ -15,7 +15,6 @@ export type AuthStates =
   | "register/confirm-sent"
   | "register/confirm"
   | "register/details"
-  | "register/extra"
   | "register/required"
 
 export type AuthFlow = "register" | "login"
@@ -43,8 +42,8 @@ export type AuthResponse = {
 export type LegalAddress = {
   first_name: string,
   last_name: string,
-  street_address: Array<string>,
   country: string,
+  street_address?: Array<string>,
   state_or_territory?: string,
   postal_code?: string,
   company?: string
@@ -81,9 +80,7 @@ export type User = {
   name: string,
   created_on: string,
   updated_on: string,
-  profile: ?Profile,
-  legal_address: ?LegalAddress,
-  unused_coupons: Array<UnusedCoupon>
+  legal_address: ?LegalAddress
 }
 
 export type AnonymousUser = {
@@ -124,8 +121,7 @@ export type PasswordFormValues = {
 export type UserProfileForm = {
   email: string,
   name: string,
-  legal_address: ?LegalAddress,
-  profile: ?Profile
+  legal_address: ?LegalAddress
 }
 
 export type updateEmailResponse = {

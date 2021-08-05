@@ -42,35 +42,10 @@ describe("EditProfilePage", () => {
     assert.isTrue(inner.find("EditProfileForm").exists())
   })
 
-  it("renders the page for an anonymous user", async () => {
-    const { inner } = await renderPage({
-      entities: {
-        currentUser: makeAnonymousUser(),
-        countries:   countries
-      }
-    })
-    assert.isFalse(inner.find("EditProfileForm").exists())
-    assert.isTrue(
-      inner
-        .find(".auth-page")
-        .text()
-        .includes("You must be logged in to edit your profile.")
-    )
-  })
-
   //
-  ;[[true, true], [true, false], [false, true], [false, false]].forEach(
-    ([hasError, hasEmptyFields]) => {
-      it(`submits the updated profile ${
-        hasEmptyFields ? "with some empty fields " : ""
-      }${hasError ? "and received an error" : "successfully"}`, async () => {
-        // $FlowFixMe
-        user.profile.company_size = hasEmptyFields ? "" : 50
-        // $FlowFixMe
-        user.profile.years_experience = hasEmptyFields ? "" : 5
-        // $FlowFixMe
-        user.profile.highest_education = hasEmptyFields ? "" : "Doctorate"
-
+  ;[[true, "with errors"], [false, "without errors"]].forEach(
+    ([hasError, desc]) => {
+      it(`handles form submission ${desc}`, async () => {
         const { inner } = await renderPage()
         const setSubmitting = helper.sandbox.stub()
         const setErrors = helper.sandbox.stub()
@@ -87,38 +62,23 @@ describe("EditProfilePage", () => {
         })
 
         await inner.find("EditProfileForm").prop("onSubmit")(values, actions)
-
-        const expectedPayload = {
-          ...user,
-          profile: {
-            ...user.profile
-          }
-        }
-        if (hasEmptyFields) {
-          // $FlowFixMe
-          expectedPayload.profile.company_size = null
-          // $FlowFixMe
-          expectedPayload.profile.years_experience = null
-          // $FlowFixMe
-          expectedPayload.profile.highest_education = ""
-        }
-
         sinon.assert.calledWith(
           helper.handleRequestStub,
           "/api/users/me",
           "PATCH",
           {
-            body:        expectedPayload,
+            body:        values,
             credentials: undefined,
             headers:     { "X-CSRFTOKEN": null }
           }
         )
         sinon.assert.calledWith(setSubmitting, false)
-        assert.equal(setErrors.length, 0)
         if (hasError) {
           assert.isNull(helper.currentLocation)
+          sinon.assert.calledOnce(setErrors)
         } else {
           assert.equal(helper.currentLocation.pathname, "/profile/")
+          sinon.assert.notCalled(setErrors)
         }
       })
     }

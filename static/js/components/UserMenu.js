@@ -34,6 +34,14 @@ const UserMenu = ({ currentUser }: Props) => {
       <div className="dropdown-menu" aria-labelledby="dropdownMenuButton">
         <MixedLink
           className="dropdown-item"
+          dest={routes.profile.view}
+          aria-label="Profile"
+        >
+          <div className="dropdown-icon icon-21 icon-profile" />
+          Profile
+        </MixedLink>
+        <MixedLink
+          className="dropdown-item"
           dest={routes.accountSettings}
           aria-label="settings"
         >

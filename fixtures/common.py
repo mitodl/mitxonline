@@ -72,11 +72,7 @@ def valid_address_dict():
     return dict(
         first_name="Test",
         last_name="User",
-        street_address_1="1 Main St",
-        state_or_territory="US-MA",
-        city="Cambridge",
         country="US",
-        postal_code="02139",
     )
 
 

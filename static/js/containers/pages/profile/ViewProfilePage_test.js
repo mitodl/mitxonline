@@ -32,35 +32,11 @@ describe("ViewProfilePage", () => {
 
   it("renders the page for a logged in user", async () => {
     const { inner } = await renderPage()
-    assert.isTrue(inner.find(".submit-row").exists())
-    assert.isTrue(
-      inner
-        .find(".auth-page")
-        .text()
-        // $FlowFixMe: user.legal_address is not null
-        .includes(user.legal_address.street_address[0])
-    )
-    assert.isTrue(
-      inner
-        .find(".auth-page")
-        .text()
-        // $FlowFixMe: user.profile is not null
-        .includes(user.profile.company)
-    )
-  })
-
-  it("renders the page for an anonymous user", async () => {
-    const { inner } = await renderPage({
-      entities: {
-        currentUser: makeAnonymousUser()
-      }
-    })
-    assert.isFalse(inner.find(".submit-row").exists())
-    assert.isTrue(
-      inner
-        .find(".auth-page")
-        .text()
-        .includes("You must be logged in to view your profile.")
-    )
+    const editBtn = inner.find("button")
+    assert.isTrue(editBtn.exists())
+    assert.equal(editBtn.text(), "Edit Profile")
+    assert.isNull(helper.currentLocation)
+    editBtn.simulate("click")
+    assert.equal(helper.currentLocation.pathname, "/profile/edit/")
   })
 })

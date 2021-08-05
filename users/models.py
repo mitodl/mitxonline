@@ -244,7 +244,6 @@ class LegalAddress(TimestampedModel):
     country = models.CharField(
         max_length=2, blank=True, validators=[validate_iso_3166_1_code]
     )  # ISO-3166-1
-
     # only required in the US/CA
     state_or_territory = models.CharField(
         max_length=6, blank=True, validators=[validate_iso_3166_2_code]
@@ -272,34 +271,9 @@ class LegalAddress(TimestampedModel):
 
 
 class Profile(TimestampedModel):
-    """A user's profile and employment info"""
+    """A user's profile"""
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-
-    gender = models.CharField(
-        max_length=10, blank=True, choices=GENDER_CHOICES, default=""
-    )
-    birth_year = models.IntegerField(null=True, blank=True)
-
-    company = models.CharField(max_length=128, blank=True, default="")
-    job_title = models.CharField(max_length=128, blank=True, default="")
-    industry = models.CharField(max_length=60, blank=True, default="")
-    job_function = models.CharField(max_length=60, blank=True, default="")
-    company_size = models.IntegerField(
-        null=True, blank=True, choices=COMPANY_SIZE_CHOICES
-    )
-    years_experience = models.IntegerField(
-        null=True, blank=True, choices=YRS_EXPERIENCE_CHOICES
-    )
-    leadership_level = models.CharField(max_length=60, blank=True, default="")
-    highest_education = models.CharField(
-        max_length=60, blank=True, default="", choices=HIGHEST_EDUCATION_CHOICES
-    )
-
-    @property
-    def is_complete(self):
-        """Returns True if the profile is complete"""
-        return all((self.gender, self.birth_year, self.company, self.job_title))
 
     def __str__(self):
         """Str representation for the profile"""

@@ -20,12 +20,6 @@ class UserLegalAddressInline(admin.StackedInline):
             {
                 "fields": (
                     ("first_name", "last_name"),
-                    "street_address_1",
-                    "street_address_2",
-                    "street_address_3",
-                    "street_address_4",
-                    "street_address_5",
-                    ("city", "state_or_territory", "postal_code"),
                     "country",
                 )
             },

@@ -1,7 +1,7 @@
 import React from "react"
 import moment from "moment"
-import { __, find, includes, propEq, range, reverse } from "ramda"
-import { ErrorMessage, Field, FieldArray } from "formik"
+import { range, reverse } from "ramda"
+import { ErrorMessage, Field } from "formik"
 import * as yup from "yup"
 
 import {
@@ -50,47 +50,11 @@ export const legalAddressValidation = yup.object().shape({
       .trim()
       .matches(NAME_REGEX, NAME_REGEX_FAIL_MESSAGE)
       .required(),
-    city: yup
-      .string()
-      .label("City")
-      .trim()
-      .required(),
-    street_address: yup
-      .array()
-      .label("Street address")
-      .of(yup.string().max(60))
-      .min(1, "Street address is a required field")
-      .max(ADDRESS_LINES_MAX)
-      .compact()
-      .required(),
-    state_or_territory: yup
-      .mixed()
-      .label("State/Territory")
-      .when("country", {
-        is:   includes(__, COUNTRIES_REQUIRING_STATE),
-        then: yup.string().required()
-      }),
     country: yup
       .string()
       .label("Country")
       .length(2)
-      .required(),
-    postal_code: yup
-      .string()
-      .label("Zip/Postal Code")
-      .trim()
-      .when("country", (country, schema) => {
-        if (country === US_ALPHA_2) {
-          return schema.required().matches(US_POSTAL_CODE_REGEX, {
-            message:
-              "Postal Code must be formatted as either 'NNNNN' or 'NNNNN-NNNN'"
-          })
-        } else if (country === CA_ALPHA_2) {
-          return schema.required().matches(CA_POSTAL_CODE_REGEX, {
-            message: "Postal Code must be formatted as 'ANA NAN'"
-          })
-        }
-      })
+      .required()
   })
 })
 
@@ -131,9 +95,6 @@ type LegalAddressProps = {
 
 export const LegalAddressFields = ({
   countries,
-  setFieldValue,
-  setFieldTouched,
-  values,
   includePassword
 }: LegalAddressProps) => (
   <React.Fragment>
@@ -163,9 +124,8 @@ export const LegalAddressFields = ({
       <ErrorMessage name="legal_address.last_name" component={FormError} />
     </div>
     <div className="form-group">
-      <label htmlFor="name" className="row">
-        <div className="col-4 font-weight-bold">Full Name*</div>
-        <div className="col-8">(As it will appear in your certificate)</div>
+      <label htmlFor="name" className="font-weight-bold">
+        Full Name*
       </label>
       <Field
         type="text"
@@ -191,44 +151,7 @@ export const LegalAddressFields = ({
         </div>
       </div>
     ) : null}
-    <div className="form-group">
-      {/* LegalAddress fields */}
-      <label htmlFor="legal_address.street_address" className="row">
-        <div className="col-4 font-weight-bold">Street Address*</div>
-        <div className="col-8">(Home or Residential Address Only)</div>
-      </label>
-      <FieldArray
-        name="legal_address.street_address"
-        render={arrayHelpers => (
-          <div>
-            {values.legal_address.street_address.map((line, index) => (
-              <div key={index}>
-                <Field
-                  name={`legal_address.street_address[${index}]`}
-                  className={`form-control ${index > 0 ? "row-inner" : ""}`}
-                  autoComplete={`address-line${index + 1}`}
-                />
-                {index === 0 ? (
-                  <ErrorMessage
-                    name="legal_address.street_address"
-                    component={FormError}
-                  />
-                ) : null}
-              </div>
-            ))}
-            {values.legal_address.street_address.length < ADDRESS_LINES_MAX ? (
-              <button
-                type="button"
-                className="additional-street"
-                onClick={() => arrayHelpers.push("")}
-              >
-                Add additional line
-              </button>
-            ) : null}
-          </div>
-        )}
-      />
-    </div>
+
     <div className="form-group">
       <label htmlFor="legal_address.country" className="font-weight-bold">
         Country*
@@ -238,14 +161,6 @@ export const LegalAddressFields = ({
         name="legal_address.country"
         className="form-control"
         autoComplete="country"
-        onChange={e => {
-          setFieldValue("legal_address.country", e.target.value)
-          setFieldTouched("legal_address.country")
-          if (!includes(e.target.value, [US_ALPHA_2, CA_ALPHA_2])) {
-            setFieldValue("legal_address.state_or_territory", "")
-            setFieldValue("legal_address.postal_code", "")
-          }
-        }}
       >
         <option value="">-----</option>
         {countries
@@ -258,62 +173,6 @@ export const LegalAddressFields = ({
       </Field>
       <ErrorMessage name="legal_address.country" component={FormError} />
     </div>
-    {includes(values.legal_address.country, COUNTRIES_REQUIRING_STATE) ? (
-      <div className="form-group">
-        <label
-          htmlFor="legal_address.state_or_territory"
-          className="font-weight-bold"
-        >
-          State/Province*
-        </label>
-        <Field
-          component="select"
-          name="legal_address.state_or_territory"
-          className="form-control"
-          autoComplete="address-level1"
-        >
-          <option value="">-----</option>
-          {find(
-            propEq("code", values.legal_address.country),
-            countries
-          ).states.map((state, i) => (
-            <option key={i} value={state.code}>
-              {state.name}
-            </option>
-          ))}
-        </Field>
-        <ErrorMessage
-          name="legal_address.state_or_territory"
-          component={FormError}
-        />
-      </div>
-    ) : null}
-    <div className="form-group">
-      <label htmlFor="legal_address.city" className="font-weight-bold">
-        City*
-      </label>
-      <Field
-        type="text"
-        name="legal_address.city"
-        className="form-control"
-        autoComplete="address-level2"
-      />
-      <ErrorMessage name="legal_address.city" component={FormError} />
-    </div>
-    {includes(values.legal_address.country, COUNTRIES_REQUIRING_POSTAL_CODE) ? (
-      <div className="form-group">
-        <label htmlFor="legal_address.postal_code" className="font-weight-bold">
-          Zip/Postal Code*
-        </label>
-        <Field
-          type="text"
-          name="legal_address.postal_code"
-          className="form-control"
-          autoComplete="postal-code"
-        />
-        <ErrorMessage name="legal_address.postal_code" component={FormError} />
-      </div>
-    ) : null}
   </React.Fragment>
 )
 

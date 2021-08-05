@@ -16,6 +16,7 @@ import PrivateRoute from "../components/PrivateRoute"
 
 import LoginPages from "./pages/login/LoginPages"
 import RegisterPages from "./pages/register/RegisterPages"
+import ProfilePages from "./pages/profile/ProfilePages"
 import AccountSettingsPage from "./pages/settings/AccountSettingsPage"
 import EmailConfirmPage from "./pages/settings/EmailConfirmPage"
 import DashboardPage from "./pages/DashboardPage"
@@ -54,6 +55,10 @@ export class App extends React.Component<Props, void> {
             <PrivateRoute
               path={urljoin(match.url, String(routes.accountSettings))}
               component={AccountSettingsPage}
+            />
+            <PrivateRoute
+              path={urljoin(match.url, String(routes.profile))}
+              component={ProfilePages}
             />
             <Route
               path={urljoin(match.url, String(routes.account.confirmEmail))}

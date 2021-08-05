@@ -23,7 +23,6 @@ class SocialAuthState:  # pylint: disable=too-many-instance-attributes
     STATE_REGISTER_CONFIRM_SENT = "register/confirm-sent"
     STATE_REGISTER_CONFIRM = "register/confirm"
     STATE_REGISTER_DETAILS = "register/details"
-    STATE_REGISTER_EXTRA_DETAILS = "register/extra"
     STATE_REGISTER_REQUIRED = "register/required"
 
     # end states
