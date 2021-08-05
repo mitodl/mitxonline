@@ -16,37 +16,38 @@ type Props = {
 
 const TopAppBar = ({ currentUser, location }: Props) => (
   <header className="header-holder">
-    <div className="container">
+    <div className="container-fluid">
       <nav
         className={`sub-nav navbar navbar-expand-md link-section ${
           currentUser.is_authenticated ? "nowrap login" : ""
         }`}
       >
         <div className="navbar-brand">
-          <a
-            href="https://web.mit.edu/"
-            rel="noopener noreferrer"
-            target="_blank"
-            className="mit-link"
-          />
+          <a href="https://mit.edu">
+            <img
+              src="/static/images/mit-logo.jpg"
+              className="site-logo"
+              alt={SETTINGS.site_name}
+            />
+          </a>
+          <div className="divider-large" />
           <a href={routes.root} className="mitx-online-link">
-            mitX Online
+            MITx Online
           </a>
         </div>
-        {currentUser.is_authenticated ? null : (
-          <button
-            className="navbar-toggler nav-opener"
-            type="button"
-            data-toggle="collapse"
-            data-target="#nav"
-            aria-controls="nav"
-            aria-expanded="false"
-            aria-label="Toggle navigation"
-          >
-            <span className="navbar-toggler-icon" />
-            Menu
-          </button>
-        )}
+        <button
+          className="navbar-toggler nav-opener collapsed"
+          type="button"
+          data-toggle="collapse"
+          data-target="#nav"
+          aria-controls="nav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span className="bar" />
+          <span className="bar" />
+          <span className="bar" />
+        </button>
         <ul
           id="nav"
           className={`${
@@ -54,15 +55,32 @@ const TopAppBar = ({ currentUser, location }: Props) => (
           } navbar-collapse px-0 justify-content-end`}
         >
           {currentUser.is_authenticated ? (
-            <li>
-              <UserMenu currentUser={currentUser} />
-            </li>
+            <React.Fragment>
+              <li>
+                <UserMenu currentUser={currentUser} />
+              </li>
+              {/* These menu lists will show/hide based on desktop/mobile screen. */}
+              <li className="authenticated-menu">
+                <MixedLink dest={routes.accountSettings} aria-label="Settings">
+                  Settings
+                </MixedLink>
+              </li>
+              <li className="authenticated-menu">
+                <MixedLink
+                  dest={routes.logout}
+                  className="button"
+                  aria-label="Sign Out"
+                >
+                  Sign Out
+                </MixedLink>
+              </li>
+            </React.Fragment>
           ) : (
             <React.Fragment>
               <li>
                 <MixedLink
                   dest={routes.login.begin}
-                  className="button"
+                  // className="button"
                   aria-label="Login"
                 >
                   Sign In

@@ -51,19 +51,20 @@ describe("TopAppBar component", () => {
       )
     })
 
-    it("does not have a button to collapse the menu", () => {
-      assert.isNotOk(
+    it("have MixedLinks for login/registration for mobile view", () => {
+      assert.isOk(
         shallow(<TopAppBar currentUser={user} location={null} />)
-          .find("button")
+          .find("MixedLink")
           .exists()
       )
     })
 
-    it("does not have MixedLinks for login/registration", () => {
-      assert.isNotOk(
+    it("have two menu items with authenticated-menu class attributes", () => {
+      assert.equal(
         shallow(<TopAppBar currentUser={user} location={null} />)
-          .find("MixedLink")
-          .exists()
+          .find(".authenticated-menu")
+          .getElements().length,
+        2
       )
     })
   })
