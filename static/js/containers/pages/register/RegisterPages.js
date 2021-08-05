@@ -8,7 +8,6 @@ import RegisterEmailPage from "./RegisterEmailPage"
 import RegisterConfirmPage from "./RegisterConfirmPage"
 import RegisterConfirmSentPage from "./RegisterConfirmSentPage"
 import RegisterDetailsPage from "./RegisterDetailsPage"
-import RegisterExtraDetailsPage from "./RegisterExtraDetailsPage"
 import RegisterDeniedPage from "./RegisterDeniedPage"
 import RegisterErrorPage from "./RegisterErrorPage"
 
@@ -25,11 +24,6 @@ const RegisterPages = () => (
         exact
         path={routes.register.confirm}
         component={RegisterConfirmPage}
-      />
-      <Route
-        exact
-        path={routes.register.extra}
-        component={RegisterExtraDetailsPage}
       />
       <Route
         exact

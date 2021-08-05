@@ -28,7 +28,6 @@ export const STATE_REGISTER_EMAIL = "register/email"
 export const STATE_REGISTER_CONFIRM_SENT = "register/confirm-sent"
 export const STATE_REGISTER_CONFIRM = "register/confirm"
 export const STATE_REGISTER_DETAILS = "register/details"
-export const STATE_REGISTER_EXTRA_DETAILS = "register/extra"
 export const STATE_REGISTER_REQUIRED = "register/required"
 
 export const INFORMATIVE_STATES = [
@@ -51,7 +50,6 @@ export const ALL_STATES = [
   STATE_REGISTER_CONFIRM,
   STATE_REGISTER_CONFIRM_SENT,
   STATE_REGISTER_DETAILS,
-  STATE_REGISTER_EXTRA_DETAILS,
   STATE_REGISTER_REQUIRED
 ]
 
@@ -95,11 +93,6 @@ export const handleAuthResponse = (
       partial_token
     })
     history.push(`${routes.register.details}?${params}`)
-  } else if (state === STATE_REGISTER_EXTRA_DETAILS) {
-    const params = qs.stringify({
-      partial_token
-    })
-    history.push(`${routes.register.extra}?${params}`)
   } else if (state === STATE_USER_BLOCKED) {
     history.push(`${routes.register.denied}?${getErrorQs(errors)}`)
   } else if (

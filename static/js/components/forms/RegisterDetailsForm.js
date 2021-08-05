@@ -19,13 +19,9 @@ const INITIAL_VALUES = {
   name:          "",
   password:      "",
   legal_address: {
-    first_name:         "",
-    last_name:          "",
-    street_address:     ["", ""],
-    city:               "",
-    country:            "",
-    state_or_territory: "",
-    postal_code:        ""
+    first_name: "",
+    last_name:  "",
+    country:    ""
   }
 }
 

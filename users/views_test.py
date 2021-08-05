@@ -68,8 +68,6 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
             "legal_address": None,
             "is_anonymous": True,
             "is_authenticated": False,
-            "profile": None,
-            "unused_coupons": [],
         }
         # patched_unused_coupon_api.assert_not_called()
     elif not is_anonymous and show_enrollment_codes:
@@ -81,35 +79,13 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
             "legal_address": {
                 "first_name": user.legal_address.first_name,
                 "last_name": user.legal_address.last_name,
-                "street_address": [user.legal_address.street_address_1],
-                "city": user.legal_address.city,
-                "state_or_territory": user.legal_address.state_or_territory,
                 "country": user.legal_address.country,
-                "postal_code": user.legal_address.postal_code,
             },
-            "profile": {
-                "gender": user.profile.gender,
-                "company": user.profile.company,
-                "company_size": user.profile.company_size,
-                "job_title": user.profile.job_title,
-                "birth_year": int(user.profile.birth_year),
-                "leadership_level": user.profile.leadership_level,
-                "job_function": user.profile.job_function,
-                "years_experience": user.profile.years_experience,
-                "highest_education": user.profile.highest_education,
-                "industry": user.profile.industry,
-            },
-            "unused_coupons": [],  # patched_unused_coupon_api.return_value,
             "is_anonymous": False,
             "is_authenticated": True,
             "created_on": drf_datetime(user.created_on),
             "updated_on": drf_datetime(user.updated_on),
         }
-        # patched_unused_coupon_api.assert_called_with(user)
-    # elif not is_anonymous and not show_enrollment_codes:
-    #     response = resp.json()
-    #     patched_unused_coupon_api.assert_called_with(user)
-    #     assert response["unused_coupons"] == patched_unused_coupon_api.return_value
 
 
 @pytest.mark.django_db

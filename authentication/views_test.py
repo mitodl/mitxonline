@@ -5,8 +5,6 @@ from unittest.mock import patch
 
 import factory
 import pytest
-import responses
-from django.conf import settings
 from django.contrib.auth import get_user, get_user_model
 from django.core import mail
 from django.db import transaction
@@ -117,8 +115,6 @@ class AuthStateMachine(RuleBasedStateMachine):
 
     ConfirmationSentAuthStates = Bundle("confirmation-sent")
     ConfirmationRedeemedAuthStates = Bundle("confirmation-redeemed")
-    RegisterExtraDetailsAuthStates = Bundle("register-details-extra")
-
     LoginPasswordAuthStates = Bundle("login-password")
     LoginPasswordAbandonedAuthStates = Bundle("login-password-abandoned")
 
@@ -317,53 +313,6 @@ class AuthStateMachine(RuleBasedStateMachine):
             },
         )
 
-    @rule(
-        target=LoginPasswordAbandonedAuthStates,
-        auth_state=consumes(RegisterExtraDetailsAuthStates),
-    )
-    @precondition(lambda self: self.flow_started)
-    def login_email_abandoned(self, auth_state):  # pylint: disable=unused-argument
-        """Login with a user that abandoned the register flow"""
-        # NOTE: This works by "consuming" an extra details auth state,
-        #       but discarding the state and starting a new login.
-        #       It then re-targets the new state into the extra details again.
-        auth_state = None  # assign None to ensure no accidental usage here
-
-        return assert_api_call(
-            self.client,
-            "psa-login-email",
-            {
-                "flow": SocialAuthState.FLOW_LOGIN,
-                "email": self.user.email,
-                "next": NEXT_URL,
-            },
-            {
-                "flow": SocialAuthState.FLOW_LOGIN,
-                "state": SocialAuthState.STATE_LOGIN_PASSWORD,
-                "extra_data": {"name": self.user.name},
-            },
-        )
-
-    @rule(
-        target=RegisterExtraDetailsAuthStates,
-        auth_state=consumes(LoginPasswordAbandonedAuthStates),
-    )
-    def login_password_abandoned(self, auth_state):
-        """Login with an abandoned registration user"""
-        return assert_api_call(
-            self.client,
-            "psa-login-password",
-            {
-                "flow": auth_state["flow"],
-                "partial_token": auth_state["partial_token"],
-                "password": self.password,
-            },
-            {
-                "flow": auth_state["flow"],
-                "state": SocialAuthState.STATE_REGISTER_EXTRA_DETAILS,
-            },
-        )
-
     @rule(auth_state=consumes(LoginPasswordAuthStates))
     def login_password_valid(self, auth_state):
         """Login with a valid password"""
@@ -465,12 +414,12 @@ class AuthStateMachine(RuleBasedStateMachine):
         return assert_api_call(
             self.client,
             "psa-register-confirm",
-            {
+            payload={
                 "flow": auth_state["flow"],
                 "verification_code": code.code,
                 "partial_token": partial_token,
             },
-            {
+            expected={
                 "flow": auth_state["flow"],
                 "state": SocialAuthState.STATE_REGISTER_DETAILS,
             },
@@ -483,12 +432,12 @@ class AuthStateMachine(RuleBasedStateMachine):
         assert_api_call(
             self.client,
             "psa-register-confirm",
-            {
+            payload={
                 "flow": auth_state["flow"],
                 "verification_code": code.code,
                 "partial_token": partial_token,
             },
-            {
+            expected={
                 "errors": [],
                 "flow": auth_state["flow"],
                 "redirect_url": None,
@@ -520,7 +469,6 @@ class AuthStateMachine(RuleBasedStateMachine):
         )
 
     @rule(
-        target=RegisterExtraDetailsAuthStates,
         auth_state=consumes(ConfirmationRedeemedAuthStates),
     )
     def register_details(self, auth_state):
@@ -528,7 +476,7 @@ class AuthStateMachine(RuleBasedStateMachine):
         result = assert_api_call(
             self.client,
             "psa-register-details",
-            {
+            payload={
                 "flow": auth_state["flow"],
                 "partial_token": auth_state["partial_token"],
                 "password": self.password,
@@ -536,155 +484,18 @@ class AuthStateMachine(RuleBasedStateMachine):
                 "legal_address": {
                     "first_name": "Sally",
                     "last_name": "Smith",
-                    "street_address": ["Main Street"],
                     "country": "US",
-                    "state_or_territory": "US-CO",
-                    "city": "Boulder",
-                    "postal_code": "02183",
                 },
             },
-            {
-                "flow": auth_state["flow"],
-                "state": SocialAuthState.STATE_REGISTER_EXTRA_DETAILS,
-            },
-        )
-        self.user = User.objects.get(email=self.email)
-        return result
-
-    # @rule(
-    #     target=RegisterExtraDetailsAuthStates,
-    #     auth_state=consumes(ConfirmationRedeemedAuthStates),
-    # )
-    # def register_details_export_success(self, auth_state):
-    #     """Complete the register confirmation details page with exports enabled"""
-    #     with export_check_response("100_success"):
-    #         result = assert_api_call(
-    #             self.client,
-    #             "psa-register-details",
-    #             {
-    #                 "flow": auth_state["flow"],
-    #                 "partial_token": auth_state["partial_token"],
-    #                 "password": self.password,
-    #                 "name": "Sally Smith",
-    #                 "legal_address": {
-    #                     "first_name": "Sally",
-    #                     "last_name": "Smith",
-    #                     "street_address": ["Main Street"],
-    #                     "country": "US",
-    #                     "state_or_territory": "US-CO",
-    #                     "city": "Boulder",
-    #                     "postal_code": "02183",
-    #                 },
-    #             },
-    #             {
-    #                 "flow": auth_state["flow"],
-    #                 "state": SocialAuthState.STATE_REGISTER_EXTRA_DETAILS,
-    #             },
-    #         )
-    #         assert ExportsInquiryLog.objects.filter(user__email=self.email).exists()
-    #         assert (
-    #             ExportsInquiryLog.objects.get(user__email=self.email).computed_result
-    #             == RESULT_SUCCESS
-    #         )
-    #         assert len(mail.outbox) == 0
-    #
-    #         self.user = User.objects.get(email=self.email)
-    #         return result
-
-    # @rule(auth_state=consumes(ConfirmationRedeemedAuthStates))
-    # def register_details_export_reject(self, auth_state):
-    #     """Complete the register confirmation details page with exports enabled"""
-    #     with export_check_response("700_reject"):
-    #         assert_api_call(
-    #             self.client,
-    #             "psa-register-details",
-    #             {
-    #                 "flow": auth_state["flow"],
-    #                 "partial_token": auth_state["partial_token"],
-    #                 "password": self.password,
-    #                 "name": "Sally Smith",
-    #                 "legal_address": {
-    #                     "first_name": "Sally",
-    #                     "last_name": "Smith",
-    #                     "street_address": ["Main Street"],
-    #                     "country": "US",
-    #                     "state_or_territory": "US-CO",
-    #                     "city": "Boulder",
-    #                     "postal_code": "02183",
-    #                 },
-    #             },
-    #             {
-    #                 "flow": auth_state["flow"],
-    #                 "partial_token": None,
-    #                 "errors": ["Error code: CS_700"],
-    #                 "state": SocialAuthState.STATE_USER_BLOCKED,
-    #             },
-    #         )
-    #         assert ExportsInquiryLog.objects.filter(user__email=self.email).exists()
-    #         assert (
-    #             ExportsInquiryLog.objects.get(user__email=self.email).computed_result
-    #             == RESULT_DENIED
-    #         )
-    #         assert len(mail.outbox) == 1
-    #
-    # @rule(auth_state=consumes(ConfirmationRedeemedAuthStates))
-    # def register_details_export_temporary_error(self, auth_state):
-    #     """Complete the register confirmation details page with exports raising a temporary error"""
-    #     with override_settings(**get_cybersource_test_settings()), patch(
-    #         "authentication.pipeline.compliance.api.verify_user_with_exports",
-    #         side_effect=Exception("register_details_export_temporary_error"),
-    #     ):
-    #         assert_api_call(
-    #             self.client,
-    #             "psa-register-details",
-    #             {
-    #                 "flow": auth_state["flow"],
-    #                 "partial_token": auth_state["partial_token"],
-    #                 "password": self.password,
-    #                 "name": "Sally Smith",
-    #                 "legal_address": {
-    #                     "first_name": "Sally",
-    #                     "last_name": "Smith",
-    #                     "street_address": ["Main Street"],
-    #                     "country": "US",
-    #                     "state_or_territory": "US-CO",
-    #                     "city": "Boulder",
-    #                     "postal_code": "02183",
-    #                 },
-    #             },
-    #             {
-    #                 "flow": auth_state["flow"],
-    #                 "partial_token": None,
-    #                 "errors": [
-    #                     "Unable to register at this time, please try again later"
-    #                 ],
-    #                 "state": SocialAuthState.STATE_ERROR_TEMPORARY,
-    #             },
-    #         )
-    #         assert not ExportsInquiryLog.objects.filter(user__email=self.email).exists()
-    #         assert len(mail.outbox) == 0
-
-    @rule(auth_state=consumes(RegisterExtraDetailsAuthStates))
-    def register_user_extra_details(self, auth_state):
-        """Complete the user's extra details"""
-        assert_api_call(
-            Client(),
-            "psa-register-extra",
-            {
-                "flow": auth_state["flow"],
-                "partial_token": auth_state["partial_token"],
-                "gender": "f",
-                "birth_year": "2000",
-                "company": "MIT",
-                "job_title": "QA Manager",
-            },
-            {
+            expected={
                 "flow": auth_state["flow"],
                 "state": SocialAuthState.STATE_SUCCESS,
                 "partial_token": None,
             },
             expect_authenticated=True,
         )
+        self.user = User.objects.get(email=self.email)
+        return result
 
 
 AuthStateMachine.TestCase.settings = hypothesis_settings(

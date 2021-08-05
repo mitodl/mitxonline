@@ -26,7 +26,6 @@ export const routes = {
     confirmSent: "confirm-sent/",
     details:     "details/",
     error:       "error/",
-    extra:       "extra/",
     denied:      "denied/"
   }),
 

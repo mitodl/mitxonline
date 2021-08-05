@@ -79,19 +79,6 @@ export default {
     }
   }),
 
-  registerExtraDetailsMutation: (
-    profileData: ProfileForm,
-    partialToken: string
-  ) => ({
-    ...DEFAULT_OPTIONS,
-    url:  "/api/register/extra/",
-    body: {
-      flow:          FLOW_REGISTER,
-      partial_token: partialToken,
-      ...profileData.profile
-    }
-  }),
-
   forgotPasswordMutation: (email: string) => ({
     url:     "/api/password_reset/",
     body:    { email },

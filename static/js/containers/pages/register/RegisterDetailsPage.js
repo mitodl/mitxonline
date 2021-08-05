@@ -91,9 +91,6 @@ export class RegisterDetailsPage extends React.Component<Props> {
             <div className="col-auto flex-shrink-1">
               <h1>Create an Account</h1>
             </div>
-            <div className="col-auto align-text-right gray-text">
-              <h4>Step 1 of 2</h4>
-            </div>
           </div>
           <div className="auth-card card-shadow row">
             <div className="container">

@@ -23,7 +23,7 @@ from authentication.exceptions import (
 from authentication.utils import SocialAuthState, is_user_email_blocked
 from openedx import api as openedx_api
 from openedx import tasks as openedx_tasks
-from users.serializers import ProfileSerializer, UserSerializer
+from users.serializers import UserSerializer
 from users.utils import usernameify
 
 log = logging.getLogger()
@@ -124,36 +124,6 @@ def create_user_via_email(
         raise UserCreationFailedException(backend, current_partial) from exc
 
     return {"is_new": True, "user": created_user, "username": created_user.username}
-
-
-@partial
-def create_profile(
-    strategy, backend, user=None, flow=None, current_partial=None, *args, **kwargs
-):  # pylint: disable=too-many-arguments,unused-argument
-    """
-    Creates a new profile for the user
-    Args:
-        strategy (social_django.strategy.DjangoStrategy): the strategy used to authenticate
-        backend (social_core.backends.base.BaseAuth): the backend being used to authenticate
-        user (User): the current user
-        flow (str): the type of flow (login or register)
-        current_partial (Partial): the partial for the step in the pipeline
-
-    Raises:
-        RequireProfileException: if the profile data is missing or invalid
-    """
-    if backend.name != EmailAuth.name or user.profile.is_complete:
-        return {}
-
-    data = strategy.request_data().copy()
-
-    serializer = ProfileSerializer(instance=user.profile, data=data)
-    if not serializer.is_valid():
-        raise RequireProfileException(
-            backend, current_partial, errors=serializer.errors
-        )
-    serializer.save()
-    return {}
 
 
 @partial

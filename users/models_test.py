@@ -68,9 +68,6 @@ def test_create_superuser_error(kwargs):
     [
         ["country", "US", True],
         ["country", "United States", False],
-        ["state_or_territory", "US-MA", True],
-        ["state_or_territory", "MA", False],
-        ["state_or_territory", "Massachusets", False],
     ],
 )
 def test_legal_address_validation(field, value, is_valid):

@@ -53,12 +53,13 @@ urlpatterns = [
     ),
     path("create-account/", index, name="signup"),
     path("create-account/details/", index, name="signup-details"),
-    path("create-account/extra/", index, name="signup-extra"),
     path("create-account/denied/", index, name="signup-denied"),
     path("create-account/error/", index, name="signup-error"),
     path("create-account/confirm/", index, name="register-confirm"),
     path("account/inactive/", index, name="account-inactive"),
     path("account/confirm-email/", index, name="account-confirm-email-change"),
+    path("profile/", index, name="view-profile"),
+    path("profile/edit/", index, name="edit-profile"),
     re_path(r"^account-settings/", index, name="account-settings"),
     # Wagtail
     re_path(
