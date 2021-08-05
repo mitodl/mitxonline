@@ -1,17 +1,25 @@
+// sass-lint:disable mixins-before-declarations
 body {
   font-size: 16px;
 }
 
 h1 {
-  font-size: 48px;
-  font-weight: bold;
-  margin: 15px 0;
+  font-size: 42px;
+  line-height: 50px;
+  margin: 0 0 13px;
+  font-weight: 700;
+
+  @include media-breakpoint-up(md) {
+    font-size: 48px;
+    line-height: 60px;
+  }
 }
 
 h2 {
   font-size: 28px;
-  line-height: 38px;
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 28px;
+  margin: 0 0 18px;
 }
 
 h3 {
@@ -187,5 +195,27 @@ a.link-button {
     img {
       margin-bottom: 15px;
     }
+  }
+}
+
+.action-btn {
+  font-size: 20px;
+  line-height: 30px;
+  color: #fff;
+  min-height: 60px;
+  border: 0;
+  box-sizing: border-box;
+  padding: 15px 20px;
+  text-align: center;
+  min-width: 230px;
+  display: inline-block;
+  vertical-align: top;
+  background: linear-gradient(174.8deg, #c5264e 0%, #951328 100%);
+  text-decoration: none;
+  font-weight: 700;
+  transition: linear 0.4s;
+
+  &:hover {
+    opacity: 0.8;
   }
 }
