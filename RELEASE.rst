@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.1.2
+-------------
+
+- Removed unneeded auth fields
+- asadiqbal08/Basic Product Detail Page (#45)
+- add header hero section details (#48)
+
 Version 0.1.1 (Released August 05, 2021)
 -------------
 
