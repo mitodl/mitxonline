@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.1.2
+-------------
+
+- fix wagtail media upload error (#66)
+- added styling for header logo and sinin/creat account links (#37)
+- Removed unneeded auth fields
+- asadiqbal08/Basic Product Detail Page (#45)
+- add header hero section details (#48)
+
 Version 0.1.1 (Released August 05, 2021)
 -------------
 
