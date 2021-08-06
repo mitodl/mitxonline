@@ -30,7 +30,6 @@ const UserMenu = ({ currentUser }: Props) => {
           dest={routes.profile.view}
           aria-label="Profile"
         >
-          <div className="dropdown-icon icon-21 icon-profile" />
           Profile
         </MixedLink>
         <MixedLink
