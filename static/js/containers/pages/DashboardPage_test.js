@@ -51,6 +51,21 @@ describe("DashboardPage", () => {
     })
   })
 
+  it("shows a message if the user has no enrollments", async () => {
+    const { inner } = await renderPage({
+      entities: {
+        enrollments: []
+      }
+    })
+    assert.isTrue(inner.find(".dashboard").exists())
+    const enrolledItems = inner.find(".enrolled-item")
+    assert.lengthOf(enrolledItems, 1)
+    assert.equal(
+      enrolledItems.at(0).text(),
+      "Once you enroll in a course, you can find it listed here."
+    )
+  })
+
   it("links to the courseware URL if that property is set on the course run", async () => {
     const exampleCoursewareUrl = "http://example.com/my-course"
     userEnrollments[0].run.courseware_url = exampleCoursewareUrl

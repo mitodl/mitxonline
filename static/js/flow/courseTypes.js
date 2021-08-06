@@ -22,5 +22,5 @@ export type CourseRunDetail = BaseCourseRun & {
 }
 
 export type RunEnrollment = {
-  run: BaseCourseRun
+  run: CourseRunDetail
 }

@@ -18,7 +18,7 @@ import { formatPrettyDate, parseDateString } from "../../lib/util"
 import { RunEnrollment } from "../../flow/courseTypes"
 
 type DashboardPageProps = {
-  enrollments: RunEnrollment
+  enrollments: RunEnrollment[]
 }
 
 export class DashboardPage extends React.Component<DashboardPageProps, void> {
@@ -77,7 +77,13 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
         <div className="dashboard container">
           <h1>My Courses</h1>
           <div className="enrolled-items container">
-            {enrollments && enrollments.map(this.renderEnrolledItemCard)}
+            {enrollments && enrollments.length > 0 ? (
+              enrollments.map(this.renderEnrolledItemCard)
+            ) : (
+              <div className="enrolled-item row card p-3 p-sm-5 rounded-0">
+                Once you enroll in a course, you can find it listed here.
+              </div>
+            )}
           </div>
         </div>
       </DocumentTitle>
