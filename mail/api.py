@@ -299,9 +299,7 @@ def send_messages(messages, raise_errors=False):
             errored_emails.add(msg)
     if errored_emails:
         for email_msg in errored_emails:
-            log.error(
-                "Error sending email '%s' to %s", email_msg.subject, email_msg.to
-            )
+            log.error("Error sending email '%s' to %s", email_msg.subject, email_msg.to)
         if raise_errors:
             raise EmailSendFailureException()
 

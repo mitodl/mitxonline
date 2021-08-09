@@ -6,9 +6,11 @@ from urllib.parse import urljoin
 from django.conf import settings
 from django.templatetags.static import static
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from cms.serializers import CoursePageSerializer
 from courses import models
+from courses.api import create_run_enrollments
 
 
 def _get_thumbnail_url(page):
@@ -234,10 +236,25 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
     """CourseRunEnrollment model serializer"""
 
     run = CourseRunDetailSerializer(read_only=True)
+    run_id = serializers.IntegerField(write_only=True)
+
+    def create(self, validated_data):
+        user = self.context["user"]
+        run_id = validated_data["run_id"]
+        try:
+            run = models.CourseRun.objects.get(id=run_id)
+        except models.CourseRun.DoesNotExist:
+            raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
+        successful_enrollments, edx_request_success = create_run_enrollments(
+            user,
+            [run],
+            keep_failed_enrollments=True,
+        )
+        return successful_enrollments
 
     class Meta:
         model = models.CourseRunEnrollment
-        fields = ["run"]
+        fields = ["run", "run_id"]
 
 
 class ProgramEnrollmentSerializer(serializers.ModelSerializer):

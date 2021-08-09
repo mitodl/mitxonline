@@ -1,5 +1,5 @@
 """Course views verson 1"""
-from rest_framework import status, viewsets, generics
+from rest_framework import status, mixins, viewsets, generics
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -42,8 +42,10 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = CourseRun.objects.all()
 
 
-class UserEnrollmentsView(generics.ListAPIView):
-    """API view for user enrollments"""
+class UserEnrollmentsViewSet(
+    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+):
+    """API view set for user enrollments"""
 
     serializer_class = CourseRunEnrollmentSerializer
     permission_classes = [IsAuthenticated]
@@ -56,4 +58,7 @@ class UserEnrollmentsView(generics.ListAPIView):
         )
 
     def get_serializer_context(self):
-        return {"include_page_fields": True}
+        if self.action == "list":
+            return {"include_page_fields": True}
+        else:
+            return {"user": self.request.user}

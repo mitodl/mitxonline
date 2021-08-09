@@ -25,7 +25,7 @@ from courses.serializers import (
     ProgramSerializer,
     CourseRunEnrollmentSerializer,
 )
-from courses.views.v1 import UserEnrollmentsView
+from courses.views.v1 import UserEnrollmentsViewSet
 from main.test_utils import assert_drf_json_equal
 
 pytestmark = [pytest.mark.django_db]
@@ -248,10 +248,10 @@ def test_course_runs_not_live_in_courses_api(client, live):
 
 def test_user_enrollments_list(user_drf_client, user):
     """The user enrollments view should return serialized enrollments for the logged-in user"""
-    assert UserEnrollmentsView.serializer_class == CourseRunEnrollmentSerializer
+    assert UserEnrollmentsViewSet.serializer_class == CourseRunEnrollmentSerializer
     user_run_enrollment = CourseRunEnrollmentFactory.create(user=user)
     CourseRunEnrollmentFactory.create()
-    resp = user_drf_client.get(reverse("user-enrollments"))
+    resp = user_drf_client.get(reverse("user-enrollments-api-list"))
     assert resp.status_code == status.HTTP_200_OK
     assert_drf_json_equal(
         resp.json(),
@@ -261,3 +261,36 @@ def test_user_enrollments_list(user_drf_client, user):
             ).data
         ],
     )
+
+
+def test_user_enrollments_create(mocker, user_drf_client, user):
+    """The user enrollments view should succeed when creating a new enrollment"""
+    run = CourseRunFactory.create()
+    fake_enrollment = {"fake": "enrollment"}
+    patched_enroll = mocker.patch(
+        "courses.serializers.create_run_enrollments",
+        return_value=([fake_enrollment], True),
+    )
+    resp = user_drf_client.post(
+        reverse("user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_201_CREATED
+    patched_enroll.assert_called_once_with(
+        user,
+        [run],
+        keep_failed_enrollments=True,
+    )
+    # Running a request to create the enrollment again should succeed
+    resp = user_drf_client.post(
+        reverse("user-enrollments-api-list"), data={"run_id": run.id}
+    )
+    assert resp.status_code == status.HTTP_201_CREATED
+
+
+def test_user_enrollments_create_invalid(user_drf_client, user):
+    """The user enrollments view should fail when creating a new enrollment with an invalid run id"""
+    resp = user_drf_client.post(
+        reverse("user-enrollments-api-list"), data={"run_id": 1234}
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.json() == {"errors": {"run_id": f"Invalid course run id: 1234"}}
