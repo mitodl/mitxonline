@@ -7,24 +7,41 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('wagtailimages', '0023_add_choose_permissions'),
-        ('cms', '0003_resourcepage'),
+        ("wagtailimages", "0023_add_choose_permissions"),
+        ("cms", "0003_resourcepage"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='homepage',
-            name='hero_subtitle',
-            field=models.CharField(blank=True, help_text='The subtitle text to display in the hero section of the home page.', max_length=255, null=True),
+            model_name="homepage",
+            name="hero_subtitle",
+            field=models.CharField(
+                blank=True,
+                help_text="The subtitle text to display in the hero section of the home page.",
+                max_length=255,
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='homepage',
-            name='hero_title',
-            field=models.CharField(blank=True, help_text='The title text to display in the hero section of the home page.', max_length=255, null=True),
+            model_name="homepage",
+            name="hero_title",
+            field=models.CharField(
+                blank=True,
+                help_text="The title text to display in the hero section of the home page.",
+                max_length=255,
+                null=True,
+            ),
         ),
         migrations.AlterField(
-            model_name='homepage',
-            name='hero',
-            field=models.ForeignKey(blank=True, help_text='Main image displayed at the top of the home page. (The recommended dimensions for hero image are 1920x400)', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='wagtailimages.image'),
+            model_name="homepage",
+            name="hero",
+            field=models.ForeignKey(
+                blank=True,
+                help_text="Main image displayed at the top of the home page. (The recommended dimensions for hero image are 1920x400)",
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="+",
+                to="wagtailimages.image",
+            ),
         ),
     ]
