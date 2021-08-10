@@ -60,33 +60,42 @@ const TopAppBar = ({ currentUser, location }: Props) => (
                 <UserMenu currentUser={currentUser} />
               </li>
               {/* These menu lists will show/hide based on desktop/mobile screen. */}
-              <li className="authenticated-menu">
+              <li
+                className="authenticated-menu"
+                data-toggle="collapse"
+                data-target="#nav"
+              >
+                <MixedLink dest={routes.profile.view} aria-label="Profile">
+                  Profile
+                </MixedLink>
+              </li>
+              <li
+                className="authenticated-menu"
+                data-toggle="collapse"
+                data-target="#nav"
+              >
                 <MixedLink dest={routes.accountSettings} aria-label="Settings">
                   Settings
                 </MixedLink>
               </li>
-              <li className="authenticated-menu">
-                <MixedLink
-                  dest={routes.logout}
-                  className="button"
-                  aria-label="Sign Out"
-                >
+              <li
+                className="authenticated-menu"
+                data-toggle="collapse"
+                data-target="#nav"
+              >
+                <MixedLink dest={routes.logout} aria-label="Sign Out">
                   Sign Out
                 </MixedLink>
               </li>
             </React.Fragment>
           ) : (
             <React.Fragment>
-              <li>
-                <MixedLink
-                  dest={routes.login.begin}
-                  // className="button"
-                  aria-label="Login"
-                >
+              <li data-toggle="collapse" data-target="#nav">
+                <MixedLink dest={routes.login.begin} aria-label="Login">
                   Sign In
                 </MixedLink>
               </li>
-              <li>
+              <li data-toggle="collapse" data-target="#nav">
                 <MixedLink
                   dest={routes.register.begin}
                   className="button"

@@ -59,12 +59,12 @@ describe("TopAppBar component", () => {
       )
     })
 
-    it("have two menu items with authenticated-menu class attributes", () => {
+    it("have three menu items with authenticated-menu class attributes", () => {
       assert.equal(
         shallow(<TopAppBar currentUser={user} location={null} />)
           .find(".authenticated-menu")
           .getElements().length,
-        2
+        3
       )
     })
   })
