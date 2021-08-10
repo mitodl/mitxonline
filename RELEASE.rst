@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+Version 0.2.0
+-------------
+
+- Implement logged-ui in the site header (#54)
+- Fixed container class  styling
+- Added API endpoint for creating user enrollments
+- Added styling to pin footer to the bottom of the page
+- Added dashboard message for users with no enrollments
+- fix wagtail media upload error (#66)
+- added styling for header logo and sinin/creat account links (#37)
+- Removed unneeded auth fields
+- asadiqbal08/Basic Product Detail Page (#45)
+- add header hero section details (#48)
+
 Version 0.1.1 (Released August 05, 2021)
 -------------
 
