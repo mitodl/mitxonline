@@ -79,12 +79,14 @@ class HomePage(Page):
         for page in self.featured_products.all():
             if page.course_product_page:
                 product_page = page.course_product_page.specific
+                run = product_page.product.first_unexpired_run
                 page_data.append(
                     {
                         "title": product_page.title,
                         "description": product_page.description,
                         "feature_image": product_page.feature_image,
-                        "start_date": product_page.product.first_unexpired_run.start_date,
+                        "start_date": run.start_date if run is not None else None,
+                        "url_path": product_page.url_path,
                     }
                 )
         return page_data

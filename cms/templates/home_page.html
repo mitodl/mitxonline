@@ -11,6 +11,18 @@
 {% endblock %}
 
 {% block content %}
+<div class="hero-container" style="background-image: url('{% wagtail_img_src page.hero%}')">
+  <div class="container hero-content">
+    <div class="hero-title">
+      {% if page.hero_title %}
+        <h1>{{ page.hero_title }}</h1>
+      {% endif %}
+      {% if page.hero_subtitle %}
+        <h2>{{ page.hero_subtitle }}</h2>
+      {% endif %}
+    </div>
+  </div>
+</div>
 <div class="course-section">
   <div class="container">
     {% if product_cards_section_title %}
@@ -22,7 +34,9 @@
         <div class="course-card">
           <img src="{% wagtail_img_src product.feature_image %}" alt="Featured course image">
           <div class="course-info">
-            <h2 class="course-card-title">{{ product.title }}</h2>
+            <a href="{{ product.url_path }}">
+              <h2 class="course-card-title">{{ product.title }}</h2>
+            </a>
             <div class="course-card-description">
               {{ product.description |richtext }}
             </div>
