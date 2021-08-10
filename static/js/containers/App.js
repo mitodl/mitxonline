@@ -64,7 +64,8 @@ export class App extends React.Component<Props, void> {
               path={urljoin(match.url, String(routes.account.confirmEmail))}
               component={EmailConfirmPage}
             />
-            <Route
+            <PrivateRoute
+              exact
               path={urljoin(match.url, String(routes.dashboard))}
               component={DashboardPage}
             />
