@@ -1,14 +1,22 @@
 """CMS model definitions"""
 from django.conf import settings
 from django.db import models
-from wagtail.admin.edit_handlers import FieldPanel, StreamFieldPanel
+from wagtail.admin.edit_handlers import (
+    FieldPanel,
+    StreamFieldPanel,
+    PageChooserPanel,
+    InlinePanel,
+)
 from wagtail.core.blocks import StreamBlock
 from wagtail.core.fields import RichTextField, StreamField
 from wagtail.core.models import Page
+from wagtail.core.models import Page, Orderable
 from wagtail.images.models import Image
 from wagtail.images.edit_handlers import ImageChooserPanel
 
 from cms.blocks import ResourceBlock, PriceBlock
+
+from modelcluster.fields import ParentalKey
 
 
 class HomePage(Page):
@@ -40,15 +48,76 @@ class HomePage(Page):
         help_text="The subtitle text to display in the hero section of the home page.",
     )
 
+    product_section_title = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="The title text to display in the product cards section of the home page.",
+    )
+
     content_panels = Page.content_panels + [
         ImageChooserPanel("hero"),
         FieldPanel("hero_title"),
         FieldPanel("hero_subtitle"),
+        FieldPanel("product_section_title"),
+        InlinePanel("featured_products", label="Featured Products"),
     ]
+
     parent_page_types = [Page]
     subpage_types = [
-        "CoursePage",
         "ResourcePage",
+    ]
+
+    def _get_child_page_of_type(self, cls):
+        """Gets the first child page of the given type if it exists"""
+        child = self.get_children().type(cls).live().first()
+        return child.specific if child else None
+
+    @property
+    def products(self):
+        page_data = []
+        for page in self.featured_products.all():
+            if page.course_product_page:
+                product_page = page.course_product_page.specific
+                run = product_page.product.first_unexpired_run
+                page_data.append(
+                    {
+                        "title": product_page.title,
+                        "description": product_page.description,
+                        "feature_image": product_page.feature_image,
+                        "start_date": run.start_date if run is not None else None,
+                        "url_path": product_page.url_path,
+                    }
+                )
+        return page_data
+
+    def get_context(self, request, *args, **kwargs):
+        return {
+            **super().get_context(request),
+            "product_cards_section_title": self.product_section_title,
+            "products": self.products,
+        }
+
+
+class HomeProductLink(Orderable):
+    """
+    Home and ProductPage Link
+    """
+
+    page = ParentalKey(
+        HomePage, on_delete=models.CASCADE, related_name="featured_products"
+    )
+
+    course_product_page = models.ForeignKey(
+        "wagtailcore.Page",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
+    panels = [
+        PageChooserPanel("course_product_page", "cms.CoursePage"),
     ]
 
 
@@ -115,7 +184,7 @@ class ProductPage(Page):
         FieldPanel("what_you_learn"),
         FieldPanel("feature_image"),
     ]
-    parent_page_types = ["HomePage"]
+
     subpage_types = []
 
 
@@ -123,6 +192,8 @@ class CoursePage(ProductPage):
     """
     Detail page for courses
     """
+
+    parent_page_types = [Page]
 
     course = models.OneToOneField(
         "courses.Course", null=True, on_delete=models.SET_NULL, related_name="page"

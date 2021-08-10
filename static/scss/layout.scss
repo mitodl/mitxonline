@@ -16,11 +16,13 @@
 @import "error";
 @import "expandable";
 @import "dashboard";
+@import "course-cards";
 @import "home";
 @import "product-details";
 
+
 body {
-  font-family: Montserrat, "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: "Montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
   margin: 0;
   color: #000000;
   background: linear-gradient(to bottom, #ffffff, #f5f5f5 250px);
