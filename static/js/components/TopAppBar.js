@@ -60,17 +60,29 @@ const TopAppBar = ({ currentUser, location }: Props) => (
                 <UserMenu currentUser={currentUser} />
               </li>
               {/* These menu lists will show/hide based on desktop/mobile screen. */}
-              <li className="authenticated-menu" data-toggle="collapse" data-target="#nav">
+              <li
+                className="authenticated-menu"
+                data-toggle="collapse"
+                data-target="#nav"
+              >
                 <MixedLink dest={routes.profile.view} aria-label="Profile">
                   Profile
                 </MixedLink>
               </li>
-              <li className="authenticated-menu" data-toggle="collapse" data-target="#nav">
+              <li
+                className="authenticated-menu"
+                data-toggle="collapse"
+                data-target="#nav"
+              >
                 <MixedLink dest={routes.accountSettings} aria-label="Settings">
                   Settings
                 </MixedLink>
               </li>
-              <li className="authenticated-menu" data-toggle="collapse" data-target="#nav">
+              <li
+                className="authenticated-menu"
+                data-toggle="collapse"
+                data-target="#nav"
+              >
                 <MixedLink dest={routes.logout} aria-label="Sign Out">
                   Sign Out
                 </MixedLink>
