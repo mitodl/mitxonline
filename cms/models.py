@@ -1,6 +1,9 @@
 """CMS model definitions"""
+import re
+
 from django.conf import settings
 from django.db import models
+from django.http import Http404
 from wagtail.admin.edit_handlers import (
     FieldPanel,
     StreamFieldPanel,
@@ -17,6 +20,8 @@ from wagtail.images.edit_handlers import ImageChooserPanel
 from cms.blocks import ResourceBlock, PriceBlock
 
 from modelcluster.fields import ParentalKey
+
+from cms.constants import COURSE_INDEX_SLUG
 
 
 class HomePage(Page):
@@ -67,6 +72,7 @@ class HomePage(Page):
     subpage_types = [
         "CoursePage",
         "ResourcePage",
+        "CourseIndexPage",
     ]
 
     def _get_child_page_of_type(self, cls):
@@ -120,6 +126,69 @@ class HomeProductLink(Orderable):
     panels = [
         PageChooserPanel("course_product_page", "cms.CoursePage"),
     ]
+
+
+class CourseObjectIndexPage(Page):
+    """
+    A placeholder class to group courseware object pages as children.
+    This class logically acts as no more than a "folder" to organize
+    pages and add parent slug segment to the page url.
+    """
+
+    class Meta:
+        abstract = True
+
+    parent_page_types = ["HomePage"]
+
+    @classmethod
+    def can_create_at(cls, parent):
+        """
+        You can only create one of these pages under the home page.
+        The parent is limited via the `parent_page_type` list.
+        """
+        return (
+            super().can_create_at(parent)
+            and not parent.get_children().type(cls).exists()
+        )
+
+    def get_child_by_readable_id(self, readable_id):
+        """Fetch a child page by a Program/Course readable_id value"""
+        raise NotImplementedError
+
+    def route(self, request, path_components):
+        if path_components:
+            # request is for a child of this page
+            child_readable_id = path_components[0]
+            remaining_components = path_components[1:]
+
+            try:
+                # Try to find a child by the 'readable_id' of a Program/Course
+                # instead of the page slug (as Wagtail does by default)
+                subpage = self.get_child_by_readable_id(child_readable_id)
+            except Page.DoesNotExist:
+                raise Http404
+
+            return subpage.specific.route(request, remaining_components)
+        return super().route(request, path_components)
+
+    def serve(self, request, *args, **kwargs):
+        """
+        For index pages we raise a 404 because these pages do not have a template
+        of their own and we do not expect a page to available at their slug.
+        """
+        raise Http404
+
+
+class CourseIndexPage(CourseObjectIndexPage):
+    """
+    An index page for CoursePages
+    """
+
+    slug = COURSE_INDEX_SLUG
+
+    def get_child_by_readable_id(self, readable_id):
+        """Fetch a child page by the related Course's readable_id value"""
+        return self.get_children().get(coursepage__course__readable_id=readable_id)
 
 
 class ProductPage(Page):
@@ -188,13 +257,43 @@ class ProductPage(Page):
 
     subpage_types = []
 
+    # Matches the standard page path that Wagtail returns for this page type.
+    slugged_page_path_pattern = re.compile(r"(^.*/)([^/]+)(/?$)")
+
+    @property
+    def product(self):
+        """Returns the courseware object (Course, Program) associated with this page"""
+        raise NotImplementedError
+
+    def get_url_parts(self, request=None):
+        """
+        Overrides base method for returning the parts of the URL for pages of this class
+
+        Wagtail generates the 'page_path' part of the url tuple with the
+        parent page slug followed by this page's slug (e.g.: "/courses/my-page-title").
+        We want to generate that path with the parent page slug followed by the readable_id
+        of the Course/Program instead (e.g.: "/courses/course-v1:edX+DemoX+Demo_Course")
+        """
+        url_parts = super().get_url_parts(request=request)
+        if not url_parts:
+            return None
+        return (
+            url_parts[0],
+            url_parts[1],
+            re.sub(
+                self.slugged_page_path_pattern,
+                r"\1{}\3".format(self.product.readable_id),
+                url_parts[2],
+            ),
+        )
+
 
 class CoursePage(ProductPage):
     """
     Detail page for courses
     """
 
-    parent_page_types = [HomePage]
+    parent_page_types = ["CourseIndexPage"]
 
     course = models.OneToOneField(
         "courses.Course", null=True, on_delete=models.SET_NULL, related_name="page"

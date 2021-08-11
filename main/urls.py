@@ -68,6 +68,7 @@ urlpatterns = [
     re_path(r"^cms/", include(wagtailadmin_urls)),
     re_path(r"^documents/", include(wagtaildocs_urls)),
     path("", include(wagtail_urls)),
+    path("", include("cms.urls")),
     # Example view
     path("", index, name="main-index"),
 ] + (
