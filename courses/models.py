@@ -65,7 +65,7 @@ class ActiveEnrollmentManager(models.Manager):
         return super().get_queryset().filter(active=True)
 
 
-detail_path_char_pattern = r"\w\-+:"
+detail_path_char_pattern = r"\w\-+:\."
 validate_url_path_field = RegexValidator(
     r"^[{}]+$".format(detail_path_char_pattern),
     "This field is used to produce URL paths. It must contain only characters that match this pattern: [{}]".format(
