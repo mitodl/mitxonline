@@ -65,6 +65,7 @@ class HomePage(Page):
 
     parent_page_types = [Page]
     subpage_types = [
+        "CoursePage",
         "ResourcePage",
     ]
 
@@ -86,7 +87,7 @@ class HomePage(Page):
                         "description": product_page.description,
                         "feature_image": product_page.feature_image,
                         "start_date": run.start_date if run is not None else None,
-                        "url_path": product_page.url_path,
+                        "url_path": product_page.slug,
                     }
                 )
         return page_data
@@ -193,7 +194,7 @@ class CoursePage(ProductPage):
     Detail page for courses
     """
 
-    parent_page_types = [Page]
+    parent_page_types = [HomePage]
 
     course = models.OneToOneField(
         "courses.Course", null=True, on_delete=models.SET_NULL, related_name="page"
