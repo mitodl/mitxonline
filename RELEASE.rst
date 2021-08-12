@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.2.1
+-------------
+
+- fix home page feature products section (#88)
+- changed image src to valid image
+- fix: made dashboard accessible only when authenticated (#77)
+- home page product section (#38)
+
 Version 0.2.0 (Released August 11, 2021)
 -------------
 
