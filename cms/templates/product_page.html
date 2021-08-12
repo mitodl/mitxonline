@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% load static render_bundle  %}
+{% load static wagtail_img_src render_bundle  %}
 {% load wagtailcore_tags wagtailembeds_tags %}
 
 {% block title %}{{ page.title }} | {{ site_name }}{% endblock %}
@@ -93,5 +93,26 @@
           </div>
         </div>
       </section>
+      {% if page.faculty_members %}
+      <section class="faculty-section">
+        <div class="container">
+          <h2>{{ page.faculty_section_title }}</h2>
+          <ul class="faculty-members">
+            {% for member in page.faculty_members %}
+              <li>
+                <div class="member-card">
+                  <img src="{% wagtail_img_src member.value.image %}" alt="{{ member.name }}">
+                  <div class="member-info">
+                    <h2 class="name">{{ member.value.name }}</h2>
+                    <div class="designation">{{ member.value.designation }}</div>
+                    <div class="description">{{ member.value.description }}</div>
+                  </div>
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
+      {% endif %}
     </div>
 {% endblock %}
