@@ -93,7 +93,7 @@ class HomePage(Page):
                         "description": product_page.description,
                         "feature_image": product_page.feature_image,
                         "start_date": run.start_date if run is not None else None,
-                        "url_path": product_page.slug,
+                        "url_path": product_page.get_url(),
                     }
                 )
         return page_data
