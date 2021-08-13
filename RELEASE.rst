@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.2.1
+Version 0.2.1 (Released August 13, 2021)
 -------------
 
 - fix home page feature products section (#88)
