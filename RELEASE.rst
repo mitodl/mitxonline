@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.3.0
+-------------
+
+- allow dot in course readable_id (#85)
+- Fixed home page product URLs
+- Added course index page
+
 Version 0.2.1 (Released August 13, 2021)
 -------------
 
