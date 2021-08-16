@@ -1,6 +1,9 @@
 """CMS model definitions"""
+import logging
 import re
 from urllib.parse import quote_plus
+
+from json import dumps
 
 from django.conf import settings
 from django.db import models
@@ -18,6 +21,8 @@ from wagtail.core.models import Page
 from wagtail.core.models import Page, Orderable
 from wagtail.images.models import Image
 from wagtail.images.edit_handlers import ImageChooserPanel
+from wagtail.embeds.embeds import get_embed
+from wagtail.embeds.exceptions import EmbedException
 
 from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
 
@@ -25,6 +30,7 @@ from modelcluster.fields import ParentalKey
 
 from cms.constants import COURSE_INDEX_SLUG
 
+log = logging.getLogger()
 
 class HomePage(Page):
     """
@@ -233,6 +239,12 @@ class ProductPage(Page):
 
     about = RichTextField(null=True, blank=True, help_text="About this course details.")
 
+    video_url = models.URLField(
+        null=True,
+        blank=True,
+        help_text="URL to the video to be displayed for this program/course. It can be an HLS or Youtube video URL."
+    )
+
     what_you_learn = RichTextField(
         null=True, blank=True, help_text="What you will learn from this course."
     )
@@ -260,6 +272,26 @@ class ProductPage(Page):
         help_text="The faculty members to display on this page",
     )
 
+    @property
+    def video_player_config(self):
+        """ Get configuration for video player """
+
+        if self.video_url:
+            config = {
+                "techOrder" : ["html5"],
+                "sources" : [{
+                    "src": self.video_url
+                }]
+            }
+            try:
+                embed = get_embed(self.video_url)
+                provider_name = embed.provider_name.lower()
+                config["techOrder"] = [provider_name, *config["techOrder"]]
+                config["sources"][0]["type"] = f"video/{provider_name}"
+            except EmbedException:
+                log.info(f"The embed for the current url {self.video_url} is unavailable.")
+            return dumps(config)
+
     content_panels = Page.content_panels + [
         FieldPanel("description"),
         FieldPanel("length"),
@@ -271,6 +303,7 @@ class ProductPage(Page):
         FieldPanel("feature_image"),
         FieldPanel("faculty_section_title"),
         StreamFieldPanel("faculty_members"),
+        FieldPanel("video_url")
     ]
 
     subpage_types = []
@@ -347,7 +380,7 @@ class CoursePage(ProductPage):
             "sign_in_url": sign_in_url,
             "start_date": first_unexpired_run.start_date
             if first_unexpired_run
-            else None,
+            else None
         }
 
     content_panels = [
