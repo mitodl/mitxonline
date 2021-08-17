@@ -28,10 +28,10 @@
     {% if product_cards_section_title %}
       <h1>{{ product_cards_section_title }}</h1>
     {% endif %}
-    <ul class="course-listing">
+    <ul class="course-listing card-listing">
       {% for product in products %}
       <li>
-        <div class="course-card">
+        <div class="course-card highlight-card">
           <img src="{% wagtail_img_src product.feature_image %}" alt="Featured course image">
           <div class="course-info">
             <a href="{{ product.url_path }}">

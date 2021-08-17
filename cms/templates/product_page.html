@@ -97,14 +97,13 @@
       <section class="faculty-section">
         <div class="container">
           <h2>{{ page.faculty_section_title }}</h2>
-          <ul class="faculty-members">
+          <ul class="faculty-members card-listing">
             {% for member in page.faculty_members %}
               <li>
-                <div class="member-card">
+                <div class="member-card highlight-card">
                   <img src="{% wagtail_img_src member.value.image %}" alt="{{ member.name }}">
                   <div class="member-info">
-                    <h2 class="name">{{ member.value.name }}</h2>
-                    <div class="designation">{{ member.value.designation }}</div>
+                    <h4 class="name">{{ member.value.name }}</h4>
                     <div class="description">{{ member.value.description }}</div>
                   </div>
                 </div>
