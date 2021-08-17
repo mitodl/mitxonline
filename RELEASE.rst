@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.3.0
+Version 0.3.0 (Released August 17, 2021)
 -------------
 
 - allow dot in course readable_id (#85)
