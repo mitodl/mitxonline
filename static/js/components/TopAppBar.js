@@ -104,6 +104,20 @@ const TopAppBar = ({ currentUser, location }: Props) => (
                   Create Account
                 </MixedLink>
               </li>
+              <li>
+                <MixedLink dest={routes.login.begin} aria-label="Login">
+                  Sign In
+                </MixedLink>
+              </li>
+              <li>
+                <MixedLink
+                  dest={routes.register.begin}
+                  className="button"
+                  aria-label="Login"
+                >
+                  Create Account
+                </MixedLink>
+              </li>
             </React.Fragment>
           )}
         </ul>
