@@ -1,10 +1,5 @@
 // sass-lint:disable mixins-before-declarations
 .course-listing {
-  padding: 0;
-  margin: 0 -22px;
-  list-style: none;
-  letter-spacing: -0.32em;
-
   .course-card-description {
     overflow-y: auto;
     margin-bottom: 30px;
@@ -18,17 +13,10 @@
     @include media-breakpoint-down(sm) {
       width: calc(100% - 44px);
     }
-    letter-spacing: normal;
-    display: inline-block;
-    vertical-align: top;
     width: calc(33.33% - 44px);
     margin: 0 22px 44px;
 
     .course-card {
-      background: white;
-      border-bottom: 3px solid transparent;
-      box-shadow: 0 1px 0 0 rgba(0, 0, 0, 0.23);
-
       .course-info {
         padding: 15px;
 
@@ -61,11 +49,8 @@
       }
 
       &:hover {
-        border-color: #a41e34;
-        box-shadow: 0 2px 15px 4px rgba(0, 0, 0, 0.16);
-
         h2 {
-          color: #a41e34;
+          color: $brand-button-bg;
         }
       }
     }

@@ -17,7 +17,7 @@ from wagtail.core.models import Page, Orderable
 from wagtail.images.models import Image
 from wagtail.images.edit_handlers import ImageChooserPanel
 
-from cms.blocks import ResourceBlock, PriceBlock
+from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
 
 from modelcluster.fields import ParentalKey
 
@@ -244,6 +244,20 @@ class ProductPage(Page):
         help_text="Image that will be used where the course is featured or linked.",
     )
 
+    faculty_section_title = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        default="Meet your instructors",
+        help_text="The title text to display in the faculty cards section of the product page.",
+    )
+
+    faculty_members = StreamField(
+        [("faculty_member", FacultyBlock())],
+        null=True,
+        help_text="The faculty members to display on this page",
+    )
+
     content_panels = Page.content_panels + [
         FieldPanel("description"),
         FieldPanel("length"),
@@ -253,6 +267,8 @@ class ProductPage(Page):
         FieldPanel("about"),
         FieldPanel("what_you_learn"),
         FieldPanel("feature_image"),
+        FieldPanel("faculty_section_title"),
+        StreamFieldPanel("faculty_members"),
     ]
 
     subpage_types = []
@@ -315,7 +331,9 @@ class CoursePage(ProductPage):
             else None,
         }
 
-    content_panels = [FieldPanel("course")] + ProductPage.content_panels
+    content_panels = [
+        FieldPanel("course"),
+    ] + ProductPage.content_panels
 
 
 class ResourcePage(Page):
