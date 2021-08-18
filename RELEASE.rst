@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.3.1
+-------------
+
+- add faculty section in the product page (#89)
+
 Version 0.3.0 (Released August 17, 2021)
 -------------
 
