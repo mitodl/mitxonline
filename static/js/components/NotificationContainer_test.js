@@ -8,6 +8,8 @@ import NotificationContainer, {
 import { TextNotification } from "./notifications"
 import { ALERT_TYPE_TEXT } from "../constants"
 import IntegrationTestHelper from "../util/integration_test_helper"
+import * as notificationsApi from "../lib/notificationsApi"
+import sinon from "sinon"
 
 describe("NotificationContainer component", () => {
   const messages = {
@@ -17,10 +19,13 @@ describe("NotificationContainer component", () => {
     }
   }
 
-  let helper, render
+  let helper, render, getAlertPropsStub
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
+    getAlertPropsStub = helper.sandbox
+      .stub(notificationsApi, "getNotificationAlertProps")
+      .returns({})
     render = helper.configureHOCRenderer(
       NotificationContainer,
       InnerNotificationContainer,
@@ -48,6 +53,22 @@ describe("NotificationContainer component", () => {
     assert.equal(alerts.at(0).prop("children").type, TextNotification)
   })
 
+  it("uses TextNotification as the default inner component", async () => {
+    const { inner } = await render({
+      ui: {
+        userNotifications: {
+          aMessage: {
+            type:  "unrecognized-type",
+            props: { text: "derp" }
+          }
+        }
+      }
+    })
+    const alerts = inner.find("Alert")
+    assert.lengthOf(alerts, Object.keys(messages).length)
+    assert.equal(alerts.at(0).prop("children").type, TextNotification)
+  })
+
   //
   ;[[undefined, "info"], ["danger", "danger"]].forEach(
     ([color, expectedColor]) => {
@@ -66,9 +87,26 @@ describe("NotificationContainer component", () => {
           }
         })
         assert.equal(inner.find("Alert").prop("color"), expectedColor)
+        sinon.assert.calledWith(getAlertPropsStub, ALERT_TYPE_TEXT)
       })
     }
   )
+
+  it("uses a default color value for the alert type if a color was not exactly specified", async () => {
+    getAlertPropsStub.returns({ color: "some-color" })
+    const { inner } = await render({
+      ui: {
+        userNotifications: {
+          aMessage: {
+            type:  "some-type",
+            props: { text: "derp" }
+          }
+        }
+      }
+    })
+    assert.equal(inner.find("Alert").prop("color"), "some-color")
+    sinon.assert.calledWith(getAlertPropsStub, "some-type")
+  })
 
   it("hides a message when it's dismissed, then removes it from global state", async () => {
     const delayMs = 5

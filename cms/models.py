@@ -1,9 +1,11 @@
 """CMS model definitions"""
 import re
+from urllib.parse import quote_plus
 
 from django.conf import settings
 from django.db import models
 from django.http import Http404
+from django.urls import reverse
 from wagtail.admin.edit_handlers import (
     FieldPanel,
     StreamFieldPanel,
@@ -324,8 +326,25 @@ class CoursePage(ProductPage):
 
     def get_context(self, request, *args, **kwargs):
         first_unexpired_run = self.product.first_unexpired_run
+        is_enrolled = (
+            False
+            if (first_unexpired_run is None or not request.user.is_authenticated)
+            else (
+                first_unexpired_run.courserunenrollment_set.filter(
+                    user_id=request.user.id
+                ).exists()
+            )
+        )
+        sign_in_url = (
+            None
+            if request.user.is_authenticated
+            else f'{reverse("login")}?next={quote_plus(self.get_url())}'
+        )
         return {
             **super().get_context(request, *args, **kwargs),
+            "run": first_unexpired_run,
+            "is_enrolled": is_enrolled,
+            "sign_in_url": sign_in_url,
             "start_date": first_unexpired_run.start_date
             if first_unexpired_run
             else None,

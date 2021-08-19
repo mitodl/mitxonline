@@ -1,17 +1,20 @@
 // @flow
 import { assert } from "chai"
 import sinon from "sinon"
-import { mergeRight } from "ramda"
 
 import HeaderApp, { HeaderApp as InnerHeaderApp } from "./HeaderApp"
 import IntegrationTestHelper from "../util/integration_test_helper"
-import { makeUser, makeUnusedCoupon } from "../factories/user"
+import * as notificationsApi from "../lib/notificationsApi"
+import { ALERT_TYPE_TEXT } from "../constants"
 
 describe("Top-level HeaderApp", () => {
-  let helper, renderPage
+  let helper, renderPage, getStoredUserMessageStub
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
+    getStoredUserMessageStub = helper.sandbox
+      .stub(notificationsApi, "getStoredUserMessage")
+      .returns(null)
     renderPage = helper.configureHOCRenderer(HeaderApp, InnerHeaderApp, {}, {})
   })
 
@@ -24,5 +27,24 @@ describe("Top-level HeaderApp", () => {
 
     assert.notExists(inner.find("div").prop("children"))
     sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+  })
+
+  it("adds a user notification if a stored message is found in cookies", async () => {
+    const userMsg = {
+      type: "some-type",
+      text: "some text"
+    }
+    getStoredUserMessageStub.returns(userMsg)
+    const { store } = await renderPage()
+
+    const { ui } = store.getState()
+    assert.deepEqual(ui.userNotifications, {
+      "loaded-user-msg": {
+        type:  userMsg.type,
+        props: {
+          text: userMsg.text
+        }
+      }
+    })
   })
 })

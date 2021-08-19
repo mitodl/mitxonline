@@ -19,7 +19,33 @@
               <div class="text">
                 <h1>{{ page.title }}</h1>
                 <p>{{ page.description |richtext }}</p>
-                <a href="#" class="action-btn">Enroll now</a>
+                {% if run %}
+                  {% if is_enrolled %}
+                    {% if run.courseware_url_path %}
+                      <a href="{{ run.courseware_url }}" class="action-btn" target="_blank" rel="noopener noreferrer">
+                        Enrolled &#10003;
+                      </a>
+                    {% else %}
+                      <div class="action-btn">
+                        Enrolled &#10003;
+                      </div>
+                    {% endif %}
+                  {% else %}
+                    {% if sign_in_url %}
+                      <a href="{{ sign_in_url }}" class="action-btn">
+                        Enroll now
+                      </a>
+                    {% else %}
+                      <form action="/enrollments/" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="run" value="{{ run.id }}" />
+                        <button type="submit" class="action-btn">
+                          Enroll now
+                        </button>
+                      </form>
+                    {% endif %}
+                  {% endif %}
+                {% endif %}
               </div>
             </div>
             <div class="content-col video">

@@ -34,9 +34,11 @@
         <div class="course-card highlight-card">
           <img src="{% wagtail_img_src product.feature_image %}" alt="Featured course image">
           <div class="course-info">
-            <a href="{{ product.url_path }}">
-              <h2 class="course-card-title">{{ product.title }}</h2>
-            </a>
+            <h2 class="course-card-title">
+              <a href="{{ product.url_path }}">
+                {{ product.title }}
+              </a>
+            </h2>
             <div class="course-card-description">
               {{ product.description |richtext }}
             </div>

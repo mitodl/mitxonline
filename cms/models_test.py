@@ -1,8 +1,13 @@
+from urllib.parse import quote_plus
+
 import pytest
 import factory
+from django.contrib.auth.models import AnonymousUser
 from django.urls import resolve
+from django.test.client import RequestFactory
 
 from cms.factories import ResourcePageFactory, CoursePageFactory
+from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -34,3 +39,47 @@ def test_custom_detail_page_urls_handled():
         resolver_match.func.__module__ == "wagtail.core.views"
     )  # pylint: disable=protected-access
     assert resolver_match.func.__name__ == "serve"  # pylint: disable=protected-access
+
+
+@pytest.mark.parametrize(
+    "is_authenticated,has_unexpired_run,enrolled,exp_sign_in_url,exp_is_enrolled",
+    [
+        [True, True, True, False, True],
+        [False, False, False, True, False],
+        [False, True, True, True, False],
+    ],
+)
+def test_course_page_context(
+    user,
+    is_authenticated,
+    has_unexpired_run,
+    enrolled,
+    exp_sign_in_url,
+    exp_is_enrolled,
+):
+    """CoursePage.get_context should return expected values"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = user if is_authenticated else AnonymousUser()
+    course_readable_id = "my:course+1"
+    if has_unexpired_run:
+        run = CourseRunFactory.create(course__readable_id=course_readable_id)
+        course_page_kwargs = dict(course=run.course)
+    else:
+        run = None
+        course_page_kwargs = dict(course__readable_id=course_readable_id)
+    course_page = CoursePageFactory.create(**course_page_kwargs)
+    if enrolled:
+        CourseRunEnrollmentFactory.create(user=user, run=run)
+    context = course_page.get_context(request=request)
+    assert context == {
+        "self": course_page,
+        "page": course_page,
+        "request": request,
+        "run": run,
+        "is_enrolled": exp_is_enrolled,
+        "sign_in_url": f"/signin/?next={quote_plus(course_page.get_url())}"
+        if exp_sign_in_url
+        else None,
+        "start_date": getattr(run, "start_date", None),
+    }

@@ -11,6 +11,7 @@ from rest_framework.exceptions import ValidationError
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
+from main import features
 
 
 def _get_thumbnail_url(page):
@@ -248,7 +249,7 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
         successful_enrollments, edx_request_success = create_run_enrollments(
             user,
             [run],
-            keep_failed_enrollments=True,
+            keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
         )
         return successful_enrollments
 
