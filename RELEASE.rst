@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.3.2
+-------------
+
+- Implemented enrollment and notification from product detail
+
 Version 0.3.1 (Released August 19, 2021)
 -------------
 
