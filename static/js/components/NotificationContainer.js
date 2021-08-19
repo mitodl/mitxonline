@@ -6,8 +6,14 @@ import { partial } from "ramda"
 import { Alert } from "reactstrap"
 
 import { removeUserNotification } from "../actions"
-import { newSetWith, newSetWithout, timeoutPromise } from "../lib/util"
-import { notificationTypeMap } from "./notifications"
+import {
+  firstNotNil,
+  newSetWith,
+  newSetWithout,
+  timeoutPromise
+} from "../lib/util"
+import { getNotificationAlertProps } from "../lib/notificationsApi"
+import { notificationTypeMap, TextNotification } from "./notifications"
 
 import type { UserNotificationMapping } from "../reducers/notifications"
 
@@ -56,12 +62,19 @@ export class NotificationContainer extends React.Component<Props, State> {
         {Object.keys(userNotifications).map((notificationKey, i) => {
           const dismiss = partial(this.onDismiss, [notificationKey])
           const notification = userNotifications[notificationKey]
-          const AlertBodyComponent = notificationTypeMap[notification.type]
+          const alertProps = getNotificationAlertProps(notification.type)
+          const color = firstNotNil([
+            notification.color,
+            alertProps.color,
+            "info"
+          ])
+          const AlertBodyComponent =
+            notificationTypeMap[notification.type] || TextNotification
 
           return (
             <Alert
               key={i}
-              color={notification.color || "info"}
+              color={color}
               className="rounded-0 border-0"
               isOpen={!hiddenNotifications.has(notificationKey)}
               toggle={dismiss}

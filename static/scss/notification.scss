@@ -14,7 +14,7 @@
   .alert {
     margin-bottom: 0;
 
-    &.alert-info, &.alert-danger {
+    &.alert-info, &.alert-danger, &.alert-success {
       color: white;
 
       a.alert-link, .close {
@@ -41,6 +41,10 @@
 
     &.alert-danger {
       background-color: $primary;
+    }
+
+    &.alert-success {
+      background-color: $success;
     }
   }
 

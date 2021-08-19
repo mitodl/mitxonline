@@ -23,14 +23,32 @@ import DashboardPage from "./pages/DashboardPage"
 
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
+import { getStoredUserMessage } from "../lib/notificationsApi"
 
 type Props = {
   match: Match,
   location: Location,
-  currentUser: ?CurrentUser
+  currentUser: ?CurrentUser,
+  addUserNotification: Function
 }
 
 export class App extends React.Component<Props, void> {
+  componentDidMount() {
+    const { addUserNotification } = this.props
+
+    const userMsg = getStoredUserMessage()
+    if (userMsg) {
+      addUserNotification({
+        "loaded-user-msg": {
+          type:  userMsg.type,
+          props: {
+            text: userMsg.text
+          }
+        }
+      })
+    }
+  }
+
   render() {
     const { match, currentUser, location } = this.props
 

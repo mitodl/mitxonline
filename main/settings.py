@@ -656,6 +656,12 @@ if MITX_ONLINE_USE_S3:
         AWS_S3_CUSTOM_DOMAIN = "{dist}.cloudfront.net".format(dist=CLOUDFRONT_DIST)
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
+FEATURES_DEFAULT = get_bool(
+    name="FEATURES_DEFAULT",
+    default=False,
+    dev_only=True,
+    description="The default value for all feature flags",
+)
 FEATURES = get_features()
 
 # Redis

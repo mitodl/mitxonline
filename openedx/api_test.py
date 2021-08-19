@@ -14,9 +14,8 @@ from oauthlib.common import generate_token
 from requests.exceptions import HTTPError
 from rest_framework import status
 
+from courses.factories import CourseRunFactory
 from main.test_utils import MockHttpError, MockResponse
-
-# from courses.factories import CourseRunFactory, CourseRunEnrollmentFactory
 from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
     OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS,
@@ -28,17 +27,13 @@ from openedx.api import (
     get_valid_edx_api_auth,
     repair_faulty_edx_user,
     repair_faulty_openedx_users,
-    retry_failed_edx_enrollments,
-    unenroll_edx_course_run,
     update_edx_user_email,
     update_edx_user_name,
 )
 from openedx.constants import (
-    EDX_ENROLLMENT_AUDIT_MODE,
-    EDX_ENROLLMENT_PRO_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     PLATFORM_EDX,
-    PRO_ENROLL_MODE_ERROR_TEXTS,
+    EDX_DEFAULT_ENROLLMENT_MODE,
 )
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
@@ -305,81 +300,55 @@ def test_get_edx_api_client(mocker, settings, user):
     )
 
 
-# def test_enroll_in_edx_course_runs(mocker, user):
-#     """Tests that enroll_in_edx_course_runs uses the EdxApi client to enroll in course runs"""
-#     mock_client = mocker.MagicMock()
-#     enroll_return_values = ["result1", "result2"]
-#     mock_client.enrollments.create_student_enrollment = mocker.Mock(
-#         side_effect=enroll_return_values
-#     )
-#     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
-#     course_runs = CourseRunFactory.build_batch(2)
-#     enroll_results = enroll_in_edx_course_runs(user, course_runs)
-#     mock_client.enrollments.create_student_enrollment.assert_any_call(
-#         course_runs[0].courseware_id, mode=EDX_ENROLLMENT_PRO_MODE
-#     )
-#     mock_client.enrollments.create_student_enrollment.assert_any_call(
-#         course_runs[1].courseware_id, mode=EDX_ENROLLMENT_PRO_MODE
-#     )
-#     assert enroll_results == enroll_return_values
+def test_enroll_in_edx_course_runs(mocker, user):
+    """Tests that enroll_in_edx_course_runs uses the EdxApi client to enroll in course runs"""
+    mock_client = mocker.MagicMock()
+    enroll_return_values = ["result1", "result2"]
+    mock_client.enrollments.create_student_enrollment = mocker.Mock(
+        side_effect=enroll_return_values
+    )
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    course_runs = CourseRunFactory.build_batch(2)
+    enroll_results = enroll_in_edx_course_runs(user, course_runs)
+    mock_client.enrollments.create_student_enrollment.assert_any_call(
+        course_runs[0].courseware_id, mode=EDX_DEFAULT_ENROLLMENT_MODE
+    )
+    mock_client.enrollments.create_student_enrollment.assert_any_call(
+        course_runs[1].courseware_id, mode=EDX_DEFAULT_ENROLLMENT_MODE
+    )
+    assert enroll_results == enroll_return_values
 
 
-# @pytest.mark.parametrize("error_text", PRO_ENROLL_MODE_ERROR_TEXTS)
-# def test_enroll_in_edx_course_runs_audit(mocker, user, error_text):
-#     """Tests that enroll_in_edx_course_runs fails over to attempting enrollment with 'audit' mode"""
-#     mock_client = mocker.MagicMock()
-#     pro_enrollment_response = MockResponse({"message": error_text})
-#     audit_result = {"good": "result"}
-#     mock_client.enrollments.create_student_enrollment = mocker.Mock(
-#         side_effect=[HTTPError(response=pro_enrollment_response), audit_result]
-#     )
-#     patched_log_error = mocker.patch("openedx.api.log.error")
-#     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
-#
-#     course_run = CourseRunFactory.build()
-#     results = enroll_in_edx_course_runs(user, [course_run])
-#     assert mock_client.enrollments.create_student_enrollment.call_count == 2
-#     mock_client.enrollments.create_student_enrollment.assert_any_call(
-#         course_run.courseware_id, mode=EDX_ENROLLMENT_PRO_MODE
-#     )
-#     mock_client.enrollments.create_student_enrollment.assert_any_call(
-#         course_run.courseware_id, mode=EDX_ENROLLMENT_AUDIT_MODE
-#     )
-#     assert results == [audit_result]
-#     patched_log_error.assert_called_once()
+def test_enroll_api_fail(mocker, user):
+    """
+    Tests that enroll_in_edx_course_runs raises an EdxApiEnrollErrorException if the request fails
+    """
+    mock_client = mocker.MagicMock()
+    enrollment_response = MockResponse({"message": "no dice"}, status_code=401)
+    mock_client.enrollments.create_student_enrollment = mocker.Mock(
+        side_effect=HTTPError(response=enrollment_response)
+    )
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    course_run = CourseRunFactory.build()
+
+    with pytest.raises(EdxApiEnrollErrorException):
+        enroll_in_edx_course_runs(user, [course_run])
 
 
-# def test_enroll_pro_api_fail(mocker, user):
-#     """
-#     Tests that enroll_in_edx_course_runs raises an EdxApiEnrollErrorException if the request fails
-#     for some reason besides an enrollment mode error
-#     """
-#     mock_client = mocker.MagicMock()
-#     pro_enrollment_response = MockResponse({"message": "no dice"}, status_code=401)
-#     mock_client.enrollments.create_student_enrollment = mocker.Mock(
-#         side_effect=HTTPError(response=pro_enrollment_response)
-#     )
-#     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
-#     course_run = CourseRunFactory.build()
-#
-#     with pytest.raises(EdxApiEnrollErrorException):
-#         enroll_in_edx_course_runs(user, [course_run])
+def test_enroll_pro_unknown_fail(mocker, user):
+    """
+    Tests that enroll_in_edx_course_runs raises an UnknownEdxApiEnrollException if an unexpected exception
+    is encountered
+    """
+    mock_client = mocker.MagicMock()
+    mock_client.enrollments.create_student_enrollment = mocker.Mock(
+        side_effect=ValueError("Unexpected error")
+    )
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    course_run = CourseRunFactory.build()
 
-
-# def test_enroll_pro_unknown_fail(mocker, user):
-#     """
-#     Tests that enroll_in_edx_course_runs raises an UnknownEdxApiEnrollException if an unexpected exception
-#     is encountered
-#     """
-#     mock_client = mocker.MagicMock()
-#     mock_client.enrollments.create_student_enrollment = mocker.Mock(
-#         side_effect=ValueError("Unexpected error")
-#     )
-#     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
-#     course_run = CourseRunFactory.build()
-#
-#     with pytest.raises(UnknownEdxApiEnrollException):
-#         enroll_in_edx_course_runs(user, [course_run])
+    with pytest.raises(UnknownEdxApiEnrollException):
+        enroll_in_edx_course_runs(user, [course_run])
 
 
 # @pytest.mark.parametrize("exception_raised", [Exception("An error happened"), None])

@@ -7,6 +7,7 @@ import {
   curry,
   defaultTo,
   either,
+  find,
   isEmpty,
   isNil,
   lensPath,
@@ -49,6 +50,7 @@ export const isEmptyText = compose(
 )
 
 export const notNil = complement(isNil)
+export const firstNotNil = find(notNil)
 
 export const goBackAndHandleEvent = curry((history, e) => {
   e.preventDefault()

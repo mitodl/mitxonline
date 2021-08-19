@@ -1,7 +1,7 @@
 """
 Tests for course views
 """
-# pylint: disable=unused-argument, redefined-outer-name
+# pylint: disable=unused-argument, redefined-outer-name, too-many-arguments
 import operator as op
 from datetime import timedelta
 
@@ -25,7 +25,8 @@ from courses.serializers import (
     ProgramSerializer,
     CourseRunEnrollmentSerializer,
 )
-from courses.views.v1 import UserEnrollmentsViewSet
+from courses.views.v1 import UserEnrollmentsApiViewSet
+from main import features
 from main.test_utils import assert_drf_json_equal
 
 pytestmark = [pytest.mark.django_db]
@@ -248,7 +249,7 @@ def test_course_runs_not_live_in_courses_api(client, live):
 
 def test_user_enrollments_list(user_drf_client, user):
     """The user enrollments view should return serialized enrollments for the logged-in user"""
-    assert UserEnrollmentsViewSet.serializer_class == CourseRunEnrollmentSerializer
+    assert UserEnrollmentsApiViewSet.serializer_class == CourseRunEnrollmentSerializer
     user_run_enrollment = CourseRunEnrollmentFactory.create(user=user)
     CourseRunEnrollmentFactory.create()
     resp = user_drf_client.get(reverse("user-enrollments-api-list"))
@@ -263,8 +264,12 @@ def test_user_enrollments_list(user_drf_client, user):
     )
 
 
-def test_user_enrollments_create(mocker, user_drf_client, user):
+@pytest.mark.parametrize("ignore_failures_flag", [True, False])
+def test_user_enrollments_create(
+    mocker, settings, user_drf_client, user, ignore_failures_flag
+):
     """The user enrollments view should succeed when creating a new enrollment"""
+    settings.FEATURES[features.IGNORE_EDX_FAILURES] = ignore_failures_flag
     run = CourseRunFactory.create()
     fake_enrollment = {"fake": "enrollment"}
     patched_enroll = mocker.patch(
@@ -278,7 +283,7 @@ def test_user_enrollments_create(mocker, user_drf_client, user):
     patched_enroll.assert_called_once_with(
         user,
         [run],
-        keep_failed_enrollments=True,
+        keep_failed_enrollments=ignore_failures_flag,
     )
     # Running a request to create the enrollment again should succeed
     resp = user_drf_client.post(

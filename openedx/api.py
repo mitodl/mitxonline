@@ -24,7 +24,7 @@ from rest_framework import status
 from authentication import api as auth_api
 from openedx.constants import (
     EDX_ENROLLMENT_AUDIT_MODE,
-    EDX_ENROLLMENT_PRO_MODE,
+    EDX_DEFAULT_ENROLLMENT_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     PLATFORM_EDX,
     PRO_ENROLL_MODE_ERROR_TEXTS,
@@ -506,41 +506,11 @@ def enroll_in_edx_course_runs(user, course_runs):
     for course_run in course_runs:
         try:
             result = edx_client.enrollments.create_student_enrollment(
-                course_run.courseware_id, mode=EDX_ENROLLMENT_PRO_MODE
+                course_run.courseware_id, mode=EDX_DEFAULT_ENROLLMENT_MODE
             )
             results.append(result)
         except HTTPError as exc:
-            # If there is an error message and it indicates that the preferred enrollment mode was the cause of the
-            # error, log an error and try to enroll the user in 'audit' mode as a failover.
-            if not is_json_response(exc.response):
-                raise EdxApiEnrollErrorException(user, course_run, exc) from exc
-            error_msg = exc.response.json().get("message", "")
-            is_enroll_mode_error = any(
-                [error_text in error_msg for error_text in PRO_ENROLL_MODE_ERROR_TEXTS]
-            )
-            if not is_enroll_mode_error:
-                raise EdxApiEnrollErrorException(user, course_run, exc) from exc
-            log.error(
-                "Failed to enroll user in %s with '%s' mode. Attempting to enroll with '%s' mode instead. "
-                "(%s)",
-                course_run.courseware_id,
-                EDX_ENROLLMENT_PRO_MODE,
-                EDX_ENROLLMENT_AUDIT_MODE,
-                get_error_response_summary(exc.response),
-            )
-            try:
-                result = edx_client.enrollments.create_student_enrollment(
-                    course_run.courseware_id, mode=EDX_ENROLLMENT_AUDIT_MODE
-                )
-            except HTTPError as inner_exc:
-                raise EdxApiEnrollErrorException(
-                    user, course_run, inner_exc
-                ) from inner_exc
-            except Exception as inner_exc:  # pylint: disable=broad-except
-                raise UnknownEdxApiEnrollException(
-                    user, course_run, inner_exc
-                ) from inner_exc
-            results.append(result)
+            raise EdxApiEnrollErrorException(user, course_run, exc) from exc
         except Exception as exc:  # pylint: disable=broad-except
             raise UnknownEdxApiEnrollException(user, course_run, exc) from exc
     return results

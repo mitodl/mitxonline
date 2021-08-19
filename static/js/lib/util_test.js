@@ -11,6 +11,7 @@ import {
   isEmptyText,
   preventDefaultAndInvoke,
   notNil,
+  firstNotNil,
   truncate,
   getTokenFromUrl,
   makeUUID,
@@ -105,6 +106,16 @@ describe("utility functions", () => {
       ["abc", true]
     ].forEach(([val, exp]) => {
       assert.equal(notNil(val), exp)
+    })
+  })
+
+  it("firstNotNil works as expected", () => {
+    [
+      [["value"], "value"],
+      [[null, undefined, "value"], "value"],
+      [[null, 123, null], 123]
+    ].forEach(([val, exp]) => {
+      assert.equal(firstNotNil(val), exp)
     })
   })
 

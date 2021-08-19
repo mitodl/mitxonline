@@ -6,6 +6,7 @@ import { connectRequest } from "redux-query"
 import { createStructuredSelector } from "reselect"
 
 import users, { currentUserSelector } from "../lib/queries/users"
+import { getStoredUserMessage } from "../lib/notificationsApi"
 import { addUserNotification } from "../actions"
 
 import Header from "../components/Header"
@@ -20,6 +21,22 @@ type Props = {
 }
 
 export class HeaderApp extends React.Component<Props, void> {
+  componentDidMount() {
+    const { addUserNotification } = this.props
+
+    const userMsg = getStoredUserMessage()
+    if (userMsg) {
+      addUserNotification({
+        "loaded-user-msg": {
+          type:  userMsg.type,
+          props: {
+            text: userMsg.text
+          }
+        }
+      })
+    }
+  }
+
   render() {
     const { currentUser } = this.props
 
