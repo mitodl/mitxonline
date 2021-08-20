@@ -35,6 +35,7 @@ def get_js_settings(request: HttpRequest):
         "environment": settings.ENVIRONMENT,
         "public_path": webpack_public_path(request),
         "release_version": settings.VERSION,
+        "recaptchaKey": settings.RECAPTCHA_SITE_KEY,
         "sentry_dsn": remove_password_from_url(settings.SENTRY_DSN),
         "support_email": settings.EMAIL_SUPPORT,
         "site_name": settings.SITE_NAME,
