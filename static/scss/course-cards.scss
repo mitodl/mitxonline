@@ -46,6 +46,23 @@
           letter-spacing: 0;
           line-height: 19px;
         }
+
+        .course-card-title {
+          color: $primary;
+
+          &:hover {
+            color: #63131f;
+            text-decoration: underline;
+            cursor: pointer;
+          }
+
+        }
+      }
+
+      .course-card-link {
+        display: block;
+        cursor: pointer;
+        text-decoration: none;
       }
 
       &:hover {
