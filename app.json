@@ -35,6 +35,10 @@
       "description": "Enables querystring auth for S3 urls",
       "required": false
     },
+    "AWS_S3_FILE_OVERWRITE": {
+      "description": "Django Storages setting. By default files with the same name will overwrite each other. Set this to False to have extra characters appended.",
+      "required": false
+    },
     "AWS_SECRET_ACCESS_KEY": {
       "description": "AWS Secret Key for S3 storage.",
       "required": false
