@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.3.3
+Version 0.3.3 (Released August 20, 2021)
 -------------
 
 - Fixed issues with register API and recaptcha (#111)
