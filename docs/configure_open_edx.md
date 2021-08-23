@@ -114,6 +114,7 @@ In Open edX (derived from instructions [here](https://edx.readthedocs.io/project
         "ENABLE_COMBINED_LOGIN_REGISTRATION": true,
         "ENABLE_THIRD_PARTY_AUTH": true,
         "ENABLE_OAUTH2_PROVIDER": true,
+        "SKIP_EMAIL_VALIDATION": true,
         ...
       },
       ...
@@ -151,13 +152,13 @@ mitxpro-oauth2`
   - In "Other settings", put:
     ```
     {
-        "AUTHORIZATION_URL": "http://<LOCAL_MITX_ONLINE_ALIAS>:8053/oauth2/authorize/",
-        "ACCESS_TOKEN_URL": "http://<EXTERNAL_MITX_ONLINE_HOST>:8053/oauth2/token/",
-        "API_ROOT": "http://<EXTERNAL_MITX_ONLINE_HOST>:8053/"
+        "AUTHORIZATION_URL": "http://<LOCAL_MITX_ONLINE_ALIAS>:8013/oauth2/authorize/",
+        "ACCESS_TOKEN_URL": "http://<EXTERNAL_MITX_ONLINE_HOST>:8013/oauth2/token/",
+        "API_ROOT": "http://<EXTERNAL_MITX_ONLINE_HOST>:8013/"
     }
     ```
     - `LOCAL_MITX_ONLINE_ALIAS` should be your `/etc/hosts` alias for the mitxonline app
-    - `EXTERNAL_XMITX_ONLINE_HOST` will depend on your OS, but it needs to be resolvable within the edx container
+    - `EXTERNAL_MITX_ONLINE_HOST` will depend on your OS, but it needs to be resolvable within the edx container
           - Linux users: The gateway IP of the docker-compose networking setup for mitxonline as found via `docker network inspect mitx-online_default`
         - OSX users: Use `host.docker.internal`
 
@@ -167,7 +168,7 @@ mitxpro-oauth2`
 
   - In Open edX:
     - go to `/admin/oauth2_provider/application/` and verify that an application named 'edx-oauth-app' exists with these settings:
-      - `Redirect uris`: `http://mitxonline.odl.local:8053/login/_private/complete`
+      - `Redirect uris`: `http://mitxonline.odl.local:8013/login/_private/complete`
       - `Client type`: "Confidential"
       - `Authorization grant type`: "Authorization code"
       - `Skip authorization`: checked
@@ -180,7 +181,7 @@ mitxpro-oauth2`
 ### Configure Logout
 
   - In Open edX, configure `settings.IDA_LOGOUT_URI_LIST` to be a list including the full url to `<protocol>://<hostname>[:<port>]/logout` in mitX Online
-    - For devstack, this means modifying the value in `edx-platform/lms/envs/devstack.py` to include `http://mitxonline.odl.local:8053/logout`
+    - For devstack, this means modifying the value in `edx-platform/lms/envs/devstack.py` to include `http://mitxonline.odl.local:8013/logout`
     - For production, this setting can go in `lms.env.json` under the key `IDA_LOGOUT_URI_LIST` as a JSON array of with that string in it
 
   - mitX Online:
