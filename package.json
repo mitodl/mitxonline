@@ -113,6 +113,8 @@
     "url-join": "^4.0.0",
     "url-loader": "^4.1.0",
     "validator": "^10.11.0",
+    "video.js": "^7.0.3",
+    "videojs-youtube": "^2.6.1",
     "waait": "^1.0.4",
     "webpack": "^4.42.1",
     "webpack-bundle-tracker": "^0.2.0",

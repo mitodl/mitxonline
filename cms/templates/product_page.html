@@ -48,10 +48,17 @@
                 {% endif %}
               </div>
             </div>
-            <div class="content-col video">
-              <div class="video-holder">
+            {% if page.video_url %}
+              <div class="content-col video">
+                <video-js
+                  class="vjs-default-skin vjs-big-play-centered" 
+                  controls 
+                  data-setup="{{page.video_player_config}}"
+                  preload='metadata'
+                >
+                </video-js>
               </div>
-            </div>
+            {% endif %}
           </div>
         </div>
       </section>
