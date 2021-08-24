@@ -642,6 +642,16 @@ AWS_QUERYSTRING_AUTH = get_bool(
     default=False,
     description="Enables querystring auth for S3 urls",
 )
+AWS_S3_FILE_OVERWRITE = get_bool(
+    name="AWS_S3_FILE_OVERWRITE",
+    # Django Storages defaults this setting to True, but our desired default is False to avoid name collisions in
+    # files uploaded in the CMS.
+    default=False,
+    description=(
+        "Django Storages setting. By default files with the same name will overwrite each other. "
+        "Set this to False to have extra characters appended."
+    ),
+)
 # Provide nice validation of the configuration
 if MITX_ONLINE_USE_S3 and (
     not AWS_ACCESS_KEY_ID or not AWS_SECRET_ACCESS_KEY or not AWS_STORAGE_BUCKET_NAME
