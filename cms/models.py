@@ -32,6 +32,7 @@ from cms.constants import COURSE_INDEX_SLUG
 
 log = logging.getLogger()
 
+
 class HomePage(Page):
     """
     Site home page
@@ -242,7 +243,7 @@ class ProductPage(Page):
     video_url = models.URLField(
         null=True,
         blank=True,
-        help_text="URL to the video to be displayed for this program/course. It can be an HLS or Youtube video URL."
+        help_text="URL to the video to be displayed for this program/course. It can be an HLS or Youtube video URL.",
     )
 
     what_you_learn = RichTextField(
@@ -269,27 +270,25 @@ class ProductPage(Page):
     faculty_members = StreamField(
         [("faculty_member", FacultyBlock())],
         null=True,
+        blank=True,
         help_text="The faculty members to display on this page",
     )
 
     @property
     def video_player_config(self):
-        """ Get configuration for video player """
+        """Get configuration for video player"""
 
         if self.video_url:
-            config = {
-                "techOrder" : ["html5"],
-                "sources" : [{
-                    "src": self.video_url
-                }]
-            }
+            config = {"techOrder": ["html5"], "sources": [{"src": self.video_url}]}
             try:
                 embed = get_embed(self.video_url)
                 provider_name = embed.provider_name.lower()
                 config["techOrder"] = [provider_name, *config["techOrder"]]
                 config["sources"][0]["type"] = f"video/{provider_name}"
             except EmbedException:
-                log.info(f"The embed for the current url {self.video_url} is unavailable.")
+                log.info(
+                    f"The embed for the current url {self.video_url} is unavailable."
+                )
             return dumps(config)
 
     content_panels = Page.content_panels + [
@@ -303,7 +302,7 @@ class ProductPage(Page):
         FieldPanel("feature_image"),
         FieldPanel("faculty_section_title"),
         StreamFieldPanel("faculty_members"),
-        FieldPanel("video_url")
+        FieldPanel("video_url"),
     ]
 
     subpage_types = []
@@ -380,7 +379,7 @@ class CoursePage(ProductPage):
             "sign_in_url": sign_in_url,
             "start_date": first_unexpired_run.start_date
             if first_unexpired_run
-            else None
+            else None,
         }
 
     content_panels = [
