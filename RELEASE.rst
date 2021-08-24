@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.3.4
+-------------
+
+- Update openedx configuration docs
+- make product page faculty memebers optional (#122)
+- Fixed animation issue and overlay open/close issue
+- added embeded video in product page
+- Added setting to avoid name collisions in Wagtail
+
 Version 0.3.3 (Released August 20, 2021)
 -------------
 
