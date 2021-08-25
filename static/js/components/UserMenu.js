@@ -34,10 +34,17 @@ const UserMenu = ({ currentUser }: Props) => {
         </MixedLink>
         <MixedLink
           className="dropdown-item"
-          dest={routes.accountSettings}
-          aria-label="settings"
+          dest={routes.dashboard}
+          aria-label="Dashboard"
         >
-          Settings
+          Dashboard
+        </MixedLink>
+        <MixedLink
+          className="dropdown-item"
+          dest={routes.accountSettings}
+          aria-label="Account"
+        >
+          Account
         </MixedLink>
 
         <a className="dropdown-item" href={routes.logout} aria-label="Sign Out">
