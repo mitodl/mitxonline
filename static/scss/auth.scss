@@ -1,10 +1,10 @@
 .auth-page {
-  max-width: 600px;
-  padding-top: 15px;
+  max-width: 650px;
+  padding-top: 65px;
   padding-bottom: 35px;
 
   &.registration-page {
-    max-width: 800px;
+    max-width: 650px;
   }
 
   h1 {
@@ -12,7 +12,12 @@
       font-size: 28px;
     }
 
-    letter-spacing: 0.06em;
+    font-size: 32px;
+    margin: 0px;
+
+    &:only-child {
+      margin-bottom: 18px;
+    }
   }
 
   b {
@@ -116,12 +121,47 @@
     padding: 15px 0;
   }
 
-  background-color: $very-light-gray;
-  border-width: 7px 0 0 0;
+  background-color: $white;
+  border-width: 0 0 3px 0;
   border-style: solid;
-  border-image-source: linear-gradient(90deg, #43bebc, #ebbb47);
-  border-image-slice: 1;
-  padding: 40px;
+  border-bottom-color: $brand-button-bg;
+  padding: 20px;
+  min-height: 400px;
+
+  ul {
+    padding-top: 5px;
+    padding-left: 22px;
+    letter-spacing: 0.55px;
+    line-height: 19px;
+    margin-bottom: 0;
+    list-style: none;
+
+    li {
+      margin-bottom: 20px;
+    }
+
+    a {
+      color: $footer-bg;
+      text-decoration: underline;
+    }
+  }
+
+  .contact-support {
+    padding-top: 5px;
+    line-height: 19px;
+
+    a {
+      color: $footer-bg;
+      text-decoration: underline;
+    }
+
+  }
+
+  hr.hr-class-margin {
+    margin-top: 5px;
+    margin-bottom: 30px;
+  }
+
 }
 
 .auth-form {
@@ -137,10 +177,6 @@
 
   .errored {
     border: 2px solid $red;
-  }
-
-  label {
-    font-weight: 600;
   }
 
   .submit-row {
@@ -159,6 +195,34 @@
 
   .col {
     align-self: flex-start;
+  }
+
+  .form-control:focus {
+    border-color: $success;
+    box-shadow: 0 0 0 1px $success;
+  }
+
+  label {
+    font-weight: normal !important;
+    justify-content: space-between;
+
+    div {
+      font-weight: inherit !important;
+    }
+
+    .subtitle {
+      color: $label-subtitle;
+      font-size: 14px;
+    }
+
+    .required {
+      color: $brand-button-bg;
+    }
+  }
+
+  .label-secondary {
+    padding-top: 10px;
+    font-size: 14px;
   }
 }
 

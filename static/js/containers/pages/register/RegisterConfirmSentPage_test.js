@@ -47,14 +47,17 @@ describe("RegisterConfirmSentPage", () => {
 
   it("displays a link to create account page", async () => {
     const { inner } = await renderPage()
-    assert.equal(inner.find("li > a").prop("href"), routes.register.begin)
+    assert.equal(
+      inner
+        .find("Link")
+        .at(0)
+        .prop("to"),
+      routes.register.begin
+    )
   })
 
   it("displays user's email on the page", async () => {
     const { inner } = await renderPage()
-    assert.equal(
-      inner.find(".confirm-sent-page > p > span").text("href"),
-      userEmail
-    )
+    assert.include(inner.find(".auth-card").text(), userEmail)
   })
 })

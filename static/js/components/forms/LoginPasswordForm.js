@@ -35,17 +35,17 @@ const LoginPasswordForm = ({ onSubmit }: LoginPasswordFormProps) => (
           <ErrorMessage name="password" component={FormError} />
         </div>
         <div className="form-group">
-          <Link to={routes.login.forgot.begin} className="link-light-blue">
+          <Link to={routes.login.forgot.begin} className="link-black">
             Forgot Password?
           </Link>
         </div>
         <div className="row submit-row no-gutters justify-content-end">
           <button
             type="submit"
-            className="btn btn-primary btn-light-blue"
+            className="btn btn-primary btn-gradient-red"
             disabled={isSubmitting}
           >
-            Submit
+            Sign in
           </button>
         </div>
       </Form>

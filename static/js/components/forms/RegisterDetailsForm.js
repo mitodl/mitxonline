@@ -42,7 +42,7 @@ const RegisterDetailsForm = ({ onSubmit, countries }: Props) => (
         <div className="row submit-row no-gutters justify-content-end">
           <button
             type="submit"
-            className="btn btn-primary btn-light-blue"
+            className="btn btn-primary btn-gradient-red"
             disabled={isSubmitting}
           >
             Continue
