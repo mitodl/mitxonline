@@ -74,8 +74,17 @@ const TopAppBar = ({ currentUser, location }: Props) => (
                 data-toggle="collapse"
                 data-target="#nav"
               >
-                <MixedLink dest={routes.accountSettings} aria-label="Settings">
-                  Settings
+                <MixedLink dest={routes.dashboard} aria-label="Dashboard">
+                  Dashboard
+                </MixedLink>
+              </li>
+              <li
+                className="authenticated-menu"
+                data-toggle="collapse"
+                data-target="#nav"
+              >
+                <MixedLink dest={routes.accountSettings} aria-label="Account">
+                  Account
                 </MixedLink>
               </li>
               <li
