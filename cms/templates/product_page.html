@@ -103,14 +103,6 @@
               </div>
             </div>  
             {% endif %}
-            {% if page.prerequisites %}
-            <div class="stat-col large">
-              <div class="title">prerequisites</div>
-              <div class="text">
-                <div>{{ page.prerequisites | richtext }}</div>
-              </div>
-            </div>
-            {% endif %}
           </div>
         </div>
       </section>
@@ -121,6 +113,10 @@
               <h2>About this course</h2>
               {{ page.about |richtext }}
             </div>
+            {% if page.prerequisites %}
+              <h2>Prerequisites</h2>
+              <p>{{ page.prerequisites |richtext }}</p>
+            {% endif %}
             <h2>What you’ll learn</h2>
             {{ page.what_you_learn |richtext }}
           </div>
