@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.3.4
+Version 0.3.4 (Released August 30, 2021)
 -------------
 
 - Update openedx configuration docs
