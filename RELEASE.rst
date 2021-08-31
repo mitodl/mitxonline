@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.4.1
+-------------
+
+- Remove settings regarding reloading worker processes (#133)
+- fix: styling and layout changes for dashboard, footer and product page (#98)
+
 Version 0.4.0 (Released August 31, 2021)
 -------------
 
