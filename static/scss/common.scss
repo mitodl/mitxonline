@@ -4,14 +4,14 @@ body {
 }
 
 h1 {
-  font-size: 42px;
-  line-height: 50px;
+  font-size: 34px;
+  line-height: 38px;
   margin: 0 0 13px;
   font-weight: 700;
 
   @include media-breakpoint-up(md) {
-    font-size: 48px;
-    line-height: 60px;
+    font-size: 42px;
+    line-height: 52px;
   }
 }
 
