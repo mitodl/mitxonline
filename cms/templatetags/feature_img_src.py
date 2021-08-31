@@ -9,9 +9,8 @@ register = template.Library()
 
 
 @register.simple_tag
-def feature_img_src(product):
+def feature_img_src(product_feature_image):
     """Get feature image for product"""
-    feature_image = product.get('feature_image')
-    if feature_image:
-        return get_wagtail_img_src(feature_image)
+    if product_feature_image:
+        return get_wagtail_img_src(product_feature_image)
     return static(DEFAULT_COURSE_IMG_PATH)

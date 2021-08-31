@@ -17,7 +17,7 @@ class CoursePageSerializer(serializers.ModelSerializer):
         if hasattr(instance, "feature_image"):
             feature_img_src = get_wagtail_img_src(instance.feature_image)
 
-        return feature_img_src if feature_img_src else static(DEFAULT_COURSE_IMG_PATH)
+        return feature_img_src or static(DEFAULT_COURSE_IMG_PATH)
 
     class Meta:
         model = models.CoursePage
