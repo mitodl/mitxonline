@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.4.0 (Released August 31, 2021)
+-------------
+
+- Bump path-parse from 1.0.6 to 1.0.7 (#82)
+- Made entire course card clickable
+- add dashboard, rename settings in the topbar menu (#124)
+
 Version 0.3.4 (Released August 30, 2021)
 -------------
 
