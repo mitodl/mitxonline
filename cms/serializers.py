@@ -15,8 +15,8 @@ class CoursePageSerializer(serializers.ModelSerializer):
         """Serializes the source of the feature_image"""
         feature_img_src = None
         if hasattr(instance, "feature_image"):
-            feature_img_src = get_wagtail_img_src(instance.feature_image)        
-        
+            feature_img_src = get_wagtail_img_src(instance.feature_image)
+
         return feature_img_src if feature_img_src else static(DEFAULT_COURSE_IMG_PATH)
 
     class Meta:
