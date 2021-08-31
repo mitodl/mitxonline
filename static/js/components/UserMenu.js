@@ -1,6 +1,6 @@
 // @flow
 /* global SETTINGS:false */
-import React from "react"
+import React, { Fragment } from "react"
 
 import MixedLink from "./MixedLink"
 import { routes } from "../lib/urls"
@@ -9,12 +9,48 @@ import type { User } from "../flow/authTypes"
 
 type Props = {
   /* This is here for future use when we have custom profile avatars */
-  currentUser: User
+  currentUser: User,
+  useScreenOverlay: boolean
 }
 
-const UserMenu = ({ currentUser }: Props) => {
+const desktopMenuContainerProps = {
+  className: "user-menu dropdown"
+}
+
+const desktopUListProps = {
+  className: "dropdown-menu"
+}
+
+const overlayListItemProps = {
+  className:     "authenticated-menu",
+  "data-toggle": "collapse",
+  "data-target": "#nav"
+}
+
+const desktopListItemProps = {
+  className: "dropdown-item"
+}
+
+type MenuChildProps = {
+  container?: Object,
+  ul?: Object,
+  li?: Object
+}
+
+const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
+  /* eslint-disable prefer-const */
+  let menuChildProps: MenuChildProps
+  menuChildProps = useScreenOverlay
+    ? {
+      li: overlayListItemProps
+    }
+    : {
+      container: desktopMenuContainerProps,
+      ul:        desktopUListProps,
+      li:        desktopListItemProps
+    }
   return (
-    <div className="user-menu dropdown">
+    <div {...menuChildProps.container || {}}>
       <div
         className="col-2 dropdown-toggle"
         id="dropdownMenuButton"
@@ -24,33 +60,28 @@ const UserMenu = ({ currentUser }: Props) => {
       >
         {currentUser.name}
       </div>
-      <div className="dropdown-menu" aria-labelledby="dropdownMenuButton">
-        <MixedLink
-          className="dropdown-item"
-          dest={routes.profile.view}
-          aria-label="Profile"
-        >
-          Profile
-        </MixedLink>
-        <MixedLink
-          className="dropdown-item"
-          dest={routes.dashboard}
-          aria-label="Dashboard"
-        >
-          Dashboard
-        </MixedLink>
-        <MixedLink
-          className="dropdown-item"
-          dest={routes.accountSettings}
-          aria-label="Account"
-        >
-          Account
-        </MixedLink>
-
-        <a className="dropdown-item" href={routes.logout} aria-label="Sign Out">
-          Sign Out
-        </a>
-      </div>
+      <ul {...menuChildProps.ul || {}} aria-labelledby="dropdownMenuButton">
+        <li {...menuChildProps.li || {}}>
+          <MixedLink dest={routes.profile.view} aria-label="Profile">
+            Profile
+          </MixedLink>
+        </li>
+        <li {...menuChildProps.li || {}}>
+          <MixedLink dest={routes.dashboard} aria-label="Dashboard">
+            Dashboard
+          </MixedLink>
+        </li>
+        <li {...menuChildProps.li || {}}>
+          <MixedLink dest={routes.accountSettings} aria-label="Account">
+            Account
+          </MixedLink>
+        </li>
+        <li {...menuChildProps.li || {}}>
+          <MixedLink dest={routes.logout} aria-label="Sign Out">
+            Sign Out
+          </MixedLink>
+        </li>
+      </ul>
     </div>
   )
 }

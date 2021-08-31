@@ -35,6 +35,18 @@ body {
   header {
     background-color: #ffffff;
     box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14);
+
+    .full-screen-menu {
+      display: block;
+    }
+
+    .mobile-menu {
+      @include media-breakpoint-down(xs) {
+        display: block;
+      }
+
+      display: none;
+    }
   }
 
   .main-panel {

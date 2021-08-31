@@ -51,13 +51,16 @@
     padding: 0 0 0 25px;
 
     a {
-      padding: 5px 16px;
       color: black;
       text-decoration: none;
       display: block;
 
       &:hover {
         color: $primary;
+      }
+
+      &.simple {
+        padding: 5px 16px;
       }
 
       &.button {
@@ -94,7 +97,7 @@
     background: rgba(0, 0, 0, 0.91);
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: -10px;
     top: 55px;
     height: auto !important;
     z-index: 999;
@@ -226,4 +229,10 @@
       transform: none;
     }
   }
+}
+
+ul.menu-holder {
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
