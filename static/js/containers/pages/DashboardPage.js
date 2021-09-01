@@ -7,6 +7,7 @@ import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
 import { connectRequest } from "redux-query"
 import moment from "moment"
+import * as R from "ramda"
 
 import { DASHBOARD_PAGE_TITLE } from "../../constants"
 import {
@@ -22,9 +23,16 @@ type DashboardPageProps = {
 }
 
 export class DashboardPage extends React.Component<DashboardPageProps, void> {
+  now = moment();
+  isLinkableCourseRun = ({ run }: RunEnrollment): boolean =>
+    !R.isNil(run.courseware_url) &&
+    !R.isNil(run.start_date) &&
+    moment(run.start_date).isBefore(this.now) &&
+    (R.isNil(run.end_date) || moment(run.end_date).isAfter(this.now))
+  
   renderEnrolledItemCard(enrollment: RunEnrollment) {
     let startDate, startDateDescription
-    const title = enrollment.run.courseware_url ? (
+    const title = this.isLinkableCourseRun(enrollment) ? (
       <a
         href={enrollment.run.courseware_url}
         target="_blank"
@@ -78,7 +86,7 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
           <h1>My Courses</h1>
           <div className="enrolled-items container">
             {enrollments && enrollments.length > 0 ? (
-              enrollments.map(this.renderEnrolledItemCard)
+              enrollments.map(this.renderEnrolledItemCard.bind(this))
             ) : (
               <div className="enrolled-item row card p-3 p-sm-5 rounded-0">
                 Once you enroll in a course, you can find it listed here.
