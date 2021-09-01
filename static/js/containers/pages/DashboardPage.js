@@ -29,7 +29,7 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
     !R.isNil(run.start_date) &&
     moment(run.start_date).isBefore(this.now) &&
     (R.isNil(run.end_date) || moment(run.end_date).isAfter(this.now))
-  
+
   renderEnrolledItemCard(enrollment: RunEnrollment) {
     let startDate, startDateDescription
     const title = this.isLinkableCourseRun(enrollment) ? (
