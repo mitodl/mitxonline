@@ -23,7 +23,7 @@ type DashboardPageProps = {
 }
 
 export class DashboardPage extends React.Component<DashboardPageProps, void> {
-  now = moment();
+  now = moment()
   isLinkableCourseRun = ({ run }: RunEnrollment): boolean =>
     !R.isNil(run.courseware_url) &&
     !R.isNil(run.start_date) &&
