@@ -115,7 +115,7 @@
             </div>
             {% if page.prerequisites %}
               <h2>Prerequisites</h2>
-              <p>{{ page.prerequisites |richtext }}</p>
+              {{ page.prerequisites |richtext }}
             {% endif %}
             <h2>What you’ll learn</h2>
             {{ page.what_you_learn |richtext }}
