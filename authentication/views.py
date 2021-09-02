@@ -31,6 +31,12 @@ from authentication.serializers import (
 )
 from authentication.utils import load_drf_strategy
 from mail.api import render_email_templates, send_messages
+from main.constants import (
+    USER_MSG_COOKIE_NAME,
+    USER_MSG_TYPE_COMPLETED_AUTH,
+    USER_MSG_COOKIE_MAX_AGE,
+)
+from main.utils import is_success_response, encode_json_cookie_value
 
 User = get_user_model()
 
@@ -118,6 +124,20 @@ class RegisterDetailsView(SocialAuthAPIView):
     def get_serializer_cls(self):
         """Return the serializer cls"""
         return RegisterDetailsSerializer
+
+    def post(self, request):
+        resp = super().post(request)
+        if is_success_response(resp):
+            resp.set_cookie(
+                key=USER_MSG_COOKIE_NAME,
+                value=encode_json_cookie_value(
+                    {
+                        "type": USER_MSG_TYPE_COMPLETED_AUTH,
+                    }
+                ),
+                max_age=USER_MSG_COOKIE_MAX_AGE,
+            )
+        return resp
 
 
 class RegisterExtraDetailsView(SocialAuthAPIView):

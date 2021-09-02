@@ -4,6 +4,7 @@ import {
   ALERT_TYPE_DANGER,
   ALERT_TYPE_SUCCESS,
   USER_MSG_COOKIE_NAME,
+  USER_MSG_TYPE_COMPLETED_AUTH,
   USER_MSG_TYPE_ENROLL_FAILED,
   USER_MSG_TYPE_ENROLLED
 } from "../constants"
@@ -42,6 +43,10 @@ export function parseStoredUserMessage(
     msgText = `Something went wrong with your enrollment. Please contact support at ${
       SETTINGS.support_email
     }.`
+    break
+  case USER_MSG_TYPE_COMPLETED_AUTH:
+    alertType = ALERT_TYPE_SUCCESS
+    msgText = "Account created!"
     break
   default:
     return null

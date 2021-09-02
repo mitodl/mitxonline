@@ -1,7 +1,4 @@
 """Course views verson 1"""
-import json
-from typing import Union
-from urllib.parse import quote_plus
 import logging
 
 from django.http import HttpResponseRedirect
@@ -25,6 +22,7 @@ from main.constants import (
     USER_MSG_COOKIE_MAX_AGE,
     USER_MSG_TYPE_ENROLL_FAILED,
 )
+from main.utils import encode_json_cookie_value
 
 log = logging.getLogger(__name__)
 
@@ -52,15 +50,6 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = CourseRunSerializer
     queryset = CourseRun.objects.all()
-
-
-def encode_json_cookie_value(cookie_value: Union[dict, list, str, None]) -> str:
-    """
-    Encodes a JSON-compatible value to be set as the value of a cookie, which can then be decoded to get the original
-    JSON value.
-    """
-    json_str_value = json.dumps(cookie_value)
-    return quote_plus(json_str_value.replace(" ", "%20"))
 
 
 @api_view(["POST"])

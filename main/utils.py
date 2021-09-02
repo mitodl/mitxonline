@@ -1,12 +1,16 @@
 """mitx_online utilities"""
 import json
 from enum import Flag, auto
+from typing import Union
+from urllib.parse import quote_plus
 
 from django.conf import settings
 from django.core.serializers import serialize
 from django.http import HttpRequest
 from mitol.common.utils.urls import remove_password_from_url
 from mitol.common.utils.webpack import webpack_public_path
+from rest_framework import status
+from rest_framework.response import Response
 
 
 class FeatureFlag(Flag):
@@ -73,3 +77,19 @@ def get_field_names(model):
         for field in model._meta.get_fields()
         if not field.auto_created  # pylint: disable=protected-access
     ]
+
+
+def encode_json_cookie_value(cookie_value: Union[dict, list, str, None]) -> str:
+    """
+    Encodes a JSON-compatible value to be set as the value of a cookie, which can then be decoded to get the original
+    JSON value.
+    """
+    json_str_value = json.dumps(cookie_value)
+    return quote_plus(json_str_value.replace(" ", "%20"))
+
+
+def is_success_response(resp: Response) -> bool:
+    return (
+        resp.status_code >= status.HTTP_200_OK
+        and resp.status_code < status.HTTP_300_MULTIPLE_CHOICES
+    )
