@@ -48,3 +48,14 @@ $featureImgMobileWidth: 343px;
     margin-bottom: 30px;
   }
 }
+
+.placeholder-card {
+  background-color: white;
+  border: 0;
+  box-shadow: 0 1px 0 0 rgba(0, 0, 0, 0.23);
+
+  a {
+    color: black;
+    text-decoration: underline;
+  }
+}

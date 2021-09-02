@@ -58,11 +58,13 @@ describe("DashboardPage", () => {
       }
     })
     assert.isTrue(inner.find(".dashboard").exists())
-    const enrolledItems = inner.find(".enrolled-item")
+    const enrolledItems = inner.find(".placeholder-card")
     assert.lengthOf(enrolledItems, 1)
-    assert.equal(
-      enrolledItems.at(0).text(),
-      "Once you enroll in a course, you can find it listed here."
+    assert.isTrue(
+      enrolledItems
+        .at(0)
+        .text()
+        .includes("You are not enrolled in any courses yet")
     )
   })
 
