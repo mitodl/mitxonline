@@ -1,7 +1,6 @@
 /* global SETTINGS: false */
 // @flow
 import { assert } from "chai"
-import sinon from "sinon"
 import moment from "moment"
 
 import DashboardPage, {
