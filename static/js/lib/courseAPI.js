@@ -1,8 +1,7 @@
 import moment from "moment"
-import { complement, isNil } from "ramda"
+import { isNil } from "ramda"
 import { RunEnrollment } from "../flow/courseTypes"
-
-export const notNil = complement(isNil)
+import { notNil } from "./util"
 
 export const isLinkableCourseRun = (
   run: RunEnrollment,

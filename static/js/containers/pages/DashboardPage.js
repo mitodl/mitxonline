@@ -7,7 +7,7 @@ import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
 import { connectRequest } from "redux-query"
 import moment from "moment"
-import { isLinkableCourseRun } from "../../lib/courseAPI"
+import { isLinkableCourseRun } from "../../lib/courseApi"
 import { DASHBOARD_PAGE_TITLE } from "../../constants"
 import {
   enrollmentsSelector,
