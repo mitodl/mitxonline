@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.4.2
+-------------
+
+- updated styles for Create Account and Sign In Pages
+- enhance footer layout design (#129)
+
 Version 0.4.1 (Released September 01, 2021)
 -------------
 
