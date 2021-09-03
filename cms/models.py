@@ -299,7 +299,7 @@ class ProductPage(Page):
         FieldPanel("prerequisites"),
         FieldPanel("about"),
         FieldPanel("what_you_learn"),
-        FieldPanel("feature_image"),
+        ImageChooserPanel("feature_image"),
         FieldPanel("faculty_section_title"),
         StreamFieldPanel("faculty_members"),
         FieldPanel("video_url"),
