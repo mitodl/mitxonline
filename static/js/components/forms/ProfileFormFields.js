@@ -100,8 +100,10 @@ export const LegalAddressFields = ({
   <React.Fragment>
     <div className="form-group">
       <label htmlFor="legal_address.first_name" className="row">
-        <div className="col-4 font-weight-bold">First Name*</div>
-        <div className="col-8">(Name that will appear on emails)</div>
+        <div className="col-auto font-weight-bold">
+          First Name<span className="required">*</span>
+        </div>
+        <div className="col-auto subtitle">Name that will appear on emails</div>
       </label>
       <Field
         type="text"
@@ -113,7 +115,7 @@ export const LegalAddressFields = ({
     </div>
     <div className="form-group">
       <label htmlFor="legal_address.last_name" className="font-weight-bold">
-        Last Name*
+        Last Name<span className="required">*</span>
       </label>
       <Field
         type="text"
@@ -124,8 +126,13 @@ export const LegalAddressFields = ({
       <ErrorMessage name="legal_address.last_name" component={FormError} />
     </div>
     <div className="form-group">
-      <label htmlFor="name" className="font-weight-bold">
-        Full Name*
+      <label htmlFor="name" className="row">
+        <div className="col-auto font-weight-bold">
+          Full Name<span className="required">*</span>
+        </div>
+        <div className="col-auto subtitle">
+          Name that will appear on your certificate
+        </div>
       </label>
       <Field
         type="text"
@@ -138,23 +145,20 @@ export const LegalAddressFields = ({
     {includePassword ? (
       <div className="form-group">
         <label htmlFor="password" className="font-weight-bold">
-          Password*
+          Password<span className="required">*</span>
         </label>
         <Field type="password" name="password" className="form-control" />
         <ErrorMessage name="password" component={FormError} />
         <div className="label-secondary">
-          Password must contain:
-          <ul>
-            <li>at least 8 characters</li>
-            <li>at least 1 number and 1 letter</li>
-          </ul>
+          Passwords must contain at least 8 characters and at least 1 number and
+          1 letter.
         </div>
       </div>
     ) : null}
 
     <div className="form-group">
       <label htmlFor="legal_address.country" className="font-weight-bold">
-        Country*
+        Country<span className="required">*</span>
       </label>
       <Field
         component="select"

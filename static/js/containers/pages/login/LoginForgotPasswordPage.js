@@ -32,8 +32,8 @@ type State = {
 
 const passwordResetText = (email: string) => (
   <p>
-    If an account with the email <span className="email">{email}</span> <br />{" "}
-    exists, an email has been sent with a password reset link.
+    If an account with the email <b>{email}</b> exists, an email has been sent
+    with a password reset link.
   </p>
 )
 
@@ -45,7 +45,10 @@ const getCustomerSupportLayout = (isError: boolean) => {
           Sorry, there was an error sending the email.
         </h3>
       ) : (
-        <b>Still no password reset email? </b>
+        <>
+          <hr />
+          <b>Still no password reset email? </b>
+        </>
       )}
       Please {isError ? "try again or" : ""} contact our{" "}
       {` ${SETTINGS.site_name} `}
@@ -95,50 +98,63 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
         title={`${SETTINGS.site_name} | ${FORGOT_PASSWORD_PAGE_TITLE}`}
       >
         <div className="container auth-page">
-          <div className="auth-header">
-            <h1>Forgot Password</h1>
-          </div>
           {this.state.isError ? (
-            <div className="auth-card card-shadow auth-form">
-              {getCustomerSupportLayout(true)}
-              <EmailForm onSubmit={this.onSubmit.bind(this)} />
+            <div className="row auth-card card-shadow auth-form">
+              <div className="col-12">
+                <div className="row auth-header">
+                  <h1 className="col-12">Forgot Password</h1>
+                </div>
+                {getCustomerSupportLayout(true)}
+                <EmailForm onSubmit={this.onSubmit.bind(this)} />
+              </div>
             </div>
           ) : this.state.forgotEmailSent ? (
-            <div className="card-shadow confirm-sent-page">
-              <h3 className="text-center">Thank You!</h3>
-              {this.state.text}
-              <p>
-                <b>
-                  If you do NOT receive your password reset email, here's what
-                  to do:
-                </b>
-              </p>
-              <ol>
-                <li>
-                  <b>Wait a few moments.</b> It might take several minutes to
-                  receive your password reset email.
-                </li>
-                <li>
-                  <b>Check your spam folder.</b> It might be there.
-                </li>
-                <li>
-                  <b>Is your email correct?</b> If you made a typo, no problem,
-                  just try to
-                  <Link
-                    to={routes.login.forgot.begin}
-                    onClick={this.resetEmailLinkSent.bind(this)}
-                  >
-                    {` reset your password `}
-                  </Link>
-                  again.
-                </li>
-              </ol>
-              {getCustomerSupportLayout(false)}
+            <div className="row auth-card card-shadow">
+              <div className="col-12">
+                <div className="row auth-header">
+                  <h1 className="col-12">Password reset!</h1>
+                </div>
+                {this.state.text}
+                <p>
+                  <b>
+                    If you do NOT receive your password reset email, here's what
+                    to do:
+                  </b>
+                </p>
+                <ul>
+                  <li>
+                    <b>Wait a few moments.</b> It might take several minutes to
+                    receive your password reset email.
+                  </li>
+                  <li>
+                    <b>Check your spam folder.</b> It might be there.
+                  </li>
+                  <li>
+                    <b>Is your email correct?</b> If you made a typo, no
+                    problem,{" "}
+                    <Link
+                      to={routes.login.forgot.begin}
+                      onClick={this.resetEmailLinkSent.bind(this)}
+                    >
+                      create an account
+                    </Link>{" "}
+                    again.
+                  </li>
+                </ul>
+                {getCustomerSupportLayout(false)}
+              </div>
             </div>
           ) : (
-            <div className="auth-card card-shadow auth-form">
-              <p>Enter your email to receive a password reset link.</p>
-              <EmailForm onSubmit={this.onSubmit.bind(this)} />
+            <div className="row auth-card card-shadow auth-form">
+              <div className="col-12">
+                <div className="row auth-header">
+                  <h1 className="col-12">Forgot Password</h1>
+                  <p className="col-12">
+                    Enter your email to receive a password reset link.
+                  </p>
+                </div>
+                <EmailForm onSubmit={this.onSubmit.bind(this)} />
+              </div>
             </div>
           )}
         </div>

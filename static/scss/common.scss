@@ -82,6 +82,15 @@ a.link-button {
   }
 }
 
+.btn-gradient-red {
+  background-image: linear-gradient(174deg, #c5264e,#951328 #951328);
+  font-size: 20px;
+  height: 59px;
+  width: 200px;
+  border-radius: 0px;
+  font-weight: 600;
+}
+
 .btn-denim-blue {
   background-color: $denim-blue;
   border-color: $denim-blue;
@@ -97,6 +106,12 @@ a.link-button {
   &, &:hover, &:visited, &:active {
     color: $light-blue;
   }
+}
+
+.link-black {
+  text-decoration: underline;
+  color: black;
+  font-weight: bold;
 }
 
 .text-ribbon {
