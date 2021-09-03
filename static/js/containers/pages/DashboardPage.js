@@ -14,7 +14,7 @@ import {
   enrollmentsQuery
 } from "../../lib/queries/enrollment"
 import { formatPrettyDate, parseDateString } from "../../lib/util"
-
+import { routes } from "../../lib/urls"
 import { RunEnrollment } from "../../flow/courseTypes"
 
 type DashboardPageProps = {
@@ -80,11 +80,11 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
             {enrollments && enrollments.length > 0 ? (
               enrollments.map(this.renderEnrolledItemCard)
             ) : (
-              <div className="placeholder-card p-3 p-sm-5 rounded-0">
+              <div className="card no-enrollments p-3 p-sm-5 rounded-0">
                 <h4>Enroll Now</h4>
                 <p>
                   You are not enrolled in any courses yet. Please{" "}
-                  <a href="/">browse our courses</a>.
+                  <a href={routes.root}>browse our courses</a>.
                 </p>
               </div>
             )}
