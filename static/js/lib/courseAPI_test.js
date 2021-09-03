@@ -1,3 +1,5 @@
+/* global SETTINGS: false */
+// @flow
 import { isLinkableCourseRun } from "./courseApi"
 import { assert } from "chai"
 import moment from "moment"
