@@ -67,7 +67,11 @@
 
     .video-js {
       width: 100%;
-      height: 263px;
+      height: 217px;
+
+      @include media-breakpoint-up(md) {
+        height: 263px;
+      }
 
       .vjs-big-play-button {
         background: black;
