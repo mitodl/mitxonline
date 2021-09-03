@@ -58,7 +58,7 @@ describe("DashboardPage", () => {
       }
     })
     assert.isTrue(inner.find(".dashboard").exists())
-    const enrolledItems = inner.find(".placeholder-card")
+    const enrolledItems = inner.find(".no-enrollments")
     assert.lengthOf(enrolledItems, 1)
     assert.isTrue(
       enrolledItems
