@@ -95,21 +95,6 @@ describe("DashboardPage", () => {
     })
   })
 
-  it("Not links to the courseware URL if run is started in future", async () => {
-    const future = moment().add(10, "days")
-    const exampleCoursewareUrl = "http://example.com/my-course"
-    userEnrollments[0].run.courseware_url = exampleCoursewareUrl
-    userEnrollments[0].run.start_date = future.toISOString()
-    userEnrollments[0].run.end_date = future.toISOString()
-    const { inner } = await renderPage({
-      entities: { enrollments: userEnrollments }
-    })
-    const enrolledItems = inner.find(".enrolled-item")
-    assert.lengthOf(enrolledItems, userEnrollments.length)
-    const unlinkedTitle = enrolledItems.at(0).find("h4")
-    assert.isFalse(unlinkedTitle.find("a").exists())
-  })
-
   it("shows different text depending on whether the start date is in the future or past", async () => {
     const past = moment().add(-1, "days"),
       future = moment().add(1, "days")

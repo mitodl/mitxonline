@@ -2,10 +2,10 @@
 /* global SETTINGS:false */
 import moment from "moment"
 import { isNil } from "ramda"
-import { RunEnrollment } from "../flow/courseTypes"
 import { notNil } from "./util"
 
 import type Moment from "moment"
+import type { RunEnrollment } from "../flow/courseTypes"
 
 export const isLinkableCourseRun = (
   run: RunEnrollment,
