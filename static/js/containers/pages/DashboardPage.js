@@ -14,7 +14,7 @@ import {
   enrollmentsQuery
 } from "../../lib/queries/enrollment"
 import { formatPrettyDate, parseDateString } from "../../lib/util"
-
+import { routes } from "../../lib/urls"
 import { RunEnrollment } from "../../flow/courseTypes"
 
 type DashboardPageProps = {
@@ -76,12 +76,16 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
       <DocumentTitle title={`${SETTINGS.site_name} | ${DASHBOARD_PAGE_TITLE}`}>
         <div className="dashboard container">
           <h1>My Courses</h1>
-          <div className="enrolled-items container">
+          <div className="enrolled-items">
             {enrollments && enrollments.length > 0 ? (
               enrollments.map(this.renderEnrolledItemCard)
             ) : (
-              <div className="enrolled-item row card p-3 p-sm-5 rounded-0">
-                Once you enroll in a course, you can find it listed here.
+              <div className="card no-enrollments p-3 p-sm-5 rounded-0">
+                <h4>Enroll Now</h4>
+                <p>
+                  You are not enrolled in any courses yet. Please{" "}
+                  <a href={routes.root}>browse our courses</a>.
+                </p>
               </div>
             )}
           </div>

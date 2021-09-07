@@ -8,6 +8,19 @@ $featureImgMobileWidth: 343px;
     display: flex;
     flex-direction: row;
 
+    &.no-enrollments {
+      flex-direction: column;
+
+      a {
+        color: black;
+        text-decoration: underline;
+      }
+
+      p {
+        margin: 0;
+      }
+    }
+
     h4 a {
       text-decoration: underline;
     }
