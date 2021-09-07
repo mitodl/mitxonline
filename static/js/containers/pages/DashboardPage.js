@@ -7,7 +7,7 @@ import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
 import { connectRequest } from "redux-query"
 import moment from "moment"
-
+import { isLinkableCourseRun } from "../../lib/courseApi"
 import { DASHBOARD_PAGE_TITLE } from "../../constants"
 import {
   enrollmentsSelector,
@@ -24,7 +24,7 @@ type DashboardPageProps = {
 export class DashboardPage extends React.Component<DashboardPageProps, void> {
   renderEnrolledItemCard(enrollment: RunEnrollment) {
     let startDate, startDateDescription
-    const title = enrollment.run.courseware_url ? (
+    const title = isLinkableCourseRun(enrollment.run) ? (
       <a
         href={enrollment.run.courseware_url}
         target="_blank"

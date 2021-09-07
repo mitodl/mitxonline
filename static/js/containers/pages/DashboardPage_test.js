@@ -1,25 +1,26 @@
 /* global SETTINGS: false */
 // @flow
 import { assert } from "chai"
-import sinon from "sinon"
 import moment from "moment"
 
 import DashboardPage, {
   DashboardPage as InnerDashboardPage
 } from "./DashboardPage"
 import { formatPrettyDate } from "../../lib/util"
-import { shouldIf } from "../../lib/test_utils"
+import { shouldIf, isIf } from "../../lib/test_utils"
 import IntegrationTestHelper from "../../util/integration_test_helper"
 import { makeCourseRunEnrollment } from "../../factories/course"
 import { makeUser } from "../../factories/user"
+import * as courseApi from "../../lib/courseApi"
 
 describe("DashboardPage", () => {
-  let helper, renderPage, userEnrollments, currentUser
+  let helper, isLinkableStub, renderPage, userEnrollments, currentUser
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
     userEnrollments = [makeCourseRunEnrollment(), makeCourseRunEnrollment()]
     currentUser = makeUser()
+    isLinkableStub = helper.sandbox.stub(courseApi, "isLinkableCourseRun")
 
     renderPage = helper.configureHOCRenderer(
       DashboardPage,
@@ -65,21 +66,33 @@ describe("DashboardPage", () => {
       "Once you enroll in a course, you can find it listed here."
     )
   })
-
-  it("links to the courseware URL if that property is set on the course run", async () => {
-    const exampleCoursewareUrl = "http://example.com/my-course"
-    userEnrollments[0].run.courseware_url = exampleCoursewareUrl
-    userEnrollments[1].run.courseware_url = null
-    const { inner } = await renderPage({
-      entities: { enrollments: userEnrollments }
+  ;[[false, false], [true, true]].forEach(([isLinkable, expCourseLink]) => {
+    it(`${shouldIf(expCourseLink)} show a link if course run ${isIf(
+      isLinkable
+    )} linkable`, async () => {
+      isLinkableStub.returns(isLinkable)
+      const exampleCoursewareUrl = "http://example.com/my-course"
+      userEnrollments[0].run.courseware_url = exampleCoursewareUrl
+      const enrollment = {
+        ...userEnrollments[0]
+      }
+      const { inner } = await renderPage({
+        entities: { enrollments: [enrollment] }
+      })
+      const enrolledItems = inner.find(".enrolled-item")
+      assert.lengthOf(enrolledItems, 1)
+      assert.equal(
+        enrolledItems
+          .at(0)
+          .find("a")
+          .exists(),
+        expCourseLink
+      )
+      if (expCourseLink) {
+        const linkedTitle = enrolledItems.at(0).find("h4")
+        assert.equal(linkedTitle.find("a").prop("href"), exampleCoursewareUrl)
+      }
     })
-    const enrolledItems = inner.find(".enrolled-item")
-    assert.lengthOf(enrolledItems, userEnrollments.length)
-    const linkedTitle = enrolledItems.at(0).find("h4")
-    const unlinkedTitle = enrolledItems.at(1).find("h4")
-    assert.isTrue(linkedTitle.find("a").exists())
-    assert.equal(linkedTitle.find("a").prop("href"), exampleCoursewareUrl)
-    assert.isFalse(unlinkedTitle.find("a").exists())
   })
 
   it("shows different text depending on whether the start date is in the future or past", async () => {
