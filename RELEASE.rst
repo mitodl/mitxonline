@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.4.2
+Version 0.4.2 (Released September 07, 2021)
 -------------
 
 - updated styles for Create Account and Sign In Pages
