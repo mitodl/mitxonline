@@ -7,6 +7,7 @@ import * as notificationsApi from "./notificationsApi"
 import * as api from "./api"
 import {
   USER_MSG_COOKIE_NAME,
+  USER_MSG_TYPE_COMPLETED_AUTH,
   USER_MSG_TYPE_ENROLL_FAILED,
   USER_MSG_TYPE_ENROLLED
 } from "../constants"
@@ -54,6 +55,18 @@ describe("notifications API", () => {
             SETTINGS.support_email
           }.`,
           type: "danger"
+        }
+      )
+    })
+
+    it("returns the correct message properties given an 'completed auth' message cookie value", () => {
+      assert.deepEqual(
+        notificationsApi.parseStoredUserMessage({
+          type: USER_MSG_TYPE_COMPLETED_AUTH
+        }),
+        {
+          text: "Account created!",
+          type: "success"
         }
       )
     })

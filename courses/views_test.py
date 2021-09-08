@@ -3,20 +3,15 @@ Tests for course views
 """
 # pylint: disable=unused-argument, redefined-outer-name, too-many-arguments
 import operator as op
-from datetime import timedelta
 
 import pytest
-from django.contrib.auth.models import AnonymousUser
 from django.urls import reverse
-from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status
 
-from courses.api import UserEnrollments
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
-    ProgramEnrollmentFactory,
     ProgramFactory,
 )
 from courses.serializers import (

@@ -29,7 +29,9 @@ from social_core.backends.email import EmailAuth
 
 from authentication.serializers import PARTIAL_PIPELINE_TOKEN_KEY
 from authentication.utils import SocialAuthState
+from main.constants import USER_MSG_COOKIE_NAME, USER_MSG_TYPE_COMPLETED_AUTH
 from main.test_utils import MockResponse
+from main.utils import encode_json_cookie_value
 from users.factories import UserFactory, UserSocialAuthFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -61,11 +63,10 @@ def assert_api_call(
     expect_status=status.HTTP_200_OK,
     use_defaults=True,
 ):
-    """Run the API call and perform basic assertions"""
+    """Runs the API call, performs basic assertions, and returns the response"""
     assert bool(get_user(client).is_authenticated) is False
 
     response = client.post(reverse(url), payload, content_type="application/json")
-    actual = response.json()
 
     defaults = {
         "errors": [],
@@ -78,12 +79,35 @@ def assert_api_call(
         "partial_token": any_instance_of(str),
     }
 
-    assert actual == ({**defaults, **expected} if use_defaults else expected)
+    assert response.json() == ({**defaults, **expected} if use_defaults else expected)
     assert response.status_code == expect_status
 
     assert bool(get_user(client).is_authenticated) is expect_authenticated
 
-    return actual
+    return response
+
+
+# pylint: disable=too-many-arguments
+def assert_api_call_json(
+    client,
+    url,
+    payload,
+    expected,
+    expect_authenticated=False,
+    expect_status=status.HTTP_200_OK,
+    use_defaults=True,
+):
+    """Runs the API call, performs basic assertions, and returns the response JSON"""
+    response = assert_api_call(
+        client=client,
+        url=url,
+        payload=payload,
+        expected=expected,
+        expect_authenticated=expect_authenticated,
+        expect_status=expect_status,
+        use_defaults=use_defaults,
+    )
+    return response.json()
 
 
 @pytest.fixture()
@@ -190,7 +214,7 @@ class AuthStateMachine(RuleBasedStateMachine):
             if recaptcha_enabled:
                 mock_recaptcha_success = stack.enter_context(self.recaptcha_patcher)
                 stack.enter_context(override_settings(**{"RECAPTCHA_SITE_KEY": "fake"}))
-            result = assert_api_call(
+            response_json = assert_api_call_json(
                 self.client,
                 "psa-register-email",
                 {
@@ -207,7 +231,7 @@ class AuthStateMachine(RuleBasedStateMachine):
             self.mock_email_send.assert_called_once()
             if mock_recaptcha_success:
                 mock_recaptcha_success.assert_called_once()
-            return result
+            return response_json
 
     @rule(
         target=LoginPasswordAuthStates, recaptcha_enabled=st.sampled_from([True, False])
@@ -224,7 +248,7 @@ class AuthStateMachine(RuleBasedStateMachine):
                 mock_recaptcha_success = stack.enter_context(self.recaptcha_patcher)
                 stack.enter_context(override_settings(**{"RECAPTCHA_SITE_KEY": "fake"}))
 
-            result = assert_api_call(
+            response_json = assert_api_call_json(
                 self.client,
                 "psa-register-email",
                 {
@@ -242,7 +266,7 @@ class AuthStateMachine(RuleBasedStateMachine):
             self.mock_email_send.assert_not_called()
             if mock_recaptcha_success:
                 mock_recaptcha_success.assert_called_once()
-            return result
+            return response_json
 
     @rule()
     @precondition(lambda self: not self.flow_started)
@@ -258,7 +282,7 @@ class AuthStateMachine(RuleBasedStateMachine):
         ) as mock_recaptcha_failure, override_settings(
             **{"RECAPTCHA_SITE_KEY": "fakse"}
         ):
-            assert_api_call(
+            assert_api_call_json(
                 self.client,
                 "psa-register-email",
                 {
@@ -278,7 +302,7 @@ class AuthStateMachine(RuleBasedStateMachine):
     def login_email_not_exists(self):
         """Login for an email that doesn't exist"""
         self.flow_started = True
-        assert_api_call(
+        assert_api_call_json(
             self.client,
             "psa-login-email",
             {"flow": SocialAuthState.FLOW_LOGIN, "email": self.email},
@@ -298,7 +322,7 @@ class AuthStateMachine(RuleBasedStateMachine):
         self.flow_started = True
         self.create_existing_user()
 
-        return assert_api_call(
+        return assert_api_call_json(
             self.client,
             "psa-login-email",
             {
@@ -316,7 +340,7 @@ class AuthStateMachine(RuleBasedStateMachine):
     @rule(auth_state=consumes(LoginPasswordAuthStates))
     def login_password_valid(self, auth_state):
         """Login with a valid password"""
-        assert_api_call(
+        assert_api_call_json(
             self.client,
             "psa-login-password",
             {
@@ -336,7 +360,7 @@ class AuthStateMachine(RuleBasedStateMachine):
     @rule(target=LoginPasswordAuthStates, auth_state=consumes(LoginPasswordAuthStates))
     def login_password_invalid(self, auth_state):
         """Login with an invalid password"""
-        return assert_api_call(
+        return assert_api_call_json(
             self.client,
             "psa-login-password",
             {
@@ -362,7 +386,7 @@ class AuthStateMachine(RuleBasedStateMachine):
         self.user.is_active = False
         self.user.save()
 
-        assert_api_call(
+        assert_api_call_json(
             self.client,
             "psa-login-password",
             {
@@ -386,7 +410,7 @@ class AuthStateMachine(RuleBasedStateMachine):
     #         "authentication.pipeline.compliance.api.verify_user_with_exports",
     #         side_effect=Exception("register_details_export_temporary_error"),
     #     ):
-    #         assert_api_call(
+    #         assert_api_call_json(
     #             self.client,
     #             "psa-login-password",
     #             {
@@ -411,7 +435,7 @@ class AuthStateMachine(RuleBasedStateMachine):
     def redeem_confirmation_code(self, auth_state):
         """Redeem a registration confirmation code"""
         _, _, code, partial_token = self.mock_email_send.call_args[0]
-        return assert_api_call(
+        return assert_api_call_json(
             self.client,
             "psa-register-confirm",
             payload={
@@ -429,7 +453,7 @@ class AuthStateMachine(RuleBasedStateMachine):
     def redeem_confirmation_code_twice(self, auth_state):
         """Redeeming a code twice should fail"""
         _, _, code, partial_token = self.mock_email_send.call_args[0]
-        assert_api_call(
+        assert_api_call_json(
             self.client,
             "psa-register-confirm",
             payload={
@@ -451,7 +475,7 @@ class AuthStateMachine(RuleBasedStateMachine):
         """Redeeming a code twice with an existing user should fail with existing account state"""
         _, _, code, partial_token = self.mock_email_send.call_args[0]
         self.create_existing_user()
-        assert_api_call(
+        assert_api_call_json(
             self.client,
             "psa-register-confirm",
             {
@@ -473,7 +497,7 @@ class AuthStateMachine(RuleBasedStateMachine):
     )
     def register_details(self, auth_state):
         """Complete the register confirmation details page"""
-        result = assert_api_call(
+        response = assert_api_call(
             self.client,
             "psa-register-details",
             payload={
@@ -494,8 +518,15 @@ class AuthStateMachine(RuleBasedStateMachine):
             },
             expect_authenticated=True,
         )
+        # User message should be included in the cookies
+        assert USER_MSG_COOKIE_NAME in response.cookies
+        assert response.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+            {
+                "type": USER_MSG_TYPE_COMPLETED_AUTH,
+            }
+        )
         self.user = User.objects.get(email=self.email)
-        return result
+        return response.json()
 
 
 AuthStateMachine.TestCase.settings = hypothesis_settings(
@@ -518,7 +549,7 @@ def test_new_register_no_session_partial(client):
     token should be cleared from the session. The Partial object associated with that token should
     only be used when it's matched from the email verification link.
     """
-    assert_api_call(
+    assert_api_call_json(
         client,
         "psa-register-email",
         {"flow": SocialAuthState.FLOW_REGISTER, "email": NEW_EMAIL},
