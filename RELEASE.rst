@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.5.0
+Version 0.5.0 (Released September 08, 2021)
 -------------
 
 - add/enable GTM support for basic events (#140)
