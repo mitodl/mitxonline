@@ -31,19 +31,31 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
           <label htmlFor="newPassword">New Password</label>
           <Field
             name="newPassword"
+            id="newPassword"
             className="form-control"
             component={PasswordInput}
+            aria-describedby="newPasswordError"
           />
-          <ErrorMessage name="newPassword" component={FormError} />
+          <ErrorMessage
+            name="newPassword"
+            id="newPasswordError"
+            component={FormError}
+          />
         </div>
         <div className="form-group">
           <label htmlFor="confirmPassword">Confirm Password</label>
           <Field
             name="confirmPassword"
+            id="confirmPassword"
             className="form-control"
             component={PasswordInput}
+            aria-describedby="confirmPasswordError"
           />
-          <ErrorMessage name="confirmPassword" component={FormError} />
+          <ErrorMessage
+            name="confirmPassword"
+            id="confirmPasswordError"
+            component={FormError}
+          />
         </div>
         <div className="row submit-row no-gutters justify-content-end">
           <button

@@ -6,7 +6,11 @@ type Props = {
 
 export default class FormError extends React.Component<Props> {
   render() {
-    const { children } = this.props
-    return <div className="form-error">{children}</div>
+    const { children, id } = this.props
+    return (
+      <div className="form-error" id={id} role="alert">
+        {children}
+      </div>
+    )
   }
 }
