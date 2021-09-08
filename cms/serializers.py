@@ -6,6 +6,7 @@ from cms.api import get_wagtail_img_src
 from courses.constants import DEFAULT_COURSE_IMG_PATH
 from django.templatetags.static import static
 
+
 class CoursePageSerializer(serializers.ModelSerializer):
     """Course page model serializer"""
 

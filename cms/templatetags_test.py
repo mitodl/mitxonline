@@ -25,9 +25,7 @@ def test_wagtail_img_src(mocker, settings):
 def test_featured_img_src(mocker, settings):
     """featured_img_src should return the correct image URL if found else return the Default one"""
     image = ImageFactory()
-    product = CoursePageFactory.create(
-        feature_image=image
-    )
+    product = CoursePageFactory.create(feature_image=image)
     fake_src_value = "http://example.com"
     mocker.patch(
         "cms.templatetags.feature_img_src.get_wagtail_img_src",
@@ -38,4 +36,4 @@ def test_featured_img_src(mocker, settings):
 
     # Now when feature_image is not set.
     img_src = feature_img_src(None)
-    assert img_src == '/static/' + DEFAULT_COURSE_IMG_PATH
+    assert img_src == "/static/" + DEFAULT_COURSE_IMG_PATH

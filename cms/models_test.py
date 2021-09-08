@@ -21,7 +21,7 @@ def test_resource_page_site_name(settings, mocker):
     assert page.get_context(mocker.Mock())["site_name"] == settings.SITE_NAME
 
 
-def test_custom_detail_page_urls():
+def test_custom_detail_page_urls(fully_configured_wagtail):
     """Verify that course detail pages return our custom URL path"""
     readable_id = "some:readable-id"
     course_pages = CoursePageFactory.create_batch(
@@ -30,7 +30,7 @@ def test_custom_detail_page_urls():
     assert course_pages[0].get_url() == "/courses/{}/".format(readable_id)
 
 
-def test_custom_detail_page_urls_handled():
+def test_custom_detail_page_urls_handled(fully_configured_wagtail):
     """Verify that custom URL paths for our course pages are served by the standard Wagtail view"""
     readable_id = "some:readable-id"
     CoursePageFactory.create(course__readable_id=readable_id)
@@ -51,6 +51,7 @@ def test_custom_detail_page_urls_handled():
 )
 def test_course_page_context(
     user,
+    fully_configured_wagtail,
     is_authenticated,
     has_unexpired_run,
     enrolled,
