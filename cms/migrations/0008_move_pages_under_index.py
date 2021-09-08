@@ -2,92 +2,9 @@
 
 from django.db import migrations
 
-# NOTE:
-# These models are imported directly from the Wagtail app because some model functionality is not available when
-# the model is imported via apps.get_model().
-#
-# If the Page model changes, this migration may not succeed. In that case, the operations for this migration
-# should be changed to a no-op (migrations.RunPython.noop), and a new migration file should be created that
-# re-implements the data migrations applied here.
-from wagtail.core.models import Page
 
-
-COURSE_INDEX_PAGE_PROPERTIES = dict(title="Courses")
-
-
-def delete_wagtail_pages(specific_page_cls, filter_dict=None):
-    """
-    Completely deletes Wagtail CMS pages that match a filter. Wagtail overrides standard delete functionality,
-    making it difficult to actually delete Page objects and get information about what was deleted.
-    """
-    page_ids_to_delete = specific_page_cls.objects.values_list("id", flat=True)
-    if filter_dict:
-        page_ids_to_delete = page_ids_to_delete.filter(**filter_dict)
-    num_pages = len(page_ids_to_delete)
-    base_pages_qset = Page.objects.filter(id__in=page_ids_to_delete)
-    if not base_pages_qset.exists():
-        return 0, {}
-    base_pages_qset.delete()
-    return (
-        num_pages,
-        {specific_page_cls._meta.label: num_pages},  # pylint: disable=protected-access
-    )
-
-
-def get_home_page(apps):
-    """
-    Importing the Site model from the registry means if we access the root page from this
-    model we will get an instance of the Page with only the basic model methods so we simply extract
-    the ID of the page and hand it to the Page model imported directly.
-    """
-    Site = apps.get_model("wagtailcore", "Site")
-    site = Site.objects.filter(is_default_site=True).first()
-    if not site:
-        raise Exception(
-            "A default site is not set up. Please setup a default site before running this migration"
-        )
-    if not site.root_page:
-        raise Exception(
-            "No root (home) page set up. Please setup a root (home) page for the default site before running this migration"
-        )
-    return Page.objects.get(id=site.root_page.id)
-
-
-def create_index_page_and_nest_detail(apps, schema_editor):
-    """
-    Create index page for courses and move the respective course pages under this index page.
-    """
-    from cms.models import CourseIndexPage
-
-    CoursePage = apps.get_model("cms", "CoursePage")
-
-    home_page = get_home_page(apps)
-    course_index = CourseIndexPage.objects.first()
-    if not course_index:
-        page_obj = CourseIndexPage(**COURSE_INDEX_PAGE_PROPERTIES)
-        course_index = home_page.add_child(instance=page_obj)
-    # Move course detail pages to be children of the course index pages
-    for page_id in CoursePage.objects.values_list("id", flat=True):
-        page = Page.objects.get(id=page_id)
-        page.move(course_index, "last-child")
-
-
-def unnest_detail_and_delete_index_pages(apps, schema_editor):
-    """
-    Move course and program pages under the home page and remove index pages.
-    """
-    CourseIndexPage = apps.get_model("cms", "CourseIndexPage")
-    CoursePage = apps.get_model("cms", "CoursePage")
-
-    # Move course detail pages to be children of the root page
-    home_page = get_home_page(apps)
-    top_level_child_ids = [child.id for child in home_page.get_children()]
-    for page_id in CoursePage.objects.values_list("id", flat=True):
-        if page_id not in top_level_child_ids:
-            page = Page.objects.get(id=page_id)
-            page.move(home_page, "last-child")
-    # Remove the course index page
-    delete_wagtail_pages(CourseIndexPage)
+# NOTE: This migration was set to a no-op in favor of running a management command that performs the
+# Wagtail data migrations that we need.
 
 
 class Migration(migrations.Migration):
@@ -97,7 +14,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(
-            create_index_page_and_nest_detail, unnest_detail_and_delete_index_pages
-        )
+        migrations.RunPython(migrations.RunPython.noop, migrations.RunPython.noop)
     ]

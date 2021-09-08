@@ -55,6 +55,7 @@ services:
       sleep 3 &&
       python3 manage.py collectstatic --noinput &&
       python3 manage.py migrate --noinput &&
+      python3 manage.py configure_wagtail &&
       uwsgi uwsgi.ini --honour-stdin'
     stdin_open: true
     tty: true

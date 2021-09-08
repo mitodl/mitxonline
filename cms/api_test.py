@@ -2,16 +2,47 @@
 import pytest
 from django.contrib.contenttypes.models import ContentType
 from wagtail.core.models import Page
+from wagtail_factories import PageFactory
 
 from cms.api import (
     ensure_home_page_and_site,
     get_wagtail_img_src,
     ensure_resource_pages,
+    ensure_product_index,
+    get_home_page,
+    RESOURCE_PAGE_TITLES,
 )
-from cms.factories import HomePageFactory
-from cms.models import HomePage, ResourcePage
+from cms.exceptions import WagtailSpecificPageError
+from cms.factories import HomePageFactory, CoursePageFactory
+from cms.models import HomePage, ResourcePage, CourseIndexPage
 
-pytestmark = [pytest.mark.django_db]
+
+@pytest.mark.django_db
+def test_get_home_page():
+    """
+    get_home_page should fetch a Page object for the home page or raise exceptions if certain conditions are met
+    """
+    with pytest.raises(Page.DoesNotExist):
+        get_home_page()
+    assert get_home_page(raise_if_missing=False) is None
+    # Orphaned home page (no HomePage record associated with the Page record
+    orphaned_home_page = PageFactory.create(
+        content_type=ContentType.objects.get_for_model(HomePage)
+    )
+    with pytest.raises(WagtailSpecificPageError):
+        get_home_page(check_specific=True)
+    assert get_home_page() == orphaned_home_page
+
+
+@pytest.mark.django_db
+def test_get_home_page_specific():
+    """
+    get_home_page should fetch a Page object successfully if check_specific=True and there is a HomePage record
+    associated with that Page
+    """
+    home_page = HomePageFactory.create()
+    returned_home_page = get_home_page(check_specific=True)
+    assert home_page.page_ptr == returned_home_page
 
 
 @pytest.mark.django_db
@@ -35,9 +66,11 @@ def test_ensure_home_page_and_site():
     home_page_parents = home_page.get_ancestors()
     assert home_page_parents.count() == 1
     assert home_page_parents.first().is_root() is True
+    # Make sure the function is idempotent
+    ensure_home_page_and_site()
+    assert home_page_qset.count() == 1
 
 
-@pytest.mark.django_db
 def test_get_wagtail_img_src(settings):
     """get_wagtail_img_src should return the correct image URL"""
     settings.MEDIA_URL = "/mediatest/"
@@ -51,20 +84,53 @@ def test_get_wagtail_img_src(settings):
 
 
 @pytest.mark.django_db
-def test_ensure_resource_pages():
+def test_ensure_resource_pages(mocker):
     """
-    ensure_resource_pages makes sure that resource pages created if no already exist
+    ensure_resource_pages should create resource pages if they don't already exist
     """
-    ensure_home_page_and_site()
+    patched_get_home_page = mocker.patch(
+        "cms.api.get_home_page", return_value=HomePageFactory.create()
+    )
+    expected_resource_pages = len(RESOURCE_PAGE_TITLES)
     resource_page_qset = Page.objects.filter(
         content_type=ContentType.objects.get_for_model(ResourcePage)
     )
-    assert not resource_page_qset.exists()
+    assert resource_page_qset.exists() is False
     assert resource_page_qset.count() == 0
     ensure_resource_pages()
-    assert resource_page_qset.exists()
-    assert resource_page_qset.count() == 4
-    assert ResourcePage.objects.filter(title="About Us").exists()
-    assert ResourcePage.objects.filter(title="Terms of Service").exists()
-    assert ResourcePage.objects.filter(title="Privacy Policy").exists()
-    assert ResourcePage.objects.filter(title="Honor Code").exists()
+    patched_get_home_page.assert_called_once()
+    assert resource_page_qset.exists() is True
+    assert resource_page_qset.count() == expected_resource_pages
+    assert sorted(
+        [resource_page.title for resource_page in resource_page_qset]
+    ) == sorted(RESOURCE_PAGE_TITLES)
+    # Make sure the function is idempotent
+    ensure_resource_pages()
+    assert resource_page_qset.count() == expected_resource_pages
+
+
+@pytest.mark.django_db
+def test_ensure_product_index(mocker):
+    """
+    ensure_product_index should make sure that a course index page exists and that all course detail pages are nested
+    under it
+    """
+    home_page = HomePageFactory.create()
+    patched_get_home_page = mocker.patch(
+        "cms.api.get_home_page", return_value=home_page
+    )
+    existing_course_page = CoursePageFactory.create(parent=home_page)
+    course_index_qset = Page.objects.filter(
+        content_type=ContentType.objects.get_for_model(CourseIndexPage)
+    )
+    assert existing_course_page.get_parent() == home_page
+    assert course_index_qset.exists() is False
+    ensure_product_index()
+    patched_get_home_page.assert_called_once()
+    course_index_page = course_index_qset.first()
+    assert course_index_page is not None
+    course_index_children_qset = course_index_page.get_children()
+    assert list(course_index_children_qset.all()) == [existing_course_page.page_ptr]
+    # Make sure the function is idempotent
+    ensure_product_index()
+    assert list(course_index_children_qset.all()) == [existing_course_page.page_ptr]

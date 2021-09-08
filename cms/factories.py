@@ -13,9 +13,22 @@ class HomePageFactory(wagtail_factories.PageFactory):
     """HomePage factory class"""
 
     hero = factory.SubFactory(wagtail_factories.ImageFactory)
+    title = "Home Page"
 
     class Meta:
         model = HomePage
+
+
+class CourseIndexPageFactory(wagtail_factories.PageFactory):
+    """CourseIndexPage factory class"""
+
+    title = "Courses"
+    parent = LazyAttribute(
+        lambda _: HomePage.objects.first() or HomePageFactory.create()
+    )
+
+    class Meta:
+        model = CourseIndexPage
 
 
 class CoursePageFactory(wagtail_factories.PageFactory):
@@ -25,7 +38,9 @@ class CoursePageFactory(wagtail_factories.PageFactory):
     feature_image = factory.SubFactory(wagtail_factories.ImageFactory)
     course = factory.SubFactory(CourseFactory)
     slug = fuzzy.FuzzyText(prefix="my-page-")
-    parent = LazyAttribute(lambda _: CourseIndexPage.objects.first())
+    parent = LazyAttribute(
+        lambda _: CourseIndexPage.objects.first() or CourseIndexPageFactory.create()
+    )
 
     class Meta:
         model = CoursePage
