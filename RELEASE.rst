@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.5.0 (Released September 08, 2021)
+-------------
+
+- add/enable GTM support for basic events (#140)
+- update empty dashboard message (#144)
+- changed background color
+- asadiqbal08/Move prerequisites (#126)
+- asadiqbal08/Don't link to courses that aren't open yet (#139)
+- asadiqbal08/Add support for the default Feature Image (#128)
+
 Version 0.4.2 (Released September 07, 2021)
 -------------
 
