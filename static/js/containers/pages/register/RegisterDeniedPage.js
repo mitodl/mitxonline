@@ -22,7 +22,7 @@ export class RegisterDeniedPage extends React.Component<Props> {
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${REGISTER_DENIED_PAGE_TITLE}`}
       >
-        <div className="container auth-page">
+        <div className="std-page-body container auth-page">
           <div className="auth-card card-shadow row">
             <div className="col-12">
               <div className="register-error-icon" />

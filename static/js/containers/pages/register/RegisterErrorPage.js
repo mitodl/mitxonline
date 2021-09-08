@@ -6,7 +6,7 @@ import { REGISTER_ERROR_PAGE_TITLE } from "../../../constants"
 
 const RegisterErrorPage = () => (
   <DocumentTitle title={`${SETTINGS.site_name} | ${REGISTER_ERROR_PAGE_TITLE}`}>
-    <div className="container auth-page">
+    <div className="std-page-body container auth-page">
       <div className="auth-card card-shadow row">
         <div className="col-12">
           <div className="register-error-icon" />

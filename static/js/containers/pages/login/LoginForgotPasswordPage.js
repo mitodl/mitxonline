@@ -97,7 +97,7 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${FORGOT_PASSWORD_PAGE_TITLE}`}
       >
-        <div className="container auth-page">
+        <div className="std-page-body container auth-page">
           {this.state.isError ? (
             <div className="row auth-card card-shadow auth-form">
               <div className="col-12">
