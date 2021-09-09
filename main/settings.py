@@ -234,6 +234,7 @@ TEMPLATES = [
                 "social_django.context_processors.backends",
                 "social_django.context_processors.login_redirect",
                 "main.context_processors.api_keys",
+                "main.context_processors.configuration_context"
             ]
         },
     }

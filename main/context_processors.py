@@ -17,3 +17,12 @@ def api_keys(request):
             "GTM_TRACKING_ID": settings.GTM_TRACKING_ID,
         }
     }
+
+
+def configuration_context(request):
+    """
+    Configuration context for django templates.
+    """
+    return {
+        "site_name": settings.SITE_NAME,
+    }
