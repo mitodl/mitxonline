@@ -1,8 +1,8 @@
 """mitx_online utilities"""
 import json
 from enum import Flag, auto
-from typing import Union
 from urllib.parse import quote_plus
+from typing import Union, Tuple, TypeVar, Set
 
 from django.conf import settings
 from django.core.serializers import serialize
@@ -89,7 +89,18 @@ def encode_json_cookie_value(cookie_value: Union[dict, list, str, None]) -> str:
 
 
 def is_success_response(resp: Response) -> bool:
-    return (
-        resp.status_code >= status.HTTP_200_OK
-        and resp.status_code < status.HTTP_300_MULTIPLE_CHOICES
-    )
+    return status.HTTP_200_OK <= resp.status_code < status.HTTP_300_MULTIPLE_CHOICES
+
+
+T = TypeVar("T")
+
+
+def get_partitioned_set_difference(
+    set1: Set[T], set2: Set[T]
+) -> Tuple[Set[T], Set[T], Set[T]]:
+    """
+    Returns a tuple containing items that only exist in the first set, items that exist in both sets, and items that
+    only exist in the second set.
+    """
+    common_item_set = set1.intersection(set2)
+    return set1 - common_item_set, common_item_set, set2 - common_item_set

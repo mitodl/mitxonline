@@ -23,6 +23,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_FAILED,
 )
 from main.utils import encode_json_cookie_value
+from openedx.api import sync_enrollments_with_edx
 
 log = logging.getLogger(__name__)
 
@@ -111,3 +112,11 @@ class UserEnrollmentsApiViewSet(
             return {"include_page_fields": True}
         else:
             return {"user": self.request.user}
+
+    def list(self, request, *args, **kwargs):
+        if features.is_enabled(features.SYNC_ON_DASHBOARD_LOAD):
+            try:
+                sync_enrollments_with_edx(self.request.user)
+            except Exception:  # pylint: disable=broad-except
+                log.exception("Failed to sync user enrollments with edX")
+        return super().list(request, *args, **kwargs)

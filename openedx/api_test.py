@@ -4,6 +4,7 @@ import itertools
 from datetime import timedelta
 from urllib.parse import parse_qsl
 
+import factory
 import pytest
 import responses
 from django.contrib.auth import get_user_model
@@ -14,7 +15,8 @@ from oauthlib.common import generate_token
 from requests.exceptions import HTTPError
 from rest_framework import status
 
-from courses.factories import CourseRunFactory
+from courses.factories import CourseRunFactory, CourseRunEnrollmentFactory
+from courses.models import CourseRunEnrollment
 from main.test_utils import MockHttpError, MockResponse
 from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
@@ -29,6 +31,7 @@ from openedx.api import (
     repair_faulty_openedx_users,
     update_edx_user_email,
     update_edx_user_name,
+    sync_enrollments_with_edx,
 )
 from openedx.constants import (
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
@@ -43,6 +46,7 @@ from openedx.exceptions import (
 )
 from openedx.factories import OpenEdxApiAuthFactory, OpenEdxUserFactory
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
+from openedx.utils import SyncResult
 from users.factories import UserFactory
 
 User = get_user_model()
@@ -565,3 +569,93 @@ def test_update_edx_user_name_failure(
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
     with pytest.raises(expected_exception):
         update_edx_user_name(user)
+
+
+def test_sync_enrollments_with_edx_active(mocker, user):
+    """sync_enrollments_with_edx should update the 'active' property of existing enrollment records"""
+    courseware_ids = [
+        "course-v1:abc",
+        "course-v1:def",
+        "course-v1:ghi",
+    ]
+    CourseRunEnrollmentFactory.create_batch(
+        3,
+        user=user,
+        run__courseware_id=factory.Iterator(courseware_ids),
+        active=factory.Iterator([True, False, False]),
+    )
+    edx_active_flags = (False, True, False)
+    mock_client = mocker.MagicMock()
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    mock_client.enrollments.get_student_enrollments = mocker.Mock(
+        return_value=mocker.Mock(
+            enrollments={
+                courseware_id: mocker.Mock(is_active=edx_active_flag)
+                for courseware_id, edx_active_flag in zip(
+                    courseware_ids, edx_active_flags
+                )
+            }
+        )
+    )
+    results = sync_enrollments_with_edx(user)
+    updated_enrollments = (
+        user.courserunenrollment_set(manager="all_objects")
+        .filter(run__courseware_id__in=courseware_ids)
+        .order_by("run__courseware_id")
+    )
+    assert [
+        (enrollment.run.courseware_id, enrollment.active)
+        for enrollment in updated_enrollments
+    ] == [
+        ("course-v1:abc", False),
+        ("course-v1:def", True),
+        ("course-v1:ghi", False),
+    ]
+    assert len(results.created) == 0
+    assert len(results.reactivated) == 1
+    assert len(results.deactivated) == 1
+
+
+def test_sync_enrollments_with_edx_new(mocker, user):
+    """sync_enrollments_with_edx should create new enrollment records if they exist in edX but not locally"""
+    run_id_1 = "course-v1:abc"
+    run_id_2 = "course-v1:def"
+    CourseRunFactory.create_batch(
+        2, courseware_id=factory.Iterator([run_id_1, run_id_2])
+    )
+    mock_client = mocker.MagicMock()
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    mock_client.enrollments.get_student_enrollments = mocker.Mock(
+        return_value=mocker.Mock(
+            enrollments={
+                run_id_1: mocker.Mock(is_active=True),
+                run_id_2: mocker.Mock(is_active=False),
+            }
+        )
+    )
+    results = sync_enrollments_with_edx(user)
+    user_enrollments = user.courserunenrollment_set(manager="all_objects").order_by(
+        "run__courseware_id"
+    )
+    assert [
+        (enrollment.run.courseware_id, enrollment.active)
+        for enrollment in user_enrollments
+    ] == [
+        (run_id_1, True),
+        (run_id_2, False),
+    ]
+    assert len(results.created) == 2
+
+
+def test_sync_enrollments_with_edx_missing(mocker, user):
+    """sync_enrollments_with_edx log an error if enrollments exist locally but not in edX"""
+    CourseRunEnrollmentFactory.create(user=user, active=True)
+    mock_client = mocker.MagicMock()
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    patched_log_error = mocker.patch("openedx.api.log.error")
+    mock_client.enrollments.get_student_enrollments = mocker.Mock(
+        return_value=mocker.Mock(enrollments={})
+    )
+    results = sync_enrollments_with_edx(user)
+    patched_log_error.assert_called_once()
+    assert results == SyncResult()

@@ -21,7 +21,10 @@ from oauthlib.common import generate_token
 from requests.exceptions import HTTPError
 from rest_framework import status
 
+import courses.models
 from authentication import api as auth_api
+from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from main.utils import get_partitioned_set_difference
 from openedx.constants import (
     EDX_ENROLLMENT_AUDIT_MODE,
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -40,7 +43,7 @@ from openedx.exceptions import (
     UserNameUpdateFailedException,
 )
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
-from openedx.utils import edx_url
+from openedx.utils import edx_url, SyncResult
 
 log = logging.getLogger(__name__)
 User = get_user_model()
@@ -598,3 +601,59 @@ def update_edx_user_name(user):
         raise UserNameUpdateFailedException(
             "Error updating user's full name in edX.", exc
         )
+
+
+def sync_enrollments_with_edx(
+    user: User,
+) -> SyncResult[courses.models.CourseRunEnrollment]:
+    """Syncs enrollment records so that local enrollments match the enrollment data in edX"""
+    client = get_edx_api_client(user)
+    edx_enrollments = client.enrollments.get_student_enrollments()
+    local_enrollments = (
+        user.courserunenrollment_set(manager="all_objects")
+        .filter(user=user)
+        .exclude(run__courseware_id=None)
+        .order_by("run__courseware_id")
+        .all()
+    )
+    local_enrollments_map = {
+        enrollment.run.courseware_id: enrollment for enrollment in local_enrollments
+    }
+    local_only_ids, common_ids, edx_only_ids = get_partitioned_set_difference(
+        set(local_enrollments_map.keys()), set(edx_enrollments.enrollments.keys())
+    )
+    results = SyncResult()
+    # Sync active status for local enrollments that have an equivalent enrollment in edX
+    for courseware_id in common_ids:
+        edx_enrollment = edx_enrollments.enrollments[courseware_id]
+        local_enrollment = local_enrollments_map[courseware_id]
+        if local_enrollment.active and not edx_enrollment.is_active:
+            local_enrollment.deactivate_and_save(
+                change_status=ENROLL_CHANGE_STATUS_UNENROLLED
+            )
+            results.deactivated.append(local_enrollment)
+        elif not local_enrollment.active and edx_enrollment.is_active:
+            local_enrollment.reactivate_and_save()
+            results.reactivated.append(local_enrollment)
+    # Create enrollment records for any enrollments that exist in edX but not locally
+    if edx_only_ids:
+        run_values_list = courses.models.CourseRun.objects.filter(
+            courseware_id__in=edx_only_ids
+        ).values("id", "courseware_id")
+        for run_values in run_values_list:
+            local_enrollment = user.courserunenrollment_set.create(
+                user=user,
+                run_id=run_values["id"],
+                edx_enrolled=True,
+                active=edx_enrollments.enrollments[
+                    run_values["courseware_id"]
+                ].is_active,
+            )
+            results.created.append(local_enrollment)
+    # Log an error if any enrollments exist locally but not in edX
+    if local_only_ids:
+        log.error(
+            "Found local enrollments with no equivalent enrollment in edX (CourseRunEnrollment ids: %s)",
+            str(local_only_ids),
+        )
+    return results

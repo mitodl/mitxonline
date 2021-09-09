@@ -7,6 +7,7 @@ from mitol.common.utils import get_error_response_summary
 from requests.exceptions import HTTPError
 
 from openedx.api import repair_faulty_edx_user
+from users.api import fetch_user
 
 User = get_user_model()
 
@@ -18,16 +19,30 @@ class Command(BaseCommand):
 
     help = "Repairs missing openedx records"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--user",
+            type=str,
+            help="The id, email, or username of the User",
+            required=False,
+        )
+
     def handle(self, *args, **options):
         """Walk all users who are missing records and repair them"""
-
-        users_to_repair = User.faulty_openedx_users
-        self.stdout.write(f"Repairing {users_to_repair.count()} users")
+        user_attr = options.get("user")
+        if user_attr is not None:
+            user = fetch_user(user_attr)
+            self.stdout.write(f"Repairing user '{user.username}' ({user.email})")
+            users = [user]
+        else:
+            users_to_repair = User.faulty_openedx_users
+            self.stdout.write(f"Repairing {users_to_repair.count()} users")
+            users = users_to_repair.iterator()
 
         error_count = 0
         success_count = 0
 
-        for user in users_to_repair.iterator():
+        for user in users:
             result = []
             try:
                 created_user, created_auth_token = repair_faulty_edx_user(user)
