@@ -63,6 +63,14 @@
       "description": "The Cloundfront distribution to use for static assets",
       "required": false
     },
+    "CRON_COURSERUN_SYNC_DAYS": {
+      "description": "'day_of_week' value for 'sync-courseruns-data' scheduled task (default will run once a day).",
+      "required": false
+    },
+    "CRON_COURSERUN_SYNC_HOURS": {
+      "description": "'hours' value for the 'sync-courseruns-data' scheduled task (defaults to midnight)",
+      "required": false
+    },
     "CSRF_TRUSTED_ORIGINS": {
       "description": "Comma separated string of trusted domains that should be CSRF exempt",
       "required": false
