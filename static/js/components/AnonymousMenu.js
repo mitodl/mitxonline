@@ -33,7 +33,7 @@ const AnonymousMenu = ({ useScreenOverlay }: Props) => {
         <MixedLink
           dest={routes.register.begin}
           className="simple button"
-          aria-label="Login"
+          aria-label="Create Account"
         >
           Create Account
         </MixedLink>
