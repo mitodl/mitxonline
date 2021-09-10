@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.5.1
+Version 0.5.1 (Released September 10, 2021)
 -------------
 
 - fix user name font weight in user menu (#165)
