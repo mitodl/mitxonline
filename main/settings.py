@@ -814,6 +814,9 @@ DJOSER = {
     "PASSWORD_RESET_CONFIRM_RETYPE": True,
     "PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND": True,
     "EMAIL": {"password_reset": "authentication.views.CustomPasswordResetEmail"},
+    "SERIALIZERS": {
+        "password_reset": "authentication.serializers.CustomSendEmailResetSerializer"
+    },
 }
 
 # ol-django configuration
