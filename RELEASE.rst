@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.5.1 (Released September 10, 2021)
+-------------
+
+- fix user name font weight in user menu (#165)
+- fix head title for wagtail based pages (#152)
+- fix: accessibility issues on homepage (#160)
+- improve top-bar menu (#135)
+- Added welcome message for users that complete first authentication
+- Fixed CMS migrations, added startup command to configure Wagtail
+
 Version 0.5.0 (Released September 08, 2021)
 -------------
 
