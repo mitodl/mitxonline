@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.6.0
+-------------
+
+- made forgot password case insensitive
+- Added loading animation component and applied to dashboard
+
 Version 0.5.1 (Released September 10, 2021)
 -------------
 
