@@ -3,7 +3,7 @@ from mitol.common.utils.urls import remove_password_from_url
 from mitol.common.utils.webpack import webpack_public_path
 
 from main.models import AuditModel
-from main.utils import get_field_names, get_js_settings
+from main.utils import get_field_names, get_js_settings, get_partitioned_set_difference
 
 
 def test_get_field_names():
@@ -40,3 +40,14 @@ def test_get_js_settings(settings, rf):
         "support_email": settings.EMAIL_SUPPORT,
         "site_name": settings.SITE_NAME,
     }
+
+
+def test_get_partitioned_set_difference():
+    """
+    get_partitioned_set_difference should return a tuple with unique and common items between two sets
+    """
+    set1 = {1, 2, 3, 4}
+    set2 = {3, 4, 5, 6}
+    assert get_partitioned_set_difference(set1, set2) == ({1, 2}, {3, 4}, {5, 6})
+    set2 = {3, 4}
+    assert get_partitioned_set_difference(set1, set2) == ({1, 2}, {3, 4}, set())

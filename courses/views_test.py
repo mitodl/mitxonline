@@ -6,6 +6,7 @@ import operator as op
 
 import pytest
 from django.urls import reverse
+from requests import HTTPError
 from rest_framework import status
 
 from courses.factories import (
@@ -23,6 +24,7 @@ from courses.serializers import (
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from main import features
 from main.test_utils import assert_drf_json_equal
+from openedx.exceptions import NoEdxApiAuthError
 
 pytestmark = [pytest.mark.django_db]
 
@@ -257,6 +259,42 @@ def test_user_enrollments_list(user_drf_client, user):
             ).data
         ],
     )
+
+
+@pytest.mark.parametrize("sync_dashboard_flag", [True, False])
+def test_user_enrollments_list_sync(
+    mocker, settings, user_drf_client, user, sync_dashboard_flag
+):
+    """
+    If the appropriate feature flag is turned on, the enrollments list API call should sync enrollments with
+    """
+    settings.FEATURES[features.SYNC_ON_DASHBOARD_LOAD] = sync_dashboard_flag
+    patched_sync = mocker.patch(
+        "courses.views.v1.sync_enrollments_with_edx",
+    )
+    resp = user_drf_client.get(reverse("user-enrollments-api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+    assert patched_sync.called is sync_dashboard_flag
+    if sync_dashboard_flag is True:
+        patched_sync.assert_called_once_with(user)
+
+
+@pytest.mark.parametrize("exception_raised", [NoEdxApiAuthError, HTTPError, ValueError])
+def test_user_enrollments_list_sync_fail(
+    mocker, settings, user_drf_client, user, exception_raised
+):
+    """
+    The enrollments list API should log an exception and continue if enrollment syncing fails for any reason
+    """
+    settings.FEATURES[features.SYNC_ON_DASHBOARD_LOAD] = True
+    patched_sync = mocker.patch(
+        "courses.views.v1.sync_enrollments_with_edx", side_effect=exception_raised
+    )
+    patched_log_exception = mocker.patch("courses.views.v1.log.exception")
+    resp = user_drf_client.get(reverse("user-enrollments-api-list"))
+    assert resp.status_code == status.HTTP_200_OK
+    patched_sync.assert_called_once()
+    patched_log_exception.assert_called_once()
 
 
 @pytest.mark.parametrize("ignore_failures_flag", [True, False])
