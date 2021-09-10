@@ -69,7 +69,7 @@ export class RegisterConfirmPage extends React.Component<Props> {
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${REGISTER_CONFIRM_PAGE_TITLE}`}
       >
-        <div className="container auth-page">
+        <div className="std-page-body container auth-page">
           <div className="row">
             <div className="col">
               {auth && INFORMATIVE_STATES.indexOf(auth.state) > -1 ? (

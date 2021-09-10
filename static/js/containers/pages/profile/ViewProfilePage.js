@@ -42,7 +42,7 @@ export class ViewProfilePage extends React.Component<Props> {
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${VIEW_PROFILE_PAGE_TITLE}`}
       >
-        <div className="container auth-page registration-page">
+        <div className="std-page-body container auth-page registration-page">
           <div className="auth-header row d-flex  align-items-center justify-content-between flex-nowrap">
             <div className="col-auto flex-shrink-1">
               <h1>Profile</h1>

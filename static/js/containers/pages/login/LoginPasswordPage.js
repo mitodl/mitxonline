@@ -92,7 +92,7 @@ export class LoginPasswordPage extends React.Component<Props> {
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${LOGIN_PASSWORD_PAGE_TITLE}`}
       >
-        <div className="container auth-page">
+        <div className="std-page-body container auth-page">
           <div className="row auth-card card-shadow auth-form">
             <div className="col-12">
               <div className="row auth-header">

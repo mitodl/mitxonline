@@ -86,7 +86,7 @@ export class RegisterDetailsPage extends React.Component<Props> {
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${REGISTER_DETAILS_PAGE_TITLE}`}
       >
-        <div className="container auth-page registration-page">
+        <div className="std-page-body container auth-page registration-page">
           <div className="auth-card card-shadow row">
             <div className="container">
               <div className="auth-header row d-flex flex-row align-items-center justify-content-between flex-nowrap">

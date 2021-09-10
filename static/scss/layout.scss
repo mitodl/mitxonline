@@ -5,8 +5,9 @@
 @import "node_modules/react-day-picker/lib/style";
 @import "node_modules/bootstrap/scss/bootstrap";
 @import "node_modules/video.js/dist/video-js";
-@import "auth";
 @import "common";
+@import "loader";
+@import "auth";
 @import "top-app-bar";
 @import "collapsible";
 @import "footer";
@@ -61,5 +62,13 @@ body {
         width: 100% !important;
       }
     }
+  }
+
+  .std-page-body {
+    @include media-breakpoint-down(md) {
+      padding-top: 32px;
+    }
+
+    padding-top: 50px;
   }
 }

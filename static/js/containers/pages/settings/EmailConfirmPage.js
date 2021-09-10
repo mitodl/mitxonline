@@ -74,7 +74,7 @@ export class EmailConfirmPage extends React.Component<Props> {
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${EMAIL_CONFIRM_PAGE_TITLE}`}
       >
-        <div className="container auth-page">
+        <div className="std-page-body container auth-page">
           <div className="row">
             <div className="col">
               {isLoading && <p>Confirming...</p>}

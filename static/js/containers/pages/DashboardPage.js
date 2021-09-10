@@ -6,19 +6,25 @@ import { connect } from "react-redux"
 import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
 import { connectRequest } from "redux-query"
+import { pathOr } from "ramda"
 import moment from "moment"
-import { isLinkableCourseRun } from "../../lib/courseApi"
+
+import Loader from "../../components/Loader"
 import { DASHBOARD_PAGE_TITLE } from "../../constants"
 import {
   enrollmentsSelector,
-  enrollmentsQuery
+  enrollmentsQuery,
+  enrollmentsQueryKey
 } from "../../lib/queries/enrollment"
+import { isLinkableCourseRun } from "../../lib/courseApi"
 import { formatPrettyDate, parseDateString } from "../../lib/util"
 import { routes } from "../../lib/urls"
-import { RunEnrollment } from "../../flow/courseTypes"
+
+import type { RunEnrollment } from "../../flow/courseTypes"
 
 type DashboardPageProps = {
-  enrollments: RunEnrollment[]
+  enrollments: RunEnrollment[],
+  isLoading: boolean
 }
 
 export class DashboardPage extends React.Component<DashboardPageProps, void> {
@@ -70,25 +76,27 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
   }
 
   render() {
-    const { enrollments } = this.props
+    const { enrollments, isLoading } = this.props
 
     return (
       <DocumentTitle title={`${SETTINGS.site_name} | ${DASHBOARD_PAGE_TITLE}`}>
-        <div className="dashboard container">
-          <h1>My Courses</h1>
-          <div className="enrolled-items">
-            {enrollments && enrollments.length > 0 ? (
-              enrollments.map(this.renderEnrolledItemCard)
-            ) : (
-              <div className="card no-enrollments p-3 p-sm-5 rounded-0">
-                <h4>Enroll Now</h4>
-                <p>
-                  You are not enrolled in any courses yet. Please{" "}
-                  <a href={routes.root}>browse our courses</a>.
-                </p>
-              </div>
-            )}
-          </div>
+        <div className="std-page-body dashboard container">
+          <Loader isLoading={isLoading}>
+            <h1>My Courses</h1>
+            <div className="enrolled-items">
+              {enrollments && enrollments.length > 0 ? (
+                enrollments.map(this.renderEnrolledItemCard)
+              ) : (
+                <div className="card no-enrollments p-3 p-sm-5 rounded-0">
+                  <h4>Enroll Now</h4>
+                  <p>
+                    You are not enrolled in any courses yet. Please{" "}
+                    <a href={routes.root}>browse our courses</a>.
+                  </p>
+                </div>
+              )}
+            </div>
+          </Loader>
         </div>
       </DocumentTitle>
     )
@@ -96,7 +104,8 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
 }
 
 const mapStateToProps = createStructuredSelector({
-  enrollments: enrollmentsSelector
+  enrollments: enrollmentsSelector,
+  isLoading:   pathOr(true, ["queries", enrollmentsQueryKey, "isPending"])
 })
 
 const mapPropsToConfig = () => [enrollmentsQuery()]

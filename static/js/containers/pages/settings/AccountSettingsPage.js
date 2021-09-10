@@ -121,7 +121,7 @@ export class AccountSettingsPage extends React.Component<Props> {
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${ACCOUNT_SETTINGS_PAGE_TITLE}`}
       >
-        <div className="container auth-page account-settings-page">
+        <div className="std-page-body container auth-page account-settings-page">
           <div className="auth-header">
             <h1>User Settings</h1>
           </div>
