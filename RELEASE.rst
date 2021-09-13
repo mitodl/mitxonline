@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.7.0
+-------------
+
+- Fixed user menu visibility regression
+- Updated Forgot Password flow in case of email does not exist. (#169)
+- Added enrollment sync when dashboard loads
+
 Version 0.6.0 (Released September 13, 2021)
 -------------
 
