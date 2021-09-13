@@ -42,7 +42,7 @@ body {
     }
 
     .mobile-menu {
-      @include media-breakpoint-down(xs) {
+      @include media-breakpoint-down(sm) {
         display: block;
       }
 
