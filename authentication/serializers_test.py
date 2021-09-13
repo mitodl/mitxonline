@@ -4,7 +4,10 @@ from rest_framework.exceptions import ValidationError
 from social_core.backends.email import EmailAuth
 from social_core.exceptions import AuthException, InvalidEmail
 
-from authentication.serializers import RegisterEmailSerializer, CustomSendEmailResetSerializer
+from authentication.serializers import (
+    RegisterEmailSerializer,
+    CustomSendEmailResetSerializer,
+)
 from authentication.utils import SocialAuthState
 
 from users.factories import UserFactory
@@ -76,23 +79,19 @@ def test_register_email_validation(data, raises, message):
     else:  # no exception
         assert RegisterEmailSerializer().validate(data) == data
 
+
 @pytest.mark.parametrize(
-    "email,raises,code",
+    "email,exists",
     (
-        ("email@example.com", None, None),
-        ("EmaIl@example.com", None, None),
-        ("falseemail@example.com", ValidationError, "email_not_found")
+        ("email@example.com", True),
+        ("EmaIl@example.com", True),
+        ("falseemail@example.com", False),
     ),
 )
-def test_forgot_password_case_insensitive(email, raises, code):
+def test_forgot_password_case_insensitive(email, exists):
     """Test that CustomEmailResetSerializer is case insensitive"""
-   
-    user = UserFactory.create(email=EMAIL)
-    serializer =  CustomSendEmailResetSerializer(data= {"email": email})
+
+    user = UserFactory.create(email=EMAIL) if exists else None
+    serializer = CustomSendEmailResetSerializer(data={"email": email})
     assert serializer.is_valid() is True
-    if not raises:
-        assert  serializer.get_user() == user
-    else:
-        with pytest.raises(raises) as exc:
-            serializer.get_user()
-        assert exc.value.detail[0].code == code
+    assert serializer.get_user() == user
