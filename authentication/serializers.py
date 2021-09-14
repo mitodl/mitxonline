@@ -348,7 +348,6 @@ class RegisterExtraDetailsSerializer(SocialAuthSerializer):
 
 
 class CustomSendEmailResetSerializer(SendEmailResetSerializer):
-    
     def get_user(self, is_active=True):
         # NOTE: This directly copies the implementation of djoser.serializers.UserFunctionsMixin.get_user
         # and only changes the User query. If this method is changed in an updated Djoser

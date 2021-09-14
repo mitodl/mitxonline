@@ -3,14 +3,13 @@ Course models
 """
 import logging
 import operator as op
-import uuid
 
 from django.contrib.auth import get_user_model
-from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 from django.utils.functional import cached_property
+from django_countries.fields import CountryField
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
@@ -425,6 +424,22 @@ class CourseRun(TimestampedModel):
             using=using,
             update_fields=update_fields,
         )
+
+
+class BlockedCountry(TimestampedModel):
+    """Represents a country that is blocked from enrollment for a course"""
+
+    course = models.ForeignKey(
+        Course, on_delete=models.CASCADE, related_name="blocked_countries"
+    )
+    country = CountryField()
+
+    class Meta:
+        verbose_name_plural = "blocked countries"
+        unique_together = ("course", "country")
+
+    def __str__(self):
+        return f"course='{self.course.title}'; country='{self.country.name}'"
 
 
 class EnrollmentModel(TimestampedModel, AuditableModel):

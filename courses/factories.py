@@ -14,6 +14,7 @@ from courses.models import (
     Program,
     ProgramEnrollment,
     ProgramRun,
+    BlockedCountry,
 )
 from users.factories import UserFactory
 
@@ -96,6 +97,16 @@ class CourseRunFactory(DjangoModelFactory):
         past_enrollment_end = factory.Trait(
             enrollment_end=factory.Faker("past_datetime", tzinfo=pytz.utc)
         )
+
+
+class BlockedCountryFactory(DjangoModelFactory):
+    """Factory for BlockedCountry"""
+
+    course = factory.SubFactory(CourseFactory)
+    country = factory.Faker("country_code", representation="alpha-2")
+
+    class Meta:
+        model = BlockedCountry
 
 
 class CourseRunGradeFactory(DjangoModelFactory):
