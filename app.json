@@ -64,11 +64,11 @@
       "required": false
     },
     "CRON_COURSERUN_SYNC_DAYS": {
-      "description": "'day_of_week' value for 'sync-courseruns-data' scheduled task (default will run once a day).",
+      "description": "day_of_week' value for scheduled task to sync course run data (by default, it will run each day of the week).",
       "required": false
     },
     "CRON_COURSERUN_SYNC_HOURS": {
-      "description": "'hours' value for the 'sync-courseruns-data' scheduled task (defaults to midnight)",
+      "description": "'hours' value for scheduled task to sync course run data (by default, it will run at midnight",
       "required": false
     },
     "CSRF_TRUSTED_ORIGINS": {
