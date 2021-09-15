@@ -93,6 +93,8 @@ django-compat==1.0.15
     # via
     #   django-hijack
     #   django-hijack-admin
+django-countries==7.2.1
+    # via -r requirements.in
 django-filter==2.3.0
     # via
     #   -r requirements.in

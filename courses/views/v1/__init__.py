@@ -1,11 +1,14 @@
 """Course views verson 1"""
 import logging
+from typing import Tuple, Optional, Union
 
-from django.http import HttpResponseRedirect
+from django.contrib.auth.models import User
+from django.http import HttpResponseRedirect, HttpResponse, HttpRequest
 from django.urls import reverse
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
 
 from courses.api import create_run_enrollments
 from courses.models import Course, CourseRun, Program, CourseRunEnrollment
@@ -21,6 +24,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLLED,
     USER_MSG_COOKIE_MAX_AGE,
     USER_MSG_TYPE_ENROLL_FAILED,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
 )
 from main.utils import encode_json_cookie_value
 from openedx.api import sync_enrollments_with_edx
@@ -53,21 +57,50 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = CourseRun.objects.all()
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def create_enrollment_view(request):
-    """View to handle direct POST requests to enroll in a course run"""
+def _validate_enrollment_post_request(
+    request: Request,
+) -> Union[Tuple[Optional[HttpResponse], None, None], Tuple[None, User, CourseRun]]:
+    """
+    Validates a request to create an enrollment. Returns a response if validation fails, or a user and course run
+    if validation succeeds.
+    """
     user = request.user
     run_id_str = request.data.get("run")
     if run_id_str is not None and run_id_str.isdigit():
-        run = CourseRun.objects.filter(id=int(run_id_str)).first()
+        run = (
+            CourseRun.objects.filter(id=int(run_id_str))
+            .select_related("course")
+            .first()
+        )
     else:
         run = None
     if run is None:
         log.error(
             "Attempting to enroll in a non-existent run (id: %s)", str(run_id_str)
         )
-        return HttpResponseRedirect(request.get_raw_uri())
+        return HttpResponseRedirect(request.headers["Referer"]), None, None
+    if run.course.blocked_countries.filter(country=user.legal_address.country).exists():
+        resp = HttpResponseRedirect(request.headers["Referer"])
+        resp.set_cookie(
+            key=USER_MSG_COOKIE_NAME,
+            value=encode_json_cookie_value(
+                {
+                    "type": USER_MSG_TYPE_ENROLL_BLOCKED,
+                }
+            ),
+            max_age=USER_MSG_COOKIE_MAX_AGE,
+        )
+        return resp, None, None
+    return None, user, run
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_enrollment_view(request):
+    """View to handle direct POST requests to enroll in a course run"""
+    resp, user, run = _validate_enrollment_post_request(request)
+    if resp is not None:
+        return resp
     _, edx_request_success = create_run_enrollments(
         user=user,
         runs=[run],
