@@ -932,3 +932,5 @@ if DEBUG:
     INSTALLED_APPS += ("debug_toolbar",)
     # it needs to be enabled before other middlewares
     MIDDLEWARE = ("debug_toolbar.middleware.DebugToolbarMiddleware",) + MIDDLEWARE
+
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
