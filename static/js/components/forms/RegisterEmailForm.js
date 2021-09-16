@@ -46,7 +46,7 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
             component={EmailInput}
           />
           <ErrorMessage name="email" component={FormError} />
-          <p className="policy-consent">
+          <p className="py-2">
             By creating an account I agree to the{" "}
             <a href={routes.informationLinks.termsOfService}>
               Terms of Service
