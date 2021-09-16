@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.7.1
+-------------
+
+- Enable no cache for API
+- Added valid mitx logo (#182)
+
 Version 0.7.0 (Released September 14, 2021)
 -------------
 
