@@ -40,27 +40,33 @@ type MenuChildProps = {
 const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
   /* eslint-disable prefer-const */
   let menuChildProps: MenuChildProps
+  let dropdownIdentifier = "dropdownMenuButton"
   menuChildProps = useScreenOverlay
     ? {
-      li: overlayListItemProps
+      li:                 overlayListItemProps,
+      dropdownIdentifier: dropdownIdentifier.concat("Mobile")
     }
     : {
-      container: desktopMenuContainerProps,
-      ul:        desktopUListProps,
-      li:        desktopListItemProps
+      container:          desktopMenuContainerProps,
+      ul:                 desktopUListProps,
+      li:                 desktopListItemProps,
+      dropdownIdentifier: dropdownIdentifier.concat("Desktop")
     }
   return (
     <div {...menuChildProps.container || {}}>
       <div
         className="col-2 dropdown-toggle"
-        id="dropdownMenuButton"
+        id={menuChildProps.dropdownIdentifier}
         data-toggle="dropdown"
         aria-haspopup="true"
         aria-expanded="false"
       >
         {currentUser.name}
       </div>
-      <ul {...menuChildProps.ul || {}} aria-labelledby="dropdownMenuButton">
+      <ul
+        {...menuChildProps.ul || {}}
+        aria-labelledby={menuChildProps.dropdownIdentifier}
+      >
         <li {...menuChildProps.li || {}}>
           <MixedLink dest={routes.profile.view} aria-label="Profile">
             Profile
