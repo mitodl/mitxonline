@@ -18,19 +18,22 @@ const AnonymousMenu = ({ useScreenOverlay }: Props) => {
   /* eslint-disable prefer-const */
   let listItemProps: Object
   listItemProps = useScreenOverlay ? overlayListItemProps : null
+  let identifierPostfix = useScreenOverlay ? "Mobile" : "Desktop"
   return (
     <ul className="menu-holder">
       <li {...listItemProps || {}}>
         <MixedLink
+          id={"login".concat(identifierPostfix)}
           dest={routes.login.begin}
           className="simple"
-          aria-label="Login"
+          aria-label="Sign In"
         >
           Sign In
         </MixedLink>
       </li>
       <li {...listItemProps || {}}>
         <MixedLink
+          id={"createAccount".concat(identifierPostfix)}
           dest={routes.register.begin}
           className="simple button"
           aria-label="Create Account"
