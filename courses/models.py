@@ -312,7 +312,9 @@ class CourseRun(TimestampedModel):
         Course, on_delete=models.CASCADE, related_name="courseruns"
     )
     # product = GenericRelation(Product, related_query_name="course_run")
-    title = models.CharField(max_length=255, help_text=SYNC_COURSE_RUN_STRING)
+    title = models.CharField(
+        max_length=255, help_text=f"The title of the course. {SYNC_COURSE_RUN_STRING}"
+    )
     courseware_id = models.CharField(max_length=255, unique=True)
     run_tag = models.CharField(
         max_length=10,
@@ -320,16 +322,28 @@ class CourseRun(TimestampedModel):
     )
     courseware_url_path = models.CharField(max_length=500, blank=True, null=True)
     start_date = models.DateTimeField(
-        null=True, blank=True, db_index=True, help_text=SYNC_COURSE_RUN_STRING
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=f"The day the course begins. {SYNC_COURSE_RUN_STRING}",
     )
     end_date = models.DateTimeField(
-        null=True, blank=True, db_index=True, help_text=SYNC_COURSE_RUN_STRING
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=f"The last day the course is active. {SYNC_COURSE_RUN_STRING}",
     )
     enrollment_start = models.DateTimeField(
-        null=True, blank=True, db_index=True, help_text=SYNC_COURSE_RUN_STRING
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=f"The first day students can enroll. {SYNC_COURSE_RUN_STRING}",
     )
     enrollment_end = models.DateTimeField(
-        null=True, blank=True, db_index=True, help_text=SYNC_COURSE_RUN_STRING
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=f"The last day students can enroll. {SYNC_COURSE_RUN_STRING}",
     )
     expiration_date = models.DateTimeField(
         null=True,
