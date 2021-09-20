@@ -32,4 +32,4 @@ ENROLL_CHANGE_STATUS_CHOICES = list(
     zip(ALL_ENROLL_CHANGE_STATUSES, ALL_ENROLL_CHANGE_STATUSES)
 )
 
-SYNC_COURSE_RUN_STRING = "This value is synced automatically with edX studio."
+SYNCED_COURSE_RUN_FIELD_MSG = "This value is synced automatically with edX studio."
