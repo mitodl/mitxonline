@@ -14,7 +14,11 @@ from mitol.common.models import TimestampedModel
 from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 
-from courses.constants import ENROLL_CHANGE_STATUS_CHOICES, ENROLLABLE_ITEM_ID_SEPARATOR
+from courses.constants import (
+    ENROLL_CHANGE_STATUS_CHOICES,
+    ENROLLABLE_ITEM_ID_SEPARATOR,
+    SYNCED_COURSE_RUN_FIELD_MSG,
+)
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
 from openedx.utils import edx_redirect_url
@@ -307,17 +311,39 @@ class CourseRun(TimestampedModel):
         Course, on_delete=models.CASCADE, related_name="courseruns"
     )
     # product = GenericRelation(Product, related_query_name="course_run")
-    title = models.CharField(max_length=255)
+    title = models.CharField(
+        max_length=255, help_text=f"The title of the course. {SYNCED_COURSE_RUN_FIELD_MSG}"
+    )
     courseware_id = models.CharField(max_length=255, unique=True)
     run_tag = models.CharField(
         max_length=10,
         help_text="A string that identifies the set of runs that this run belongs to (example: 'R2')",
     )
     courseware_url_path = models.CharField(max_length=500, blank=True, null=True)
-    start_date = models.DateTimeField(null=True, blank=True, db_index=True)
-    end_date = models.DateTimeField(null=True, blank=True, db_index=True)
-    enrollment_start = models.DateTimeField(null=True, blank=True, db_index=True)
-    enrollment_end = models.DateTimeField(null=True, blank=True, db_index=True)
+    start_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=f"The day the course begins. {SYNCED_COURSE_RUN_FIELD_MSG}",
+    )
+    end_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=f"The last day the course is active. {SYNCED_COURSE_RUN_FIELD_MSG}",
+    )
+    enrollment_start = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=f"The first day students can enroll. {SYNCED_COURSE_RUN_FIELD_MSG}",
+    )
+    enrollment_end = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=f"The last day students can enroll. {SYNCED_COURSE_RUN_FIELD_MSG}",
+    )
     expiration_date = models.DateTimeField(
         null=True,
         blank=True,
