@@ -68,7 +68,7 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
           )}
         </div>
         <div className="col-12 col-sm p-3 p-sm-0">
-          <h4 className="mb-3">{title}</h4>
+          <h2 className="mb-3">{title}</h2>
           <div className="detail">{startDateDescription}</div>
         </div>
       </div>
@@ -88,7 +88,7 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
                 enrollments.map(this.renderEnrolledItemCard)
               ) : (
                 <div className="card no-enrollments p-3 p-sm-5 rounded-0">
-                  <h4>Enroll Now</h4>
+                  <h2>Enroll Now</h2>
                   <p>
                     You are not enrolled in any courses yet. Please{" "}
                     <a href={routes.root}>browse our courses</a>.

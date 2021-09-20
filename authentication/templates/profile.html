@@ -2,7 +2,7 @@
 {% load i18n static %}
 
 {% block content %}
-<div id="login-page">
+<div id="profile-page">
   <h2>Profile</h2>
   <form method="post" action="{% url 'social:complete' 'email' %}">
     {% csrf_token %}
