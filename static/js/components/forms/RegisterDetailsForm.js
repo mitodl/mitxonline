@@ -18,6 +18,7 @@ type Props = {
 const INITIAL_VALUES = {
   name:          "",
   password:      "",
+  username:      "",
   legal_address: {
     first_name: "",
     last_name:  "",

@@ -505,6 +505,7 @@ class AuthStateMachine(RuleBasedStateMachine):
                 "partial_token": auth_state["partial_token"],
                 "password": self.password,
                 "name": "Sally Smith",
+                "username": "custom-username",
                 "legal_address": {
                     "first_name": "Sally",
                     "last_name": "Smith",

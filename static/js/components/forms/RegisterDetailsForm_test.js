@@ -55,6 +55,10 @@ describe("RegisterDetailsForm", () => {
     ["name", "", "Full Name is a required field"],
     ["name", "  ", "Full Name is a required field"],
     ["name", "Jane", null],
+    ["username", "", "Username is a required field"],
+    ["username", "  ", "Username is a required field"],
+    ["username", "ab", "Username must be at least 3 characters"],
+    ["username", "ábc-dèf-123", null],
     ["legal_address.first_name", "", "First Name is a required field"],
     ["legal_address.last_name", "", "Last Name is a required field"]
   ].forEach(([name, value, errorMessage]) => {

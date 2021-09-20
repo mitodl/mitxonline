@@ -12,7 +12,11 @@ import { createStructuredSelector } from "reselect"
 import auth from "../../../lib/queries/auth"
 import users from "../../../lib/queries/users"
 import { routes } from "../../../lib/urls"
-import { STATE_ERROR, handleAuthResponse } from "../../../lib/auth"
+import {
+  STATE_ERROR,
+  handleAuthResponse,
+  STATE_REGISTER_DETAILS
+} from "../../../lib/auth"
 import queries from "../../../lib/queries"
 import { qsPartialTokenSelector } from "../../../lib/selectors"
 
@@ -41,6 +45,7 @@ type DispatchProps = {|
   registerDetails: (
     name: string,
     password: string,
+    username: string,
     legalAddress: LegalAddress,
     partialToken: string
   ) => Promise<Response<AuthResponse>>,
@@ -65,15 +70,24 @@ export class RegisterDetailsPage extends React.Component<Props> {
       const { body } = await registerDetails(
         detailsData.name,
         detailsData.password,
+        detailsData.username,
         detailsData.legal_address,
         partialToken
       )
 
+      /* eslint-disable camelcase */
       handleAuthResponse(history, body, {
-        // eslint-disable-next-line camelcase
         [STATE_ERROR]: ({ field_errors }: AuthResponse) =>
-          setErrors(field_errors)
+          setErrors(field_errors),
+        [STATE_REGISTER_DETAILS]: ({ field_errors }: AuthResponse) => {
+          // Validation failures will result in a 200 API response that still points to this page but contains
+          // field errors.
+          if (field_errors) {
+            setErrors(field_errors)
+          }
+        }
       })
+      /* eslint-enable camelcase */
     } finally {
       setSubmitting(false)
     }
@@ -129,11 +143,18 @@ const mapPropsToConfig = () => [queries.users.countriesQuery()]
 const registerDetails = (
   name: string,
   password: string,
+  username: string,
   legalAddress: LegalAddress,
   partialToken: string
 ) =>
   mutateAsync(
-    auth.registerDetailsMutation(name, password, legalAddress, partialToken)
+    auth.registerDetailsMutation(
+      name,
+      password,
+      username,
+      legalAddress,
+      partialToken
+    )
   )
 
 const getCurrentUser = () =>

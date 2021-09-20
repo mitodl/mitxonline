@@ -5,6 +5,7 @@ import logging
 import requests
 from django.conf import settings
 from django.db import IntegrityError
+from mitol.common.utils import dict_without_keys
 from social_core.backends.email import EmailAuth
 from social_core.exceptions import AuthException
 from social_core.pipeline.partial import partial
@@ -94,7 +95,8 @@ def create_user_via_email(
 
     context = {}
     data = strategy.request_data().copy()
-    if "name" not in data or "password" not in data:
+    expected_data_fields = {"name", "password", "username"}
+    if any(field for field in expected_data_fields if field not in data):
         raise RequirePasswordAndPersonalInfoException(backend, current_partial)
     if len(data.get("name", 0)) < NAME_MIN_LENGTH:
         raise RequirePasswordAndPersonalInfoException(
@@ -104,22 +106,30 @@ def create_user_via_email(
         )
 
     data["email"] = kwargs.get("email", kwargs.get("details", {}).get("email"))
-    username = usernameify(data["name"], email=data["email"])
-    data["username"] = username
-
     serializer = UserSerializer(data=data, context=context)
+    username = data["username"]
 
     if not serializer.is_valid():
         raise RequirePasswordAndPersonalInfoException(
-            backend, current_partial, errors=serializer.errors
+            backend,
+            current_partial,
+            errors=serializer.errors.get("non_field_errors"),
+            field_errors=dict_without_keys(serializer.errors, "non_field_errors"),
         )
 
     try:
-        created_user = create_user_with_generated_username(serializer, username)
-        if created_user is None:
-            raise IntegrityError(
-                "Failed to create User with generated username ({})".format(username)
-            )
+        created_user = serializer.save(username=username)
+    except IntegrityError:
+        # 'email' and 'username' are the only unique fields that can be supplied by the user at this point, and a user
+        # cannot reach this point of the auth flow without a unique email, so we know that the IntegrityError is caused
+        # by the username not being unique.
+        raise RequirePasswordAndPersonalInfoException(
+            backend,
+            current_partial,
+            field_errors={
+                "username": f"The username '{username}' is already taken. Please try a different username."
+            },
+        )
     except Exception as exc:
         raise UserCreationFailedException(backend, current_partial) from exc
 

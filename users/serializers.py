@@ -18,7 +18,7 @@ log = logging.getLogger()
 
 US_POSTAL_RE = re.compile(r"[0-9]{5}(-[0-9]{4}){0,1}")
 CA_POSTAL_RE = re.compile(r"[A-Z]\d[A-Z] \d[A-Z]\d$", flags=re.I)
-USER_NAME_RE = re.compile(
+USER_GIVEN_NAME_RE = re.compile(
     r"""
     ^                               # Start of string
     (?![~!@&)(+:'.?/,`-]+)          # String should not start from character(s) in this set - They can exist in elsewhere
@@ -27,6 +27,9 @@ USER_NAME_RE = re.compile(
     """,
     flags=re.I | re.VERBOSE | re.MULTILINE,
 )
+USERNAME_RE_PARTIAL = r"[\w .@_+-]+"
+USERNAME_RE = re.compile(fr"(?P<username>{USERNAME_RE_PARTIAL})")
+USERNAME_ERROR_MSG = "Username can only contain letters, numbers, spaces, and the following characters: @_+-"
 
 
 class LegalAddressSerializer(serializers.ModelSerializer):
@@ -40,13 +43,13 @@ class LegalAddressSerializer(serializers.ModelSerializer):
 
     def validate_first_name(self, value):
         """Validates the first name of the user"""
-        if value and not USER_NAME_RE.match(value):
+        if value and not USER_GIVEN_NAME_RE.match(value):
             raise serializers.ValidationError("First name is not valid")
         return value
 
     def validate_last_name(self, value):
         """Validates the last name of the user"""
-        if value and not USER_NAME_RE.match(value):
+        if value and not USER_GIVEN_NAME_RE.match(value):
             raise serializers.ValidationError("Last name is not valid")
         return value
 
@@ -81,7 +84,9 @@ class UserSerializer(serializers.ModelSerializer):
         return {"email": value}
 
     def validate_username(self, value):
-        """Empty validation function, but this is required for WriteableSerializerMethodField"""
+        """Validates the username field"""
+        if not re.fullmatch(USERNAME_RE, value):
+            raise serializers.ValidationError(USERNAME_ERROR_MSG)
         return {"username": value}
 
     def get_email(self, instance):
