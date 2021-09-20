@@ -312,7 +312,8 @@ class CourseRun(TimestampedModel):
     )
     # product = GenericRelation(Product, related_query_name="course_run")
     title = models.CharField(
-        max_length=255, help_text=f"The title of the course. {SYNCED_COURSE_RUN_FIELD_MSG}"
+        max_length=255,
+        help_text=f"The title of the course. {SYNCED_COURSE_RUN_FIELD_MSG}",
     )
     courseware_id = models.CharField(max_length=255, unique=True)
     run_tag = models.CharField(
