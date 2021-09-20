@@ -48,11 +48,21 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
           <ErrorMessage name="email" component={FormError} />
           <p className="py-2">
             By creating an account I agree to the{" "}
-            <a href={routes.informationLinks.termsOfService}>
+            <a
+              href={routes.informationLinks.termsOfService}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Terms of Service
             </a>
             {" and "}
-            <a href={routes.informationLinks.privacyPolicy}>Privacy Policy</a>
+            <a
+              href={routes.informationLinks.privacyPolicy}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Privacy Policy
+            </a>
             {"."}
           </p>
         </div>
