@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.7.1
+Version 0.7.1 (Released September 20, 2021)
 -------------
 
 - fix: resolve the accessibility issues in header (#168)
