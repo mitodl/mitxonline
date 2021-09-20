@@ -10,7 +10,8 @@ import {
   EMPLOYMENT_INDUSTRY,
   EMPLOYMENT_LEVEL,
   EMPLOYMENT_SIZE,
-  HIGHEST_EDUCATION_CHOICES
+  HIGHEST_EDUCATION_CHOICES,
+  USERNAME_LENGTH
 } from "../../constants"
 import FormError from "./elements/FormError"
 import { newPasswordFieldValidation } from "../../lib/validation"
@@ -23,12 +24,12 @@ const CA_POSTAL_CODE_REGEX = /[A-Z][0-9][A-Z] [0-9][A-Z][0-9]/
 const COUNTRIES_REQUIRING_POSTAL_CODE = [US_ALPHA_2, CA_ALPHA_2]
 const COUNTRIES_REQUIRING_STATE = [US_ALPHA_2, CA_ALPHA_2]
 export const NAME_REGEX = /^(?![~!@&)(+:'.?/,`-]+)([^/^$#*=[\]`%_;<>{}"|]+)$/
+const ADDRESS_LINES_MAX = 4
+const seedYear = moment().year()
 
 // Field Error messages
 export const NAME_REGEX_FAIL_MESSAGE =
   "Name cannot start with a special character (~!@&)(+:'.?/,`-), and cannot contain any of (/^$#*=[]`%_;<>{}|\")"
-const ADDRESS_LINES_MAX = 4
-const seedYear = moment().year()
 
 export const legalAddressValidation = yup.object().shape({
   name: yup
@@ -37,6 +38,13 @@ export const legalAddressValidation = yup.object().shape({
     .trim()
     .required()
     .min(2),
+  username: yup
+    .string()
+    .label("Username")
+    .trim()
+    .required()
+    .min(3)
+    .max(USERNAME_LENGTH),
   legal_address: yup.object().shape({
     first_name: yup
       .string()
@@ -141,6 +149,23 @@ export const LegalAddressFields = ({
         autoComplete="name"
       />
       <ErrorMessage name="name" component={FormError} />
+    </div>
+    <div className="form-group">
+      <label htmlFor="username" className="row">
+        <div className="col-auto font-weight-bold">
+          Public Username<span className="required">*</span>
+        </div>
+        <div className="col-auto subtitle">
+          Name that will identify you in courses
+        </div>
+      </label>
+      <Field
+        type="text"
+        name="username"
+        className="form-control"
+        autoComplete="username"
+      />
+      <ErrorMessage name="username" component={FormError} />
     </div>
     {includePassword ? (
       <div className="form-group">

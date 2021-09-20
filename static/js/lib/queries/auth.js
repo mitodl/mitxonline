@@ -65,6 +65,7 @@ export default {
   registerDetailsMutation: (
     name: string,
     password: string,
+    username: string,
     legalAddress: LegalAddress,
     partialToken: string
   ) => ({
@@ -73,6 +74,7 @@ export default {
     body: {
       name,
       password,
+      username,
       legal_address: legalAddress,
       flow:          FLOW_REGISTER,
       partial_token: partialToken

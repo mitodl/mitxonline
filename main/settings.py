@@ -309,7 +309,6 @@ SOCIAL_AUTH_EMAIL_FORM_HTML = "login.html"
 
 SOCIAL_AUTH_EMAIL_USER_FIELDS = ["username", "email", "name", "password"]
 
-
 # Only validate emails for the email backend
 SOCIAL_AUTH_EMAIL_FORCE_EMAIL_VALIDATION = True
 

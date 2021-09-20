@@ -111,6 +111,8 @@ export const USER_MSG_TYPE_ENROLL_FAILED = "enroll-failed"
 export const USER_MSG_TYPE_ENROLL_BLOCKED = "enroll-blocked"
 export const USER_MSG_TYPE_COMPLETED_AUTH = "completed-auth"
 
+export const USERNAME_LENGTH = 30
+
 export const ALERT_TYPE_TEXT = "text"
 export const ALERT_TYPE_SUCCESS = "success"
 export const ALERT_TYPE_DANGER = "danger"
