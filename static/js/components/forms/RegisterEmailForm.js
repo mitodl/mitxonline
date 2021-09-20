@@ -9,6 +9,7 @@ import ScaledRecaptcha from "../ScaledRecaptcha"
 import { EmailInput } from "./elements/inputs"
 import FormError from "./elements/FormError"
 import { emailFieldValidation } from "../../lib/validation"
+import { routes } from "../../lib/urls"
 
 const emailValidation = yup.object().shape({
   email:     emailFieldValidation,
@@ -45,6 +46,25 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
             component={EmailInput}
           />
           <ErrorMessage name="email" component={FormError} />
+          <p className="py-2">
+            By creating an account I agree to the{" "}
+            <a
+              href={routes.informationLinks.termsOfService}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Terms of Service
+            </a>
+            {" and "}
+            <a
+              href={routes.informationLinks.privacyPolicy}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Privacy Policy
+            </a>
+            {"."}
+          </p>
         </div>
         {SETTINGS.recaptchaKey ? (
           <div className="form-group">

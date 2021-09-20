@@ -36,5 +36,10 @@ export const routes = {
 
   account: include("/account/", {
     confirmEmail: "confirm-email"
+  }),
+
+  informationLinks: include("", {
+    termsOfService: "terms-of-service",
+    privacyPolicy:  "privacy-policy"
   })
 }
