@@ -122,12 +122,10 @@ export class AccountSettingsPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${ACCOUNT_SETTINGS_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page account-settings-page">
-          <div className="auth-header">
-            <h1>User Settings</h1>
-          </div>
-
           <div className="auth-card card-shadow auth-form">
-            <h3>Basic Account Information</h3>
+            <div className="auth-header">
+              <h1>Account</h1>
+            </div>
             <ChangeEmailForm
               user={currentUser}
               onSubmit={this.onSubmitEmailForm.bind(this)}

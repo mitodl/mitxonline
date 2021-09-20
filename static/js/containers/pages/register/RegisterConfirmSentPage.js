@@ -25,46 +25,43 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${REGISTER_CONFIRM_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page">
-          <div className="row auth-card card-shadow">
-            <div className="col-12">
-              <div className="row auth-header">
-                <h1 className="col-12">Thank you!</h1>
-              </div>
-              <p>
-                We sent an email to <b>{email}</b>, please verify your address
-                to continue.
-              </p>
-              <p>
-                <b>
-                  If you do NOT receive your password reset email, here's what
-                  to do:
-                </b>
-              </p>
-              <ul>
-                <li>
-                  <b>Wait a few moments.</b> It might take several minutes to
-                  receive your password reset email.
-                </li>
-                <li>
-                  <b>Check your spam folder.</b> It might be there.
-                </li>
-                <li>
-                  <b>Is your email correct?</b> If you made a typo, no problem,{" "}
-                  <Link to={routes.register.begin}>create an account</Link>{" "}
-                  again.
-                </li>
-              </ul>
-              <div className="contact-support">
-                <hr />
-                <b>Still no password reset email? </b>
-                <br />
-                Please contact our {` ${SETTINGS.site_name} `}
-                <a href={`mailto:${SETTINGS.support_email}`}>
-                  Customer Support Center.
-                </a>
-                <br />
-                <br />
-              </div>
+          <div className="auth-card card-shadow auth-form">
+            <div className="auth-header">
+              <h1>Thank you!</h1>
+            </div>
+            <p>
+              We sent an email to <b>{email}</b>, please verify your address to
+              continue.
+            </p>
+            <p>
+              <b>
+                If you do NOT receive your password reset email, here's what to
+                do:
+              </b>
+            </p>
+            <ul>
+              <li>
+                <b>Wait a few moments.</b> It might take several minutes to
+                receive your password reset email.
+              </li>
+              <li>
+                <b>Check your spam folder.</b> It might be there.
+              </li>
+              <li>
+                <b>Is your email correct?</b> If you made a typo, no problem,{" "}
+                <Link to={routes.register.begin}>create an account</Link> again.
+              </li>
+            </ul>
+            <div className="contact-support">
+              <hr />
+              <b>Still no password reset email? </b>
+              <br />
+              Please contact our {` ${SETTINGS.site_name} `}
+              <a href={`mailto:${SETTINGS.support_email}`}>
+                Customer Support Center.
+              </a>
+              <br />
+              <br />
             </div>
           </div>
         </div>

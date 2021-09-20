@@ -42,7 +42,7 @@ const LoginPasswordForm = ({ onSubmit }: LoginPasswordFormProps) => (
         <div className="row submit-row no-gutters justify-content-end">
           <button
             type="submit"
-            className="btn btn-primary btn-gradient-red"
+            className="btn btn-primary btn-gradient-red large"
             disabled={isSubmitting}
           >
             Sign in

@@ -68,7 +68,7 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
         aria-labelledby={menuChildProps.dropdownIdentifier}
       >
         <li {...menuChildProps.li || {}}>
-          <MixedLink dest={routes.profile.view} aria-label="Profile">
+          <MixedLink dest={routes.profile} aria-label="Profile">
             Profile
           </MixedLink>
         </li>

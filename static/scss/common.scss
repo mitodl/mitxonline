@@ -76,19 +76,37 @@ a.link-button {
   background-color: $light-blue !important;
   border-color: $light-blue !important;
   font-size: 20px;
+}
 
-  &.btn-profile-submit {
-    margin-top: 12px;
+.btn-primary {
+  color: white;
+  font-size: 18px;
+  padding: 11px 40px;
+  border-radius: 0;
+  font-weight: 600;
+  background-color: $brand-button-bg;
+
+  &.large {
+    font-size: 20px;
+    padding: 17px 50px;
+  }
+
+  &.highlight {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 30px;
+    padding: 18px 60px;
+    text-decoration: none;
+    transition: linear 0.4s;
+
+    &:hover {
+      opacity: 0.8;
+    }
   }
 }
 
 .btn-gradient-red {
-  background-image: linear-gradient(174deg, #c5264e,#951328 #951328);
-  font-size: 20px;
-  height: 59px;
-  width: 200px;
-  border-radius: 0px;
-  font-weight: 600;
+  background: linear-gradient(174deg, $brand-lighter-bg, $brand-darker-bg);
 }
 
 .btn-denim-blue {
@@ -100,7 +118,6 @@ a.link-button {
     color: white !important;
   }
 }
-
 
 .link-light-blue {
   &, &:hover, &:visited, &:active {
@@ -179,28 +196,6 @@ a.link-button {
 .dotted {
   border-bottom: 2px dashed #8a8b8c;
   margin-top: 25px;
-}
-
-.action-btn {
-  font-size: 20px;
-  line-height: 30px;
-  color: #fff;
-  min-height: 60px;
-  border: 0;
-  box-sizing: border-box;
-  padding: 15px 20px;
-  text-align: center;
-  min-width: 230px;
-  display: inline-block;
-  vertical-align: top;
-  background: linear-gradient(174.8deg, #c5264e 0%, #951328 100%);
-  text-decoration: none;
-  font-weight: 700;
-  transition: linear 0.4s;
-
-  &:hover {
-    opacity: 0.8;
-  }
 }
 
 .card-listing {

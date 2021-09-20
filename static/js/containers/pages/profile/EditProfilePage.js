@@ -51,7 +51,7 @@ export class EditProfilePage extends React.Component<Props> {
           email: errors[0]
         })
       } else {
-        history.push(routes.profile.view)
+        history.push(routes.profile)
       }
     } finally {
       setSubmitting(false)
@@ -64,24 +64,16 @@ export class EditProfilePage extends React.Component<Props> {
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${EDIT_PROFILE_PAGE_TITLE}`}
       >
-        <div className="std-page-body container auth-page registration-page">
-          <div className="auth-header row d-flex  align-items-center justify-content-between flex-nowrap">
-            <div className="col-auto flex-shrink-1">
+        <div className="std-page-body container auth-page">
+          <div className="auth-card card-shadow auth-form">
+            <div className="auth-header">
               <h1>Edit Profile</h1>
             </div>
-          </div>
-          <div className="auth-card card-shadow row">
-            <div className="container">
-              <div className="row">
-                <div className="col-12 auth-form">
-                  <EditProfileForm
-                    countries={countries}
-                    user={currentUser}
-                    onSubmit={this.onSubmit.bind(this)}
-                  />
-                </div>
-              </div>
-            </div>
+            <EditProfileForm
+              countries={countries}
+              user={currentUser}
+              onSubmit={this.onSubmit.bind(this)}
+            />
           </div>
         </div>
       </DocumentTitle>

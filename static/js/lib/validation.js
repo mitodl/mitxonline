@@ -49,7 +49,7 @@ export const changePasswordFormValidation = yup.object().shape({
 export const changeEmailFormValidation = yup.object().shape({
   email: emailFieldValidation.notOneOf(
     [yup.ref("$currentEmail")],
-    "Email cannot be same, Use a different one"
+    "Email cannot be the same. Please use a different one."
   ),
 
   confirmPassword: passwordFieldValidation.label("Confirm Password")
