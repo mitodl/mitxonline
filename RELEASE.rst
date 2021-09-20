@@ -1,10 +1,13 @@
 Release Notes
 =============
 
-Version 0.7.1
+Version 0.7.1 (Released September 20, 2021)
 -------------
 
+- fix: resolve the accessibility issues in header (#168)
+- Pull courserun title, dates from studio (#166)
 - Enable no cache for API
+- Implemented country blocklist at the course level
 - Added valid mitx logo (#182)
 
 Version 0.7.0 (Released September 14, 2021)

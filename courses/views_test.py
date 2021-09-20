@@ -14,6 +14,7 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
+    BlockedCountryFactory,
 )
 from courses.serializers import (
     CourseRunSerializer,
@@ -23,10 +24,20 @@ from courses.serializers import (
 )
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from main import features
+from main.constants import (
+    USER_MSG_COOKIE_NAME,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLLED,
+    USER_MSG_TYPE_ENROLL_FAILED,
+)
 from main.test_utils import assert_drf_json_equal
 from openedx.exceptions import NoEdxApiAuthError
+from main.utils import encode_json_cookie_value
 
 pytestmark = [pytest.mark.django_db]
+
+
+EXAMPLE_URL = "http://example.com"
 
 
 @pytest.fixture()
@@ -332,3 +343,87 @@ def test_user_enrollments_create_invalid(user_drf_client, user):
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {"errors": {"run_id": f"Invalid course run id: 1234"}}
+
+
+def test_create_enrollments(mocker, user_client):
+    """Create enrollment view should create an enrollment and include a user message in the response cookies"""
+    patched_create_enrollments = mocker.patch(
+        "courses.views.v1.create_run_enrollments",
+        return_value=(None, True),
+    )
+    run = CourseRunFactory.create()
+    resp = user_client.post(
+        reverse("create-enrollment-via-form"),
+        data={"run": str(run.id)},
+    )
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url == reverse("user-dashboard")
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {
+            "type": USER_MSG_TYPE_ENROLLED,
+            "run": run.title,
+        }
+    )
+    patched_create_enrollments.assert_called_once()
+
+
+def test_create_enrollments_failed(mocker, settings, user_client):
+    """
+    Create enrollment view should redirect and include a user message in the response cookies if the enrollment
+    request to edX fails
+    """
+    settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
+    patched_create_enrollments = mocker.patch(
+        "courses.views.v1.create_run_enrollments",
+        return_value=(None, False),
+    )
+    run = CourseRunFactory.create()
+    resp = user_client.post(
+        reverse("create-enrollment-via-form"),
+        data={"run": str(run.id)},
+        HTTP_REFERER=EXAMPLE_URL,
+    )
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url == EXAMPLE_URL
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {
+            "type": USER_MSG_TYPE_ENROLL_FAILED,
+        }
+    )
+    patched_create_enrollments.assert_called_once()
+
+
+def test_create_enrollments_no_run(mocker, user_client):
+    """Create enrollment view should redirect if the run doesn't exist"""
+    patched_log_error = mocker.patch("courses.views.v1.log.error")
+    resp = user_client.post(
+        reverse("create-enrollment-via-form"),
+        data={"run": "1234"},
+        HTTP_REFERER=EXAMPLE_URL,
+    )
+    assert resp.status_code == status.HTTP_302_FOUND
+    patched_log_error.assert_called_once()
+    assert resp.url == EXAMPLE_URL
+
+
+def test_create_enrollments_blocked_country(user_client, user):
+    """
+    Create enrollment view should redirect with a user message in a cookie if the attempted enrollment is blocked
+    """
+    run = CourseRunFactory.create()
+    BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
+    resp = user_client.post(
+        reverse("create-enrollment-via-form"),
+        data={"run": str(run.id)},
+        HTTP_REFERER=EXAMPLE_URL,
+    )
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url == EXAMPLE_URL
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {
+            "type": USER_MSG_TYPE_ENROLL_BLOCKED,
+        }
+    )

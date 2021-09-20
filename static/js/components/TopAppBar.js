@@ -27,7 +27,7 @@ const TopAppBar = ({ currentUser, location }: Props) => (
             <img
               src="/static/images/mit-logo.jpg"
               className="site-logo"
-              alt={SETTINGS.site_name}
+              alt="MIT Home page"
             />
           </a>
           <div className="divider-large" />

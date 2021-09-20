@@ -15,6 +15,7 @@ from courses.models import (
     CourseRunGrade,
     CourseRunGradeAudit,
     CourseTopic,
+    BlockedCountry,
     Program,
     ProgramEnrollment,
     ProgramEnrollmentAudit,
@@ -39,6 +40,7 @@ class ProgramRunAdmin(admin.ModelAdmin):
     model = ProgramRun
     list_display = ("id", "program", "run_tag", "full_readable_id")
     list_filter = ["program"]
+    raw_id_fields = ("program",)
 
 
 class CourseAdmin(admin.ModelAdmin):
@@ -46,19 +48,17 @@ class CourseAdmin(admin.ModelAdmin):
 
     model = Course
     search_fields = ["title", "topics__name", "readable_id"]
-    list_display = ("id", "title", "get_program", "position_in_program")
+    list_display = (
+        "id",
+        "title",
+        "readable_id",
+    )
     list_filter = ["live", "program", "topics"]
+    raw_id_fields = ("program",)
 
     formfield_overrides = {
         models.CharField: {"widget": TextInput(attrs={"size": "80"})}
     }
-
-    def get_program(self, obj):
-        """Returns the related User email"""
-        return obj.program.readable_id if obj.program is not None else None
-
-    get_program.short_description = "Program"
-    get_program.admin_order_field = "program__readable_id"
 
 
 class CourseRunAdmin(TimestampedModelAdmin):
@@ -76,6 +76,7 @@ class CourseRunAdmin(TimestampedModelAdmin):
         "enrollment_start",
     )
     list_filter = ["live", "course"]
+    raw_id_fields = ("course",)
 
     formfield_overrides = {
         models.CharField: {"widget": TextInput(attrs={"size": "80"})}
@@ -297,6 +298,16 @@ class CourseTopicAdmin(admin.ModelAdmin):
     model = CourseTopic
 
 
+class BlockedCountryAdmin(TimestampedModelAdmin):
+    """Admin for BlockedCountry"""
+
+    model = BlockedCountry
+    search_fields = ["course__title", "course__readable_id", "country"]
+    list_display = ("id", "course", "country")
+    list_filter = ["course"]
+    raw_id_fields = ("course",)
+
+
 admin.site.register(Program, ProgramAdmin)
 admin.site.register(ProgramRun, ProgramRunAdmin)
 admin.site.register(Course, CourseAdmin)
@@ -308,3 +319,4 @@ admin.site.register(CourseRunEnrollmentAudit, CourseRunEnrollmentAuditAdmin)
 admin.site.register(CourseRunGrade, CourseRunGradeAdmin)
 admin.site.register(CourseRunGradeAudit, CourseRunGradeAuditAdmin)
 admin.site.register(CourseTopic, CourseTopicAdmin)
+admin.site.register(BlockedCountry, BlockedCountryAdmin)

@@ -108,6 +108,7 @@ export const HIGHEST_EDUCATION_CHOICES = [
 export const USER_MSG_COOKIE_NAME = "user-message"
 export const USER_MSG_TYPE_ENROLLED = "enrolled"
 export const USER_MSG_TYPE_ENROLL_FAILED = "enroll-failed"
+export const USER_MSG_TYPE_ENROLL_BLOCKED = "enroll-blocked"
 export const USER_MSG_TYPE_COMPLETED_AUTH = "completed-auth"
 
 export const ALERT_TYPE_TEXT = "text"

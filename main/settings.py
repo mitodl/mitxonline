@@ -717,6 +717,16 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TIMEZONE = "UTC"
+CRON_COURSERUN_SYNC_HOURS = get_string(
+    name="CRON_COURSERUN_SYNC_HOURS",
+    default=0,
+    description="'hours' value for scheduled task to sync course run data (by default, it will run at midnight",
+)
+CRON_COURSERUN_SYNC_DAYS = get_string(
+    name="CRON_COURSERUN_SYNC_DAYS",
+    default="*",
+    description="day_of_week' value for scheduled task to sync course run data (by default, it will run each day of the week).",
+)
 RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY = get_int(
     name="RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY",
     default=60 * 30,
@@ -739,6 +749,16 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": OffsettingSchedule(
             run_every=timedelta(seconds=REPAIR_OPENEDX_USERS_FREQUENCY),
             offset=timedelta(seconds=REPAIR_OPENEDX_USERS_OFFSET),
+        ),
+    },
+    "sync-courseruns-data": {
+        "task": "courses.tasks.sync_courseruns_data",
+        "schedule": crontab(
+            minute=0,
+            hour=CRON_COURSERUN_SYNC_HOURS,
+            day_of_week=CRON_COURSERUN_SYNC_DAYS,
+            day_of_month="*",
+            month_of_year="*",
         ),
     },
 }
