@@ -46,7 +46,7 @@ describe("DashboardPage", () => {
     userEnrollments.forEach((userEnrollment, i) => {
       const enrolledItem = enrolledItems.at(i)
       assert.equal(
-        enrolledItem.find("h4").text(),
+        enrolledItem.find("h2").text(),
         userEnrollment.run.course.title
       )
     })
@@ -91,7 +91,7 @@ describe("DashboardPage", () => {
         expCourseLink
       )
       if (expCourseLink) {
-        const linkedTitle = enrolledItems.at(0).find("h4")
+        const linkedTitle = enrolledItems.at(0).find("h2")
         assert.equal(linkedTitle.find("a").prop("href"), exampleCoursewareUrl)
       }
     })

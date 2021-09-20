@@ -39,13 +39,13 @@
         .description {
           p {
             margin: 0;
-            color: $light-gray;
+            color: $label-subtitle;
           }
         }
       }
 
       &:hover {
-        h4 {
+        h3 {
           color: $brand-button-bg;
         }
       }
