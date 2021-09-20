@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.8.0
+-------------
+
+- Add privacy policy and terms of service links to register page (#198)
+- fix: address accessibility concerns on Dashboard and Product Detail Page (#176)
+- fix migration conflicts (#203)
+- add help_text in courserun title and dates for syncing from edX studio course (#195)
+- Implemented user-supplied usernames
+
 Version 0.7.1 (Released September 20, 2021)
 -------------
 
