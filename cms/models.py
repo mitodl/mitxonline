@@ -209,7 +209,7 @@ class ProductPage(Page):
         abstract = True
 
     description = RichTextField(
-        blank=True, help_text="The description shown on the product page"
+        blank=True, help_text="The description shown on the home page and product page."
     )
 
     length = models.CharField(
