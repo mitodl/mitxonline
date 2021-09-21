@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.8.0
+Version 0.8.0 (Released September 21, 2021)
 -------------
 
 - Add privacy policy and terms of service links to register page (#198)
