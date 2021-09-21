@@ -83,6 +83,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
             },
             "is_anonymous": False,
             "is_authenticated": True,
+            "is_editor": False,
             "created_on": drf_datetime(user.created_on),
             "updated_on": drf_datetime(user.updated_on),
         }

@@ -22,7 +22,7 @@
                 {{ page.description | richtext }}
                 {% if run %}
                   {% if is_enrolled %}
-                    {% if run.courseware_url_path %}
+                    {% if run.courseware_url_path and can_access_edx_course %}
                       <a href="{{ run.courseware_url }}" class="btn btn-primary btn-gradient-red highlight" target="_blank" rel="noopener noreferrer">
                         Enrolled &#10003;
                       </a>

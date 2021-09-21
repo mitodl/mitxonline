@@ -2,9 +2,11 @@
 # pylint: disable=too-many-arguments, redefined-outer-name
 import factory
 import pytest
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from cms.constants import CMS_EDITORS_GROUP_NAME
 from openedx.factories import OpenEdxApiAuthFactory, OpenEdxUserFactory
 from users.factories import UserFactory
 from users.models import LegalAddress, User
@@ -101,3 +103,23 @@ def test_faulty_user_qset():
     assert set(User.faulty_openedx_users.values_list("id", flat=True)) == {
         user.id for user in expected_faulty_users
     }
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "is_staff, is_superuser, has_editor_group, exp_is_editor",
+    [
+        [True, True, True, True],
+        [True, False, False, True],
+        [False, True, False, True],
+        [False, False, True, True],
+        [False, False, False, False],
+    ],
+)
+def test_user_is_editor(is_staff, is_superuser, has_editor_group, exp_is_editor):
+    """User.is_editor should return True if a user is staff, superuser, or belongs to the 'editor' group"""
+    user = UserFactory.create(is_staff=is_staff, is_superuser=is_superuser)
+    if has_editor_group:
+        user.groups.add(Group.objects.get(name=CMS_EDITORS_GROUP_NAME))
+        user.save()
+    assert user.is_editor is exp_is_editor

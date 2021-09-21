@@ -397,6 +397,18 @@ class CourseRun(TimestampedModel):
         return not self.is_past and self.is_not_beyond_enrollment
 
     @property
+    def is_in_progress(self) -> bool:
+        """
+        Returns True if the course run has started and has not yet ended
+        """
+        now = now_in_utc()
+        return (
+            self.start_date is not None
+            and self.start_date <= now
+            and (self.end_date is None or self.end_date > now)
+        )
+
+    @property
     def courseware_url(self):
         """
         Full URL for this CourseRun as it exists in the courseware

@@ -20,6 +20,8 @@ class UserFactory(DjangoModelFactory):
     email = FuzzyText(suffix="@example.com")
     name = Faker("name")
     password = FuzzyText(length=8)
+    is_superuser = False
+    is_staff = False
 
     is_active = True
 

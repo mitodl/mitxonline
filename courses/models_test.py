@@ -245,6 +245,32 @@ def test_course_run_not_beyond_enrollment(
 
 
 @pytest.mark.parametrize(
+    "start_delta, end_delta, exp_result",
+    [
+        [-1, 2, True],
+        [-1, None, True],
+        [None, 2, False],
+        [-2, -1, False],
+    ],
+)
+def test_course_run_in_progress(start_delta, end_delta, exp_result):
+    """
+    Test that CourseRun.is_in_progress returns the correct value based on the start and end dates
+    """
+    now = now_in_utc()
+    start_date = None if start_delta is None else now + timedelta(days=start_delta)
+    end_date = None if end_delta is None else now + timedelta(days=end_delta)
+    assert (
+        CourseRunFactory.create(
+            start_date=start_date,
+            end_date=end_date,
+            expiration_date=now + timedelta(days=10),
+        ).is_in_progress
+        is exp_result
+    )
+
+
+@pytest.mark.parametrize(
     "end_days,enroll_days,expected", [[-1, 1, False], [1, -1, False], [1, 1, True]]
 )
 def test_course_run_unexpired(end_days, enroll_days, expected):

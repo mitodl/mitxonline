@@ -15,6 +15,7 @@ from mitol.common.utils import now_in_utc
 
 # Defined in edX Profile model
 from users.constants import USERNAME_MAX_LEN
+from cms.constants import CMS_EDITORS_GROUP_NAME
 
 MALE = "m"
 FEMALE = "f"
@@ -158,6 +159,15 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     def get_full_name(self):
         """Returns the user's fullname"""
         return self.name
+
+    @property
+    def is_editor(self) -> bool:
+        """Returns True if the user has editor permissions for the CMS"""
+        return (
+            self.is_superuser
+            or self.is_staff
+            or self.groups.filter(name=CMS_EDITORS_GROUP_NAME).exists()
+        )
 
     def __str__(self):
         """Str representation for the user"""

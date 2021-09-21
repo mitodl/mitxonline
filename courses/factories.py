@@ -97,6 +97,13 @@ class CourseRunFactory(DjangoModelFactory):
         past_enrollment_end = factory.Trait(
             enrollment_end=factory.Faker("past_datetime", tzinfo=pytz.utc)
         )
+        in_progress = factory.Trait(
+            start_date=factory.Faker("past_datetime", tzinfo=pytz.utc),
+            end_date=factory.Faker("future_datetime", tzinfo=pytz.utc),
+        )
+        in_future = factory.Trait(
+            start_date=factory.Faker("future_datetime", tzinfo=pytz.utc), end_date=None
+        )
 
 
 class BlockedCountryFactory(DjangoModelFactory):
