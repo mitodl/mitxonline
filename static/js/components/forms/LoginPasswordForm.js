@@ -29,10 +29,16 @@ const LoginPasswordForm = ({ onSubmit }: LoginPasswordFormProps) => (
           <label htmlFor="password">Password</label>
           <Field
             name="password"
+            id="password"
             className="form-control"
             component={PasswordInput}
+            aria-describedby="passwordError"
           />
-          <ErrorMessage name="password" component={FormError} />
+          <ErrorMessage
+            name="password"
+            id="passwordError"
+            component={FormError}
+          />
         </div>
         <div className="form-group">
           <Link to={routes.login.forgot.begin} className="link-black">

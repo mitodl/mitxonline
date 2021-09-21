@@ -49,10 +49,12 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => (
             </label>
             <Field
               name="email"
+              id="email"
               className="form-control"
               component={EmailInput}
+              aria-describedby="emailError"
             />
-            <ErrorMessage name="email" component={FormError} />
+            <ErrorMessage name="email" id="emailError" component={FormError} />
           </div>
           <div className="form-group">
             <label htmlFor="confirmPassword" className="row">
@@ -64,11 +66,17 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => (
               </div>
             </label>
             <Field
+              id="confirmPassword"
               name="confirmPassword"
               className="form-control"
               component={PasswordInput}
+              aria-describedby="confirmPasswordError"
             />
-            <ErrorMessage name="confirmPassword" component={FormError} />
+            <ErrorMessage
+              name="confirmPassword"
+              id="confirmPasswordError"
+              component={FormError}
+            />
           </div>
         </section>
 

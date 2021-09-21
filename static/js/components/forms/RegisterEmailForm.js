@@ -41,11 +41,13 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
           <label htmlFor="email">Email</label>
           <Field
             name="email"
+            id="email"
             className="form-control"
             autoComplete="email"
             component={EmailInput}
+            aria-describedby="emailError"
           />
-          <ErrorMessage name="email" component={FormError} />
+          <ErrorMessage name="email" id="emailError" component={FormError} />
           <p className="py-2">
             By creating an account I agree to the{" "}
             <a

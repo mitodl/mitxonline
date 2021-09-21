@@ -32,11 +32,13 @@ const EmailForm = ({ onSubmit, children }: EmailFormProps) => (
           <label htmlFor="email">Email</label>
           <Field
             name="email"
+            id="email"
             className="form-control"
             component={EmailInput}
             autoComplete="email"
+            aria-describedby="emailError"
           />
-          <ErrorMessage name="email" component={FormError} />
+          <ErrorMessage name="email" id="emailError" component={FormError} />
         </div>
         {children && <div className="form-group">{children}</div>}
         <div className="row submit-row no-gutters justify-content-end">

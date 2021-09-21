@@ -37,10 +37,16 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
             </label>
             <Field
               name="oldPassword"
+              id="oldPassword"
               className="form-control"
               component={PasswordInput}
+              aria-describedby="oldPasswordError"
             />
-            <ErrorMessage name="oldPassword" component={FormError} />
+            <ErrorMessage
+              name="oldPassword"
+              id="oldPasswordError"
+              component={FormError}
+            />
           </div>
           <div className="form-group">
             <label htmlFor="newPassword">
@@ -48,10 +54,16 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
             </label>
             <Field
               name="newPassword"
+              id="newPassword"
               className="form-control"
               component={PasswordInput}
+              aria-describedby="newPasswordError"
             />
-            <ErrorMessage name="newPassword" component={FormError} />
+            <ErrorMessage
+              name="newPassword"
+              id="newPasswordError"
+              component={FormError}
+            />
           </div>
           <div className="form-group">
             <label htmlFor="confirmPassword">
@@ -59,10 +71,16 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
             </label>
             <Field
               name="confirmPassword"
+              id="confirmPassword"
               className="form-control"
               component={PasswordInput}
+              aria-describedby="confirmPasswordError"
             />
-            <ErrorMessage name="confirmPassword" component={FormError} />
+            <ErrorMessage
+              name="confirmPassword"
+              id="confirmPasswordError"
+              component={FormError}
+            />
           </div>
         </section>
         <div className="row submit-row no-gutters justify-content-end">

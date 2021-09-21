@@ -116,10 +116,16 @@ export const LegalAddressFields = ({
       <Field
         type="text"
         name="legal_address.first_name"
+        id="legal_address.first_name"
         className="form-control"
         autoComplete="given-name"
+        aria-describedby="legal_address.first_name_error"
       />
-      <ErrorMessage name="legal_address.first_name" component={FormError} />
+      <ErrorMessage
+        name="legal_address.first_name"
+        id="legal_address.first_name_error"
+        component={FormError}
+      />
     </div>
     <div className="form-group">
       <label htmlFor="legal_address.last_name" className="font-weight-bold">
@@ -128,10 +134,16 @@ export const LegalAddressFields = ({
       <Field
         type="text"
         name="legal_address.last_name"
+        id="legal_address.last_name"
         className="form-control"
         autoComplete="family-name"
+        aria-describedby="legal_address.last_name_error"
       />
-      <ErrorMessage name="legal_address.last_name" component={FormError} />
+      <ErrorMessage
+        name="legal_address.last_name"
+        id="legal_address.last_name_error"
+        component={FormError}
+      />
     </div>
     <div className="form-group">
       <label htmlFor="name" className="row">
@@ -145,10 +157,12 @@ export const LegalAddressFields = ({
       <Field
         type="text"
         name="name"
+        id="name"
         className="form-control"
         autoComplete="name"
+        aria-describedby="nameError"
       />
-      <ErrorMessage name="name" component={FormError} />
+      <ErrorMessage name="name" id="nameError" component={FormError} />
     </div>
     <div className="form-group">
       <label htmlFor="username" className="row">
@@ -164,16 +178,28 @@ export const LegalAddressFields = ({
         name="username"
         className="form-control"
         autoComplete="username"
+        id="username"
+        aria-describedby="usernameError"
       />
-      <ErrorMessage name="username" component={FormError} />
+      <ErrorMessage name="username" id="usernameError" component={FormError} />
     </div>
     {includePassword ? (
       <div className="form-group">
         <label htmlFor="password" className="font-weight-bold">
           Password<span className="required">*</span>
         </label>
-        <Field type="password" name="password" className="form-control" />
-        <ErrorMessage name="password" component={FormError} />
+        <Field
+          type="password"
+          name="password"
+          id="password"
+          aria-describedby="passwordError"
+          className="form-control"
+        />
+        <ErrorMessage
+          name="password"
+          id="passwordError"
+          component={FormError}
+        />
         <div className="label-secondary">
           Passwords must contain at least 8 characters and at least 1 number and
           1 letter.
@@ -188,8 +214,10 @@ export const LegalAddressFields = ({
       <Field
         component="select"
         name="legal_address.country"
+        id="legal_address.country"
         className="form-control"
         autoComplete="country"
+        aria-describedby="legal_address.country_error"
       >
         <option value="">-----</option>
         {countries
@@ -200,7 +228,11 @@ export const LegalAddressFields = ({
           ))
           : null}
       </Field>
-      <ErrorMessage name="legal_address.country" component={FormError} />
+      <ErrorMessage
+        name="legal_address.country"
+        id="legal_address.country_error"
+        component={FormError}
+      />
     </div>
   </React.Fragment>
 )
@@ -217,14 +249,20 @@ export const ProfileFields = () => (
           <Field
             component="select"
             name="profile.gender"
+            id="profile.gender"
             className="form-control"
+            aria-describedby="profile.genderError"
           >
             <option value="">-----</option>
             <option value="f">Female</option>
             <option value="m">Male</option>
             <option value="o">Other / Prefer not to say</option>
           </Field>
-          <ErrorMessage name="profile.gender" component={FormError} />
+          <ErrorMessage
+            name="profile.gender"
+            id="profile.genderError"
+            component={FormError}
+          />
         </div>
         <div className="col">
           <label htmlFor="profile.birth_year" className="font-weight-bold">
@@ -233,7 +271,9 @@ export const ProfileFields = () => (
           <Field
             component="select"
             name="profile.birth_year"
+            id="profile.birth_year"
             className="form-control"
+            aria-describedby="profile.birth_year_error"
           >
             <option value="">-----</option>
             {reverse(range(seedYear - 120, seedYear - 14)).map((year, i) => (
@@ -242,7 +282,11 @@ export const ProfileFields = () => (
               </option>
             ))}
           </Field>
-          <ErrorMessage name="profile.birth_year" component={FormError} />
+          <ErrorMessage
+            name="profile.birth_year"
+            id="profile.birth_year_error"
+            component={FormError}
+          />
         </div>
       </div>
     </div>
@@ -250,15 +294,35 @@ export const ProfileFields = () => (
       <label htmlFor="profile.company" className="font-weight-bold">
         Company*
       </label>
-      <Field type="text" name="profile.company" className="form-control" />
-      <ErrorMessage name="profile.company" component={FormError} />
+      <Field
+        type="text"
+        name="profile.company"
+        id="profile.company"
+        aria-describedby="profile.companyError"
+        className="form-control"
+      />
+      <ErrorMessage
+        name="profile.company"
+        id="profile.companyError"
+        component={FormError}
+      />
     </div>
     <div className="form-group">
       <label htmlFor="profile.job_title" className="font-weight-bold">
         Job Title*
       </label>
-      <Field type="text" name="profile.job_title" className="form-control" />
-      <ErrorMessage name="profile.job_title" component={FormError} />
+      <Field
+        type="text"
+        name="profile.job_title"
+        id="profile.job_title"
+        aria-describedby="profile.job_title_error"
+        className="form-control"
+      />
+      <ErrorMessage
+        name="profile.job_title"
+        id="profile.job_title_error"
+        component={FormError}
+      />
     </div>
     <div className="form-group dotted" />
     <div className="form-group">
@@ -268,6 +332,7 @@ export const ProfileFields = () => (
       <Field
         component="select"
         name="profile.industry"
+        id="profile.industry"
         className="form-control"
       >
         <option value="">-----</option>
@@ -285,6 +350,7 @@ export const ProfileFields = () => (
       <Field
         component="select"
         name="profile.job_function"
+        id="profile.job_function"
         className="form-control"
       >
         <option value="">-----</option>
@@ -302,6 +368,7 @@ export const ProfileFields = () => (
       <Field
         component="select"
         name="profile.company_size"
+        id="profile.company_size"
         className="form-control"
       >
         <option value="">-----</option>
@@ -324,6 +391,7 @@ export const ProfileFields = () => (
           <Field
             component="select"
             name="profile.years_experience"
+            id="profile.years_experience"
             className="form-control"
           >
             <option value="">-----</option>
@@ -344,6 +412,7 @@ export const ProfileFields = () => (
           <Field
             component="select"
             name="profile.leadership_level"
+            id="profile.leadership_level"
             className="form-control"
           >
             <option value="">-----</option>
@@ -368,6 +437,7 @@ export const ProfileFields = () => (
           <Field
             component="select"
             name="profile.highest_education"
+            id="profile.highest_education"
             className="form-control"
           >
             <option value="">-----</option>
