@@ -16,21 +16,26 @@ import {
   enrollmentsQuery,
   enrollmentsQueryKey
 } from "../../lib/queries/enrollment"
+import { currentUserSelector } from "../../lib/queries/users"
 import { isLinkableCourseRun } from "../../lib/courseApi"
 import { formatPrettyDate, parseDateString } from "../../lib/util"
 import { routes } from "../../lib/urls"
 
 import type { RunEnrollment } from "../../flow/courseTypes"
+import type { CurrentUser } from "../../flow/authTypes"
 
 type DashboardPageProps = {
   enrollments: RunEnrollment[],
+  currentUser: CurrentUser,
   isLoading: boolean
 }
 
 export class DashboardPage extends React.Component<DashboardPageProps, void> {
   renderEnrolledItemCard(enrollment: RunEnrollment) {
+    const { currentUser } = this.props
+
     let startDate, startDateDescription
-    const title = isLinkableCourseRun(enrollment.run) ? (
+    const title = isLinkableCourseRun(enrollment.run, currentUser) ? (
       <a
         href={enrollment.run.courseware_url}
         target="_blank"
@@ -85,7 +90,7 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
             <h1>My Courses</h1>
             <div className="enrolled-items">
               {enrollments && enrollments.length > 0 ? (
-                enrollments.map(this.renderEnrolledItemCard)
+                enrollments.map(this.renderEnrolledItemCard.bind(this))
               ) : (
                 <div className="card no-enrollments p-3 p-sm-5 rounded-0">
                   <h2>Enroll Now</h2>
@@ -105,6 +110,7 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
 
 const mapStateToProps = createStructuredSelector({
   enrollments: enrollmentsSelector,
+  currentUser: currentUserSelector,
   isLoading:   pathOr(true, ["queries", enrollmentsQueryKey, "isPending"])
 })
 

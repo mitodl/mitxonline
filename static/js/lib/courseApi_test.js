@@ -4,61 +4,61 @@ import { isLinkableCourseRun } from "./courseApi"
 import { assert } from "chai"
 import moment from "moment"
 
-import { makeCourseRunEnrollment } from "../factories/course"
+import { makeCourseRunDetail } from "../factories/course"
+import { makeUser } from "../factories/user"
+
+import type { CourseRunDetail } from "../flow/courseTypes"
+import type { LoggedInUser } from "../flow/authTypes"
 
 describe("Course API", () => {
-  let userEnrollment
+  const past = moment()
+      .add(-10, "days")
+      .toISOString(),
+    future = moment()
+      .add(10, "days")
+      .toISOString(),
+    farFuture = moment()
+      .add(50, "days")
+      .toISOString(),
+    exampleUrl = "http://example.com"
+  let courseRun: CourseRunDetail, user: LoggedInUser
+
   beforeEach(() => {
-    userEnrollment = makeCourseRunEnrollment()
+    courseRun = makeCourseRunDetail()
+    user = makeUser()
   })
 
   describe("isLinkableCourseRun", () => {
-    it("returns false when courseware_url is nil", () => {
-      const past = moment().add(-10, "days"),
-        future = moment().add(10, "days")
-      const exampleCoursewareUrl = null
-      userEnrollment.run.courseware_url = exampleCoursewareUrl
-      userEnrollment.run.start_date = past.toISOString()
-      userEnrollment.run.end_date = future.toISOString()
-      assert.isFalse(isLinkableCourseRun(userEnrollment.run))
-    })
-
-    it("returns false when start date is nil", () => {
-      const future = moment().add(10, "days")
-      const exampleCoursewareUrl = "http://example.com/my-course"
-      userEnrollment.run.courseware_url = exampleCoursewareUrl
-      userEnrollment.run.start_date = null
-      userEnrollment.run.end_date = future.toISOString()
-      assert.isFalse(isLinkableCourseRun(userEnrollment.run))
-    })
-
-    it("returns false when start date is in future", () => {
-      const future = moment().add(10, "days")
-      const exampleCoursewareUrl = "http://example.com/my-course"
-      userEnrollment.run.courseware_url = exampleCoursewareUrl
-      userEnrollment.run.start_date = future.toISOString()
-      userEnrollment.run.end_date = null
-      assert.isFalse(isLinkableCourseRun(userEnrollment.run))
-    })
-
-    it("returns false when end date is in past", () => {
-      const farPast = moment().add(-10, "days")
-      const nearPast = moment().add(-1, "days")
-      const exampleCoursewareUrl = "http://example.com/my-course"
-      userEnrollment.run.courseware_url = exampleCoursewareUrl
-      userEnrollment.run.start_date = farPast.toISOString()
-      userEnrollment.run.end_date = nearPast.toISOString()
-      assert.isFalse(isLinkableCourseRun(userEnrollment.run))
-    })
-
-    it("returns true if course run start date is in the past and end date is in the future", () => {
-      const past = moment().add(-10, "days"),
-        future = moment().add(10, "days")
-      const exampleCoursewareUrl = "http://example.com/my-course"
-      userEnrollment.run.courseware_url = exampleCoursewareUrl
-      userEnrollment.run.start_date = past.toISOString()
-      userEnrollment.run.end_date = future.toISOString()
-      assert.isTrue(isLinkableCourseRun(userEnrollment.run))
-    })
+    [
+      [exampleUrl, past, future, false, "run is in progress", true],
+      [
+        exampleUrl,
+        past,
+        null,
+        false,
+        "run is in progress with no end date",
+        true
+      ],
+      [
+        exampleUrl,
+        future,
+        farFuture,
+        true,
+        "logged-in user is an editor",
+        true
+      ],
+      [null, past, future, true, "run has an empty courseware url", false],
+      [exampleUrl, future, null, false, "run is not in progress", false]
+    ].forEach(
+      ([coursewareUrl, startDate, endDate, isEditor, desc, expLinkable]) => {
+        it(`returns ${String(expLinkable)} when ${desc}`, () => {
+          courseRun.courseware_url = coursewareUrl
+          courseRun.start_date = startDate
+          courseRun.end_date = endDate
+          user.is_editor = isEditor
+          assert.equal(isLinkableCourseRun(courseRun, user), expLinkable)
+        })
+      }
+    )
   })
 })

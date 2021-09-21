@@ -1,3 +1,4 @@
+from unittest.mock import PropertyMock, create_autospec
 from urllib.parse import quote_plus
 
 import pytest
@@ -5,6 +6,7 @@ import factory
 from django.contrib.auth.models import AnonymousUser
 from django.urls import resolve
 from django.test.client import RequestFactory
+from mitol.common.factories import UserFactory
 
 from cms.factories import ResourcePageFactory, CoursePageFactory
 from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
@@ -50,7 +52,7 @@ def test_custom_detail_page_urls_handled(fully_configured_wagtail):
     ],
 )
 def test_course_page_context(
-    user,
+    staff_user,
     fully_configured_wagtail,
     is_authenticated,
     has_unexpired_run,
@@ -61,7 +63,7 @@ def test_course_page_context(
     """CoursePage.get_context should return expected values"""
     rf = RequestFactory()
     request = rf.get("/")
-    request.user = user if is_authenticated else AnonymousUser()
+    request.user = staff_user if is_authenticated else AnonymousUser()
     course_readable_id = "my:course+1"
     if has_unexpired_run:
         run = CourseRunFactory.create(course__readable_id=course_readable_id)
@@ -71,7 +73,7 @@ def test_course_page_context(
         course_page_kwargs = dict(course__readable_id=course_readable_id)
     course_page = CoursePageFactory.create(**course_page_kwargs)
     if enrolled:
-        CourseRunEnrollmentFactory.create(user=user, run=run)
+        CourseRunEnrollmentFactory.create(user=staff_user, run=run)
     context = course_page.get_context(request=request)
     assert context == {
         "self": course_page,
@@ -83,4 +85,37 @@ def test_course_page_context(
         if exp_sign_in_url
         else None,
         "start_date": getattr(run, "start_date", None),
+        "can_access_edx_course": is_authenticated or has_unexpired_run,
     }
+
+
+@pytest.mark.parametrize(
+    "is_editor,has_unexpired_run,is_in_progress,exp_can_access",
+    [
+        [True, True, True, True],
+        [True, True, False, True],
+        [True, False, True, False],
+        [False, True, False, False],
+    ],
+)
+def test_course_page_context_edx_access(
+    user, is_editor, has_unexpired_run, is_in_progress, exp_can_access
+):
+    """CoursePage.get_context should correctly indicate if user can access the edX course"""
+    course_readable_id = "my:course+1"
+    mock_user = create_autospec(user, instance=True, **user.__dict__)
+    mock_user.is_editor = is_editor
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = mock_user
+    if has_unexpired_run:
+        run = CourseRunFactory.create(
+            course__readable_id=course_readable_id,
+            **(dict(in_progress=True) if is_in_progress else dict(in_future=True)),
+        )
+        course_page_kwargs = dict(course=run.course)
+    else:
+        course_page_kwargs = dict(course__readable_id=course_readable_id)
+    course_page = CoursePageFactory.create(**course_page_kwargs)
+    context = course_page.get_context(request=request)
+    assert context["can_access_edx_course"] is exp_can_access

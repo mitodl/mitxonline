@@ -157,6 +157,7 @@ class UserSerializer(serializers.ModelSerializer):
             "legal_address",
             "is_anonymous",
             "is_authenticated",
+            "is_editor",
             "created_on",
             "updated_on",
         )
@@ -164,6 +165,7 @@ class UserSerializer(serializers.ModelSerializer):
             "username",
             "is_anonymous",
             "is_authenticated",
+            "is_editor",
             "created_on",
             "updated_on",
         )

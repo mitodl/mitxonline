@@ -32,6 +32,7 @@ export const makeUser = (username: ?string): LoggedInUser => ({
   name:             casual.full_name,
   is_anonymous:     false,
   is_authenticated: true,
+  is_editor:        false,
   created_on:       casual.moment.format(),
   updated_on:       casual.moment.format(),
   profile:          {

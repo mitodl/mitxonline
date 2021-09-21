@@ -28,7 +28,7 @@ from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
 
 from modelcluster.fields import ParentalKey
 
-from cms.constants import COURSE_INDEX_SLUG
+from cms.constants import COURSE_INDEX_SLUG, CMS_EDITORS_GROUP_NAME
 
 log = logging.getLogger()
 
@@ -372,14 +372,17 @@ class CoursePage(ProductPage):
             if request.user.is_authenticated
             else f'{reverse("login")}?next={quote_plus(self.get_url())}'
         )
+        start_date = first_unexpired_run.start_date if first_unexpired_run else None
+        can_access_edx_course = first_unexpired_run is not None and (
+            first_unexpired_run.is_in_progress or request.user.is_editor
+        )
         return {
             **super().get_context(request, *args, **kwargs),
             "run": first_unexpired_run,
             "is_enrolled": is_enrolled,
             "sign_in_url": sign_in_url,
-            "start_date": first_unexpired_run.start_date
-            if first_unexpired_run
-            else None,
+            "start_date": start_date,
+            "can_access_edx_course": can_access_edx_course,
         }
 
     content_panels = [

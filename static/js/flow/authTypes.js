@@ -90,7 +90,8 @@ export type AnonymousUser = {
 
 export type LoggedInUser = {
   is_anonymous: false,
-  is_authenticated: true
+  is_authenticated: true,
+  is_editor: boolean
 } & User
 
 export type CurrentUser = AnonymousUser | LoggedInUser

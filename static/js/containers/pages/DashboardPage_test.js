@@ -27,7 +27,8 @@ describe("DashboardPage", () => {
       InnerDashboardPage,
       {
         entities: {
-          enrollments: userEnrollments
+          enrollments: userEnrollments,
+          currentUser: currentUser
         }
       },
       {}
