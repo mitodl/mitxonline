@@ -93,27 +93,26 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
   }
 
   render() {
+    const titleText = this.state.forgotEmailSent
+      ? "Forgot Password"
+      : "Password reset!"
+
     return (
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${FORGOT_PASSWORD_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page">
-          {this.state.isError ? (
-            <div className="row auth-card card-shadow auth-form">
-              <div className="col-12">
-                <div className="row auth-header">
-                  <h1 className="col-12">Forgot Password</h1>
-                </div>
+          <div className="auth-card card-shadow auth-form">
+            <div className="auth-header">
+              <h1>{titleText}</h1>
+            </div>
+            {this.state.isError ? (
+              <React.Fragment>
                 {getCustomerSupportLayout(true)}
                 <EmailForm onSubmit={this.onSubmit.bind(this)} />
-              </div>
-            </div>
-          ) : this.state.forgotEmailSent ? (
-            <div className="row auth-card card-shadow">
-              <div className="col-12">
-                <div className="row auth-header">
-                  <h1 className="col-12">Password reset!</h1>
-                </div>
+              </React.Fragment>
+            ) : this.state.forgotEmailSent ? (
+              <React.Fragment>
                 {this.state.text}
                 <p>
                   <b>
@@ -142,21 +141,14 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
                   </li>
                 </ul>
                 {getCustomerSupportLayout(false)}
-              </div>
-            </div>
-          ) : (
-            <div className="row auth-card card-shadow auth-form">
-              <div className="col-12">
-                <div className="row auth-header">
-                  <h1 className="col-12">Forgot Password</h1>
-                  <p className="col-12">
-                    Enter your email to receive a password reset link.
-                  </p>
-                </div>
+              </React.Fragment>
+            ) : (
+              <React.Fragment>
+                <p>Enter your email to receive a password reset link.</p>
                 <EmailForm onSubmit={this.onSubmit.bind(this)} />
-              </div>
-            </div>
-          )}
+              </React.Fragment>
+            )}
+          </div>
         </div>
       </DocumentTitle>
     )

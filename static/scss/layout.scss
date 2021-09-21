@@ -67,8 +67,10 @@ body {
   .std-page-body {
     @include media-breakpoint-down(md) {
       padding-top: 32px;
+      padding-bottom: 32px;
     }
 
     padding-top: 50px;
+    padding-bottom: 50px;
   }
 }

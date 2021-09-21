@@ -9,6 +9,7 @@ import urljoin from "url-join"
 
 import users, { currentUserSelector } from "../lib/queries/users"
 import { routes } from "../lib/urls"
+import { getStoredUserMessage } from "../lib/notificationsApi"
 import { addUserNotification } from "../actions"
 
 import Header from "../components/Header"
@@ -16,14 +17,13 @@ import PrivateRoute from "../components/PrivateRoute"
 
 import LoginPages from "./pages/login/LoginPages"
 import RegisterPages from "./pages/register/RegisterPages"
-import ProfilePages from "./pages/profile/ProfilePages"
+import EditProfilePage from "./pages/profile/EditProfilePage"
 import AccountSettingsPage from "./pages/settings/AccountSettingsPage"
 import EmailConfirmPage from "./pages/settings/EmailConfirmPage"
 import DashboardPage from "./pages/DashboardPage"
 
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
-import { getStoredUserMessage } from "../lib/notificationsApi"
 
 type Props = {
   match: Match,
@@ -76,7 +76,7 @@ export class App extends React.Component<Props, void> {
             />
             <PrivateRoute
               path={urljoin(match.url, String(routes.profile))}
-              component={ProfilePages}
+              component={EditProfilePage}
             />
             <Route
               path={urljoin(match.url, String(routes.account.confirmEmail))}

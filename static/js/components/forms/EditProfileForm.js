@@ -32,16 +32,14 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => (
           values={values}
           includePassword={false}
         />
-        <div className="row-inner justify-content-end">
-          <div className="row justify-content-end">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="btn btn-primary btn-light-blue btn-profile-submit"
-            >
-              CONTINUE
-            </button>
-          </div>
+        <div className="row submit-row no-gutters justify-content-end">
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={isSubmitting}
+          >
+            Submit
+          </button>
         </div>
       </Form>
     )}

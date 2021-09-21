@@ -23,18 +23,16 @@ export class RegisterDeniedPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${REGISTER_DENIED_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page">
-          <div className="auth-card card-shadow row">
-            <div className="col-12">
-              <div className="register-error-icon" />
-              <p>Sorry, we cannot create an account for you at this time.</p>
-              {error ? <p className="error-detail">{error}</p> : null}
-              <p>
-                Please contact us at{" "}
-                <a href={`mailto:${SETTINGS.support_email}`}>
-                  {SETTINGS.support_email}
-                </a>
-              </p>
-            </div>
+          <div className="auth-card card-shadow auth-form">
+            <div className="register-error-icon" />
+            <p>Sorry, we cannot create an account for you at this time.</p>
+            {error ? <p className="error-detail">{error}</p> : null}
+            <p>
+              Please contact us at{" "}
+              <a href={`mailto:${SETTINGS.support_email}`}>
+                {SETTINGS.support_email}
+              </a>
+            </p>
           </div>
         </div>
       </DocumentTitle>

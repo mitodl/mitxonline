@@ -7,6 +7,7 @@ export const getNextParam = (search: string) => qs.parse(search).next || "/"
 export const routes = {
   root:            "/",
   dashboard:       "/dashboard/",
+  profile:         "/profile/",
   accountSettings: "/account-settings/",
   logout:          "/logout/",
 
@@ -27,11 +28,6 @@ export const routes = {
     details:     "details/",
     error:       "error/",
     denied:      "denied/"
-  }),
-
-  profile: include("/profile/", {
-    view:   "",
-    update: "edit/"
   }),
 
   account: include("/account/", {

@@ -101,30 +101,22 @@ export class RegisterDetailsPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${REGISTER_DETAILS_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page registration-page">
-          <div className="auth-card card-shadow row">
-            <div className="container">
-              <div className="auth-header row d-flex flex-row align-items-center justify-content-between flex-nowrap">
-                <div className="col-auto flex-shrink-1">
-                  <h1>Create an Account</h1>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-12 form-group">
-                  {`Already have an ${SETTINGS.site_name} account? `}
-                  <Link className="link-black" to={routes.login.begin}>
-                    Sign in to your account
-                  </Link>
-                </div>
-              </div>
-              <hr className="hr-class-margin" />
-              <div className="row">
-                <div className="col-12 auth-form">
-                  <RegisterDetailsForm
-                    onSubmit={this.onSubmit.bind(this)}
-                    countries={countries}
-                  />
-                </div>
-              </div>
+          <div className="auth-card card-shadow auth-form">
+            <div className="auth-header">
+              <h1>Create an Account</h1>
+            </div>
+            <div className="form-group">
+              {`Already have an ${SETTINGS.site_name} account? `}
+              <Link className="link-black" to={routes.login.begin}>
+                Sign in to your account
+              </Link>
+            </div>
+            <hr className="hr-class-margin" />
+            <div className="auth-form">
+              <RegisterDetailsForm
+                onSubmit={this.onSubmit.bind(this)}
+                countries={countries}
+              />
             </div>
           </div>
         </div>

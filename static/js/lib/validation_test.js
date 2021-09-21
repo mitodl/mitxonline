@@ -129,7 +129,7 @@ describe("validation utils", () => {
           email:           "abc@example.com",
           confirmPassword: "password"
         },
-        ["Email cannot be same, Use a different one"]
+        ["Email cannot be the same. Please use a different one."]
       ],
       [
         {
