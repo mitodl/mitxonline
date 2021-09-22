@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.9.0
+-------------
+
+- Fixed logout link
+- Fixed 'enrolled' UI on product detail page
+- Allowed admins/editors to access closed edX courses (#190)
+- Update product description help text in CMS (#201)
+- Fixed accessibility issues in forms
+- Bump sqlparse from 0.4.1 to 0.4.2 (#181)
+- Bump pillow from 8.3.1 to 8.3.2 (#158)
+- Fixed profile and auth UI
+
 Version 0.8.0 (Released September 21, 2021)
 -------------
 
