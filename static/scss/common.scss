@@ -103,6 +103,17 @@ a.link-button {
       opacity: 0.8;
     }
   }
+
+  &.outline {
+    background-image: none;
+    background-color: #ffffff;
+    color: $brand-lighter-bg;
+    border: 2px solid $brand-lighter-bg;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
 }
 
 .btn-gradient-red {
