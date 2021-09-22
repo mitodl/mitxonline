@@ -10,18 +10,18 @@ import { makeUser } from "../factories/user"
 describe("UserMenu component", () => {
   const user = makeUser()
   it("has the correct number of menu links", () => {
-    assert.isOk(
-      shallow(<UserMenu currentUser={user} useScreenOverlay={false} />)
-        .find("MixedLink")
-        .exists()
+    const userMenu = shallow(
+      <UserMenu currentUser={user} useScreenOverlay={false} />
     )
+    assert.lengthOf(userMenu.find("MixedLink"), 3)
+    assert.lengthOf(userMenu.find("a"), 1)
   })
 
-  it("has the correct number of menu links in the mobile view", () => {
-    assert.equal(
+  it("has the correct class applied to menu items in the mobile view", () => {
+    assert.lengthOf(
       shallow(<UserMenu currentUser={user} useScreenOverlay={true} />).find(
         ".authenticated-menu"
-      ).length,
+      ),
       4
     )
   })
@@ -29,9 +29,9 @@ describe("UserMenu component", () => {
   it("has a link to logout", () => {
     assert.equal(
       shallow(<UserMenu currentUser={user} useScreenOverlay={false} />)
-        .find("MixedLink")
-        .at(3)
-        .prop("dest"),
+        .find("a")
+        .at(0)
+        .prop("href"),
       routes.logout
     )
   })
