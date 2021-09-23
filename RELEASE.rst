@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.9.0
+Version 0.9.0 (Released September 23, 2021)
 -------------
 
 - Fixed logout link
