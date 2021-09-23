@@ -1,7 +1,9 @@
 // sass-lint:disable mixins-before-declarations
 
-$featureImgWidth: 120px;
-$featureImgMobileWidth: 343px;
+$featureImgWidth: 202px;
+$featureImgHeight: 143px;
+$featureImgMobileWidth: 345px;
+$featureImgMobileHeight: 223px;
 
 .enrolled-items {
   .card {
@@ -25,20 +27,31 @@ $featureImgMobileWidth: 343px;
       text-decoration: underline;
     }
 
-    .img-col {
-      min-width: $featureImgWidth;
+    @include media-breakpoint-up(sm) {
+      .row {
+        height: $featureImgHeight;
 
-      @include media-breakpoint-down(xs)  {
-        min-width: inherit;
+        > * {
+          height: 100%;
+        }
       }
     }
 
-    img {
-      width: $featureImgWidth;
-
+    .img-container {
       @include media-breakpoint-down(xs)  {
-        width: inherit;
-        max-width: $featureImgMobileWidth;
+        width: 100%;
+        height: $featureImgMobileHeight;
+      }
+
+      width: $featureImgWidth;
+      height: 100%;
+      overflow: hidden;
+
+      img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
       }
     }
 

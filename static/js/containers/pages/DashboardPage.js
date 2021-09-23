@@ -61,20 +61,24 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
 
     return (
       <div
-        className="enrolled-item row card p-sm-3 mb-4 rounded-0"
+        className="enrolled-item container card p-sm-3 mb-4 rounded-0"
         key={enrollment.run.id}
       >
-        <div className="img-col col-12 col-sm-2 p-0 mr-sm-3">
-          {enrollment.run.course.feature_image_src && (
-            <img
-              src={enrollment.run.course.feature_image_src}
-              alt="Preview image"
-            />
-          )}
-        </div>
-        <div className="col-12 col-sm p-3 p-sm-0">
-          <h2 className="mb-3">{title}</h2>
-          <div className="detail">{startDateDescription}</div>
+        <div className="row">
+          <div className="col-12 col-sm-auto mr-sm-3 px-0 px-sm-3">
+            {enrollment.run.course.feature_image_src && (
+              <div className="img-container">
+                <img
+                  src={enrollment.run.course.feature_image_src}
+                  alt="Preview image"
+                />
+              </div>
+            )}
+          </div>
+          <div className="col-12 col-sm p-3 p-sm-0">
+            <h2 className="mb-3">{title}</h2>
+            <div className="detail">{startDateDescription}</div>
+          </div>
         </div>
       </div>
     )
