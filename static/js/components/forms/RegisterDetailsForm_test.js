@@ -58,6 +58,11 @@ describe("RegisterDetailsForm", () => {
     ["username", "", "Username is a required field"],
     ["username", "  ", "Username is a required field"],
     ["username", "ab", "Username must be at least 3 characters"],
+    [
+      "username",
+      "0123456789012345678901234567890",
+      "Username must be at most 30 characters"
+    ],
     ["username", "ábc-dèf-123", null],
     ["legal_address.first_name", "", "First Name is a required field"],
     ["legal_address.last_name", "", "Last Name is a required field"]

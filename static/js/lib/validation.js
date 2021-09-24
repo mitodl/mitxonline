@@ -1,6 +1,8 @@
 // @flow
 import * as yup from "yup"
 
+import { USERNAME_LENGTH } from "../constants"
+
 // Field validations
 
 export const emailFieldValidation = yup
@@ -14,6 +16,14 @@ export const passwordFieldValidation = yup
   .label("Password")
   .required()
   .min(8)
+
+export const usernameFieldValidation = yup
+  .string()
+  .label("Username")
+  .trim()
+  .required()
+  .min(3)
+  .max(USERNAME_LENGTH)
 
 export const newPasswordFieldValidation = passwordFieldValidation.matches(
   /^(?=.*[0-9])(?=.*[a-zA-Z]).*$/,

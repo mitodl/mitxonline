@@ -30,7 +30,7 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => (
           setFieldValue={setFieldValue}
           setFieldTouched={setFieldTouched}
           values={values}
-          includePassword={false}
+          isNewAccount={false}
         />
         <div className="row submit-row no-gutters justify-content-end">
           <button
