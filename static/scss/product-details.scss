@@ -4,6 +4,18 @@
   z-index: -1;
   position: relative;
 
+  @include media-breakpoint-down(sm) {
+    h2 {
+      font-size: 20px;
+      line-height: 20px;
+    }
+
+    h3 {
+      font-size: 20px;
+      line-height: 26px;
+    }
+  }
+
   .container {
     max-width: 1260px;
     padding: 0 15px;

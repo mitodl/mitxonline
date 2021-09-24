@@ -13,6 +13,12 @@ h1 {
     font-size: 42px;
     line-height: 52px;
   }
+
+  @include media-breakpoint-down(sm) {
+    font-size: 24px;
+    line-height: 28px;
+  }
+
 }
 
 h2 {
@@ -20,6 +26,11 @@ h2 {
   font-weight: 600;
   line-height: 28px;
   margin: 0 0 18px;
+
+  @include media-breakpoint-down(sm) {
+    font-size: 18px;
+    line-height: 22px;
+  }
 }
 
 h3 {
