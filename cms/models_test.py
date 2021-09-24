@@ -13,6 +13,8 @@ from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
 
 pytestmark = [pytest.mark.django_db]
 
+FAKE_READABLE_ID = "some:readable-id"
+
 
 def test_resource_page_site_name(settings, mocker):
     """
@@ -25,18 +27,16 @@ def test_resource_page_site_name(settings, mocker):
 
 def test_custom_detail_page_urls(fully_configured_wagtail):
     """Verify that course detail pages return our custom URL path"""
-    readable_id = "some:readable-id"
     course_pages = CoursePageFactory.create_batch(
-        2, course__readable_id=factory.Iterator([readable_id, "non-matching-id"])
+        2, course__readable_id=factory.Iterator([FAKE_READABLE_ID, "non-matching-id"])
     )
-    assert course_pages[0].get_url() == "/courses/{}/".format(readable_id)
+    assert course_pages[0].get_url() == "/courses/{}/".format(FAKE_READABLE_ID)
 
 
 def test_custom_detail_page_urls_handled(fully_configured_wagtail):
     """Verify that custom URL paths for our course pages are served by the standard Wagtail view"""
-    readable_id = "some:readable-id"
-    CoursePageFactory.create(course__readable_id=readable_id)
-    resolver_match = resolve("/courses/{}/".format(readable_id))
+    CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
+    resolver_match = resolve("/courses/{}/".format(FAKE_READABLE_ID))
     assert (
         resolver_match.func.__module__ == "wagtail.core.views"
     )  # pylint: disable=protected-access
@@ -64,13 +64,12 @@ def test_course_page_context(
     rf = RequestFactory()
     request = rf.get("/")
     request.user = staff_user if is_authenticated else AnonymousUser()
-    course_readable_id = "my:course+1"
     if has_unexpired_run:
-        run = CourseRunFactory.create(course__readable_id=course_readable_id)
+        run = CourseRunFactory.create(course__readable_id=FAKE_READABLE_ID)
         course_page_kwargs = dict(course=run.course)
     else:
         run = None
-        course_page_kwargs = dict(course__readable_id=course_readable_id)
+        course_page_kwargs = dict(course__readable_id=FAKE_READABLE_ID)
     course_page = CoursePageFactory.create(**course_page_kwargs)
     if enrolled:
         CourseRunEnrollmentFactory.create(user=staff_user, run=run)
@@ -85,37 +84,45 @@ def test_course_page_context(
         if exp_sign_in_url
         else None,
         "start_date": getattr(run, "start_date", None),
-        "can_access_edx_course": is_authenticated or has_unexpired_run,
+        "can_access_edx_course": is_authenticated and has_unexpired_run,
     }
 
 
 @pytest.mark.parametrize(
-    "is_editor,has_unexpired_run,is_in_progress,exp_can_access",
+    "is_authed,is_editor,has_unexpired_run,is_in_progress,exp_can_access",
     [
-        [True, True, True, True],
-        [True, True, False, True],
-        [True, False, True, False],
-        [False, True, False, False],
+        [True, True, True, True, True],
+        [False, True, True, True, False],
+        [True, True, True, False, True],
+        [True, True, False, True, False],
+        [True, False, True, False, False],
     ],
 )
 def test_course_page_context_edx_access(
-    user, is_editor, has_unexpired_run, is_in_progress, exp_can_access
+    user,
+    fully_configured_wagtail,
+    is_authed,
+    is_editor,
+    has_unexpired_run,
+    is_in_progress,
+    exp_can_access,
 ):
     """CoursePage.get_context should correctly indicate if user can access the edX course"""
-    course_readable_id = "my:course+1"
-    mock_user = create_autospec(user, instance=True, **user.__dict__)
-    mock_user.is_editor = is_editor
+    if not is_authed:
+        request_user = AnonymousUser()
+    else:
+        # Use a mock with a request user's properties copied over so we can set the 'is_editor' flag as we want
+        mock_request_user = create_autospec(user, instance=True, **user.__dict__)
+        mock_request_user.is_editor = is_editor
+        request_user = mock_request_user
     rf = RequestFactory()
     request = rf.get("/")
-    request.user = mock_user
+    request.user = request_user
+    course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
     if has_unexpired_run:
-        run = CourseRunFactory.create(
-            course__readable_id=course_readable_id,
+        CourseRunFactory.create(
+            course=course_page.course,
             **(dict(in_progress=True) if is_in_progress else dict(in_future=True)),
         )
-        course_page_kwargs = dict(course=run.course)
-    else:
-        course_page_kwargs = dict(course__readable_id=course_readable_id)
-    course_page = CoursePageFactory.create(**course_page_kwargs)
     context = course_page.get_context(request=request)
     assert context["can_access_edx_course"] is exp_can_access

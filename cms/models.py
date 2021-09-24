@@ -373,8 +373,10 @@ class CoursePage(ProductPage):
             else f'{reverse("login")}?next={quote_plus(self.get_url())}'
         )
         start_date = first_unexpired_run.start_date if first_unexpired_run else None
-        can_access_edx_course = first_unexpired_run is not None and (
-            first_unexpired_run.is_in_progress or request.user.is_editor
+        can_access_edx_course = (
+            request.user.is_authenticated
+            and first_unexpired_run is not None
+            and (first_unexpired_run.is_in_progress or request.user.is_editor)
         )
         return {
             **super().get_context(request, *args, **kwargs),
