@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.9.1
+-------------
+
+- Fixed logged-out bug on product detail page
+
 Version 0.9.0 (Released September 23, 2021)
 -------------
 
