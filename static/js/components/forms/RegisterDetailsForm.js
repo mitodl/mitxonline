@@ -3,7 +3,7 @@ import React from "react"
 import { Formik, Form } from "formik"
 
 import {
-  passwordValidation,
+  newAccountValidation,
   legalAddressValidation,
   LegalAddressFields
 } from "./ProfileFormFields"
@@ -29,7 +29,7 @@ const INITIAL_VALUES = {
 const RegisterDetailsForm = ({ onSubmit, countries }: Props) => (
   <Formik
     onSubmit={onSubmit}
-    validationSchema={legalAddressValidation.concat(passwordValidation)}
+    validationSchema={legalAddressValidation.concat(newAccountValidation)}
     initialValues={INITIAL_VALUES}
     render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
       <Form>
@@ -38,7 +38,7 @@ const RegisterDetailsForm = ({ onSubmit, countries }: Props) => (
           setFieldValue={setFieldValue}
           setFieldTouched={setFieldTouched}
           values={values}
-          includePassword={true}
+          isNewAccount={true}
         />
         <div className="row submit-row no-gutters justify-content-end">
           <button

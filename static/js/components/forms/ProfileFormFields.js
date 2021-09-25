@@ -10,11 +10,13 @@ import {
   EMPLOYMENT_INDUSTRY,
   EMPLOYMENT_LEVEL,
   EMPLOYMENT_SIZE,
-  HIGHEST_EDUCATION_CHOICES,
-  USERNAME_LENGTH
+  HIGHEST_EDUCATION_CHOICES
 } from "../../constants"
 import FormError from "./elements/FormError"
-import { newPasswordFieldValidation } from "../../lib/validation"
+import {
+  newPasswordFieldValidation,
+  usernameFieldValidation
+} from "../../lib/validation"
 
 const US_ALPHA_2 = "US"
 const CA_ALPHA_2 = "CA"
@@ -38,13 +40,6 @@ export const legalAddressValidation = yup.object().shape({
     .trim()
     .required()
     .min(2),
-  username: yup
-    .string()
-    .label("Username")
-    .trim()
-    .required()
-    .min(3)
-    .max(USERNAME_LENGTH),
   legal_address: yup.object().shape({
     first_name: yup
       .string()
@@ -66,8 +61,9 @@ export const legalAddressValidation = yup.object().shape({
   })
 })
 
-export const passwordValidation = yup.object().shape({
-  password: newPasswordFieldValidation
+export const newAccountValidation = yup.object().shape({
+  password: newPasswordFieldValidation,
+  username: usernameFieldValidation
 })
 
 export const profileValidation = yup.object().shape({
@@ -98,12 +94,12 @@ type LegalAddressProps = {
   setFieldValue: Function,
   setFieldTouched: Function,
   values: Object,
-  includePassword: boolean
+  isNewAccount: boolean
 }
 
 export const LegalAddressFields = ({
   countries,
-  includePassword
+  isNewAccount
 }: LegalAddressProps) => (
   <React.Fragment>
     <div className="form-group">
@@ -164,49 +160,54 @@ export const LegalAddressFields = ({
       />
       <ErrorMessage name="name" id="nameError" component={FormError} />
     </div>
-    <div className="form-group">
-      <label htmlFor="username" className="row">
-        <div className="col-auto font-weight-bold">
-          Public Username<span className="required">*</span>
+    {isNewAccount ? (
+      <React.Fragment>
+        <div className="form-group">
+          <label htmlFor="username" className="row">
+            <div className="col-auto font-weight-bold">
+              Public Username<span className="required">*</span>
+            </div>
+            <div className="col-auto subtitle">
+              Name that will identify you in courses
+            </div>
+          </label>
+          <Field
+            type="text"
+            name="username"
+            className="form-control"
+            autoComplete="username"
+            id="username"
+            aria-describedby="usernameError"
+          />
+          <ErrorMessage
+            name="username"
+            id="usernameError"
+            component={FormError}
+          />
         </div>
-        <div className="col-auto subtitle">
-          Name that will identify you in courses
+        <div className="form-group">
+          <label htmlFor="password" className="font-weight-bold">
+            Password<span className="required">*</span>
+          </label>
+          <Field
+            type="password"
+            name="password"
+            id="password"
+            aria-describedby="passwordError"
+            className="form-control"
+          />
+          <ErrorMessage
+            name="password"
+            id="passwordError"
+            component={FormError}
+          />
+          <div className="label-secondary">
+            Passwords must contain at least 8 characters and at least 1 number
+            and 1 letter.
+          </div>
         </div>
-      </label>
-      <Field
-        type="text"
-        name="username"
-        className="form-control"
-        autoComplete="username"
-        id="username"
-        aria-describedby="usernameError"
-      />
-      <ErrorMessage name="username" id="usernameError" component={FormError} />
-    </div>
-    {includePassword ? (
-      <div className="form-group">
-        <label htmlFor="password" className="font-weight-bold">
-          Password<span className="required">*</span>
-        </label>
-        <Field
-          type="password"
-          name="password"
-          id="password"
-          aria-describedby="passwordError"
-          className="form-control"
-        />
-        <ErrorMessage
-          name="password"
-          id="passwordError"
-          component={FormError}
-        />
-        <div className="label-secondary">
-          Passwords must contain at least 8 characters and at least 1 number and
-          1 letter.
-        </div>
-      </div>
+      </React.Fragment>
     ) : null}
-
     <div className="form-group">
       <label htmlFor="legal_address.country" className="font-weight-bold">
         Country<span className="required">*</span>
