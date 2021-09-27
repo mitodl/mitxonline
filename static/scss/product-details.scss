@@ -29,8 +29,12 @@
       line-height: 36px;
     }
 
+    @include media-breakpoint-down(md) {
+      padding: 0;
+    }
+
     @include media-breakpoint-up(lg) {
-      padding: 38px 0;
+      padding: 38px 0 5px;
     }
 
     .content-row {
@@ -46,10 +50,8 @@
       }
 
       .content-col {
-        padding: 0 0 20px;
-        @include media-breakpoint-up(md) {
-          padding: 0 0 30px;
-        }
+        padding: 0 0 26px;
+
         @include media-breakpoint-up(lg) {
           width: calc(100% - 497px);
           padding: 0 15px;
@@ -62,10 +64,23 @@
 
         &.video {
           padding-bottom: 0;
+
+          @include media-breakpoint-down(md) {
+            margin: 0px -15px;
+          }
+
           @include media-breakpoint-up(lg) {
             width: 497px;
-            padding: 12px 15px;
+            padding: 6px 15px;
             flex-shrink: 0;
+          }
+        }
+
+        .text {
+          padding-top: 7px !important;
+
+          @include media-breakpoint-down(md) {
+            padding-top: 25px !important;
           }
         }
       }
@@ -126,12 +141,12 @@
     }
 
     p {
-      margin: 0 0 28px;
+      margin: 0 0 24px;
     }
   }
 
   .info-block {
-    padding: 20px 0;
+    padding-bottom: 32px;
     font-size: 14px;
     line-height: 16px;
     color: $black;
@@ -229,10 +244,10 @@
 
   .text-block {
     color: $black;
-    padding: 20px 0;
+    padding: 0;
 
     @include media-breakpoint-up(lg) {
-      padding: 30px 0;
+      padding: 25px 0 10px;
     }
 
     p {
@@ -249,7 +264,7 @@
       }
 
       .content-data {
-        @include media-breakpoint-up(md) {
+        @include media-breakpoint-up(lg) {
           padding-bottom: 20px;
         }
       }
