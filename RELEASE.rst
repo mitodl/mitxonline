@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.10.0 (Released September 27, 2021)
+--------------
+
+- Removed username from profile edit form
+
 Version 0.9.1 (Released September 24, 2021)
 -------------
 
