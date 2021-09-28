@@ -9,6 +9,7 @@ from django.conf import settings
 from django.db import models
 from django.http import Http404
 from django.urls import reverse
+from modelcluster.fields import ParentalKey
 from wagtail.admin.edit_handlers import (
     FieldPanel,
     StreamFieldPanel,
@@ -25,10 +26,8 @@ from wagtail.embeds.embeds import get_embed
 from wagtail.embeds.exceptions import EmbedException
 
 from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
-
-from modelcluster.fields import ParentalKey
-
 from cms.constants import COURSE_INDEX_SLUG, CMS_EDITORS_GROUP_NAME
+from courses.api import get_user_relevant_course_run
 
 log = logging.getLogger()
 
@@ -357,30 +356,28 @@ class CoursePage(ProductPage):
     template = "product_page.html"
 
     def get_context(self, request, *args, **kwargs):
-        first_unexpired_run = self.product.first_unexpired_run
+        relevant_run = get_user_relevant_course_run(
+            course=self.product, user=request.user
+        )
         is_enrolled = (
             False
-            if (first_unexpired_run is None or not request.user.is_authenticated)
-            else (
-                first_unexpired_run.courserunenrollment_set.filter(
-                    user_id=request.user.id
-                ).exists()
-            )
+            if (relevant_run is None or not request.user.is_authenticated)
+            else (relevant_run.enrollments.filter(user_id=request.user.id).exists())
         )
         sign_in_url = (
             None
             if request.user.is_authenticated
             else f'{reverse("login")}?next={quote_plus(self.get_url())}'
         )
-        start_date = first_unexpired_run.start_date if first_unexpired_run else None
+        start_date = relevant_run.start_date if relevant_run else None
         can_access_edx_course = (
             request.user.is_authenticated
-            and first_unexpired_run is not None
-            and (first_unexpired_run.is_in_progress or request.user.is_editor)
+            and relevant_run is not None
+            and (relevant_run.is_in_progress or request.user.is_editor)
         )
         return {
             **super().get_context(request, *args, **kwargs),
-            "run": first_unexpired_run,
+            "run": relevant_run,
             "is_enrolled": is_enrolled,
             "sign_in_url": sign_in_url,
             "start_date": start_date,

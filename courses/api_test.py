@@ -12,6 +12,7 @@ from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 
 from courses.api import (
+    get_user_relevant_course_run,
     create_program_enrollments,
     create_run_enrollments,
     deactivate_program_enrollment,
@@ -42,6 +43,111 @@ from openedx.exceptions import (
 )
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def dates():
+    """Fixture that provides several dates"""
+    now = now_in_utc()
+    return SimpleNamespace(
+        future_60_days=now + timedelta(days=60),
+        future_30_days=now + timedelta(days=30),
+        future_10_days=now + timedelta(days=10),
+        now=now,
+        past_10_days=now - timedelta(days=10),
+        past_30_days=now - timedelta(days=30),
+        past_60_days=now - timedelta(days=60),
+    )
+
+
+@pytest.mark.parametrize("is_enrolled", [True, False])
+def test_get_user_relevant_course_run(user, dates, is_enrolled):
+    """
+    get_user_relevant_course_run should return an enrolled run if the end date isn't in the past, or the soonest course
+    run that does not have a past enrollment end date.
+    """
+    course = CourseFactory.create()
+    # One run in the near future, one run in progress with an expired enrollment period, and one run in the far future.
+    course_runs = CourseRunFactory.create_batch(
+        3,
+        course=course,
+        start_date=factory.Iterator(
+            [dates.future_10_days, dates.past_10_days, dates.future_30_days]
+        ),
+        end_date=factory.Iterator([None, dates.future_10_days, dates.future_60_days]),
+        enrollment_start=factory.Iterator(
+            [dates.future_10_days, dates.past_60_days, dates.future_30_days]
+        ),
+        enrollment_end=factory.Iterator(
+            [None, dates.past_30_days, dates.future_60_days]
+        ),
+    )
+    if is_enrolled:
+        # Enroll in the in-progress course run
+        CourseRunEnrollmentFactory.create(
+            run=course_runs[1], user=user, edx_enrolled=True, active=True
+        )
+    returned_run = get_user_relevant_course_run(course=course, user=user)
+    assert returned_run == (course_runs[1] if is_enrolled else course_runs[0])
+
+
+def test_get_user_relevant_course_run_invalid_dates(user, dates):
+    """
+    get_user_relevant_course_run should ignore course runs with any of the following properties:
+    1) No start date or enrollment start date
+    2) An end date in the past
+
+    """
+    course = CourseFactory.create()
+    CourseRunFactory.create_batch(
+        3,
+        course=course,
+        start_date=factory.Iterator([None, dates.future_10_days, dates.past_30_days]),
+        end_date=factory.Iterator([None, dates.future_60_days, dates.past_10_days]),
+        enrollment_start=factory.Iterator(
+            [dates.future_10_days, None, dates.past_30_days]
+        ),
+        enrollment_end=factory.Iterator(
+            [dates.future_60_days, None, dates.past_10_days]
+        ),
+    )
+    returned_run = get_user_relevant_course_run(course=course, user=user)
+    assert returned_run is None
+
+
+def test_get_user_relevant_course_run_ignore_enrolled(user, dates):
+    """
+    get_user_relevant_course_run return a future course run if an enrolled run's end date is in the past, or if an
+    enrollment for an open course is not flagged as edX-enrolled
+    """
+    course = CourseFactory.create()
+    course_runs = CourseRunFactory.create_batch(
+        3,
+        course=course,
+        start_date=factory.Iterator(
+            [dates.past_30_days, dates.now, dates.future_10_days]
+        ),
+        end_date=factory.Iterator(
+            [dates.past_10_days, dates.future_10_days, dates.future_30_days]
+        ),
+        enrollment_start=factory.Iterator(
+            [dates.past_30_days, dates.past_30_days, dates.future_10_days]
+        ),
+        enrollment_end=factory.Iterator(
+            [dates.past_10_days, dates.past_10_days, dates.future_30_days]
+        ),
+    )
+    # Enroll in a past course run
+    CourseRunEnrollmentFactory.create(
+        run=course_runs[0], user=user, edx_enrolled=True, active=True
+    )
+    # Enroll in a currently-open course run with a closed enrollment period, but set to inactive
+    CourseRunEnrollmentFactory.create(
+        run=course_runs[1], user=user, edx_enrolled=False, active=True
+    )
+    returned_run = get_user_relevant_course_run(course=course, user=user)
+    # Returned course run should be the one with the unexpired enrollment period
+    assert returned_run == course_runs[2]
 
 
 def test_get_user_enrollments(user):
