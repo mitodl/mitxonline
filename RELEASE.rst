@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.11.0
+--------------
+
+- Bump django from 3.1.12 to 3.1.13 (#213)
+- fix retry_edx_enrollment management command (#209)
+- Fixed 'enrolled' UI regression
+
 Version 0.10.0 (Released September 27, 2021)
 --------------
 
