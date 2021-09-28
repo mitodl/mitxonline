@@ -32,6 +32,7 @@ from openedx.api import (
     update_edx_user_email,
     update_edx_user_name,
     sync_enrollments_with_edx,
+    retry_failed_edx_enrollments,
 )
 from openedx.constants import (
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
@@ -355,59 +356,59 @@ def test_enroll_pro_unknown_fail(mocker, user):
         enroll_in_edx_course_runs(user, [course_run])
 
 
-# @pytest.mark.parametrize("exception_raised", [Exception("An error happened"), None])
-# def test_retry_failed_edx_enrollments(mocker, exception_raised):
-#     """
-#     Tests that retry_failed_edx_enrollments loops through enrollments that failed in edX
-#     and attempts to enroll them again
-#     """
-#     with freeze_time(now_in_utc() - timedelta(days=1)):
-#         failed_enrollments = CourseRunEnrollmentFactory.create_batch(
-#             3, edx_enrolled=False, user__is_active=True
-#         )
-#         CourseRunEnrollmentFactory.create(edx_enrolled=False, user__is_active=False)
-#     patched_enroll_in_edx = mocker.patch(
-#         "openedx.api.enroll_in_edx_course_runs",
-#         side_effect=[None, exception_raised or None, None],
-#     )
-#     patched_log_exception = mocker.patch("openedx.api.log.exception")
-#     successful_enrollments = retry_failed_edx_enrollments()
-#
-#     assert patched_enroll_in_edx.call_count == len(failed_enrollments)
-#     assert len(successful_enrollments) == (3 if exception_raised is None else 2)
-#     assert patched_log_exception.called == bool(exception_raised)
-#     if exception_raised:
-#         failed_enroll_user, failed_enroll_runs = patched_enroll_in_edx.call_args_list[
-#             1
-#         ][0]
-#         expected_successful_enrollments = [
-#             e
-#             for e in failed_enrollments
-#             if e.user != failed_enroll_user and e.run != failed_enroll_runs[0]
-#         ]
-#         assert {e.id for e in successful_enrollments} == {
-#             e.id for e in expected_successful_enrollments
-#         }
+@pytest.mark.parametrize("exception_raised", [Exception("An error happened"), None])
+def test_retry_failed_edx_enrollments(mocker, exception_raised):
+    """
+    Tests that retry_failed_edx_enrollments loops through enrollments that failed in edX
+    and attempts to enroll them again
+    """
+    with freeze_time(now_in_utc() - timedelta(days=1)):
+        failed_enrollments = CourseRunEnrollmentFactory.create_batch(
+            3, edx_enrolled=False, user__is_active=True
+        )
+        CourseRunEnrollmentFactory.create(edx_enrolled=False, user__is_active=False)
+    patched_enroll_in_edx = mocker.patch(
+        "openedx.api.enroll_in_edx_course_runs",
+        side_effect=[None, exception_raised or None, None],
+    )
+    patched_log_exception = mocker.patch("openedx.api.log.exception")
+    successful_enrollments = retry_failed_edx_enrollments()
 
-#
-# def test_retry_failed_enroll_grace_period(mocker):
-#     """
-#     Tests that retry_failed_edx_enrollments does not attempt to repair any enrollments that were recently created
-#     """
-#     now = now_in_utc()
-#     with freeze_time(now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS - 1)):
-#         CourseRunEnrollmentFactory.create(edx_enrolled=False, user__is_active=True)
-#     with freeze_time(now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS + 1)):
-#         older_enrollment = CourseRunEnrollmentFactory.create(
-#             edx_enrolled=False, user__is_active=True
-#         )
-#     patched_enroll_in_edx = mocker.patch("openedx.api.enroll_in_edx_course_runs")
-#     successful_enrollments = retry_failed_edx_enrollments()
-#
-#     assert successful_enrollments == [older_enrollment]
-#     patched_enroll_in_edx.assert_called_once_with(
-#         older_enrollment.user, [older_enrollment.run]
-#     )
+    assert patched_enroll_in_edx.call_count == len(failed_enrollments)
+    assert len(successful_enrollments) == (3 if exception_raised is None else 2)
+    assert patched_log_exception.called == bool(exception_raised)
+    if exception_raised:
+        failed_enroll_user, failed_enroll_runs = patched_enroll_in_edx.call_args_list[
+            1
+        ][0]
+        expected_successful_enrollments = [
+            e
+            for e in failed_enrollments
+            if e.user != failed_enroll_user and e.run != failed_enroll_runs[0]
+        ]
+        assert {e.id for e in successful_enrollments} == {
+            e.id for e in expected_successful_enrollments
+        }
+
+
+def test_retry_failed_enroll_grace_period(mocker):
+    """
+    Tests that retry_failed_edx_enrollments does not attempt to repair any enrollments that were recently created
+    """
+    now = now_in_utc()
+    with freeze_time(now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS - 1)):
+        CourseRunEnrollmentFactory.create(edx_enrolled=False, user__is_active=True)
+    with freeze_time(now - timedelta(minutes=OPENEDX_REPAIR_GRACE_PERIOD_MINS + 1)):
+        older_enrollment = CourseRunEnrollmentFactory.create(
+            edx_enrolled=False, user__is_active=True
+        )
+    patched_enroll_in_edx = mocker.patch("openedx.api.enroll_in_edx_course_runs")
+    successful_enrollments = retry_failed_edx_enrollments()
+
+    assert successful_enrollments == [older_enrollment]
+    patched_enroll_in_edx.assert_called_once_with(
+        older_enrollment.user, [older_enrollment.run]
+    )
 
 
 @pytest.mark.parametrize(

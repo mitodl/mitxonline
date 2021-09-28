@@ -7,7 +7,7 @@ from django.core.management import BaseCommand
 from openedx.api import enroll_in_edx_course_runs
 from users.api import fetch_users
 
-# from courses.models import CourseRunEnrollment
+from courses.models import CourseRunEnrollment
 
 User = get_user_model()
 
@@ -44,7 +44,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         """Run the command"""
-        raise NotImplemented("This command requires the course application")
         enrollment_filter = {}
         if not options["force"]:
             enrollment_filter["edx_enrolled"] = False

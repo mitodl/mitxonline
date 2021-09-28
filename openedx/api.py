@@ -33,7 +33,6 @@ from openedx.constants import (
     PRO_ENROLL_MODE_ERROR_TEXTS,
 )
 
-# from courses.models import CourseRunEnrollment
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
     NoEdxApiAuthError,
@@ -526,10 +525,8 @@ def retry_failed_edx_enrollments():
     Returns:
         list of CourseRunEnrollment: All CourseRunEnrollments that were successfully retried
     """
-    log.error("retry_failed_edx_enrollments() requires the courses app")
-    return []
     now = now_in_utc()
-    failed_run_enrollments = CourseRunEnrollment.objects.select_related(
+    failed_run_enrollments = courses.models.CourseRunEnrollment.objects.select_related(
         "user", "run"
     ).filter(
         user__is_active=True,
