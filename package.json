@@ -117,7 +117,7 @@
     "videojs-youtube": "^2.6.1",
     "waait": "^1.0.4",
     "webpack": "^4.42.1",
-    "webpack-bundle-tracker": "^0.2.0",
+    "webpack-bundle-tracker": "^0.4.3",
     "webpack-cli": "^3.3.12",
     "webpack-dev-middleware": "^3.6.1",
     "webpack-hot-middleware": "^2.24.3",
