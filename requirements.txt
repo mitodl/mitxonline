@@ -69,7 +69,7 @@ defusedxml==0.7.1
     #   social-auth-core
 dj-database-url==0.5.0
     # via -r requirements.in
-django==3.1.12
+django==3.1.13
     # via
     #   -r requirements.in
     #   django-anymail
