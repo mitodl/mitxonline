@@ -93,3 +93,13 @@
   height: 25px;
   width: 25px;
 }
+
+.user-menu-button {
+
+  @include media-breakpoint-down(sm) {
+    display: none;
+  }
+
+  border-color: transparent;
+  background-color: inherit;
+}
