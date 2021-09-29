@@ -256,7 +256,7 @@ class ProductPage(Page):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
-        help_text="Image that will be used where the course is featured or linked.",
+        help_text="Image that will be used where the course is featured or linked. (The recommended dimensions for the image are 375x244)",
     )
 
     faculty_section_title = models.CharField(
