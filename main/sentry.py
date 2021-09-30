@@ -4,6 +4,7 @@ from celery.exceptions import WorkerLostError
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
 
 # these errors occur when a shutdown is happening (usually caused by a SIGTERM)
 SHUTDOWN_ERRORS = (WorkerLostError, SystemExit)
@@ -47,6 +48,7 @@ def init_sentry(*, dsn, environment, version, log_level, heroku_app_name):
         integrations=[
             DjangoIntegration(),
             CeleryIntegration(),
+            RedisIntegration(),
             LoggingIntegration(level=log_level),
         ],
     )
