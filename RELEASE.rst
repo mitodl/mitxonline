@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.11.2
+--------------
+
+- Added headers to tab order
+- build: upgrade sentry browser and sdk version + RedisIntegration (#232)
+- Fixed product detail links to in-progress enrolled course runs
+
 Version 0.11.1 (Released September 30, 2021)
 --------------
 
