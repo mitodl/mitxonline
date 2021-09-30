@@ -29,7 +29,7 @@ psycopg2
 pycountry==19.7.15
 redis
 requests
-sentry-sdk
+sentry-sdk==1.4.2
 social-auth-app-django==4.0.0
 user-util==0.1.5
 ulid-py
