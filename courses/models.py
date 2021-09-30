@@ -533,7 +533,9 @@ class CourseRunEnrollment(EnrollmentModel):
     Link between User and CourseRun indicating a user's enrollment
     """
 
-    run = models.ForeignKey("courses.CourseRun", on_delete=models.CASCADE)
+    run = models.ForeignKey(
+        "courses.CourseRun", related_name="enrollments", on_delete=models.CASCADE
+    )
     edx_enrolled = models.BooleanField(
         default=False,
         help_text="Indicates whether or not the request succeeded to enroll via the edX API",

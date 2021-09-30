@@ -3,11 +3,15 @@
 import itertools
 import logging
 from collections import namedtuple
+from datetime import datetime
 from traceback import format_exc
+from typing import Optional
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q, Count
+from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
     has_equal_properties,
@@ -25,6 +29,7 @@ from courses.models import (
     CourseRunGrade,
     Program,
     ProgramEnrollment,
+    Course,
 )
 from openedx.api import (
     enroll_in_edx_course_runs,
@@ -36,6 +41,7 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
+from users.models import User
 
 log = logging.getLogger(__name__)
 UserEnrollments = namedtuple(
@@ -48,6 +54,48 @@ UserEnrollments = namedtuple(
         "past_non_program_runs",
     ],
 )
+
+
+def get_user_relevant_course_run(
+    course: Course, user: Optional[User], now: Optional[datetime] = None
+) -> CourseRun:
+    """
+    For a given Course, finds the course run that is the most relevant to the user.
+    For anonymous users, this means the soonest enrollable course run.
+    For logged-in users, this means an active course run that they're enrolled in, or the soonest enrollable course run.
+    """
+    now = now or now_in_utc()
+    run_qset = (
+        course.courseruns.exclude(start_date=None)
+        .exclude(enrollment_start=None)
+        .filter(Q(end_date=None) | Q(end_date__gt=now))
+    )
+    if user and user.is_authenticated:
+        user_enrollments = Count(
+            "enrollments",
+            filter=Q(
+                enrollments__user=user,
+                enrollments__active=True,
+                enrollments__edx_enrolled=True,
+            ),
+        )
+        run_qset = run_qset.annotate(user_enrollments=user_enrollments).order_by(
+            "-user_enrollments", "enrollment_start"
+        )
+        runs = (
+            run
+            for run in run_qset
+            if run.user_enrollments > 0
+            or (run.enrollment_end is None or run.enrollment_end > now)
+        )
+    else:
+        runs = (
+            run_qset.filter(start_date__gt=now)
+            .filter(Q(enrollment_end=None) | Q(enrollment_end__gt=now))
+            .order_by("enrollment_start")
+        )
+    run = first_or_none(runs)
+    return run
 
 
 def get_user_enrollments(user):

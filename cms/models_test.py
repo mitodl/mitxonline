@@ -1,13 +1,14 @@
-from unittest.mock import PropertyMock, create_autospec
+"""Tests for Wagtail models"""
 from urllib.parse import quote_plus
 
 import pytest
 import factory
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, Group
 from django.urls import resolve
 from django.test.client import RequestFactory
 from mitol.common.factories import UserFactory
 
+from cms.constants import CMS_EDITORS_GROUP_NAME
 from cms.factories import ResourcePageFactory, CoursePageFactory
 from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
 
@@ -44,7 +45,7 @@ def test_custom_detail_page_urls_handled(fully_configured_wagtail):
 
 
 @pytest.mark.parametrize(
-    "is_authenticated,has_unexpired_run,enrolled,exp_sign_in_url,exp_is_enrolled",
+    "is_authenticated,has_relevant_run,enrolled,exp_sign_in_url,exp_is_enrolled",
     [
         [True, True, True, False, True],
         [False, False, False, True, False],
@@ -55,7 +56,7 @@ def test_course_page_context(
     staff_user,
     fully_configured_wagtail,
     is_authenticated,
-    has_unexpired_run,
+    has_relevant_run,
     enrolled,
     exp_sign_in_url,
     exp_is_enrolled,
@@ -64,8 +65,10 @@ def test_course_page_context(
     rf = RequestFactory()
     request = rf.get("/")
     request.user = staff_user if is_authenticated else AnonymousUser()
-    if has_unexpired_run:
-        run = CourseRunFactory.create(course__readable_id=FAKE_READABLE_ID)
+    if has_relevant_run:
+        run = CourseRunFactory.create(
+            course__readable_id=FAKE_READABLE_ID, in_future=True
+        )
         course_page_kwargs = dict(course=run.course)
     else:
         run = None
@@ -84,45 +87,55 @@ def test_course_page_context(
         if exp_sign_in_url
         else None,
         "start_date": getattr(run, "start_date", None),
-        "can_access_edx_course": is_authenticated and has_unexpired_run,
+        "can_access_edx_course": is_authenticated and has_relevant_run,
     }
 
 
 @pytest.mark.parametrize(
-    "is_authed,is_editor,has_unexpired_run,is_in_progress,exp_can_access",
+    "is_authed,is_editor,has_relevant_run,is_in_progress,exp_can_access",
     [
         [True, True, True, True, True],
-        [False, True, True, True, False],
+        [False, False, True, True, False],
         [True, True, True, False, True],
         [True, True, False, True, False],
         [True, False, True, False, False],
     ],
 )
 def test_course_page_context_edx_access(
-    user,
+    mocker,
     fully_configured_wagtail,
     is_authed,
     is_editor,
-    has_unexpired_run,
+    has_relevant_run,
     is_in_progress,
     exp_can_access,
 ):
     """CoursePage.get_context should correctly indicate if user can access the edX course"""
-    if not is_authed:
-        request_user = AnonymousUser()
-    else:
-        # Use a mock with a request user's properties copied over so we can set the 'is_editor' flag as we want
-        mock_request_user = create_autospec(user, instance=True, **user.__dict__)
-        mock_request_user.is_editor = is_editor
-        request_user = mock_request_user
-    rf = RequestFactory()
-    request = rf.get("/")
-    request.user = request_user
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
-    if has_unexpired_run:
-        CourseRunFactory.create(
+    run = (
+        None
+        if not has_relevant_run
+        else CourseRunFactory.create(
             course=course_page.course,
             **(dict(in_progress=True) if is_in_progress else dict(in_future=True)),
         )
+    )
+    patched_get_relevant_run = mocker.patch(
+        "cms.models.get_user_relevant_course_run", return_value=run
+    )
+    if not is_authed:
+        request_user = AnonymousUser()
+    else:
+        request_user = UserFactory.create()
+    if is_editor:
+        editor_group = Group.objects.get(name=CMS_EDITORS_GROUP_NAME)
+        editor_group.user_set.add(request_user)
+        request_user.save()
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = request_user
     context = course_page.get_context(request=request)
     assert context["can_access_edx_course"] is exp_can_access
+    patched_get_relevant_run.assert_called_once_with(
+        course=course_page.course, user=request_user
+    )
