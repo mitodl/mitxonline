@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.11.1 (Released September 30, 2021)
+--------------
+
+- Fixed dashboard card spacing and image sizing
+
 Version 0.11.0 (Released September 29, 2021)
 --------------
 
