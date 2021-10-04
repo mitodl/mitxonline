@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.12.0
+--------------
+
+- Added username whitespace trimming and case-insensitive unique validation
+- fix product detail spacing issues (#226)
+
 Version 0.11.2 (Released October 04, 2021)
 --------------
 
