@@ -8,10 +8,8 @@ import { connect } from "react-redux"
 import { mutateAsync } from "redux-query"
 import { Link } from "react-router-dom"
 
-import { addUserNotification } from "../../../actions"
 import auth from "../../../lib/queries/auth"
 import { routes } from "../../../lib/urls"
-import { ALERT_TYPE_TEXT } from "../../../constants"
 
 import EmailForm from "../../../components/forms/EmailForm"
 
@@ -159,8 +157,7 @@ const forgotPassword = (email: string) =>
   mutateAsync(auth.forgotPasswordMutation(email))
 
 const mapDispatchToProps = {
-  forgotPassword,
-  addUserNotification
+  forgotPassword
 }
 
 export default compose(

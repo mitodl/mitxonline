@@ -5,11 +5,13 @@ import * as R from "ramda"
 
 import { S, parseJSON, filterE } from "./sanctuary"
 
+const COOKIE_DIVIDER = ";"
+
 export function getCookie(name: string): string | null {
   let cookieValue = null
 
   if (document.cookie && document.cookie !== "") {
-    const cookies = document.cookie.split(";")
+    const cookies = document.cookie.split(COOKIE_DIVIDER)
 
     for (let cookie of cookies) {
       cookie = cookie.trim()
@@ -22,6 +24,16 @@ export function getCookie(name: string): string | null {
     }
   }
   return cookieValue
+}
+
+export function removeCookie(name: string) {
+  if (!document.cookie || document.cookie === "") {
+    return
+  }
+  // This only empties the value for the cookie with the given name, not the entire set of cookies.
+  // This is a very weird API. Documentation for more details:
+  //   https://developer.mozilla.org/en-US/docs/Web/API/Document/cookie
+  document.cookie = `${name}=;path=/;`
 }
 
 export function csrfSafeMethod(method: string): boolean {

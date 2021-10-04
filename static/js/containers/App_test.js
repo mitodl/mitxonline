@@ -8,13 +8,17 @@ import * as notificationsApi from "../lib/notificationsApi"
 import IntegrationTestHelper from "../util/integration_test_helper"
 
 describe("Top-level App", () => {
-  let helper, renderPage, getStoredUserMessageStub
+  let helper, renderPage, getStoredUserMessageStub, removeStoredUserMessageStub
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
     getStoredUserMessageStub = helper.sandbox
       .stub(notificationsApi, "getStoredUserMessage")
       .returns(null)
+    removeStoredUserMessageStub = helper.sandbox.stub(
+      notificationsApi,
+      "removeStoredUserMessage"
+    )
     renderPage = helper.configureHOCRenderer(
       App,
       InnerApp,
@@ -56,5 +60,6 @@ describe("Top-level App", () => {
         }
       }
     })
+    sinon.assert.calledOnce(removeStoredUserMessageStub)
   })
 })

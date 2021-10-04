@@ -14,11 +14,12 @@ import {
 import IntegrationTestHelper from "../util/integration_test_helper"
 
 describe("notifications API", () => {
-  let helper, getCookieStub
+  let helper, getCookieStub, removeCookieStub
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
     getCookieStub = helper.sandbox.stub(api, "getCookie")
+    removeCookieStub = helper.sandbox.stub(api, "removeCookie")
   })
 
   afterEach(() => {
@@ -92,5 +93,10 @@ describe("notifications API", () => {
       })
       sinon.assert.calledWith(getCookieStub, USER_MSG_COOKIE_NAME)
     })
+  })
+
+  it("removeStoredUserMessage removes the user message cookie", () => {
+    notificationsApi.removeStoredUserMessage()
+    sinon.assert.calledWith(removeCookieStub, USER_MSG_COOKIE_NAME)
   })
 })

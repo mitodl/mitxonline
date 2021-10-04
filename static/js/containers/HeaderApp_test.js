@@ -5,16 +5,19 @@ import sinon from "sinon"
 import HeaderApp, { HeaderApp as InnerHeaderApp } from "./HeaderApp"
 import IntegrationTestHelper from "../util/integration_test_helper"
 import * as notificationsApi from "../lib/notificationsApi"
-import { ALERT_TYPE_TEXT } from "../constants"
 
 describe("Top-level HeaderApp", () => {
-  let helper, renderPage, getStoredUserMessageStub
+  let helper, renderPage, getStoredUserMessageStub, removeStoredUserMessageStub
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
     getStoredUserMessageStub = helper.sandbox
       .stub(notificationsApi, "getStoredUserMessage")
       .returns(null)
+    removeStoredUserMessageStub = helper.sandbox.stub(
+      notificationsApi,
+      "removeStoredUserMessage"
+    )
     renderPage = helper.configureHOCRenderer(HeaderApp, InnerHeaderApp, {}, {})
   })
 
@@ -46,5 +49,6 @@ describe("Top-level HeaderApp", () => {
         }
       }
     })
+    sinon.assert.calledOnce(removeStoredUserMessageStub)
   })
 })

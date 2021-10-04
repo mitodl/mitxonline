@@ -1,5 +1,6 @@
 /* global SETTINGS: false */
-import { getCookie } from "./api"
+import { getCookie, removeCookie } from "./api"
+import { isEmptyText } from "./util"
 import {
   ALERT_TYPE_DANGER,
   ALERT_TYPE_SUCCESS,
@@ -17,7 +18,7 @@ type UserMessage = {
 
 export function getStoredUserMessage(): UserMessage | null {
   const userMsgValue = getCookie(USER_MSG_COOKIE_NAME)
-  if (!userMsgValue) {
+  if (!userMsgValue || isEmptyText(userMsgValue)) {
     return null
   }
   const userMsgObject = JSON.parse(decodeURIComponent(userMsgValue))
@@ -64,6 +65,10 @@ export function parseStoredUserMessage(
     type: alertType,
     text: msgText
   }
+}
+
+export function removeStoredUserMessage(): null {
+  removeCookie(USER_MSG_COOKIE_NAME)
 }
 
 export const getNotificationAlertProps = (
