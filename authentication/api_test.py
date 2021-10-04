@@ -16,33 +16,6 @@ def test_create_user_session(user):
     assert session.session_key is not None
 
 
-def test_create_user_with_generated_username(mocker, valid_address_dict):
-    """
-    Integration test to assert that create_user_with_generated_username tries to find an available
-    username and try again to save a User if there was a username collision
-    """
-    username = "testuser"
-    # Create a user with the desired username before calling the function so we get a collision
-    UserFactory.create(username=username)
-    data = {
-        "username": username,
-        "email": "test@example.com",
-        "name": "Test User",
-        "legal_address": valid_address_dict,
-        "password": "fakepassword",
-    }
-    serializer = UserSerializer(data=data)
-    serializer.is_valid()
-    patched_find_username = mocker.patch(
-        "authentication.api.find_available_username", return_value="testuser1"
-    )
-
-    created_user = api.create_user_with_generated_username(serializer, username)
-    patched_find_username.assert_called_once_with(username)
-    assert created_user is not None
-    assert created_user.username == patched_find_username.return_value
-
-
 def test_create_user_reattempt(mocker):
     """
     Test that create_user_with_generated_username reattempts User creation multiple times when

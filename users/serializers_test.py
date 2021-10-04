@@ -1,5 +1,8 @@
 """Tests for users.serializers"""
 import pytest
+from django.contrib.auth.models import AnonymousUser
+
+from django.test.client import RequestFactory
 from rest_framework.exceptions import ValidationError
 
 from users.factories import UserFactory
@@ -11,6 +14,8 @@ from users.serializers import (
 )
 
 # pylint:disable=redefined-outer-name
+
+USERNAME = "my-username"
 
 
 @pytest.fixture()
@@ -128,6 +133,88 @@ def test_update_user_email(
     else:
         mock_update_edx_user_email.assert_called_once_with(user)
     mock_change_edx_user_email_task.apply_async.assert_not_called()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "new_username, expect_valid, expect_saved_username",
+    [
+        [f"{USERNAME}-1", True, f"{USERNAME}-1"],
+        [" My-Üsérname 1 ", True, "My-Üsérname 1"],
+        ["my>usern@me>1", False, None],
+        [f"   {USERNAME.upper()}  ", False, None],
+    ],
+)
+def test_username_validation(
+    sample_address, new_username, expect_valid, expect_saved_username
+):
+    """
+    UserSerializer should raise a validation error if the given username has invalid characters,
+    or if there is already a user with that username after trimming and ignoring case. The saved
+    username should have whitespace trimmed.
+    """
+    # Seed an initial user with a constant username
+    UserFactory.create(username=USERNAME)
+    serializer = UserSerializer(
+        data={
+            "username": new_username,
+            "email": "email@example.com",
+            "password": "abcdefghi123",
+            "legal_address": sample_address,
+        }
+    )
+    is_valid = serializer.is_valid()
+    assert is_valid is expect_valid
+    if expect_valid:
+        instance = serializer.save()
+        assert instance.username == expect_saved_username
+
+
+@pytest.mark.django_db
+def test_user_create_required_fields_post(sample_address):
+    """
+    UserSerializer should raise a validation error if a new User is being created and certain fields aren't
+    included in the data.
+    """
+    base_data = {
+        "email": "email@example.com",
+        "legal_address": sample_address,
+    }
+    rf = RequestFactory()
+    # Request path does not matter here
+    request = rf.post("/")
+    request.user = AnonymousUser()
+    serializer = UserSerializer(
+        data={**base_data, "username": USERNAME}, context={"request": request}
+    )
+    assert serializer.is_valid() is False
+    assert "password" in serializer.errors
+    assert str(serializer.errors["password"][0]) == "This field is required."
+    serializer = UserSerializer(
+        data={**base_data, "password": "abcdefghij1"}, context={"request": request}
+    )
+    assert serializer.is_valid() is False
+    assert "username" in serializer.errors
+    assert str(serializer.errors["username"][0]) == "This field is required."
+
+
+def test_user_create_required_fields_not_post(sample_address):
+    """
+    If UserSerializer is given no request in the context, or that request is not a POST,
+    it should not raise a validation error if certain fields are not included.
+    """
+    base_data = {
+        "email": "email@example.com",
+        "legal_address": sample_address,
+    }
+    serializer = UserSerializer(data=base_data)
+    assert serializer.is_valid() is True
+    rf = RequestFactory()
+    # Request path does not matter here
+    request = rf.patch("/")
+    request.user = AnonymousUser()
+    serializer = UserSerializer(data=base_data, context={"request": request})
+    assert serializer.is_valid() is True
 
 
 def test_legal_address_serializer_invalid_name(sample_address):

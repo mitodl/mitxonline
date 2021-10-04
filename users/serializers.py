@@ -6,6 +6,7 @@ from collections import defaultdict
 import pycountry
 from django.db import transaction
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 from social_django.models import UserSocialAuth
 
 # from ecommerce.api import fetch_and_serialize_unused_coupons
@@ -76,7 +77,16 @@ class UserSerializer(serializers.ModelSerializer):
     # password is explicitly write_only
     password = serializers.CharField(write_only=True, required=False)
     email = WriteableSerializerMethodField()
-    username = WriteableSerializerMethodField()
+    username = serializers.CharField(
+        validators=[
+            UniqueValidator(
+                queryset=User.objects.all(),
+                message="A user already exists with this username. Please try a different one.",
+                lookup="iexact",
+            )
+        ],
+        required=False,
+    )
     legal_address = LegalAddressSerializer(allow_null=True)
 
     def validate_email(self, value):
@@ -85,9 +95,10 @@ class UserSerializer(serializers.ModelSerializer):
 
     def validate_username(self, value):
         """Validates the username field"""
-        if not re.fullmatch(USERNAME_RE, value):
+        trimmed_value = value.strip()
+        if not re.fullmatch(USERNAME_RE, trimmed_value):
             raise serializers.ValidationError(USERNAME_ERROR_MSG)
-        return {"username": value}
+        return trimmed_value
 
     def get_email(self, instance):
         """Returns the email or None in the case of AnonymousUser"""
@@ -96,6 +107,20 @@ class UserSerializer(serializers.ModelSerializer):
     def get_username(self, instance):
         """Returns the username or None in the case of AnonymousUser"""
         return getattr(instance, "username", None)
+
+    def validate(self, data):
+        request = self.context.get("request", None)
+        # Certain fields are required only if a new User is being created (i.e.: the request method is POST)
+        if request is not None and request.method == "POST":
+            if not data.get("password"):
+                raise serializers.ValidationError(
+                    {"password": "This field is required."}
+                )
+            if not data.get("username"):
+                raise serializers.ValidationError(
+                    {"username": "This field is required."}
+                )
+        return data
 
     def create(self, validated_data):
         """Create a new user"""
