@@ -107,7 +107,6 @@ def create_user_via_email(
 
     data["email"] = kwargs.get("email", kwargs.get("details", {}).get("email"))
     serializer = UserSerializer(data=data, context=context)
-    username = data["username"]
 
     if not serializer.is_valid():
         raise RequirePasswordAndPersonalInfoException(
@@ -118,11 +117,12 @@ def create_user_via_email(
         )
 
     try:
-        created_user = serializer.save(username=username)
+        created_user = serializer.save()
     except IntegrityError:
         # 'email' and 'username' are the only unique fields that can be supplied by the user at this point, and a user
         # cannot reach this point of the auth flow without a unique email, so we know that the IntegrityError is caused
         # by the username not being unique.
+        username = data["username"]
         raise RequirePasswordAndPersonalInfoException(
             backend,
             current_partial,
