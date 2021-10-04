@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.12.0
+Version 0.12.0 (Released October 04, 2021)
 --------------
 
 - Added username whitespace trimming and case-insensitive unique validation
