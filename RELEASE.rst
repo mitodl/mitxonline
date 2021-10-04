@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.11.2
+Version 0.11.2 (Released October 04, 2021)
 --------------
 
 - Added headers to tab order
