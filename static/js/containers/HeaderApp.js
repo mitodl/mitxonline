@@ -5,11 +5,13 @@ import { connect } from "react-redux"
 import { connectRequest } from "redux-query"
 import { createStructuredSelector } from "reselect"
 
-import users, { currentUserSelector } from "../lib/queries/users"
-import { getStoredUserMessage } from "../lib/notificationsApi"
-import { addUserNotification } from "../actions"
-
 import Header from "../components/Header"
+import { addUserNotification } from "../actions"
+import users, { currentUserSelector } from "../lib/queries/users"
+import {
+  getStoredUserMessage,
+  removeStoredUserMessage
+} from "../lib/notificationsApi"
 
 import type { Store } from "redux"
 import type { CurrentUser } from "../flow/authTypes"
@@ -34,6 +36,7 @@ export class HeaderApp extends React.Component<Props, void> {
           }
         }
       })
+      removeStoredUserMessage()
     }
   }
 

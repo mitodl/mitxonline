@@ -9,7 +9,10 @@ import urljoin from "url-join"
 
 import users, { currentUserSelector } from "../lib/queries/users"
 import { routes } from "../lib/urls"
-import { getStoredUserMessage } from "../lib/notificationsApi"
+import {
+  getStoredUserMessage,
+  removeStoredUserMessage
+} from "../lib/notificationsApi"
 import { addUserNotification } from "../actions"
 
 import Header from "../components/Header"
@@ -46,6 +49,7 @@ export class App extends React.Component<Props, void> {
           }
         }
       })
+      removeStoredUserMessage()
     }
   }
 

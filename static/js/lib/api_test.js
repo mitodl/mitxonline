@@ -5,6 +5,7 @@ import sinon from "sinon"
 
 import {
   getCookie,
+  removeCookie,
   fetchJSONWithCSRF,
   fetchWithCSRF,
   csrfSafeMethod,
@@ -251,6 +252,28 @@ describe("api", function() {
     })
     it("returns null if cookie not found", () => {
       assert.equal(null, getCookie("unknown"))
+    })
+  })
+
+  describe("removeCookie", () => {
+    it("sets a cookie value to empty", () => {
+      document.cookie = "key=cookie"
+      removeCookie("key")
+      assert.equal(getCookie("key"), "")
+    })
+
+    it("handles multiple cookies correctly", () => {
+      document.cookie = "key1=cookie1"
+      document.cookie = "key2=cookie2"
+      removeCookie("key2")
+      assert.equal(getCookie("key1"), "cookie1")
+      assert.equal(getCookie("key2"), "")
+    })
+
+    it("does nothing if the cookie doesn't exist", () => {
+      document.cookie = "key=cookie"
+      removeCookie("unknown")
+      assert.equal(getCookie("key"), "cookie")
     })
   })
 
