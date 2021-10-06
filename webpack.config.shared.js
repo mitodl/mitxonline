@@ -7,7 +7,7 @@ module.exports = {
       root:         ["@babel/polyfill", "./static/js/entry/root"],
       header:       ["@babel/polyfill", "./static/js/entry/header"],
       style:        "./static/js/entry/style",
-      django:       ["@babel/polyfill", "./static/js/entry/django"],
+      django:       "./static/js/entry/django",
     },
     module: {
       rules: [
