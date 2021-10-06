@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.12.1
+--------------
+
+- bump webpack-bundle-tracker=0.4.3 to fix deep-extend alert (#230)
+- Fixed user notifications so they are only seen once
+
 Version 0.12.0 (Released October 04, 2021)
 --------------
 
