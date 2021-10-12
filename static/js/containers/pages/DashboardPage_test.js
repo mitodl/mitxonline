@@ -6,7 +6,7 @@ import moment from "moment"
 import DashboardPage, {
   DashboardPage as InnerDashboardPage
 } from "./DashboardPage"
-import { formatPrettyDate } from "../../lib/util"
+import { formatPrettyDateTimeAmPmTz } from "../../lib/util"
 import { shouldIf, isIf } from "../../lib/test_utils"
 import IntegrationTestHelper from "../../util/integration_test_helper"
 import { makeCourseRunEnrollment } from "../../factories/course"
@@ -109,7 +109,7 @@ describe("DashboardPage", () => {
     const enrolledItems = inner.find(".enrolled-item")
     const pastItemDesc = enrolledItems.at(0).find(".detail")
     const futureItemDesc = enrolledItems.at(1).find(".detail")
-    assert.equal(pastItemDesc.text(), `Active from ${formatPrettyDate(past)}`)
-    assert.equal(futureItemDesc.text(), `Starts - ${formatPrettyDate(future)}`)
+    assert.equal(pastItemDesc.text(), `Active from ${formatPrettyDateTimeAmPmTz(past)}`)
+    assert.equal(futureItemDesc.text(), `Starts - ${formatPrettyDateTimeAmPmTz(future)}`)
   })
 })

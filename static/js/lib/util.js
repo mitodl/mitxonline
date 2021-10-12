@@ -18,7 +18,7 @@ import _truncate from "lodash/truncate"
 import qs from "query-string"
 import { assert } from "chai"
 import * as R from "ramda"
-import moment from "moment"
+import moment from "moment-timezone"
 
 import type Moment from "moment"
 
@@ -143,6 +143,9 @@ export const formatPrettyDate = (momentDate: Moment) =>
 
 export const formatPrettyDateTimeAmPm = (momentDate: Moment) =>
   momentDate.format("LLL")
+
+export const formatPrettyDateTimeAmPmTz = (monthDate: Moment) =>
+  monthDate.tz("UTC").format("LLL z")
 
 export const firstItem = R.view(R.lensIndex(0))
 

@@ -63,6 +63,8 @@
     "mini-css-extract-plugin": "^0.5.0",
     "minimist": "^1.2.5",
     "mocha": "^4.0.1",
+    "moment": "^2.29.1",
+    "moment-timezone": "^0.5.33",
     "named-urls": "^1.4.0",
     "node-gyp": "^5.0.3",
     "node-sass": "^4.14.1",
