@@ -109,7 +109,13 @@ describe("DashboardPage", () => {
     const enrolledItems = inner.find(".enrolled-item")
     const pastItemDesc = enrolledItems.at(0).find(".detail")
     const futureItemDesc = enrolledItems.at(1).find(".detail")
-    assert.equal(pastItemDesc.text(), `Active from ${formatPrettyDateTimeAmPmTz(past)}`)
-    assert.equal(futureItemDesc.text(), `Starts - ${formatPrettyDateTimeAmPmTz(future)}`)
+    assert.equal(
+      pastItemDesc.text(),
+      `Active from ${formatPrettyDateTimeAmPmTz(past)}`
+    )
+    assert.equal(
+      futureItemDesc.text(),
+      `Starts - ${formatPrettyDateTimeAmPmTz(future)}`
+    )
   })
 })
