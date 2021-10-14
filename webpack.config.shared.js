@@ -26,13 +26,6 @@ module.exports = {
             options: '$'
           }]
         },
-        {
-          test: require.resolve('hls.js'),
-          use:  [{
-            loader:  'expose-loader',
-            options: 'Hls'
-          }]
-        }
       ]
     },
     resolve: {
