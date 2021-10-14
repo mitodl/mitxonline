@@ -20,33 +20,8 @@
                 <h1>{{ page.title }}</h1>
                 {# Description field contents are already rendered wrapped in a <p> tag #}
                 {{ page.description | richtext }}
-                {% if run %}
-                  {% if is_enrolled %}
-                    {% if run.courseware_url_path and can_access_edx_course %}
-                      <a href="{{ run.courseware_url }}" class="btn btn-primary btn-gradient-red highlight outline" target="_blank" rel="noopener noreferrer">
-                        Enrolled &#10003;
-                      </a>
-                    {% else %}
-                      <div class="btn btn-primary btn-gradient-red highlight outline">
-                        Enrolled &#10003;
-                      </div>
-                    {% endif %}
-                  {% else %}
-                    {% if sign_in_url %}
-                      <a href="{{ sign_in_url }}" class="btn btn-primary btn-gradient-red highlight">
-                        Enroll now
-                      </a>
-                    {% else %}
-                      <form action="/enrollments/" method="post">
-                        {% csrf_token %}
-                        <input type="hidden" name="run" value="{{ run.id }}" />
-                        <button type="submit" class="btn btn-primary btn-gradient-red highlight">
-                          Enroll now
-                        </button>
-                      </form>
-                    {% endif %}
-                  {% endif %}
-                {% endif %}
+                <input id="courseId" type="hidden" value="{{page.course.readable_id}}" />
+                <div id="productDetailEnrollment"></div>
               </div>
             </div>
             {% if page.video_url %}

@@ -8,6 +8,7 @@ import { createBrowserHistory } from "history"
 import configureStore from "../store/configureStore"
 import { AppTypeContext, MIXED_APP_CONTEXT } from "../contextDefinitions"
 import HeaderApp from "../containers/HeaderApp"
+import ProductDetailEnrollApp from "../containers/ProductDetailEnrollApp"
 // Object.entries polyfill
 import entries from "object.entries"
 
@@ -39,4 +40,25 @@ const renderHeader = () => {
   )
 }
 
+const renderEnrollSection = (courseId, element, reduxStore) => {
+  ReactDOM.render(
+    <AppContainer>
+      <Provider store={reduxStore}>
+        <ProductDetailEnrollApp courseId={courseId} />
+      </Provider>
+    </AppContainer>,
+    element
+  )
+}
+
 renderHeader()
+
+document.addEventListener("DOMContentLoaded", function() {
+  const enrollSectionEl = document.getElementById("productDetailEnrollment")
+  const courseIdEl = document.getElementById("courseId")
+  if (enrollSectionEl && courseIdEl) {
+    const productDetailStore = configureStore()
+    const courseId = courseIdEl.value
+    renderEnrollSection(courseId, enrollSectionEl, productDetailStore)
+  }
+})

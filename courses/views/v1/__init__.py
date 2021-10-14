@@ -12,7 +12,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from courses.api import create_run_enrollments, deactivate_run_enrollment
+from courses.api import (
+    create_run_enrollments,
+    deactivate_run_enrollment,
+    get_user_relevant_course_run_qset,
+)
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import Course, CourseRun, Program, CourseRunEnrollment
 from courses.serializers import (
@@ -57,7 +61,23 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for CourseRuns"""
 
     serializer_class = CourseRunSerializer
-    queryset = CourseRun.objects.all()
+
+    def get_queryset(self):
+        relevant_to = self.request.query_params.get("relevant_to", None)
+        if relevant_to:
+            course = Course.objects.filter(readable_id=relevant_to).first()
+            if course:
+                return get_user_relevant_course_run_qset(course, self.request.user)
+            else:
+                return CourseRun.objects.none()
+        else:
+            return CourseRun.objects.all()
+
+    def get_serializer_context(self):
+        added_context = {}
+        if self.request.query_params.get("relevant_to", None):
+            added_context["include_enrolled_flag"] = True
+        return {**super().get_serializer_context(), **added_context}
 
 
 def _validate_enrollment_post_request(

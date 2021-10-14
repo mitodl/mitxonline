@@ -17,6 +17,7 @@ from courses.factories import (
     ProgramFactory,
     BlockedCountryFactory,
 )
+from courses.models import CourseRun
 from courses.serializers import (
     CourseRunSerializer,
     CourseSerializer,
@@ -168,6 +169,37 @@ def test_get_course_runs(user_drf_client, course_runs):
     course_runs_data = sorted(course_runs_data, key=op.itemgetter("id"))
     for course_run, course_run_data in zip(course_runs, course_runs_data):
         assert course_run_data == CourseRunSerializer(course_run).data
+
+
+@pytest.mark.parametrize("is_enrolled", [True, False])
+def test_get_course_runs_relevant(
+    mocker, user_drf_client, course_runs, user, is_enrolled
+):
+    """A GET request for course runs with a `relevant_to` parameter should return user-relevant course runs"""
+    course_run = course_runs[0]
+
+    if is_enrolled:
+        CourseRunEnrollmentFactory.create(user=user, run=course_run, edx_enrolled=True)
+
+    patched_run_qset = mocker.patch(
+        "courses.views.v1.get_user_relevant_course_run_qset",
+        return_value=CourseRun.objects.filter(id=course_run.id),
+    )
+    resp = user_drf_client.get(
+        f"{reverse('course_runs_api-list')}?relevant_to={course_run.course.readable_id}"
+    )
+    patched_run_qset.assert_called_once_with(course_run.course, user)
+    course_run_data = resp.json()[0]
+    assert course_run_data["is_enrolled"] == is_enrolled
+
+
+def test_get_course_runs_relevant_missing(user_drf_client):
+    """A GET request for course runs with an invalid `relevant_to` query parameter should return empty results"""
+    resp = user_drf_client.get(
+        f"{reverse('course_runs_api-list')}?relevant_to=invalid+course+id"
+    )
+    course_runs_data = resp.json()
+    assert course_runs_data == []
 
 
 def test_get_course_run(user_drf_client, course_runs):
