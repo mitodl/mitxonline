@@ -145,7 +145,7 @@ export const formatPrettyDateTimeAmPm = (momentDate: Moment) =>
   momentDate.format("LLL")
 
 export const formatPrettyDateTimeAmPmTz = (monthDate: Moment) =>
-  monthDate.tz("UTC").format("LLL z")
+  monthDate.tz(moment.tz.guess()).format("LLL z")
 
 export const firstItem = R.view(R.lensIndex(0))
 
