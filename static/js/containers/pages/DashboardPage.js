@@ -18,7 +18,7 @@ import {
 } from "../../lib/queries/enrollment"
 import { currentUserSelector } from "../../lib/queries/users"
 import { isLinkableCourseRun } from "../../lib/courseApi"
-import { formatPrettyDate, parseDateString } from "../../lib/util"
+import { formatPrettyDateTimeAmPmTz, parseDateString } from "../../lib/util"
 import { routes } from "../../lib/urls"
 
 import type { RunEnrollment } from "../../flow/courseTypes"
@@ -49,7 +49,7 @@ export class DashboardPage extends React.Component<DashboardPageProps, void> {
     if (enrollment.run.start_date) {
       const now = moment()
       startDate = parseDateString(enrollment.run.start_date)
-      const formattedStartDate = formatPrettyDate(startDate)
+      const formattedStartDate = formatPrettyDateTimeAmPmTz(startDate)
       startDateDescription = now.isBefore(startDate) ? (
         <span>Starts - {formattedStartDate}</span>
       ) : (
