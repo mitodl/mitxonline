@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.12.2
+Version 0.12.2 (Released October 19, 2021)
 --------------
 
 - fix: remove multiple instances loading of polyfill (#248)
