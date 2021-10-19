@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.12.3
+--------------
+
+- Show dates, times, and time zones on dashboard (#254)
+
 Version 0.12.2 (Released October 19, 2021)
 --------------
 
