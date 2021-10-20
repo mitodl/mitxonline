@@ -63,7 +63,11 @@ describe("RegisterDetailsForm", () => {
       "0123456789012345678901234567890",
       "Username must be at most 30 characters"
     ],
-    ["username", "ábc-dèf-123", null],
+    [
+      "username",
+      "ábc-dèf-123",
+      "Username can only contain letters, numbers and the following characters: @_+-"
+    ],
     ["legal_address.first_name", "", "First Name is a required field"],
     ["legal_address.last_name", "", "Last Name is a required field"]
   ].forEach(([name, value, errorMessage]) => {

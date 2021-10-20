@@ -22,6 +22,10 @@ export const usernameFieldValidation = yup
   .label("Username")
   .trim()
   .required()
+  .matches(
+    /^[A-Za-z0-9.@_+-]+$/,
+    "Username can only contain letters, numbers and the following characters: @_+-"
+  )
   .min(3)
   .max(USERNAME_LENGTH)
 

@@ -140,7 +140,7 @@ def test_update_user_email(
     "new_username, expect_valid, expect_saved_username",
     [
         [f"{USERNAME}-1", True, f"{USERNAME}-1"],
-        [" My-Üsérname 1 ", True, "My-Üsérname 1"],
+        [" My-Üsérname 1 ", False, "My-Üsérname 1"],
         ["my>usern@me>1", False, None],
         [f"   {USERNAME.upper()}  ", False, None],
     ],
