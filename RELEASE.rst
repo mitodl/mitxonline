@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.12.4
+--------------
+
+- removed unused depedencies and imports
+
 Version 0.12.3 (Released October 20, 2021)
 --------------
 
