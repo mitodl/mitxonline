@@ -220,6 +220,7 @@ def test_serialize_course_run_enrollments(settings, receipts_enabled):
     serialized_data = CourseRunEnrollmentSerializer(course_run_enrollment).data
     assert serialized_data == {
         "run": CourseRunDetailSerializer(course_run_enrollment.run).data,
+        "id": course_run_enrollment.id,
     }
 
 

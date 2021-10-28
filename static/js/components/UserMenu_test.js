@@ -20,7 +20,7 @@ describe("UserMenu component", () => {
   it("has the correct class applied to menu items in the mobile view", () => {
     assert.lengthOf(
       shallow(<UserMenu currentUser={user} useScreenOverlay={true} />).find(
-        ".authenticated-menu"
+        "ul li"
       ),
       4
     )

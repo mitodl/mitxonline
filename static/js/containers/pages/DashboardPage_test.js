@@ -2,10 +2,12 @@
 // @flow
 import { assert } from "chai"
 import moment from "moment"
+import sinon from "sinon"
 
 import DashboardPage, {
   DashboardPage as InnerDashboardPage
 } from "./DashboardPage"
+import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../../constants"
 import { formatPrettyDateTimeAmPmTz } from "../../lib/util"
 import { shouldIf, isIf } from "../../lib/test_utils"
 import IntegrationTestHelper from "../../util/integration_test_helper"
@@ -117,5 +119,55 @@ describe("DashboardPage", () => {
       futureItemDesc.text(),
       `Starts - ${formatPrettyDateTimeAmPmTz(future)}`
     )
+  })
+  ;[[true, 204], [false, 400]].forEach(([success, returnedStatusCode]) => {
+    it(`allows users to unenroll and handles ${returnedStatusCode} response`, async () => {
+      window.scrollTo = sinon.stub()
+      const enrollmentIndex = 0
+      const enrollment = userEnrollments[enrollmentIndex]
+      const expectedUserMsgProps = success
+        ? {
+          type: ALERT_TYPE_SUCCESS,
+          msg:  `You have been successfully unenrolled from ${
+            enrollment.run.title
+          }.`
+        }
+        : {
+          type: ALERT_TYPE_DANGER,
+          msg:  `Something went wrong with your request to unenroll. Please contact support at ${
+            SETTINGS.support_email
+          }.`
+        }
+      helper.handleRequestStub
+        .withArgs(`/api/enrollments/${enrollment.id}/`)
+        .returns({
+          status: returnedStatusCode
+        })
+
+      const { inner, store } = await renderPage()
+      const enrolledItem = inner.find(".enrolled-item").at(enrollmentIndex)
+      const unenrollBtn = enrolledItem.find(".dropdown-menu button").at(0)
+      assert.isTrue(unenrollBtn.exists())
+      await unenrollBtn.prop("onClick")()
+
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        `/api/enrollments/${enrollment.id}/`,
+        "DELETE",
+        {
+          body:        undefined,
+          credentials: undefined,
+          headers:     { "X-CSRFTOKEN": null }
+        }
+      )
+      assert.deepEqual(store.getState().ui.userNotifications, {
+        "unenroll-status": {
+          type:  expectedUserMsgProps.type,
+          props: {
+            text: expectedUserMsgProps.msg
+          }
+        }
+      })
+    })
   })
 })

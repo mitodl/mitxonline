@@ -130,6 +130,12 @@ a.link-button {
   }
 }
 
+button.unstyled {
+  border: none;
+  background-color: inherit;
+  padding: 0;
+}
+
 .link-light-blue {
   &, &:hover, &:visited, &:active {
     color: $light-blue;
@@ -178,37 +184,6 @@ a.link-button {
   box-shadow: -4px 5px 8px 0px rgba(204,204,204,0.8);
 }
 
-.profile-container {
-  @include media-breakpoint-down(sm)  {
-    padding: 20px 40px;
-  }
-
-  @include media-breakpoint-down(xs)  {
-    padding: 20px 20px;
-  }
-
-  background-color: $very-light-gray;
-  max-width: 840px;
-  margin: auto;
-
-  .auth-form {
-    .row {
-      margin-top: 20px;
-    }
-  }
-}
-
-.profile {
-  background: url(/static/images/user.svg) left no-repeat;
-  height: 120px;
-  width: 120px;
-}
-
-.dotted {
-  border-bottom: 2px dashed #8a8b8c;
-  margin-top: 25px;
-}
-
 .card-listing {
   padding: 0;
   margin: 0 -22px;
@@ -230,5 +205,48 @@ a.link-button {
   &:hover {
     border-color: $brand-button-bg;
     box-shadow: 0 2px 15px 4px rgba(0, 0, 0, 0.16);
+  }
+}
+
+.profile {
+  background: url(/static/images/user.svg) left no-repeat;
+  height: 120px;
+  width: 120px;
+}
+
+.dotted {
+  border-bottom: 2px dashed #8a8b8c;
+  margin-top: 25px;
+}
+
+ul.dropdown-menu {
+  box-shadow: 0 2px 4px 0 rgba(0,0,0,0.5), 0 13px 11px 8px rgba(0,0,0,0.12);
+  border-color: $white-smoke;
+  border-radius: 0;
+  padding: 10px 15px;
+
+  li.dropdown-item {
+    display: block;
+    padding: 7px 0;
+    font-size: 16px;
+    line-height: 14px;
+
+    &:active,
+    &:hover {
+      background-color: white;
+    }
+
+    a, button.unstyled {
+      display: block;
+      width: 100%;
+      color: $black;
+      font-weight: 600;
+      text-align: left;
+      text-decoration: none;
+
+      &:hover {
+        color: $primary;
+      }
+    }
   }
 }

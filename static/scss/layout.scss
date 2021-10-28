@@ -33,23 +33,6 @@ body {
   min-height: 100vh;
   flex-direction: column;
 
-  header {
-    background-color: #ffffff;
-    box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14);
-
-    .full-screen-menu {
-      display: block;
-    }
-
-    .mobile-menu {
-      @include media-breakpoint-down(sm) {
-        display: block;
-      }
-
-      display: none;
-    }
-  }
-
   .main-panel {
     flex: 1;
     min-height: calc(100vh - 351px);

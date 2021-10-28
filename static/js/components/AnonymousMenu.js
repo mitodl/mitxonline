@@ -20,7 +20,7 @@ const AnonymousMenu = ({ useScreenOverlay }: Props) => {
   listItemProps = useScreenOverlay ? overlayListItemProps : null
   let identifierPostfix = useScreenOverlay ? "Mobile" : "Desktop"
   return (
-    <ul className="menu-holder">
+    <ul>
       <li {...listItemProps || {}}>
         <MixedLink
           id={"login".concat(identifierPostfix)}

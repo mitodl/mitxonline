@@ -77,7 +77,7 @@ html {
     text-decoration: none;
 
     &:after {
-      font-size: 24px;
+      font-size: $material-icon-height;
       font-family: Material Icons;
       content: "arrow_circle_up";
       margin-left: 5px;
