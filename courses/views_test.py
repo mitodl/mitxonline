@@ -9,6 +9,7 @@ from django.urls import reverse
 from requests import HTTPError
 from rest_framework import status
 
+from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -343,6 +344,60 @@ def test_user_enrollments_create_invalid(user_drf_client, user):
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     assert resp.json() == {"errors": {"run_id": f"Invalid course run id: 1234"}}
+
+
+@pytest.mark.parametrize(
+    "deactivate_fail, exp_success, exp_status_code",
+    [
+        [False, True, status.HTTP_204_NO_CONTENT],
+        [True, False, status.HTTP_400_BAD_REQUEST],
+    ],
+)
+def test_user_enrollment_delete(
+    mocker,
+    settings,
+    user_drf_client,
+    user,
+    deactivate_fail,
+    exp_success,
+    exp_status_code,
+):
+    """
+    The user enrollment view DELETE handler should unenroll in edX and deactivate the local enrollment record, and
+    return the appropriate status code depending on the success of the unenrollment.
+    """
+    settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user, active=True, change_status=None
+    )
+    patched_deactivate = mocker.patch(
+        "courses.views.v1.deactivate_run_enrollment",
+        return_value=(None if deactivate_fail else enrollment),
+    )
+    resp = user_drf_client.delete(
+        reverse("user-enrollments-api-detail", kwargs={"pk": enrollment.id})
+    )
+    patched_deactivate.assert_called_once_with(
+        enrollment,
+        change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
+        keep_failed_enrollments=False,
+    )
+    assert resp.status_code == exp_status_code
+
+
+def test_user_enrollment_delete_other_fail(mocker, settings, user_drf_client, user):
+    """
+    The user enrollment view DELETE handler should reject a request to deactivate another user's enrollment
+    """
+    other_user_enrollment = CourseRunEnrollmentFactory.create(
+        user__username="other-user", active=True, change_status=None
+    )
+    patched_deactivate = mocker.patch("courses.views.v1.deactivate_run_enrollment")
+    resp = user_drf_client.delete(
+        reverse("user-enrollments-api-detail", kwargs={"pk": other_user_enrollment.id})
+    )
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+    patched_deactivate.assert_not_called()
 
 
 def test_create_enrollments(mocker, user_client):

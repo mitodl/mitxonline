@@ -18,11 +18,10 @@ const desktopMenuContainerProps = {
 }
 
 const desktopUListProps = {
-  className: "dropdown-menu"
+  className: "dropdown-menu dropdown-menu-right"
 }
 
 const overlayListItemProps = {
-  className:     "authenticated-menu",
   "data-toggle": "collapse",
   "data-target": "#nav"
 }

@@ -1,10 +1,12 @@
 // sass-lint:disable mixins-before-declarations
 
-.header-holder {
-  padding: 10px 0;
+header.site-header {
   box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14);
+  background-color: $white;
 
   .navbar {
+    display: flex;
+    justify-content: space-between;
     padding: 0;
 
     @include media-breakpoint-down(sm) {
@@ -17,123 +19,117 @@
   }
 }
 
-.link-section.nowrap.login {
-  ul {
+.full-screen-menu {
+  display: block;
 
-    @include media-breakpoint-down(md) {
-      text-align: right;
-
-      li {
-        padding: 0;
-
-        a {
-          padding: 5px 0;
-        }
-
-        .dropdown-toggle {
-          padding-right: 0;
-        }
-      }
-    }
+  @include media-breakpoint-down(sm) {
+    display: none;
   }
-}
 
-.navbar-collapse {
-  margin: 0;
+  ul {
+    display: flex;
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
 
-  li {
-    letter-spacing: normal;
-    display: inline-block;
-    vertical-align: top;
-    font-size: 16px;
-    line-height: 22px;
-    font-weight: 600;
-    padding: 0 0 0 25px;
+    li {
+      font-weight: 600;
+      padding: 0 0 0 25px;
 
-    a {
-      color: black;
-      text-decoration: none;
-      display: block;
+      a {
+        color: black;
+        text-decoration: none;
+        display: block;
 
-      &:hover {
-        color: $primary;
-      }
+        &:hover {
+          color: $primary;
+        }
 
-      &.simple {
-        padding: 5px 16px;
-      }
+        &.simple {
+          padding: 5px 16px;
+        }
 
-      &.button {
-        @include media-breakpoint-up(md) {
-          background: $primary;
-          color: white;
-          border-radius: 3px;
-          box-shadow: inset 0 0 2px 0 rgba(255, 255, 255, 0.57);
+        &.button {
+          @include media-breakpoint-up(md) {
+            background: $primary;
+            color: white;
+            border-radius: 3px;
+            box-shadow: inset 0 0 2px 0 rgba(255, 255, 255, 0.57);
 
-          &:hover {
-            background: black;
+            &:hover {
+              background: black;
+            }
           }
         }
       }
     }
   }
+}
 
-  li[data-toggle="collapse"] {
-    display: none;
-  }
-
-  &.collapsing,
-  &.show {
-    display: flex;
-    @include media-breakpoint-down(sm) {
-      display: block;
-    }
-  }
+.mobile-menu {
+  display: none;
 
   @include media-breakpoint-down(sm) {
-    display: none;
-    position: absolute;
-    padding-top: 70px;
-    background: rgba(0, 0, 0, 0.91);
-    left: 0;
-    right: 0;
-    bottom: -10px;
-    top: 55px;
-    height: auto !important;
-    z-index: 999;
+    display: block;
+  }
 
-    li {
-      display: none;
-    }
+  li[data-toggle="collapse"] {
+    display: block;
+    padding: 10px 0;
+    margin: 0 auto;
+    max-width: 170px;
 
-    li[data-toggle="collapse"] {
-      display: block;
-      padding: 10px 0;
-      margin: 0 auto;
-      max-width: 170px;
-      text-align: left;
+    a {
+      color: white;
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 25px;
+      padding: 0;
+      margin-top: 5px;
 
-      a {
+      &:hover {
         color: white;
-        font-size: 18px;
-        font-weight: 600;
-        line-height: 25px;
-        padding: 0;
-        margin-top: 5px;
-
-        &:hover {
-          color: white;
-        }
       }
     }
   }
 }
 
-.authenticated-menu {
-  display: none !important;
+.user-menu-overlay {
+  display: none;
+  margin: 0;
+
+  &.collapsing,
+  &.show {
+    @include media-breakpoint-down(sm) {
+      display: block;
+    }
+  }
+
+  @include media-breakpoint-up(md) {
+    display: block;
+
+    &.collapse {
+      display: flex;
+    }
+  }
 
   @include media-breakpoint-down(sm) {
-    display: block !important;
+    position: absolute;
+    padding-top: 70px;
+    left: 0;
+    right: 0;
+    bottom: -10px;
+    height: auto !important;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.91);
+  }
+
+  @include media-breakpoint-between(sm, md) {
+    top: 66px;
+  }
+
+  @include media-breakpoint-down(xs) {
+    top: 50px;
   }
 }
 
@@ -229,10 +225,4 @@
       transform: none;
     }
   }
-}
-
-ul.menu-holder {
-  padding: 0;
-  margin: 0;
-  list-style: none;
 }

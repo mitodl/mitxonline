@@ -1,12 +1,13 @@
 // @flow
 import { nthArg, objOf, pathOr } from "ramda"
 
+import { getCsrfOptions } from "./util"
+
 import type {
   CurrentUser,
   Country,
   UserProfileForm
 } from "../../flow/authTypes"
-import { getCookie } from "../api"
 
 export const currentUserSelector = (state: any): ?CurrentUser =>
   state.entities.currentUser
@@ -23,10 +24,8 @@ const updateResult = {
 
 const DEFAULT_OPTIONS = {
   options: {
-    method:  "PATCH",
-    headers: {
-      "X-CSRFTOKEN": getCookie("csrftoken")
-    }
+    ...getCsrfOptions(),
+    method: "PATCH"
   }
 }
 

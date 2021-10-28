@@ -2,15 +2,9 @@
 import { pathOr, nthArg } from "ramda"
 
 import { FLOW_LOGIN, FLOW_REGISTER } from "../auth"
+import { getCsrfOptions } from "./util"
 
-import { getCookie } from "../api"
-
-import type {
-  AuthResponse,
-  LegalAddress,
-  ProfileForm
-} from "../../flow/authTypes"
-
+import type { AuthResponse, LegalAddress } from "../../flow/authTypes"
 import type { updateEmailResponse } from "../../flow/authTypes"
 
 export const authSelector = (state: any) => state.entities.auth
@@ -85,21 +79,15 @@ export default {
     url:     "/api/password_reset/",
     body:    { email },
     options: {
-      method:  "POST",
-      headers: {
-        "X-CSRFTOKEN": getCookie("csrftoken")
-      }
+      ...getCsrfOptions(),
+      method: "POST"
     }
   }),
 
   changePasswordMutation: (oldPassword: string, newPassword: string) => ({
     url:     "/api/set_password/",
-    options: {
-      headers: {
-        "X-CSRFTOKEN": getCookie("csrftoken")
-      }
-    },
-    body: {
+    options: getCsrfOptions(),
+    body:    {
       current_password: oldPassword,
       new_password:     newPassword
     }
@@ -119,20 +107,16 @@ export default {
       uid
     },
     options: {
-      method:  "POST",
-      headers: {
-        "X-CSRFTOKEN": getCookie("csrftoken")
-      }
+      ...getCsrfOptions(),
+      method: "POST"
     }
   }),
 
   changeEmailMutation: (newEmail: string, password: string) => ({
     url:     "/api/change-emails/",
     options: {
-      method:  "POST",
-      headers: {
-        "X-CSRFTOKEN": getCookie("csrftoken")
-      }
+      ...getCsrfOptions(),
+      method: "POST"
     },
     body: {
       new_email: newEmail,
@@ -151,10 +135,8 @@ export default {
         next
     },
     options: {
-      method:  "PATCH",
-      headers: {
-        "X-CSRFTOKEN": getCookie("csrftoken")
-      }
+      ...getCsrfOptions(),
+      method: "PATCH"
     },
     body: {
       confirmed: true

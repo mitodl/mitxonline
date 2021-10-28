@@ -15,44 +15,20 @@
   vertical-align: unset;
 }
 
-.dropdown-menu {
-  box-shadow: 0 2px 4px 0 rgba(0,0,0,0.5), 0 13px 11px 8px rgba(0,0,0,0.12);
-  border-color: $white-smoke;
-  border-radius: 0px;
-  right: 0px;
-  left: unset;
+.user-menu .dropdown-menu {
+  margin-top: 27px;
   padding: 20px 25px;
-  margin-top: 22px;
+  display: none;
 
-  .dropdown-item {
-    display: flex;
-    align-items: center;
-    font-size: 16px;
-    font-weight: 500;
-    color: $black;
-    line-height: 14px;
-    padding: 7px 0px;
-
-    .dropdown-icon {
-      margin-right: 20px;
-    }
-
-    &:active,
-    &:hover {
-      background-color: white;
-    }
-
+  &.show {
+    display: block;
   }
 }
 
 .user-menu.dropdown {
-
   @include media-breakpoint-down(sm) {
     display: none;
   }
-
-  padding-left: 15px;
-  padding-right: 15px;
 
   &.show {
     color: $primary;

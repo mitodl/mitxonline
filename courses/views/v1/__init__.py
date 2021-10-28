@@ -3,14 +3,17 @@ import logging
 from typing import Tuple, Optional, Union
 
 from django.contrib.auth.models import User
-from django.http import HttpResponseRedirect, HttpResponse, HttpRequest
+from django.http import HttpResponseRedirect, HttpResponse
 from django.urls import reverse
-from rest_framework import mixins, viewsets
+from django.conf import settings
+from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
+from rest_framework.response import Response
 
-from courses.api import create_run_enrollments
+from courses.api import create_run_enrollments, deactivate_run_enrollment
+from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import Course, CourseRun, Program, CourseRunEnrollment
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
@@ -27,7 +30,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_BLOCKED,
 )
 from main.utils import encode_json_cookie_value
-from openedx.api import sync_enrollments_with_edx
+from openedx.api import sync_enrollments_with_edx, unenroll_edx_course_run
 
 log = logging.getLogger(__name__)
 
@@ -126,7 +129,10 @@ def create_enrollment_view(request):
 
 
 class UserEnrollmentsApiViewSet(
-    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
 ):
     """API view set for user enrollments"""
 
@@ -153,3 +159,14 @@ class UserEnrollmentsApiViewSet(
             except Exception:  # pylint: disable=broad-except
                 log.exception("Failed to sync user enrollments with edX")
         return super().list(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        enrollment = self.get_object()
+        deactivated_enrollment = deactivate_run_enrollment(
+            enrollment,
+            change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
+            keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
+        )
+        if deactivated_enrollment is None:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_204_NO_CONTENT)

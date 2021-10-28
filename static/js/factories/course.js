@@ -19,6 +19,7 @@ import type {
 } from "../flow/courseTypes"
 
 const genCourseRunId = incrementer()
+const genEnrollmentId = incrementer()
 const genCoursewareId = incrementer()
 const genRunTagNumber = incrementer()
 const genReadableId = incrementer()
@@ -54,5 +55,7 @@ export const makeCourseRunDetail = (): CourseRunDetail => {
 }
 
 export const makeCourseRunEnrollment = (): CourseRunEnrollment => ({
+  // $FlowFixMe
+  id:  genEnrollmentId.next().value,
   run: makeCourseRunDetail()
 })

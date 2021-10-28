@@ -27,7 +27,7 @@ $featureImgMobileHeight: 223px;
       text-decoration: underline;
     }
 
-    @include media-breakpoint-up(sm) {
+    @include media-breakpoint-up(md) {
       .row {
         height: $featureImgHeight;
 
@@ -38,7 +38,7 @@ $featureImgMobileHeight: 223px;
     }
 
     .img-container {
-      @include media-breakpoint-down(xs)  {
+      @include media-breakpoint-down(sm)  {
         width: 100%;
         height: $featureImgMobileHeight;
       }
@@ -62,6 +62,11 @@ $featureImgMobileHeight: 223px;
         color: $primary;
       }
     }
+  }
+
+  button.dot-menu {
+    // Setting height so the button element doesn't expand to cover the full height of the row
+    height: $material-icon-height;
   }
 }
 

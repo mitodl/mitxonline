@@ -22,5 +22,6 @@ export type CourseRunDetail = BaseCourseRun & {
 }
 
 export type RunEnrollment = {
-  run: CourseRunDetail
+  run: CourseRunDetail,
+  id: number
 }
