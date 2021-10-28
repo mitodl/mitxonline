@@ -27,6 +27,10 @@ def test_get_js_settings(settings, rf):
     settings.EMAIL_SUPPORT = "support@text.com"
     settings.USE_WEBPACK_DEV_SERVER = False
     settings.RECAPTCHA_SITE_KEY = "fake_key"
+    settings.ZENDESK_CONFIG = {
+        "HELP_WIDGET_ENABLED": False,
+        "HELP_WIDGET_KEY": "fake_key",
+    }
 
     request = rf.get("/")
 
@@ -39,6 +43,7 @@ def test_get_js_settings(settings, rf):
         "recaptchaKey": settings.RECAPTCHA_SITE_KEY,
         "support_email": settings.EMAIL_SUPPORT,
         "site_name": settings.SITE_NAME,
+        "zendesk_config": {"help_widget_enabled": False, "help_widget_key": "fake_key"},
     }
 
 

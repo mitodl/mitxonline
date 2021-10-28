@@ -101,6 +101,19 @@ SECURE_SSL_HOST = get_string(
     "Overrides value from HOST header.",
 )
 
+ZENDESK_CONFIG = {
+    "HELP_WIDGET_ENABLED": get_bool(
+        name="ZENDESK_HELP_WIDGET_ENABLED",
+        default=True,
+        description="Enabled/disable state for Zendesk web help widget.",
+    ),
+    "HELP_WIDGET_KEY": get_string(
+        name="ZENDESK_HELP_WIDGET_KEY",
+        default="d686fe05-ddda-4e0c-8bcc-77f3fd03a32d",
+        description="Represents the key for Zendesk web help widget.",
+    ),
+}
+
 WEBPACK_LOADER = {
     "DEFAULT": {
         "CACHE": not DEBUG,

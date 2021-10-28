@@ -25,6 +25,9 @@
     {% block extrahead %}
     {% endblock %}
     {% endspaceless %}
+    {% if zendesk_config.help_widget_enabled %}
+      <script id="ze-snippet" src="https://static.zdassets.com/ekr/snippet.js?key={{zendesk_config.help_widget_key}}"> </script>
+    {% endif %}
   </head>
   <body class="{% block bodyclass %}{% endblock %}">
   <div class="main-panel">
