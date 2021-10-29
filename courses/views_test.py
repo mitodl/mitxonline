@@ -5,6 +5,7 @@ Tests for course views
 import operator as op
 
 import pytest
+from django.db.models import Count, Q
 from django.urls import reverse
 from requests import HTTPError
 from rest_framework import status
@@ -177,19 +178,30 @@ def test_get_course_runs_relevant(
 ):
     """A GET request for course runs with a `relevant_to` parameter should return user-relevant course runs"""
     course_run = course_runs[0]
+    user_enrollments = Count(
+        "enrollments",
+        filter=Q(
+            enrollments__user=user,
+            enrollments__active=True,
+            enrollments__edx_enrolled=True,
+        ),
+    )
+    patched_run_qset = mocker.patch(
+        "courses.views.v1.get_user_relevant_course_run_qset",
+        return_value=CourseRun.objects.filter(id=course_run.id)
+        .annotate(user_enrollments=user_enrollments)
+        .order_by("-user_enrollments", "enrollment_start"),
+    )
 
     if is_enrolled:
         CourseRunEnrollmentFactory.create(user=user, run=course_run, edx_enrolled=True)
 
-    patched_run_qset = mocker.patch(
-        "courses.views.v1.get_user_relevant_course_run_qset",
-        return_value=CourseRun.objects.filter(id=course_run.id),
-    )
     resp = user_drf_client.get(
         f"{reverse('course_runs_api-list')}?relevant_to={course_run.course.readable_id}"
     )
     patched_run_qset.assert_called_once_with(course_run.course, user)
     course_run_data = resp.json()[0]
+
     assert course_run_data["is_enrolled"] == is_enrolled
 
 
