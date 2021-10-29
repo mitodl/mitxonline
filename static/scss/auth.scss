@@ -3,7 +3,7 @@
 
   h1 {
     @include media-breakpoint-down(xs) {
-      font-size: 28px;
+      font-size: 30px;
     }
 
     font-size: 32px;
