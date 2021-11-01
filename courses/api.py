@@ -11,6 +11,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q, Count
+from django.db.models.query import QuerySet
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
@@ -56,13 +57,11 @@ UserEnrollments = namedtuple(
 )
 
 
-def get_user_relevant_course_run(
+def get_user_relevant_course_run_qset(
     course: Course, user: Optional[User], now: Optional[datetime] = None
-) -> CourseRun:
+) -> QuerySet:
     """
-    For a given Course, finds the course run that is the most relevant to the user.
-    For anonymous users, this means the soonest enrollable course run.
-    For logged-in users, this means an active course run that they're enrolled in, or the soonest enrollable course run.
+    Returns a QuerySet of relevant course runs
     """
     now = now or now_in_utc()
     run_qset = (
@@ -82,11 +81,11 @@ def get_user_relevant_course_run(
         run_qset = run_qset.annotate(user_enrollments=user_enrollments).order_by(
             "-user_enrollments", "enrollment_start"
         )
-        runs = (
-            run
-            for run in run_qset
-            if run.user_enrollments > 0
-            or (run.enrollment_end is None or run.enrollment_end > now)
+
+        runs = run_qset.filter(
+            Q(user_enrollments__gt=0)
+            | Q(enrollment_end=None)
+            | Q(enrollment_end__gt=now)
         )
     else:
         runs = (
@@ -94,6 +93,18 @@ def get_user_relevant_course_run(
             .filter(Q(enrollment_end=None) | Q(enrollment_end__gt=now))
             .order_by("enrollment_start")
         )
+    return runs
+
+
+def get_user_relevant_course_run(
+    course: Course, user: Optional[User], now: Optional[datetime] = None
+) -> CourseRun:
+    """
+    For a given Course, finds the course run that is the most relevant to the user.
+    For anonymous users, this means the soonest enrollable course run.
+    For logged-in users, this means an active course run that they're enrolled in, or the soonest enrollable course run.
+    """
+    runs = get_user_relevant_course_run_qset(course, user, now)
     run = first_or_none(runs)
     return run
 

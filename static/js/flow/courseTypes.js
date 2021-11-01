@@ -17,6 +17,11 @@ export type BaseCourseRun = {
   id: number
 }
 
+export type EnrollmentFlaggedCourseRun = BaseCourseRun & {
+  expiration_date: ?string,
+  is_enrolled: boolean
+}
+
 export type CourseRunDetail = BaseCourseRun & {
   course: CourseDetail
 }

@@ -76,6 +76,15 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         model = models.CourseRun
         fields = BaseCourseRunSerializer.Meta.fields
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if self.context and self.context.get("include_enrolled_flag"):
+            return {
+                **data,
+                **{"is_enrolled": getattr(instance, "user_enrollments", 0) > 0},
+            }
+        return data
+
 
 class CourseSerializer(serializers.ModelSerializer):
     """Course model serializer - also serializes child course runs"""
