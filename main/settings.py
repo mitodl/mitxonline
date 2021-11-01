@@ -9,7 +9,6 @@ from datetime import timedelta
 from urllib.parse import urljoin, urlparse
 
 import dj_database_url
-import pytz
 from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common.envs import (
@@ -18,6 +17,7 @@ from mitol.common.envs import (
     get_features,
     get_int,
     get_string,
+    import_settings_modules,
 )
 
 # wildcard import boilerplate digital credentials settings
@@ -172,6 +172,7 @@ INSTALLED_APPS = (
     "mitol.common.apps.CommonApp",
     # "mitol.digitalcredentials.apps.DigitalCredentialsApp",
     "mitol.mail.apps.MailApp",
+    "mitol.authentication.apps.TransitionalAuthenticationApp"
     # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
 )
 # Only include the seed data app if this isn't running in prod
@@ -826,20 +827,12 @@ REST_FRAMEWORK = {
 # (see: http://djoser.readthedocs.io/en/stable/settings.html#password-reset-confirm-url)
 PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"
 
-# Djoser library settings (see: http://djoser.readthedocs.io/en/stable/settings.html)
-DJOSER = {
-    "PASSWORD_RESET_CONFIRM_URL": PASSWORD_RESET_CONFIRM_URL,
-    "SET_PASSWORD_RETYPE": False,
-    "LOGOUT_ON_PASSWORD_CHANGE": False,
-    "PASSWORD_RESET_CONFIRM_RETYPE": True,
-    "PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND": False,
-    "EMAIL": {"password_reset": "authentication.views.CustomPasswordResetEmail"},
-    "SERIALIZERS": {
-        "password_reset": "authentication.serializers.CustomSendEmailResetSerializer"
-    },
-}
-
 # ol-django configuration
+
+import_settings_modules(
+    globals(),
+    "mitol.authentication.settings.djoser_settings"
+)
 
 # mitol-django-common
 MITOL_COMMON_USER_FACTORY = "users.factories.UserFactory"
@@ -856,6 +849,10 @@ MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the leg
     description="Enable the mitol-mail email debugger",
     dev_only=True,
 )
+
+#mitol-django-authentication
+MITOL_AUTHENTICATION_FROM_EMAIL = MAILGUN_FROM_EMAIL
+MITOL_AUTHENTICATION_REPLY_TO_EMAIL = MITX_ONLINE_REPLY_TO_ADDRESS
 
 # mitol-django-digital-credentials
 # MITOL_DIGITAL_CREDENTIALS_BUILD_CREDENTIAL_FUNC = (

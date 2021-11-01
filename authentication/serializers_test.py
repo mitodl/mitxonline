@@ -6,11 +6,8 @@ from social_core.exceptions import AuthException, InvalidEmail
 
 from authentication.serializers import (
     RegisterEmailSerializer,
-    CustomSendEmailResetSerializer,
 )
 from authentication.utils import SocialAuthState
-
-from users.factories import UserFactory
 
 EMAIL = "email@example.com"
 TOKEN = {"token": "value"}
@@ -78,20 +75,3 @@ def test_register_email_validation(data, raises, message):
         assert exc.value.detail == [message]
     else:  # no exception
         assert RegisterEmailSerializer().validate(data) == data
-
-
-@pytest.mark.parametrize(
-    "email,exists",
-    (
-        ("email@example.com", True),
-        ("EmaIl@example.com", True),
-        ("falseemail@example.com", False),
-    ),
-)
-def test_forgot_password_case_insensitive(email, exists):
-    """Test that CustomEmailResetSerializer is case insensitive"""
-
-    user = UserFactory.create(email=EMAIL) if exists else None
-    serializer = CustomSendEmailResetSerializer(data={"email": email})
-    assert serializer.is_valid() is True
-    assert serializer.get_user() == user

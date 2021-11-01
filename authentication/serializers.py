@@ -13,14 +13,11 @@ from social_core.utils import (
     user_is_authenticated,
 )
 from social_django.views import _do_login as login
-from djoser.serializers import SendEmailResetSerializer
-from djoser.conf import settings
 from authentication.exceptions import (
     EmailBlockedException,
     InvalidPasswordException,
     RequirePasswordAndPersonalInfoException,
     RequirePasswordException,
-    RequireProfileException,
     RequireProviderException,
     RequireRegistrationException,
     UserExportBlockedException,
@@ -348,24 +345,3 @@ class RegisterExtraDetailsSerializer(SocialAuthSerializer):
     def create(self, validated_data):
         """Try to 'save' the request"""
         return super()._authenticate(SocialAuthState.FLOW_REGISTER)
-
-
-class CustomSendEmailResetSerializer(SendEmailResetSerializer):
-    def get_user(self, is_active=True):
-        # NOTE: This directly copies the implementation of djoser.serializers.UserFunctionsMixin.get_user
-        # and only changes the User query. If this method is changed in an updated Djoser
-        # release, this method may need to be updated as well.
-        try:
-            user = User._default_manager.get(
-                is_active=is_active,
-                **{f"{self.email_field}__iexact": self.data.get(self.email_field, "")},
-            )
-            if user.has_usable_password():
-                return user
-        except User.DoesNotExist:
-            pass
-        if (
-            settings.PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND
-            or settings.USERNAME_RESET_SHOW_EMAIL_NOT_FOUND
-        ):
-            self.fail("email_not_found")
