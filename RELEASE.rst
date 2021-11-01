@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.13.0 (Released November 01, 2021)
+--------------
+
+- Added unenroll button to dashboard
+
 Version 0.12.4 (Released October 28, 2021)
 --------------
 
