@@ -5,6 +5,7 @@ import React from "react"
 import { routes } from "../lib/urls"
 import UserMenu from "./UserMenu"
 import AnonymousMenu from "./AnonymousMenu"
+import InstituteLogo from "./InstituteLogo"
 import type { Location } from "react-router"
 
 import type { CurrentUser } from "../flow/authTypes"
@@ -22,12 +23,8 @@ const TopAppBar = ({ currentUser, location }: Props) => (
       }`}
     >
       <div className="navbar-brand">
-        <a href="https://mit.edu">
-          <img
-            src="/static/images/mit-logo.jpg"
-            className="site-logo"
-            alt="MIT Home page"
-          />
+        <a href="https://mit.edu" className="logo-link">
+          <InstituteLogo />
         </a>
         <div className="divider-large" />
         <a href={routes.root} className="mitx-online-link">
