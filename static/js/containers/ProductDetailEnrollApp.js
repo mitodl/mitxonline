@@ -60,8 +60,7 @@ export class ProductDetailEnrollApp extends React.Component<Props> {
               >
                 Enroll now
               </a>
-            ) : run && 
-                now.isAfter(moment(run.enrollment_start)) ? (
+            ) : run && now.isAfter(moment(run.enrollment_start)) ? (
               <Fragment>
                 <form action="/enrollments/" method="post">
                   <input
@@ -78,7 +77,7 @@ export class ProductDetailEnrollApp extends React.Component<Props> {
                   </button>
                 </form>
               </Fragment>
-            ): null }
+            ) : null}
           </Fragment>
         )}
       </Loader>
