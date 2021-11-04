@@ -99,6 +99,34 @@ describe("ProductDetailEnrollApp", () => {
     )
   })
 
+  it("checks for enroll now button should appear if enrollment start not in future", async () => {
+    const courseRun = makeCourseRunDetail()
+    courseRun.enrollment_start = moment().add(-1, "M")
+    courseRun.enrollment_end = moment().add(10, "M")
+    const { inner } = await renderPage(
+      {
+        entities: {
+          courseRuns: [courseRun]
+        },
+        queries: {
+          courseRuns: {
+            isPending: false,
+            status:    200
+          }
+        }
+      },
+      {}
+    )
+
+    assert.equal(
+      inner
+        .find("button")
+        .at(0)
+        .text(),
+      "Enroll now"
+    )
+  })
+
   it("checks for enrolled button", async () => {
     const userEnrollment = makeCourseRunEnrollment()
     const expectedResponse = {
