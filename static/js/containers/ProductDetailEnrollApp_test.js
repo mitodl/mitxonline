@@ -12,6 +12,8 @@ import {
   makeCourseRunEnrollment
 } from "../factories/course"
 
+import moment from "moment"
+
 describe("ProductDetailEnrollApp", () => {
   let helper, renderPage
 
@@ -67,6 +69,33 @@ describe("ProductDetailEnrollApp", () => {
         .at(0)
         .text(),
       "Enroll now"
+    )
+  })
+
+  it("checks for enroll now button should not appear if enrollment start in future", async () => {
+    const courseRun = makeCourseRunDetail()
+    courseRun.enrollment_start = moment().add(1, "M")
+    courseRun.enrollment_end = moment().add(10, "M")
+    const { inner } = await renderPage(
+      {
+        entities: {
+          courseRuns: [courseRun]
+        },
+        queries: {
+          courseRuns: {
+            isPending: false,
+            status:    200
+          }
+        }
+      },
+      {}
+    )
+
+    assert.isNotOk(
+      inner
+        .find("button")
+        .at(0)
+        .exists()
     )
   })
 
