@@ -3,10 +3,17 @@
 import React from "react"
 import DocumentTitle from "react-document-title"
 import { connect } from "react-redux"
+import {
+  Tooltip,
+  Dropdown,
+  DropdownToggle,
+  DropdownMenu,
+  DropdownItem
+} from "reactstrap"
 import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
 import { connectRequest, mutateAsync } from "redux-query"
-import { partial, pathOr } from "ramda"
+import { partial, pathOr, without } from "ramda"
 import moment from "moment"
 
 import Loader from "../../components/Loader"
@@ -22,7 +29,10 @@ import {
   deactivateEnrollmentMutation
 } from "../../lib/queries/enrollment"
 import { currentUserSelector } from "../../lib/queries/users"
-import { isLinkableCourseRun } from "../../lib/courseApi"
+import {
+  isLinkableCourseRun,
+  isWithinEnrollmentPeriod
+} from "../../lib/courseApi"
 import {
   formatPrettyDateTimeAmPmTz,
   isSuccessResponse,
@@ -44,7 +54,8 @@ type DashboardPageProps = {
 
 type DashboardPageState = {
   submittingEnrollmentId: number | null,
-  activeMenuEnrollmentId: number | null
+  activeMenuIds: number[],
+  activeEnrollMsgIds: number[]
 }
 
 export class DashboardPage extends React.Component<
@@ -53,7 +64,38 @@ export class DashboardPage extends React.Component<
 > {
   state = {
     submittingEnrollmentId: null,
-    activeMenuEnrollmentId: null
+    activeMenuIds:          [],
+    activeEnrollMsgIds:     []
+  }
+
+  isActiveMenuId(itemId: number): boolean {
+    return !!this.state.activeMenuIds.find(id => id === itemId)
+  }
+
+  isActiveEnrollMsgId(itemId: number): boolean {
+    return !!this.state.activeEnrollMsgIds.find(id => id === itemId)
+  }
+
+  toggleActiveMenuId(itemId: number) {
+    return () => {
+      const isActive = this.isActiveMenuId(itemId)
+      this.setState({
+        activeMenuIds: isActive
+          ? without([itemId], this.state.activeMenuIds)
+          : [...this.state.activeMenuIds, itemId]
+      })
+    }
+  }
+
+  toggleActiveEnrollMsgId(itemId: number) {
+    return () => {
+      const isActive = this.isActiveEnrollMsgId(itemId)
+      this.setState({
+        activeEnrollMsgIds: isActive
+          ? without([itemId], this.state.activeEnrollMsgIds)
+          : [...this.state.activeEnrollMsgIds, itemId]
+      })
+    }
   }
 
   async onDeactivate(enrollment: RunEnrollment) {
@@ -92,7 +134,7 @@ export class DashboardPage extends React.Component<
     const { currentUser } = this.props
     const { submittingEnrollmentId } = this.state
 
-    let startDate, startDateDescription
+    let startDate, startDateDescription, onUnenrollClick, unenrollEnabled
     const title = isLinkableCourseRun(enrollment.run, currentUser) ? (
       <a
         href={enrollment.run.courseware_url}
@@ -116,6 +158,13 @@ export class DashboardPage extends React.Component<
         </span>
       )
     }
+    if (isWithinEnrollmentPeriod(enrollment.run)) {
+      onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
+      unenrollEnabled = true
+    } else {
+      onUnenrollClick = () => {}
+      unenrollEnabled = false
+    }
 
     return (
       <div
@@ -136,34 +185,43 @@ export class DashboardPage extends React.Component<
           <div className="col-12 col-md px-3 py-3 py-md-0">
             <div className="d-flex justify-content-between align-content-start flex-nowrap mb-3">
               <h2 className="my-0 mr-3">{title}</h2>
-              <button
-                className="d-inline-flex unstyled dot-menu"
+              <Dropdown
+                isOpen={this.isActiveMenuId(enrollment.id)}
+                toggle={this.toggleActiveMenuId(enrollment.id).bind(this)}
                 id={`enrollmentDropdown-${enrollment.id}`}
-                data-toggle="dropdown"
-                aria-haspopup="true"
-                aria-expanded="false"
-                aria-label="Show Course Options"
               >
-                <i className="material-icons">more_vert</i>
-              </button>
-              <ul
-                className="dropdown-menu dropdown-menu-right"
-                aria-labelledby={`enrollmentDropdown-${enrollment.id}`}
-              >
-                <li className="dropdown-item">
-                  <button
-                    className="unstyled d-block"
-                    onClick={partial(this.onDeactivate.bind(this), [
-                      enrollment
-                    ])}
-                    {...(enrollment.id === submittingEnrollmentId
-                      ? { disabled: true }
-                      : {})}
+                <DropdownToggle className="d-inline-flex unstyled dot-menu">
+                  <i className="material-icons">more_vert</i>
+                </DropdownToggle>
+                <DropdownMenu right>
+                  <span id={`unenrollButtonWrapper-${enrollment.id}`}>
+                    <DropdownItem
+                      className="unstyled d-block"
+                      onClick={onUnenrollClick}
+                      {...(!unenrollEnabled ||
+                      enrollment.id === submittingEnrollmentId
+                        ? { disabled: true }
+                        : {})}
+                    >
+                      Unenroll
+                    </DropdownItem>
+                  </span>
+                  <Tooltip
+                    delay={0}
+                    placement="bottom-end"
+                    target={`unenrollButtonWrapper-${enrollment.id}`}
+                    container={`enrollmentDropdown-${enrollment.id}`}
+                    className="unenroll-denied-msg"
+                    isOpen={this.isActiveEnrollMsgId(enrollment.id)}
+                    toggle={this.toggleActiveEnrollMsgId(enrollment.id).bind(
+                      this
+                    )}
                   >
-                    Unenroll
-                  </button>
-                </li>
-              </ul>
+                    The enrollment period for this course has ended. If you'd
+                    like to unenroll, please contact support.
+                  </Tooltip>
+                </DropdownMenu>
+              </Dropdown>
             </div>
             <div className="detail">{startDateDescription}</div>
           </div>

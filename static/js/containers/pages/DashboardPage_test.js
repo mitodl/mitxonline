@@ -16,13 +16,22 @@ import { makeUser } from "../../factories/user"
 import * as courseApi from "../../lib/courseApi"
 
 describe("DashboardPage", () => {
-  let helper, isLinkableStub, renderPage, userEnrollments, currentUser
+  let helper,
+    renderPage,
+    userEnrollments,
+    currentUser,
+    isLinkableStub,
+    isWithinEnrollmentPeriodStub
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
     userEnrollments = [makeCourseRunEnrollment(), makeCourseRunEnrollment()]
     currentUser = makeUser()
     isLinkableStub = helper.sandbox.stub(courseApi, "isLinkableCourseRun")
+    isWithinEnrollmentPeriodStub = helper.sandbox.stub(
+      courseApi,
+      "isWithinEnrollmentPeriod"
+    )
 
     renderPage = helper.configureHOCRenderer(
       DashboardPage,
@@ -138,6 +147,7 @@ describe("DashboardPage", () => {
             SETTINGS.support_email
           }.`
         }
+      isWithinEnrollmentPeriodStub.returns(true)
       helper.handleRequestStub
         .withArgs(`/api/enrollments/${enrollment.id}/`)
         .returns({
@@ -146,7 +156,7 @@ describe("DashboardPage", () => {
 
       const { inner, store } = await renderPage()
       const enrolledItem = inner.find(".enrolled-item").at(enrollmentIndex)
-      const unenrollBtn = enrolledItem.find(".dropdown-menu button").at(0)
+      const unenrollBtn = enrolledItem.find("Dropdown DropdownItem").at(0)
       assert.isTrue(unenrollBtn.exists())
       await unenrollBtn.prop("onClick")()
 
@@ -160,6 +170,7 @@ describe("DashboardPage", () => {
           headers:     { "X-CSRFTOKEN": null }
         }
       )
+      sinon.assert.calledWith(isWithinEnrollmentPeriodStub, enrollment.run)
       assert.deepEqual(store.getState().ui.userNotifications, {
         "unenroll-status": {
           type:  expectedUserMsgProps.type,
@@ -169,5 +180,27 @@ describe("DashboardPage", () => {
         }
       })
     })
+  })
+
+  it("disables the unenroll button if the enrollment period has expired", async () => {
+    const enrollmentIndex = 0
+    const enrollment = userEnrollments[enrollmentIndex]
+    isWithinEnrollmentPeriodStub.returns(false)
+
+    const { inner } = await renderPage()
+    const enrolledItem = inner.find(".enrolled-item").at(enrollmentIndex)
+    const unenrollBtn = enrolledItem.find("Dropdown DropdownItem").at(0)
+    assert.isTrue(unenrollBtn.prop("disabled"))
+    sinon.assert.calledWith(isWithinEnrollmentPeriodStub, enrollment.run)
+    // Check that the button has a wrapper element that the tooltip can use
+    const btnWrapper = unenrollBtn.parent()
+    assert.equal(btnWrapper.type(), "span")
+    const wrapperId = btnWrapper.prop("id")
+    // Check that the tooltip correctly refers to the wrapper
+    const tooltip = enrolledItem.find("Tooltip")
+    assert.isTrue(tooltip.exists())
+    // Our component library just requires a tooltip to refer to the id of the target element
+    // in the "target" attribute, then takes care of the rest.
+    assert.equal(tooltip.prop("target"), wrapperId)
   })
 })
