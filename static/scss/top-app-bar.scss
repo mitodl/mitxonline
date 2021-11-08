@@ -160,6 +160,12 @@ header.site-header {
     }
   }
 
+  .logo-link {
+    @include media-breakpoint-down(sm) {
+      display: inline-flex;
+    }
+  }
+
   .divider-large {
     width: 1px;
     height: 48px;
@@ -223,6 +229,24 @@ header.site-header {
     .bar:nth-child(3) {
       top: 80%;
       transform: none;
+    }
+  }
+}
+
+.svg-site-logo {
+  height: 35px !important;
+  width: 65px !important;
+
+  @include media-breakpoint-down(sm) {
+    width: 46px !important;
+    height: 25px !important;
+  }
+
+  g {
+    transform: scale(0.2);
+
+    @include media-breakpoint-down(sm) {
+      transform: scale(0.15);
     }
   }
 }
