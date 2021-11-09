@@ -16,6 +16,8 @@ import {
   courseRunsQueryKey
 } from "../lib/queries/courseRuns"
 
+import { isWithinEnrollmentPeriod } from "../lib/courseApi"
+
 import { getCookie } from "../lib/api"
 
 type Props = {
@@ -60,7 +62,7 @@ export class ProductDetailEnrollApp extends React.Component<Props> {
               >
                 Enroll now
               </a>
-            ) : run && now.isAfter(moment(run.enrollment_start)) ? (
+            ) : run && isWithinEnrollmentPeriod(run) ? (
               <Fragment>
                 <form action="/enrollments/" method="post">
                   <input

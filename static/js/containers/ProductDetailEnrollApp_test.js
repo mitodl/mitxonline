@@ -12,10 +12,12 @@ import {
   makeCourseRunEnrollment
 } from "../factories/course"
 
+import * as courseApi from "../lib/courseApi"
+
 import moment from "moment"
 
 describe("ProductDetailEnrollApp", () => {
-  let helper, renderPage
+  let helper, renderPage, isWithinEnrollmentPeriodStub
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
@@ -25,6 +27,11 @@ describe("ProductDetailEnrollApp", () => {
       InnerProductDetailEnrollApp,
       {},
       {}
+    )
+
+    isWithinEnrollmentPeriodStub = helper.sandbox.stub(
+      courseApi,
+      "isWithinEnrollmentPeriod"
     )
   })
 
@@ -49,6 +56,7 @@ describe("ProductDetailEnrollApp", () => {
 
   it("checks for enroll now button", async () => {
     const courseRun = makeCourseRunDetail()
+    isWithinEnrollmentPeriodStub.returns(true)
     const { inner } = await renderPage(
       {
         entities: {
@@ -74,8 +82,7 @@ describe("ProductDetailEnrollApp", () => {
 
   it("checks for enroll now button should not appear if enrollment start in future", async () => {
     const courseRun = makeCourseRunDetail()
-    courseRun.enrollment_start = moment().add(1, "M")
-    courseRun.enrollment_end = moment().add(10, "M")
+    isWithinEnrollmentPeriodStub.returns(false)
     const { inner } = await renderPage(
       {
         entities: {
@@ -101,8 +108,7 @@ describe("ProductDetailEnrollApp", () => {
 
   it("checks for enroll now button should appear if enrollment start not in future", async () => {
     const courseRun = makeCourseRunDetail()
-    courseRun.enrollment_start = moment().add(-1, "M")
-    courseRun.enrollment_end = moment().add(10, "M")
+    isWithinEnrollmentPeriodStub.returns(true)
     const { inner } = await renderPage(
       {
         entities: {
