@@ -75,3 +75,30 @@
    }
  }
 }
+
+.dropdown {
+  .tooltip.show {
+    display: none;
+  }
+
+  &.show {
+    .tooltip.show {
+      display: inherit;
+    }
+  }
+}
+
+.tooltip {
+  &.show {
+    opacity: 0.95;
+  }
+
+  .tooltip-inner,
+  .tooltip-arrow {
+    background-color: $gray;
+  }
+
+  &.bs-tooltip-bottom .arrow::before {
+    border-bottom-color: $gray;
+  }
+}

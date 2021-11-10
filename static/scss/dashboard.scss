@@ -68,6 +68,10 @@ $featureImgMobileHeight: 223px;
     // Setting height so the button element doesn't expand to cover the full height of the row
     height: $material-icon-height;
   }
+
+  .unenroll-denied-msg .tooltip {
+    width: 250px;
+  }
 }
 
 .dashboard h1 {

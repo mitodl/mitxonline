@@ -1,6 +1,6 @@
 /* global SETTINGS: false */
 // @flow
-import { isLinkableCourseRun } from "./courseApi"
+import { isLinkableCourseRun, isWithinEnrollmentPeriod } from "./courseApi"
 import { assert } from "chai"
 import moment from "moment"
 
@@ -13,6 +13,9 @@ import type { LoggedInUser } from "../flow/authTypes"
 describe("Course API", () => {
   const past = moment()
       .add(-10, "days")
+      .toISOString(),
+    farPast = moment()
+      .add(-50, "days")
       .toISOString(),
     future = moment()
       .add(10, "days")
@@ -60,5 +63,21 @@ describe("Course API", () => {
         })
       }
     )
+  })
+
+  describe("isWithinEnrollmentPeriod", () => {
+    [
+      [past, future, "active enrollment period", true],
+      [past, null, "active enrollment period with no end", true],
+      [null, null, "null enrollment start", false],
+      [farPast, past, "past enrollment period", false],
+      [future, farFuture, "future enrollment period", false]
+    ].forEach(([enrollStart, enrollEnd, desc, expResult]) => {
+      it(`returns ${String(expResult)} with ${desc}`, () => {
+        courseRun.enrollment_start = enrollStart
+        courseRun.enrollment_end = enrollEnd
+        assert.equal(isWithinEnrollmentPeriod(courseRun), expResult)
+      })
+    })
   })
 })
