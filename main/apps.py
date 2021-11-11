@@ -12,15 +12,6 @@ class RootConfig(AppConfig):
     name = "main"
 
     def ready(self):
-        missing_settings = [
-            setting_name
-            for setting_name in settings.MANDATORY_SETTINGS
-            if getattr(settings, setting_name, None) in (None, "")
-        ]
+        from mitol.common import envs
 
-        if missing_settings:
-            raise ImproperlyConfigured(
-                "The following settings are missing: {}".format(
-                    ", ".join(missing_settings)
-                )
-            )
+        envs.validate()
