@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.14.0
+--------------
+
+- Upgrade to django 3.2 (#196)
+- Use SVG for the MIT logo (#281)
+- Prevented unenrollment for runs with expired enrollment period
+- Load enrollment status dynamically in product detail page (#255)
+
 Version 0.13.1 (Released November 15, 2021)
 --------------
 
