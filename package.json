@@ -123,8 +123,7 @@
     "yup": "^0.31.0"
   },
   "engines": {
-    "node": "12.16.1",
-    "yarn": "1.13.0"
+    "node": "15.14.0"
   },
   "scripts": {
     "postinstall": "./webpack_if_prod.sh",
@@ -145,7 +144,7 @@
     "js-yaml": "^3.13.1",
     "kind-of": "6.0.3",
     "minimist": "1.2.5",
-    "merge": "^2.1.1",
-    "node-sass/**/trim-newlines": "^3.0.1"
-  }
+    "merge": "^2.1.1"
+  },
+  "packageManager": "yarn@3.1.0"
 }
