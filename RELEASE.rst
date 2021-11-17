@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+Version 0.14.0
+--------------
+
+- Fixed tooltip behavior when enrollment period is active
+- Course product pages: If no Video URL is set, display the Feature Image (#300)
+- upgrade to yarn 3
+- Bump django from 3.2 to 3.2.5 (#291)
+- Bump validator from 10.11.0 to 13.7.0 (#285)
+- Upgrade to django 3.2 (#196)
+- Removed @ symbol as valid username character
+- Use SVG for the MIT logo (#281)
+- Prevented unenrollment for runs with expired enrollment period
+- Load enrollment status dynamically in product detail page (#255)
+
 Version 0.13.2 (Released November 17, 2021)
 --------------
 
