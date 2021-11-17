@@ -206,20 +206,22 @@ export class DashboardPage extends React.Component<
                       Unenroll
                     </DropdownItem>
                   </span>
-                  <Tooltip
-                    delay={0}
-                    placement="bottom-end"
-                    target={`unenrollButtonWrapper-${enrollment.id}`}
-                    container={`enrollmentDropdown-${enrollment.id}`}
-                    className="unenroll-denied-msg"
-                    isOpen={this.isActiveEnrollMsgId(enrollment.id)}
-                    toggle={this.toggleActiveEnrollMsgId(enrollment.id).bind(
-                      this
-                    )}
-                  >
-                    The enrollment period for this course has ended. If you'd
-                    like to unenroll, please contact support.
-                  </Tooltip>
+                  {!unenrollEnabled && (
+                    <Tooltip
+                      delay={0}
+                      placement="bottom-end"
+                      target={`unenrollButtonWrapper-${enrollment.id}`}
+                      container={`enrollmentDropdown-${enrollment.id}`}
+                      className="unenroll-denied-msg"
+                      isOpen={this.isActiveEnrollMsgId(enrollment.id)}
+                      toggle={this.toggleActiveEnrollMsgId(enrollment.id).bind(
+                        this
+                      )}
+                    >
+                      The enrollment period for this course has ended. If you'd
+                      like to unenroll, please contact support.
+                    </Tooltip>
+                  )}
                 </DropdownMenu>
               </Dropdown>
             </div>
