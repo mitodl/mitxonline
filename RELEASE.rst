@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.13.2
+Version 0.13.2 (Released November 17, 2021)
 --------------
 
 - Course product pages: If no Video URL is set, display the Feature Image (#300)
