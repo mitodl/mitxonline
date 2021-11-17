@@ -90,6 +90,7 @@
           img, .video-js {
             width: 100%;
             height: 217px;
+            object-fit: cover;
 
             @include media-breakpoint-up(md) {
               height: 263px;
