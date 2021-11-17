@@ -141,7 +141,8 @@ def test_update_user_email(
     [
         [f"{USERNAME}-1", True, f"{USERNAME}-1"],
         [" My-Üsérname 1 ", True, "My-Üsérname 1"],
-        ["my>usern@me>1", False, None],
+        ["my@username", False, None],
+        ["my>username>1", False, None],
         [f"   {USERNAME.upper()}  ", False, None],
     ],
 )
