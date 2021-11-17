@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% load static wagtail_img_src render_bundle  %}
+{% load static wagtail_img_src render_bundle feature_img_src %}
 {% load wagtailcore_tags wagtailembeds_tags %}
 
 {% block title %}{{ page.title }} | {{ site_name }}{% endblock %}
@@ -24,17 +24,19 @@
                 <div id="productDetailEnrollment"></div>
               </div>
             </div>
-            {% if page.video_url %}
-              <div class="content-col video">
-                <video-js
-                  class="vjs-default-skin vjs-big-play-centered" 
-                  controls 
-                  data-setup="{{page.video_player_config}}"
-                  preload='metadata'
-                >
-                </video-js>
-              </div>
-            {% endif %}
+            <div class="content-col hero-media">
+              {% if page.video_url %}
+              <video-js
+                class="vjs-default-skin vjs-big-play-centered"
+                controls
+                data-setup="{{page.video_player_config}}"
+                preload="metadata"
+              >
+              </video-js>
+              {% else %}
+              <img src="{% feature_img_src page.feature_image %}" alt="{{ page.title }}">
+              {% endif %}
+            </div>
           </div>
         </div>
       </section>

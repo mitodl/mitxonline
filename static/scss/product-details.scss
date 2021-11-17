@@ -74,7 +74,7 @@
           width: 100%;
         }
 
-        &.video {
+        &.hero-media {
           padding-bottom: 0;
 
           @include media-breakpoint-down(md) {
@@ -85,6 +85,16 @@
             width: 497px;
             padding: 6px 15px;
             flex-shrink: 0;
+          }
+
+          img, .video-js {
+            width: 100%;
+            height: 217px;
+            object-fit: cover;
+
+            @include media-breakpoint-up(md) {
+              height: 263px;
+            }
           }
         }
 
@@ -99,13 +109,6 @@
     }
 
     .video-js {
-      width: 100%;
-      height: 217px;
-
-      @include media-breakpoint-up(md) {
-        height: 263px;
-      }
-
       .vjs-big-play-button {
         background: black;
         opacity: 0.8;
