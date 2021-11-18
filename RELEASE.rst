@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.14.0
+Version 0.14.0 (Released November 18, 2021)
 --------------
 
 - Fixed tooltip behavior when enrollment period is active
