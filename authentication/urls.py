@@ -1,8 +1,8 @@
 """URL configurations for authentication"""
 from django.urls import path
+from django.urls.conf import include
 
 from authentication.views import (
-    CustomDjoserAPIView,
     CustomLogoutView,
     LoginEmailView,
     LoginPasswordView,
@@ -34,20 +34,7 @@ urlpatterns = [
         name="psa-register-extra",
     ),
     path(
-        "api/password_reset/",
-        CustomDjoserAPIView.as_view({"post": "reset_password"}),
-        name="password-reset-api",
-    ),
-    path(
-        "api/password_reset/confirm/",
-        CustomDjoserAPIView.as_view({"post": "reset_password_confirm"}),
-        name="password-reset-confirm-api",
-    ),
-    path(
-        "api/set_password/",
-        CustomDjoserAPIView.as_view({"post": "set_password"}),
-        name="set-password-api",
-    ),
+        "api/", include("mitol.authentication.urls.djoser_urls")),
     path("api/auths/", get_social_auth_types, name="get-auth-types-api"),
     path("logout/", CustomLogoutView.as_view(), name="logout"),
     path(

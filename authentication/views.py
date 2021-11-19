@@ -6,11 +6,7 @@ from anymail.message import AnymailMessage
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.views import LogoutView
-from django.core import mail as django_mail
 from django.shortcuts import render, reverse
-from djoser.email import PasswordResetEmail as DjoserPasswordResetEmail
-from djoser.utils import ActionViewMixin
-from djoser.views import UserViewSet
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, renderer_classes
 from rest_framework.permissions import IsAuthenticated
@@ -30,7 +26,6 @@ from authentication.serializers import (
     RegisterExtraDetailsSerializer,
 )
 from authentication.utils import load_drf_strategy
-from mail.api import render_email_templates, send_messages
 from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_COMPLETED_AUTH,
@@ -164,44 +159,6 @@ def confirmation_sent(request, **kwargs):  # pylint: disable=unused-argument
     """The confirmation of an email being sent"""
     return render(request, "confirmation_sent.html")
 
-
-class CustomPasswordResetEmail(DjoserPasswordResetEmail):
-    """Custom class to modify base functionality in Djoser's PasswordResetEmail class"""
-
-    def send(self, to, *args, **kwargs):
-        """
-        Overrides djoser.email.PasswordResetEmail#send to use our mail API.
-        """
-        context = self.get_context_data()
-        context.update(self.context)
-        with django_mail.get_connection(
-            settings.NOTIFICATION_EMAIL_BACKEND
-        ) as connection:
-            subject, text_body, html_body = render_email_templates(
-                "password_reset", context
-            )
-            msg = AnymailMessage(
-                subject=subject,
-                body=text_body,
-                to=to,
-                from_email=settings.MAILGUN_FROM_EMAIL,
-                connection=connection,
-                headers={"Reply-To": settings.MITX_ONLINE_REPLY_TO_ADDRESS},
-            )
-            msg.attach_alternative(html_body, "text/html")
-            send_messages([msg], raise_errors=True)
-
-    def get_context_data(self):
-        """Adds base_url to the template context"""
-        context = super().get_context_data()
-        context["base_url"] = settings.SITE_BASE_URL
-        return context
-
-
-class CustomDjoserAPIView(UserViewSet, ActionViewMixin):
-    """
-    Overrides the post method of a Djoser view to update session after successful password change
-    """
 
 
 class CustomLogoutView(LogoutView):
