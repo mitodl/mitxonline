@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.14.1
+--------------
+
+- added ol-django-authentication app to MITxOnline
+
 Version 0.14.0 (Released November 18, 2021)
 --------------
 
