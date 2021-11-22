@@ -12,8 +12,12 @@ import {
   makeCourseRunEnrollment
 } from "../factories/course"
 
+import * as courseApi from "../lib/courseApi"
+
+import moment from "moment"
+
 describe("ProductDetailEnrollApp", () => {
-  let helper, renderPage
+  let helper, renderPage, isWithinEnrollmentPeriodStub
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
@@ -23,6 +27,11 @@ describe("ProductDetailEnrollApp", () => {
       InnerProductDetailEnrollApp,
       {},
       {}
+    )
+
+    isWithinEnrollmentPeriodStub = helper.sandbox.stub(
+      courseApi,
+      "isWithinEnrollmentPeriod"
     )
   })
 
@@ -47,6 +56,7 @@ describe("ProductDetailEnrollApp", () => {
 
   it("checks for enroll now button", async () => {
     const courseRun = makeCourseRunDetail()
+    isWithinEnrollmentPeriodStub.returns(true)
     const { inner } = await renderPage(
       {
         entities: {
@@ -61,6 +71,59 @@ describe("ProductDetailEnrollApp", () => {
       },
       {}
     )
+    assert.equal(
+      inner
+        .find("button")
+        .at(0)
+        .text(),
+      "Enroll now"
+    )
+  })
+
+  it("checks for enroll now button should not appear if enrollment start in future", async () => {
+    const courseRun = makeCourseRunDetail()
+    isWithinEnrollmentPeriodStub.returns(false)
+    const { inner } = await renderPage(
+      {
+        entities: {
+          courseRuns: [courseRun]
+        },
+        queries: {
+          courseRuns: {
+            isPending: false,
+            status:    200
+          }
+        }
+      },
+      {}
+    )
+
+    assert.isNotOk(
+      inner
+        .find("button")
+        .at(0)
+        .exists()
+    )
+  })
+
+  it("checks for enroll now button should appear if enrollment start not in future", async () => {
+    const courseRun = makeCourseRunDetail()
+    isWithinEnrollmentPeriodStub.returns(true)
+    const { inner } = await renderPage(
+      {
+        entities: {
+          courseRuns: [courseRun]
+        },
+        queries: {
+          courseRuns: {
+            isPending: false,
+            status:    200
+          }
+        }
+      },
+      {}
+    )
+
     assert.equal(
       inner
         .find("button")

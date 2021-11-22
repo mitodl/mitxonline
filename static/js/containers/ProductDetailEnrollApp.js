@@ -5,6 +5,7 @@ import { pathOr } from "ramda"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { connectRequest } from "redux-query"
+import moment from "moment"
 
 import Loader from "../components/Loader"
 import { routes } from "../lib/urls"
@@ -14,6 +15,8 @@ import {
   courseRunsQuery,
   courseRunsQueryKey
 } from "../lib/queries/courseRuns"
+
+import { isWithinEnrollmentPeriod } from "../lib/courseApi"
 
 import { getCookie } from "../lib/api"
 
@@ -28,6 +31,7 @@ export class ProductDetailEnrollApp extends React.Component<Props> {
     const { courseRuns, isLoading, status } = this.props
     const csrfToken = getCookie("csrftoken")
     const run = courseRuns ? courseRuns[0] : null
+    const now = moment()
 
     return (
       // $FlowFixMe: isLoading null or undefined
@@ -58,7 +62,7 @@ export class ProductDetailEnrollApp extends React.Component<Props> {
               >
                 Enroll now
               </a>
-            ) : (
+            ) : run && isWithinEnrollmentPeriod(run) ? (
               <Fragment>
                 <form action="/enrollments/" method="post">
                   <input
@@ -75,7 +79,7 @@ export class ProductDetailEnrollApp extends React.Component<Props> {
                   </button>
                 </form>
               </Fragment>
-            )}
+            ) : null}
           </Fragment>
         )}
       </Loader>
