@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.15.0
+--------------
+
+- Fixing: 'Enroll now' button appears when 'Enrollment start' date is in the future (#282)
+
 Version 0.14.1 (Released November 23, 2021)
 --------------
 
