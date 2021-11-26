@@ -11,7 +11,7 @@ from main.celery import app
 
 
 @app.task
-def sync_course_runs_data():
+def sync_courseruns_data():
     """
     Task to sync titles and dates for course runs from edX.
     """
