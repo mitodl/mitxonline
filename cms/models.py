@@ -208,13 +208,12 @@ class ProductPage(Page):
         abstract = True
 
     description = RichTextField(
-        blank=True, help_text="The description shown on the home page and product page."
+        help_text="The description shown on the home page and product page. The recommended character limit is 1000 characters. Longer entries may not display nicely on the page."
     )
 
     length = models.CharField(
         max_length=50,
-        null=True,
-        blank=True,
+        default="",
         help_text="A short description indicating how long it takes to complete (e.g. '4 weeks').",
     )
 
@@ -227,7 +226,6 @@ class ProductPage(Page):
 
     price = StreamField(
         StreamBlock([("price_details", PriceBlock())], max_num=1),
-        blank=True,
         help_text="Specify the product price details.",
     )
 
@@ -252,7 +250,6 @@ class ProductPage(Page):
     feature_image = models.ForeignKey(
         Image,
         null=True,
-        blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
         help_text="Image that will be used where the course is featured or linked. (The recommended dimensions for the image are 375x244)",

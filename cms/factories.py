@@ -35,6 +35,7 @@ class CoursePageFactory(wagtail_factories.PageFactory):
     """CoursePage factory class"""
 
     description = fuzzy.FuzzyText(prefix="Description ")
+    length = fuzzy.FuzzyText(prefix="Length ")
     feature_image = factory.SubFactory(wagtail_factories.ImageFactory)
     course = factory.SubFactory(CourseFactory)
     slug = fuzzy.FuzzyText(prefix="my-page-")

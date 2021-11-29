@@ -33,8 +33,7 @@ urlpatterns = [
         RegisterExtraDetailsView.as_view(),
         name="psa-register-extra",
     ),
-    path(
-        "api/", include("mitol.authentication.urls.djoser_urls")),
+    path("api/", include("mitol.authentication.urls.djoser_urls")),
     path("api/auths/", get_social_auth_types, name="get-auth-types-api"),
     path("logout/", CustomLogoutView.as_view(), name="logout"),
     path(

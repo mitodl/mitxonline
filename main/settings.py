@@ -829,10 +829,7 @@ PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"
 
 # ol-django configuration
 
-import_settings_modules(
-    globals(),
-    "mitol.authentication.settings.djoser_settings"
-)
+import_settings_modules(globals(), "mitol.authentication.settings.djoser_settings")
 
 # mitol-django-common
 MITOL_COMMON_USER_FACTORY = "users.factories.UserFactory"
@@ -850,7 +847,7 @@ MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the leg
     dev_only=True,
 )
 
-#mitol-django-authentication
+# mitol-django-authentication
 MITOL_AUTHENTICATION_FROM_EMAIL = MAILGUN_FROM_EMAIL
 MITOL_AUTHENTICATION_REPLY_TO_EMAIL = MITX_ONLINE_REPLY_TO_ADDRESS
 
@@ -930,4 +927,4 @@ if DEBUG:
     # it needs to be enabled before other middlewares
     MIDDLEWARE = ("debug_toolbar.middleware.DebugToolbarMiddleware",) + MIDDLEWARE
 
-DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
