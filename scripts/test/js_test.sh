@@ -50,6 +50,9 @@ if [[ $(
     grep -v "This browser doesn't support the \`onScroll\` event" |
     grep -v "process.on(SIGPROF) is reserved while debugging" |
     grep -v "Browserslist: caniuse-lite is outdated" |
+    grep -v "browserslist" |
+    grep -v "" |
+    grep -v "Why you should do it regularly:" |
     wc -l |
     awk '{print $1}'
     ) -ne 0 ]]  # is file empty?
