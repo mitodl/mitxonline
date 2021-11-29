@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.16.0
+--------------
+
+- fix the build
+
 Version 0.15.0 (Released November 29, 2021)
 --------------
 
