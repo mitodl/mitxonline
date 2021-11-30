@@ -160,7 +160,6 @@ def confirmation_sent(request, **kwargs):  # pylint: disable=unused-argument
     return render(request, "confirmation_sent.html")
 
 
-
 class CustomLogoutView(LogoutView):
     """Custom view to modify base functionality in django.contrib.auth.views.LogoutView"""
 
