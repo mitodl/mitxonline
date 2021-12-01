@@ -27,7 +27,9 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
         <div className="std-page-body container auth-page">
           <div className="auth-card card-shadow auth-form">
             <div className="auth-header">
-              <h1>Thank you!</h1>
+              <h1 id="thanks-msg" tabIndex="0">
+                Thank you!
+              </h1>
             </div>
             <p>
               We sent an email to <b>{email}</b>, please verify your address to
