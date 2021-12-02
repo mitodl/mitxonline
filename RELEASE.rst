@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.16.2
+--------------
+
+- removed docker-node file
+- updated task name
+- asadiqbal08/ Fix accessibility issue by tabindex to header (#286)
+
 Version 0.16.1 (Released December 02, 2021)
 --------------
 
