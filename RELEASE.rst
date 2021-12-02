@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.16.1
+Version 0.16.1 (Released December 02, 2021)
 --------------
 
 - Strengthen validation requirements for course pages (#318)
