@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.16.2
+Version 0.16.2 (Released December 07, 2021)
 --------------
 
 - removed docker-node file
