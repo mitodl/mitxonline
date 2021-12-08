@@ -540,6 +540,7 @@ class CourseRunEnrollment(EnrollmentModel):
         default=False,
         help_text="Indicates whether or not the request succeeded to enroll via the edX API",
     )
+    edx_emails_subscription = models.BooleanField(default=True)
 
     class Meta:
         unique_together = ("user", "run")

@@ -159,7 +159,7 @@ djoser==2.1.0
     #   mitol-django-authentication
 draftjs-exporter==2.1.7
     # via wagtail
-edx-api-client==1.0.1
+edx-api-client==1.1.0
     # via -r requirements.in
 et-xmlfile==1.1.0
     # via openpyxl

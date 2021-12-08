@@ -214,4 +214,44 @@ describe("DashboardPage", () => {
       }
     })
   })
+  ;[[true, 200], [false, 400]].forEach(([success, returnedStatusCode]) => {
+    it(`allow users to course email subscription and handles ${returnedStatusCode} response`, async () => {
+      window.scrollTo = sinon.stub()
+      const enrollmentIndex = 0
+      const enrollment = userEnrollments[enrollmentIndex]
+      const expectedUserMsgProps = success
+        ? {
+          type: ALERT_TYPE_SUCCESS,
+          msg:  `You have been successfully subscribed to course ${
+            enrollment.run.title
+          } emails.`
+        }
+        : {
+          type: ALERT_TYPE_DANGER,
+          msg:  `Something went wrong with your request to course emails subscription. Please contact support at ${
+            SETTINGS.support_email
+          }.`
+        }
+      helper.handleRequestStub
+        .withArgs(`/api/enrollments/${enrollment.id}/`)
+        .returns({
+          status: returnedStatusCode
+        })
+
+      const { inner, store } = await renderPage()
+      const enrolledItems = inner.find(".enrolled-item").at(enrollmentIndex)
+      const unsubscribeBtn = enrolledItems.find("Dropdown DropdownItem").at(1)
+      assert.isTrue(unsubscribeBtn.exists())
+      await unsubscribeBtn.prop("onClick")()
+      sinon.assert.calledTwice(helper.handleRequestStub)
+      assert.deepEqual(store.getState().ui.userNotifications, {
+        "subscription-status": {
+          type:  expectedUserMsgProps.type,
+          props: {
+            text: expectedUserMsgProps.msg
+          }
+        }
+      })
+    })
+  })
 })

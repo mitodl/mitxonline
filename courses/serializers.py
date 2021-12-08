@@ -264,7 +264,7 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.CourseRunEnrollment
-        fields = ["run", "id", "run_id"]
+        fields = ["run", "id", "run_id", "edx_emails_subscription"]
 
 
 class ProgramEnrollmentSerializer(serializers.ModelSerializer):

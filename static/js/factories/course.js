@@ -56,6 +56,7 @@ export const makeCourseRunDetail = (): CourseRunDetail => {
 
 export const makeCourseRunEnrollment = (): CourseRunEnrollment => ({
   // $FlowFixMe
-  id:  genEnrollmentId.next().value,
-  run: makeCourseRunDetail()
+  id:                      genEnrollmentId.next().value,
+  run:                     makeCourseRunDetail(),
+  edx_emails_subscription: true
 })

@@ -28,5 +28,6 @@ export type CourseRunDetail = BaseCourseRun & {
 
 export type RunEnrollment = {
   run: CourseRunDetail,
-  id: number
+  id: number,
+  edx_emails_subscription: ?string
 }

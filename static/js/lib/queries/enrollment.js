@@ -32,3 +32,29 @@ export const deactivateEnrollmentMutation = (enrollmentId: number) => ({
     }
   }
 })
+
+export const courseEmailsSubscriptionMutation = (
+  enrollmentId: number,
+  emailsSubscription: string = ""
+) => ({
+  url:  `/api/enrollments/${enrollmentId}/`,
+  body: {
+    receive_emails: emailsSubscription
+  },
+  options: {
+    ...getCsrfOptions(),
+    method: "PATCH"
+  },
+  update: {
+    enrollments: prevEnrollments => {
+      if (!emptyOrNil(prevEnrollments)) {
+        prevEnrollments.find(
+          enrollment => enrollment.id === enrollmentId
+        ).edx_emails_subscription = emailsSubscription ? true : false
+      } else {
+        prevEnrollments = []
+      }
+      return prevEnrollments
+    }
+  }
+})

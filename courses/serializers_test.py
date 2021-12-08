@@ -221,6 +221,7 @@ def test_serialize_course_run_enrollments(settings, receipts_enabled):
     assert serialized_data == {
         "run": CourseRunDetailSerializer(course_run_enrollment.run).data,
         "id": course_run_enrollment.id,
+        "edx_emails_subscription": True,
     }
 
 

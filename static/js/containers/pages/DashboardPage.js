@@ -26,7 +26,8 @@ import {
   enrollmentsSelector,
   enrollmentsQuery,
   enrollmentsQueryKey,
-  deactivateEnrollmentMutation
+  deactivateEnrollmentMutation,
+  courseEmailsSubscriptionMutation
 } from "../../lib/queries/enrollment"
 import { currentUserSelector } from "../../lib/queries/users"
 import {
@@ -49,6 +50,10 @@ type DashboardPageProps = {
   currentUser: CurrentUser,
   isLoading: boolean,
   deactivateEnrollment: (enrollmentId: number) => Promise<any>,
+  courseEmailsSubscription: (
+    enrollmentId: number,
+    emailsSubscription: string
+  ) => Promise<any>,
   addUserNotification: Function
 }
 
@@ -130,6 +135,44 @@ export class DashboardPage extends React.Component<
     }
   }
 
+  async onChangeEmailSettings(enrollment: RunEnrollment) {
+    const { courseEmailsSubscription, addUserNotification } = this.props
+    this.setState({ submittingEnrollmentId: enrollment.id })
+    try {
+      const resp = await courseEmailsSubscription(
+        enrollment.id,
+        enrollment.edx_emails_subscription ? "" : "on"
+      )
+      const message = enrollment.edx_emails_subscription
+        ? "subscribed to"
+        : "unsubscribed from"
+      let userMessage, messageType
+      if (isSuccessResponse(resp)) {
+        messageType = ALERT_TYPE_SUCCESS
+        userMessage = `You have been successfully ${message} course ${
+          enrollment.run.title
+        } emails.`
+      } else {
+        messageType = ALERT_TYPE_DANGER
+        userMessage = `Something went wrong with your request to course emails subscription. Please contact support at ${
+          SETTINGS.support_email
+        }.`
+      }
+      addUserNotification({
+        "subscription-status": {
+          type:  messageType,
+          props: {
+            text: userMessage
+          }
+        }
+      })
+      // Scroll to the top of the page to make sure the user sees the message
+      window.scrollTo(0, 0)
+    } finally {
+      this.setState({ submittingEnrollmentId: null })
+    }
+  }
+
   renderEnrolledItemCard(enrollment: RunEnrollment) {
     const { currentUser } = this.props
     const { submittingEnrollmentId } = this.state
@@ -165,6 +208,10 @@ export class DashboardPage extends React.Component<
       onUnenrollClick = () => {}
       unenrollEnabled = false
     }
+
+    const onSubscriptionClick = partial(this.onChangeEmailSettings.bind(this), [
+      enrollment
+    ])
 
     return (
       <div
@@ -204,6 +251,16 @@ export class DashboardPage extends React.Component<
                         : {})}
                     >
                       Unenroll
+                    </DropdownItem>
+                  </span>
+                  <span id="subscribeButtonWrapper">
+                    <DropdownItem
+                      className="unstyled d-block"
+                      onClick={onSubscriptionClick}
+                    >
+                      {enrollment.edx_emails_subscription
+                        ? "Unsubscribe from emails"
+                        : "Subscribe to emails"}
                     </DropdownItem>
                   </span>
                   {!unenrollEnabled && (
@@ -271,8 +328,17 @@ const mapPropsToConfig = () => [enrollmentsQuery()]
 const deactivateEnrollment = (enrollmentId: number) =>
   mutateAsync(deactivateEnrollmentMutation(enrollmentId))
 
+const courseEmailsSubscription = (
+  enrollmentId: number,
+  emailsSubscription: string
+) =>
+  mutateAsync(
+    courseEmailsSubscriptionMutation(enrollmentId, emailsSubscription)
+  )
+
 const mapDispatchToProps = {
   deactivateEnrollment,
+  courseEmailsSubscription,
   addUserNotification
 }
 
