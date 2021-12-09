@@ -1,0 +1,12 @@
+[GLOBAL]
+backend_packages = [
+  "pants.backend.python",
+  "pants.backend.python.lint.black",
+  # local plugins
+  "mitol.docs"
+]
+pants_version = "2.8.1rc1"
+pythonpath = ["%(buildroot)s/pants-plugins"]
+
+[anonymous-telemetry]
+enabled = false

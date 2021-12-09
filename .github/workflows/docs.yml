@@ -1,0 +1,23 @@
+name: Publish Documentation
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    name: Publish Documentation
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+      - name: Install ghp-import
+        run: pip install ghp-import
+      - name: Build documentation
+        run: "./pants docs ::"
+      - name: Publish Documentation
+        run: ghp-import --push --force --no-history --no-jekyll dist/sphinx/
