@@ -111,3 +111,9 @@ webpack-stats.json
 
 # Celery Beat
 celerybeat-schedule
+
+# pants
+/.pants.d/
+/dist/
+/.pids
+/.pants.workdir.file_lock*
