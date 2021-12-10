@@ -154,6 +154,8 @@ INSTALLED_APPS = (
     "taggit",
     # django-robots
     "robots",
+    # django-reversion
+    "reversion",
     # Put our apps after this point
     "main",
     "authentication",
