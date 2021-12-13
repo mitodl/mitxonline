@@ -9,6 +9,7 @@ from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
 )
+from courses.management.utils import get_course_number
 from courses.mail_api import (
     send_course_run_enrollment_email,
     send_course_run_unenrollment_email,
@@ -24,12 +25,13 @@ def test_send_course_run_enrollment_email(mocker):
     patched_get_message_sender = mocker.patch("courses.mail_api.get_message_sender")
     mock_sender = patched_get_message_sender.return_value.__enter__.return_value
     enrollment = CourseRunEnrollmentFactory.create()
+    course_number = get_course_number(enrollment.run.course.readable_id)
 
     send_course_run_enrollment_email(enrollment)
 
     patched_get_message_sender.assert_called_once_with(CourseRunEnrollmentMessage)
     mock_sender.build_and_send_message.assert_called_once_with(
-        enrollment.user, {"enrollment": enrollment}
+        enrollment.user, {"enrollment": enrollment, "course_number": course_number}
     )
 
 
