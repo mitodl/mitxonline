@@ -11,9 +11,9 @@
                       <p style="margin: 0 0 10px;">
                         You have been unenrolled in
                         {% if enrollment.run.start_date %}
-                          {{ enrollment.run }} starting {{ enrollment.run.start_date|date:"F j, Y"}}.
+                          {{ course_number }} {{ enrollment.run.course.title }} starting {{ enrollment.run.start_date|date:"F j, Y"}}.
                         {% else %}
-                          {{ enrollment.run }}.
+                          {{ course_number }} {{ enrollment.run.course.title }}.
                         {% endif %}
                         The course will no longer appear on your <a href="{{ base_url }}{% url 'user-dashboard' %}">{{ site_name }} dashboard</a>.
                       </p>
