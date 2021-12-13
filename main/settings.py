@@ -154,6 +154,8 @@ INSTALLED_APPS = (
     "taggit",
     # django-robots
     "robots",
+    # django-reversion
+    "reversion",
     # Put our apps after this point
     "main",
     "authentication",
@@ -167,7 +169,7 @@ INSTALLED_APPS = (
     "compat",
     "hijack",
     "hijack_admin",
-    # "ecommerce",
+    "ecommerce",
     # ol-dango apps, must be after this project's apps for template precedence
     "mitol.common.apps.CommonApp",
     # "mitol.digitalcredentials.apps.DigitalCredentialsApp",
