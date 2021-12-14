@@ -198,6 +198,9 @@ class CourseIndexPage(CourseObjectIndexPage):
         """Fetch a child page by the related Course's readable_id value"""
         return self.get_children().get(coursepage__course__readable_id=readable_id)
 
+    def get_children(self):
+        return super().get_children().order_by(
+            "coursepage__course__readable_id")
 
 class ProductPage(Page):
     """
@@ -351,6 +354,10 @@ class CoursePage(ProductPage):
         return self.course
 
     template = "product_page.html"
+
+    def get_admin_display_title(self): 
+        """Gets the title of the course in the speacified format"""
+        return str(self.course)
 
     def get_context(self, request, *args, **kwargs):
         relevant_run = get_user_relevant_course_run(
