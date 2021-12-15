@@ -153,6 +153,9 @@ INSTALLED_APPS = (
     "wagtail.core",
     "modelcluster",
     "taggit",
+    # django-fsm-admin
+    "django_fsm",
+    "fsm_admin",
     # django-robots
     "robots",
     # django-reversion

@@ -1,11 +1,15 @@
-from django.db import models
 from django.conf import settings
+from django.db import models
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django_fsm import FSMField, transition
 from mitol.common.models import TimestampedModel
 import reversion
 from ecommerce.constants import DISCOUNT_TYPES, REDEMPTION_TYPES
 from users.models import User
+
+User = get_user_model()
 
 
 def valid_purchasable_objects_list():
@@ -45,9 +49,7 @@ class Product(TimestampedModel):
 class Basket(TimestampedModel):
     """Represents a User's basket."""
 
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="basket"
-    )
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="basket")
 
 
 class BasketItem(TimestampedModel):
@@ -111,3 +113,145 @@ class DiscountRedemption(TimestampedModel):
 
     def __str__(self):
         return f"{self.redemption_date}: {self.redeemed_discount}, {self.redeemed_by}"
+
+
+class Order(TimestampedModel):
+    """An order containing information for a purchase."""
+
+    class STATE:
+        PENDING = "pending"
+        FULFILLED = "fulfilled"
+        CANCELED = "canceled"
+        REFUNDED = "refunded"
+
+        @classmethod
+        def choices(cls):
+            return (
+                (cls.PENDING, "Pending", "PendingOrder"),
+                (cls.FULFILLED, "Fulfilled", "FulfilledOrder"),
+                (cls.CANCELED, "Canceled", "CanceledOrder"),
+                (cls.REFUNDED, "Refunded", "RefundedOrder"),
+            )
+
+    state = FSMField(default=STATE.PENDING, state_choices=STATE.choices())
+    purchaser = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="orders",
+    )
+    total_price_paid = models.DecimalField(
+        decimal_places=5,
+        max_digits=20,
+    )
+
+    @transition(field=state, source=STATE.PENDING, target=STATE.FULFILLED)
+    def fulfill(self):
+        """Fulfill this order"""
+        raise NotImplementedError()
+
+    @transition(field=state, source=STATE.PENDING, target=STATE.CANCELED)
+    def cancel(self):
+        """Cancel this order"""
+        raise NotImplementedError()
+
+    @transition(field=state, source=STATE.FULFILLED, target=STATE.REFUNDED)
+    def refund(self):
+        """Issue a refund"""
+        raise NotImplementedError()
+
+    def __str__(self):
+        return f"{self.state.capitalize()} Order for {self.purchaser.name} ({self.purchaser.email})"
+
+
+class PendingOrder(Order):
+    """An order that is pending payment"""
+
+    def fulfill(self):
+        """Fulfill this order"""
+        pass
+
+    def cancel(self):
+        """Cancel this order"""
+        pass
+
+    class Meta:
+        proxy = True
+
+
+class FulfilledOrder(Order):
+    """An order that has a fulfilled payment"""
+
+    def refund(self):
+        """Issue a refund"""
+        pass
+
+    class Meta:
+        proxy = True
+
+
+class CanceledOrder(Order):
+    """
+    An order that is canceled.
+
+    The state of this can't be altered further.
+    """
+
+    class Meta:
+        proxy = True
+
+
+class RefundedOrder(Order):
+    """
+    An order that is refunded.
+
+    The state of this can't be altered further.
+    """
+
+    class Meta:
+        proxy = True
+
+
+class Line(TimestampedModel):
+    """A line in an Order."""
+
+    def _order_line_product_versions():
+        """Returns a Q object filtering to Versions for Products"""
+        return models.Q()
+
+    order = models.ForeignKey(
+        "ecommerce.Order",
+        on_delete=models.CASCADE,
+        related_name="lines",
+    )
+    product_version = models.ForeignKey(
+        "reversion.Version",
+        limit_choices_to=_order_line_product_versions,
+        on_delete=models.CASCADE,
+    )
+    quantity = models.PositiveIntegerField()
+
+    @property
+    def unit_price(self):
+        """Return the price of the product"""
+        return self.product_version.field_dict["price"]
+
+    @property
+    def total_price(self):
+        """Return the price of the product"""
+        return self.unit_price * self.quantity
+
+    def __str__(self):
+        return f"{self.product_version}"
+
+
+class Transaction(TimestampedModel):
+    """A transaction on an order, generally a payment but can also cover refunds"""
+
+    order = models.ForeignKey(
+        "ecommerce.Order", on_delete=models.CASCADE, related_name="transactions"
+    )
+    amount = models.DecimalField(
+        decimal_places=5,
+        max_digits=20,
+    )
+    data = models.JSONField()
