@@ -15,6 +15,18 @@ type Props = {|
 |}
 
 export class RegisterConfirmSentPage extends React.Component<Props> {
+  headingRef: { current: null | HTMLHeadingElement }
+  constructor(props: Props) {
+    super(props)
+    this.headingRef = React.createRef()
+  }
+
+  componentDidMount() {
+    if (this.headingRef.current) {
+      this.headingRef.current.focus()
+    }
+  }
+
   render() {
     const {
       params: { email }
@@ -27,7 +39,7 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
         <div className="std-page-body container auth-page">
           <div className="auth-card card-shadow auth-form">
             <div className="auth-header">
-              <h1 id="thanks-msg" tabIndex="0">
+              <h1 tabIndex="0" ref={this.headingRef}>
                 Thank you!
               </h1>
             </div>
