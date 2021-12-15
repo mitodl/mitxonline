@@ -75,6 +75,7 @@ django==3.2.10
     #   -r requirements.in
     #   django-anymail
     #   django-filter
+    #   django-fsm-admin
     #   django-oauth-toolkit
     #   django-redis
     #   django-reversion
@@ -104,6 +105,12 @@ django-filter==2.4.0
     # via
     #   -r requirements.in
     #   wagtail
+django-fsm==2.8.0
+    # via
+    #   -r requirements.in
+    #   django-fsm-admin
+django-fsm-admin==1.2.4
+    # via -r requirements.in
 django-hijack==2.1.10
     # via
     #   -r requirements.in
