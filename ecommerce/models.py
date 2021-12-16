@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from mitol.common.models import TimestampedModel
@@ -37,3 +38,23 @@ class Product(TimestampedModel):
 
     def __str__(self):
         return f"{self.description} {self.price}"
+
+
+class Basket(TimestampedModel):
+    """Represents a User's basket."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="basket"
+    )
+
+
+class BasketItem(TimestampedModel):
+    """Represents one or more products in a user's basket."""
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name="basket_item"
+    )
+    basket = models.ForeignKey(
+        Basket, on_delete=models.CASCADE, related_name="basket_item"
+    )
+    quantity = models.PositiveIntegerField()
