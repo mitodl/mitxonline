@@ -4,6 +4,8 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from mitol.common.models import TimestampedModel
 import reversion
+from ecommerce.constants import DISCOUNT_TYPES, REDEMPTION_TYPES
+from users.models import User
 
 
 def valid_purchasable_objects_list():
@@ -58,3 +60,54 @@ class BasketItem(TimestampedModel):
         Basket, on_delete=models.CASCADE, related_name="basket_item"
     )
     quantity = models.PositiveIntegerField()
+
+
+class Discount(TimestampedModel):
+    """Discount model"""
+
+    amount = models.DecimalField(
+        decimal_places=5,
+        max_digits=20,
+    )
+    automatic = models.BooleanField(default=False)
+    discount_type = models.CharField(choices=DISCOUNT_TYPES, max_length=30)
+    redemption_type = models.CharField(choices=REDEMPTION_TYPES, max_length=30)
+    max_redemptions = models.PositiveIntegerField(null=True, default=0)
+
+    def __str__(self):
+        return f"{self.amount} {self.discount_type} {self.redemption_type}"
+
+
+class UserDiscount(TimestampedModel):
+    """pre-assignment for a discount to a user"""
+
+    discount = models.ForeignKey(
+        Discount, on_delete=models.CASCADE, related_name="user_discount_discount"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="user_discount_user",
+    )
+
+    def __str__(self):
+        return f"{self.discount} {self.user}"
+
+
+class DiscountRedemption(TimestampedModel):
+    """
+    Tracks when discounts were redeemed, for discounts that aren't unlimited use
+    """
+
+    redemption_date = models.DateTimeField()
+    redeemed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="redeemed_by_user",
+    )
+    redeemed_discount = models.ForeignKey(
+        Discount, on_delete=models.CASCADE, related_name="redeemed_discount"
+    )
+
+    def __str__(self):
+        return f"{self.redemption_date}: {self.redeemed_discount}, {self.redeemed_by}"
