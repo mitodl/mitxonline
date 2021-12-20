@@ -90,11 +90,11 @@ def test_get_course_number():
     """
 
     # checking if it returns last part of readable_id, after the final +
-    readable_id = "course-v1:edX+DemoX+Demo_Course"
+    readable_id = "course-v1:edX+DemoX"
     course_number = get_course_number(readable_id)
-    assert course_number == "Demo_Course"
+    assert course_number == "DemoX"
 
     # checking if it returns readable_id as it is, if + is not found
-    readable_id = "course-v1:edX-DemoX-Demo_Course"
+    readable_id = "course-v1:edX-DemoX"
     course_number = get_course_number(readable_id)
     assert course_number == readable_id
