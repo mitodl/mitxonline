@@ -198,10 +198,6 @@ class CourseIndexPage(CourseObjectIndexPage):
         """Fetch a child page by the related Course's readable_id value"""
         return self.get_children().get(coursepage__course__readable_id=readable_id)
 
-    def get_children(self):
-        return super().get_children().order_by(
-            "coursepage__course__readable_id")
-
 class ProductPage(Page):
     """
     Abstract detail page for course runs and any other "product" that a user can enroll in
