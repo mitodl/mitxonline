@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.17.0
+Version 0.17.0 (Released December 22, 2021)
 --------------
 
 - Added autofocus and tabindex properties to div (#328)
