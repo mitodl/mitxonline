@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.17.1
+--------------
+
+- Bump django from 3.2.5 to 3.2.10 (#334)
+- removed unused code
+- formatted course name and ordered them in explorer
+- Adding Basket subsystem models (#338)
+
 Version 0.17.0 (Released December 22, 2021)
 --------------
 
