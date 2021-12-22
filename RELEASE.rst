@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 0.17.0 (Released December 22, 2021)
+--------------
+
+- Added autofocus and tabindex properties to div (#328)
+- Revert "Adding Basket subsystem"
+- Adding Basket subsystem
+- Ran formatter on admin.py
+- Updated products model admin bindings to include reversion hook Updated main config to include reversion (forgot to do this earlier) You will need to migrate and run createinitialrevisions (per the django-reversion docs)
+- ran formatter on new code
+- migrated object list into a function
+- removing unused stuff
+- Added app for ecommerce, Products model, admin bindings
+
 Version 0.16.2 (Released December 07, 2021)
 --------------
 
