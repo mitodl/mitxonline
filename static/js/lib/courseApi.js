@@ -21,11 +21,7 @@ export const isLinkableCourseRun = (
     return true
   }
   const now = dtNow || moment()
-  return (
-    notNil(run.start_date) &&
-    moment(run.start_date).isBefore(now) &&
-    (isNil(run.end_date) || moment(run.end_date).isAfter(now))
-  )
+  return notNil(run.start_date) && moment(run.start_date).isBefore(now)
 }
 
 export const isWithinEnrollmentPeriod = (run: CourseRunDetail): boolean => {
