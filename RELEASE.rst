@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.17.1
+Version 0.17.1 (Released December 23, 2021)
 --------------
 
 - fix: enable dashboard course link when end date is in past (#349)
