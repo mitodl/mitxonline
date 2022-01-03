@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.18.0
+--------------
+
+- Bump lxml from 4.6.3 to 4.6.5 (#335)
+
 Version 0.17.1 (Released December 23, 2021)
 --------------
 
