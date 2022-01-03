@@ -9,16 +9,11 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-<<<<<<< HEAD
         ("ecommerce", "0005_basket_basketitem"),
-=======
-        ('ecommerce', '0005_basket_basketitem'),
->>>>>>> Addded Discount, UserDiscount, DiscountRedemption models
     ]
 
     operations = [
         migrations.CreateModel(
-<<<<<<< HEAD
             name="Discount",
             fields=[
                 (
@@ -131,48 +126,6 @@ class Migration(migrations.Migration):
             ],
             options={
                 "abstract": False,
-=======
-            name='Discount',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_on', models.DateTimeField(auto_now_add=True)),
-                ('updated_on', models.DateTimeField(auto_now=True)),
-                ('amount', models.DecimalField(decimal_places=5, max_digits=20)),
-                ('automatic', models.BooleanField(default=False)),
-                ('discount_type', models.CharField(choices=[('percentoff', 'percentoff'), ('dollarsoff', 'dollarsoff'), ('fixedprice', 'fixedprice')], max_length=30)),
-                ('redemption_type', models.CharField(choices=[('onetime', 'onetime'), ('onetimeperuser', 'onetimeperuser'), ('unlimited', 'unlimited')], max_length=30)),
-                ('max_redemptions', models.PositiveIntegerField(default=0, null=True)),
-            ],
-            options={
-                'abstract': False,
-            },
-        ),
-        migrations.CreateModel(
-            name='UserDiscount',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_on', models.DateTimeField(auto_now_add=True)),
-                ('updated_on', models.DateTimeField(auto_now=True)),
-                ('discount', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='user_discount_discount', to='ecommerce.discount')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='user_discount_user', to=settings.AUTH_USER_MODEL)),
-            ],
-            options={
-                'abstract': False,
-            },
-        ),
-        migrations.CreateModel(
-            name='DiscountRedemption',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_on', models.DateTimeField(auto_now_add=True)),
-                ('updated_on', models.DateTimeField(auto_now=True)),
-                ('redemption_date', models.DateTimeField()),
-                ('redeemed_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='redeemed_by_user', to=settings.AUTH_USER_MODEL)),
-                ('redeemed_discount', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='redeemed_discount', to='ecommerce.discount')),
-            ],
-            options={
-                'abstract': False,
->>>>>>> Addded Discount, UserDiscount, DiscountRedemption models
             },
         ),
     ]

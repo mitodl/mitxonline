@@ -6,10 +6,7 @@ from mitol.common.models import TimestampedModel
 import reversion
 from ecommerce.constants import DISCOUNT_TYPES, REDEMPTION_TYPES
 from users.models import User
-<<<<<<< HEAD
 
-=======
->>>>>>> Addded Discount, UserDiscount, DiscountRedemption models
 
 def valid_purchasable_objects_list():
     return models.Q(app_label="courses", model="courserun") | models.Q(
