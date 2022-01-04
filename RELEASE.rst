@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.18.1
+Version 0.18.1 (Released January 04, 2022)
 --------------
 
 - fixing auto named migration
