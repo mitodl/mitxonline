@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.18.0
+Version 0.18.0 (Released January 04, 2022)
 --------------
 
 - Bump lxml from 4.6.3 to 4.6.5 (#335)
