@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.18.1
+--------------
+
+- fixing auto named migration
+- updated migration after black run
+- forgot to run black
+- Addded Discount, UserDiscount, DiscountRedemption models
+- Addded Discount, UserDiscount, DiscountRedemption models
+- Documentation updates
+
 Version 0.18.0 (Released January 04, 2022)
 --------------
 
