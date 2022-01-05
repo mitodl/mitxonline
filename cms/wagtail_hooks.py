@@ -13,21 +13,18 @@ def parse_ordering_params(param: List[str]) -> List[str]:
     """
     Ignores the request to sort by "ord".
     Returns a sorting order based on the params and includes "readable_id"
-    sorting in passed params if the sorting request contains title 
+    sorting in passed params if the sorting request contains title
     otherwise, it returns the requested order.
     """
     if "ord" in param:
         order = []
     elif "title" in param:
-        prefix= "-" if param[0]=="-" else ""
-        order =  [
-            "{prefix}coursepage__course__readable_id".format(
-                prefix=prefix),
-            param
-            ]
+        prefix = "-" if param[0] == "-" else ""
+        order = ["{prefix}coursepage__course__readable_id".format(prefix=prefix), param]
     else:
         order = [param]
     return order
+
 
 @hooks.register("construct_explorer_page_queryset")
 def sort_pages_alphabetically(

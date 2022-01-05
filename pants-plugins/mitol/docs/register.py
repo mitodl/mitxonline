@@ -1,5 +1,7 @@
 from pants.backend.python.target_types import ConsoleScript
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.interpreter_constraints import (
+    InterpreterConstraints,
+)
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexProcess,
@@ -11,11 +13,20 @@ from pants.engine.fs import Digest, Workspace, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, goal_rule, collect_rules, rule
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.target import Target, Tags, COMMON_TARGET_FIELDS, Targets, Sources, StringField, FieldSet
+from pants.engine.target import (
+    Target,
+    Tags,
+    COMMON_TARGET_FIELDS,
+    Targets,
+    Sources,
+    StringField,
+    FieldSet,
+)
 from dataclasses import dataclass
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 class DocsGoalSubsystem(GoalSubsystem):
     name = "docs"
@@ -35,6 +46,7 @@ class SphinxDocsFieldSet(FieldSet):
     required_fields = (SphinxSources,)
     source_directory: SphinxSources
 
+
 class SphinxDocs(Target):
     alias = "sphinx_docs"
     core_fields = (*COMMON_TARGET_FIELDS, SphinxSources)
@@ -49,10 +61,12 @@ async def build_docs(targets: Targets, dist_dir: DistDir, workspace: Workspace) 
         PexRequest(
             output_filename="sphinx-build.pex",
             internal_only=True,
-            requirements=PexRequirements(["sphinx", "insipid-sphinx-theme", "sphinxcontrib-mermaid"]),
+            requirements=PexRequirements(
+                ["sphinx", "insipid-sphinx-theme", "sphinxcontrib-mermaid"]
+            ),
             interpreter_constraints=InterpreterConstraints([">=3.6"]),
             main=ConsoleScript("sphinx-build"),
-        )
+        ),
     )
     digests = []
 
@@ -70,23 +84,22 @@ async def build_docs(targets: Targets, dist_dir: DistDir, workspace: Workspace) 
                 argv=[source_dir, output_path],
                 description="Generate sphinx docs",
                 input_digest=digest,
-                output_directories=[output_path]
-            )
+                output_directories=[output_path],
+            ),
         )
         digests.append(result.output_digest)
         logger.info(result.stdout.decode())
         logger.info(result.stderr.decode())
 
-    merged_digest = await Get(
-        Digest,
-        MergeDigests(digests)
-    )
+    merged_digest = await Get(Digest, MergeDigests(digests))
 
     workspace.write_digest(merged_digest, path_prefix=str(dist_dir.relpath))
     return Docs(exit_code=0)
 
+
 def target_types():
     return [SphinxDocs]
+
 
 def rules():
     return collect_rules()
