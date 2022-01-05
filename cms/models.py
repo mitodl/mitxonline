@@ -24,6 +24,7 @@ from wagtail.images.models import Image
 from wagtail.images.edit_handlers import ImageChooserPanel
 from wagtail.embeds.embeds import get_embed
 from wagtail.embeds.exceptions import EmbedException
+from wagtail.search import index
 
 from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
 from cms.constants import COURSE_INDEX_SLUG, CMS_EDITORS_GROUP_NAME
@@ -344,6 +345,12 @@ class CoursePage(ProductPage):
         "courses.Course", null=True, on_delete=models.SET_NULL, related_name="page"
     )
 
+    search_fields = Page.search_fields + [
+        index.RelatedFields('course', [
+            index.SearchField('readable_id', partial_match=True),
+        ])
+    ]
+
     @property
     def product(self):
         """Gets the product associated with this page"""
@@ -351,9 +358,9 @@ class CoursePage(ProductPage):
 
     template = "product_page.html"
 
-    def get_admin_display_title(self): 
-        """Gets the title of the course in the speacified format"""
-        return str(self.course)
+    def get_admin_display_title(self):
+        """Gets the title of the course in the specified format"""
+        return f"{self.course.readable_id} | {self.title}"
 
     def get_context(self, request, *args, **kwargs):
         relevant_run = get_user_relevant_course_run(
