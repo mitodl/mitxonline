@@ -13,7 +13,7 @@ Run through those steps **including the addition of `/etc/hosts` aliases and the
 
 ### Configure mitxonline and Open edX
 
-See [Configure Open edX](docs/configure_open_edx.md)
+See [Configure Open edX](docs/source/configuration/open_edx.rst)
 
 ### Configuring the CMS
 
