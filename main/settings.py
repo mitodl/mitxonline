@@ -621,9 +621,9 @@ SITE_NAME = get_string(
 WAGTAIL_SITE_NAME = SITE_NAME
 
 WAGTAILSEARCH_BACKENDS = {
-    'default': {
-        'BACKEND': 'wagtail.contrib.postgres_search.backend',
-        'ATOMIC_REBUILD': True,
+    "default": {
+        "BACKEND": "wagtail.contrib.postgres_search.backend",
+        "ATOMIC_REBUILD": True,
     },
 }
 
