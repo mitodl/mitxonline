@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.18.2
+Version 0.18.2 (Released January 06, 2022)
 --------------
 
 - docs: fix broken open edx config link (#356)
