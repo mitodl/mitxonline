@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.18.3
+--------------
+
+- Added Product subsystem REST API
+- Order models
+- Add black formatting check to CI
+
 Version 0.18.2 (Released January 06, 2022)
 --------------
 
