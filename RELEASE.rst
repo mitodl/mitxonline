@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.18.3
+Version 0.18.3 (Released January 06, 2022)
 --------------
 
 - Added Product subsystem REST API
