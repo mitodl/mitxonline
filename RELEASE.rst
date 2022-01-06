@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.18.2 (Released January 06, 2022)
+--------------
+
+- docs: fix broken open edx config link (#356)
+- feat: add search index for readable id (#352)
+
 Version 0.18.1 (Released January 04, 2022)
 --------------
 
