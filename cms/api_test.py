@@ -14,7 +14,7 @@ from cms.api import (
 )
 from cms.exceptions import WagtailSpecificPageError
 from cms.factories import HomePageFactory, CoursePageFactory
-from cms.models import HomePage, ResourcePage, CourseIndexPage
+from cms.models import HomePage, ResourcePage, CourseIndexPage, HomeProductLink
 
 
 @pytest.mark.django_db
@@ -134,3 +134,57 @@ def test_ensure_product_index(mocker):
     # Make sure the function is idempotent
     ensure_product_index()
     assert list(course_index_children_qset.all()) == [existing_course_page.page_ptr]
+
+
+@pytest.mark.django_db
+def atest_home_page_featured_products(mocker):
+    """test home page is loading featured product"""
+    home_page = HomePageFactory.create()
+    patched_get_home_page = mocker.patch(
+        "cms.api.get_home_page", return_value=home_page
+    )
+    course_page = CoursePageFactory.create(parent=home_page)
+    # make sure featured products are listing
+    HomeProductLink.objects.create(page=home_page, course_product_page=course_page)
+    featured_products = home_page.products
+    assert len(featured_products) == 1
+    run = course_page.product.first_unexpired_run
+    assert featured_products == [
+        {
+            "title": course_page.title,
+            "description": course_page.description,
+            "feature_image": course_page.feature_image,
+            "start_date": run.start_date if run is not None else None,
+            "url_path": course_page.get_url(),
+        }
+    ]
+
+
+@pytest.mark.django_db
+def test_home_page_featured_products_sorting(mocker):
+    """tests that featured products are sorted in ascending order"""
+    home_page = HomePageFactory.create()
+    patched_get_home_page = mocker.patch(
+        "cms.api.get_home_page", return_value=home_page
+    )
+    course_pages = CoursePageFactory.create_batch(2, parent=home_page)
+    page_data = []
+    for course_page in course_pages:
+        HomeProductLink.objects.create(page=home_page, course_product_page=course_page)
+        run = course_page.product.first_unexpired_run
+        page_data.append(
+            {
+                "title": course_page.title,
+                "description": course_page.description,
+                "feature_image": course_page.feature_image,
+                "start_date": run.start_date if run is not None else None,
+                "url_path": course_page.get_url(),
+            }
+        )
+    page_data = sorted(
+        page_data,
+        key=lambda item: (item["start_date"] is None, item["start_date"]),
+    )
+    featured_products = home_page.products
+    assert len(featured_products) == 2
+    assert featured_products == page_data

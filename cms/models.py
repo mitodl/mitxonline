@@ -9,6 +9,7 @@ from django.conf import settings
 from django.db import models
 from django.http import Http404
 from django.urls import reverse
+from mitol.common.utils.datetime import now_in_utc
 from modelcluster.fields import ParentalKey
 from wagtail.admin.edit_handlers import (
     FieldPanel,
@@ -91,20 +92,37 @@ class HomePage(Page):
 
     @property
     def products(self):
-        page_data = []
+        future_data = []
+        past_data = []
         for page in self.featured_products.all():
             if page.course_product_page:
                 product_page = page.course_product_page.specific
                 run = product_page.product.first_unexpired_run
-                page_data.append(
-                    {
-                        "title": product_page.title,
-                        "description": product_page.description,
-                        "feature_image": product_page.feature_image,
-                        "start_date": run.start_date if run is not None else None,
-                        "url_path": product_page.get_url(),
-                    }
-                )
+                run_data = {
+                    "title": product_page.title,
+                    "description": product_page.description,
+                    "feature_image": product_page.feature_image,
+                    "start_date": run.start_date if run is not None else None,
+                    "url_path": product_page.get_url(),
+                }
+                if run and run.start_date and run.start_date < now_in_utc():
+                    past_data.append(run_data)
+                else:
+                    future_data.append(run_data)
+
+        # sort future course run in ascending order
+        page_data = sorted(
+            future_data,
+            key=lambda item: (item["start_date"] is None, item["start_date"]),
+        )
+        # sort past course run in descending order
+        page_data.extend(
+            sorted(
+                past_data,
+                key=lambda item: (item["start_date"] is None, item["start_date"]),
+                reverse=True,
+            )
+        )
         return page_data
 
     def get_context(self, request, *args, **kwargs):
@@ -115,7 +133,7 @@ class HomePage(Page):
         }
 
 
-class HomeProductLink(Orderable):
+class HomeProductLink(models.Model):
     """
     Home and ProductPage Link
     """
