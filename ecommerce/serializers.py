@@ -64,3 +64,36 @@ class ProductSerializer(serializers.ModelSerializer):
             "is_active",
         ]
         model = models.Product
+
+
+class BasketItemSerializer(serializers.ModelSerializer):
+    """BasketItem model serializer"""
+
+    class Meta:
+        model = models.BasketItem
+        fields = [
+            "basket",
+            "product",
+            "id",
+        ]
+
+
+class BasketSerializer(serializers.ModelSerializer):
+    """Basket model serializer"""
+
+    basket_items = serializers.SerializerMethodField()
+
+    def get_basket_items(self, instance):
+        """Get items in the basket"""
+        return [
+            BasketItemSerializer(instance=basket, context=self.context).data
+            for basket in instance.basket_items.all()
+        ]
+
+    class Meta:
+        fields = [
+            "id",
+            "user",
+            "basket_items",
+        ]
+        model = models.Basket

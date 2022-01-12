@@ -59,9 +59,9 @@ class BasketItem(TimestampedModel):
         Product, on_delete=models.CASCADE, related_name="basket_item"
     )
     basket = models.ForeignKey(
-        Basket, on_delete=models.CASCADE, related_name="basket_item"
+        Basket, on_delete=models.CASCADE, related_name="basket_items"
     )
-    quantity = models.PositiveIntegerField()
+    quantity = models.PositiveIntegerField(default=1)
 
 
 class Discount(TimestampedModel):

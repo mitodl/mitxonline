@@ -5,9 +5,9 @@ from django.urls import reverse
 import operator as op
 
 from ecommerce.serializers import (
-    ProductSerializer,
+    ProductSerializer, BasketSerializer, BasketItemSerializer,
 )
-from ecommerce.factories import ProductFactory
+from ecommerce.factories import ProductFactory, BasketItemFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -35,3 +35,28 @@ def test_get_products(user_drf_client, products):
     )
 
     assert_drf_json_equal(resp.json(), ProductSerializer(product).data)
+
+
+def test_get_basket(user_drf_client):
+    """Test the view that returns a state of Basket"""
+    basket_item = BasketItemFactory.create()
+    basket = basket_item.basket
+    resp = user_drf_client.get(
+        reverse("basket-detail", kwargs={"pk": basket.id})
+    )
+    assert_drf_json_equal(resp.json(), BasketSerializer(basket).data)
+
+
+def test_get_basket_items(user_drf_client):
+    """Test the view that returns a list of BasketItems in a Basket"""
+    basket_item = BasketItemFactory.create()
+    basket = basket_item.basket
+    basket_item_2 = BasketItemFactory.create(basket=basket)
+    # this item belongs to another basket, and should not be in the response
+    BasketItemFactory.create()
+    resp = user_drf_client.get(
+        reverse("basket-items-list", kwargs={"pk": basket.id})
+    )
+    returned_items = resp.json()
+    assert len(returned_items) == 2
+    assert_drf_json_equal(resp.json(), [BasketItemSerializer(basket_item_2).data, BasketItemSerializer(basket_item)])

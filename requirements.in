@@ -19,6 +19,7 @@ django-webpack-loader==0.7.0
 django-oauth-toolkit==1.5.0
 django-user-agents==0.4.0
 djangorestframework==3.12.4
+drf-extensions==0.7.1
 django-reversion==4.0.1
 django-storages==1.11.1
 djoser==2.1.0
