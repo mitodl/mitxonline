@@ -40,6 +40,8 @@ from openedx.exceptions import (
     OpenEdxUserCreateError,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
+    EdxApiEmailSettingsErrorException,
+    UnknownEdxApiEmailSettingsException,
 )
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
 from openedx.utils import edx_url, SyncResult
@@ -654,3 +656,55 @@ def sync_enrollments_with_edx(
             str(local_only_ids),
         )
     return results
+
+
+def subscribe_to_edx_course_emails(user, course_run):
+    """
+    Subscribes a user to course emails in edX
+
+    Args:
+        user (users.models.User): The user that will be subscribed
+        course_run (CourseRun): The course runs to subscribe to
+
+    Returns:
+        boolean:
+            either subscribed successfully or not
+
+    Raises:
+        EdxApiEmailSettingsErrorException: Raised if the underlying edX API HTTP request fails
+        EdxApiChangeEmailSettingsException: Raised if an unknown error was encountered during the edX API request
+    """
+    edx_client = get_edx_api_client(user)
+    try:
+        result = edx_client.email_settings.subscribe(course_run.courseware_id)
+    except HTTPError as exc:
+        raise EdxApiEmailSettingsErrorException(user, course_run, exc) from exc
+    except Exception as exc:
+        raise UnknownEdxApiEmailSettingsException(user, course_run, exc) from exc
+    return result
+
+
+def unsubscribe_from_edx_course_emails(user, course_run):
+    """
+    Unsubscribes a user from an edX course
+
+    Args:
+        user (users.models.User): The user to unsubscribe
+        course_run (CourseRun): The enrolled course run
+
+    Returns:
+        boolean:
+            either unsubscribed successfully or not
+
+    Raises:
+        EdxApiEmailSettingsErrorException: Raised if the underlying edX API HTTP request fails
+        EdxApiChangeEmailSettingsException: Raised if an unknown error was encountered during the edX API request
+    """
+    edx_client = get_edx_api_client(user)
+    try:
+        result = edx_client.email_settings.unsubscribe(course_run.courseware_id)
+    except HTTPError as exc:
+        raise EdxApiEmailSettingsErrorException(user, course_run, exc) from exc
+    except Exception as exc:
+        raise UnknownEdxApiEmailSettingsException(user, course_run, exc) from exc
+    return result

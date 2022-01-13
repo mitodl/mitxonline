@@ -3,9 +3,12 @@ import logging
 from typing import Tuple, Optional, Union
 
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.http import HttpResponseRedirect, HttpResponse
 from django.urls import reverse
 from django.conf import settings
+from requests import ConnectionError as RequestsConnectionError
+from requests.exceptions import HTTPError
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -34,7 +37,17 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_BLOCKED,
 )
 from main.utils import encode_json_cookie_value
-from openedx.api import sync_enrollments_with_edx, unenroll_edx_course_run
+from openedx.api import (
+    sync_enrollments_with_edx,
+    unenroll_edx_course_run,
+    subscribe_to_edx_course_emails,
+    unsubscribe_from_edx_course_emails,
+)
+from openedx.exceptions import (
+    UnknownEdxApiEmailSettingsException,
+    EdxApiEmailSettingsErrorException,
+    NoEdxApiAuthError,
+)
 
 log = logging.getLogger(__name__)
 
@@ -152,6 +165,7 @@ class UserEnrollmentsApiViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.DestroyModelMixin,
+    mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
     """API view set for user enrollments"""
@@ -190,3 +204,39 @@ class UserEnrollmentsApiViewSet(
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def partial_update(self, request, *args, **kwargs):
+        enrollment = self.get_object()
+        receive_emails = request.data.get("receive_emails")
+
+        if receive_emails is not None:
+            # means if receive_emails is passed in the request body
+            with transaction.atomic():
+                try:
+                    if receive_emails:
+                        response = subscribe_to_edx_course_emails(
+                            request.user, enrollment.run
+                        )
+                        enrollment.edx_emails_subscription = True
+                    else:
+                        response = unsubscribe_from_edx_course_emails(
+                            request.user, enrollment.run
+                        )
+                        enrollment.edx_emails_subscription = False
+                    enrollment.save()
+                    return Response(data=response, status=status.HTTP_200_OK)
+                except (
+                    EdxApiEmailSettingsErrorException,
+                    UnknownEdxApiEmailSettingsException,
+                    NoEdxApiAuthError,
+                    HTTPError,
+                    RequestsConnectionError,
+                ) as exc:
+                    log.exception(str(exc))
+                    return Response(data=str(exc), status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # only designed to update edx_emails_subscription field
+            # TODO: In the future please add the implementation
+            # to update the rest of the fields in the PATCH request
+            # or separate out the APIs into function-based views.
+            raise NotImplementedError

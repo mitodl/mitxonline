@@ -7,7 +7,7 @@ import operator as op
 import pytest
 from django.db.models import Count, Q
 from django.urls import reverse
-from requests import HTTPError
+from requests import HTTPError, ConnectionError as RequestsConnectionError
 from rest_framework import status
 
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
@@ -526,3 +526,51 @@ def test_create_enrollments_blocked_country(user_client, user):
             "type": USER_MSG_TYPE_ENROLL_BLOCKED,
         }
     )
+
+
+@pytest.mark.parametrize("receive_emails", [True, False])
+def test_update_user_enrollment(mocker, user_drf_client, user, receive_emails):
+    """the enrollment should update the course email subscriptions"""
+    run_enrollment = CourseRunEnrollmentFactory.create(user=user)
+    fake_enrollment = {"fake": "enrollment"}
+    patch_func = (
+        "subscribe_to_edx_course_emails"
+        if receive_emails
+        else "unsubscribe_from_edx_course_emails"
+    )
+    patched_email_subscription = mocker.patch(
+        f"courses.views.v1.{patch_func}", return_value=fake_enrollment
+    )
+    resp = user_drf_client.patch(
+        reverse("user-enrollments-api-detail", kwargs={"pk": run_enrollment.id}),
+        data={"receive_emails": "on" if receive_emails else ""},
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    patched_email_subscription.assert_called_once_with(user, run_enrollment.run)
+
+
+@pytest.mark.parametrize("receive_emails", [True, False])
+@pytest.mark.parametrize(
+    "exception_raised", [NoEdxApiAuthError, HTTPError, RequestsConnectionError]
+)
+def test_update_user_enrollment_failure(
+    mocker, user_drf_client, user, receive_emails, exception_raised
+):
+    """the enrollment update failure to the course email subscriptions"""
+    run_enrollment = CourseRunEnrollmentFactory.create(user=user)
+    patch_func = (
+        "subscribe_to_edx_course_emails"
+        if receive_emails
+        else "unsubscribe_from_edx_course_emails"
+    )
+    patched_email_subscription = mocker.patch(
+        f"courses.views.v1.{patch_func}", side_effect=exception_raised
+    )
+    patched_log_exception = mocker.patch("courses.views.v1.log.exception")
+    resp = user_drf_client.patch(
+        reverse("user-enrollments-api-detail", kwargs={"pk": run_enrollment.id}),
+        data={"receive_emails": "on" if receive_emails else ""},
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    patched_email_subscription.assert_called_once_with(user, run_enrollment.run)
+    patched_log_exception.assert_called_once()

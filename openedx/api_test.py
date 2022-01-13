@@ -33,6 +33,8 @@ from openedx.api import (
     update_edx_user_name,
     sync_enrollments_with_edx,
     retry_failed_edx_enrollments,
+    subscribe_to_edx_course_emails,
+    unsubscribe_from_edx_course_emails,
 )
 from openedx.constants import (
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
@@ -44,6 +46,8 @@ from openedx.exceptions import (
     OpenEdxUserCreateError,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
+    EdxApiEmailSettingsErrorException,
+    UnknownEdxApiEmailSettingsException,
 )
 from openedx.factories import OpenEdxApiAuthFactory, OpenEdxUserFactory
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
@@ -660,3 +664,85 @@ def test_sync_enrollments_with_edx_missing(mocker, user):
     results = sync_enrollments_with_edx(user)
     patched_log_error.assert_called_once()
     assert results == SyncResult()
+
+
+def test_subscribe_to_edx_course_emails(mocker, user):
+    """tests that subscribe_to_edx_course_emails makes a call to subscribe for course emails in edX via api client"""
+    mock_client = mocker.MagicMock()
+    run_enrollment = CourseRunEnrollmentFactory()
+    courseware_id = run_enrollment.run.courseware_id
+    subscribe_return_value = mocker.Mock(json={"course_id": courseware_id})
+    mock_client.email_settings.subscribe = mocker.Mock(
+        return_value=subscribe_return_value
+    )
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    subscribe_to_course_emails = subscribe_to_edx_course_emails(
+        user, run_enrollment.run
+    )
+
+    mock_client.email_settings.subscribe.assert_called_once_with(courseware_id)
+    assert subscribe_to_course_emails == subscribe_return_value
+
+
+@pytest.mark.parametrize(
+    "client_exception_raised, expected_exception",
+    [
+        [MockHttpError, EdxApiEmailSettingsErrorException],
+        [ValueError, UnknownEdxApiEmailSettingsException],
+        [Exception, UnknownEdxApiEmailSettingsException],
+    ],
+)
+def test_subscribe_to_edx_course_emails_failure(
+    mocker, user, client_exception_raised, expected_exception
+):
+    """tests that subscribe_to_edx_course_emails translates exceptions raised by api client"""
+    mock_client = mocker.MagicMock()
+    run_enrollment = CourseRunEnrollmentFactory()
+    mock_client.email_settings.subscribe = mocker.Mock(
+        side_effect=client_exception_raised
+    )
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+
+    with pytest.raises(expected_exception):
+        subscribe_to_edx_course_emails(user, run_enrollment.run)
+
+
+def test_unsubscribe_from_edx_course_emails(mocker, user):
+    """tests that unsubscribe_from_edx_course_emails makes a call to unsubscribe for course emails in edX via api client"""
+    mock_client = mocker.MagicMock()
+    run_enrollment = CourseRunEnrollmentFactory()
+    courseware_id = run_enrollment.run.courseware_id
+    unsubscribe_return_value = mocker.Mock(json={"courseware_id": courseware_id})
+    mock_client.email_settings.unsubscribe = mocker.Mock(
+        return_value=unsubscribe_return_value
+    )
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    unsubscribe_to_course_emails = unsubscribe_from_edx_course_emails(
+        user, run_enrollment.run
+    )
+
+    mock_client.email_settings.unsubscribe.assert_called_once_with(courseware_id)
+    assert unsubscribe_to_course_emails == unsubscribe_return_value
+
+
+@pytest.mark.parametrize(
+    "client_exception_raised, expected_exception",
+    [
+        (MockHttpError, EdxApiEmailSettingsErrorException),
+        (ValueError, UnknownEdxApiEmailSettingsException),
+        (Exception, UnknownEdxApiEmailSettingsException),
+    ],
+)
+def test_unsubscribe_from_edx_course_emails_failure(
+    mocker, user, client_exception_raised, expected_exception
+):
+    """tests that unsubscribe_from_edx_course_emails translates exception raised by api client"""
+    mock_client = mocker.MagicMock()
+    run_enrollment = CourseRunEnrollmentFactory()
+    mock_client.email_settings.unsubscribe = mocker.Mock(
+        side_effect=client_exception_raised
+    )
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+
+    with pytest.raises(expected_exception):
+        unsubscribe_from_edx_course_emails(user, run_enrollment.run)
