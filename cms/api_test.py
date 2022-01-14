@@ -137,7 +137,7 @@ def test_ensure_product_index(mocker):
 
 
 @pytest.mark.django_db
-def atest_home_page_featured_products(mocker):
+def test_home_page_featured_products(mocker):
     """test home page is loading featured product"""
     home_page = HomePageFactory.create()
     patched_get_home_page = mocker.patch(
