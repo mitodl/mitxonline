@@ -232,17 +232,3 @@ class EnrollmentChangeCommand(BaseCommand):
         ) as exc:
             self.stdout.write(self.style.WARNING(str(exc)))
         return False
-
-
-def get_course_number(readable_id):
-    """
-    Returns course number from readable_id
-    i.e: last part of course.readable_id, after the final +
-    returns whole readable_id, if + is not found
-
-    Args:
-        readable_id: Readable Id from course: course.readable_id
-    Returns:
-        str: course number
-    """
-    return readable_id.split('+')[-1].strip()

@@ -10,7 +10,7 @@ from courses.factories import (
     CourseRunFactory,
     ProgramEnrollmentFactory,
 )
-from courses.management.utils import EnrollmentChangeCommand, get_course_number
+from courses.management.utils import EnrollmentChangeCommand
 from main.test_utils import MockHttpError
 from openedx.exceptions import EdxApiEnrollErrorException, UnknownEdxApiEnrollException
 from users.factories import UserFactory
@@ -82,19 +82,3 @@ def test_create_run_enrollment_edx_failure(
         assert new_enrollment == expected_enrollment
     else:
         assert new_enrollment is None
-
-
-def test_get_course_number():
-    """
-        Tests get_course_number
-    """
-
-    # checking if it returns last part of readable_id, after the final +
-    readable_id = "course-v1:edX+DemoX"
-    course_number = get_course_number(readable_id)
-    assert course_number == "DemoX"
-
-    # checking if it returns readable_id as it is, if + is not found
-    readable_id = "course-v1:edX-DemoX"
-    course_number = get_course_number(readable_id)
-    assert course_number == readable_id

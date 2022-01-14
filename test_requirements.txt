@@ -23,3 +23,4 @@ pytest-lazy-fixture~=0.6.3
 responses
 semantic-version
 wagtail-factories
+mitol-django-openedx==1.0.0
