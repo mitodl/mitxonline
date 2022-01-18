@@ -3,6 +3,7 @@
 import { assert } from "chai"
 import moment from "moment"
 import sinon from "sinon"
+import { Formik } from "formik"
 
 import DashboardPage, {
   DashboardPage as InnerDashboardPage
@@ -240,9 +241,22 @@ describe("DashboardPage", () => {
 
       const { inner, store } = await renderPage()
       const enrolledItems = inner.find(".enrolled-item").at(enrollmentIndex)
-      const unsubscribeBtn = enrolledItems.find("Dropdown DropdownItem").at(1)
-      assert.isTrue(unsubscribeBtn.exists())
-      await unsubscribeBtn.prop("onClick")()
+      const emailSettingsBtn = enrolledItems.find("Dropdown DropdownItem").at(1)
+      assert.isTrue(emailSettingsBtn.exists())
+      emailSettingsBtn.prop("onClick")()
+      const formik = inner.find(Formik).at(0)
+      assert.isTrue(formik.exists())
+      const submitBtn = formik
+        .dive()
+        .find("Form Button")
+        .at(0)
+      assert.isTrue(submitBtn.exists())
+      const onSubmit = formik.prop("onSubmit")
+      await onSubmit({
+        enrollmentId:    enrollment.id,
+        subscribeEmails: true,
+        courseTitle:     enrollment.run.title
+      })
       sinon.assert.calledTwice(helper.handleRequestStub)
       assert.deepEqual(store.getState().ui.userNotifications, {
         "subscription-status": {
