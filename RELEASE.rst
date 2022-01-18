@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.19.0
+--------------
+
+- Sort courses on home page by date ascending (#368)
+- feat: Allow users to unsubscribe from course emails from the dashboard (#329)
+- Adding discount abstractions
+
 Version 0.18.3 (Released January 06, 2022)
 --------------
 
