@@ -1,7 +1,6 @@
 """Course mail API tests"""
 import pytest
 from django.urls import reverse
-from mitol.openedx.utils import get_course_number
 from mitol.common.factories import UserFactory
 from pytz import UTC
 
@@ -25,13 +24,12 @@ def test_send_course_run_enrollment_email(mocker):
     patched_get_message_sender = mocker.patch("courses.mail_api.get_message_sender")
     mock_sender = patched_get_message_sender.return_value.__enter__.return_value
     enrollment = CourseRunEnrollmentFactory.create()
-    course_number = get_course_number(enrollment.run.courseware_id)
 
     send_course_run_enrollment_email(enrollment)
 
     patched_get_message_sender.assert_called_once_with(CourseRunEnrollmentMessage)
     mock_sender.build_and_send_message.assert_called_once_with(
-        enrollment.user, {"enrollment": enrollment, "course_number": course_number}
+        enrollment.user, {"enrollment": enrollment}
     )
 
 

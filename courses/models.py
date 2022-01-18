@@ -13,6 +13,7 @@ from django_countries.fields import CountryField
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
+from mitol.openedx.utils import get_course_number
 
 from courses.constants import (
     ENROLL_CHANGE_STATUS_CHOICES,
@@ -426,6 +427,14 @@ class CourseRun(TimestampedModel):
     def text_id(self):
         """Gets the courseware_id"""
         return self.courseware_id
+
+    @property
+    def course_number(self):
+        """
+            Returns course_number: 
+            i.e. the last part of course.readable_id, after the final +
+        """
+        return get_course_number(self.courseware_id)
 
     def __str__(self):
         title = f"{self.courseware_id} | {self.title}"

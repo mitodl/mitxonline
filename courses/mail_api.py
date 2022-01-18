@@ -4,7 +4,6 @@ import logging
 from django.conf import settings
 from django.core import mail
 from django.urls import reverse
-from mitol.openedx.utils import get_course_number
 from mitol.mail.api import get_message_sender
 from courses.messages import (
     CourseRunEnrollmentMessage,
@@ -25,11 +24,10 @@ def send_course_run_enrollment_email(enrollment):
     """
     try:
         user = enrollment.user
-        course_number = get_course_number(enrollment.run.courseware_id)
 
         with get_message_sender(CourseRunEnrollmentMessage) as sender:
             sender.build_and_send_message(
-                user, {"enrollment": enrollment, "course_number": course_number}
+                user, {"enrollment": enrollment}
             )
     except Exception:  # pylint: disable=broad-except
         log.exception("Error sending enrollment success email")
@@ -44,11 +42,10 @@ def send_course_run_unenrollment_email(enrollment):
     """
     try:
         user = enrollment.user
-        course_number = get_course_number(enrollment.run.courseware_id)
 
         with get_message_sender(CourseRunUnenrollmentMessage) as sender:
             sender.build_and_send_message(
-                user, {"enrollment": enrollment, "course_number": course_number}
+                user, {"enrollment": enrollment}
             )
     except Exception:  # pylint: disable=broad-except
         log.exception("Error sending unenrollment success email")
