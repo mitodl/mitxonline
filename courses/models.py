@@ -431,8 +431,8 @@ class CourseRun(TimestampedModel):
     @property
     def course_number(self):
         """
-        Returns course_number:
-        i.e. the last part of course.readable_id, after the final +
+        Returns:
+            str: Course number (last part of readable_id, after the final +)
         """
         return get_course_number(self.courseware_id)
 
