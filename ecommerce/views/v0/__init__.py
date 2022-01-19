@@ -4,9 +4,8 @@ MITxOnline ecommerce views
 import logging
 from django.http import HttpResponseRedirect
 from django.urls import reverse
-from rest_framework.decorators import permission_classes, api_view
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet, ModelViewSet
 from rest_framework.pagination import LimitOffsetPagination
 from django.db.models import Q, Count
@@ -20,7 +19,11 @@ from courses.models import (
     ProgramRun,
 )
 
-from ecommerce.serializers import ProductSerializer, BasketSerializer, BasketItemSerializer
+from ecommerce.serializers import (
+    ProductSerializer,
+    BasketSerializer,
+    BasketItemSerializer,
+)
 from ecommerce.models import Product, Basket, BasketItem
 
 log = logging.getLogger(__name__)
@@ -94,45 +97,29 @@ class ProductViewSet(ReadOnlyModelViewSet):
 
 class BasketViewSet(NestedViewSetMixin, ModelViewSet):
     """API view set for Basket"""
+
     queryset = Basket.objects.all()
     serializer_class = BasketSerializer
     permission_classes = [IsAuthenticated]
 
-    def update(self, request, *args, **kwargs):
+    @action(detail=True, methods=["post"], url_name="add-item")
+    def add_item(self, request):
         basket = self.get_object()
-        product_id = request.data.get("product_id")
-        serializer = BasketSerializer(basket)
-        return Response(serializer.data)
+        product_id_str = request.data.get("product_id")
+        product = Product.objects.filter(id=int(product_id_str)).first()
+        item, created = BasketItem.objects.update_or_create(
+            basket=basket, product=product
+        )
+        if created is False:
+            item.quantity += 1
+            item.save()
+
+        return HttpResponseRedirect(reverse("user-dashboard"))
 
 
 class BasketItemViewSet(NestedViewSetMixin, ModelViewSet):
     """API view set for BasketItem"""
+
     queryset = BasketItem.objects.all()
     serializer_class = BasketItemSerializer
     permission_classes = [IsAuthenticated]
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def add_product_to_basket_view(request):
-    """View to handle direct POST requests to enroll in a course run"""
-    user = request.user
-    product_id_str = request.data.get("product_id")
-    if product_id_str is not None and product_id_str.isdigit():
-        product = (
-            Product.objects.filter(id=int(product_id_str)).first()
-        )
-    else:
-        product = None
-    if product is None:
-        log.error(
-            "Attempting to add in a non-existent product (id: %s)", str(product_id_str)
-        )
-        return HttpResponseRedirect(request.headers["Referer"]), None, None
-    basket, _ = Basket.objects.get_or_create(user=user)
-    item, created = BasketItem.objects.update_or_create(basket=basket, product=product)
-    if created is False:
-        item.quantity += 1
-        item.save()
-
-    return HttpResponseRedirect(reverse("user-dashboard"))

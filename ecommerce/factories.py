@@ -34,6 +34,7 @@ class DiscountFactory(DjangoModelFactory):
 
 class BasketFactory(DjangoModelFactory):
     """Factory for Basket"""
+
     user = SubFactory(UserFactory)
 
     class Meta:
@@ -42,6 +43,7 @@ class BasketFactory(DjangoModelFactory):
 
 class BasketItemFactory(DjangoModelFactory):
     """Factory for BasketItem"""
+
     product = SubFactory(ProductFactory)
     basket = SubFactory(BasketFactory)
 

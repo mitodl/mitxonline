@@ -1,5 +1,5 @@
 import pytest
-from main.test_utils import assert_drf_json_equal, drf_datetime
+from main.test_utils import assert_drf_json_equal
 
 from courses.factories import (
     CourseRunFactory,
@@ -10,7 +10,9 @@ from courses.factories import (
 from ecommerce.serializers import (
     ProductSerializer,
     CourseRunProductPurchasableObjectSerializer,
-    ProgramRunProductPurchasableObjectSerializer, BasketSerializer, BasketItemSerializer,
+    ProgramRunProductPurchasableObjectSerializer,
+    BasketSerializer,
+    BasketItemSerializer,
 )
 from ecommerce.factories import ProductFactory, BasketItemFactory
 
