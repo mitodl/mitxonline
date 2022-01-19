@@ -1,1 +1,1 @@
-You have been unenrolled in {{ enrollment.run }}
+You have been unenrolled in {{ enrollment.run.course_number }} {{ enrollment.run.course.title }}.

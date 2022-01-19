@@ -5,7 +5,6 @@ from django.conf import settings
 from django.core import mail
 from django.urls import reverse
 from mitol.mail.api import get_message_sender
-
 from courses.messages import (
     CourseRunEnrollmentMessage,
     CourseRunUnenrollmentMessage,
@@ -25,6 +24,7 @@ def send_course_run_enrollment_email(enrollment):
     """
     try:
         user = enrollment.user
+
         with get_message_sender(CourseRunEnrollmentMessage) as sender:
             sender.build_and_send_message(user, {"enrollment": enrollment})
     except Exception:  # pylint: disable=broad-except
