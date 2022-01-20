@@ -3,6 +3,7 @@
 import { assert } from "chai"
 import moment from "moment"
 import sinon from "sinon"
+import { Formik } from "formik"
 
 import DashboardPage, {
   DashboardPage as InnerDashboardPage
@@ -223,12 +224,14 @@ describe("DashboardPage", () => {
         ? {
           type: ALERT_TYPE_SUCCESS,
           msg:  `You have been successfully subscribed to course ${
-            enrollment.run.title
+            enrollment.run.course_number
           } emails.`
         }
         : {
           type: ALERT_TYPE_DANGER,
-          msg:  `Something went wrong with your request to course emails subscription. Please contact support at ${
+          msg:  `Something went wrong with your request to course ${
+            enrollment.run.course_number
+          } emails subscription. Please contact support at ${
             SETTINGS.support_email
           }.`
         }
@@ -240,9 +243,22 @@ describe("DashboardPage", () => {
 
       const { inner, store } = await renderPage()
       const enrolledItems = inner.find(".enrolled-item").at(enrollmentIndex)
-      const unsubscribeBtn = enrolledItems.find("Dropdown DropdownItem").at(1)
-      assert.isTrue(unsubscribeBtn.exists())
-      await unsubscribeBtn.prop("onClick")()
+      const emailSettingsBtn = enrolledItems.find("Dropdown DropdownItem").at(1)
+      assert.isTrue(emailSettingsBtn.exists())
+      emailSettingsBtn.prop("onClick")()
+      const formik = inner.find(Formik).at(0)
+      assert.isTrue(formik.exists())
+      const submitBtn = formik
+        .dive()
+        .find("Form Button")
+        .at(0)
+      assert.isTrue(submitBtn.exists())
+      const onSubmit = formik.prop("onSubmit")
+      await onSubmit({
+        enrollmentId:    enrollment.id,
+        subscribeEmails: true,
+        courseNumber:    enrollment.run.course_number
+      })
       sinon.assert.calledTwice(helper.handleRequestStub)
       assert.deepEqual(store.getState().ui.userNotifications, {
         "subscription-status": {

@@ -3,12 +3,17 @@
 import React from "react"
 import DocumentTitle from "react-document-title"
 import { connect } from "react-redux"
+import { Formik, Form, Field } from "formik"
 import {
   Tooltip,
   Dropdown,
   DropdownToggle,
   DropdownMenu,
-  DropdownItem
+  DropdownItem,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  Button
 } from "reactstrap"
 import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
@@ -60,7 +65,8 @@ type DashboardPageProps = {
 type DashboardPageState = {
   submittingEnrollmentId: number | null,
   activeMenuIds: number[],
-  activeEnrollMsgIds: number[]
+  activeEnrollMsgIds: number[],
+  emailSettingsModalVisibility: boolean
 }
 
 export class DashboardPage extends React.Component<
@@ -68,9 +74,17 @@ export class DashboardPage extends React.Component<
   DashboardPageState
 > {
   state = {
-    submittingEnrollmentId: null,
-    activeMenuIds:          [],
-    activeEnrollMsgIds:     []
+    submittingEnrollmentId:       null,
+    activeMenuIds:                [],
+    activeEnrollMsgIds:           [],
+    emailSettingsModalVisibility: false
+  }
+
+  toggleEmailSettingsModalVisibility = () => {
+    const { emailSettingsModalVisibility } = this.state
+    this.setState({
+      emailSettingsModalVisibility: !emailSettingsModalVisibility
+    })
   }
 
   isActiveMenuId(itemId: number): boolean {
@@ -135,26 +149,30 @@ export class DashboardPage extends React.Component<
     }
   }
 
-  async onChangeEmailSettings(enrollment: RunEnrollment) {
+  async onSubmit(payload: Object) {
     const { courseEmailsSubscription, addUserNotification } = this.props
-    this.setState({ submittingEnrollmentId: enrollment.id })
+    this.setState({ submittingEnrollmentId: payload.enrollmentId })
+    this.toggleEmailSettingsModalVisibility()
     try {
       const resp = await courseEmailsSubscription(
-        enrollment.id,
-        enrollment.edx_emails_subscription ? "" : "on"
+        payload.enrollmentId,
+        payload.subscribeEmails
       )
-      const message = enrollment.edx_emails_subscription
-        ? "subscribed to"
-        : "unsubscribed from"
+
       let userMessage, messageType
       if (isSuccessResponse(resp)) {
+        const message = payload.subscribeEmails
+          ? "subscribed to"
+          : "unsubscribed from"
         messageType = ALERT_TYPE_SUCCESS
         userMessage = `You have been successfully ${message} course ${
-          enrollment.run.title
+          payload.courseNumber
         } emails.`
       } else {
         messageType = ALERT_TYPE_DANGER
-        userMessage = `Something went wrong with your request to course emails subscription. Please contact support at ${
+        userMessage = `Something went wrong with your request to course ${
+          payload.courseNumber
+        } emails subscription. Please contact support at ${
           SETTINGS.support_email
         }.`
       }
@@ -171,6 +189,59 @@ export class DashboardPage extends React.Component<
     } finally {
       this.setState({ submittingEnrollmentId: null })
     }
+  }
+
+  renderEmailSettingsDialog(enrollment: RunEnrollment) {
+    const { emailSettingsModalVisibility } = this.state
+    return (
+      <Modal
+        className="text-center"
+        isOpen={emailSettingsModalVisibility}
+        toggle={this.toggleEmailSettingsModalVisibility}
+      >
+        <ModalHeader toggle={this.toggleEmailSettingsModalVisibility}>
+          Email Settings for {enrollment.run.course_number}
+        </ModalHeader>
+        <ModalBody>
+          <Formik
+            onSubmit={this.onSubmit.bind(this)}
+            initialValues={{
+              subscribeEmails: enrollment.edx_emails_subscription,
+              enrollmentId:    enrollment.id,
+              courseNumber:    enrollment.run.course_number
+            }}
+            render={({ values }) => (
+              <Form className="text-center">
+                <section>
+                  <Field
+                    type="hidden"
+                    name="enrollmentId"
+                    value={values.enrollmentId}
+                  />
+                  <Field
+                    type="hidden"
+                    name="courseNumber"
+                    value={values.courseNumber}
+                  />
+                  <Field
+                    type="checkbox"
+                    name="subscribeEmails"
+                    checked={values.subscribeEmails}
+                  />{" "}
+                  <label check>Receive course emails</label>
+                </section>
+                <Button type="submit" color="success">
+                  Save Settings
+                </Button>{" "}
+                <Button onClick={this.toggleEmailSettingsModalVisibility}>
+                  Cancel
+                </Button>
+              </Form>
+            )}
+          />
+        </ModalBody>
+      </Modal>
+    )
   }
 
   renderEnrolledItemCard(enrollment: RunEnrollment) {
@@ -208,10 +279,6 @@ export class DashboardPage extends React.Component<
       onUnenrollClick = () => {}
       unenrollEnabled = false
     }
-
-    const onSubscriptionClick = partial(this.onChangeEmailSettings.bind(this), [
-      enrollment
-    ])
 
     return (
       <div
@@ -256,12 +323,11 @@ export class DashboardPage extends React.Component<
                   <span id="subscribeButtonWrapper">
                     <DropdownItem
                       className="unstyled d-block"
-                      onClick={onSubscriptionClick}
+                      onClick={() => this.toggleEmailSettingsModalVisibility()}
                     >
-                      {enrollment.edx_emails_subscription
-                        ? "Unsubscribe from emails"
-                        : "Subscribe to emails"}
+                      Email Settings
                     </DropdownItem>
+                    {this.renderEmailSettingsDialog(enrollment)}
                   </span>
                   {!unenrollEnabled && (
                     <Tooltip
