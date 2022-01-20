@@ -10,6 +10,67 @@
     padding: 0 0 10px;
   }
 
+  .support-links {
+    background: white;
+    position: relative;
+    padding-top: 40px;
+
+    &:after {
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 0;
+      content: '';
+      height: 10px;
+      background: $gray-darker;
+    }
+
+    .content-holder {
+      max-width: 966px;
+
+      .row {
+        justify-content: space-between;
+
+        h2 {
+          color: $primary;
+        }
+
+        p {
+          color: black;
+        }
+
+        .col-sm-6 {
+          padding: 0 15px 20px;
+          text-align: center;
+
+          @include media-breakpoint-up(sm) {
+            max-width: 400px;
+            text-align: left;
+          }
+
+          img {
+            margin: 0 0 15px;
+            width: 70px;
+            height: 70px;
+            color: black;
+
+            @include media-breakpoint-up(sm) {
+              float: left;
+              margin: 0 45px 0 0;
+            }
+          }
+
+          .info {
+            overflow: hidden;
+            font-size: 20px;
+            font-weight: 500;
+            line-height: 26px;
+          }
+        }
+      }
+    }
+}
+
   .footer-top {
     padding-top: 30px;
 
