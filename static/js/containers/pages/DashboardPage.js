@@ -13,7 +13,6 @@ import {
   Modal,
   ModalHeader,
   ModalBody,
-  ModalFooter,
   Button
 } from "reactstrap"
 import { createStructuredSelector } from "reselect"
