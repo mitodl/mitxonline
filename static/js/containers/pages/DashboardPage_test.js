@@ -224,12 +224,14 @@ describe("DashboardPage", () => {
         ? {
           type: ALERT_TYPE_SUCCESS,
           msg:  `You have been successfully subscribed to course ${
-            enrollment.run.title
+            enrollment.run.course_number
           } emails.`
         }
         : {
           type: ALERT_TYPE_DANGER,
-          msg:  `Something went wrong with your request to course emails subscription. Please contact support at ${
+          msg:  `Something went wrong with your request to course ${
+            enrollment.run.course_number
+          } emails subscription. Please contact support at ${
             SETTINGS.support_email
           }.`
         }
@@ -255,7 +257,7 @@ describe("DashboardPage", () => {
       await onSubmit({
         enrollmentId:    enrollment.id,
         subscribeEmails: true,
-        courseTitle:     enrollment.run.title
+        courseNumber:    enrollment.run.course_number
       })
       sinon.assert.calledTwice(helper.handleRequestStub)
       assert.deepEqual(store.getState().ui.userNotifications, {

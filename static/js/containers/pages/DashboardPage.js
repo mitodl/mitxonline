@@ -167,11 +167,13 @@ export class DashboardPage extends React.Component<
           : "unsubscribed from"
         messageType = ALERT_TYPE_SUCCESS
         userMessage = `You have been successfully ${message} course ${
-          payload.courseTitle
+          payload.courseNumber
         } emails.`
       } else {
         messageType = ALERT_TYPE_DANGER
-        userMessage = `Something went wrong with your request to course emails subscription. Please contact support at ${
+        userMessage = `Something went wrong with your request to course ${
+          payload.courseNumber
+        } emails subscription. Please contact support at ${
           SETTINGS.support_email
         }.`
       }
@@ -199,7 +201,7 @@ export class DashboardPage extends React.Component<
         toggle={this.toggleEmailSettingsModalVisibility}
       >
         <ModalHeader toggle={this.toggleEmailSettingsModalVisibility}>
-          Email Settings for {enrollment.run.course.readable_id}
+          Email Settings for {enrollment.run.course_number}
         </ModalHeader>
         <ModalBody>
           <Formik
@@ -207,7 +209,7 @@ export class DashboardPage extends React.Component<
             initialValues={{
               subscribeEmails: enrollment.edx_emails_subscription,
               enrollmentId:    enrollment.id,
-              courseTitle:     enrollment.run.title
+              courseNumber:    enrollment.run.course_number
             }}
             render={({ values }) => (
               <Form className="text-center">
@@ -215,12 +217,12 @@ export class DashboardPage extends React.Component<
                   <Field
                     type="hidden"
                     name="enrollmentId"
-                    value={enrollment.id}
+                    value={values.enrollmentId}
                   />
                   <Field
                     type="hidden"
-                    name="courseTitle"
-                    value={enrollment.run.title}
+                    name="courseNumber"
+                    value={values.courseNumber}
                   />
                   <Field
                     type="checkbox"
