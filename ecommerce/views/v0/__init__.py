@@ -2,14 +2,11 @@
 MITxOnline ecommerce views
 """
 import logging
-from django.http import HttpResponseRedirect
-from django.urls import reverse
-from rest_framework.response import Response
 from rest_framework import mixins, status
 from rest_framework.decorators import action
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.viewsets import ReadOnlyModelViewSet, ModelViewSet, GenericViewSet
+from rest_framework.viewsets import ReadOnlyModelViewSet, GenericViewSet
 from rest_framework.pagination import LimitOffsetPagination
 from django.db.models import Q, Count
 from mitol.common.utils import now_in_utc
@@ -98,7 +95,9 @@ class ProductViewSet(ReadOnlyModelViewSet):
         )
 
 
-class BasketViewSet(NestedViewSetMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericViewSet):
+class BasketViewSet(
+    NestedViewSetMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericViewSet
+):
     """API view set for Basket"""
 
     serializer_class = BasketSerializer
@@ -107,12 +106,11 @@ class BasketViewSet(NestedViewSetMixin, mixins.ListModelMixin, mixins.RetrieveMo
     lookup_url_kwarg = "username"
 
     def get_object(self, username=None):
-        return Basket.objects.get_or_create(user=self.request.user)
+        basket, _ = Basket.objects.get_or_create(user=self.request.user)
+        return basket
 
     def get_queryset(self):
-        return (
-            Basket.objects.filter(user=self.request.user).all()
-        )
+        return Basket.objects.filter(user=self.request.user).all()
 
     @action(detail=True, methods=["post"], url_name="add-item")
     def add_item(self, request):
@@ -127,7 +125,9 @@ class BasketViewSet(NestedViewSetMixin, mixins.ListModelMixin, mixins.RetrieveMo
             item.save()
 
 
-class BasketItemViewSet(NestedViewSetMixin, ListCreateAPIView, mixins.DestroyModelMixin, GenericViewSet):
+class BasketItemViewSet(
+    NestedViewSetMixin, ListCreateAPIView, mixins.DestroyModelMixin, GenericViewSet
+):
     """API view set for BasketItem"""
 
     serializer_class = BasketItemSerializer
@@ -138,13 +138,12 @@ class BasketItemViewSet(NestedViewSetMixin, ListCreateAPIView, mixins.DestroyMod
 
     def create(self, request, *args, **kwargs):
         basket = Basket.objects.get(user=request.user)
-        product_id = request.data.get("product_id")
-        product = Product.objects.filter(id=int(product_id)).first()
+
+        product_id = request.data.get("product")
+        product = Product.objects.get(id=int(product_id))
         item, created = BasketItem.objects.update_or_create(
             basket=basket, product=product
         )
         if created is False:
             item.quantity += 1
             item.save()
-
-        return Response(status=status.HTTP_200_OK)

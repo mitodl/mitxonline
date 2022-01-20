@@ -52,7 +52,9 @@ def test_get_basket(user_drf_client, user):
     """Test the view that returns a state of Basket"""
     basket = BasketFactory.create(user=user)
     BasketItemFactory.create(basket=basket)
-    resp = user_drf_client.get(reverse("basket-detail", kwargs={"username": user.username}))
+    resp = user_drf_client.get(
+        reverse("basket-detail", kwargs={"username": user.username})
+    )
     assert_drf_json_equal(resp.json(), BasketSerializer(basket).data)
 
 
@@ -96,7 +98,7 @@ def test_add_basket_item(user_drf_client, user):
     new_product = ProductFactory.create()
     resp = user_drf_client.post(
         "/api/baskets/{}/items".format(basket.id),
-        data={"product_id": new_product.id}
+        data={"product": new_product.id, "basket": basket.id},
+        follow=True,
     )
     assert BasketItem.objects.filter(basket=basket).count() == 2
-
