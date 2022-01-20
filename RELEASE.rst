@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.19.0
+--------------
+
+- Change unsubscribe UI to email settings (#375)
+- style: style: add support footer (#371)
+- fix: replacing course key with course number in enroll and unenroll email (#333)
+- Sort courses on home page by date ascending (#368)
+- feat: Allow users to unsubscribe from course emails from the dashboard (#329)
+- Adding discount abstractions
+
 Version 0.18.3 (Released January 06, 2022)
 --------------
 
