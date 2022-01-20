@@ -92,13 +92,14 @@ def test_delete_basket_item(user_drf_client, user):
 
 def test_add_basket_item(user_drf_client, user):
     """Test the view to add a new item into the Basket"""
-    basket_item = BasketItemFactory.create(basket__user=user)
-    basket = basket_item.basket
-    assert basket.basket_items.count() == 1
     new_product = ProductFactory.create()
-    resp = user_drf_client.post(
-        "/api/baskets/{}/items".format(basket.id),
-        data={"product": new_product.id, "basket": basket.id},
+    basket = BasketFactory.create(user=user)
+    BasketItemFactory.create(basket=basket)
+    assert BasketItem.objects.filter(basket__user=user).count() == 1
+
+    user_drf_client.post(
+        "/api/baskets/{}/items/".format(basket.id),
+        data={"product": new_product.id},
         follow=True,
     )
-    assert BasketItem.objects.filter(basket=basket).count() == 2
+    assert BasketItem.objects.filter(basket__user=user).count() == 2

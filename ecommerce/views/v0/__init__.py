@@ -3,6 +3,7 @@ MITxOnline ecommerce views
 """
 import logging
 from rest_framework import mixins, status
+from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -112,18 +113,6 @@ class BasketViewSet(
     def get_queryset(self):
         return Basket.objects.filter(user=self.request.user).all()
 
-    @action(detail=True, methods=["post"], url_name="add-item")
-    def add_item(self, request):
-        basket = self.get_object()
-        product_id_str = request.data.get("product_id")
-        product = Product.objects.filter(id=int(product_id_str)).first()
-        item, created = BasketItem.objects.update_or_create(
-            basket=basket, product=product
-        )
-        if created is False:
-            item.quantity += 1
-            item.save()
-
 
 class BasketItemViewSet(
     NestedViewSetMixin, ListCreateAPIView, mixins.DestroyModelMixin, GenericViewSet
@@ -141,9 +130,5 @@ class BasketItemViewSet(
 
         product_id = request.data.get("product")
         product = Product.objects.get(id=int(product_id))
-        item, created = BasketItem.objects.update_or_create(
-            basket=basket, product=product
-        )
-        if created is False:
-            item.quantity += 1
-            item.save()
+        BasketItem.objects.create(basket=basket, product=product)
+        return Response(status=status.HTTP_200_OK)
