@@ -143,7 +143,6 @@ class CourseRunDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.CourseRun
         fields = [
-            "course_number",
             "course",
             "title",
             "start_date",
