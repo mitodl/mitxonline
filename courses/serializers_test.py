@@ -200,6 +200,7 @@ def test_serialize_course_run_detail():
     data = CourseRunDetailSerializer(course_run).data
     assert data == {
         "course": BaseCourseSerializer(course_run.course).data,
+        "course_number": course_run.course_number,
         "title": course_run.title,
         "courseware_id": course_run.courseware_id,
         "courseware_url": course_run.courseware_url,
