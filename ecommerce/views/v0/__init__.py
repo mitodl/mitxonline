@@ -4,7 +4,6 @@ MITxOnline ecommerce views
 import logging
 from rest_framework import mixins, status
 from rest_framework.response import Response
-from rest_framework.decorators import action
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ReadOnlyModelViewSet, GenericViewSet
@@ -127,8 +126,13 @@ class BasketItemViewSet(
 
     def create(self, request, *args, **kwargs):
         basket = Basket.objects.get(user=request.user)
-
         product_id = request.data.get("product")
-        product = Product.objects.get(id=int(product_id))
-        BasketItem.objects.create(basket=basket, product=product)
-        return Response(status=status.HTTP_200_OK)
+        serializer = self.get_serializer(
+            data={"product": product_id, "basket": basket.id}
+        )
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )

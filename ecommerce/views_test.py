@@ -84,7 +84,7 @@ def test_delete_basket_item(user_drf_client, user):
     basket = basket_item.basket
     assert basket.basket_items.count() == 1
     user_drf_client.delete(
-        "/api/baskets/{}/items/{}/".format(basket.id, basket_item.id),
+        "/api/baskets/{}/items/{}/".format(user.username, basket_item.id),
         content_type="application/json",
     )
     assert BasketItem.objects.filter(basket=basket).count() == 0
