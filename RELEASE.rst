@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+Version 0.19.0
+--------------
+
+- fix email settings pop-up references wrong course (#380)
+- Revert "Revert "Change unsubscribe UI to email settings (#375)" (#381)" (#385)
+- Bump celery from 4.3.0 to 5.2.2 & celery-redbeat to 2.0.0 (#363)
+- Revert "Change unsubscribe UI to email settings (#375)" (#381)
+- Change unsubscribe UI to email settings (#375)
+- style: style: add support footer (#371)
+- fix: replacing course key with course number in enroll and unenroll email (#333)
+- Sort courses on home page by date ascending (#368)
+- feat: Allow users to unsubscribe from course emails from the dashboard (#329)
+- Adding discount abstractions
+
 Version 0.18.3 (Released January 06, 2022)
 --------------
 
