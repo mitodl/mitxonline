@@ -10,10 +10,10 @@ import {
   DropdownToggle,
   DropdownMenu,
   DropdownItem,
+  Button,
   Modal,
   ModalHeader,
-  ModalBody,
-  Button
+  ModalBody
 } from "reactstrap"
 import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
@@ -66,7 +66,7 @@ type DashboardPageState = {
   submittingEnrollmentId: number | null,
   activeMenuIds: number[],
   activeEnrollMsgIds: number[],
-  emailSettingsModalVisibility: boolean
+  emailSettingsModalVisibility: boolean[]
 }
 
 export class DashboardPage extends React.Component<
@@ -77,13 +77,20 @@ export class DashboardPage extends React.Component<
     submittingEnrollmentId:       null,
     activeMenuIds:                [],
     activeEnrollMsgIds:           [],
-    emailSettingsModalVisibility: false
+    emailSettingsModalVisibility: []
   }
 
-  toggleEmailSettingsModalVisibility = () => {
+  toggleEmailSettingsModalVisibility = (enrollmentId: number) => {
     const { emailSettingsModalVisibility } = this.state
+    let isOpen = false
+    if (emailSettingsModalVisibility[enrollmentId] === undefined) {
+      isOpen = true
+    } else {
+      isOpen = !emailSettingsModalVisibility[enrollmentId]
+    }
+    emailSettingsModalVisibility[enrollmentId] = isOpen
     this.setState({
-      emailSettingsModalVisibility: !emailSettingsModalVisibility
+      emailSettingsModalVisibility: emailSettingsModalVisibility
     })
   }
 
@@ -152,7 +159,7 @@ export class DashboardPage extends React.Component<
   async onSubmit(payload: Object) {
     const { courseEmailsSubscription, addUserNotification } = this.props
     this.setState({ submittingEnrollmentId: payload.enrollmentId })
-    this.toggleEmailSettingsModalVisibility()
+    this.toggleEmailSettingsModalVisibility(payload.enrollmentId)
     try {
       const resp = await courseEmailsSubscription(
         payload.enrollmentId,
@@ -193,13 +200,21 @@ export class DashboardPage extends React.Component<
 
   renderEmailSettingsDialog(enrollment: RunEnrollment) {
     const { emailSettingsModalVisibility } = this.state
+    let isOpen = false
+    if (emailSettingsModalVisibility[enrollment.id] !== undefined) {
+      isOpen = emailSettingsModalVisibility[enrollment.id]
+    }
+
     return (
       <Modal
+        id={`enrollment-${enrollment.id}-modal`}
         className="text-center"
-        isOpen={emailSettingsModalVisibility}
-        toggle={this.toggleEmailSettingsModalVisibility}
+        isOpen={isOpen}
+        toggle={() => this.toggleEmailSettingsModalVisibility(enrollment.id)}
       >
-        <ModalHeader toggle={this.toggleEmailSettingsModalVisibility}>
+        <ModalHeader
+          toggle={() => this.toggleEmailSettingsModalVisibility(enrollment.id)}
+        >
           Email Settings for {enrollment.run.course_number}
         </ModalHeader>
         <ModalBody>
@@ -233,7 +248,11 @@ export class DashboardPage extends React.Component<
                 <Button type="submit" color="success">
                   Save Settings
                 </Button>{" "}
-                <Button onClick={this.toggleEmailSettingsModalVisibility}>
+                <Button
+                  onClick={() =>
+                    this.toggleEmailSettingsModalVisibility(enrollment.id)
+                  }
+                >
                   Cancel
                 </Button>
               </Form>
@@ -323,7 +342,9 @@ export class DashboardPage extends React.Component<
                   <span id="subscribeButtonWrapper">
                     <DropdownItem
                       className="unstyled d-block"
-                      onClick={() => this.toggleEmailSettingsModalVisibility()}
+                      onClick={() =>
+                        this.toggleEmailSettingsModalVisibility(enrollment.id)
+                      }
                     >
                       Email Settings
                     </DropdownItem>
