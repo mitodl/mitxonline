@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from ecommerce import models
 from courses.models import CourseRun, ProgramRun
+from ecommerce.models import Basket, Product, BasketItem
 
 
 class ProgramRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
@@ -64,3 +65,42 @@ class ProductSerializer(serializers.ModelSerializer):
             "is_active",
         ]
         model = models.Product
+
+
+class BasketItemSerializer(serializers.ModelSerializer):
+    """BasketItem model serializer"""
+
+    def perform_create(self, validated_data):
+        basket = Basket.objects.get(user=validated_data["user"])
+        product = Product.objects.get(id=validated_data["product"])
+        item, _ = BasketItem.objects.get_or_create(basket=basket, product=product)
+        return item
+
+    class Meta:
+        model = models.BasketItem
+        fields = [
+            "basket",
+            "product",
+            "id",
+        ]
+
+
+class BasketSerializer(serializers.ModelSerializer):
+    """Basket model serializer"""
+
+    basket_items = serializers.SerializerMethodField()
+
+    def get_basket_items(self, instance):
+        """Get items in the basket"""
+        return [
+            BasketItemSerializer(instance=basket, context=self.context).data
+            for basket in instance.basket_items.all()
+        ]
+
+    class Meta:
+        fields = [
+            "id",
+            "user",
+            "basket_items",
+        ]
+        model = models.Basket

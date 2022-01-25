@@ -6,6 +6,7 @@ import random
 from courses.factories import CourseRunFactory
 from ecommerce import models
 from ecommerce.constants import ALL_DISCOUNT_TYPES, ALL_REDEMPTION_TYPES
+from users.factories import UserFactory
 
 FAKE = faker.Factory.create()
 
@@ -29,3 +30,22 @@ class DiscountFactory(DjangoModelFactory):
 
     class Meta:
         model = models.Discount
+
+
+class BasketFactory(DjangoModelFactory):
+    """Factory for Basket"""
+
+    user = SubFactory(UserFactory)
+
+    class Meta:
+        model = models.Basket
+
+
+class BasketItemFactory(DjangoModelFactory):
+    """Factory for BasketItem"""
+
+    product = SubFactory(ProductFactory)
+    basket = SubFactory(BasketFactory)
+
+    class Meta:
+        model = models.BasketItem

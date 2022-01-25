@@ -160,6 +160,7 @@ djangorestframework==3.12.4
     # via
     #   -r requirements.in
     #   djangorestframework-simplejwt
+    #   drf-extensions
     #   mitol-django-authentication
     #   wagtail
 djangorestframework-simplejwt==4.7.1
@@ -170,6 +171,8 @@ djoser==2.1.0
     #   mitol-django-authentication
 draftjs-exporter==2.1.7
     # via wagtail
+drf-extensions==0.7.1
+    # via -r requirements.in
 edx-api-client==1.1.0
     # via -r requirements.in
 et-xmlfile==1.1.0

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from ecommerce.models import Product
+from ecommerce.models import Product, Basket, BasketItem
 from django.contrib.admin.decorators import display
 from fsm_admin.mixins import FSMTransitionMixin
 from reversion.admin import VersionAdmin
@@ -26,6 +26,24 @@ class ProductAdmin(VersionAdmin):
     model = Product
     search_fields = ["description", "price"]
     list_display = ["id", "description", "price"]
+
+
+@admin.register(Basket)
+class BasketAdmin(VersionAdmin):
+    """Admin for Basket"""
+
+    model = Basket
+    search_fields = ["user"]
+    list_display = ["id", "user"]
+
+
+@admin.register(BasketItem)
+class ProductAdmin(VersionAdmin):
+    """Admin for BasketItem"""
+
+    model = BasketItem
+    search_fields = ["product"]
+    list_display = ["id", "product", "quantity"]
 
 
 @admin.register(Discount)
