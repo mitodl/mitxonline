@@ -100,6 +100,7 @@ django==3.2.10
     #   mitol-django-authentication
     #   mitol-django-common
     #   mitol-django-mail
+    #   mitol-django-openedx
     #   wagtail
 django-anymail[mailgun]==8.4
     # via
@@ -175,6 +176,8 @@ drf-extensions==0.7.1
     # via -r requirements.in
 edx-api-client==1.1.0
     # via -r requirements.in
+edx-opaque-keys==2.2.2
+    # via mitol-django-openedx
 et-xmlfile==1.1.0
     # via openpyxl
 factory-boy==3.2.0
@@ -226,6 +229,8 @@ mitol-django-mail==3.0.1
     # via
     #   -r requirements.in
     #   mitol-django-authentication
+mitol-django-openedx==1.0.0
+    # via -r requirements.in
 newrelic==6.4.1.158
     # via -r requirements.in
 oauthlib==3.1.1
@@ -239,6 +244,8 @@ packaging==20.9
     # via pytest
 parso==0.8.2
     # via jedi
+pbr==5.8.0
+    # via stevedore
 pexpect==4.8.0
     # via ipython
 pickleshare==0.7.5
@@ -269,6 +276,8 @@ pyjwt==2.1.0
     # via
     #   djangorestframework-simplejwt
     #   social-auth-core
+pymongo==4.0.1
+    # via edx-opaque-keys
 pyopenssl==17.5.0
     # via -r requirements.in
 pyparsing==2.4.7
@@ -335,6 +344,8 @@ soupsieve==2.2.1
     # via beautifulsoup4
 sqlparse==0.4.2
     # via django
+stevedore==3.5.0
+    # via edx-opaque-keys
 tablib[xls,xlsx]==3.0.0
     # via wagtail
 telepath==0.2
