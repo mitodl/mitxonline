@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.19.0
+Version 0.19.0 (Released January 26, 2022)
 --------------
 
 - fix: add the requirements for mitol-django-openedx (#389)
