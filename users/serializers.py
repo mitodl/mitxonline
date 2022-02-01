@@ -29,7 +29,7 @@ USER_GIVEN_NAME_RE = re.compile(
     flags=re.I | re.VERBOSE | re.MULTILINE,
 )
 USERNAME_RE_PARTIAL = r"[\w ._+-]+"
-USERNAME_RE = re.compile(fr"(?P<username>{USERNAME_RE_PARTIAL})")
+USERNAME_RE = re.compile(rf"(?P<username>{USERNAME_RE_PARTIAL})")
 USERNAME_ERROR_MSG = "Username can only contain letters, numbers, spaces, and the following characters: _+-"
 
 
