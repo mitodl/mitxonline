@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.19.2
+Version 0.19.2 (Released February 01, 2022)
 --------------
 
 - Format code since `black` changed regex flag order 🙄
