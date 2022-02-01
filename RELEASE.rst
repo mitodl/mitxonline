@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.19.2
+--------------
+
+- Format code since `black` changed regex flag order 🙄
+
 Version 0.19.1 (Released January 31, 2022)
 --------------
 
