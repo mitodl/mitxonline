@@ -81,7 +81,7 @@ deprecated==1.2.13
     # via jwcrypto
 dj-database-url==0.5.0
     # via -r requirements.in
-django==3.2.10
+django==3.2.11
     # via
     #   -r requirements.in
     #   django-anymail
