@@ -131,7 +131,7 @@ django-hijack-admin==2.1.10
     # via -r requirements.in
 django-ipware==4.0.0
     # via -r requirements.in
-django-modelcluster==5.1
+django-modelcluster==5.2
     # via wagtail
 django-oauth-toolkit==1.5.0
     # via -r requirements.in
@@ -384,7 +384,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-wagtail==2.13.4
+wagtail==2.15.2
     # via -r requirements.in
 wcwidth==0.2.5
     # via prompt-toolkit
