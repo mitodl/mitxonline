@@ -2,54 +2,63 @@ const webpack = require("webpack")
 const path = require("path")
 const R = require("ramda")
 const BundleTracker = require("webpack-bundle-tracker")
-const { config, babelSharedLoader } = require(path.resolve(
-  "./webpack.config.shared.js"
-))
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin
+const { config } = require(path.resolve("./webpack.config.shared.js"))
 
 const hotEntry = (host, port) =>
   `webpack-hot-middleware/client?path=http://${host}:${port}/__webpack_hmr&timeout=20000&reload=true`
 
 const insertHotReload = (host, port, entries) =>
   R.map(
-    R.compose(
-      R.flatten,
-      v => [v].concat(hotEntry(host, port))
-    ),
+    R.compose(R.flatten, v => [v].concat(hotEntry(host, port))),
     entries
   )
 
 const devConfig = Object.assign({}, config, {
   context: __dirname,
-  mode:    "development",
-  output:  {
-    path:     path.resolve("./static/bundles/"),
+  mode: "development",
+  devtool: "inline-source-map",
+  output: {
+    path: path.resolve("./static/bundles/"),
     filename: "[name].js"
   },
   plugins: [
     new webpack.HotModuleReplacementPlugin(),
-    new BundleTracker({ filename: "./webpack-stats.json" })
+    new BundleTracker({ filename: "./webpack-stats.json" }),
+    new BundleAnalyzerPlugin()
   ],
-  devtool:      "source-map",
   optimization: {
-    namedModules: true,
-    splitChunks:  {
-      name:      "common",
-      minChunks: 2
+    moduleIds: 'named',
+    splitChunks: {
+      chunks: "all",
+      minChunks: 2,
+      cacheGroups: {
+        common: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'common',
+          chunks: 'all',
+        },
+      },
     },
-    noEmitOnErrors: true
-  }
+    emitOnErrors: true
+  },
 })
 
 devConfig.module.rules = [
-  babelSharedLoader,
   ...config.module.rules,
   {
-    test: /\.css$|\.scss$/,
-    use:  [
+    // this regex is necessary to explicitly exclude ckeditor stuff
+    test: /static\/scss\/.+(\.css$|\.scss$)/,
+    use: [
       { loader: "style-loader" },
-      { loader: "css-loader" },
+      { loader: "css-loader?url=false" },
       { loader: "postcss-loader" },
-      { loader: "sass-loader" }
+      {
+        loader: "sass-loader",
+        options: {
+          sassOptions: { quietDeps: true },
+        },
+      }
     ]
   }
 ]

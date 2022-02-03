@@ -153,7 +153,7 @@ django-treebeard==4.5.1
     # via wagtail
 django-user-agents==0.4.0
     # via -r requirements.in
-django-webpack-loader==0.7.0
+django-webpack-loader==1.4.1
     # via
     #   -r requirements.in
     #   mitol-django-common

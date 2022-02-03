@@ -1,5 +1,3 @@
-// sass-lint:disable mixins-before-declarations
-
 html {
   scroll-behavior: smooth;
 }
@@ -7,7 +5,8 @@ html {
 .resource-banner {
   width: 100%;
   padding: 75px 0;
-  background: rgba(53, 53, 53, .97) url("#{$static-path}/images/resource-page-banner-bg.png") repeat-x 0 0;
+  background: rgb(53 53 53 / 97%)
+    url("#{$static-path}/images/resource-page-banner-bg.png") repeat-x 0 0;
   min-height: 200px;
 
   .container {
@@ -16,7 +15,7 @@ html {
   }
 
   h1 {
-    background: rgba($primary, .8);
+    background: rgba($primary, 0.8);
     color: white;
     padding: 15px;
     line-height: 50px;
@@ -40,7 +39,6 @@ html {
 }
 
 .resource-container {
-
   h2 {
     color: $blue;
     margin-top: 50px;
@@ -76,9 +74,10 @@ html {
   .back-to-top {
     text-decoration: none;
 
-    &:after {
+    &::after {
       font-size: $material-icon-height;
-      font-family: Material Icons;
+      /* stylelint-disable-next-line font-family-no-missing-generic-family-keyword */
+      font-family: "Material Icons";
       content: "arrow_circle_up";
       margin-left: 5px;
       vertical-align: middle;

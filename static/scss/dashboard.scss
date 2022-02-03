@@ -1,14 +1,15 @@
-// sass-lint:disable mixins-before-declarations
-
-$featureImgWidth: 202px;
-$featureImgHeight: 143px;
-$featureImgMobileWidth: 345px;
-$featureImgMobileHeight: 223px;
+$feature-img-width: 202px;
+$feature-img-height: 143px;
+$feature-img-mobile-height: 223px;
 
 .enrolled-items {
   .card {
     display: flex;
     flex-direction: row;
+
+    h2 a {
+      text-decoration: underline;
+    }
 
     &.no-enrollments {
       flex-direction: column;
@@ -23,13 +24,9 @@ $featureImgMobileHeight: 223px;
       }
     }
 
-    h2 a {
-      text-decoration: underline;
-    }
-
     @include media-breakpoint-up(md) {
       .row {
-        height: $featureImgHeight;
+        height: $feature-img-height;
 
         > * {
           height: 100%;
@@ -38,12 +35,12 @@ $featureImgMobileHeight: 223px;
     }
 
     .img-container {
-      @include media-breakpoint-down(sm)  {
+      @include media-breakpoint-down(sm) {
         width: 100%;
-        height: $featureImgMobileHeight;
+        height: $feature-img-mobile-height;
       }
 
-      width: $featureImgWidth;
+      width: $feature-img-width;
       height: 100%;
       overflow: hidden;
 

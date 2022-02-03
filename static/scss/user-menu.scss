@@ -30,22 +30,12 @@
     display: none;
   }
 
-  &.show {
-    color: $primary;
-
-    .dropdown-toggle::after {
-      border-color: $primary;
-      transform: rotate(45deg);
-      margin-top: 5px;
-    }
-  }
-
   .dropdown-toggle {
     max-width: 100%;
-    padding: 0px;
+    padding: 0;
     font-weight: 600;
 
-    &:after {
+    &::after {
       border: 2px;
       border-top: 2px solid black;
       border-left: 2px solid black;
@@ -62,6 +52,16 @@
       cursor: pointer;
     }
   }
+
+  &.show {
+    color: $primary;
+
+    .dropdown-toggle::after {
+      border-color: $primary;
+      transform: rotate(45deg);
+      margin-top: 5px;
+    }
+  }
 }
 
 .icon-dashboard {
@@ -71,7 +71,6 @@
 }
 
 .user-menu-button {
-
   @include media-breakpoint-down(sm) {
     display: none;
   }

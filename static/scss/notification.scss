@@ -14,10 +14,13 @@
   .alert {
     margin-bottom: 0;
 
-    &.alert-info, &.alert-danger, &.alert-success {
+    &.alert-info,
+    &.alert-danger,
+    &.alert-success {
       color: white;
 
-      a.alert-link, .close {
+      a.alert-link,
+      .close {
         color: white;
       }
 
@@ -59,7 +62,6 @@
       text-decoration: underline;
       background-color: transparent;
     }
-
   }
 
   .close-notification {
@@ -68,22 +70,11 @@
     float: right;
     margin-right: 10px;
 
-    &:after {
+    &::after {
       content: "cancel";
-      font-family: Material Icons;
+      /* stylelint-disable-next-line font-family-no-missing-generic-family-keyword */
+      font-family: "Material Icons";
       margin-left: 10px;
-   }
- }
-}
-
-.dropdown {
-  .tooltip.show {
-    display: none;
-  }
-
-  &.show {
-    .tooltip.show {
-      display: inherit;
     }
   }
 }
@@ -100,5 +91,17 @@
 
   &.bs-tooltip-bottom .arrow::before {
     border-bottom-color: $gray;
+  }
+}
+
+.dropdown {
+  .tooltip.show {
+    display: none;
+  }
+
+  &.show {
+    .tooltip.show {
+      display: inherit;
+    }
   }
 }

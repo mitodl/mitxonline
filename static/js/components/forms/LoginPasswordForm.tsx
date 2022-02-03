@@ -1,0 +1,60 @@
+import { ErrorMessage, Field, Form, Formik } from "formik"
+import React from "react"
+import { Link } from "react-router-dom"
+import * as yup from "yup"
+import { routes } from "../../lib/urls"
+import { passwordFieldValidation } from "../../lib/validation"
+import FormError from "./elements/FormError"
+import { PasswordInput } from "./elements/inputs"
+
+const passwordValidation = yup.object().shape({
+  password: passwordFieldValidation
+})
+type LoginPasswordFormProps = {
+  onSubmit: (...args: Array<any>) => any
+}
+
+const LoginPasswordForm = ({ onSubmit }: LoginPasswordFormProps) => (
+  <Formik
+    onSubmit={onSubmit}
+    validationSchema={passwordValidation}
+    initialValues={{
+      password: ""
+    }}
+    render={({ isSubmitting }) => (
+      <Form>
+        <div className="form-group">
+          <label htmlFor="password">Password</label>
+          <Field
+            name="password"
+            id="password"
+            className="form-control"
+            component={PasswordInput}
+            aria-describedby="passwordError"
+          />
+          <ErrorMessage
+            name="password"
+            id="passwordError"
+            component={FormError}
+          />
+        </div>
+        <div className="form-group">
+          <Link to={routes.login.forgot.begin} className="link-black">
+            Forgot Password?
+          </Link>
+        </div>
+        <div className="row submit-row no-gutters justify-content-end">
+          <button
+            type="submit"
+            className="btn btn-primary btn-gradient-red large"
+            disabled={isSubmitting}
+          >
+            Sign in
+          </button>
+        </div>
+      </Form>
+    )}
+  />
+)
+
+export default LoginPasswordForm

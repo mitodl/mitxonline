@@ -26,13 +26,16 @@
     ],
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "downlevelIteration": true
   },
   "include": [
     "./static/**/*.ts",
     "./static/**/*.tsx"
   ],
   "exclude": [
+    "./static/bundles/*.ts",
     "./static/*.test.ts",
     "./static/*.test.tsx"
   ]

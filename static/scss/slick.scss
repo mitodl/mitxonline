@@ -1,22 +1,16 @@
-// sass-lint:disable mixins-before-declarations
 /* Slider */
 .slick-slider {
   position: relative;
-
   display: block;
   box-sizing: border-box;
-
   user-select: none;
-
   touch-action: pan-y;
 }
 
 .slick-list {
   position: relative;
-
   display: block;
   overflow: hidden;
-
   margin: 0;
   padding: 0;
 }
@@ -29,11 +23,6 @@
   cursor: pointer;
 }
 
-.slick-slider .slick-track,
-.slick-slider .slick-list {
-  transform: translate3d(0, 0, 0);
-}
-
 .slick-track {
   position: relative;
   top: 0;
@@ -43,14 +32,18 @@
   margin-right: auto;
 }
 
-.slick-track:before,
-.slick-track:after {
-  display: table;
+.slick-slider .slick-track,
+.slick-slider .slick-list {
+  transform: translate3d(0, 0, 0);
+}
 
+.slick-track::before,
+.slick-track::after {
+  display: table;
   content: "";
 }
 
-.slick-track:after {
+.slick-track::after {
   clear: both;
 }
 
@@ -61,7 +54,6 @@
 .slick-slide {
   display: none;
   float: left;
-
   height: inherit !important;
   min-height: 1px;
 }
@@ -92,9 +84,7 @@
 
 .slick-vertical .slick-slide {
   display: block;
-
   height: auto;
-
   border: 1px solid transparent;
 }
 
@@ -102,10 +92,30 @@
   display: none;
 }
 
+.slick-next {
+  left: auto;
+  right: 0;
+
+  @include media-breakpoint-up(md) {
+    right: -25px;
+  }
+
+  &::after {
+    content: "chevron_right";
+  }
+  @media (min-width: 1275px) {
+    right: -65px;
+  }
+
+  @media (min-width: 1450px) {
+    right: -135px;
+  }
+}
+
 .slick-prev,
 .slick-next {
   position: absolute;
-  left: 0px;
+  left: 0;
   z-index: 99;
   top: 50%;
   font-size: 0;
@@ -118,7 +128,7 @@
   height: 30px;
   border-radius: 50%;
   outline: none;
-  box-shadow: 5px 5px 10px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: 5px 5px 10px 0 rgb(0 0 0 / 10%);
   margin: -75px 0 0;
   cursor: pointer;
   padding: 0;
@@ -153,10 +163,11 @@
     outline: none;
   }
 
-  &:after {
+  &::after {
     font-size: 30px;
     line-height: 30px;
-    font-family: Material Icons;
+    /* stylelint-disable-next-line font-family-no-missing-generic-family-keyword */
+    font-family: "Material Icons";
     content: "chevron_left";
     @include media-breakpoint-up(md) {
       font-size: 34px;
@@ -166,26 +177,6 @@
       font-size: 50px;
       line-height: 40px;
     }
-  }
-}
-
-.slick-next {
-  left: auto;
-  right: 0px;
-
-  @include media-breakpoint-up(md) {
-    right: -25px;
-  }
-
-  &:after {
-    content: "chevron_right";
-  }
-  @media (min-width: 1275px) {
-    right: -65px;
-  }
-
-  @media (min-width: 1450px) {
-    right: -135px;
   }
 }
 

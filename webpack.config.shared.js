@@ -12,51 +12,48 @@ module.exports = {
     module: {
       rules: [
         {
-          test: /\.(svg|ttf|woff|woff2|eot|gif)$/,
-          use:  "url-loader"
+          // this regex is necessary to explicitly exclude ckeditor stuff
+          test: /static\/.+\.(svg|ttf|woff|woff2|eot|gif)$/,
+          use: "url-loader"
         },
         {
-          test: require.resolve('jquery'),
-          use:  [{
-            loader:  'expose-loader',
-            options: 'jQuery'
-          },
-          {
-            loader:  'expose-loader',
-            options: '$'
-          }]
+          test: /node_modules\/react-nestable\/.+\.svg$/,
+          use: "svg-inline-loader?classPrefix"
         },
+        {
+          test: /node_modules\/react-nestable\/dist\/styles\/.+\.css/,
+          loader: "style-loader"
+        },
+        {
+          test: /\.tsx?$/,
+          use: "swc-loader",
+          exclude: /node_modules/
+        },
+        {
+          test: /ckeditor5-[^/\\]+[/\\]theme[/\\]icons[/\\][^/\\]+\.svg$/,
+          use: ["raw-loader"]
+        },
+        {
+          test: /ckeditor5-[^/\\]+[/\\]theme[/\\].+\.css$/,
+          use: [
+            {
+              loader: "style-loader",
+              options: {
+                injectType: "singletonStyleTag",
+              }
+            },
+            "css-loader",
+            "postcss-loader"
+          ]
+        }
       ]
     },
     resolve: {
-      modules:    [path.join(__dirname, "static/js"), "node_modules"],
-      extensions: [".js", ".jsx"]
+      modules: [path.join(__dirname, "static/js"), "node_modules"],
+      extensions: [".js", ".jsx", ".ts", ".tsx"]
     },
     performance: {
       hints: false
-    }
-  },
-  babelSharedLoader: {
-    test:    /\.jsx?$/,
-    include: [
-      path.resolve(__dirname, "static/js"),
-      path.resolve(__dirname, "node_modules/query-string"),
-      path.resolve(__dirname, "node_modules/strict-uri-encode"),
-    ],
-    loader:  "babel-loader",
-    query:   {
-      presets: [
-        ["@babel/preset-env", { modules: false }],
-        "@babel/preset-react",
-        "@babel/preset-flow"
-      ],
-      plugins: [
-        "@babel/plugin-transform-flow-strip-types",
-        "react-hot-loader/babel",
-        "@babel/plugin-proposal-object-rest-spread",
-        "@babel/plugin-proposal-class-properties",
-        "@babel/plugin-syntax-dynamic-import"
-      ]
     }
   }
 }

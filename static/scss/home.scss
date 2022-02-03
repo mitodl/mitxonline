@@ -1,4 +1,3 @@
-// sass-lint:disable mixins-before-declarations
 .course-section h1 {
   text-align: center;
   padding: 50px 10%;
@@ -10,7 +9,7 @@
 }
 
 .hero-title {
-  background: rgba(black, 0.83);
+  background: rgb(0 0 0 / 83%);
   max-width: 580px;
   padding: 40px;
 
@@ -24,7 +23,7 @@
     font-weight: 600;
     font-size: 48px;
     line-height: 48px;
-    margin: 0 0 15px 0;
+    margin: 0 0 15px;
 
     @include media-breakpoint-down(sm) {
       font-size: 18px;
@@ -59,4 +58,3 @@
     padding-bottom: 28px;
   }
 }
-

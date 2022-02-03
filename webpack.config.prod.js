@@ -2,41 +2,37 @@ const webpack = require("webpack")
 const path = require("path")
 const BundleTracker = require("webpack-bundle-tracker")
 const MiniCssExtractPlugin = require("mini-css-extract-plugin")
-const { config, babelSharedLoader } = require(path.resolve(
-  "./webpack.config.shared.js"
-))
-
-const prodBabelConfig = Object.assign({}, babelSharedLoader)
-
-prodBabelConfig.query.plugins.push(
-  "@babel/plugin-transform-react-constant-elements",
-  "@babel/plugin-transform-react-inline-elements"
-)
+const { config } = require(path.resolve("./webpack.config.shared.js"))
 
 const prodConfig = Object.assign({}, config)
 prodConfig.module.rules = [
-  prodBabelConfig,
   ...config.module.rules,
   {
-    test: /\.css$|\.scss$/,
-    use:  [
+    // this regex is necessary to explicitly exclude ckeditor stuff
+    test: /static\/scss\/.+(\.css$|\.scss$)/,
+    use: [
       {
         loader: MiniCssExtractPlugin.loader
       },
-      "css-loader",
+      "css-loader?url=false",
       "postcss-loader",
-      "sass-loader"
+      {
+        loader: "sass-loader",
+        options: {
+          sassOptions: { quietDeps: true },
+        },
+      }
     ]
   }
 ]
 
 module.exports = Object.assign(prodConfig, {
   context: __dirname,
-  mode:    "production",
-  output:  {
-    path:               path.resolve("./static/bundles/"),
-    filename:           "[name]-[chunkhash].js",
-    chunkFilename:      "[id]-[chunkhash].js",
+  mode: "production",
+  output: {
+    path: path.resolve("./static/bundles/"),
+    filename: "[name]-[chunkhash].js",
+    chunkFilename: "[id]-[chunkhash].js",
     crossOriginLoading: "anonymous"
   },
 
@@ -53,11 +49,18 @@ module.exports = Object.assign(prodConfig, {
     })
   ],
   optimization: {
+    minimize: true,
     splitChunks: {
-      name:      "common",
-      minChunks: 2
+      chunks: "all",
+      minChunks: 2,
+      cacheGroups: {
+        common: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'common',
+          chunks: 'all',
+        },
+      },
     },
-    minimize: true
   },
   devtool: "source-map"
 })

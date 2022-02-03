@@ -1,13 +1,10 @@
-$static-path: '/static';
-
+$static-path: "/static";
 $material-icon-height: 24px;
-
 $primary: #a31f34;
 $gray: #363636;
 $gray-85: #d9d9d9;
 $gray-darker: #c2c2c2;
 $success: #28977e;
-
 $light-gray: #8a8b8c;
 $very-light-gray: #f5f5f5;
 $soft-light-gray: #d8d8d8;
@@ -20,20 +17,17 @@ $cornflower-blue: #579cf9;
 $denim-blue: #16729b;
 $deep-sky-blue: #07a3ff;
 $tile-background: #fff;
-$tiles-background: rgba(53, 53, 53, 97);
+$tiles-background: rgb(53 53 53);
 $tab-color: #c2c0bf;
-$label-subtitle: #666666;
+$label-subtitle: #666;
 $gray-bg: #ebebeb;
 $catalog-text: #909090;
 $detail-grid-border-color: #b4b4b4;
 $featured-banner-background: #a32034;
 $featured-banner-border: #5e0c19;
-
 $events-background: #e3e3e3;
-
-$footer-bg: #000000;
+$footer-bg: #000;
 $footer-border: #686461;
-
 $dc-background: #f2f2f2;
 $subtitle-color: #ff4a68;
 $sirocco: #465a5b;

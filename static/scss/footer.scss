@@ -1,7 +1,4 @@
-// sass-lint:disable mixins-before-declarations
-
 .footer {
-
   background: $footer-bg;
   color: white;
   padding: 0 0 42px;
@@ -15,12 +12,12 @@
     position: relative;
     padding-top: 40px;
 
-    &:after {
+    &::after {
       position: absolute;
       left: 0;
       top: 0;
       right: 0;
-      content: '';
+      content: "";
       height: 10px;
       background: $gray-darker;
     }
@@ -69,14 +66,14 @@
         }
       }
     }
-}
+  }
 
   .footer-top {
     padding-top: 30px;
 
-    &:after {
+    &::after {
       clear: both;
-      content: '';
+      content: "";
       display: block;
     }
   }
@@ -95,6 +92,22 @@
     color: white;
   }
 
+  .copyright {
+    display: block;
+    text-align: left;
+    font-size: 15px;
+    line-height: 18px;
+    margin: 5px 0;
+
+    @media (max-width: 576px) {
+      padding-bottom: 10px;
+    }
+
+    @include media-breakpoint-up(md) {
+      margin: 0;
+    }
+  }
+
   .mit-info {
     font-size: 14px;
     line-height: 24px;
@@ -106,6 +119,7 @@
       width: 44%;
     }
 
+    /* stylelint-disable-next-line no-descending-specificity */
     img {
       width: 92px;
       height: 48px;
@@ -135,6 +149,7 @@
   .right-info {
     text-align: center;
     padding: 0 0 20px;
+
     // TODO: remove that line while adding hubspot form in the footer
     display: none;
 
@@ -142,113 +157,6 @@
       float: right;
       text-align: left;
       padding: 0;
-    }
-  }
-
-  .footer-nav {
-    padding: 0;
-    margin: 0;
-    list-style: none;
-    @include media-breakpoint-up(md) {
-      float: left;
-    }
-
-    li {
-      display: inline-block;
-      vertical-align: top;
-      margin: 0 0 0 10px;
-      font-size: 18px;
-      line-height: 28px;
-
-      @include media-breakpoint-up(lg) {
-        margin: 0 0 0 15px;
-      }
-
-      &:first-child {
-        margin: 0;
-      }
-    }
-  }
-
-  .hbspt-form {
-
-    @include media-breakpoint-up(md) {
-      float: left;
-      margin: 0 0 0 65px;
-      width: 208px;
-    }
-
-    label, .hs_error_rollup {
-      display: none;
-    }
-
-    .hs-form input[type="email"] {
-      border: none;
-      border-bottom: 1px solid $footer-border;
-      background: none;
-      color: white;
-      height: 30px;
-      font-size: 16px;
-      line-height: 30px;
-      outline: none;
-      font-family: inherit;
-      width: 100%;
-    }
-
-    .hs_email {
-      display: inline-block;
-      vertical-align: top;
-      width: calc(100% - 43px);
-      margin: 0 10px 0 0;
-      @include media-breakpoint-up(md) {
-        width: 180px;
-      }
-    }
-
-    .hs_submit {
-      display: inline-block;
-      vertical-align: top;
-      margin: 6px 0 0;
-      line-height: 0;
-    }
-
-    .hs-form .hs-button {
-      color: white;
-      background: url("#{$static-path}/images/arrow-circle-right.svg") no-repeat;
-      background-size: 18px 18px;
-      border: none;
-      padding: 0;
-      opacity: .7;
-      width: 18px;
-      height: 18px;
-      cursor: pointer;
-      text-indent: -9999px;
-      overflow: hidden;
-    }
-
-    .submitted-message {
-      margin-left: 0;
-      color: $blue;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0;
-      line-height: 14px;
-      text-align: center;
-      width: auto;
-      padding: 10px 0 0;
-    }
-
-    .no-list {
-      margin: 0;
-      padding: 5px 0 0;
-      list-style: none;
-
-      label {
-        display: block;
-        font-size: 12px;
-        line-height: 15px;
-        color: $primary;
-      }
     }
   }
 
@@ -288,21 +196,115 @@
     }
   }
 
-  .copyright {
-    display: block;
-    text-align: left;
-    font-size: 15px;
-    line-height: 18px;
-    margin: 5px 0;
-
-    @media (max-width: 576px) {
-      padding-bottom: 10px;
+  .footer-nav {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    @include media-breakpoint-up(md) {
+      float: left;
     }
 
-    @include media-breakpoint-up(md) {
-      margin: 0;
+    /* stylelint-disable-next-line no-descending-specificity */
+    li {
+      display: inline-block;
+      vertical-align: top;
+      margin: 0 0 0 10px;
+      font-size: 18px;
+      line-height: 28px;
+
+      @include media-breakpoint-up(lg) {
+        margin: 0 0 0 15px;
+      }
+
+      &:first-child {
+        margin: 0;
+      }
     }
   }
+
+  /* stylelint-disable selector-class-pattern */
+  .hbspt-form {
+    @include media-breakpoint-up(md) {
+      float: left;
+      margin: 0 0 0 65px;
+      width: 208px;
+    }
+
+    label,
+    .hs_error_rollup {
+      display: none;
+    }
+
+    .hs-form input[type="email"] {
+      border: none;
+      border-bottom: 1px solid $footer-border;
+      background: none;
+      color: white;
+      height: 30px;
+      font-size: 16px;
+      line-height: 30px;
+      outline: none;
+      font-family: inherit;
+      width: 100%;
+    }
+
+    .hs_email {
+      display: inline-block;
+      vertical-align: top;
+      width: calc(100% - 43px);
+      margin: 0 10px 0 0;
+      @include media-breakpoint-up(md) {
+        width: 180px;
+      }
+    }
+
+    .hs_submit {
+      display: inline-block;
+      vertical-align: top;
+      margin: 6px 0 0;
+      line-height: 0;
+    }
+
+    .hs-form .hs-button {
+      color: white;
+      background: url("#{$static-path}/images/arrow-circle-right.svg") no-repeat;
+      background-size: 18px 18px;
+      border: none;
+      padding: 0;
+      opacity: 0.7;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      text-indent: -9999px;
+      overflow: hidden;
+    }
+
+    .submitted-message {
+      margin-left: 0;
+      color: $blue;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0;
+      line-height: 14px;
+      text-align: center;
+      width: auto;
+      padding: 10px 0 0;
+    }
+
+    .no-list {
+      margin: 0;
+      padding: 5px 0 0;
+      list-style: none;
+
+      label {
+        display: block;
+        font-size: 12px;
+        line-height: 15px;
+        color: $primary;
+      }
+    }
+  }
+  /* stylelint-enable selector-class-pattern */
 
   .container {
     max-width: 100%;
