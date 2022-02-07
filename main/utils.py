@@ -11,6 +11,7 @@ from mitol.common.utils.urls import remove_password_from_url
 from mitol.common.utils.webpack import webpack_public_path
 from rest_framework import status
 from rest_framework.response import Response
+from main import features
 
 
 class FeatureFlag(Flag):
@@ -43,6 +44,9 @@ def get_js_settings(request: HttpRequest):
         "sentry_dsn": remove_password_from_url(settings.SENTRY_DSN),
         "support_email": settings.EMAIL_SUPPORT,
         "site_name": settings.SITE_NAME,
+        "features": {
+            "upgrade_dialog": features.is_enabled(features.ENABLE_UPGRADE_DIALOG),
+        },
     }
 
 

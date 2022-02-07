@@ -11,6 +11,9 @@ from rest_framework.exceptions import ValidationError
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
+from courses.models import ProgramRun, CourseRun
+from ecommerce.models import Product
+from ecommerce.serializers import ProductSerializer, BaseProductSerializer
 from main import features
 
 
@@ -50,6 +53,14 @@ class BaseCourseSerializer(serializers.ModelSerializer):
         fields = ["id", "title", "readable_id"]
 
 
+class ProductRelatedField(serializers.RelatedField):
+    """serializer for the Product generic field"""
+
+    def to_representation(self, value):
+        serializer = BaseProductSerializer(value)
+        return serializer.data
+
+
 class BaseCourseRunSerializer(serializers.ModelSerializer):
     """Minimal CourseRun model serializer"""
 
@@ -72,9 +83,11 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
+    products = ProductRelatedField(many=True, queryset=Product.objects.all())
+
     class Meta:
         model = models.CourseRun
-        fields = BaseCourseRunSerializer.Meta.fields
+        fields = BaseCourseRunSerializer.Meta.fields + ["products"]
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

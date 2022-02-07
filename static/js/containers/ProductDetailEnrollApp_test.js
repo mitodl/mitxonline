@@ -1,3 +1,4 @@
+/* global SETTINGS: false */
 // @flow
 import { assert } from "chai"
 
@@ -14,20 +15,29 @@ import {
 
 import * as courseApi from "../lib/courseApi"
 
-import moment from "moment"
+import sinon from "sinon"
+import { makeUser } from "../factories/user"
 
 describe("ProductDetailEnrollApp", () => {
-  let helper, renderPage, isWithinEnrollmentPeriodStub
+  let helper, renderPage, isWithinEnrollmentPeriodStub, courseRun, currentUser
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
-
+    courseRun = makeCourseRunDetail()
+    currentUser = makeUser()
+    courseRun["products"] = [{ id: 1 }]
     renderPage = helper.configureHOCRenderer(
       ProductDetailEnrollApp,
       InnerProductDetailEnrollApp,
-      {},
+      {
+        entities: {
+          courseRuns:  [courseRun],
+          currentUser: currentUser
+        }
+      },
       {}
     )
+    SETTINGS.features = { upgrade_dialog: false }
 
     isWithinEnrollmentPeriodStub = helper.sandbox.stub(
       courseApi,
@@ -73,7 +83,7 @@ describe("ProductDetailEnrollApp", () => {
     )
     assert.equal(
       inner
-        .find("button")
+        .find(".enroll-now")
         .at(0)
         .text(),
       "Enroll now"
@@ -100,7 +110,7 @@ describe("ProductDetailEnrollApp", () => {
 
     assert.isNotOk(
       inner
-        .find("button")
+        .find(".enroll-now")
         .at(0)
         .exists()
     )
@@ -126,7 +136,7 @@ describe("ProductDetailEnrollApp", () => {
 
     assert.equal(
       inner
-        .find("button")
+        .find(".enroll-now")
         .at(0)
         .text(),
       "Enroll now"
@@ -163,5 +173,44 @@ describe("ProductDetailEnrollApp", () => {
       "Enrolled ✓"
     )
     assert.equal(courseRunsSelector(store.getState())[0], expectedResponse)
+  })
+  ;[[true, 201], [false, 400]].forEach(([success, returnedStatusCode]) => {
+    it(`shows dialog to upgrade user enrollment and handles ${returnedStatusCode} response`, async () => {
+      isWithinEnrollmentPeriodStub.returns(true)
+      SETTINGS.features.upgrade_dialog = true
+      helper.handleRequestStub
+        .withArgs(`/api/baskets/${currentUser.id}/items/`)
+        .returns({
+          status: returnedStatusCode
+        })
+      const { inner } = await renderPage()
+
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      await enrollBtn.prop("onClick")()
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        "/api/course_runs/?relevant_to=",
+        "GET"
+      )
+      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+      assert.isTrue(
+        inner
+          .find(".upgrade-enrollment-modal .btn-primary")
+          .at(0)
+          .exists()
+      )
+      const upgradeBtn = inner
+        .find(".upgrade-enrollment-modal .btn-primary")
+        .at(0)
+
+      upgradeBtn.prop("onClick")()
+      sinon.assert.calledThrice(helper.handleRequestStub)
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        `/api/baskets/${currentUser.id}/items/`,
+        "POST"
+      )
+    })
   })
 })

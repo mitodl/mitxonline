@@ -447,7 +447,6 @@ MITX_ONLINE_REPLY_TO_ADDRESS = get_string(
     description="E-mail to use for reply-to address of emails",
 )
 
-
 DEFAULT_FROM_EMAIL = get_string(
     name="MITX_ONLINE_FROM_EMAIL",
     default="webmaster@localhost",

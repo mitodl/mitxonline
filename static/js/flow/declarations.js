@@ -11,6 +11,9 @@ declare type Settings = {
   gaTrackingID: ?string,
   recaptchaKey: ?string,
   support_email: string,
+  features: {
+    upgrade_dialog: boolean
+  },
   site_name: string,
   zendesk_config: {
     help_widget_enabled: boolean,

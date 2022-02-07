@@ -27,6 +27,7 @@ def test_get_js_settings(settings, rf):
     settings.EMAIL_SUPPORT = "support@text.com"
     settings.USE_WEBPACK_DEV_SERVER = False
     settings.RECAPTCHA_SITE_KEY = "fake_key"
+    settings.ENABLE_UPGRADE_DIALOG = False
 
     request = rf.get("/")
 
@@ -39,6 +40,9 @@ def test_get_js_settings(settings, rf):
         "recaptchaKey": settings.RECAPTCHA_SITE_KEY,
         "support_email": settings.EMAIL_SUPPORT,
         "site_name": settings.SITE_NAME,
+        "features": {
+            "upgrade_dialog": settings.ENABLE_UPGRADE_DIALOG,
+        },
     }
 
 

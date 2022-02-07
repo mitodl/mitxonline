@@ -1,3 +1,5 @@
+import type { Product } from "./ecommerceTypes"
+
 export type CourseDetail = {
   id: number,
   title: string,
@@ -14,6 +16,7 @@ export type BaseCourseRun = {
   courseware_url: ?string,
   courseware_id: string,
   run_tag: ?string,
+  products: Array<Product>,
   id: number
 }
 

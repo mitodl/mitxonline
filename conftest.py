@@ -11,6 +11,7 @@ def default_settings(settings):
     settings.DISABLE_WEBPACK_LOADER_STATS = True
     settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
     settings.FEATURES[features.SYNC_ON_DASHBOARD_LOAD] = False
+    settings.FEATURES[features.ENABLE_UPGRADE_DIALOG] = False
 
 
 def pytest_addoption(parser):
