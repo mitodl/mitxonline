@@ -35,7 +35,8 @@ export const makeCourseRun = (): CourseRun => ({
   run_tag:          casual.word.concat(genRunTagNumber.next().value),
   // $FlowFixMe
   id:               genCourseRunId.next().value,
-  course_number:    casual.word
+  course_number:    casual.word,
+  products:         []
 })
 
 const genCourseId = incrementer()

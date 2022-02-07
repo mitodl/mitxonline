@@ -53,16 +53,25 @@ class ProductPurchasableObjectField(serializers.RelatedField):
         )
 
 
-class ProductSerializer(serializers.ModelSerializer):
-    purchasable_object = ProductPurchasableObjectField(read_only=True)
+class BaseProductSerializer(serializers.ModelSerializer):
+    """Simple serializer for Product without related purchasable objects"""
 
     class Meta:
         fields = [
             "id",
             "price",
             "description",
-            "purchasable_object",
             "is_active",
+        ]
+        model = models.Product
+
+
+class ProductSerializer(BaseProductSerializer):
+    purchasable_object = ProductPurchasableObjectField(read_only=True)
+
+    class Meta:
+        fields = BaseProductSerializer.Meta.fields + [
+            "purchasable_object",
         ]
         model = models.Product
 

@@ -13,6 +13,7 @@ from ecommerce.serializers import (
     ProgramRunProductPurchasableObjectSerializer,
     BasketSerializer,
     BasketItemSerializer,
+    BaseProductSerializer,
 )
 from ecommerce.factories import ProductFactory, BasketItemFactory
 
@@ -37,6 +38,17 @@ def test_product_course_serializer(mock_context):
             "is_active": product.is_active,
             "price": str(product.price),
             "purchasable_object": run_serialized,
+        },
+    )
+
+    product_serialized = BaseProductSerializer(instance=product).data
+    assert_drf_json_equal(
+        product_serialized,
+        {
+            "description": product.description,
+            "id": product.id,
+            "is_active": product.is_active,
+            "price": str(product.price),
         },
     )
 

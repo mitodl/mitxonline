@@ -190,6 +190,7 @@ def test_serialize_course_run():
             "enrollment_end": drf_datetime(course_run.enrollment_end),
             "expiration_date": drf_datetime(course_run.expiration_date),
             "id": course_run.id,
+            "products": [],
         },
     )
 

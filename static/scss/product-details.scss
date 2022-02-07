@@ -321,3 +321,56 @@
     }
   }
 }
+
+.upgrade-enrollment-modal {
+  max-width: 550px;
+
+  .modal-content {
+    padding: 5px 12px;
+  }
+
+  .modal-header {
+    font-weight: 600;
+    font-size: large;
+    border-bottom: none;
+    padding-bottom: 0;
+
+    h5 {
+      font-size: 30px;
+    }
+
+    span {
+      font-size: 45px;
+      font-weight: 200;
+    }
+  }
+
+  p {
+    font-size: small;
+  }
+
+  a {
+    text-decoration: underline;
+  }
+
+  .modal-subheader {
+    font-weight: 600;
+    font-size: 20px;
+    margin-bottom: 20px;
+  }
+
+  .cancel-link {
+    text-align: center !important;
+    margin: 20px 0;
+  }
+
+  .upgrade-icon {
+    background: url("https://via.placeholder.com/150 ") left no-repeat;
+    height: 70px;
+  }
+
+  .enroll-now-free {
+    text-decoration: underline;
+    box-shadow: none;
+  }
+}

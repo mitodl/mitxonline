@@ -5,6 +5,7 @@ import logging
 import operator as op
 
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
@@ -20,6 +21,7 @@ from courses.constants import (
     ENROLLABLE_ITEM_ID_SEPARATOR,
     SYNCED_COURSE_RUN_FIELD_MSG,
 )
+from ecommerce.models import Product
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
 from openedx.utils import edx_redirect_url
@@ -353,7 +355,7 @@ class CourseRun(TimestampedModel):
         help_text="The date beyond which the learner should not see link to this course run on their dashboard.",
     )
     live = models.BooleanField(default=False)
-    # products = GenericRelation(Product, related_query_name="courseruns")
+    products = GenericRelation(Product, related_query_name="courseruns")
 
     class Meta:
         unique_together = ("course", "run_tag")
