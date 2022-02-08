@@ -4,10 +4,12 @@ import ReactDOM from "react-dom"
 import { AppContainer } from "react-hot-loader"
 import { Provider } from "react-redux"
 import { Router as ReactRouter } from "react-router"
+import { Provider as ReduxQueryProvider } from "redux-query-react"
 import HeaderApp from "../containers/HeaderApp"
 import ProductDetailEnrollApp from "../containers/ProductDetailEnrollApp"
 import { AppTypeContext, MIXED_APP_CONTEXT } from "../contextDefinitions"
 import { NotificationsProvider } from "../hooks/notifications"
+import { getQueries } from "../lib/redux_query"
 import configureStore, { Store } from "../store/configureStore"
 
 require("react-hot-loader/patch")
@@ -23,13 +25,15 @@ const renderHeader = () => {
   ReactDOM.render(
     <AppContainer>
       <Provider store={store}>
-        <AppTypeContext.Provider value={MIXED_APP_CONTEXT}>
-          <NotificationsProvider>
-            <ReactRouter history={history}>
-              <HeaderApp />
-            </ReactRouter>
-          </NotificationsProvider>
-        </AppTypeContext.Provider>
+        <ReduxQueryProvider queriesSelector={getQueries}>
+          <AppTypeContext.Provider value={MIXED_APP_CONTEXT}>
+            <NotificationsProvider>
+              <ReactRouter history={history}>
+                <HeaderApp />
+              </ReactRouter>
+            </NotificationsProvider>
+          </AppTypeContext.Provider>
+        </ReduxQueryProvider>
       </Provider>
     </AppContainer>,
     rootEl
@@ -44,9 +48,11 @@ const renderEnrollSection = (
   ReactDOM.render(
     <AppContainer>
       <Provider store={reduxStore}>
-        <NotificationsProvider>
-          <ProductDetailEnrollApp courseId={courseId} />
-        </NotificationsProvider>
+        <ReduxQueryProvider queriesSelector={getQueries}>
+          <NotificationsProvider>
+            <ProductDetailEnrollApp courseId={courseId} />
+          </NotificationsProvider>
+        </ReduxQueryProvider>
       </Provider>
     </AppContainer>,
     element
