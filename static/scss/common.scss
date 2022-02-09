@@ -223,6 +223,19 @@ a.link-button {
   margin-top: 25px;
 }
 
+button.unstyled,
+button.btn-secondary.unstyled {
+  border: none;
+  background-color: inherit;
+  color: inherit;
+  padding: 0;
+
+  &:hover, &:active, &:not(:disabled):not(.disabled):active {
+    background-color: inherit;
+    color: inherit;
+  }
+}
+
 .dropdown-menu {
   box-shadow: 0 2px 4px 0 rgb(0 0 0 / 50%), 0 13px 11px 8px rgb(0 0 0 / 12%);
   border-color: $white-smoke;
