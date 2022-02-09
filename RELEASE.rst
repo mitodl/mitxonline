@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.19.4
+Version 0.19.4 (Released February 09, 2022)
 --------------
 
 - Bump wagtail from 2.13.4 to 2.15.2 (#383)
