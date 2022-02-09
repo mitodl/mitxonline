@@ -63,23 +63,34 @@ export default function DashboardPage() {
     courseEmailsSubscriptionMutation(enrollmentId, emailsSubscription)
   )
 
-  const isActiveMenuId = useCallback((itemId: number): boolean => {
-    return !!activeMenuIds.find(id => id === itemId)
-  }, [])
+  const isActiveMenuId = useCallback(
+    (itemId: number): boolean => {
+      return !!activeMenuIds.find(id => id === itemId)
+    },
+    [activeMenuIds]
+  )
 
-  const isActiveEnrollMsgId = useCallback((itemId: number): boolean => {
-    return !!activeEnrollMsgIds.find(id => id === itemId)
-  }, [])
+  const isActiveEnrollMsgId = useCallback(
+    (itemId: number): boolean => {
+      return !!activeEnrollMsgIds.find(id => id === itemId)
+    },
+    [activeEnrollMsgIds]
+  )
 
-  const toggleActiveMenuId = useCallback((itemId: number) => {
-    return () => {
-      const isActive = isActiveMenuId(itemId)
+  const toggleActiveMenuId = useCallback(
+    (itemId: number) => {
+      return () => {
+        const isActive = isActiveMenuId(itemId)
 
-      setActiveMenuIds(
-        isActive ? without([itemId], activeMenuIds) : [...activeMenuIds, itemId]
-      )
-    }
-  }, [])
+        setActiveMenuIds(
+          isActive
+            ? without([itemId], activeMenuIds)
+            : [...activeMenuIds, itemId]
+        )
+      }
+    },
+    [isActiveMenuId, activeMenuIds, setActiveMenuIds]
+  )
 
   const toggleActiveEnrollMsgId = useCallback(
     (itemId: number) => {
@@ -92,7 +103,7 @@ export default function DashboardPage() {
         )
       }
     },
-    [isActiveEnrollMsgId, setActiveEnrollMsgIds]
+    [activeEnrollMsgIds, isActiveEnrollMsgId, setActiveEnrollMsgIds]
   )
 
   const onDeactivate = useCallback(

@@ -19,7 +19,6 @@ export default function Root({ children, store, history }: Props) {
   return (
     <div>
       <Provider store={store}>
-
         <ReduxQueryProvider queriesSelector={getQueries}>
           <NotificationsProvider>
             <ReactRouter history={history}>

@@ -24,8 +24,7 @@ export default function EmailConfirmPage() {
     confirmEmail
   ] = useMutation((code: string) => queries.auth.confirmEmailMutation(code))
 
-
-  const [,refreshUser] = useRequest(queries.users.currentUserQuery())
+  const [, refreshUser] = useRequest(queries.users.currentUserQuery())
 
   const confirmEmailAsync = useCallback(
     async (code: string) => {
@@ -36,7 +35,7 @@ export default function EmailConfirmPage() {
 
       if (confirmed) {
         await refreshUser()
-        
+
         addNotification("email-verified", {
           type:  ALERT_TYPE_TEXT,
           props: {

@@ -223,6 +223,7 @@ a.link-button {
   margin-top: 25px;
 }
 
+/* stylelint-disable no-descending-specificity */
 button.unstyled,
 button.btn-secondary.unstyled {
   border: none;
@@ -230,7 +231,9 @@ button.btn-secondary.unstyled {
   color: inherit;
   padding: 0;
 
-  &:hover, &:active, &:not(:disabled):not(.disabled):active {
+  &:hover,
+  &:active,
+  &:not(:disabled):not(.disabled):active {
     background-color: inherit;
     color: inherit;
   }
@@ -253,9 +256,7 @@ button.btn-secondary.unstyled {
       background-color: white;
     }
 
-    /* stylelint-disable-next-line no-descending-specificity */
     a,
-    /* stylelint-disable-next-line no-descending-specificity */
     button.unstyled {
       display: block;
       width: 100%;
@@ -270,3 +271,5 @@ button.btn-secondary.unstyled {
     }
   }
 }
+
+/* stylelint-enable no-descending-specificity */
