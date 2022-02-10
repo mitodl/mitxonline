@@ -65,7 +65,6 @@ type DashboardPageProps = {
 type DashboardPageState = {
   submittingEnrollmentId: number | null,
   activeMenuIds: number[],
-  activeEnrollMsgIds: number[],
   emailSettingsModalVisibility: boolean[]
 }
 
@@ -76,7 +75,6 @@ export class DashboardPage extends React.Component<
   state = {
     submittingEnrollmentId:       null,
     activeMenuIds:                [],
-    activeEnrollMsgIds:           [],
     emailSettingsModalVisibility: []
   }
 
@@ -98,10 +96,6 @@ export class DashboardPage extends React.Component<
     return !!this.state.activeMenuIds.find(id => id === itemId)
   }
 
-  isActiveEnrollMsgId(itemId: number): boolean {
-    return !!this.state.activeEnrollMsgIds.find(id => id === itemId)
-  }
-
   toggleActiveMenuId(itemId: number) {
     return () => {
       const isActive = this.isActiveMenuId(itemId)
@@ -109,17 +103,6 @@ export class DashboardPage extends React.Component<
         activeMenuIds: isActive
           ? without([itemId], this.state.activeMenuIds)
           : [...this.state.activeMenuIds, itemId]
-      })
-    }
-  }
-
-  toggleActiveEnrollMsgId(itemId: number) {
-    return () => {
-      const isActive = this.isActiveEnrollMsgId(itemId)
-      this.setState({
-        activeEnrollMsgIds: isActive
-          ? without([itemId], this.state.activeEnrollMsgIds)
-          : [...this.state.activeEnrollMsgIds, itemId]
       })
     }
   }
@@ -267,7 +250,7 @@ export class DashboardPage extends React.Component<
     const { currentUser } = this.props
     const { submittingEnrollmentId } = this.state
 
-    let startDate, startDateDescription, onUnenrollClick, unenrollEnabled
+    let startDate, startDateDescription
     const title = isLinkableCourseRun(enrollment.run, currentUser) ? (
       <a
         href={enrollment.run.courseware_url}
@@ -291,13 +274,7 @@ export class DashboardPage extends React.Component<
         </span>
       )
     }
-    if (isWithinEnrollmentPeriod(enrollment.run)) {
-      onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
-      unenrollEnabled = true
-    } else {
-      onUnenrollClick = () => {}
-      unenrollEnabled = false
-    }
+    const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
 
     return (
       <div
@@ -331,10 +308,6 @@ export class DashboardPage extends React.Component<
                     <DropdownItem
                       className="unstyled d-block"
                       onClick={onUnenrollClick}
-                      {...(!unenrollEnabled ||
-                      enrollment.id === submittingEnrollmentId
-                        ? { disabled: true }
-                        : {})}
                     >
                       Unenroll
                     </DropdownItem>
@@ -350,22 +323,6 @@ export class DashboardPage extends React.Component<
                     </DropdownItem>
                     {this.renderEmailSettingsDialog(enrollment)}
                   </span>
-                  {!unenrollEnabled && (
-                    <Tooltip
-                      delay={0}
-                      placement="bottom-end"
-                      target={`unenrollButtonWrapper-${enrollment.id}`}
-                      container={`enrollmentDropdown-${enrollment.id}`}
-                      className="unenroll-denied-msg"
-                      isOpen={this.isActiveEnrollMsgId(enrollment.id)}
-                      toggle={this.toggleActiveEnrollMsgId(enrollment.id).bind(
-                        this
-                      )}
-                    >
-                      The enrollment period for this course has ended. If you'd
-                      like to unenroll, please contact support.
-                    </Tooltip>
-                  )}
                 </DropdownMenu>
               </Dropdown>
             </div>
