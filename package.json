@@ -66,7 +66,7 @@
     "moment-timezone": "^0.5.33",
     "named-urls": "^1.4.0",
     "node-gyp": "^5.0.3",
-    "node-sass": "^4.14.1",
+    "node-sass": "^7.0.0",
     "nyc": "^15.1.0",
     "object.entries": "^1.0.4",
     "postcss-loader": "^2.0.6",
