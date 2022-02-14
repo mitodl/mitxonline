@@ -1,5 +1,7 @@
 """Constants for ecommerce."""
 
+REFERENCE_NUMBER_PREFIX = "mitxonline-"
+
 DISCOUNT_TYPE_PERCENT_OFF = "percent-off"
 DISCOUNT_TYPE_DOLLARS_OFF = "dollars-off"
 DISCOUNT_TYPE_FIXED_PRICE = "fixed-price"

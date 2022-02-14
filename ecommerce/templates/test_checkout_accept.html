@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Checkout Form</title>
+
+</head>
+<body>
+    <h1>Test Checkout Form</h1>
+
+    <p>The transaction was accepted, and the order should now be in a completed state. {{ fmt_response.message }}</p>
+
+    <p>You bought:</p>
+
+    {% for item in order.lines.items %}
+    <p>{{ item.product_version }}</p>
+    {% endfor %}
+
+    <p><textarea rows="10" cols="100">
+{{ full_response|pprint }}
+    </textarea></p>
+        
+    <p><a href="{% url 'checkout_test_step1' %}">Start over?</a> You should get a new reference ID if you start again.</p>
+</body>
+</html>

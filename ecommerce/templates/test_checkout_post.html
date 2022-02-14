@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Checkout Form</title>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+</head>
+<body onload="get_payload()">
+    <h1>Test Checkout Form</h1>
+
+    <p>A cart has been created for you and is ready to be completed and run through CyberSource. You are {{ request.user }} </p>
+
+    <form method="post" action="{{ step2 }}">{% csrf_token %}
+        <p>
+        <label for="checkout_payload">Checkout Payload</label><br />
+        <textarea id="checkout_payload" name="checkout_payload" rows="20" cols="80"></textarea>
+        </p>
+
+        <p><button type="submit">Checkout</button></p>
+
+    </form>
+
+    <script type="text/javascript">
+function get_payload() {
+    csrf = document.querySelector('[name=csrfmiddlewaretoken]').value
+
+    axios.post('{{ int_checkout_url }}', {}, { 'headers': { 'X-CSRFToken': csrf } })
+        .then(function (response) {
+            if(response.status == 200) {
+                console.log(response.data);
+                document.getElementById('checkout_payload').value = JSON.stringify(response.data);
+            }
+        });
+}
+    </script>
+</body>
+</html>

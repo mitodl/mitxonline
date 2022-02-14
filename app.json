@@ -79,6 +79,10 @@
       "description": "The log level for django",
       "required": false
     },
+    "ECOMMERCE_DEFAULT_PAYMENT_GATEWAY": {
+      "description": "The default payment gateway to use. Must match the value of the constant in the mitol.payment_gateway library.",
+      "required": false
+    },
     "EDX_API_CLIENT_TIMEOUT": {
       "description": "Timeout (in seconds) for requests made via the edX API client",
       "required": false
@@ -121,6 +125,22 @@
     },
     "MEDIA_ROOT": {
       "description": "The root directory for locally stored media. Typically not used.",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY": {
+      "description": "CyberSource access key",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID": {
+      "description": "CyberSource profile ID",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL": {
+      "description": "CyberSource secure acceptance URL",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY": {
+      "description": "CyberSource security key",
       "required": false
     },
     "MITX_ONLINE_ADMIN_EMAIL": {

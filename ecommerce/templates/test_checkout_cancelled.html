@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Checkout Form</title>
+
+</head>
+<body>
+    <h1>Test Checkout Form</h1>
+
+    <p>The transaction was cancelled. {{ fmt_response.message }}</p>
+
+    <p><textarea rows="10" cols="100">
+{{ full_response|pprint }}
+    </textarea></p>
+        
+    <p><a href="{% url 'checkout_test_step1' %}">Start over?</a></p>
+</body>
+</html>
