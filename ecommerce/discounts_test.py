@@ -66,6 +66,6 @@ def test_discount_factory_adjustment(discounts, products):
                 discounted_price = None
 
             assert (
-                discounted_price > 0
+                discounted_price >= 0
                 and discounted_price == discount_logic.get_product_price(product)
             )

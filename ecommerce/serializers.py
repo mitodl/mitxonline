@@ -104,3 +104,15 @@ class BasketSerializer(serializers.ModelSerializer):
             "basket_items",
         ]
         model = models.Basket
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        fields = [
+            "id",
+            "state",
+            "purchaser",
+            "total_price_paid",
+            "lines",
+        ]
+        model = models.Order

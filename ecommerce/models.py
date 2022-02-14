@@ -1,3 +1,4 @@
+from turtle import st
 from django.conf import settings
 from django.db import models
 from django.contrib.auth import get_user_model
@@ -6,7 +7,11 @@ from django.contrib.contenttypes.models import ContentType
 from django_fsm import FSMField, transition
 from mitol.common.models import TimestampedModel
 import reversion
-from ecommerce.constants import DISCOUNT_TYPES, REDEMPTION_TYPES
+from ecommerce.constants import (
+    DISCOUNT_TYPES,
+    REDEMPTION_TYPES,
+    REFERENCE_NUMBER_PREFIX,
+)
 from users.models import User
 
 User = get_user_model()
@@ -18,7 +23,7 @@ def valid_purchasable_objects_list():
     )
 
 
-@reversion.register(exclude=("content_type", "object_id", "created_on", "updated_on"))
+@reversion.register(exclude=("created_on", "updated_on"))
 class Product(TimestampedModel):
     """
     Representation of a purchasable product. There is a GenericForeignKey to a
@@ -96,25 +101,6 @@ class UserDiscount(TimestampedModel):
         return f"{self.discount} {self.user}"
 
 
-class DiscountRedemption(TimestampedModel):
-    """
-    Tracks when discounts were redeemed, for discounts that aren't unlimited use
-    """
-
-    redemption_date = models.DateTimeField()
-    redeemed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="redeemed_by_user",
-    )
-    redeemed_discount = models.ForeignKey(
-        Discount, on_delete=models.CASCADE, related_name="redeemed_discount"
-    )
-
-    def __str__(self):
-        return f"{self.redemption_date}: {self.redeemed_discount}, {self.redeemed_by}"
-
-
 class Order(TimestampedModel):
     """An order containing information for a purchase."""
 
@@ -159,8 +145,16 @@ class Order(TimestampedModel):
         """Issue a refund"""
         raise NotImplementedError()
 
+    @property
+    def reference_number(self):
+        return f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{self.id}"
+
     def __str__(self):
         return f"{self.state.capitalize()} Order for {self.purchaser.name} ({self.purchaser.email})"
+
+    @staticmethod
+    def decode_reference_number(refno):
+        return refno.replace(f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-", "")
 
 
 class PendingOrder(Order):
@@ -255,3 +249,51 @@ class Transaction(TimestampedModel):
         max_digits=20,
     )
     data = models.JSONField()
+
+
+class BasketDiscount(TimestampedModel):
+    """
+    This is a mirror of DiscountRedemption, but is designed to attach the
+    redemption to a Basket rather than an Order, allowing discount codes to be
+    used as long as a customer has a basket at all. These also need to be
+    ephemeral, so we don't clog up the DiscountRedemption model with FKs to
+    removed objects.
+    """
+
+    redemption_date = models.DateTimeField()
+    redeemed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="basketdiscount_user",
+    )
+    redeemed_discount = models.ForeignKey(
+        Discount, on_delete=models.CASCADE, related_name="basketdiscount_discount"
+    )
+    redeemed_basket = models.ForeignKey(
+        Basket, on_delete=models.CASCADE, related_name="basketdiscount_basket"
+    )
+
+    def __str__(self):
+        return f"{self.redemption_date}: {self.redeemed_discount}, {self.redeemed_by}"
+
+
+class DiscountRedemption(TimestampedModel):
+    """
+    Tracks when discounts were redeemed, for discounts that aren't unlimited use
+    """
+
+    redemption_date = models.DateTimeField()
+    redeemed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="redeemed_by_user",
+    )
+    redeemed_discount = models.ForeignKey(
+        Discount, on_delete=models.CASCADE, related_name="redeemed_discount"
+    )
+    redeemed_order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name="redeemed_order"
+    )
+
+    def __str__(self):
+        return f"{self.redemption_date}: {self.redeemed_discount}, {self.redeemed_by}"
