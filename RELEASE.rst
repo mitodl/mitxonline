@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.20.1
+--------------
+
+- Removing import for turtle in models
+- Adds CyberSource integration and checkout APIs
+
 Version 0.20.0 (Released February 15, 2022)
 --------------
 
