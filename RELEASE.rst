@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.20.1
+Version 0.20.1 (Released February 15, 2022)
 --------------
 
 - Removing import for turtle in models
