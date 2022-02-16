@@ -545,6 +545,7 @@ def retry_failed_edx_enrollments():
             log.exception(str(exc))
         else:
             enrollment.edx_enrolled = True
+            enrollment.edx_emails_subscription = True
             enrollment.save_and_log(None)
             succeeded.append(enrollment)
     return succeeded

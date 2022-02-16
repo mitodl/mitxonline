@@ -393,6 +393,8 @@ def test_retry_failed_edx_enrollments(mocker, exception_raised):
         assert {e.id for e in successful_enrollments} == {
             e.id for e in expected_successful_enrollments
         }
+        for enrollment in successful_enrollments:
+            assert enrollment.edx_emails_subscription is True
 
 
 def test_retry_failed_enroll_grace_period(mocker):

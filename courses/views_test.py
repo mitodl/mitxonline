@@ -414,9 +414,15 @@ def test_user_enrollment_delete(
     enrollment = CourseRunEnrollmentFactory.create(
         user=user, active=True, change_status=None
     )
+    inactive_enrollment = CourseRunEnrollmentFactory.create(
+        user=user,
+        active=False,
+        change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
+        edx_emails_subscription=False,
+    )
     patched_deactivate = mocker.patch(
         "courses.views.v1.deactivate_run_enrollment",
-        return_value=(None if deactivate_fail else enrollment),
+        return_value=(None if deactivate_fail else inactive_enrollment),
     )
     resp = user_drf_client.delete(
         reverse("user-enrollments-api-detail", kwargs={"pk": enrollment.id})
@@ -427,6 +433,10 @@ def test_user_enrollment_delete(
         keep_failed_enrollments=False,
     )
     assert resp.status_code == exp_status_code
+    final_enrollment = patched_deactivate.return_value
+    assert final_enrollment == None if deactivate_fail else inactive_enrollment
+    if not deactivate_fail:
+        assert final_enrollment.edx_emails_subscription is False
 
 
 def test_user_enrollment_delete_other_fail(mocker, settings, user_drf_client, user):
