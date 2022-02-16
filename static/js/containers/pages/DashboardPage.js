@@ -35,10 +35,7 @@ import {
   courseEmailsSubscriptionMutation
 } from "../../lib/queries/enrollment"
 import { currentUserSelector } from "../../lib/queries/users"
-import {
-  isLinkableCourseRun,
-  isWithinEnrollmentPeriod
-} from "../../lib/courseApi"
+import { isLinkableCourseRun } from "../../lib/courseApi"
 import {
   formatPrettyDateTimeAmPmTz,
   isSuccessResponse,
