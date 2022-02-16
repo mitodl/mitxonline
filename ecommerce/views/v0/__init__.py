@@ -24,6 +24,7 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from reversion.models import Version
 from django.urls import reverse
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+from main import features
 
 from mitol.common.utils import now_in_utc
 from rest_framework_extensions.mixins import NestedViewSetMixin
@@ -282,11 +283,16 @@ class CheckoutApiViewSet(ViewSet):
         order.total_price_paid = total
         order.save()
 
+        if features.is_enabled(features.CHECKOUT_TEST_UI):
+            response_uri = reverse("checkout_test_decode_response")
+        else:
+            response_uri = reverse("checkout-decode_response")
+
         payload = PaymentGateway.start_payment(
             ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
             gateway_order,
-            request.build_absolute_uri(reverse("checkout_test_decode_response")),
-            request.build_absolute_uri(reverse("checkout_test_decode_response")),
+            request.build_absolute_uri(response_uri),
+            request.build_absolute_uri(response_uri),
         )
 
         return Response(payload)

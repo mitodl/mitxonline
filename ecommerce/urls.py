@@ -1,5 +1,5 @@
 from django.urls import include, re_path, path
-from main.settings import ENVIRONMENT
+from main import features
 from rest_framework_extensions.routers import NestedRouterMixin
 from rest_framework.routers import SimpleRouter
 
@@ -43,7 +43,7 @@ urlpatterns = [
     re_path(r"^ecommerce/", include(frontend_router.urls)),
 ]
 
-if ENVIRONMENT == "dev":
+if features.is_enabled(features.CHECKOUT_TEST_UI):
     urlpatterns += [
         path(
             "ecommerce-test/checkout/",
