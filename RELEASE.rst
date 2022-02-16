@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.20.2
+--------------
+
+- Added feature flag to enable/disable the test checkout UI
+- allow to unenroll even after the enrollment period has past (#404)
+
 Version 0.20.1 (Released February 15, 2022)
 --------------
 
