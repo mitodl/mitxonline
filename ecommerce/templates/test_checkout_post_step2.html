@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Checkout Form</title>
+
+</head>
+<body>
+    <h1>Test Checkout Form</h1>
+
+    <p> You are {{ request.user }} </p>
+
+    <p>Ok, you've supplied a payload. Now we'll construct a form for you to post to the payment processor. You'll get to see everything that will go to the processor.</p>
+
+    <form method="post" action="{{ checkout_payload.url }}">
+        {% for key, value in form.items %}
+            <p><label for="{{ key }}">{{ key }}:</label>
+            <input style="width: 100em;" type="text" readonly="readonly" name="{{ key }}" value="{{ value }}" /></p>
+        {% endfor %}        
+
+        <p><button type="submit">Checkout</button></p>
+    </form>
+</body>
+</html>

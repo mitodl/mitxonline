@@ -6,6 +6,7 @@ from django.conf import settings
 
 IGNORE_EDX_FAILURES = "IGNORE_EDX_FAILURES"
 SYNC_ON_DASHBOARD_LOAD = "SYNC_ON_DASHBOARD_LOAD"
+CHECKOUT_TEST_UI = "CHECKOUT_TEST_UI"
 
 
 def is_enabled(name, default=None):

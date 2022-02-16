@@ -1,6 +1,22 @@
 Release Notes
 =============
 
+Version 0.20.1 (Released February 15, 2022)
+--------------
+
+- Removing import for turtle in models
+- Adds CyberSource integration and checkout APIs
+
+Version 0.20.0 (Released February 15, 2022)
+--------------
+
+- Bump django from 3.2.11 to 3.2.12 (#405)
+
+Version 0.19.4 (Released February 09, 2022)
+--------------
+
+- Bump wagtail from 2.13.4 to 2.15.2 (#383)
+
 Version 0.19.3 (Released February 08, 2022)
 --------------
 

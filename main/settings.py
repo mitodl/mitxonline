@@ -20,6 +20,8 @@ from mitol.common.envs import (
     import_settings_modules,
 )
 
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+
 # wildcard import boilerplate digital credentials settings
 # from mitol.digitalcredentials.settings import *  # pylint: disable=wildcard-import,unused-wildcard-import
 from mitol.common.settings.webpack import *  # pylint: disable=wildcard-import,unused-wildcard-import
@@ -28,7 +30,7 @@ from redbeat import RedBeatScheduler
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 
-VERSION = "0.19.3"
+VERSION = "0.20.1"
 
 ENVIRONMENT = get_string(
     name="MITX_ONLINE_ENVIRONMENT",
@@ -941,3 +943,34 @@ if DEBUG:
     MIDDLEWARE = ("debug_toolbar.middleware.DebugToolbarMiddleware",) + MIDDLEWARE
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+
+# eCommerce settings
+ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = get_string(
+    name="ECOMMERCE_DEFAULT_PAYMENT_GATEWAY",
+    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    description="The default payment gateway to use. Must match the value of the constant in the mitol.payment_gateway library.",
+)
+
+MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = get_string(
+    name="MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY",
+    default=None,
+    description="CyberSource access key",
+)
+
+MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = get_string(
+    name="MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID",
+    default=None,
+    description="CyberSource profile ID",
+)
+
+MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = get_string(
+    name="MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY",
+    default=None,
+    description="CyberSource security key",
+)
+
+MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL = get_string(
+    name="MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL",
+    default=None,
+    description="CyberSource secure acceptance URL",
+)
