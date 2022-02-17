@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.20.2
+Version 0.20.2 (Released February 17, 2022)
 --------------
 
 - Added feature flag to enable/disable the test checkout UI
