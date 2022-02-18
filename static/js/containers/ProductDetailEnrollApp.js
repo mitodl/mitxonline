@@ -5,7 +5,7 @@ import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { connectRequest, mutateAsync } from "redux-query"
+import { connectRequest } from "redux-query"
 import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 import Loader from "../components/Loader"
@@ -20,12 +20,8 @@ import {
 import { isWithinEnrollmentPeriod } from "../lib/courseApi"
 
 import { getCookie } from "../lib/api"
-import basket from "../lib/queries/basket"
 import type { User } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
-import { isSuccessResponse } from "../lib/util"
-import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../constants"
-import { addUserNotification } from "../actions"
 
 type Props = {
   courseId: string,
@@ -34,12 +30,12 @@ type Props = {
   status: ?number,
   upgradeEnrollmentDialogVisibility: boolean,
   addProductToBasket: (user: number, productId: number) => Promise<any>,
-  currentUser: User,
-  addUserNotification: Function
+  currentUser: User
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean
 }
+
 export class ProductDetailEnrollApp extends React.Component<
   Props,
   ProductDetailState
@@ -48,42 +44,6 @@ export class ProductDetailEnrollApp extends React.Component<
     upgradeEnrollmentDialogVisibility: false
   }
 
-  async addItemToBasket() {
-    const {
-      currentUser,
-      courseRuns,
-      addProductToBasket,
-      addUserNotification
-    } = this.props
-    const run = courseRuns ? courseRuns[0] : null
-    if (run === null) {
-      return
-    }
-    const product = run.products ? run.products[0] : null
-    if (product === null) {
-      return
-    }
-    const resp = await addProductToBasket(currentUser.id, product.id)
-    let userMessage, messageType
-    if (isSuccessResponse(resp)) {
-      messageType = ALERT_TYPE_SUCCESS
-      userMessage = "You have successfully added the course to your cart"
-    } else {
-      messageType = ALERT_TYPE_DANGER
-      userMessage = `Something went wrong trying to add course to cart. Please contact support at ${
-        SETTINGS.support_email
-      }.`
-    }
-    addUserNotification({
-      "add-product-status": {
-        type:  messageType,
-        props: {
-          text: userMessage
-        }
-      }
-    })
-    this.setState({ upgradeEnrollmentDialogVisibility: false })
-  }
   toggleUpgradeDialogVisibility = () => {
     const { upgradeEnrollmentDialogVisibility } = this.state
     this.setState({
@@ -91,9 +51,11 @@ export class ProductDetailEnrollApp extends React.Component<
     })
   }
 
-  renderUpgradeEnrollmentDialog() {
+  renderUpgradeEnrollmentDialog(run: EnrollmentFlaggedCourseRun) {
+    const { courseRuns } = this.props
     const { upgradeEnrollmentDialogVisibility } = this.state
-    return (
+    const product = run.products ? run.products[0] : null
+    return product ? (
       <Modal
         id={`upgrade-enrollment-dialog`}
         className="upgrade-enrollment-modal"
@@ -106,7 +68,7 @@ export class ProductDetailEnrollApp extends React.Component<
         <ModalBody>
           <div className="row modal-subheader">
             <div className="col-10">Take a course and get a certificate</div>
-            <div className="col-2">$1000</div>
+            <div className="col-2">${product.price}</div>
           </div>
           <div className="row">
             <div className="col-4">
@@ -122,18 +84,22 @@ export class ProductDetailEnrollApp extends React.Component<
                 nulla pariatur. Excepteur sint occaecat cupidatat non proident,
                 sunt in culpa qui officia deserunt mollit anim id est laborum.
               </p>
-              <button
-                onClick={this.addItemToBasket.bind(this)}
-                className="btn btn-primary btn-gradient-red"
-              >
-                Continue
-              </button>
+
+              <form action="/cart/add/" method="get">
+                <input type="hidden" name="product_id" value={product.id} />
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-gradient-red"
+                >
+                  Continue
+                </button>
+              </form>
             </div>
           </div>
           <div className="cancel-link">{this.getEnrollmentForm()}</div>
         </ModalBody>
       </Modal>
-    )
+    ) : null
   }
   getEnrollmentForm() {
     const csrfToken = getCookie("csrftoken")
@@ -211,22 +177,14 @@ export class ProductDetailEnrollApp extends React.Component<
                 </Fragment>
               )
             ) : null}
-            {SETTINGS.features.upgrade_dialog
-              ? this.renderUpgradeEnrollmentDialog()
+            {SETTINGS.features.upgrade_dialog && run
+              ? this.renderUpgradeEnrollmentDialog(run)
               : null}
           </Fragment>
         )}
       </Loader>
     )
   }
-}
-
-const addProductToBasket = (user: number, productId: number) =>
-  mutateAsync(basket.addProductToBasketMutation(user, productId))
-
-const mapDispatchToProps = {
-  addProductToBasket,
-  addUserNotification
 }
 
 const mapStateToProps = createStructuredSelector({
@@ -242,9 +200,6 @@ const mapPropsToConfig = props => [
 ]
 
 export default compose(
-  connect(
-    mapStateToProps,
-    mapDispatchToProps
-  ),
+  connect(mapStateToProps),
   connectRequest(mapPropsToConfig)
 )(ProductDetailEnrollApp)

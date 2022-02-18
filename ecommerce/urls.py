@@ -15,6 +15,7 @@ from ecommerce.views.v0 import (
     CheckoutTestView,
     CheckoutTestStepTwoView,
     CheckoutDecodeResponseView,
+    CheckoutProductView,
 )
 
 
@@ -47,6 +48,7 @@ urlpatterns = [
         CheckoutInterstitialView.as_view(),
         name="checkout_interstitial_page",
     ),
+    re_path(r"^cart/add", CheckoutProductView.as_view(), name="checkout-product"),
 ]
 
 if features.is_enabled(features.CHECKOUT_TEST_UI):

@@ -178,39 +178,24 @@ describe("ProductDetailEnrollApp", () => {
     it(`shows dialog to upgrade user enrollment and handles ${returnedStatusCode} response`, async () => {
       isWithinEnrollmentPeriodStub.returns(true)
       SETTINGS.features.upgrade_dialog = true
-      helper.handleRequestStub
-        .withArgs(`/api/baskets/${currentUser.id}/items/`)
-        .returns({
-          status: returnedStatusCode
-        })
       const { inner } = await renderPage()
 
-      const enrollBtn = inner.find(".enroll-now").at(0)
-      assert.isTrue(enrollBtn.exists())
-      await enrollBtn.prop("onClick")()
       sinon.assert.calledWith(
         helper.handleRequestStub,
         "/api/course_runs/?relevant_to=",
         "GET"
       )
       sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-      assert.isTrue(
-        inner
-          .find(".upgrade-enrollment-modal .btn-primary")
-          .at(0)
-          .exists()
-      )
-      const upgradeBtn = inner
-        .find(".upgrade-enrollment-modal .btn-primary")
-        .at(0)
 
-      upgradeBtn.prop("onClick")()
-      sinon.assert.calledThrice(helper.handleRequestStub)
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        `/api/baskets/${currentUser.id}/items/`,
-        "POST"
-      )
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      await enrollBtn.prop("onClick")()
+
+      const modal = inner.find(".upgrade-enrollment-modal")
+      const upgradeForm = modal.find("form").at(0)
+      assert.isTrue(upgradeForm.exists())
+
+      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
     })
   })
 })
