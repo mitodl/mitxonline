@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.20.3
+--------------
+
+- Add Upgrade Enrollment Dialog
+
 Version 0.20.2 (Released February 17, 2022)
 --------------
 
