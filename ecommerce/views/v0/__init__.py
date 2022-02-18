@@ -12,13 +12,14 @@ from rest_framework.permissions import BasePermission, IsAuthenticated, IsAdminU
 from rest_framework.decorators import action
 from ipware import get_client_ip
 
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, RedirectView
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.mixins import LoginRequiredMixin
 
+from django.db import transaction
 from django.db.models import Q, Count
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 
@@ -470,6 +471,27 @@ class CheckoutViewSet(ViewSet):
             order.save()
 
         return Response({})
+
+
+class CheckoutProductView(LoginRequiredMixin, RedirectView):
+    """View to add products to the cart and proceed to the checkout page"""
+
+    pattern_name = "cart"
+
+    def get_redirect_url(self, *args, **kwargs):
+        """Populate the basket before redirecting"""
+        with transaction.atomic():
+            basket, _ = Basket.objects.select_for_update().get_or_create(
+                user=self.request.user
+            )
+            basket.basket_items.all().delete()
+
+            for product in Product.objects.filter(
+                id__in=self.request.GET.getlist("product_id")
+            ):
+                BasketItem.objects.create(basket=basket, product=product)
+
+        return super().get_redirect_url(*args, **kwargs)
 
 
 class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):

@@ -237,3 +237,27 @@ def test_receipt(user, user_drf_client, products):
     completed_order = Order.objects.get(pk=pending_order.id)
 
     assert completed_order.state == Order.STATE.FULFILLED
+
+
+@pytest.mark.parametrize(
+    "cart_exists, cart_empty", [(True, False), (True, True), (False, True)]
+)
+def test_checkout_product(user, user_client, cart_exists, cart_empty):
+    """
+    Verifies the /cart/add?product_id=? url adds the product to the cart and redirect to checkout
+    """
+    basket = BasketFactory.create() if cart_exists else None
+
+    if not cart_empty:
+        BasketItemFactory.create(basket=basket)
+
+    product = ProductFactory.create()
+
+    resp = user_client.get(reverse("checkout-product"), {"product_id": product.id})
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+
+    basket = Basket.objects.get(user=user)
+
+    assert [item.product for item in basket.basket_items.all()] == [product]
