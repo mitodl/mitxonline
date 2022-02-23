@@ -25,6 +25,8 @@ import AccountSettingsPage from "./pages/settings/AccountSettingsPage"
 import EmailConfirmPage from "./pages/settings/EmailConfirmPage"
 import DashboardPage from "./pages/DashboardPage"
 
+import CartPage from "./pages/checkout/CartPage"
+
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
 
@@ -90,6 +92,10 @@ export class App extends React.Component<Props, void> {
               exact
               path={urljoin(match.url, String(routes.dashboard))}
               component={DashboardPage}
+            />
+            <Route
+              path={urljoin(match.url, String(routes.cart))}
+              component={CartPage}
             />
           </Switch>
         </div>

@@ -4,8 +4,10 @@ MITxOnline ecommerce serializers
 from rest_framework import serializers
 
 from ecommerce import models
-from courses.models import CourseRun, ProgramRun
+from courses.models import CourseRun, ProgramRun, Course
 from ecommerce.models import Basket, Product, BasketItem
+
+from cms.serializers import CoursePageSerializer
 
 
 class ProgramRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
@@ -19,12 +21,22 @@ class ProgramRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
         ]
 
 
-class CourseRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
-    course = serializers.SerializerMethodField()
-    readable_id = serializers.CharField(source="text_id")
+class CoursePageObjectField(serializers.RelatedField):
+    def to_representation(self, value):
+        return CoursePageSerializer(instance=value).data
 
-    def get_course(self, instance):
-        return {"id": instance.course.id, "title": instance.course.title}
+
+class CourseProductPurchasableObjectSerializer(serializers.ModelSerializer):
+    page = CoursePageObjectField(read_only=True)
+
+    class Meta:
+        model = Course
+        fields = ["id", "title", "page"]
+
+
+class CourseRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
+    course = CourseProductPurchasableObjectSerializer(read_only=True)
+    readable_id = serializers.CharField(source="text_id")
 
     class Meta:
         model = CourseRun
@@ -112,6 +124,42 @@ class BasketSerializer(serializers.ModelSerializer):
             "user",
             "basket_items",
         ]
+        model = models.Basket
+
+
+class BasketItemWithProductSerializer(serializers.ModelSerializer):
+    product = serializers.SerializerMethodField()
+
+    def get_product(self, instance):
+        return ProductSerializer(instance=instance.product, context=self.context).data
+
+    class Meta:
+        model = models.BasketItem
+        fields = [
+            "basket",
+            "product",
+            "id",
+        ]
+
+
+class BasketWithProductSerializer(serializers.ModelSerializer):
+    basket_items = serializers.SerializerMethodField()
+    total_price = serializers.SerializerMethodField()
+
+    def get_basket_items(self, instance):
+        return [
+            BasketItemWithProductSerializer(instance=basket, context=self.context).data
+            for basket in instance.basket_items.all()
+        ]
+
+    def get_total_price(self, instance):
+        return sum(
+            product.price
+            for product in [item.product for item in instance.basket_items.all()]
+        )
+
+    class Meta:
+        fields = ["id", "user", "basket_items", "total_price"]
         model = models.Basket
 
 

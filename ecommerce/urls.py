@@ -11,6 +11,7 @@ from ecommerce.views.v0 import (
     BasketItemViewSet,
     CheckoutViewSet,
     CheckoutApiViewSet,
+    CheckoutInterstitialView,
     CheckoutTestView,
     CheckoutTestStepTwoView,
     CheckoutDecodeResponseView,
@@ -41,6 +42,11 @@ urlpatterns = [
     re_path(r"^api/v0/", include(router.urls)),
     re_path(r"^api/", include(router.urls)),
     re_path(r"^ecommerce/", include(frontend_router.urls)),
+    re_path(
+        "checkout/to_payment",
+        CheckoutInterstitialView.as_view(),
+        name="checkout_interstitial_page",
+    ),
 ]
 
 if features.is_enabled(features.CHECKOUT_TEST_UI):

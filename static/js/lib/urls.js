@@ -34,6 +34,10 @@ export const routes = {
     confirmEmail: "confirm-email"
   }),
 
+  cart: include("/cart/", {
+    begin: ""
+  }),
+
   informationLinks: include("", {
     termsOfService: "terms-of-service",
     privacyPolicy:  "privacy-policy"
