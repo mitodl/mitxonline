@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.20.3
+Version 0.20.3 (Released February 23, 2022)
 --------------
 
 - Adding checkout page UI
