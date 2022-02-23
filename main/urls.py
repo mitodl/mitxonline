@@ -62,6 +62,7 @@ urlpatterns = [
     path("profile/", index, name="view-profile"),
     path("profile/edit/", index, name="edit-profile"),
     re_path(r"^account-settings/", index, name="account-settings"),
+    re_path(r"^cart/.*", index, name="cart"),
     # Wagtail
     re_path(
         r"^cms/login", cms_signin_redirect_to_site_signin, name="wagtailadmin_login"

@@ -17,6 +17,7 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.mixins import LoginRequiredMixin
 
 from django.db.models import Q, Count
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
@@ -47,6 +48,7 @@ from ecommerce.serializers import (
     ProductSerializer,
     BasketSerializer,
     BasketItemSerializer,
+    BasketWithProductSerializer,
     OrderSerializer,
 )
 
@@ -173,6 +175,70 @@ class BasketItemViewSet(
         )
 
 
+def generate_checkout_payload(request):
+    basket = Basket.objects.filter(user=request.user).get()
+
+    discounts = BasketDiscount.objects.filter(redeemed_basket=basket).all()
+
+    total = 0
+
+    order = PendingOrder(total_price_paid=0, purchaser=request.user)
+    order.save()
+
+    ip = get_client_ip(request)[0]
+
+    gateway_order = GatewayOrder(
+        username=request.user.username,
+        ip_address=ip,
+        reference=order.reference_number,
+        items=[],
+    )
+
+    for lineitem in basket.basket_items.all():
+        line_item_price = lineitem.product.price
+
+        if len(discounts) > 0:
+            for discount in discounts:
+                discount_cls = DiscountType.for_discount(discount.discount_type)
+                discounted_price = discount_cls.get_product_price(lineitem.product)
+                total += discounted_price
+                line_item_price = discounted_price
+        else:
+            total += lineitem.product.price
+
+        product_version = Version.objects.get_for_object(lineitem.product).first()
+        Line(order=order, product_version=product_version, quantity=1).save()
+        gateway_order.items.append(
+            GatewayCartItem(
+                code=product_version.field_dict["content_type_id"],
+                name=product_version.field_dict["description"],
+                quantity=1,
+                sku=f"{product_version.field_dict['content_type_id']}-{product_version.field_dict['object_id']}",
+                unitprice=line_item_price,
+                taxable=0,
+            )
+        )
+
+    order.total_price_paid = total
+    order.save()
+
+    basket.delete()
+
+    if features.is_enabled(features.CHECKOUT_TEST_UI):
+        response_uri = reverse("checkout_test_decode_response")
+    else:
+        response_uri = reverse("checkout-decode_response")
+
+    payload = PaymentGateway.start_payment(
+        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+        gateway_order,
+        request.build_absolute_uri(response_uri),
+        request.build_absolute_uri(response_uri),
+    )
+
+    return payload
+
+
 class CheckoutApiViewSet(ViewSet):
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated,)
@@ -235,67 +301,23 @@ class CheckoutApiViewSet(ViewSet):
               ultimately POST to the actual payment processor.
         """
         try:
+            payload = generate_checkout_payload(request)
+        except ObjectDoesNotExist:
+            return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        return Response(payload)
+
+    @action(detail=False, methods=["get"], name="Cart Info", url_name="cart")
+    def cart(self, request):
+        """
+        Returns the current cart, with the product info embedded.
+        """
+        try:
             basket = Basket.objects.filter(user=request.user).get()
         except ObjectDoesNotExist:
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 
-        discounts = BasketDiscount.objects.filter(redeemed_basket=basket).all()
-
-        total = 0
-
-        order = PendingOrder(total_price_paid=0, purchaser=request.user)
-        order.save()
-
-        ip = get_client_ip(request)[0]
-
-        gateway_order = GatewayOrder(
-            username=request.user.username,
-            ip_address=ip,
-            reference=order.reference_number,
-            items=[],
-        )
-
-        for lineitem in basket.basket_items.all():
-            line_item_price = lineitem.product.price
-
-            if len(discounts) > 0:
-                for discount in discounts:
-                    discount_cls = DiscountType.for_discount(discount.discount_type)
-                    discounted_price = discount_cls.get_product_price(lineitem.product)
-                    total += discounted_price
-                    line_item_price = discounted_price
-            else:
-                total += lineitem.product.price
-
-            product_version = Version.objects.get_for_object(lineitem.product).first()
-            Line(order=order, product_version=product_version, quantity=1).save()
-            gateway_order.items.append(
-                GatewayCartItem(
-                    code=product_version.field_dict["content_type_id"],
-                    name=product_version.field_dict["description"],
-                    quantity=1,
-                    sku=f"{product_version.field_dict['content_type_id']}-{product_version.field_dict['object_id']}",
-                    unitprice=line_item_price,
-                    taxable=0,
-                )
-            )
-
-        order.total_price_paid = total
-        order.save()
-
-        if features.is_enabled(features.CHECKOUT_TEST_UI):
-            response_uri = reverse("checkout_test_decode_response")
-        else:
-            response_uri = reverse("checkout-decode_response")
-
-        payload = PaymentGateway.start_payment(
-            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
-            gateway_order,
-            request.build_absolute_uri(response_uri),
-            request.build_absolute_uri(response_uri),
-        )
-
-        return Response(payload)
+        return Response(BasketWithProductSerializer(basket).data)
 
 
 class IsSignedByPaymentGateway(BasePermission):
@@ -448,6 +470,22 @@ class CheckoutViewSet(ViewSet):
             order.save()
 
         return Response({})
+
+
+class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
+    template_name = "checkout_interstitial.html"
+
+    def get(self, request):
+        try:
+            checkout_payload = generate_checkout_payload(request)
+        except ObjectDoesNotExist:
+            return HttpResponse("No basket")
+
+        return render(
+            request,
+            self.template_name,
+            {"checkout_payload": checkout_payload, "form": checkout_payload["payload"]},
+        )
 
 
 @method_decorator(csrf_exempt, name="dispatch")

@@ -38,7 +38,7 @@ class BasketAdmin(VersionAdmin):
 
 
 @admin.register(BasketItem)
-class ProductAdmin(VersionAdmin):
+class BasketItemAdmin(VersionAdmin):
     """Admin for BasketItem"""
 
     model = BasketItem

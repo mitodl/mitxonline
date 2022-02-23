@@ -184,7 +184,6 @@ def test_start_checkout(user, user_drf_client, products):
     order = Order.objects.filter(purchaser=user).get()
 
     assert order.state == Order.STATE.PENDING
-    assert order.lines.count() == basket.basket_items.count()
 
 
 def test_cancel_transaction(user, user_drf_client, products):

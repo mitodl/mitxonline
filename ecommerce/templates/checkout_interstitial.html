@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load i18n static render_bundle %}
+
+{% block headercontent %}
+  <div id="header"></div>
+  {% render_bundle 'header' %}
+{% endblock %}
+
+{% block title %}{% trans "mitxonline" %}{% endblock %}
+
+{% block content %}    
+    <section class="info-block">
+        <div class="container">
+            <div class="content-row">
+                <div class="content-col">
+                    <div class="text">
+                        <h1 class="mt-4">Redirecting to the payment processor...</h1>
+
+                        <form id="checkout_form" method="post" action="{{ checkout_payload.url }}">
+                            {% for key, value in form.items %}
+                            <input type="hidden" readonly="readonly" name="{{ key }}" value="{{ value }}" />
+                            {% endfor %}        
+                        </form>
+
+                        <script type="text/javascript">
+                    document.getElementById('checkout_form').submit();
+                        </script>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+{% endblock %}

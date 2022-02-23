@@ -12,7 +12,8 @@ declare type Settings = {
   recaptchaKey: ?string,
   support_email: string,
   features: {
-    upgrade_dialog: boolean
+    upgrade_dialog: boolean,
+    enable_discount_ui: boolean
   },
   site_name: string,
   zendesk_config: {
