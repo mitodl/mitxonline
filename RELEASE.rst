@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.20.4
+--------------
+
+- Add url to add product to the cart and redirect.
+
 Version 0.20.3 (Released February 23, 2022)
 --------------
 
