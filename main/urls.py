@@ -25,6 +25,9 @@ from wagtail.documents import urls as wagtaildocs_urls
 
 from main.views import cms_signin_redirect_to_site_signin, index
 
+handler500 = "main.views.handler500"
+handler404 = "main.views.handler404"
+
 urlpatterns = [
     # NOTE: we only bring in base_urlpatterns so applications can only be created via django-admin
     path(

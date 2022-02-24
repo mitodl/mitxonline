@@ -2,7 +2,9 @@
 mitx_online views
 """
 from django.contrib.auth.views import redirect_to_login
+from django.http import HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
+from django.template.loader import render_to_string
 from django.urls import reverse
 
 
@@ -10,11 +12,20 @@ def index(request, **kwargs):
     """
     The index view. Display available programs
     """
-
     return render(
         request,
         "index.html",
     )
+
+
+def handler404(request, exception):  # pylint: disable=unused-argument
+    """404: NOT FOUND ERROR handler"""
+    return HttpResponseNotFound(render_to_string("404.html", request=request))
+
+
+def handler500(request):
+    """500 INTERNAL SERVER ERROR handler"""
+    return HttpResponseServerError(render_to_string("500.html", request=request))
 
 
 def cms_signin_redirect_to_site_signin(request):
