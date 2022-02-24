@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.20.4
+--------------
+
+- Fixed 500 and 404 error pages
+- Updating payment_gateway to 1.2.2, fixing some usage errors with said library
+- Add url to add product to the cart and redirect.
+
 Version 0.20.3 (Released February 23, 2022)
 --------------
 
