@@ -84,8 +84,8 @@ export class CartPage extends React.Component<Props> {
         <div className="row d-flex flex-sm-columm p-md-3">
           <div className="img-container">{courseImage}</div>
 
-          <div className="flex-grow-1 mx-3 d-sm-flex flex-column">
-            <h5 className="mt-2">{title}</h5>
+          <div className="flex-grow-1 d-sm-flex flex-column w-50 mx-3">
+            <h5 className="">{title}</h5>
             <div className="detail">
               {readableId}
               <br />
