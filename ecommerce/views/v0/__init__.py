@@ -420,28 +420,37 @@ class CheckoutViewSet(ViewSet):
         appropriate action. This may be either a success, in which case something
         good should happen, or a failure, in which case fall over screaming.
         """
+        if request.method == "POST":
+            response = getattr(request, "data", getattr(request, "POST", {}))
+        else:
+            response = getattr(request, "query_params", getattr(request, "GET", {}))
 
         processor_response = PaymentGateway.get_formatted_response(
             ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
         )
         converted_order = PaymentGateway.get_gateway_class(
             ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
-        ).convert_to_order(processor_response)
+        ).convert_to_order(response)
 
-        order = Order.objects.get(pk=converted_order.reference, purchaser=request.user)
+        order_id = Order.decode_reference_number(converted_order.reference)
+
+        try:
+            order = Order.objects.get(pk=order_id)
+        except ObjectDoesNotExist:
+            return HttpResponse("Order not found")
 
         if processor_response.state == ProcessorResponse.STATE_DECLINED:
             # Transaction declined for some reason
             # This probably means the order needed to go through the process
             # again so maybe tell the user to do a thing.
             self.logger.debug(
-                "Transaction declined: {msg}".format(msg=processor_response["message"])
+                "Transaction declined: {msg}".format(msg=processor_response.message)
             )
         elif processor_response.state == ProcessorResponse.STATE_ERROR:
             # Error - something went wrong with the request
             self.logger.debug(
                 "Error happened submitting the transaction: {msg}".format(
-                    msg=processor_response["message"]
+                    msg=processor_response.message
                 )
             )
         elif processor_response.state == ProcessorResponse.STATE_CANCELLED:
@@ -450,7 +459,7 @@ class CheckoutViewSet(ViewSet):
             # mean that the entire order is invalid, so we'll do nothing with
             # the order here.
             self.logger.debug(
-                "Transaction cancelled: {msg}".format(msg=processor_response["message"])
+                "Transaction cancelled: {msg}".format(msg=processor_response.message)
             )
         elif processor_response.state == ProcessorResponse.STATE_REVIEW:
             # Transaction held for review in the payment processor's system
@@ -458,13 +467,13 @@ class CheckoutViewSet(ViewSet):
             # at a later time
             self.logger.debug(
                 "Transaction flagged for review: {msg}".format(
-                    msg=processor_response["message"]
+                    msg=processor_response.message
                 )
             )
         elif processor_response.state == ProcessorResponse.STATE_ACCEPTED:
             # It actually worked here
             self.logger.debug(
-                "Transaction accepted!: {msg}".format(msg=processor_response["message"])
+                "Transaction accepted!: {msg}".format(msg=processor_response.message)
             )
 
             order.state = Order.STATE.FULFILLED
@@ -546,6 +555,15 @@ class CheckoutDecodeResponseView(TemplateView):
         order_id = Order.decode_reference_number(request.POST["req_reference_number"])
 
         order = Order.objects.get(pk=order_id)
+
+        if request.method == "POST":
+            response = getattr(request, "data", getattr(request, "POST", {}))
+        else:
+            response = getattr(request, "query_params", getattr(request, "GET", {}))
+
+        converted_order = PaymentGateway.get_gateway_class(
+            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+        ).convert_to_order(response)
 
         template = "test_checkout_successful.html"
 
