@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.20.4
+Version 0.20.4 (Released February 24, 2022)
 --------------
 
 - Fixed 500 and 404 error pages
