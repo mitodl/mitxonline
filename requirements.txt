@@ -233,7 +233,7 @@ mitol-django-mail==3.0.1
     #   mitol-django-authentication
 mitol-django-openedx==1.0.0
     # via -r requirements.in
-mitol-django-payment-gateway==1.2.1
+mitol-django-payment-gateway==1.2.2
     # via -r requirements.in
 newrelic==6.4.1.158
     # via -r requirements.in
