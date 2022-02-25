@@ -30,7 +30,7 @@ from redbeat import RedBeatScheduler
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 
-VERSION = "0.20.4"
+VERSION = "0.20.5"
 
 ENVIRONMENT = get_string(
     name="MITX_ONLINE_ENVIRONMENT",
