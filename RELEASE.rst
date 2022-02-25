@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.20.5
+Version 0.20.5 (Released February 25, 2022)
 --------------
 
 - Fixing wrapping issue with long course titles (#426)
