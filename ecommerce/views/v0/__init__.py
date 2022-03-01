@@ -67,6 +67,8 @@ from ecommerce.models import (
     UserDiscount,
     PendingOrder,
     Order,
+    Line,
+    FulfilledOrder,
 )
 
 log = logging.getLogger(__name__)
@@ -485,6 +487,14 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
 class OrderHistoryViewSet(ReadOnlyModelViewSet):
     serializer_class = OrderHistorySerializer
     pagination_class = OrderHistoryPagination
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Order.objects.filter(purchaser=self.request.user).all()
+
+
+class OrderReceiptViewSet(ReadOnlyModelViewSet):
+    serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):

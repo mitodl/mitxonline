@@ -15,6 +15,8 @@ import { createStructuredSelector } from "reselect"
 import type { BasketItem, Discount } from "../../../flow/cartTypes"
 
 import Loader from "../../../components/Loader"
+import { CartItemCard } from "../../../components/CartItemCard"
+import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
 
 import {
   cartQuery,
@@ -27,7 +29,6 @@ import {
 } from "../../../lib/queries/cart"
 
 import type { RouterHistory } from "react-router"
-import moment from "moment"
 import {
   formatPrettyDateTimeAmPmTz,
   parseDateString,
@@ -128,69 +129,11 @@ export class CartPage extends React.Component<Props, CartState> {
   }
 
   renderCartItemCard(cartItem: BasketItem) {
-    if (cartItem.product.purchasable_object === null) {
-      return null
-    }
-
-    const purchasableObject = cartItem.product.purchasable_object
-    const course = purchasableObject.course
-
-    const title =
-      course !== undefined ? (
-        <a href="#" target="_blank" rel="noopener noreferrer">
-          {course.title}
-        </a>
-      ) : (
-        <a href="#" target="_blank" rel="noopener noreferrer">
-          {cartItem.product.description}
-        </a>
-      )
-
-    const readableId =
-      course !== undefined
-        ? purchasableObject.readable_id
-        : purchasableObject.run_tag
-
-    let startDate = ""
-    let startDateDescription = ""
-
-    if (purchasableObject.start_date) {
-      const now = moment()
-      startDate = parseDateString(purchasableObject.start_date)
-      const formattedStartDate = formatPrettyDateTimeAmPmTz(startDate)
-      startDateDescription = now.isBefore(startDate) ? (
-        <span>Starts - {formattedStartDate}</span>
-      ) : (
-        <span>
-          <strong>Active</strong> from {formattedStartDate}
-        </span>
-      )
-    }
-
-    const courseImage =
-      course !== undefined && course.page !== null ? (
-        <img src={course.page.feature_image_src} alt={course.title} />
-      ) : null
-    const cardKey = `cartsummarycard_${cartItem.id}`
-
     return (
-      <div
-        className="enrolled-item container card mb-4 rounded-0 flex-grow-1"
-        key={cardKey}
-      >
-        <div className="row d-flex flex-sm-columm p-md-3">
-          <div className="img-container">{courseImage}</div>
-
-          <div className="flex-grow-1 d-sm-flex flex-column w-50 mx-3">
-            <h5 className="">{title}</h5>
-            <div className="detail">
-              {readableId}
-              <br />
-              {startDateDescription !== undefined ? startDateDescription : ""}
-            </div>
-          </div>
-        </div>{" "}
-      </div>
+      <CartItemCard
+        key={`cartsummarycard_${cartItem.product.id}`}
+        product={cartItem.product}
+      />
     )
   }
 
@@ -260,6 +203,7 @@ export class CartPage extends React.Component<Props, CartState> {
   }
 
   renderOrderSummaryCard() {
+<<<<<<< HEAD
     const {
       totalPrice,
       discountedPrice,
@@ -349,6 +293,13 @@ export class CartPage extends React.Component<Props, CartState> {
           </div>
         ) : null}
       </div>
+=======
+    return (
+      <OrderSummaryCard
+        totalPrice={this.props.totalPrice}
+        orderFulfilled={false}
+      />
+>>>>>>> Adding OrderReceiptPage
     )
   }
 

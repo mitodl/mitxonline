@@ -196,18 +196,6 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         model = models.Basket
 
 
-class OrderSerializer(serializers.ModelSerializer):
-    class Meta:
-        fields = [
-            "id",
-            "state",
-            "purchaser",
-            "total_price_paid",
-            "lines",
-        ]
-        model = models.Order
-
-
 class LineSerializer(serializers.ModelSerializer):
     product = serializers.SerializerMethodField()
 
@@ -229,6 +217,20 @@ class LineSerializer(serializers.ModelSerializer):
             "product",
         ]
         model = models.Line
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    lines = LineSerializer(many=True)
+
+    class Meta:
+        fields = [
+            "id",
+            "state",
+            "purchaser",
+            "total_price_paid",
+            "lines",
+        ]
+        model = models.Order
 
 
 class OrderHistorySerializer(serializers.ModelSerializer):

@@ -14,6 +14,7 @@ from ecommerce.views.v0 import (
     CheckoutInterstitialView,
     CheckoutProductView,
     OrderHistoryViewSet,
+    OrderReceiptViewSet,
 )
 
 
@@ -25,6 +26,7 @@ router = SimpleRouterWithNesting()
 router.register(r"products", ProductViewSet, basename="products_api")
 router.register(r"checkout", CheckoutApiViewSet, basename="checkout_api")
 router.register(r"orders/history", OrderHistoryViewSet, basename="orderhistory_api")
+router.register(r"orders/receipt", OrderReceiptViewSet, basename="orderreceipt_api")
 
 basketRouter = router.register(r"baskets", BasketViewSet, basename="basket")
 basketRouter.register(

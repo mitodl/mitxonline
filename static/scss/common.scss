@@ -268,3 +268,10 @@ button.btn-secondary.unstyled {
     }
   }
 }
+
+.link-text {
+  color: $black;
+  text-decoration: underline;
+  box-shadow: none;
+  cursor: pointer;
+}
