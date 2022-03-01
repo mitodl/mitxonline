@@ -4,7 +4,10 @@ import { getCsrfOptions, nextState } from "./util"
 
 export const cartSelector = pathOr(null, ["entities", "cartItems"])
 export const totalPriceSelector = pathOr(null, ["entities", "totalPrice"])
+export const orderHistorySelector = pathOr(null, ["entities", "orderHistory"])
+
 export const cartQueryKey = "cartItems"
+export const orderHistoryQueryKey = "orderHistory"
 
 export const checkoutPayloadSelector = pathOr(null, [
   "entities",
@@ -41,5 +44,16 @@ export const checkoutFormDataMutation = () => ({
   }),
   update: {
     checkoutPayload: nextState
+  }
+})
+
+export const orderHistoryQuery = () => ({
+  url:       `/api/orders/history`,
+  queryKey:  orderHistoryQueryKey,
+  transform: json => ({
+    orderHistory: json
+  }),
+  update: {
+    orderHistory: nextState
   }
 })

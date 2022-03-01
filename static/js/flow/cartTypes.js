@@ -22,3 +22,10 @@ export type CartItem = {
   user: number,
   basket_items: Array<BasketItem>
 }
+
+export type PaginatedOrderHistory = {
+  count: number,
+  next: ?string,
+  previous: ?string,
+  results: Array<Object>
+}
