@@ -46,6 +46,7 @@ from courses.models import (
 )
 
 from ecommerce.serializers import (
+    OrderHistorySerializer,
     ProductSerializer,
     BasketSerializer,
     BasketItemSerializer,
@@ -69,6 +70,13 @@ from ecommerce.discounts import DiscountType
 
 class ProductsPagination(LimitOffsetPagination):
     default_limit = 2
+    limit_query_param = "l"
+    offset_query_param = "o"
+    max_limit = 50
+
+
+class OrderHistoryPagination(LimitOffsetPagination):
+    default_limit = 10
     limit_query_param = "l"
     offset_query_param = "o"
     max_limit = 50
@@ -621,6 +629,15 @@ class CheckoutDecodeResponseView(TemplateView):
                 "full_response": request.POST,
             },
         )
+
+
+class OrderHistoryViewSet(ReadOnlyModelViewSet):
+    serializer_class = OrderHistorySerializer
+    pagination_class = OrderHistoryPagination
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Order.objects.filter(purchaser=self.request.user).all()
 
 
 """

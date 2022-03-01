@@ -142,3 +142,5 @@ export const ACCOUNT_SETTINGS_PAGE_TITLE = "Account Settings"
 export const EMAIL_CONFIRM_PAGE_TITLE = "Confirm Email Change"
 
 export const CART_DISPLAY_PAGE_TITLE = "Checkout"
+
+export const ORDER_HISTORY_DISPLAY_PAGE_TITLE = "Order History"

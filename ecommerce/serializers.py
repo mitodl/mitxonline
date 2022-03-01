@@ -1,6 +1,7 @@
 """
 MITxOnline ecommerce serializers
 """
+from this import d
 from rest_framework import serializers
 
 from ecommerce import models
@@ -8,6 +9,7 @@ from courses.models import CourseRun, ProgramRun, Course
 from ecommerce.models import Basket, Product, BasketItem
 
 from cms.serializers import CoursePageSerializer
+from users.serializers import UserSerializer
 
 
 class ProgramRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
@@ -173,3 +175,61 @@ class OrderSerializer(serializers.ModelSerializer):
             "lines",
         ]
         model = models.Order
+
+
+class LineSerializer(serializers.ModelSerializer):
+    product = serializers.SerializerMethodField()
+
+    def get_product(self, instance):
+        product = models.Product.objects.get(
+            pk=instance.product_version.field_dict["id"]
+        )
+
+        return ProductSerializer(instance=product).data
+
+    class Meta:
+        fields = [
+            "quantity",
+            "item_description",
+            "content_type",
+            "unit_price",
+            "total_price",
+            "id",
+            "product",
+        ]
+        model = models.Line
+
+
+class OrderHistorySerializer(serializers.ModelSerializer):
+    titles = serializers.SerializerMethodField()
+    lines = LineSerializer(many=True)
+
+    def get_titles(self, instance):
+        titles = []
+
+        for line in instance.lines.all():
+            product = models.Product.objects.get(
+                pk=line.product_version.field_dict["id"]
+            )
+            if product.content_type.model == "courserun":
+                titles.append(product.purchasable_object.course.title)
+            elif product.content_type.model == "programrun":
+                titles.append(product.description)
+            else:
+                titles.append(f"No Title - {product.id}")
+
+        return titles
+
+    class Meta:
+        fields = [
+            "id",
+            "state",
+            "reference_number",
+            "purchaser",
+            "total_price_paid",
+            "lines",
+            "created_on",
+            "titles",
+        ]
+        model = models.Order
+        depth = 1

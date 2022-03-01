@@ -16,6 +16,7 @@ from ecommerce.views.v0 import (
     CheckoutTestStepTwoView,
     CheckoutDecodeResponseView,
     CheckoutProductView,
+    OrderHistoryViewSet,
 )
 
 
@@ -29,6 +30,7 @@ frontend_router = SimpleRouter()
 
 router.register(r"products", ProductViewSet, basename="products_api")
 router.register(r"checkout", CheckoutApiViewSet, basename="checkout_api")
+router.register(r"orders/history", OrderHistoryViewSet, basename="orderhistory_api")
 
 frontend_router.register(r"checkout", CheckoutViewSet, basename="checkout")
 

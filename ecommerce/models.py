@@ -224,6 +224,14 @@ class Line(TimestampedModel):
     quantity = models.PositiveIntegerField()
 
     @property
+    def item_description(self):
+        return self.product_version.field_dict["description"]
+
+    @property
+    def content_type(self):
+        return self.product_version.field_dict["content_type"]
+
+    @property
     def unit_price(self):
         """Return the price of the product"""
         return self.product_version.field_dict["price"]

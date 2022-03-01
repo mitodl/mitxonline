@@ -26,6 +26,7 @@ import EmailConfirmPage from "./pages/settings/EmailConfirmPage"
 import DashboardPage from "./pages/DashboardPage"
 
 import CartPage from "./pages/checkout/CartPage"
+import OrderHistory from "./pages/checkout/OrderHistory"
 
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
@@ -96,6 +97,10 @@ export class App extends React.Component<Props, void> {
             <Route
               path={urljoin(match.url, String(routes.cart))}
               component={CartPage}
+            />
+            <Route
+              path={urljoin(match.url, String(routes.orderHistory))}
+              component={OrderHistory}
             />
           </Switch>
         </div>

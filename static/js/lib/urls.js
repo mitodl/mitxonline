@@ -38,6 +38,10 @@ export const routes = {
     begin: ""
   }),
 
+  orderHistory: include("/orders/history", {
+    begin: ""
+  }),
+
   informationLinks: include("", {
     termsOfService: "terms-of-service",
     privacyPolicy:  "privacy-policy"
