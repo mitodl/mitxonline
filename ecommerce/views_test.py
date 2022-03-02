@@ -51,6 +51,11 @@ def payment_gateway_settings():
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
 
 
+@pytest.fixture(autouse=True)
+def mock_create_run_enrollments(mocker):
+    return mocker.patch("courses.api.create_run_enrollments", autospec=True)
+
+
 def test_list_products(user_drf_client, products):
     resp = user_drf_client.get(reverse("products_api-list"), {"l": 10, "o": 0})
     resp_products = sorted(resp.json()["results"], key=op.itemgetter("id"))
@@ -186,57 +191,66 @@ def test_start_checkout(user, user_drf_client, products):
     assert order.state == Order.STATE.PENDING
 
 
-def test_cancel_transaction(user, user_drf_client, products):
+@pytest.mark.parametrize(
+    "decision, expected_redirect_url, expected_state, basket_exists",
+    [
+        ("CANCEL", reverse("cart"), Order.STATE.CANCELED, True),
+        ("DECLINE", reverse("cart"), Order.STATE.DECLINED, True),
+        ("ERROR", reverse("cart"), Order.STATE.ERRORED, True),
+        ("REVIEW", reverse("user-dashboard"), Order.STATE.PENDING, False),
+        ("ACCEPT", reverse("user-dashboard"), Order.STATE.FULFILLED, False),
+    ],
+)
+def test_cancel_transaction(
+    user,
+    user_client,
+    mocker,
+    products,
+    decision,
+    expected_redirect_url,
+    expected_state,
+    basket_exists,
+):
     """
     Generates an order (using the API endpoint) and then cancels it using the endpoint.
     There shouldn't be any PendingOrders after that happens.
     """
-    create_basket(user, products)
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    basket = create_basket(user, products)
 
-    resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
+    resp = user_client.post(reverse("checkout_api-start_checkout"))
 
     payload = resp.json()["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": decision,
+        "message": "payment processor message",
+    }
 
     # Load the pending order from the DB(factory) - should match the ref# in
     # the payload we get back
 
-    pending_order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)
+    order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)
 
-    assert pending_order.reference_number == payload["reference_number"]
+    assert order.reference_number == payload["req_reference_number"]
 
     # This is kind of cheating - CyberSource will send back a payload that is
     # signed, but here we're just passing the payload as we got it back from
     # the start checkout call.
 
-    resp = user_drf_client.get(reverse("checkout-cancel_checkout"), payload)
+    resp = user_client.post(reverse("checkout-result-callback"), payload)
+    assert resp.status_code == 302
+    assert resp.url == expected_redirect_url
+    print(resp.cookies)
 
-    assert_drf_json_equal(resp.json(), {"message": "Order cancelled"})
+    order.refresh_from_db()
 
-    cancelled_order = Order.objects.get(pk=pending_order.id)
+    assert order.state == expected_state
 
-    assert cancelled_order == pending_order
-    assert cancelled_order.state == Order.STATE.CANCELED
-
-
-def test_receipt(user, user_drf_client, products):
-    """
-    Generates an order (using the API endpoint) and then pretends it went OK.
-    There shouldn't be any PendingOrders after that happens, and the receipt
-    endpoint should return back a single PendingOrder that has been Fulfilled.
-    """
-    create_basket(user, products)
-
-    resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
-
-    pending_order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)
-
-    resp = user_drf_client.get(reverse("checkout-receipt"), resp.json()["payload"])
-
-    assert len(resp.json()) == 1
-
-    completed_order = Order.objects.get(pk=pending_order.id)
-
-    assert completed_order.state == Order.STATE.FULFILLED
+    assert Basket.objects.filter(id=basket.id).exists() is basket_exists
 
 
 @pytest.mark.parametrize(

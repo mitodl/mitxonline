@@ -16,7 +16,6 @@ from requests.exceptions import HTTPError
 from rest_framework import status
 
 from courses.factories import CourseRunFactory, CourseRunEnrollmentFactory
-from courses.models import CourseRunEnrollment
 from main.test_utils import MockHttpError, MockResponse
 from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
@@ -37,6 +36,7 @@ from openedx.api import (
     unsubscribe_from_edx_course_emails,
 )
 from openedx.constants import (
+    EDX_ENROLLMENT_AUDIT_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     PLATFORM_EDX,
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -413,7 +413,7 @@ def test_retry_failed_enroll_grace_period(mocker):
 
     assert successful_enrollments == [older_enrollment]
     patched_enroll_in_edx.assert_called_once_with(
-        older_enrollment.user, [older_enrollment.run]
+        older_enrollment.user, [older_enrollment.run], mode=EDX_ENROLLMENT_AUDIT_MODE
     )
 
 

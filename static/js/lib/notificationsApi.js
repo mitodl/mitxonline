@@ -8,7 +8,12 @@ import {
   USER_MSG_TYPE_COMPLETED_AUTH,
   USER_MSG_TYPE_ENROLL_BLOCKED,
   USER_MSG_TYPE_ENROLL_FAILED,
-  USER_MSG_TYPE_ENROLLED
+  USER_MSG_TYPE_ENROLLED,
+  USER_MSG_TYPE_PAYMENT_DECLINED,
+  USER_MSG_TYPE_PAYMENT_CANCELLED,
+  USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
+  USER_MSG_TYPE_PAYMENT_ACCEPTED,
+  USER_MSG_TYPE_PAYMENT_REVIEW
 } from "../constants"
 
 type UserMessage = {
@@ -54,6 +59,31 @@ export function parseStoredUserMessage(
   case USER_MSG_TYPE_COMPLETED_AUTH:
     alertType = ALERT_TYPE_SUCCESS
     msgText = "Account created!"
+    break
+  case USER_MSG_TYPE_PAYMENT_DECLINED:
+    alertType = ALERT_TYPE_DANGER
+    msgText = "Payment was declined, please try again."
+    break
+  case USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN:
+    alertType = ALERT_TYPE_DANGER
+    msgText = "Unknown error trying to complete order."
+    break
+  case USER_MSG_TYPE_PAYMENT_CANCELLED:
+    alertType = ALERT_TYPE_DANGER
+    msgText = "Payment was cancelled."
+    break
+  case USER_MSG_TYPE_PAYMENT_REVIEW:
+    // Probably won't hit this in production, but here to cover all possible cases
+    alertType = ALERT_TYPE_SUCCESS
+    msgText = "Payment is pending review."
+    break
+  case USER_MSG_TYPE_PAYMENT_ACCEPTED:
+    alertType = ALERT_TYPE_SUCCESS
+    msgText = userMsgJson.run
+      ? `Success! You are now enrolled for the paid version of ${
+        userMsgJson.run
+      }.`
+      : null
     break
   default:
     return null

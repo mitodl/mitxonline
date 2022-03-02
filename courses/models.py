@@ -21,9 +21,9 @@ from courses.constants import (
     ENROLLABLE_ITEM_ID_SEPARATOR,
     SYNCED_COURSE_RUN_FIELD_MSG,
 )
-from ecommerce.models import Product
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.utils import edx_redirect_url
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 
@@ -356,7 +356,7 @@ class CourseRun(TimestampedModel):
         help_text="The date beyond which the learner should not see link to this course run on their dashboard.",
     )
     live = models.BooleanField(default=False)
-    products = GenericRelation(Product, related_query_name="courseruns")
+    products = GenericRelation("ecommerce.Product", related_query_name="courseruns")
 
     class Meta:
         unique_together = ("course", "run_tag")

@@ -20,6 +20,7 @@ from mitol.common.utils.collections import (
 )
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 from rest_framework.status import HTTP_404_NOT_FOUND
 
 from courses import mail_api
@@ -170,9 +171,7 @@ def get_user_enrollments(user):
 
 
 def create_run_enrollments(
-    user,
-    runs,
-    keep_failed_enrollments=False,
+    user, runs, *, keep_failed_enrollments=False, mode=EDX_DEFAULT_ENROLLMENT_MODE
 ):
     """
     Creates local records of a user's enrollment in course runs, and attempts to enroll them
@@ -191,7 +190,7 @@ def create_run_enrollments(
     """
     successful_enrollments = []
     try:
-        enroll_in_edx_course_runs(user, runs)
+        enroll_in_edx_course_runs(user, runs, mode=mode)
     except (
         EdxApiEnrollErrorException,
         UnknownEdxApiEnrollException,
@@ -215,7 +214,7 @@ def create_run_enrollments(
             enrollment, created = CourseRunEnrollment.all_objects.get_or_create(
                 user=user,
                 run=run,
-                defaults=dict(edx_enrolled=edx_request_success),
+                defaults=dict(edx_enrolled=edx_request_success, enrollment_mode=mode),
             )
             if not created and not enrollment.active:
                 enrollment.edx_enrolled = edx_request_success
