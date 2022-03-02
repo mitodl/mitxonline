@@ -2,17 +2,26 @@
 MITxOnline ecommerce views
 """
 import logging
+from main.constants import (
+    USER_MSG_TYPE_PAYMENT_ACCEPTED,
+    USER_MSG_TYPE_PAYMENT_CANCELLED,
+    USER_MSG_TYPE_PAYMENT_DECLINED,
+    USER_MSG_TYPE_PAYMENT_ERROR,
+    USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
+    USER_MSG_TYPE_PAYMENT_REVIEW,
+)
+from main.utils import redirect_with_user_message
 from rest_framework import mixins, status
 from rest_framework.response import Response
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.viewsets import ReadOnlyModelViewSet, GenericViewSet, ViewSet
+from rest_framework.views import APIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from rest_framework.permissions import BasePermission, IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
-from ipware import get_client_ip
 
-from django.views.generic import TemplateView, RedirectView
+from django.views.generic import TemplateView, RedirectView, View
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
@@ -23,18 +32,13 @@ from django.db import transaction
 from django.db.models import Q, Count
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 
-from reversion.models import Version
 from django.urls import reverse
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
-from main import features
 
 from mitol.common.utils import now_in_utc
 from rest_framework_extensions.mixins import NestedViewSetMixin
 from mitol.payment_gateway.api import (
-    CartItem as GatewayCartItem,
-    Order as GatewayOrder,
     PaymentGateway,
-    CyberSourcePaymentGateway,
     ProcessorResponse,
 )
 
@@ -45,27 +49,24 @@ from courses.models import (
     ProgramRun,
 )
 
+from ecommerce import api
 from ecommerce.serializers import (
     OrderHistorySerializer,
     ProductSerializer,
     BasketSerializer,
     BasketItemSerializer,
     BasketWithProductSerializer,
-    OrderSerializer,
 )
-
-log = logging.getLogger(__name__)
 from ecommerce.models import (
     Product,
     Basket,
     BasketItem,
     Discount,
     BasketDiscount,
-    PendingOrder,
     Order,
-    Line,
 )
-from ecommerce.discounts import DiscountType
+
+log = logging.getLogger(__name__)
 
 
 class ProductsPagination(LimitOffsetPagination):
@@ -184,70 +185,6 @@ class BasketItemViewSet(
         )
 
 
-def generate_checkout_payload(request):
-    basket = Basket.objects.filter(user=request.user).get()
-
-    discounts = BasketDiscount.objects.filter(redeemed_basket=basket).all()
-
-    total = 0
-
-    order = PendingOrder(total_price_paid=0, purchaser=request.user)
-    order.save()
-
-    ip = get_client_ip(request)[0]
-
-    gateway_order = GatewayOrder(
-        username=request.user.username,
-        ip_address=ip,
-        reference=order.reference_number,
-        items=[],
-    )
-
-    for lineitem in basket.basket_items.all():
-        line_item_price = lineitem.product.price
-
-        if len(discounts) > 0:
-            for discount in discounts:
-                discount_cls = DiscountType.for_discount(discount.discount_type)
-                discounted_price = discount_cls.get_product_price(lineitem.product)
-                total += discounted_price
-                line_item_price = discounted_price
-        else:
-            total += lineitem.product.price
-
-        product_version = Version.objects.get_for_object(lineitem.product).first()
-        Line(order=order, product_version=product_version, quantity=1).save()
-        gateway_order.items.append(
-            GatewayCartItem(
-                code=product_version.field_dict["content_type_id"],
-                name=product_version.field_dict["description"],
-                quantity=1,
-                sku=f"{product_version.field_dict['content_type_id']}-{product_version.field_dict['object_id']}",
-                unitprice=line_item_price,
-                taxable=0,
-            )
-        )
-
-    order.total_price_paid = total
-    order.save()
-
-    basket.delete()
-
-    if features.is_enabled(features.CHECKOUT_TEST_UI):
-        response_uri = reverse("checkout_test_decode_response")
-    else:
-        response_uri = reverse("checkout-decode_response")
-
-    payload = PaymentGateway.start_payment(
-        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
-        gateway_order,
-        request.build_absolute_uri(response_uri),
-        request.build_absolute_uri(response_uri),
-    )
-
-    return payload
-
-
 class CheckoutApiViewSet(ViewSet):
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated,)
@@ -310,7 +247,7 @@ class CheckoutApiViewSet(ViewSet):
               ultimately POST to the actual payment processor.
         """
         try:
-            payload = generate_checkout_payload(request)
+            payload = api.generate_checkout_payload(request)
         except ObjectDoesNotExist:
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 
@@ -329,76 +266,18 @@ class CheckoutApiViewSet(ViewSet):
         return Response(BasketWithProductSerializer(basket).data)
 
 
-class IsSignedByPaymentGateway(BasePermission):
+@method_decorator(csrf_exempt, name="dispatch")
+class CheckoutCallbackView(View):
     """
-    Verifies the payload that comes back from the payment processor is properly
-    signed. Defaulting to CyberSource for now but this should make its way into
-    ol-django.
+    Handle a checkout cancellation or receipt
     """
-
-    def has_permission(self, request, view):
-        # this line for when the ol-django stuff comes through
-        #         return PaymentGateway.validate_processor_response(ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request)
-
-        if request.method == "GET":
-            passed_payload = request.query_params
-        else:
-            passed_payload = request.data
-
-        cybersource = CyberSourcePaymentGateway()
-
-        signature = cybersource._generate_cybersource_sa_signature(passed_payload)
-
-        if passed_payload["signature"] == signature:
-            return True
-        else:
-            return False
-
-
-class CheckoutViewSet(ViewSet):
-    """
-    The methods here are stubs for now. These should handle the responses from
-    CyberSource or other payment gateway so they can handle the result of the
-    transaction, and then redirect into the CMS or something appropriate when
-    they're done. That stuff doesn't exist yet so these will return a JSON blob
-    instead for now.
-    """
-
-    authentication_classes = (SessionAuthentication, TokenAuthentication)
-    permission_classes = (IsSignedByPaymentGateway,)
 
     def __init__(self, *args, **kwargs):
         import logging
 
         self.logger = logging.getLogger(__name__)
 
-    @action(
-        detail=False,
-        methods=["get"],
-        name="Cancel Checkout",
-        url_name="cancel_checkout",
-    )
-    def cancel_checkout(self, request):
-        """
-        If the user cancels out of the transaction while on the payment
-        processor's site, they will be redirected here. This should then clear
-        out pending orders and (probably) send the customer somewhere where
-        they can start over.
-        """
-        orders = Order.objects.filter(
-            purchaser=request.user, state=Order.STATE.PENDING
-        ).all()
-
-        for order in orders:
-            order.state = Order.STATE.CANCELED
-            order.save()
-
-        return Response({"message": "Order cancelled"})
-
-    @action(
-        detail=False, methods=["get", "post"], name="Receipt View", url_name="receipt"
-    )
-    def receipt(self, request):
+    def post(self, request, *args, **kwargs):
         """
         This is where customers should land when they have completed the
         transaction successfully. This does a handful of things:
@@ -408,37 +287,21 @@ class CheckoutViewSet(ViewSet):
         clear out the stored basket)
         3. Perform any enrollments, account status changes, etc.
         """
-        orders = PendingOrder.objects.filter(purchaser=request.user).all()
+        if not PaymentGateway.validate_processor_response(
+            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+        ):
+            raise PermissionDenied(
+                "Could not validate response from the payment processor."
+            )
 
-        for order in orders:
-            order.state = Order.STATE.FULFILLED
-            order.save()
-
-        return Response(OrderSerializer(orders, many=True).data)
-
-    @action(
-        detail=False,
-        methods=["get", "post"],
-        name="Processor Response",
-        url_name="decode_response",
-    )
-    def decode_response(self, request):
-        """
-        Processes the response from the payment processor and performs an
-        appropriate action. This may be either a success, in which case something
-        good should happen, or a failure, in which case fall over screaming.
-        """
-        if request.method == "POST":
-            response = getattr(request, "data", getattr(request, "POST", {}))
-        else:
-            response = getattr(request, "query_params", getattr(request, "GET", {}))
+        payment_data = request.POST
 
         processor_response = PaymentGateway.get_formatted_response(
             ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
         )
         converted_order = PaymentGateway.get_gateway_class(
             ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
-        ).convert_to_order(response)
+        ).convert_to_order(payment_data)
 
         order_id = Order.decode_reference_number(converted_order.reference)
 
@@ -447,12 +310,19 @@ class CheckoutViewSet(ViewSet):
         except ObjectDoesNotExist:
             return HttpResponse("Order not found")
 
+        basket = Basket.objects.filter(user=order.purchaser).first()
+
         if processor_response.state == ProcessorResponse.STATE_DECLINED:
             # Transaction declined for some reason
             # This probably means the order needed to go through the process
             # again so maybe tell the user to do a thing.
             self.logger.debug(
                 "Transaction declined: {msg}".format(msg=processor_response.message)
+            )
+            order.decline()
+            order.save()
+            return redirect_with_user_message(
+                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
             )
         elif processor_response.state == ProcessorResponse.STATE_ERROR:
             # Error - something went wrong with the request
@@ -461,6 +331,11 @@ class CheckoutViewSet(ViewSet):
                     msg=processor_response.message
                 )
             )
+            order.error()
+            order.save()
+            return redirect_with_user_message(
+                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_ERROR}
+            )
         elif processor_response.state == ProcessorResponse.STATE_CANCELLED:
             # Transaction cancelled
             # Transaction could be cancelled for reasons that don't necessarily
@@ -468,6 +343,11 @@ class CheckoutViewSet(ViewSet):
             # the order here.
             self.logger.debug(
                 "Transaction cancelled: {msg}".format(msg=processor_response.message)
+            )
+            order.cancel()
+            order.save()
+            return redirect_with_user_message(
+                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
             )
         elif processor_response.state == ProcessorResponse.STATE_REVIEW:
             # Transaction held for review in the payment processor's system
@@ -478,16 +358,37 @@ class CheckoutViewSet(ViewSet):
                     msg=processor_response.message
                 )
             )
+            if basket:
+                basket.delete()
+
+            return redirect_with_user_message(
+                reverse("user-dashboard"), {"type": USER_MSG_TYPE_PAYMENT_REVIEW}
+            )
         elif processor_response.state == ProcessorResponse.STATE_ACCEPTED:
             # It actually worked here
             self.logger.debug(
                 "Transaction accepted!: {msg}".format(msg=processor_response.message)
             )
 
-            order.state = Order.STATE.FULFILLED
+            order.fulfill(payment_data)
             order.save()
 
-        return Response({})
+            if basket:
+                basket.delete()
+
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {
+                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
+                    "run": order.lines.first().purchased_object.course.title,
+                },
+            )
+        else:
+            order.cancel()
+            order.save()
+            return redirect_with_user_message(
+                reverse("user-dashboard"), {"type": USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN}
+            )
 
 
 class CheckoutProductView(LoginRequiredMixin, RedirectView):
@@ -516,7 +417,7 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
 
     def get(self, request):
         try:
-            checkout_payload = generate_checkout_payload(request)
+            checkout_payload = api.generate_checkout_payload(request)
         except ObjectDoesNotExist:
             return HttpResponse("No basket")
 
@@ -527,110 +428,6 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
         )
 
 
-@method_decorator(csrf_exempt, name="dispatch")
-class CheckoutDecodeResponseView(TemplateView):
-    def __init__(self, *args, **kwargs):
-        import logging
-
-        self.logger = logging.getLogger(__name__)
-
-    def post(self, request):
-        """
-        Processes the response from the payment processor and performs an
-        appropriate action. This determines what the status of the request
-        ended up being, and then displays the appropriate resposne page.
-
-        At the moment, this code does not do the following:
-        - Any enrollments or user changes once a transaction has completed
-        successfully. (It does change the state of the order once it's accepted
-        but there's more steps to the process.)
-        - Display any of the actual UI code. There are some stub templates in
-        here for testing purposes. Once the UI is ready, this code should be
-        amended to redirect to the proper location or display the actual UI once
-        it has finished processing the transaction.
-        """
-        if not PaymentGateway.validate_processor_response(
-            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
-        ):
-            raise PermissionDenied(
-                "Could not validate response from the payment processor."
-            )
-
-        fmt_response = PaymentGateway.get_formatted_response(
-            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
-        )
-
-        order_id = Order.decode_reference_number(request.POST["req_reference_number"])
-
-        order = Order.objects.get(pk=order_id)
-
-        if request.method == "POST":
-            response = getattr(request, "data", getattr(request, "POST", {}))
-        else:
-            response = getattr(request, "query_params", getattr(request, "GET", {}))
-
-        converted_order = PaymentGateway.get_gateway_class(
-            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
-        ).convert_to_order(response)
-
-        template = "test_checkout_successful.html"
-
-        if fmt_response.state == ProcessorResponse.STATE_DECLINED:
-            # Transaction declined for some reason
-            # This probably means the order needed to go through the process
-            # again so maybe tell the user to do a thing.
-            self.logger.debug(
-                "Transaction declined: {msg}".format(msg=fmt_response.message)
-            )
-            template = "test_checkout_declined.html"
-        elif fmt_response.state == ProcessorResponse.STATE_ERROR:
-            # Error - something went wrong with the request
-            self.logger.debug(
-                "Error happened submitting the transaction: {msg}".format(
-                    msg=fmt_response.message
-                )
-            )
-            template = "test_checkout_error.html"
-        elif fmt_response.state == ProcessorResponse.STATE_CANCELLED:
-            # Transaction cancelled
-            # Transaction could be cancelled for reasons that don't necessarily
-            # mean that the entire order is invalid, so we'll do nothing with
-            # the order here.
-            self.logger.debug(
-                "Transaction cancelled: {msg}".format(msg=fmt_response.message)
-            )
-
-            template = "test_checkout_cancelled.html"
-        elif fmt_response.state == ProcessorResponse.STATE_REVIEW:
-            # Transaction needs a professional review
-            # (nonjokey - someone needs to approve this so the order shouldn't be cancelled quite yet)
-            self.logger.debug(
-                "Transaction flagged for review: {msg}".format(msg=fmt_response.message)
-            )
-
-            template = "test_chekcout_review.html"
-        elif fmt_response.state == ProcessorResponse.STATE_ACCEPTED:
-            # It actually worked here
-            self.logger.debug(
-                "Transaction accepted!: {msg}".format(msg=fmt_response.message)
-            )
-
-            order.state = Order.STATE.FULFILLED
-            order.save()
-
-            template = "test_checkout_accept.html"
-
-        return render(
-            request,
-            template,
-            {
-                "order": order,
-                "fmt_response": fmt_response,
-                "full_response": request.POST,
-            },
-        )
-
-
 class OrderHistoryViewSet(ReadOnlyModelViewSet):
     serializer_class = OrderHistorySerializer
     pagination_class = OrderHistoryPagination
@@ -638,74 +435,3 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return Order.objects.filter(purchaser=self.request.user).all()
-
-
-"""
-These are testing stubs - they will allow you to fairly easily run a transaction
-through the whole workflow. These should be replaced with the actual workflow
-when that's more ready to go. (They should be removed when there's real UI.)
-"""
-
-
-class CheckoutTestView(TemplateView):
-    template_name = "test_checkout_post.html"
-
-    def get(self, request):
-        """
-        Generates a basket, and then adds a program to it, then gives you a form
-        so you can check out through the payment processor.
-        """
-        import random
-
-        if not request.user.is_superuser:
-            raise PermissionDenied("Not an admin user.")
-
-        if Product.objects.count() == 0:
-            raise Exception("You need to set up a product first.")
-
-        if Basket.objects.filter(user=request.user).count() == 0:
-            basket = Basket(user=request.user)
-            basket.save()
-        else:
-            basket = Basket.objects.filter(user=request.user).get()
-
-        if basket.basket_items.count() == 0:
-            products = Product.objects.all()
-
-            basket_item = BasketItem(
-                product=products[random.randrange(0, len(products), 1)],
-                basket=basket,
-                quantity=1,
-            )
-            basket_item.save()
-
-        return render(
-            request,
-            self.template_name,
-            {
-                "step2": reverse("checkout_test_step2"),
-                "int_checkout_url": reverse("checkout_api-start_checkout"),
-            },
-        )
-
-
-class CheckoutTestStepTwoView(TemplateView):
-    template_name = "test_checkout_post_step2.html"
-
-    def post(self, request):
-        """
-        Grabs the generated payload and then generates a form for you to actually
-        submit to the payment processor. Maybe this can be one step.
-        """
-        if not request.user.is_superuser:
-            raise PermissionDenied("Not an admin user.")
-
-        import json
-
-        payload = json.loads(request.POST["checkout_payload"])
-
-        return render(
-            request,
-            self.template_name,
-            {"checkout_payload": payload, "form": payload["payload"]},
-        )

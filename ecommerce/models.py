@@ -1,17 +1,23 @@
+from django.utils.functional import cached_property
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from courses.models import CourseRun
 from django_fsm import FSMField, transition
 from mitol.common.models import TimestampedModel
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 import reversion
+from reversion.models import Version
 from ecommerce.constants import (
     DISCOUNT_TYPES,
     REDEMPTION_TYPES,
     REFERENCE_NUMBER_PREFIX,
 )
 from users.models import User
+
+from mitol.common.utils.datetime import now_in_utc
 
 User = get_user_model()
 
@@ -107,6 +113,8 @@ class Order(TimestampedModel):
         PENDING = "pending"
         FULFILLED = "fulfilled"
         CANCELED = "canceled"
+        DECLINED = "declined"
+        ERRORED = "errored"
         REFUNDED = "refunded"
 
         @classmethod
@@ -116,6 +124,8 @@ class Order(TimestampedModel):
                 (cls.FULFILLED, "Fulfilled", "FulfilledOrder"),
                 (cls.CANCELED, "Canceled", "CanceledOrder"),
                 (cls.REFUNDED, "Refunded", "RefundedOrder"),
+                (cls.DECLINED, "Declined", "DeclinedOrder"),
+                (cls.ERRORED, "Errored", "ErroredOrder"),
             )
 
     state = FSMField(default=STATE.PENDING, state_choices=STATE.choices())
@@ -129,17 +139,22 @@ class Order(TimestampedModel):
         max_digits=20,
     )
 
-    @transition(field=state, source=STATE.PENDING, target=STATE.FULFILLED)
-    def fulfill(self):
+    def fulfill(self, payment_data):
         """Fulfill this order"""
         raise NotImplementedError()
 
-    @transition(field=state, source=STATE.PENDING, target=STATE.CANCELED)
     def cancel(self):
         """Cancel this order"""
         raise NotImplementedError()
 
-    @transition(field=state, source=STATE.FULFILLED, target=STATE.REFUNDED)
+    def decline(self):
+        """Decline this order"""
+        raise NotImplementedError()
+
+    def errored(self):
+        """Error this order"""
+        raise NotImplementedError()
+
     def refund(self):
         """Issue a refund"""
         raise NotImplementedError()
@@ -147,6 +162,17 @@ class Order(TimestampedModel):
     @property
     def reference_number(self):
         return f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{self.id}"
+
+    @property
+    def purchased_runs(self):
+        """Return a list of purchased CourseRuns"""
+
+        # TODO: handle programs
+        return [
+            line.purchased_object
+            for line in self.lines.all()
+            if isinstance(line.purchased_object, CourseRun)
+        ]
 
     def __str__(self):
         return f"{self.state.capitalize()} Order for {self.purchaser.name} ({self.purchaser.email})"
@@ -159,12 +185,82 @@ class Order(TimestampedModel):
 class PendingOrder(Order):
     """An order that is pending payment"""
 
-    def fulfill(self):
-        """Fulfill this order"""
-        pass
+    @classmethod
+    @transaction.atomic()
+    def create_from_basket(cls, basket: Basket):
+        """
+        Creates a new pending order from a basket
 
+        Args:
+            basket (Basket):  the user's basket to create an order for
+
+        Returns:
+            PendingOrder: the created pending order
+        """
+        order = cls.objects.select_for_update().create(
+            total_price_paid=0, purchaser=basket.user
+        )
+        total = 0
+        now = now_in_utc()
+
+        # apply all the discounts to the order first
+        # this is needed to compute the discounted prices of each line
+        for basket_discount in basket.discounts.all():
+            order.discounts.create(
+                redemption_date=now,
+                redeemed_by=basket_discount.redeemed_by,
+                redeemed_discount=basket_discount.redeemed_discount,
+            )
+
+        for basket_item in basket.basket_items.all():
+            product = basket_item.product
+            product_version = Version.objects.get_for_object(product).first()
+
+            line = order.lines.create(
+                order=order,
+                product_version=product_version,
+                quantity=1,
+                purchased_object=product.purchasable_object,
+            )
+
+            total += line.discounted_price
+
+        order.total_price_paid = total
+        order.save()
+
+        return order
+
+    @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.FULFILLED)
+    def fulfill(self, payment_data):
+        """Fulfill this order"""
+        from courses.api import create_run_enrollments
+
+        # record the transaction
+        self.transactions.create(
+            data=payment_data,
+            amount=self.total_price_paid,
+        )
+
+        # create enrollments for what the learner has paid for
+        create_run_enrollments(
+            self.purchaser,
+            self.purchased_runs,
+            mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+
+    @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.CANCELED)
     def cancel(self):
         """Cancel this order"""
+        pass
+
+    @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.DECLINED)
+    def decline(self):
+        """Decline this order"""
+        pass
+
+    @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.ERRORED)
+    def error(self):
+        """Error this order"""
         pass
 
     class Meta:
@@ -174,6 +270,9 @@ class PendingOrder(Order):
 class FulfilledOrder(Order):
     """An order that has a fulfilled payment"""
 
+    @transition(
+        field="state", source=Order.STATE.FULFILLED, target=Order.STATE.REFUNDED
+    )
     def refund(self):
         """Issue a refund"""
         pass
@@ -204,8 +303,32 @@ class RefundedOrder(Order):
         proxy = True
 
 
+class DeclinedOrder(Order):
+    """
+    An order that is declined.
+
+    The state of this can't be altered further.
+    """
+
+    class Meta:
+        proxy = True
+
+
+class ErroredOrder(Order):
+    """
+    An order that is errored.
+
+    The state of this can't be altered further.
+    """
+
+    class Meta:
+        proxy = True
+
+
 class Line(TimestampedModel):
     """A line in an Order."""
+
+    valid_purchasable_objects = valid_purchasable_objects_list()
 
     def _order_line_product_versions():
         """Returns a Q object filtering to Versions for Products"""
@@ -223,6 +346,18 @@ class Line(TimestampedModel):
     )
     quantity = models.PositiveIntegerField()
 
+    # denormalized reference which otherwise requires the lookup: line.product_version.product.purchasable_object
+    purchased_content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        limit_choices_to=valid_purchasable_objects,
+        null=True,
+    )
+    purchased_object_id = models.PositiveIntegerField(null=True)
+    purchased_object = GenericForeignKey(
+        "purchased_content_type", "purchased_object_id"
+    )
+
     @property
     def item_description(self):
         return self.product_version.field_dict["description"]
@@ -236,10 +371,26 @@ class Line(TimestampedModel):
         """Return the price of the product"""
         return self.product_version.field_dict["price"]
 
-    @property
+    @cached_property
     def total_price(self):
         """Return the price of the product"""
         return self.unit_price * self.quantity
+
+    @cached_property
+    def discounted_price(self):
+        """Return the price of the product with discounts"""
+        from ecommerce.discounts import DiscountType
+
+        # apply discount to product using the best discount
+        # in practice, orders will only have one discount
+        # but JUST IN CASE this ever changes
+        # we want to have this be deterministic
+        price = self.unit_price
+        for discount in self.order.discounts.all():
+            discount_cls = DiscountType.for_discount(discount.discount_type)
+            price = min(discount_cls.get_product_price(self.product), price)
+
+        return price * self.quantity
 
     def __str__(self):
         return f"{self.product_version}"
@@ -271,13 +422,13 @@ class BasketDiscount(TimestampedModel):
     redeemed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="basketdiscount_user",
+        related_name="+",
     )
     redeemed_discount = models.ForeignKey(
-        Discount, on_delete=models.CASCADE, related_name="basketdiscount_discount"
+        Discount, on_delete=models.CASCADE, related_name="+"
     )
     redeemed_basket = models.ForeignKey(
-        Basket, on_delete=models.CASCADE, related_name="basketdiscount_basket"
+        Basket, on_delete=models.CASCADE, related_name="discounts"
     )
 
     def __str__(self):
@@ -286,20 +437,20 @@ class BasketDiscount(TimestampedModel):
 
 class DiscountRedemption(TimestampedModel):
     """
-    Tracks when discounts were redeemed, for discounts that aren't unlimited use
+    Tracks when discounts were redeemed
     """
 
     redemption_date = models.DateTimeField()
     redeemed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="redeemed_by_user",
+        related_name="+",
     )
     redeemed_discount = models.ForeignKey(
-        Discount, on_delete=models.CASCADE, related_name="redeemed_discount"
+        Discount, on_delete=models.CASCADE, related_name="order_redemptions"
     )
     redeemed_order = models.ForeignKey(
-        Order, on_delete=models.CASCADE, related_name="redeemed_order"
+        Order, on_delete=models.CASCADE, related_name="discounts"
     )
 
     def __str__(self):

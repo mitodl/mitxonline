@@ -36,6 +36,7 @@ from courses.factories import (
 # pylint: disable=redefined-outer-name
 from courses.models import CourseRunEnrollment, ProgramEnrollment
 from main.test_utils import MockHttpError
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
     NoEdxApiAuthError,
@@ -248,7 +249,9 @@ def test_create_run_enrollments(mocker, user):
         user,
         runs,
     )
-    patched_edx_enroll.assert_called_once_with(user, runs)
+    patched_edx_enroll.assert_called_once_with(
+        user, runs, mode=EDX_DEFAULT_ENROLLMENT_MODE
+    )
     assert patched_send_enrollment_email.call_count == num_runs
     assert edx_request_success is True
     assert len(successful_enrollments) == num_runs
@@ -283,7 +286,9 @@ def test_create_run_enrollments_api_fail(mocker, user, exception_cls):
         [run],
         keep_failed_enrollments=True,
     )
-    patched_edx_enroll.assert_called_once_with(user, [run])
+    patched_edx_enroll.assert_called_once_with(
+        user, [run], mode=EDX_DEFAULT_ENROLLMENT_MODE
+    )
     patched_log_exception.assert_called_once()
     patched_send_enrollment_email.assert_not_called()
     assert len(successful_enrollments) == 1
@@ -321,7 +326,9 @@ def test_create_run_enrollments_enroll_api_fail(
         runs,
         keep_failed_enrollments=keep_failed_enrollments,
     )
-    patched_edx_enroll.assert_called_once_with(user, runs)
+    patched_edx_enroll.assert_called_once_with(
+        user, runs, mode=EDX_DEFAULT_ENROLLMENT_MODE
+    )
     patched_log_exception.assert_called_once()
     patched_send_enrollment_email.assert_not_called()
     expected_enrollments = 0 if not keep_failed_enrollments else num_runs
@@ -348,7 +355,9 @@ def test_create_run_enrollments_creation_fail(mocker, user):
         user,
         runs,
     )
-    patched_edx_enroll.assert_called_once_with(user, runs)
+    patched_edx_enroll.assert_called_once_with(
+        user, runs, mode=EDX_DEFAULT_ENROLLMENT_MODE
+    )
     patched_log_exception.assert_called_once()
     patched_mail_api.send_course_run_enrollment_email.assert_not_called()
     patched_mail_api.send_enrollment_failure_message.assert_called_once()

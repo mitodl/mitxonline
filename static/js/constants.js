@@ -111,6 +111,13 @@ export const USER_MSG_TYPE_ENROLL_FAILED = "enroll-failed"
 export const USER_MSG_TYPE_ENROLL_BLOCKED = "enroll-blocked"
 export const USER_MSG_TYPE_COMPLETED_AUTH = "completed-auth"
 
+export const USER_MSG_TYPE_PAYMENT_DECLINED = "payment-declined"
+export const USER_MSG_TYPE_PAYMENT_ERROR = "payment-error"
+export const USER_MSG_TYPE_PAYMENT_CANCELLED = "payment-cancelled"
+export const USER_MSG_TYPE_PAYMENT_REVIEW = "payment-review"
+export const USER_MSG_TYPE_PAYMENT_ACCEPTED = "payment-accepted"
+export const USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN = "payment-error-unknown"
+
 export const USERNAME_LENGTH = 30
 
 export const ALERT_TYPE_TEXT = "text"

@@ -489,13 +489,14 @@ def get_edx_grades_with_users(course_run, user=None):
                 yield edx_grade, user
 
 
-def enroll_in_edx_course_runs(user, course_runs):
+def enroll_in_edx_course_runs(user, course_runs, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
     """
     Enrolls a user in edx course runs
 
     Args:
         user (users.models.User): The user to enroll
         course_runs (iterable of CourseRun): The course runs to enroll in
+        mode (str): The course mode to enroll the user with
 
     Returns:
         list of edx_api.enrollments.models.Enrollment:
@@ -510,7 +511,7 @@ def enroll_in_edx_course_runs(user, course_runs):
     for course_run in course_runs:
         try:
             result = edx_client.enrollments.create_student_enrollment(
-                course_run.courseware_id, mode=EDX_DEFAULT_ENROLLMENT_MODE
+                course_run.courseware_id, mode=mode
             )
             results.append(result)
         except HTTPError as exc:
@@ -540,7 +541,9 @@ def retry_failed_edx_enrollments():
         user = enrollment.user
         course_run = enrollment.run
         try:
-            enroll_in_edx_course_runs(user, [course_run])
+            enroll_in_edx_course_runs(
+                user, [course_run], mode=enrollment.enrollment_mode
+            )
         except Exception as exc:  # pylint: disable=broad-except
             log.exception(str(exc))
         else:

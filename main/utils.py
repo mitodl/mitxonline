@@ -6,7 +6,8 @@ from typing import Union, Tuple, TypeVar, Set
 
 from django.conf import settings
 from django.core.serializers import serialize
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponseRedirect
+from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME
 from mitol.common.utils.urls import remove_password_from_url
 from mitol.common.utils.webpack import webpack_public_path
 from rest_framework import status
@@ -84,13 +85,35 @@ def get_field_names(model):
     ]
 
 
-def encode_json_cookie_value(cookie_value: Union[dict, list, str, None]) -> str:
+CookieValue = Union[dict, list, str, None]
+
+
+def encode_json_cookie_value(cookie_value: CookieValue) -> str:
     """
     Encodes a JSON-compatible value to be set as the value of a cookie, which can then be decoded to get the original
     JSON value.
     """
     json_str_value = json.dumps(cookie_value)
     return quote_plus(json_str_value.replace(" ", "%20"))
+
+
+def redirect_with_user_message(
+    redirect_uri: str, cookie_value: CookieValue
+) -> HttpResponseRedirect:
+    """
+    Creates a redirect response with a user message
+
+    Args:
+        redirect_uri (str): the uri to redirect to
+        cookie_value (CookieValue): the object to serialize into the cookie
+    """
+    resp = HttpResponseRedirect(redirect_uri)
+    resp.set_cookie(
+        key=USER_MSG_COOKIE_NAME,
+        value=encode_json_cookie_value(cookie_value),
+        max_age=USER_MSG_COOKIE_MAX_AGE,
+    )
+    return resp
 
 
 def is_success_response(resp: Response) -> bool:
