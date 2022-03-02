@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.21.0
+--------------
+
+- Adding order history page
+
 Version 0.20.5 (Released February 25, 2022)
 --------------
 
