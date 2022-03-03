@@ -42,6 +42,7 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
 log = logging.getLogger(__name__)
@@ -81,6 +82,17 @@ def get_user_relevant_course_run_qset(
         run_qset = run_qset.annotate(user_enrollments=user_enrollments).order_by(
             "-user_enrollments", "enrollment_start"
         )
+
+        verified_enrollments = Count(
+            "enrollments",
+            filter=Q(
+                enrollments__user=user,
+                enrollments__active=True,
+                enrollments__edx_enrolled=True,
+                enrollments__enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            ),
+        )
+        run_qset = run_qset.annotate(verified_enrollments=verified_enrollments)
 
         runs = run_qset.filter(
             Q(user_enrollments__gt=0)

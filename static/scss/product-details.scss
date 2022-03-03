@@ -311,6 +311,40 @@
         }
       }
     }
+
+    #upsellCard {
+      width: 497px;
+      padding: 0 24px 24px 24px;
+      flex-shrink: 0;
+      float: right;
+
+      @include media-breakpoint-down(lg) {
+        width: 100%;
+        padding: 0 12px 12px 12px;
+      }
+
+      div.card {
+        padding: 24px;
+      }
+
+      p {
+        line-height: 24px;
+      }
+
+      div.upsell-header {
+        margin-left: 0;
+        margin-right: 0;
+
+        span.badge {
+          font-weight: normal;
+        }
+
+        span.badge-danger {
+          background-color: #fae8e8;
+          color: #b43e3e;
+        }
+      }
+    }
   }
 
   .about-text {
@@ -345,10 +379,6 @@
     }
   }
 
-  p {
-    font-size: small;
-  }
-
   a {
     text-decoration: underline;
   }
@@ -357,11 +387,22 @@
     font-weight: 600;
     font-size: 20px;
     margin-bottom: 20px;
+    padding-left: 15px;
+    padding-right: 15px;
   }
 
-  .cancel-link {
+  .cancel-link, .faq-link {
     text-align: center !important;
     margin: 20px 0;
+  }
+
+  .faq-link a {
+    color: black;
+    font-weight: bold;
+  }
+
+  .faq-link a:visited {
+    color: rgba(0, 0, 0, 0.14);
   }
 
   .upgrade-icon {
@@ -372,5 +413,6 @@
   .enroll-now-free {
     text-decoration: underline;
     box-shadow: none;
+    font-weight: bold;
   }
 }

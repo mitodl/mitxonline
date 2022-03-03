@@ -25,6 +25,7 @@ from ecommerce.models import Product
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
 from openedx.utils import edx_redirect_url
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 
 User = get_user_model()
 
@@ -505,6 +506,9 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
     active = models.BooleanField(
         default=True,
         help_text="Indicates whether or not this enrollment should be considered active",
+    )
+    enrollment_mode = models.CharField(
+        default=EDX_DEFAULT_ENROLLMENT_MODE, max_length=20, null=True, blank=True
     )
 
     objects = ActiveEnrollmentManager()
