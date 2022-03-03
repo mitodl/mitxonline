@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.21.0
+--------------
+
+- Support enrolling learner as verified on payment
+- Adding UX tweaks, upsell card
+- unsubscribe from course emails after unenroll (#416)
+- Adding order history page
+
 Version 0.20.5 (Released February 25, 2022)
 --------------
 
