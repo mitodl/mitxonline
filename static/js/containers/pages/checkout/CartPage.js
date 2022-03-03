@@ -209,11 +209,7 @@ export class CartPage extends React.Component<Props> {
                 Terms of Service
               </a>
               , and{" "}
-              <a
-                href="http://mitxonline.odl.local:8013/privacy-policy/"
-                target="_blank"
-                rel="noreferrer"
-              >
+              <a href="/privacy-policy/" target="_blank" rel="noreferrer">
                 Privacy Policy.
               </a>
             </div>
