@@ -94,7 +94,10 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         if self.context and self.context.get("include_enrolled_flag"):
             return {
                 **data,
-                **{"is_enrolled": getattr(instance, "user_enrollments", 0) > 0},
+                **{
+                    "is_enrolled": getattr(instance, "user_enrollments", 0) > 0,
+                    "is_verified": getattr(instance, "verified_enrollments", 0) > 0,
+                },
             }
         return data
 

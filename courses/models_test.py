@@ -538,6 +538,7 @@ def test_audit(user, is_program):
         "updated_on": format_as_iso8601(enrollment.updated_on),
         "user": enrollment.user.id,
         "username": enrollment.user.username,
+        "enrollment_mode": enrollment.enrollment_mode,
     }
     if not is_program:
         expected["edx_enrolled"] = enrollment.edx_enrolled

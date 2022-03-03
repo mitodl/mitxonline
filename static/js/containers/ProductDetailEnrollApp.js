@@ -66,26 +66,29 @@ export class ProductDetailEnrollApp extends React.Component<
           Enroll
         </ModalHeader>
         <ModalBody>
-          <div className="row modal-subheader">
-            <div className="col-10">Take a course and get a certificate</div>
-            <div className="col-2">${product.price}</div>
+          <div className="row modal-subheader d-flex">
+            <div className="flex-grow-1 align-self-end">
+              Learn online and get a certificate
+            </div>
+            <div className="text-right align-self-end">${product.price}</div>
           </div>
           <div className="row">
-            <div className="col-4">
-              <div className="upgrade-icon" />
-            </div>
-            <div className="col-8">
+            <div className="col-12">
               <p>
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-                eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut
-                enim ad minim veniam, quis nostrud exercitation ullamco laboris
-                nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor
-                in reprehenderit in voluptate velit esse cillum dolore eu fugiat
-                nulla pariatur. Excepteur sint occaecat cupidatat non proident,
-                sunt in culpa qui officia deserunt mollit anim id est laborum.
+                Thank you for choosing an MITx online course. By paying for this
+                course, you're joining the most engaged and motivated learners
+                on your path to a certificate from MITx.
               </p>
 
-              <form action="/cart/add/" method="get">
+              <p>
+                Your certificate is signed by MIT faculty and demonstrates that
+                you have gained the knowledge and skills taught in this course.
+                Showcase your certificate on your resume and social channels to
+                advance your career, earn a promotion, or enhance your college
+                applications.
+              </p>
+
+              <form action="/cart/add/" method="get" className="text-center">
                 <input type="hidden" name="product_id" value={product.id} />
                 <button
                   type="submit"
@@ -97,6 +100,15 @@ export class ProductDetailEnrollApp extends React.Component<
             </div>
           </div>
           <div className="cancel-link">{this.getEnrollmentForm()}</div>
+          <div className="faq-link">
+            <a
+              href="https://mitxonline.zendesk.com/hc/en-us"
+              target="_blank"
+              rel="noreferrer"
+            >
+              FAQs
+            </a>
+          </div>
         </ModalBody>
       </Modal>
     ) : null
@@ -110,7 +122,7 @@ export class ProductDetailEnrollApp extends React.Component<
         <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
         <input type="hidden" name="run" value={run ? run.id : ""} />
         <button type="submit" className="btn enroll-now enroll-now-free">
-          No thanks, I'll take the free version
+          No thanks, I'll take the free version without a certificate
         </button>
       </form>
     )
