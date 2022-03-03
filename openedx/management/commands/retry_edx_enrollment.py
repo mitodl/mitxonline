@@ -72,6 +72,7 @@ class Command(BaseCommand):
                 self.stderr.write(self.style.ERROR(str(exc)))
             else:
                 enrollment.edx_enrolled = True
+                enrollment.edx_emails_subscription = True
                 enrollment.save_and_log(None)
                 self.stdout.write(
                     self.style.SUCCESS(

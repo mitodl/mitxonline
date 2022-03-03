@@ -257,6 +257,7 @@ def test_create_run_enrollments(mocker, user):
         assert enrollment.change_status is None
         assert enrollment.active is True
         assert enrollment.edx_enrolled is True
+        assert enrollment.edx_emails_subscription is True
         assert enrollment.run == run
         patched_send_enrollment_email.assert_any_call(enrollment)
 
@@ -437,6 +438,7 @@ class TestDeactivateEnrollments:
         assert enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
         assert enrollment.active is False
         assert enrollment.edx_enrolled is False
+        assert enrollment.edx_emails_subscription is False
         assert returned_enrollment == enrollment
 
     @pytest.mark.parametrize("keep_failed_enrollments", [True, False])
@@ -491,6 +493,7 @@ class TestDeactivateEnrollments:
             run_enrollment.refresh_from_db()
             assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
             assert run_enrollment.active is False
+            assert run_enrollment.edx_emails_subscription is False
 
 
 @pytest.mark.parametrize("keep_failed_enrollments", [True, False])

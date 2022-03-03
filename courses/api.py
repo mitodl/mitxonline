@@ -207,6 +207,7 @@ def create_run_enrollments(
             )
             if not created and not enrollment.active:
                 enrollment.edx_enrolled = edx_request_success
+                enrollment.edx_emails_subscription = True
                 enrollment.reactivate_and_save()
         except:  # pylint: disable=bare-except
             mail_api.send_enrollment_failure_message(user, run, details=format_exc())
@@ -289,6 +290,7 @@ def deactivate_run_enrollment(
         mail_api.send_course_run_unenrollment_email(run_enrollment)
     if edx_unenrolled:
         run_enrollment.edx_enrolled = False
+        run_enrollment.edx_emails_subscription = False
     run_enrollment.deactivate_and_save(change_status, no_user=True)
     return run_enrollment
 

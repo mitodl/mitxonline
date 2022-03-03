@@ -203,6 +203,7 @@ class EnrollmentChangeCommand(BaseCommand):
         enrolled_in_edx = self.enroll_in_edx(to_user, [to_run])
         if enrolled_in_edx:
             run_enrollment.edx_enrolled = True
+            run_enrollment.edx_emails_subscription = True
             run_enrollment.save_and_log(None)
             mail_api.send_course_run_enrollment_email(run_enrollment)
         elif not keep_failed_enrollments:
