@@ -15,7 +15,6 @@ from rest_framework import mixins, status
 from rest_framework.response import Response
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.viewsets import ReadOnlyModelViewSet, GenericViewSet, ViewSet
-from rest_framework.views import APIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -57,6 +56,7 @@ from ecommerce.serializers import (
     BasketItemSerializer,
     BasketDiscountSerializer,
     BasketWithProductSerializer,
+    OrderSerializer,
 )
 from ecommerce.models import (
     Product,
@@ -67,8 +67,6 @@ from ecommerce.models import (
     UserDiscount,
     PendingOrder,
     Order,
-    Line,
-    FulfilledOrder,
 )
 
 log = logging.getLogger(__name__)
