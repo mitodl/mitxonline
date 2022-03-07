@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.21.0
+Version 0.21.0 (Released March 07, 2022)
 --------------
 
 - fixing privacy policy link
