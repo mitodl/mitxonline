@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.22.0
+--------------
+
+- Adding migration to update enrollment modes to default to audit
+
 Version 0.21.0 (Released March 07, 2022)
 --------------
 
