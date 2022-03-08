@@ -13,7 +13,7 @@ declare type Settings = {
   support_email: string,
   features: {
     upgrade_dialog: boolean,
-    enable_discount_ui: boolean
+    disable_discount_ui: boolean
   },
   site_name: string,
   zendesk_config: {

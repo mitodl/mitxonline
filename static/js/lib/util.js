@@ -225,3 +225,9 @@ export const getErrorMessages = (
   }
   return response.body.errors
 }
+
+export const formatLocalePrice = (amount: number | null) => {
+  if (amount === null) return 0
+
+  return amount.toLocaleString("en-US", { style: "currency", currency: "USD" })
+}

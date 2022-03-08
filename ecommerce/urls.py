@@ -9,6 +9,7 @@ from ecommerce.views.v0 import (
     BasketViewSet,
     BasketItemViewSet,
     CheckoutCallbackView,
+    BasketDiscountViewSet,
     CheckoutApiViewSet,
     CheckoutInterstitialView,
     CheckoutProductView,
@@ -25,10 +26,17 @@ router.register(r"products", ProductViewSet, basename="products_api")
 router.register(r"checkout", CheckoutApiViewSet, basename="checkout_api")
 router.register(r"orders/history", OrderHistoryViewSet, basename="orderhistory_api")
 
-router.register(r"baskets", BasketViewSet, basename="basket").register(
+basketRouter = router.register(r"baskets", BasketViewSet, basename="basket")
+basketRouter.register(
     r"items",
     BasketItemViewSet,
     basename="basket-items",
+    parents_query_lookups=["basket"],
+)
+basketRouter.register(
+    r"discounts",
+    BasketDiscountViewSet,
+    basename="basket-discounts",
     parents_query_lookups=["basket"],
 )
 

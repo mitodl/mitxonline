@@ -8,6 +8,7 @@ from courses.factories import (
 )
 
 from ecommerce.serializers import (
+    BasketWithProductSerializer,
     ProductSerializer,
     CourseRunProductPurchasableObjectSerializer,
     ProgramRunProductPurchasableObjectSerializer,
@@ -15,7 +16,17 @@ from ecommerce.serializers import (
     BasketItemSerializer,
     BaseProductSerializer,
 )
-from ecommerce.factories import ProductFactory, BasketItemFactory
+from ecommerce.factories import (
+    ProductFactory,
+    BasketItemFactory,
+    UnlimitedUseDiscountFactory,
+)
+from ecommerce.models import BasketDiscount
+from ecommerce.discounts import DiscountType
+
+from users.factories import UserFactory
+
+from mitol.common.utils import now_in_utc
 
 pytestmark = [pytest.mark.django_db]
 
@@ -108,3 +119,31 @@ def test_basket_item_serializer(mock_context):
             "product": basket_item.product.id,
         },
     )
+
+
+def test_basket_with_product_serializer():
+    """
+    Tests serialization of a basket with the attached products (and any
+    discounts applied).
+    """
+
+    basket_item = BasketItemFactory.create()
+    discount = UnlimitedUseDiscountFactory.create()
+    user = UserFactory.create()
+
+    basket_discount = BasketDiscount(
+        redeemed_by=user,
+        redeemed_discount=discount,
+        redeemed_basket=basket_item.basket,
+        redemption_date=now_in_utc(),
+    )
+    basket_discount.save()
+
+    serialized_basket = BasketWithProductSerializer(basket_item.basket).data
+
+    logic = DiscountType.for_discount(discount)
+    discount_price = logic.get_product_price(basket_item.product)
+
+    assert serialized_basket["total_price"] == basket_item.product.price
+    assert serialized_basket["discounted_price"] == discount_price
+    assert len(serialized_basket["discounts"]) == 1

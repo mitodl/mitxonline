@@ -55,6 +55,7 @@ from ecommerce.serializers import (
     ProductSerializer,
     BasketSerializer,
     BasketItemSerializer,
+    BasketDiscountSerializer,
     BasketWithProductSerializer,
 )
 from ecommerce.models import (
@@ -63,6 +64,8 @@ from ecommerce.models import (
     BasketItem,
     Discount,
     BasketDiscount,
+    UserDiscount,
+    PendingOrder,
     Order,
 )
 
@@ -185,6 +188,15 @@ class BasketItemViewSet(
         )
 
 
+class BasketDiscountViewSet(ReadOnlyModelViewSet):
+    """Applied basket discounts"""
+
+    serializer_class = BasketDiscountSerializer
+
+    def get_queryset(self):
+        return BasketDiscount.objects.filter(redeemed_basket__user=self.request.user)
+
+
 class CheckoutApiViewSet(ViewSet):
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated,)
@@ -203,7 +215,7 @@ class CheckoutApiViewSet(ViewSet):
         ephemeral).
 
         POST Args:
-            - discount (int): Discount ID to apply
+            - discount (str): Discount Code to apply
 
         Returns:
             - Success message on success
@@ -216,9 +228,18 @@ class CheckoutApiViewSet(ViewSet):
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 
         try:
-            discount = Discount.objects.get(pk=request.data["discount"])
+            discount = Discount.objects.get(discount_code=request.data["discount"])
+            if not discount.check_validity(request.user):
+                raise ObjectDoesNotExist()
         except ObjectDoesNotExist:
-            return Response("Discount not found.", status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                f"Discount '{request.data['discount']}' not found.",
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # If you try to redeem a second code, clear out the discounts that
+        # have been redeemed.
+        BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
         basket_discount = BasketDiscount(
             redemption_date=now_in_utc(),
@@ -228,9 +249,37 @@ class CheckoutApiViewSet(ViewSet):
         )
         basket_discount.save()
 
-        # This should maybe recalculate the pricing for stuff in the basket?
+        return Response(
+            {
+                "message": "Discount applied",
+                "code": basket_discount.redeemed_discount.discount_code,
+            }
+        )
 
-        return Response({"message": "Discount applied", "id": basket_discount.id})
+    @action(
+        detail=False,
+        methods=["post"],
+        name="Clear Discount",
+        url_name="clear_discount",
+    )
+    def clear_discount(self, request):
+        """
+        API call to clear discounts from the current cart. This will reapply
+        UserDiscounts.
+
+        Returns:
+            - Success message on success
+        """
+        basket = Basket.objects.filter(user=request.user).get_or_create()
+
+        if basket[1]:
+            basket[0].save()
+
+        BasketDiscount.objects.filter(redeemed_basket=basket[0]).delete()
+
+        api.apply_user_discounts(request.user)
+
+        return Response("Discounts cleared")
 
     @action(
         detail=False, methods=["post"], name="Start Checkout", url_name="start_checkout"
@@ -262,6 +311,11 @@ class CheckoutApiViewSet(ViewSet):
             basket = Basket.objects.filter(user=request.user).get()
         except ObjectDoesNotExist:
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        # don't auto-apply user discounts if they've added their own code
+        # this may need to be revisited
+        if BasketDiscount.objects.filter(redeemed_basket=basket).count() == 0:
+            api.apply_user_discounts(request.user)
 
         return Response(BasketWithProductSerializer(basket).data)
 
@@ -340,7 +394,7 @@ class CheckoutCallbackView(View):
             # Transaction cancelled
             # Transaction could be cancelled for reasons that don't necessarily
             # mean that the entire order is invalid, so we'll do nothing with
-            # the order here.
+            # the order here (other than set it to Cancelled)
             self.logger.debug(
                 "Transaction cancelled: {msg}".format(msg=processor_response.message)
             )

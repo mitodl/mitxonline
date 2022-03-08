@@ -14,8 +14,12 @@ from ecommerce.constants import (
     DISCOUNT_TYPES,
     REDEMPTION_TYPES,
     REFERENCE_NUMBER_PREFIX,
+    REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_ONE_TIME_PER_USER,
+    REDEMPTION_TYPE_UNLIMITED,
 )
 from users.models import User
+from decimal import Decimal
 
 from mitol.common.utils.datetime import now_in_utc
 
@@ -73,6 +77,24 @@ class BasketItem(TimestampedModel):
     )
     quantity = models.PositiveIntegerField(default=1)
 
+    @cached_property
+    def discounted_price(self):
+        """Return the price of the product with discounts"""
+        from ecommerce.discounts import DiscountType
+
+        discounts = [
+            discount_redemption.redeemed_discount
+            for discount_redemption in self.basket.discounts.all()
+        ]
+
+        return (
+            DiscountType.get_discounted_price(
+                discounts,
+                self.product,
+            ).quantize(Decimal("0.01"))
+            * self.quantity
+        )
+
 
 class Discount(TimestampedModel):
     """Discount model"""
@@ -85,9 +107,43 @@ class Discount(TimestampedModel):
     discount_type = models.CharField(choices=DISCOUNT_TYPES, max_length=30)
     redemption_type = models.CharField(choices=REDEMPTION_TYPES, max_length=30)
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
+    discount_code = models.CharField(max_length=50)
 
     def __str__(self):
-        return f"{self.amount} {self.discount_type} {self.redemption_type}"
+        return f"{self.amount} {self.discount_type} {self.redemption_type} - {self.discount_code}"
+
+    def check_validity(self, user: User):
+        """
+        Enforces the redemption rules for a given discount.
+
+        Args:
+            - user (User): The user requesting the discount.
+        Returns:
+            - boolean
+        """
+        if (
+            self.redemption_type == REDEMPTION_TYPE_ONE_TIME
+            and DiscountRedemption.objects.filter(redeemed_discount=self).count() > 0
+        ):
+            return False
+
+        if (
+            self.redemption_type == REDEMPTION_TYPE_ONE_TIME_PER_USER
+            and DiscountRedemption.objects.filter(redeemed_discount=self)
+            .filter(redeemed_by=user)
+            .count()
+            > 0
+        ):
+            return False
+
+        if (
+            self.max_redemptions > 0
+            and DiscountRedemption.objects.filter(redeemed_discount=self).count()
+            >= self.max_redemptions
+        ):
+            return False
+
+        return True
 
 
 class UserDiscount(TimestampedModel):
@@ -381,16 +437,19 @@ class Line(TimestampedModel):
         """Return the price of the product with discounts"""
         from ecommerce.discounts import DiscountType
 
-        # apply discount to product using the best discount
-        # in practice, orders will only have one discount
-        # but JUST IN CASE this ever changes
-        # we want to have this be deterministic
-        price = self.unit_price
-        for discount in self.order.discounts.all():
-            discount_cls = DiscountType.for_discount(discount.discount_type)
-            price = min(discount_cls.get_product_price(self.product), price)
+        discounts = [
+            discount_redemption.redeemed_discount
+            for discount_redemption in self.order.discounts.all()
+        ]
 
-        return price * self.quantity
+        return (
+            DiscountType.get_discounted_price(
+                discounts,
+                Product.objects.get(pk=self.product_version.object_id),
+                product_version=self.product_version,
+            ).quantize(Decimal("0.01"))
+            * self.quantity
+        )
 
     def __str__(self):
         return f"{self.product_version}"
@@ -431,8 +490,38 @@ class BasketDiscount(TimestampedModel):
         Basket, on_delete=models.CASCADE, related_name="discounts"
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["redeemed_by", "redeemed_basket"], name="unique_basket_discount"
+            )
+        ]
+
     def __str__(self):
         return f"{self.redemption_date}: {self.redeemed_discount}, {self.redeemed_by}"
+
+    def convert_to_order(self, order: Order):
+        """
+        Converts basket discounts to order redemptions. Discounts
+        applied to the basket are meant to be ephemeral; this makes them
+        permanent.
+
+        Args:
+            - order (Order): The order to add the discount to.
+        Returns:
+            - DiscountRedemption for the converted redemption.
+        """
+        (redemption, isNew) = DiscountRedemption.objects.get_or_create(
+            redemption_date=self.redemption_date,
+            redeemed_by=self.redeemed_by,
+            redeemed_discount=self.redeemed_discount,
+            redeemed_order=order,
+        )
+
+        if isNew:
+            redemption.save()
+
+        return redemption
 
 
 class DiscountRedemption(TimestampedModel):

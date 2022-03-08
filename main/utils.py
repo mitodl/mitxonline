@@ -47,7 +47,7 @@ def get_js_settings(request: HttpRequest):
         "site_name": settings.SITE_NAME,
         "features": {
             "upgrade_dialog": features.is_enabled(features.ENABLE_UPGRADE_DIALOG),
-            "enable_discount_ui": features.is_enabled(features.ENABLE_DISCOUNT_UI),
+            "disable_discount_ui": features.is_enabled(features.DISABLE_DISCOUNT_UI),
         },
     }
 

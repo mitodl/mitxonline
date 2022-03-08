@@ -6,6 +6,11 @@ export const cartSelector = pathOr(null, ["entities", "cartItems"])
 export const totalPriceSelector = pathOr(null, ["entities", "totalPrice"])
 export const orderHistorySelector = pathOr(null, ["entities", "orderHistory"])
 
+export const discountedPriceSelector = pathOr(null, [
+  "entities",
+  "discountedPrice"
+])
+export const discountSelector = pathOr(null, ["entities", "discounts"])
 export const cartQueryKey = "cartItems"
 export const orderHistoryQueryKey = "orderHistory"
 
@@ -22,15 +27,22 @@ export const cartQuery = () => ({
       item => item.product.purchasable_object !== null
     )
 
+    const discounts = json.discounts.map(item => item.redeemed_discount)
+
     return {
-      cartItems:  cartItems,
-      totalPrice: json.total_price
+      cartItems:       cartItems,
+      totalPrice:      json.total_price,
+      discountedPrice: json.discounted_price,
+      discounts:       discounts
     }
   },
   update: {
-    cartItems:  nextState,
-    totalPrice: nextState
-  }
+    cartItems:       nextState,
+    totalPrice:      nextState,
+    discountedPrice: nextState,
+    discounts:       nextState
+  },
+  force: true
 })
 
 export const checkoutFormDataMutation = () => ({
@@ -56,4 +68,25 @@ export const orderHistoryQuery = () => ({
   update: {
     orderHistory: nextState
   }
+})
+export const applyDiscountCodeMutation = (code: string) => ({
+  url:  `/api/checkout/redeem_discount/`,
+  body: {
+    discount: code
+  },
+  options: {
+    ...getCsrfOptions(),
+    method: "POST"
+  },
+  update: {}
+})
+
+export const clearDiscountCodeMutation = () => ({
+  url:     `/api/checkout/clear_discount/`,
+  body:    {},
+  options: {
+    ...getCsrfOptions(),
+    method: "POST"
+  },
+  update: {}
 })

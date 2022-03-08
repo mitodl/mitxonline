@@ -164,7 +164,7 @@ def test_redeem_discount(user, user_drf_client, products, discounts):
     discount = discounts[random.randrange(0, len(discounts))]
 
     resp = user_drf_client.post(
-        reverse("checkout_api-redeem_discount"), {"discount": discount.id}
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
     )
 
     assert "message" in resp.json()
@@ -174,12 +174,41 @@ def test_redeem_discount(user, user_drf_client, products, discounts):
     assert resp_json["message"] == "Discount applied"
 
 
+def test_clear_discounts(user, user_drf_client, products, discounts):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it, then clears it. Should get back a success message.
+    """
+    test_redeem_discount(user, user_drf_client, products, discounts)
+
+    resp = user_drf_client.post(reverse("checkout_api-clear_discount"))
+
+    assert resp.json() == "Discounts cleared"
+
+
 def test_start_checkout(user, user_drf_client, products):
     """
     Hits the start checkout view, which should create an Order record
     and its associated line items.
     """
     basket = create_basket(user, products)
+
+    resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
+
+    # if there's not a payload in here, something went wrong
+    assert "payload" in resp.json()
+
+    order = Order.objects.filter(purchaser=user).get()
+
+    assert order.state == Order.STATE.PENDING
+
+
+def test_start_checkout_with_discounts(user, user_drf_client, products, discounts):
+    """
+    Applies a discount, then hits the start checkout view, which should create
+    an Order record and its associated line items.
+    """
+    test_redeem_discount(user, user_drf_client, products, discounts)
 
     resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
 
