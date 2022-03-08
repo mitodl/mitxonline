@@ -29,3 +29,10 @@ export type PaginatedOrderHistory = {
   previous: ?string,
   results: Array<Object>
 }
+
+export type Discount = {
+  id: number,
+  amount: number,
+  discount_code: string,
+  discount_type: string
+}

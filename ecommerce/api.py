@@ -8,12 +8,10 @@ from mitol.payment_gateway.api import (
     Order as GatewayOrder,
     PaymentGateway,
 )
+from mitol.common.utils.datetime import now_in_utc
 from ipware import get_client_ip
 
-from ecommerce.models import (
-    Basket,
-    PendingOrder,
-)
+from ecommerce.models import Basket, PendingOrder, UserDiscount, BasketDiscount
 
 
 def generate_checkout_payload(request):
@@ -52,3 +50,31 @@ def generate_checkout_payload(request):
     )
 
     return payload
+
+
+def apply_user_discounts(user):
+    """
+    Applies user discounts to the current cart. (If there are more than one for some
+    reason, this will just do the first one. More logic needs to be added here
+    if/when discounts apply to specific things.)
+
+    Args:
+        - user (User): The currently authenticated user.
+    """
+    basket = Basket.objects.filter(user=user).get()
+
+    if BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0:
+        return True
+
+    user_discounts = UserDiscount.objects.filter(user=user).all()
+
+    for discount in user_discounts:
+        bd = BasketDiscount(
+            redeemed_basket=basket,
+            redemption_date=now_in_utc(),
+            redeemed_by=user,
+            redeemed_discount=discount.discount,
+        )
+        bd.save()
+
+    return True

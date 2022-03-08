@@ -1,5 +1,5 @@
 from django.contrib import admin
-from ecommerce.models import Product, Basket, BasketItem
+from ecommerce.models import BasketDiscount, Product, Basket, BasketItem
 from django.contrib.admin.decorators import display
 from fsm_admin.mixins import FSMTransitionMixin
 from reversion.admin import VersionAdmin
@@ -16,6 +16,7 @@ from ecommerce.models import (
     FulfilledOrder,
     RefundedOrder,
     Line,
+    BasketDiscount,
 )
 
 
@@ -67,12 +68,27 @@ class DiscountRedemptionAdmin(admin.ModelAdmin):
     list_display = ["id", "redemption_date", "redeemed_discount", "redeemed_by"]
 
 
+@admin.register(BasketDiscount)
+class BasketDiscountAdmin(admin.ModelAdmin):
+    model = BasketDiscount
+    list_display = ["id", "redeemed_basket", "redeemed_discount"]
+
+
 class OrderLineInline(admin.TabularInline):
     """Inline editor for lines"""
 
     model = Line
     readonly_fields = ["unit_price", "total_price"]
     min_num = 1
+    extra = 0
+
+
+class OrderDiscountInline(admin.TabularInline):
+    """Inline editor for DiscountRedemptions in an Order"""
+
+    model = DiscountRedemption
+    readonly_fields = ["redemption_date", "redeemed_by", "redeemed_discount"]
+    min_num = 0
     extra = 0
 
 
@@ -83,7 +99,7 @@ class BaseOrderAdmin(FSMTransitionMixin, TimestampedModelAdmin):
     list_display = ["id", "state", "get_purchaser", "total_price_paid"]
     list_fields = ["state"]
     list_filter = ["state"]
-    inlines = [OrderLineInline]
+    inlines = [OrderLineInline, OrderDiscountInline]
 
     @display(description="Purchaser")
     def get_purchaser(self, obj: Order):

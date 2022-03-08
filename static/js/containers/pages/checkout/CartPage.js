@@ -2,34 +2,131 @@
 /* global SETTINGS: false */
 import React from "react"
 import DocumentTitle from "react-document-title"
-import { CART_DISPLAY_PAGE_TITLE } from "../../../constants"
+import {
+  ALERT_TYPE_DANGER,
+  ALERT_TYPE_SUCCESS,
+  CART_DISPLAY_PAGE_TITLE
+} from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { connectRequest } from "redux-query"
-import type { BasketItem } from "../../../flow/cartTypes"
+import { connectRequest, mutateAsync } from "redux-query"
+import { createStructuredSelector } from "reselect"
+
+import type { BasketItem, Discount } from "../../../flow/cartTypes"
 
 import Loader from "../../../components/Loader"
 
-import { createStructuredSelector } from "reselect"
 import {
   cartQuery,
   cartSelector,
-  totalPriceSelector
+  totalPriceSelector,
+  discountedPriceSelector,
+  discountSelector,
+  applyDiscountCodeMutation,
+  clearDiscountCodeMutation
 } from "../../../lib/queries/cart"
 
 import type { RouterHistory } from "react-router"
 import moment from "moment"
-import { formatPrettyDateTimeAmPmTz, parseDateString } from "../../../lib/util"
+import {
+  formatPrettyDateTimeAmPmTz,
+  parseDateString,
+  isSuccessResponse,
+  formatLocalePrice
+} from "../../../lib/util"
 import { Button } from "reactstrap"
+import { addUserNotification } from "../../../actions"
+
+import ApplyCouponForm from "../../../components/forms/ApplyCouponForm"
 
 type Props = {
   history: RouterHistory,
   cartItems: Array<BasketItem>,
   totalPrice: number,
-  isLoading: boolean
+  discountedPrice: number,
+  discounts: Array<Discount>,
+  isLoading: boolean,
+  applyDiscountCode: (code: string) => Promise<any>,
+  clearDiscountCode: () => Promise<any>,
+  addUserNotification: Function,
+  forceRequest: Function
 }
 
-export class CartPage extends React.Component<Props> {
+type CartState = {
+  discountCode: string,
+  discountCodeIsBad: boolean
+}
+
+export class CartPage extends React.Component<Props, CartState> {
+  state = {
+    discountCode:      "",
+    discountCodeIsBad: false
+  }
+
+  updateCode(event: Object) {
+    this.setState({
+      discountCode:      event.target.value,
+      discountCodeIsBad: false
+    })
+  }
+
+  async addDiscount(ev: Object) {
+    const subbedCode = ev.couponCode
+    const { applyDiscountCode, forceRequest, addUserNotification } = this.props
+
+    this.setState({ discountCode: subbedCode, discountCodeIsBad: false })
+
+    if (String(subbedCode).trim().length === 0) {
+      return
+    }
+
+    let userMessage, messageType
+
+    const resp = await applyDiscountCode(this.state.discountCode)
+    if (isSuccessResponse(resp)) {
+      messageType = ALERT_TYPE_SUCCESS
+      userMessage = "Discount code added."
+
+      forceRequest()
+    } else {
+      messageType = ALERT_TYPE_DANGER
+      userMessage = `Discount code ${this.state.discountCode} is invalid.`
+
+      this.setState({ discountCodeIsBad: true })
+    }
+  }
+
+  async clearDiscount() {
+    const { forceRequest, addUserNotification, clearDiscountCode } = this.props
+
+    let userMessage, messageType
+
+    const resp = await clearDiscountCode()
+
+    if (isSuccessResponse(resp)) {
+      messageType = ALERT_TYPE_SUCCESS
+      userMessage = "Discount code cleared."
+
+      forceRequest()
+      this.setState({ discountCodeIsBad: false, discountCode: "" })
+    } else {
+      // TODO: this should use the banner thingy
+      messageType = ALERT_TYPE_DANGER
+      userMessage = `Something went wrong when trying to clear your discount code. Please contact support at ${
+        SETTINGS.support_email
+      }.`
+    }
+
+    addUserNotification({
+      "clear-discount-notification": {
+        type:  messageType,
+        props: {
+          text: userMessage
+        }
+      }
+    })
+  }
+
   renderCartItemCard(cartItem: BasketItem) {
     if (cartItem.product.purchasable_object === null) {
       return null
@@ -92,7 +189,7 @@ export class CartPage extends React.Component<Props> {
               {startDateDescription !== undefined ? startDateDescription : ""}
             </div>
           </div>
-        </div>
+        </div>{" "}
       </div>
     )
   }
@@ -112,8 +209,66 @@ export class CartPage extends React.Component<Props> {
     )
   }
 
+  renderAppliedCoupons() {
+    const discounts = this.props.discounts
+
+    if (discounts === null || discounts.length === 0) {
+      return null
+    }
+
+    let discountAmountText = null
+    const discountAmount = Number(discounts[0].amount)
+
+    switch (discounts[0].discount_type) {
+    case "percent-off":
+      discountAmountText = `${discountAmount}% off`
+      break
+
+    case "dollars-off":
+      discountAmountText = `-${formatLocalePrice(discountAmount)}`
+      break
+
+    default:
+      discountAmountText = `Fixed Price: ${formatLocalePrice(discountAmount)}`
+      break
+    }
+
+    return (
+      <div className="row order-summary-total">
+        <div className="col-12 px-3 py-3 py-md-0">
+          <div className="d-flex justify-content-between">
+            <div className="flex-grow-1">
+              Coupon applied (
+              <em className="font-weight-bold text-primary">
+                {discounts[0].discount_code}
+              </em>{" "}
+              )
+              <br />
+              <a
+                href="#"
+                className="text-primary"
+                onClick={this.clearDiscount.bind(this)}
+              >
+                Clear Discount
+              </a>
+            </div>
+            <div className="ml-auto text-primary">{discountAmountText}</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   renderOrderSummaryCard() {
-    const totalPrice = this.props.totalPrice
+    const {
+      totalPrice,
+      discountedPrice,
+      discounts,
+      applyDiscountCode
+    } = this.props
+
+    const fmtPrice = formatLocalePrice(totalPrice)
+    const fmtDiscountPrice = formatLocalePrice(discountedPrice)
 
     return (
       <div
@@ -130,24 +285,14 @@ export class CartPage extends React.Component<Props> {
           <div className="col-12 px-3 py-3 py-md-0">
             <div className="d-flex justify-content-between">
               <div className="flex-grow-1">Price</div>
-              <div className="ml-auto">${totalPrice}</div>
+              <div className="ml-auto">{fmtPrice}</div>
             </div>
           </div>
         </div>
 
-        {SETTINGS.features.enable_discount_ui ? (
-          <div className="row order-summary-total">
-            <div className="col-12 px-3 py-3 py-md-0">
-              <div className="d-flex justify-content-between">
-                <div className="flex-grow-1">
-                  Coupon applied (
-                  <em className="font-weight-bold text-primary">coupon1</em> )
-                </div>
-                <div className="ml-auto text-primary">-${totalPrice}</div>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        {!SETTINGS.features.disable_discount_ui
+          ? this.renderAppliedCoupons()
+          : null}
 
         <div className="row my-3 mx-1">
           <div className="col-12 px-3 border-top border-dark" />
@@ -160,31 +305,19 @@ export class CartPage extends React.Component<Props> {
                 <h5>Total</h5>
               </div>
               <div className="ml-auto">
-                <h5>${totalPrice}</h5>
+                <h5>{fmtDiscountPrice}</h5>
               </div>
             </div>
           </div>
         </div>
 
-        {SETTINGS.features.enable_discount_ui ? (
-          <div className="row">
-            <div className="col-12 mt-4 px-3 py-3 py-md-0">
-              Have a coupon?
-              <div className="d-flex justify-content-between flex-sm-column flex-md-row">
-                <input
-                  type="text"
-                  name="coupon-code"
-                  className="form-input flex-sm-grow-1"
-                />
-                <button className="btn btn-primary btn-red btn-halfsize mx-2 highlight font-weight-normal">
-                  Apply
-                </button>
-              </div>
-              <div className="text-primary mt-2 font-weight-bold cart-text-smaller">
-                Adding another coupon will replace the currently applied coupon.
-              </div>
-            </div>
-          </div>
+        {!SETTINGS.features.disable_discount_ui ? (
+          <ApplyCouponForm
+            onSubmit={this.addDiscount.bind(this)}
+            discountCodeIsBad={this.state.discountCodeIsBad}
+            couponCode={this.state.discountCode}
+            discounts={discounts}
+          />
         ) : null}
 
         {totalPrice > 0 ? (
@@ -278,13 +411,24 @@ export class CartPage extends React.Component<Props> {
   }
 }
 
+const applyDiscountCode = (code: string) =>
+  mutateAsync(applyDiscountCodeMutation(code))
+
+const clearDiscountCode = () => mutateAsync(clearDiscountCodeMutation())
+
 const mapStateToProps = createStructuredSelector({
-  cartItems:  cartSelector,
-  totalPrice: totalPriceSelector,
-  isLoading:  () => false
+  cartItems:       cartSelector,
+  totalPrice:      totalPriceSelector,
+  discountedPrice: discountedPriceSelector,
+  discounts:       discountSelector,
+  isLoading:       () => false
 })
 
-const mapDispatchToProps = {}
+const mapDispatchToProps = {
+  addUserNotification,
+  applyDiscountCode,
+  clearDiscountCode
+}
 
 const mapPropsToConfig = () => [cartQuery()]
 

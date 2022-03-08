@@ -26,7 +26,8 @@ import {
   timeoutPromise,
   isSuccessResponse,
   isErrorResponse,
-  isUnauthorizedResponse
+  isUnauthorizedResponse,
+  formatLocalePrice
 } from "./util"
 
 describe("utility functions", () => {
@@ -308,4 +309,16 @@ describe("utility functions", () => {
       })
     }
   )
+
+  describe("formatLocalePrice", () => {
+    const testPrice = 512.25
+
+    it("formatLocalePrice returns a US-formatted price string when the input is a number", () => {
+      assert.equal(formatLocalePrice(testPrice), "$512.25")
+    })
+
+    it("formatLocalePrice returns zero when the input is null", () => {
+      assert.equal(formatLocalePrice(null), 0)
+    })
+  })
 })

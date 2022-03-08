@@ -7,9 +7,9 @@ from rest_framework import serializers
 from ecommerce import models
 from courses.models import CourseRun, ProgramRun, Course
 from ecommerce.models import Basket, Product, BasketItem
+from ecommerce.discounts import DiscountType
 
 from cms.serializers import CoursePageSerializer
-from users.serializers import UserSerializer
 
 
 class ProgramRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
@@ -129,6 +129,15 @@ class BasketSerializer(serializers.ModelSerializer):
         model = models.Basket
 
 
+class BasketDiscountSerializer(serializers.ModelSerializer):
+    """BasketDiscount model serializer"""
+
+    class Meta:
+        model = models.BasketDiscount
+        fields = ["redeemed_discount", "redeemed_basket"]
+        depth = 1
+
+
 class BasketItemWithProductSerializer(serializers.ModelSerializer):
     product = serializers.SerializerMethodField()
 
@@ -137,16 +146,15 @@ class BasketItemWithProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.BasketItem
-        fields = [
-            "basket",
-            "product",
-            "id",
-        ]
+        fields = ["basket", "product", "id"]
+        depth = 1
 
 
 class BasketWithProductSerializer(serializers.ModelSerializer):
     basket_items = serializers.SerializerMethodField()
     total_price = serializers.SerializerMethodField()
+    discounted_price = serializers.SerializerMethodField()
+    discounts = serializers.SerializerMethodField()
 
     def get_basket_items(self, instance):
         return [
@@ -160,8 +168,31 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
             for product in [item.product for item in instance.basket_items.all()]
         )
 
+    def get_discounted_price(self, instance):
+        discounts = instance.discounts.all()
+
+        if discounts.count() == 0:
+            return None
+
+        return sum(
+            basket_item.discounted_price for basket_item in instance.basket_items.all()
+        )
+
+    def get_discounts(self, instance):
+        return [
+            BasketDiscountSerializer(discount_record, context=self.context).data
+            for discount_record in instance.discounts.all()
+        ]
+
     class Meta:
-        fields = ["id", "user", "basket_items", "total_price"]
+        fields = [
+            "id",
+            "user",
+            "basket_items",
+            "total_price",
+            "discounted_price",
+            "discounts",
+        ]
         model = models.Basket
 
 
