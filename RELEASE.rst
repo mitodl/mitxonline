@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.22.1
+--------------
+
+- Adding Discount UI
+
 Version 0.22.0 (Released March 08, 2022)
 --------------
 
