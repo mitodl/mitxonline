@@ -1,7 +1,13 @@
 """Ecommerce APIs"""
 
+from functools import total_ordering
 from django.urls import reverse
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+from main.utils import redirect_with_user_message
+from main.constants import (
+    USER_MSG_TYPE_PAYMENT_ACCEPTED,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+)
 
 from mitol.payment_gateway.api import (
     CartItem as GatewayCartItem,
@@ -17,6 +23,7 @@ from ecommerce.models import Basket, PendingOrder, UserDiscount, BasketDiscount
 def generate_checkout_payload(request):
     basket = Basket.objects.filter(user=request.user).get()
     order = PendingOrder.create_from_basket(basket)
+    total_price = 0
 
     ip = get_client_ip(request)[0]
 
@@ -39,6 +46,18 @@ def generate_checkout_payload(request):
                 taxable=0,
             )
         )
+        total_price += line_item.discounted_price
+
+    if total_price == 0:
+        return {
+            "no_checkout": True,
+            "response": fulfill_completed_order(
+                order,
+                {"amount": 0, "data": {"reason": "No payment required"}},
+                basket,
+                USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+            ),
+        }
 
     callback_uri = request.build_absolute_uri(reverse("checkout-result-callback"))
 
@@ -78,3 +97,21 @@ def apply_user_discounts(user):
         bd.save()
 
     return True
+
+
+def fulfill_completed_order(
+    order, payment_data, basket, message_type=USER_MSG_TYPE_PAYMENT_ACCEPTED
+):
+    order.fulfill(payment_data)
+    order.save()
+
+    if basket:
+        basket.delete()
+
+    return redirect_with_user_message(
+        reverse("user-dashboard"),
+        {
+            "type": message_type,
+            "run": order.lines.first().purchased_object.course.title,
+        },
+    )
