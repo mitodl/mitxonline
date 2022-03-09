@@ -424,19 +424,7 @@ class CheckoutCallbackView(View):
                 "Transaction accepted!: {msg}".format(msg=processor_response.message)
             )
 
-            order.fulfill(payment_data)
-            order.save()
-
-            if basket:
-                basket.delete()
-
-            return redirect_with_user_message(
-                reverse("user-dashboard"),
-                {
-                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
-                    "run": order.lines.first().purchased_object.course.title,
-                },
-            )
+            return api.fulfill_completed_order(order, payment_data, basket)
         else:
             order.cancel()
             order.save()
@@ -474,6 +462,9 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             checkout_payload = api.generate_checkout_payload(request)
         except ObjectDoesNotExist:
             return HttpResponse("No basket")
+
+        if "no_checkout" in checkout_payload:
+            return checkout_payload["response"]
 
         return render(
             request,

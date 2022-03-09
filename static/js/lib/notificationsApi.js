@@ -13,6 +13,7 @@ import {
   USER_MSG_TYPE_PAYMENT_CANCELLED,
   USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
   USER_MSG_TYPE_PAYMENT_ACCEPTED,
+  USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE,
   USER_MSG_TYPE_PAYMENT_REVIEW
 } from "../constants"
 
@@ -81,6 +82,14 @@ export function parseStoredUserMessage(
     alertType = ALERT_TYPE_SUCCESS
     msgText = userMsgJson.run
       ? `Success! You are now enrolled for the paid version of ${
+        userMsgJson.run
+      }.`
+      : null
+    break
+  case USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE:
+    alertType = ALERT_TYPE_SUCCESS
+    msgText = userMsgJson.run
+      ? `Success! You are now enrolled for the certificate version of ${
         userMsgJson.run
       }.`
       : null

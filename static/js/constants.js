@@ -116,6 +116,8 @@ export const USER_MSG_TYPE_PAYMENT_ERROR = "payment-error"
 export const USER_MSG_TYPE_PAYMENT_CANCELLED = "payment-cancelled"
 export const USER_MSG_TYPE_PAYMENT_REVIEW = "payment-review"
 export const USER_MSG_TYPE_PAYMENT_ACCEPTED = "payment-accepted"
+export const USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE =
+  "payment-accepted-no-value"
 export const USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN = "payment-error-unknown"
 
 export const USERNAME_LENGTH = 30

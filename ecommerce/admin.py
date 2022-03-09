@@ -1,5 +1,5 @@
 from django.contrib import admin
-from ecommerce.models import BasketDiscount, Product, Basket, BasketItem
+from ecommerce.models import BasketDiscount, Product, Basket, BasketItem, Transaction
 from django.contrib.admin.decorators import display
 from fsm_admin.mixins import FSMTransitionMixin
 from reversion.admin import VersionAdmin
@@ -78,7 +78,7 @@ class OrderLineInline(admin.TabularInline):
     """Inline editor for lines"""
 
     model = Line
-    readonly_fields = ["unit_price", "total_price"]
+    readonly_fields = ["unit_price", "total_price", "discounted_price"]
     min_num = 1
     extra = 0
 
@@ -92,6 +92,20 @@ class OrderDiscountInline(admin.TabularInline):
     extra = 0
 
 
+class OrderTransactionInline(admin.TabularInline):
+    """Inline editor for transactions for an Order"""
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    model = Transaction
+    readonly_fields = ["order", "amount", "data"]
+    min_num = 0
+    extra = 0
+    can_delete = False
+    can_add = False
+
+
 class BaseOrderAdmin(FSMTransitionMixin, TimestampedModelAdmin):
     """Base admin for Order"""
 
@@ -99,7 +113,7 @@ class BaseOrderAdmin(FSMTransitionMixin, TimestampedModelAdmin):
     list_display = ["id", "state", "get_purchaser", "total_price_paid"]
     list_fields = ["state"]
     list_filter = ["state"]
-    inlines = [OrderLineInline, OrderDiscountInline]
+    inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
 
     @display(description="Purchaser")
     def get_purchaser(self, obj: Order):
