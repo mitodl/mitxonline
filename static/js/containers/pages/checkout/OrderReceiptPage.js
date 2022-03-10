@@ -13,17 +13,20 @@ import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
 
 import { createStructuredSelector } from "reselect"
 import {
+  discountedPriceSelector,
+  discountSelector,
   orderReceiptQuery,
   orderReceiptSelector
 } from "../../../lib/queries/cart"
 
 import type { RouterHistory } from "react-router"
 import { routes } from "../../../lib/urls"
-import type { Line, OrderReceipt } from "../../../flow/cartTypes"
+import type { Discount, Line, OrderReceipt } from "../../../flow/cartTypes"
 
 type Props = {
   history: RouterHistory,
   orderReceipt: OrderReceipt,
+  discounts: Array<Discount>,
   isLoading: boolean
 }
 
@@ -38,11 +41,15 @@ export class OrderReceiptPage extends React.Component<Props> {
   }
 
   renderOrderSummaryCard() {
-    const { orderReceipt } = this.props
+    const { orderReceipt, discounts } = this.props
+    const totalPaid = parseFloat(orderReceipt.total_price_paid)
     return orderReceipt ? (
       <OrderSummaryCard
-        totalPrice={orderReceipt.total_price_paid}
+        totalPrice={totalPaid}
+        discountedPrice={totalPaid}
         orderFulfilled={true}
+        discounts={discounts}
+        discountCodeIsBad={false}
       />
     ) : null
   }
@@ -106,6 +113,7 @@ export class OrderReceiptPage extends React.Component<Props> {
 
 const mapStateToProps = createStructuredSelector({
   orderReceipt: orderReceiptSelector,
+  discounts:    discountSelector,
   isLoading:    () => false
 })
 

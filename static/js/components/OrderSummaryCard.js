@@ -2,7 +2,7 @@
 /* global SETTINGS: false */
 import React from "react"
 import { Button } from "reactstrap"
-import {formatLocalePrice, isSuccessResponse} from "../lib/util"
+import { formatLocalePrice, isSuccessResponse } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
 import type { Discount } from "../flow/cartTypes"
 
@@ -11,16 +11,15 @@ type Props = {
   orderFulfilled: boolean,
   discountedPrice: number,
   discounts: Array<Discount>,
-  addDiscount: Function,
-  clearDiscount: Function,
-  discountCode: string,
-  discountCodeIsBad: boolean,
+  addDiscount?: Function,
+  clearDiscount?: Function,
+  discountCode?: string,
+  discountCodeIsBad: boolean
 }
 
 export class OrderSummaryCard extends React.Component<Props> {
-
   renderAppliedCoupons() {
-    const { discounts, clearDiscount } = this.props
+    const { discounts, clearDiscount, orderFulfilled } = this.props
 
     if (discounts === null || discounts.length === 0) {
       return null
@@ -42,6 +41,11 @@ export class OrderSummaryCard extends React.Component<Props> {
       discountAmountText = `Fixed Price: ${formatLocalePrice(discountAmount)}`
       break
     }
+    const clearDiscountLink = (
+      <a href="#" className="text-primary" onClick={clearDiscount}>
+        Clear Discount
+      </a>
+    )
 
     return (
       <div className="row order-summary-total">
@@ -54,13 +58,7 @@ export class OrderSummaryCard extends React.Component<Props> {
               </em>{" "}
               )
               <br />
-              <a
-                href="#"
-                className="text-primary"
-                onClick={clearDiscount}
-              >
-                Clear Discount
-              </a>
+              {orderFulfilled ? null : clearDiscountLink}
             </div>
             <div className="ml-auto text-primary">{discountAmountText}</div>
           </div>
@@ -69,7 +67,15 @@ export class OrderSummaryCard extends React.Component<Props> {
     )
   }
   render() {
-    const {orderFulfilled, discountedPrice, totalPrice, discounts, addDiscount, discountCodeIsBad, discountCode} = this.props
+    const {
+      orderFulfilled,
+      discountedPrice,
+      totalPrice,
+      discounts,
+      addDiscount,
+      discountCodeIsBad,
+      discountCode
+    } = this.props
     const fmtPrice = formatLocalePrice(totalPrice)
     const fmtDiscountPrice = formatLocalePrice(discountedPrice)
     return (
@@ -107,13 +113,13 @@ export class OrderSummaryCard extends React.Component<Props> {
                 <h5>Total</h5>
               </div>
               <div className="ml-auto">
-                <h5>{fmtDiscountPrice}</h5>
+                <h5>{fmtDiscountPrice || fmtPrice}</h5>
               </div>
             </div>
           </div>
         </div>
 
-        {!SETTINGS.features.disable_discount_ui ? (
+        {!SETTINGS.features.disable_discount_ui && !orderFulfilled && discountCode ? (
           <ApplyCouponForm
             onSubmit={addDiscount}
             discountCodeIsBad={discountCodeIsBad}
@@ -122,7 +128,7 @@ export class OrderSummaryCard extends React.Component<Props> {
           />
         ) : null}
 
-        {totalPrice > 0 ? (
+        {totalPrice > 0 && !orderFulfilled ? (
           <div className="row">
             <div className="col-12 text-center mt-4 mb-4">
               <Button
@@ -136,7 +142,7 @@ export class OrderSummaryCard extends React.Component<Props> {
           </div>
         ) : null}
 
-        {totalPrice > 0 ? (
+        {totalPrice > 0 && !orderFulfilled ? (
           <div className="row">
             <div className="col-12 px-3 py-3 py-md-0 cart-text-smaller">
               By placing my order I agree to the{" "}

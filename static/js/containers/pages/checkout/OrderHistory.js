@@ -22,7 +22,11 @@ import {
 
 import type { RouterHistory } from "react-router"
 import moment from "moment"
-import { formatPrettyDateTimeAmPmTz, parseDateString } from "../../../lib/util"
+import {
+  formatLocalePrice,
+  formatPrettyDateTimeAmPmTz,
+  parseDateString
+} from "../../../lib/util"
 import { Button } from "reactstrap"
 import type { PaginatedOrderHistory } from "../../../flow/cartTypes"
 
@@ -55,7 +59,9 @@ export class OrderHistory extends React.Component<Props> {
       >
         <div className="col">{orderTitle}</div>
         <div className="col">{orderDate}</div>
-        <div className="col">{order.total_price_paid}</div>
+        <div className="col">
+          {formatLocalePrice(parseFloat(order.total_price_paid))}
+        </div>
         <div className="col">{order.reference_number}</div>
         <div className="col">
           <div

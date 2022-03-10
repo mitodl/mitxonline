@@ -171,11 +171,7 @@ export class CartPage extends React.Component<Props, CartState> {
   }
 
   renderOrderSummaryCard() {
-    const {
-      totalPrice,
-      discountedPrice,
-      discounts,
-    } = this.props
+    const { totalPrice, discountedPrice, discounts } = this.props
 
     return (
       <OrderSummaryCard

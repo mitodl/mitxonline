@@ -137,6 +137,14 @@ class BasketDiscountSerializer(serializers.ModelSerializer):
         fields = ["redeemed_discount", "redeemed_basket"]
         depth = 1
 
+class RedeemedDiscountSerializer(serializers.ModelSerializer):
+    """DiscountRedemption model serializer"""
+
+    class Meta:
+        model = models.DiscountRedemption
+        fields = ["redeemed_discount"]
+        depth = 1
+
 
 class BasketItemWithProductSerializer(serializers.ModelSerializer):
     product = serializers.SerializerMethodField()
@@ -221,6 +229,13 @@ class LineSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     lines = LineSerializer(many=True)
+    discounts = serializers.SerializerMethodField()
+
+    def get_discounts(self, instance):
+        discounts = []
+        for discount in instance.discounts.all():
+            discounts.append(RedeemedDiscountSerializer(discount).data)
+        return discounts
 
     class Meta:
         fields = [
@@ -229,6 +244,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "purchaser",
             "total_price_paid",
             "lines",
+            "discounts"
         ]
         model = models.Order
 

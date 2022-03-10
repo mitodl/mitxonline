@@ -97,10 +97,15 @@ export const clearDiscountCodeMutation = () => ({
 export const orderReceiptQuery = (orderId: number) => ({
   url:       `/api/orders/receipt/${orderId}/`,
   queryKey:  receiptQueryKey,
-  transform: json => ({
-    orderReceipt: json
-  }),
+  transform: json => {
+    const discounts = json.discounts.map(item => item.redeemed_discount)
+    return {
+      orderReceipt: json,
+      discounts:    discounts
+    }
+  },
   update: {
-    orderReceipt: nextState
+    orderReceipt: nextState,
+    discounts:    nextState
   }
 })
