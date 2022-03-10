@@ -2,85 +2,76 @@
 /* global SETTINGS: false */
 import React from "react"
 import { Button } from "reactstrap"
-import {formatLocalePrice, roundPrice} from "../lib/util"
+import {formatLocalePrice, isSuccessResponse} from "../lib/util"
+import ApplyCouponForm from "./forms/ApplyCouponForm"
+import type { Discount } from "../flow/cartTypes"
 
 type Props = {
   totalPrice: number,
-  orderFulfilled: boolean
+  orderFulfilled: boolean,
+  discountedPrice: number,
+  discounts: Array<Discount>,
+  addDiscount: Function,
+  clearDiscount: Function,
+  discountCode: string,
+  discountCodeIsBad: boolean,
 }
 
 export class OrderSummaryCard extends React.Component<Props> {
-  renderDiscountUI(totalPrice: string) {
-    return SETTINGS.features.enable_discount_ui ? (
+
+  renderAppliedCoupons() {
+    const { discounts, clearDiscount } = this.props
+
+    if (discounts === null || discounts.length === 0) {
+      return null
+    }
+
+    let discountAmountText = null
+    const discountAmount = Number(discounts[0].amount)
+
+    switch (discounts[0].discount_type) {
+    case "percent-off":
+      discountAmountText = `${discountAmount}% off`
+      break
+
+    case "dollars-off":
+      discountAmountText = `-${formatLocalePrice(discountAmount)}`
+      break
+
+    default:
+      discountAmountText = `Fixed Price: ${formatLocalePrice(discountAmount)}`
+      break
+    }
+
+    return (
       <div className="row order-summary-total">
         <div className="col-12 px-3 py-3 py-md-0">
           <div className="d-flex justify-content-between">
             <div className="flex-grow-1">
               Coupon applied (
-              <em className="font-weight-bold text-primary">coupon1</em> )
+              <em className="font-weight-bold text-primary">
+                {discounts[0].discount_code}
+              </em>{" "}
+              )
+              <br />
+              <a
+                href="#"
+                className="text-primary"
+                onClick={clearDiscount}
+              >
+                Clear Discount
+              </a>
             </div>
-            <div className="ml-auto text-primary">-${totalPrice}</div>
+            <div className="ml-auto text-primary">{discountAmountText}</div>
           </div>
         </div>
       </div>
-    ) : null
-  }
-  renderPayButton() {
-    const { orderFulfilled, totalPrice } = this.props
-    return totalPrice > 0 && !orderFulfilled ? (
-      <>
-        <div className="row">
-          <div className="col-12 text-center mt-4 mb-4">
-            <Button
-              type="link"
-              className="btn btn-primary btn-gradient-red highlight font-weight-bold text-white"
-              onClick={() => (window.location = "/checkout/to_payment")}
-            >
-              Place your order
-            </Button>
-          </div>
-        </div>
-        <div className="row">
-          <div className="col-12 px-3 py-3 py-md-0 cart-text-smaller">
-            By placing my order I agree to the{" "}
-            <a href="/terms-of-service/" target="_blank" rel="noreferrer">
-              Terms of Service
-            </a>
-            , and{" "}
-            <a href="/privacy-policy/" target="_blank" rel="noreferrer">
-              Privacy Policy.
-            </a>
-          </div>
-        </div>
-      </>
-    ) : null
-  }
-  renderAddCoupon() {
-    return SETTINGS.features.enable_discount_ui ? (
-      <div className="row">
-        <div className="col-12 mt-4 px-3 py-3 py-md-0">
-          Have a coupon?
-          <div className="d-flex justify-content-between flex-sm-column flex-md-row">
-            <input
-              type="text"
-              name="coupon-code"
-              className="form-input flex-sm-grow-1"
-            />
-            <button className="btn btn-primary btn-red btn-halfsize mx-2 highlight font-weight-normal">
-              Apply
-            </button>
-          </div>
-          <div className="text-primary mt-2 font-weight-bold cart-text-smaller">
-            Adding another coupon will replace the currently applied coupon.
-          </div>
-        </div>
-      </div>
-    ) : null
+    )
   }
   render() {
-    let { totalPrice } = this.props
-    const { orderFulfilled } = this.props
-    totalPrice = formatLocalePrice(totalPrice)
+    const {orderFulfilled, discountedPrice, totalPrice, discounts, addDiscount, discountCodeIsBad, discountCode} = this.props
+    const fmtPrice = formatLocalePrice(totalPrice)
+    const fmtDiscountPrice = formatLocalePrice(discountedPrice)
     return (
       <div
         className="order-summary container card p-md-3 mb-4 rounded-0"
@@ -96,11 +87,15 @@ export class OrderSummaryCard extends React.Component<Props> {
           <div className="col-12 px-3 py-3 py-md-0">
             <div className="d-flex justify-content-between">
               <div className="flex-grow-1">Price</div>
-              <div className="ml-auto">${totalPrice}</div>
+              <div className="ml-auto">{fmtPrice}</div>
             </div>
           </div>
         </div>
-        {orderFulfilled ? null : this.renderDiscountUI(totalPrice)}
+
+        {!SETTINGS.features.disable_discount_ui
+          ? this.renderAppliedCoupons()
+          : null}
+
         <div className="row my-3 mx-1">
           <div className="col-12 px-3 border-top border-dark" />
         </div>
@@ -112,13 +107,49 @@ export class OrderSummaryCard extends React.Component<Props> {
                 <h5>Total</h5>
               </div>
               <div className="ml-auto">
-                <h5>${totalPrice}</h5>
+                <h5>{fmtDiscountPrice}</h5>
               </div>
             </div>
           </div>
         </div>
-        {orderFulfilled ? null : this.renderAddCoupon()}
-        {orderFulfilled ? null : this.renderPayButton()}
+
+        {!SETTINGS.features.disable_discount_ui ? (
+          <ApplyCouponForm
+            onSubmit={addDiscount}
+            discountCodeIsBad={discountCodeIsBad}
+            couponCode={discountCode}
+            discounts={discounts}
+          />
+        ) : null}
+
+        {totalPrice > 0 ? (
+          <div className="row">
+            <div className="col-12 text-center mt-4 mb-4">
+              <Button
+                type="link"
+                className="btn btn-primary btn-gradient-red highlight font-weight-bold text-white"
+                onClick={() => (window.location = "/checkout/to_payment")}
+              >
+                Place your order
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {totalPrice > 0 ? (
+          <div className="row">
+            <div className="col-12 px-3 py-3 py-md-0 cart-text-smaller">
+              By placing my order I agree to the{" "}
+              <a href="/terms-of-service/" target="_blank" rel="noreferrer">
+                Terms of Service
+              </a>
+              , and{" "}
+              <a href="/privacy-policy/" target="_blank" rel="noreferrer">
+                Privacy Policy.
+              </a>
+            </div>
+          </div>
+        ) : null}
       </div>
     )
   }
