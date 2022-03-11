@@ -13,6 +13,8 @@ from reversion.models import Version
 from ecommerce.constants import (
     DISCOUNT_TYPES,
     REDEMPTION_TYPES,
+    TRANSACTION_TYPE_PAYMENT,
+    TRANSACTION_TYPES,
     REFERENCE_NUMBER_PREFIX,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
@@ -466,6 +468,12 @@ class Transaction(TimestampedModel):
         max_digits=20,
     )
     data = models.JSONField()
+    transaction_type = models.TextField(
+        choices=TRANSACTION_TYPES,
+        default=TRANSACTION_TYPE_PAYMENT,
+        null=False,
+        max_length=20,
+    )
 
 
 class BasketDiscount(TimestampedModel):
