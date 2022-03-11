@@ -137,6 +137,7 @@ class BasketDiscountSerializer(serializers.ModelSerializer):
         fields = ["redeemed_discount", "redeemed_basket"]
         depth = 1
 
+
 class RedeemedDiscountSerializer(serializers.ModelSerializer):
     """DiscountRedemption model serializer"""
 
@@ -238,14 +239,7 @@ class OrderSerializer(serializers.ModelSerializer):
         return discounts
 
     class Meta:
-        fields = [
-            "id",
-            "state",
-            "purchaser",
-            "total_price_paid",
-            "lines",
-            "discounts"
-        ]
+        fields = ["id", "state", "purchaser", "total_price_paid", "lines", "discounts"]
         model = models.Order
 
 

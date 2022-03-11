@@ -119,14 +119,16 @@ export class OrderSummaryCard extends React.Component<Props> {
           </div>
         </div>
 
-        {!SETTINGS.features.disable_discount_ui && !orderFulfilled && discountCode ? (
-          <ApplyCouponForm
-            onSubmit={addDiscount}
-            discountCodeIsBad={discountCodeIsBad}
-            couponCode={discountCode}
-            discounts={discounts}
-          />
-        ) : null}
+        {!SETTINGS.features.disable_discount_ui &&
+        !orderFulfilled &&
+        discountCode ? (
+            <ApplyCouponForm
+              onSubmit={addDiscount}
+              discountCodeIsBad={discountCodeIsBad}
+              couponCode={discountCode}
+              discounts={discounts}
+            />
+          ) : null}
 
         {totalPrice > 0 && !orderFulfilled ? (
           <div className="row">
