@@ -37,8 +37,7 @@ export class OrderReceiptPage extends React.Component<Props> {
     // If we have a preloaded order but it's not the one we should display, force a fetch
     if (
       this.props.orderReceipt &&
-      this.props.orderReceipt.id !==
-        parseInt(this.props.match.params.orderId)
+      this.props.orderReceipt.id !== parseInt(this.props.match.params.orderId)
     ) {
       await this.props.forceRequest()
     }

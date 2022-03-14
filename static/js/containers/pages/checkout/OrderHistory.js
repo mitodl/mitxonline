@@ -62,7 +62,7 @@ export class OrderHistory extends React.Component<Props> {
         <div className="col">
           <div
             className="link-text"
-            onClick={() => this.renderOrderReceipt(order.reference_number)}
+            onClick={() => this.renderOrderReceipt(order.id)}
           >
             View
           </div>

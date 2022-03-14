@@ -29,16 +29,8 @@ import {
 } from "../../../lib/queries/cart"
 
 import type { RouterHistory } from "react-router"
-import {
-  formatPrettyDateTimeAmPmTz,
-  parseDateString,
-  isSuccessResponse,
-  formatLocalePrice
-} from "../../../lib/util"
-import { Button } from "reactstrap"
+import { isSuccessResponse } from "../../../lib/util"
 import { addUserNotification } from "../../../actions"
-
-import ApplyCouponForm from "../../../components/forms/ApplyCouponForm"
 
 type Props = {
   history: RouterHistory,
@@ -62,32 +54,6 @@ export class CartPage extends React.Component<Props, CartState> {
   state = {
     discountCode:      "",
     discountCodeIsBad: false
-  }
-
-  async addDiscount(ev: Object) {
-    const subbedCode = ev.couponCode
-    const { applyDiscountCode, forceRequest, addUserNotification } = this.props
-
-    this.setState({ discountCode: subbedCode, discountCodeIsBad: false })
-
-    if (String(subbedCode).trim().length === 0) {
-      return
-    }
-
-    let userMessage, messageType
-
-    const resp = await applyDiscountCode(this.state.discountCode)
-    if (isSuccessResponse(resp)) {
-      messageType = ALERT_TYPE_SUCCESS
-      userMessage = "Discount code added."
-
-      forceRequest()
-    } else {
-      messageType = ALERT_TYPE_DANGER
-      userMessage = `Discount code ${this.state.discountCode} is invalid.`
-
-      this.setState({ discountCodeIsBad: true })
-    }
   }
 
   async clearDiscount() {

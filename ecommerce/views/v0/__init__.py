@@ -494,10 +494,6 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
 class OrderReceiptView(RetrieveAPIView):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
-    lookup_field = "reference_number"
-
-    def get_object(self, reference_number=None):
-        return Order.objects.get(reference_number=reference_number)
 
     def get_queryset(self):
-        return Order.objects.filter(purchaser=self.request.user, status=Order.FULFILLED).all()
+        return Order.objects.filter(purchaser=self.request.user).all()

@@ -239,7 +239,15 @@ class OrderSerializer(serializers.ModelSerializer):
         return discounts
 
     class Meta:
-        fields = ["id", "state", "purchaser", "total_price_paid", "lines", "discounts", "reference_number"]
+        fields = [
+            "id",
+            "state",
+            "purchaser",
+            "total_price_paid",
+            "lines",
+            "discounts",
+            "reference_number",
+        ]
         model = models.Order
 
 

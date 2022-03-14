@@ -88,7 +88,7 @@ export class OrderSummaryCard extends React.Component<Props> {
       >
         <div className="row order-summary-total mt-3 mt-md-0 mb-3">
           <div className="col-12 col-md-auto px-3 px-md-3">
-            <h5>${title}</h5>
+            <h5>{title}</h5>
           </div>
         </div>
 
