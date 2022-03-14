@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.23.0
+--------------
+
+- Fix cart total display when no discounts are applied
+- Adding transaction_type field
+- Account for baskets that end up being zero-value after discounts
+- Adding Discount UI
+
 Version 0.22.0 (Released March 08, 2022)
 --------------
 
