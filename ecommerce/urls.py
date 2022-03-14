@@ -14,7 +14,7 @@ from ecommerce.views.v0 import (
     CheckoutInterstitialView,
     CheckoutProductView,
     OrderHistoryViewSet,
-    OrderReceiptViewSet,
+    OrderReceiptView,
 )
 
 
@@ -26,7 +26,6 @@ router = SimpleRouterWithNesting()
 router.register(r"products", ProductViewSet, basename="products_api")
 router.register(r"checkout", CheckoutApiViewSet, basename="checkout_api")
 router.register(r"orders/history", OrderHistoryViewSet, basename="orderhistory_api")
-router.register(r"orders/receipt", OrderReceiptViewSet, basename="orderreceipt_api")
 
 basketRouter = router.register(r"baskets", BasketViewSet, basename="basket")
 basketRouter.register(
@@ -49,6 +48,11 @@ urlpatterns = [
         "checkout/to_payment",
         CheckoutInterstitialView.as_view(),
         name="checkout_interstitial_page",
+    ),
+    re_path(
+        r"^api/orders/receipt/(?P<reference_number>[0-9A-Za-z_\-]+)/$",
+        OrderReceiptView.as_view(),
+        name="order_receipt_api",
     ),
     re_path(
         r"^checkout/result/",

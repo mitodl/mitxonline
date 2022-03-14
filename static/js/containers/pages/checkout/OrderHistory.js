@@ -37,12 +37,8 @@ type Props = {
 }
 
 export class OrderHistory extends React.Component<Props> {
-  renderOrderReceipt(orderId: number) {
-    window.localStorage.setItem(
-      "selectedOrderReceiptId",
-      JSON.stringify(orderId)
-    )
-    window.location = "/orders/receipt"
+  renderOrderReceipt(orderReference: string) {
+    window.location = `/orders/receipt/${orderReference}/`
   }
 
   renderOrderCard(order: Object) {
@@ -66,7 +62,7 @@ export class OrderHistory extends React.Component<Props> {
         <div className="col">
           <div
             className="link-text"
-            onClick={() => this.renderOrderReceipt(order.id)}
+            onClick={() => this.renderOrderReceipt(order.reference_number)}
           >
             View
           </div>

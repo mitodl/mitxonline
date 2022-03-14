@@ -13,13 +13,13 @@ import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
 
 import { createStructuredSelector } from "reselect"
 import {
-  discountedPriceSelector,
   discountSelector,
   orderReceiptQuery,
   orderReceiptSelector
 } from "../../../lib/queries/cart"
 
 import type { RouterHistory } from "react-router"
+import type { Match } from "react-router"
 import { routes } from "../../../lib/urls"
 import type { Discount, Line, OrderReceipt } from "../../../flow/cartTypes"
 
@@ -27,10 +27,28 @@ type Props = {
   history: RouterHistory,
   orderReceipt: OrderReceipt,
   discounts: Array<Discount>,
-  isLoading: boolean
+  match: Match,
+  isLoading: boolean,
+  forceRequest: () => Promise<*>
 }
 
 export class OrderReceiptPage extends React.Component<Props> {
+  async componentDidMount() {
+    // If we have a preloaded order but it's not the one we should display, force a fetch
+    if (
+      this.props.orderReceipt &&
+      this.props.orderReceipt.id !==
+        parseInt(this.props.match.params.orderId)
+    ) {
+      await this.props.forceRequest()
+    }
+  }
+
+  async componentDidUpdate(prevProps: Props) {
+    if (prevProps.match.params.orderId !== this.props.match.params.orderId) {
+      await this.props.forceRequest()
+    }
+  }
   renderCartItemCard(orderItem: Line) {
     return (
       <CartItemCard
@@ -42,6 +60,9 @@ export class OrderReceiptPage extends React.Component<Props> {
 
   renderOrderSummaryCard() {
     const { orderReceipt, discounts } = this.props
+    if (!orderReceipt) {
+      return null
+    }
     const totalPaid = parseFloat(orderReceipt.total_price_paid)
     return orderReceipt ? (
       <OrderSummaryCard
@@ -49,6 +70,7 @@ export class OrderReceiptPage extends React.Component<Props> {
         discountedPrice={totalPaid}
         orderFulfilled={true}
         discounts={discounts}
+        cardTitle={`Order Number: ${orderReceipt.reference_number} `}
         discountCodeIsBad={false}
       />
     ) : null
@@ -119,8 +141,8 @@ const mapStateToProps = createStructuredSelector({
 
 const mapDispatchToProps = {}
 
-const mapPropsToConfig = () => [
-  orderReceiptQuery(window.localStorage.getItem("selectedOrderReceiptId"))
+const mapPropsToConfig = props => [
+  orderReceiptQuery(props.match.params.orderId)
 ]
 
 export default compose(

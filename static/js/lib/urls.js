@@ -42,9 +42,7 @@ export const routes = {
     begin: ""
   }),
 
-  orderReceipt: include("/orders/receipt/", {
-    begin: ""
-  }),
+  orderReceipt: "/orders/receipt/:orderId",
 
   informationLinks: include("", {
     termsOfService: "terms-of-service",

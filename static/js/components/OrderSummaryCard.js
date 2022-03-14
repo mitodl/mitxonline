@@ -14,7 +14,8 @@ type Props = {
   addDiscount?: Function,
   clearDiscount?: Function,
   discountCode?: string,
-  discountCodeIsBad: boolean
+  discountCodeIsBad: boolean,
+  cardTitle?: string
 }
 
 export class OrderSummaryCard extends React.Component<Props> {
@@ -74,10 +75,12 @@ export class OrderSummaryCard extends React.Component<Props> {
       discounts,
       addDiscount,
       discountCodeIsBad,
-      discountCode
+      discountCode,
+      cardTitle
     } = this.props
     const fmtPrice = formatLocalePrice(totalPrice)
     const fmtDiscountPrice = formatLocalePrice(discountedPrice)
+    const title = cardTitle ? cardTitle : "Order Summary"
     return (
       <div
         className="order-summary container card p-md-3 mb-4 rounded-0"
@@ -85,7 +88,7 @@ export class OrderSummaryCard extends React.Component<Props> {
       >
         <div className="row order-summary-total mt-3 mt-md-0 mb-3">
           <div className="col-12 col-md-auto px-3 px-md-3">
-            <h5>Order summary</h5>
+            <h5>${title}</h5>
           </div>
         </div>
 

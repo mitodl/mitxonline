@@ -49,5 +49,6 @@ export type OrderReceipt = {
   lines: Array<Line>,
   id: number,
   total_price_paid: number,
-  state: string
+  state: string,
+  reference_number: string
 }

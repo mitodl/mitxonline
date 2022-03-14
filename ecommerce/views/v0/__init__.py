@@ -13,7 +13,7 @@ from main.constants import (
 from main.utils import redirect_with_user_message
 from rest_framework import mixins, status
 from rest_framework.response import Response
-from rest_framework.generics import ListCreateAPIView
+from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
 from rest_framework.viewsets import ReadOnlyModelViewSet, GenericViewSet, ViewSet
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
@@ -491,9 +491,13 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
         return Order.objects.filter(purchaser=self.request.user).all()
 
 
-class OrderReceiptViewSet(ReadOnlyModelViewSet):
+class OrderReceiptView(RetrieveAPIView):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
+    lookup_field = "reference_number"
+
+    def get_object(self, reference_number=None):
+        return Order.objects.get(reference_number=reference_number)
 
     def get_queryset(self):
-        return Order.objects.filter(purchaser=self.request.user).all()
+        return Order.objects.filter(purchaser=self.request.user, status=Order.FULFILLED).all()
