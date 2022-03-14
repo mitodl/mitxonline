@@ -13,7 +13,7 @@ type Props = {
   discounts: Array<Discount>,
   addDiscount?: Function,
   clearDiscount?: Function,
-  discountCode?: string,
+  discountCode: string,
   discountCodeIsBad: boolean,
   cardTitle?: string
 }
@@ -123,8 +123,7 @@ export class OrderSummaryCard extends React.Component<Props> {
         </div>
 
         {!SETTINGS.features.disable_discount_ui &&
-        !orderFulfilled &&
-        discountCode ? (
+        !orderFulfilled ? (
             <ApplyCouponForm
               onSubmit={addDiscount}
               discountCodeIsBad={discountCodeIsBad}
