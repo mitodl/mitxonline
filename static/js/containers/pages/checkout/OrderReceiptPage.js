@@ -13,7 +13,6 @@ import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
 
 import { createStructuredSelector } from "reselect"
 import {
-  discountSelector,
   orderReceiptQuery,
   orderReceiptSelector
 } from "../../../lib/queries/cart"
@@ -22,6 +21,7 @@ import type { RouterHistory } from "react-router"
 import type { Match } from "react-router"
 import { routes } from "../../../lib/urls"
 import type { Discount, Line, OrderReceipt } from "../../../flow/cartTypes"
+import { pathOr } from "ramda"
 
 type Props = {
   history: RouterHistory,
@@ -58,7 +58,7 @@ export class OrderReceiptPage extends React.Component<Props> {
   }
 
   renderOrderSummaryCard() {
-    const { orderReceipt, discounts } = this.props
+    const { orderReceipt } = this.props
     if (!orderReceipt) {
       return null
     }
@@ -68,7 +68,7 @@ export class OrderReceiptPage extends React.Component<Props> {
         totalPrice={totalPaid}
         discountedPrice={totalPaid}
         orderFulfilled={true}
-        discounts={discounts}
+        discounts={orderReceipt.discounts}
         cardTitle={`Order Number: ${orderReceipt.reference_number} `}
         discountCodeIsBad={false}
         discountCode=""
@@ -78,7 +78,7 @@ export class OrderReceiptPage extends React.Component<Props> {
   renderEmptyCartCard() {
     return (
       <div
-        className="enrolled-item container card mb-4 rounded-0 flex-grow-1"
+        className="empty-card container card mb-4 rounded-0 flex-grow-1"
         key="emptycard"
       >
         <div className="row d-flex flex-sm-columm p-md-3">
@@ -99,7 +99,7 @@ export class OrderReceiptPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${ORDER_RECEIPT_DISPLAY_PAGE_TITLE}`}
       >
         <Loader isLoading={isLoading}>
-          <div className="std-page-body cart container">
+          <div className="std-page-body order-receipt container">
             <div className="row">
               <div className="col-8 d-flex justify-content-between">
                 <h1 className="flex-grow-1">Order Receipt</h1>
@@ -108,7 +108,7 @@ export class OrderReceiptPage extends React.Component<Props> {
                 <p className="font-weight-normal mt-3">
                   <a
                     href={routes.orderHistory}
-                    className="link-text align-middle"
+                    className="link-text align-middle back-link"
                   >
                     Back to Order History
                   </a>
@@ -133,10 +133,10 @@ export class OrderReceiptPage extends React.Component<Props> {
   }
 }
 
-const mapStateToProps = createStructuredSelector({
-  orderReceipt: orderReceiptSelector,
-  discounts:    discountSelector,
-  isLoading:    () => false
+const mapStateToProps = state => ({
+  currentUser:  state.entities.currentUser,
+  orderReceipt: state.entities.orderReceipt,
+  isLoading:    pathOr(true, ["queries", "orderReceipt", "isPending"], state)
 })
 
 const mapDispatchToProps = {}
