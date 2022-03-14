@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.23.0
+Version 0.23.0 (Released March 14, 2022)
 --------------
 
 - Fix cart total display when no discounts are applied
