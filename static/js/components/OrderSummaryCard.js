@@ -61,7 +61,9 @@ export class OrderSummaryCard extends React.Component<Props> {
               <br />
               {orderFulfilled ? null : clearDiscountLink}
             </div>
-            <div className="ml-auto text-primary">{discountAmountText}</div>
+            <div className="ml-auto text-primary text-right">
+              {discountAmountText}
+            </div>
           </div>
         </div>
       </div>

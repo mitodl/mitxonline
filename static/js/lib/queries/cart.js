@@ -13,7 +13,7 @@ export const discountedPriceSelector = pathOr(null, [
 export const discountSelector = pathOr(null, ["entities", "discounts"])
 export const cartQueryKey = "cartItems"
 export const orderHistoryQueryKey = "orderHistory"
-export const receiptQueryKey = "orderItems"
+export const receiptQueryKey = "orderReceipt"
 
 export const checkoutPayloadSelector = pathOr(null, [
   "entities",

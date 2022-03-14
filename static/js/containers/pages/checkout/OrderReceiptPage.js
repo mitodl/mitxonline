@@ -12,7 +12,7 @@ import { CartItemCard } from "../../../components/CartItemCard"
 import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
 
 import { createStructuredSelector } from "reselect"
-import { orderReceiptQuery } from "../../../lib/queries/cart"
+import { orderReceiptQuery, receiptQueryKey } from "../../../lib/queries/cart"
 
 import type { RouterHistory } from "react-router"
 import type { Match } from "react-router"
@@ -24,6 +24,7 @@ type Props = {
   history: RouterHistory,
   orderReceipt: OrderReceipt,
   match: Match,
+  discounts: Array<Discount>,
   isLoading: boolean,
   forceRequest: () => Promise<*>
 }
@@ -54,7 +55,7 @@ export class OrderReceiptPage extends React.Component<Props> {
   }
 
   renderOrderSummaryCard() {
-    const { orderReceipt } = this.props
+    const { orderReceipt, discounts } = this.props
     if (!orderReceipt || !orderReceipt.total_price_paid) {
       return null
     }
@@ -64,7 +65,7 @@ export class OrderReceiptPage extends React.Component<Props> {
         totalPrice={totalPaid}
         discountedPrice={totalPaid}
         orderFulfilled={true}
-        discounts={orderReceipt.discounts}
+        discounts={discounts}
         cardTitle={`Order Number: ${orderReceipt.reference_number} `}
         discountCodeIsBad={false}
         discountCode=""
@@ -132,7 +133,8 @@ export class OrderReceiptPage extends React.Component<Props> {
 const mapStateToProps = state => ({
   currentUser:  state.entities.currentUser,
   orderReceipt: state.entities.orderReceipt,
-  isLoading:    pathOr(true, ["queries", "orderReceipt", "isPending"], state)
+  discounts:    state.entities.discounts,
+  isLoading:    pathOr(true, ["queries", receiptQueryKey, "isPending"], state)
 })
 
 const mapDispatchToProps = {}
