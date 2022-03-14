@@ -164,15 +164,14 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
 
     def get_total_price(self, instance):
         return sum(
-            product.price
-            for product in [item.product for item in instance.basket_items.all()]
+            basket_item.base_price for basket_item in instance.basket_items.all()
         )
 
     def get_discounted_price(self, instance):
         discounts = instance.discounts.all()
 
         if discounts.count() == 0:
-            return None
+            return self.get_total_price(instance)
 
         return sum(
             basket_item.discounted_price for basket_item in instance.basket_items.all()
