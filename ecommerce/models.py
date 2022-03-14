@@ -97,6 +97,11 @@ class BasketItem(TimestampedModel):
             * self.quantity
         )
 
+    @cached_property
+    def base_price(self):
+        """Returns the total price of the basket item without discounts."""
+        return self.product.price * self.quantity
+
 
 class Discount(TimestampedModel):
     """Discount model"""
