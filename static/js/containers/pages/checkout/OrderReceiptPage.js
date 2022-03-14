@@ -12,9 +12,7 @@ import { CartItemCard } from "../../../components/CartItemCard"
 import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
 
 import { createStructuredSelector } from "reselect"
-import {
-  orderReceiptQuery,
-} from "../../../lib/queries/cart"
+import { orderReceiptQuery } from "../../../lib/queries/cart"
 
 import type { RouterHistory } from "react-router"
 import type { Match } from "react-router"
