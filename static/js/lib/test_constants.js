@@ -22,3 +22,43 @@ export const CYBERSOURCE_CHECKOUT_RESPONSE = {
   url:    "https://testsecureacceptance.cybersource.com/pay",
   method: "POST"
 }
+
+export const ORDER_RECEIPT_OBJECT = {
+  id:               1,
+  created_on:       "2019-10-09T09:47:09.219354Z",
+  reference_number: "mitxonline-dev-1",
+  purchaser:        1,
+  total_price_paid: "200",
+  state:            "fulfilled",
+  lines:            [
+    {
+      id:               2,
+      item_description: "sdfgsdgfs",
+      product:          {
+        id:                 2,
+        price:              "35.00",
+        description:        "sdfgsdgfs",
+        is_active:          true,
+        purchasable_object: {}
+      },
+      quantity:    1,
+      total_price: 35,
+      unit_price:  35
+    }
+  ],
+  discounts: [
+    {
+      redeemed_discount: {
+        amount:          "0.00000",
+        automatic:       false,
+        created_on:      "2022-03-09T19:49:39.409600Z",
+        discount_code:   "NOMA",
+        discount_type:   "fixed-price",
+        id:              2,
+        max_redemptions: 5,
+        redemption_type: "one-time",
+        updated_on:      "2022-03-10T16:42:45.883756Z"
+      }
+    }
+  ]
+}

@@ -153,3 +153,13 @@ export const EMAIL_CONFIRM_PAGE_TITLE = "Confirm Email Change"
 export const CART_DISPLAY_PAGE_TITLE = "Checkout"
 
 export const ORDER_HISTORY_DISPLAY_PAGE_TITLE = "Order History"
+
+export const ORDER_RECEIPT_DISPLAY_PAGE_TITLE = "Order Receipt"
+
+export const ORDER_HISTORY_COLUMN_TITLES = [
+  "Items",
+  "Date placed",
+  "Total cost",
+  "Order number",
+  "Order details"
+]

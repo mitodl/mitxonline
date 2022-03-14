@@ -13,11 +13,14 @@ export const discountedPriceSelector = pathOr(null, [
 export const discountSelector = pathOr(null, ["entities", "discounts"])
 export const cartQueryKey = "cartItems"
 export const orderHistoryQueryKey = "orderHistory"
+export const receiptQueryKey = "orderReceipt"
 
 export const checkoutPayloadSelector = pathOr(null, [
   "entities",
   "checkoutPayload"
 ])
+
+export const orderReceiptSelector = pathOr(null, ["entities", "orderReceipt"])
 
 export const cartQuery = () => ({
   queryKey:  cartQueryKey,
@@ -89,4 +92,20 @@ export const clearDiscountCodeMutation = () => ({
     method: "POST"
   },
   update: {}
+})
+
+export const orderReceiptQuery = (orderId: number) => ({
+  url:       `/api/orders/receipt/${orderId}/`,
+  queryKey:  receiptQueryKey,
+  transform: json => {
+    const discounts = json.discounts.map(item => item.redeemed_discount)
+    return {
+      orderReceipt: json,
+      discounts:    discounts
+    }
+  },
+  update: {
+    orderReceipt: nextState,
+    discounts:    nextState
+  }
 })

@@ -27,6 +27,7 @@ import DashboardPage from "./pages/DashboardPage"
 
 import CartPage from "./pages/checkout/CartPage"
 import OrderHistory from "./pages/checkout/OrderHistory"
+import OrderReceiptPage from "./pages/checkout/OrderReceiptPage"
 
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
@@ -101,6 +102,10 @@ export class App extends React.Component<Props, void> {
             <Route
               path={urljoin(match.url, String(routes.orderHistory))}
               component={OrderHistory}
+            />
+            <Route
+              path={urljoin(match.url, String(routes.orderReceipt))}
+              component={OrderReceiptPage}
             />
           </Switch>
         </div>

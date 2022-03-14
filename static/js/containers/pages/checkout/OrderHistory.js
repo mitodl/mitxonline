@@ -2,7 +2,10 @@
 /* global SETTINGS: false */
 import React from "react"
 import DocumentTitle from "react-document-title"
-import { ORDER_HISTORY_DISPLAY_PAGE_TITLE } from "../../../constants"
+import {
+  ORDER_HISTORY_COLUMN_TITLES,
+  ORDER_HISTORY_DISPLAY_PAGE_TITLE
+} from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { connectRequest } from "redux-query"
@@ -19,7 +22,11 @@ import {
 
 import type { RouterHistory } from "react-router"
 import moment from "moment"
-import { formatPrettyDateTimeAmPmTz, parseDateString } from "../../../lib/util"
+import {
+  formatLocalePrice,
+  formatPrettyDateTimeAmPmTz,
+  parseDateString
+} from "../../../lib/util"
 import { Button } from "reactstrap"
 import type { PaginatedOrderHistory } from "../../../flow/cartTypes"
 
@@ -30,6 +37,10 @@ type Props = {
 }
 
 export class OrderHistory extends React.Component<Props> {
+  renderOrderReceipt(orderReference: string) {
+    window.location = `/orders/receipt/${orderReference}/`
+  }
+
   renderOrderCard(order: Object) {
     const orderTitle =
       order.titles.length > 0 ? order.titles.join("<br />") : <em>No Items</em>
@@ -38,18 +49,34 @@ export class OrderHistory extends React.Component<Props> {
     )
 
     return (
-      <div className="row d-flex p-3 my-0 bg-light">
+      <div
+        className="row d-flex p-3 my-0 bg-light"
+        key={`ordercard_${order.id}`}
+      >
         <div className="col">{orderTitle}</div>
         <div className="col">{orderDate}</div>
-        <div className="col">{order.total_price_paid}</div>
+        <div className="col">
+          {formatLocalePrice(parseFloat(order.total_price_paid))}
+        </div>
         <div className="col">{order.reference_number}</div>
-        <div className="col">View</div>
+        <div className="col">
+          <div
+            className="link-text"
+            onClick={() => this.renderOrderReceipt(order.id)}
+          >
+            View
+          </div>
+        </div>
       </div>
     )
   }
   render() {
     const { orderHistory, isLoading } = this.props
-
+    const columns = ORDER_HISTORY_COLUMN_TITLES.map((value: string) => (
+      <div key={value} className="col">
+        <strong>{value}</strong>
+      </div>
+    ))
     return (
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${ORDER_HISTORY_DISPLAY_PAGE_TITLE}`}
@@ -63,21 +90,7 @@ export class OrderHistory extends React.Component<Props> {
             </div>
 
             <div className="row d-flex p-3 mt-4 bg-light border-bottom border-2 border-dark">
-              <div className="col">
-                <strong>Items</strong>
-              </div>
-              <div className="col">
-                <strong>Date placed</strong>
-              </div>
-              <div className="col">
-                <strong>Total cost</strong>
-              </div>
-              <div className="col">
-                <strong>Order number</strong>
-              </div>
-              <div className="col">
-                <strong>Order details</strong>
-              </div>
+              {columns}
             </div>
             {orderHistory && orderHistory.results.length > 0
               ? orderHistory.results.map(this.renderOrderCard.bind(this))

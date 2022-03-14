@@ -36,3 +36,20 @@ export type Discount = {
   discount_code: string,
   discount_type: string
 }
+
+export type Line = {
+  id: number,
+  product: Product,
+  quantity: number,
+  item_description: string
+}
+
+export type OrderReceipt = {
+  order: number,
+  lines: Array<Line>,
+  id: number,
+  total_price_paid: number,
+  state: string,
+  reference_number: string,
+  discounts: Array<Discount>
+}

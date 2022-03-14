@@ -42,6 +42,8 @@ export const routes = {
     begin: ""
   }),
 
+  orderReceipt: "/orders/receipt/:orderId",
+
   informationLinks: include("", {
     termsOfService: "terms-of-service",
     privacyPolicy:  "privacy-policy"

@@ -14,6 +14,7 @@ from ecommerce.views.v0 import (
     CheckoutInterstitialView,
     CheckoutProductView,
     OrderHistoryViewSet,
+    OrderReceiptView,
 )
 
 
@@ -47,6 +48,11 @@ urlpatterns = [
         "checkout/to_payment",
         CheckoutInterstitialView.as_view(),
         name="checkout_interstitial_page",
+    ),
+    re_path(
+        r"^api/orders/receipt/(?P<pk>\d+)/$",
+        OrderReceiptView.as_view(),
+        name="order_receipt_api",
     ),
     re_path(
         r"^checkout/result/",
