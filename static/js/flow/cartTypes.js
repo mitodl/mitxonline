@@ -50,5 +50,6 @@ export type OrderReceipt = {
   id: number,
   total_price_paid: number,
   state: string,
-  reference_number: string
+  reference_number: string,
+  discounts: Array<Discount>
 }

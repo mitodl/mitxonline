@@ -1,11 +1,13 @@
 // @flow
 import { assert } from "chai"
 
-import OrderReceiptPage, { OrderReceiptPage as InnerOrderReceiptPage } from "./OrderReceiptPage"
+import OrderReceiptPage, {
+  OrderReceiptPage as InnerOrderReceiptPage
+} from "./OrderReceiptPage"
 import { makeUser } from "../../../factories/user"
 import IntegrationTestHelper from "../../../util/integration_test_helper"
 import * as courseApi from "../../../lib/courseApi"
-import {ORDER_RECEIPT_OBJECT} from "../../../lib/test_constants"
+import { ORDER_RECEIPT_OBJECT } from "../../../lib/test_constants"
 
 describe("OrderReceiptPage", () => {
   let helper, renderPage, currentUser, isLinkableStub
@@ -44,9 +46,6 @@ describe("OrderReceiptPage", () => {
   it("renders the page with a receipt for a logged in user", async () => {
     const { inner } = await renderPage()
     assert.isTrue(inner.find(".order-receipt").exists())
-    assert.equal(
-      inner.find(".back-link").text(),
-      "Back to Order History"
-    )
+    assert.equal(inner.find(".back-link").text(), "Back to Order History")
   })
 })

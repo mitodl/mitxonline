@@ -14,7 +14,6 @@ import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
 import { createStructuredSelector } from "reselect"
 import {
   orderReceiptQuery,
-  orderReceiptSelector
 } from "../../../lib/queries/cart"
 
 import type { RouterHistory } from "react-router"
@@ -26,7 +25,6 @@ import { pathOr } from "ramda"
 type Props = {
   history: RouterHistory,
   orderReceipt: OrderReceipt,
-  discounts: Array<Discount>,
   match: Match,
   isLoading: boolean,
   forceRequest: () => Promise<*>
