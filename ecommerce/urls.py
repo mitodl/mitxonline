@@ -50,7 +50,7 @@ urlpatterns = [
         name="checkout_interstitial_page",
     ),
     re_path(
-        r"^api/orders/receipt/(?P<pk>[0-9A-Za-z_\-]+)/$",
+        r"^api/orders/receipt/(?P<pk>\d+)/$",
         OrderReceiptView.as_view(),
         name="order_receipt_api",
     ),
