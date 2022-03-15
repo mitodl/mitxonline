@@ -37,6 +37,7 @@ from openedx.api import (
     enroll_in_edx_course_runs,
     get_edx_api_course_detail_client,
     unenroll_edx_course_run,
+    subscribe_to_edx_course_emails,
 )
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
@@ -218,7 +219,8 @@ def create_run_enrollments(
             )
             if not created and not enrollment.active:
                 enrollment.edx_enrolled = edx_request_success
-                enrollment.edx_emails_subscription = True
+                subscribed = subscribe_to_edx_course_emails(user, run)
+                enrollment.edx_emails_subscription = True if subscribed else False
                 enrollment.reactivate_and_save()
         except:  # pylint: disable=bare-except
             mail_api.send_enrollment_failure_message(user, run, details=format_exc())

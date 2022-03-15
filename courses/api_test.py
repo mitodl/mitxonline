@@ -244,6 +244,9 @@ def test_create_run_enrollments(mocker, user):
     patched_send_enrollment_email = mocker.patch(
         "courses.api.mail_api.send_course_run_enrollment_email"
     )
+    patched_edx_email_subscribe = mocker.patch(
+        "courses.api.subscribe_to_edx_course_emails"
+    )
 
     successful_enrollments, edx_request_success = create_run_enrollments(
         user,
@@ -252,6 +255,7 @@ def test_create_run_enrollments(mocker, user):
     patched_edx_enroll.assert_called_once_with(
         user, runs, mode=EDX_DEFAULT_ENROLLMENT_MODE
     )
+
     assert patched_send_enrollment_email.call_count == num_runs
     assert edx_request_success is True
     assert len(successful_enrollments) == num_runs
