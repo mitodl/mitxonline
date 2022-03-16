@@ -6,7 +6,7 @@ from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
 from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE, USER_MSG_TYPE_ENROLL_BLOCKED,
 )
 
 from mitol.payment_gateway.api import (
@@ -22,6 +22,14 @@ from ecommerce.models import Basket, PendingOrder, UserDiscount, BasketDiscount
 
 def generate_checkout_payload(request):
     basket = Basket.objects.filter(user=request.user).get()
+    if basket.has_user_blocked_products(request.user):
+        return {
+            "country_blocked": True,
+            "response": redirect_with_user_message(
+                reverse("user-dashboard"),
+                {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            ),
+        }
     order = PendingOrder.create_from_basket(basket)
     total_price = 0
 
