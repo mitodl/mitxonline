@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.23.1
+Version 0.23.1 (Released March 16, 2022)
 --------------
 
 - Adding OrderReceiptPage (#449)
