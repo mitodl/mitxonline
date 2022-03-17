@@ -217,12 +217,12 @@ class UserEnrollmentsApiViewSet(
                         response = subscribe_to_edx_course_emails(
                             request.user, enrollment.run
                         )
-                        enrollment.edx_emails_subscription = True
+                        enrollment.edx_emails_subscription = True if response else False
                     else:
                         response = unsubscribe_from_edx_course_emails(
                             request.user, enrollment.run
                         )
-                        enrollment.edx_emails_subscription = False
+                        enrollment.edx_emails_subscription = False if response else True
                     enrollment.save()
                     return Response(data=response, status=status.HTTP_200_OK)
                 except (
