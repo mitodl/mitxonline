@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.23.2
+Version 0.23.2 (Released March 18, 2022)
 --------------
 
 - fix email unsubscription inconsistency after unenrollment (#475)
