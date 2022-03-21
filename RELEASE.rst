@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.24.0
+--------------
+
+- Accessibility: Bypass Blocks: bypass the header on site pages for screen readers (#463)
+
 Version 0.23.2 (Released March 18, 2022)
 --------------
 
