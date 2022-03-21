@@ -2,6 +2,7 @@ import pytest
 import random
 from decimal import Decimal, getcontext
 from mitol.common.utils import now_in_utc
+import reversion
 
 from users.factories import UserFactory
 
@@ -12,6 +13,10 @@ from ecommerce.models import (
     BasketItem,
     UserDiscount,
     BasketDiscount,
+    PendingOrder,
+    FulfilledOrder,
+    RefundedOrder,
+    Transaction,
 )
 from ecommerce import api
 from ecommerce.factories import (
@@ -21,6 +26,7 @@ from ecommerce.factories import (
     OneTimePerUserDiscountFactory,
     UnlimitedUseDiscountFactory,
     SetLimitDiscountFactory,
+    BasketItemFactory,
 )
 from ecommerce.discounts import (
     DiscountType,
@@ -185,3 +191,29 @@ def test_basket_discount_conversion(user, unlimited_discount):
     reconverted_discount = basket_discount.convert_to_order(order)
 
     assert converted_discount == reconverted_discount
+
+
+def test_order_refund():
+    """
+    Tests state change from fulfilled to refund. There should be a new
+    Transaction record after the order has been refunded.
+    """
+
+    with reversion.create_revision():
+        basket_item = BasketItemFactory.create()
+
+    order = PendingOrder.create_from_basket(basket_item.basket)
+    order.fulfill({"result": "Payment succeeded"})
+    order.save()
+
+    fulfilled_order = FulfilledOrder.objects.get(pk=order.id)
+
+    assert fulfilled_order.transactions.count() == 1
+
+    fulfilled_order.refund(fulfilled_order.total_price_paid, "Test refund", True)
+    fulfilled_order.save()
+
+    fulfilled_order.refresh_from_db()
+
+    assert fulfilled_order.state == Order.STATE.REFUNDED
+    assert fulfilled_order.transactions.count() == 2

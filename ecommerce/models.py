@@ -4,7 +4,9 @@ from django.db import models, transaction
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from courses.models import CourseRun
+from django.core.exceptions import ObjectDoesNotExist
+from courses.models import CourseRun, CourseRunEnrollment
+from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from django_fsm import FSMField, transition
 from mitol.common.models import TimestampedModel
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
@@ -22,6 +24,7 @@ from ecommerce.constants import (
 )
 from users.models import User
 from decimal import Decimal
+from courses.api import deactivate_run_enrollment
 
 from mitol.common.utils.datetime import now_in_utc
 
@@ -218,7 +221,7 @@ class Order(TimestampedModel):
         """Error this order"""
         raise NotImplementedError()
 
-    def refund(self):
+    def refund(self, amount, reason, unenroll_learner):
         """Issue a refund"""
         raise NotImplementedError()
 
@@ -309,6 +312,7 @@ class PendingOrder(Order):
             self.purchaser,
             self.purchased_runs,
             mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            keep_failed_enrollments=True,
         )
 
     @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.CANCELED)
@@ -334,11 +338,53 @@ class FulfilledOrder(Order):
     """An order that has a fulfilled payment"""
 
     @transition(
-        field="state", source=Order.STATE.FULFILLED, target=Order.STATE.REFUNDED
+        field="state",
+        source=Order.STATE.FULFILLED,
+        target=Order.STATE.REFUNDED,
+        custom=dict(admin=False),
     )
-    def refund(self):
-        """Issue a refund"""
-        pass
+    def refund(self, amount: float, reason: str, unenroll_learner: bool):
+        """
+        Records the refund, and optionally attempts to unenroll the learner from
+        the things they bought.
+
+        Args:
+            amount (float): the amount that was refunded
+            reason (str): reason for refunding the order
+            unenroll_learner (bool): also unenroll the learner (if possible)
+        Returns:
+            boolean: if unenroll_learner is set to True and the unenrollment
+            fails, the unenrollment will still happen but this will return False
+            to signify that it failed.
+        """
+        self.transactions.create(
+            data={"reason": reason}, amount=amount, transaction_type="refund"
+        )
+
+        self.state = Order.STATE.REFUNDED
+
+        unenrolls_successful = True
+
+        if unenroll_learner:
+            for run in self.purchased_runs:
+                for enrollment in run.enrollments.filter(user=self.purchaser).all():
+                    try:
+                        if (
+                            deactivate_run_enrollment(
+                                enrollment, ENROLL_CHANGE_STATUS_REFUNDED
+                            )
+                            is None
+                        ):
+                            unenrolls_successful = False
+                            deactivate_run_enrollment(
+                                enrollment,
+                                ENROLL_CHANGE_STATUS_REFUNDED,
+                                keep_failed_enrollments=True,
+                            )
+                    except ObjectDoesNotExist:
+                        pass
+
+        return unenrolls_successful
 
     class Meta:
         proxy = True

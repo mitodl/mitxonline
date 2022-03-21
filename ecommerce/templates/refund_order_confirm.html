@@ -1,0 +1,84 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}">{% endblock %}
+
+{% block extrahead %}
+    {{ block.super }}
+    {{ media }}
+    <script src="{% static 'admin/js/cancel.js' %}" async></script>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>Refund Order</h1>
+
+    <p>Refunding order #{{ order.id }}.</p>
+
+    <ul>
+        <li> Placed {{ order.created_on }}</li>
+        <li> Total: ${{ order.total_price_paid }}</li>
+        <li> Reference: {{ order.reference_number }}</li>
+    </ul>
+
+    <form method="POST" id="refund_order_form" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="action" value="process_refund" />
+    <input type="hidden" name="order" value="{{ order.id }}" />
+        <div>
+            {% if not form_valid %}
+            <p class="errornote">Please correct the errors below.</p>
+            {% endif %}
+            <fieldset class="module aligned">
+                {% for field in refund_form %}
+                    {% if field.name == '_selected_action' %}
+                    {{ field }}
+                    {% elif field.name == 'perform_unenrolls' %}
+                    <div class="form-row checkbox-row field-{{ field.name }}{% if field.name in refund_form.errors %} errors{% endif %}">
+                        <div>
+                            {% if field.name in refund_form.errors %}
+                                <ul class="errorlist">
+                                    {% for fname, error_list in refund_form.errors.items %}
+                                        {% if fname == field.name %}
+                                            {% for error_string in error_list %}
+                                                <li>{{ error_string }}
+                                            {% endfor %}
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+
+                            {{ field }} <label class="vCheckboxLabel" for="{{ field.name }}">{{ field.label }}</label>
+                        </div>
+                    </div>
+                    {% else %}
+                        <div class="form-row field-{{ field.name }}{% if field.name in refund_form.errors %} errors{% endif %}">
+                            {% if field.name in refund_form.errors %}
+                                <ul class="errorlist">
+                                    {% for fname, error_list in refund_form.errors.items %}
+                                        {% if fname == field.name %}
+                                            {% for error_string in error_list %}
+                                                <li>{{ error_string }}
+                                            {% endfor %}
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            <div>
+                                <label for="{{ field.name }}">{{ field.label }}</label>
+                                {{ field }}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </fieldset>
+        </div>
+
+        <div>
+            <input type="submit" value="Refund Order" name="refund" />
+            <a href="#" class="cancel-link" style="margin-left: 2rem;">No, take me back</a>
+        </div>
+
+    </form>
+</div>
+{% endblock %}
