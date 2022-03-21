@@ -4,6 +4,8 @@ from django.contrib.admin.decorators import display
 from fsm_admin.mixins import FSMTransitionMixin
 from reversion.admin import VersionAdmin
 from mitol.common.admin import TimestampedModelAdmin
+from django.http import HttpResponse, HttpResponseRedirect
+from django.urls import reverse
 
 from ecommerce.models import (
     Product,
@@ -51,7 +53,7 @@ class BasketItemAdmin(VersionAdmin):
 class DiscountAdmin(admin.ModelAdmin):
     model = Discount
     search_fields = ["discount_type", "redemption_type"]
-    list_display = ["id", "discount_type", "amount", "redemption_type"]
+    list_display = ["id", "discount_code", "discount_type", "amount", "redemption_type"]
 
 
 @admin.register(UserDiscount)
@@ -158,14 +160,36 @@ class CanceledOrderAdmin(BaseOrderAdmin):
 
 
 @admin.register(FulfilledOrder)
-class FulfilledOrderAdmin(BaseOrderAdmin):
+class FulfilledOrderAdmin(TimestampedModelAdmin):
     """Admin for FulfilledOrder"""
 
+    search_fields = ["id", "purchaser__email", "purchaser__username"]
+    list_display = ["id", "state", "get_purchaser", "total_price_paid"]
+    list_fields = ["state"]
+    list_filter = ["state"]
+    inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     model = FulfilledOrder
+
+    @display(description="Purchaser")
+    def get_purchaser(self, obj: Order):
+        return f"{obj.purchaser.name} ({obj.purchaser.email})"
 
     def get_queryset(self, request):
         """Filter only to fulfilled orders"""
-        return super().get_queryset(request).filter(state=Order.STATE.FULFILLED)
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related("purchaser", "lines__product_version")
+            .filter(state=Order.STATE.FULFILLED)
+        )
+
+    def response_change(self, request, obj):
+        if "refund" in request.POST:
+            return HttpResponseRedirect(
+                "%s/?order=%s" % (reverse("refund-order"), obj.id)
+            )
+
+        return super().response_change(request, obj)
 
 
 @admin.register(RefundedOrder)

@@ -15,6 +15,7 @@ from ecommerce.views.v0 import (
     CheckoutProductView,
     OrderHistoryViewSet,
     OrderReceiptView,
+    AdminRefundOrderView,
 )
 
 
@@ -60,4 +61,5 @@ urlpatterns = [
         name="checkout-result-callback",
     ),
     re_path(r"^cart/add", CheckoutProductView.as_view(), name="checkout-product"),
+    re_path(r"^int_admin/refund", AdminRefundOrderView.as_view(), name="refund-order"),
 ]

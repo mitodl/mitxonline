@@ -97,6 +97,7 @@ class BasketItemFactory(DjangoModelFactory):
     """Factory for BasketItem"""
 
     product = SubFactory(ProductFactory)
+
     basket = SubFactory(BasketFactory)
 
     class Meta:
