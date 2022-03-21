@@ -68,7 +68,7 @@ export class App extends React.Component<Props, void> {
     return (
       <div className="app">
         <Header currentUser={currentUser} location={location} />
-        <div className="main-page-content">
+        <div id="main" className="main-page-content">
           <Switch>
             <Route
               path={urljoin(match.url, String(routes.login))}

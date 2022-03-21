@@ -28,6 +28,7 @@
   </head>
   <body class="{% block bodyclass %}{% endblock %}">
   <div class="main-panel">
+    <a href="#main" class="sr-only sr-only-focusable">Skip to main content</a>
     {% include "partials/gtm_body.html" %}
     {% hijack_notification %}
     {% block headercontent %}
