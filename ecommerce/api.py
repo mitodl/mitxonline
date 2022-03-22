@@ -6,7 +6,8 @@ from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
 from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE, USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
 )
 
 from mitol.payment_gateway.api import (
