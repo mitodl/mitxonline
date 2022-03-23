@@ -9,6 +9,7 @@ from main.constants import (
     USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
     USER_MSG_TYPE_PAYMENT_REVIEW,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
 )
 from main.utils import redirect_with_user_message
 from rest_framework import mixins, status
@@ -415,7 +416,13 @@ class CheckoutCallbackView(View):
                 )
             )
             if basket:
-                basket.delete()
+                if basket.has_user_blocked_products(order.purchaser):
+                    return redirect_with_user_message(
+                        reverse("user-dashboard"),
+                        {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+                    )
+                else:
+                    basket.delete()
 
             return redirect_with_user_message(
                 reverse("user-dashboard"), {"type": USER_MSG_TYPE_PAYMENT_REVIEW}
@@ -464,7 +471,8 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             checkout_payload = api.generate_checkout_payload(request)
         except ObjectDoesNotExist:
             return HttpResponse("No basket")
-
+        if "country_blocked" in checkout_payload:
+            return checkout_payload["response"]
         if "no_checkout" in checkout_payload:
             return checkout_payload["response"]
 

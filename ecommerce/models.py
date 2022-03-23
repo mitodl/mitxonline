@@ -1,3 +1,4 @@
+from django.db.models import Prefetch
 from django.utils.functional import cached_property
 from django.conf import settings
 from django.db import models, transaction
@@ -7,6 +8,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
 from courses.models import CourseRun, CourseRunEnrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
+from courses.models import CourseRun
 from django_fsm import FSMField, transition
 from mitol.common.models import TimestampedModel
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
@@ -69,6 +71,16 @@ class Basket(TimestampedModel):
     """Represents a User's basket."""
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="basket")
+
+    def has_user_blocked_products(self, user):
+        """Return true if any of the courses in the basket block user's country"""
+        basket_items = self.basket_items.prefetch_related("product")
+        return any(
+            [
+                item.product.purchasable_object.course.is_country_blocked(user)
+                for item in basket_items
+            ]
+        )
 
 
 class BasketItem(TimestampedModel):

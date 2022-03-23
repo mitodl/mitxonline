@@ -115,7 +115,7 @@ def _validate_enrollment_post_request(
             "Attempting to enroll in a non-existent run (id: %s)", str(run_id_str)
         )
         return HttpResponseRedirect(request.headers["Referer"]), None, None
-    if run.course.blocked_countries.filter(country=user.legal_address.country).exists():
+    if run.course.is_country_blocked(user):
         resp = HttpResponseRedirect(request.headers["Referer"])
         resp.set_cookie(
             key=USER_MSG_COOKIE_NAME,

@@ -267,6 +267,20 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             )
         )
 
+    def is_country_blocked(self, user):
+        """
+        Check if the user is from a blocked country for this course
+
+        Args:
+            user (users.models.User): The user to check available runs for.
+
+        Returns:
+            bool: True if user is from blocked country
+        """
+        return self.blocked_countries.filter(
+            country=user.legal_address.country
+        ).exists()
+
     def available_runs(self, user):
         """
         Get all enrollable runs for a Course that a user has not already enrolled in.
