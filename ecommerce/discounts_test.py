@@ -2,6 +2,7 @@ import pytest
 import random
 from decimal import Decimal, getcontext
 from mitol.common.utils import now_in_utc
+from django.urls import reverse
 
 from users.factories import UserFactory
 
@@ -96,11 +97,12 @@ def test_discount_factory_adjustment(discounts, products):
             )
 
 
-def test_user_discount_application(user, unlimited_discount, products):
+def test_user_discount_application(user, user_drf_client, unlimited_discount, products):
     """
     Creates a user discount (which should be applied automatically for a
     particular user), and then creates a basket for that particular user and
-    applies the user discounts. The User Discount should be applied.
+    applies the user discounts (via the clear discount API call).
+    The User Discount should be applied.
     """
     product = products[random.randrange(0, len(products), 1)]
 
@@ -113,7 +115,9 @@ def test_user_discount_application(user, unlimited_discount, products):
     user_discount = UserDiscount(user=user, discount=unlimited_discount)
     user_discount.save()
 
-    api.apply_user_discounts(user)
+    resp = user_drf_client.post(reverse("checkout_api-clear_discount"))
+
+    assert resp.data == "Discounts cleared"
 
     assert BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0
 

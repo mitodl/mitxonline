@@ -82,6 +82,40 @@ class Basket(TimestampedModel):
             ]
         )
 
+    def compare_to_order(self, order):
+        """
+        Compares this basket with the specified order. An order is considered
+        equal to the basket if it meets these criteria:
+        - Users match
+        - Products match on each line
+        - Discounts match
+        """
+        if self.user != order.purchaser:
+            return False
+
+        all_items_found = self.basket_items.count() == order.lines.count()
+        all_discounts_found = self.discounts.count() == order.discounts.count()
+
+        if all_items_found:
+            for basket_item in self.basket_items.all():
+                for order_item in order.lines.all():
+                    if order_item.product != basket_item.product:
+                        all_items_found = False
+
+        if all_discounts_found:
+            for basket_discount in self.discounts.all():
+                for order_discount in order.discounts.all():
+                    if (
+                        basket_discount.redeemed_discount
+                        != order_discount.redeemed_discount
+                    ):
+                        all_discounts_found = False
+
+        if all_items_found is False or all_discounts_found is False:
+            return False
+
+        return True
+
 
 class BasketItem(TimestampedModel):
     """Represents one or more products in a user's basket."""
@@ -194,6 +228,7 @@ class Order(TimestampedModel):
         DECLINED = "declined"
         ERRORED = "errored"
         REFUNDED = "refunded"
+        REVIEW = "review"
 
         @classmethod
         def choices(cls):
@@ -204,6 +239,7 @@ class Order(TimestampedModel):
                 (cls.REFUNDED, "Refunded", "RefundedOrder"),
                 (cls.DECLINED, "Declined", "DeclinedOrder"),
                 (cls.ERRORED, "Errored", "ErroredOrder"),
+                (cls.REVIEW, "Review", "ReviewOrder"),
             )
 
     state = FSMField(default=STATE.PENDING, state_choices=STATE.choices())
@@ -216,6 +252,12 @@ class Order(TimestampedModel):
         decimal_places=5,
         max_digits=20,
     )
+    # Flag to determine if the order is in review status - if it is, then
+    # we need to not step on the basket that may or may not exist when it is
+    # accepted
+    @property
+    def is_review(self):
+        return self.state == Order.STATE.REVIEW
 
     def fulfill(self, payment_data):
         """Fulfill this order"""
@@ -227,6 +269,10 @@ class Order(TimestampedModel):
 
     def decline(self):
         """Decline this order"""
+        raise NotImplementedError()
+
+    def review(self):
+        """Place order in review"""
         raise NotImplementedError()
 
     def errored(self):
@@ -342,6 +388,16 @@ class PendingOrder(Order):
         """Error this order"""
         pass
 
+    @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.REVIEW)
+    def review(self, payment_data):
+        """
+        Put the order into the review state. This should be mostly the same as
+        fulfilling it but we don't want to do enrollments here (but we do want
+        to store the transaction data, since there will technically be two of
+        them).
+        """
+        self.transactions.create(data=payment_data, amount=self.total_price_paid)
+
     class Meta:
         proxy = True
 
@@ -397,6 +453,31 @@ class FulfilledOrder(Order):
                         pass
 
         return unenrolls_successful
+
+    class Meta:
+        proxy = True
+
+
+class ReviewOrder(Order):
+    """An order that has been placed under review by the payment processor."""
+
+    @transition(field="state", source=Order.STATE.REVIEW, target=Order.STATE.FULFILLED)
+    def fulfill(self, payment_data):
+        """Fulfill this order"""
+        from courses.api import create_run_enrollments
+
+        # record the transaction
+        self.transactions.create(
+            data=payment_data,
+            amount=self.total_price_paid,
+        )
+
+        # create enrollments for what the learner has paid for
+        create_run_enrollments(
+            self.purchaser,
+            self.purchased_runs,
+            mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
 
     class Meta:
         proxy = True
@@ -514,6 +595,15 @@ class Line(TimestampedModel):
                 product_version=self.product_version,
             ).quantize(Decimal("0.01"))
             * self.quantity
+        )
+
+    @cached_property
+    def product(self):
+        from ecommerce.discounts import resolve_product_version
+
+        return resolve_product_version(
+            Product.objects.get(pk=self.product_version.field_dict["id"]),
+            self.product_version,
         )
 
     def __str__(self):

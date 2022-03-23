@@ -1,3 +1,4 @@
+from ecommerce.api import generate_checkout_payload
 import pytest
 import random
 
@@ -226,11 +227,11 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
         ("CANCEL", reverse("cart"), Order.STATE.CANCELED, True),
         ("DECLINE", reverse("cart"), Order.STATE.DECLINED, True),
         ("ERROR", reverse("cart"), Order.STATE.ERRORED, True),
-        ("REVIEW", reverse("user-dashboard"), Order.STATE.PENDING, False),
+        ("REVIEW", reverse("user-dashboard"), Order.STATE.PENDING, True),
         ("ACCEPT", reverse("user-dashboard"), Order.STATE.FULFILLED, False),
     ],
 )
-def test_cancel_transaction(
+def test_checkout_result(
     user,
     user_client,
     mocker,
@@ -277,7 +278,19 @@ def test_cancel_transaction(
 
     order.refresh_from_db()
 
-    assert order.state == expected_state
+    if decision == "REVIEW":
+        assert order.is_review
+
+        # create a new basket and then resubmit for acceptance
+        # basket should be extant afterwards
+        basket = create_basket(user, products)
+
+        payload["decision"] = "ACCEPT"
+        resp = user_client.post(reverse("checkout-result-callback"), payload)
+        assert resp.status_code == 302
+        assert resp.url == expected_redirect_url
+    else:
+        assert order.state == expected_state
 
     assert Basket.objects.filter(id=basket.id).exists() is basket_exists
 

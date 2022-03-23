@@ -22,6 +22,7 @@ from ecommerce import api
 from ecommerce.factories import (
     ProductFactory,
     DiscountFactory,
+    BasketFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
     UnlimitedUseDiscountFactory,
@@ -63,6 +64,11 @@ def unlimited_discount():
 @pytest.fixture()
 def set_limited_use_discount():
     return SetLimitDiscountFactory.create()
+
+
+@pytest.fixture()
+def basket():
+    return BasketFactory.create()
 
 
 def perform_discount_redemption(user, discount):
@@ -217,3 +223,30 @@ def test_order_refund():
 
     assert fulfilled_order.state == Order.STATE.REFUNDED
     assert fulfilled_order.transactions.count() == 2
+
+
+def test_basket_order_equivalency(user, basket, unlimited_discount):
+    """
+    Creates a basket with a product and a discount, then converts it to an order
+    and uses the Basket model's compare_to_order to make sure they're
+    equivalent. Then, it changes the basket and tries again, which should fail.
+    """
+
+    basket_discount = BasketDiscount(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=unlimited_discount,
+        redeemed_basket=basket,
+    )
+    basket_discount.save()
+
+    order = PendingOrder.create_from_basket(basket)
+
+    order.save()
+
+    assert basket.compare_to_order(order) is True
+
+    BasketDiscount.objects.filter(redeemed_basket=basket).all().delete()
+    basket.refresh_from_db()
+
+    assert basket.compare_to_order(order) is False
