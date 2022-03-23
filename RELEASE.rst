@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.24.1
+Version 0.24.1 (Released March 23, 2022)
 --------------
 
 - Adding code to handle refunding orders
