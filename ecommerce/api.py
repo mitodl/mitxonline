@@ -31,6 +31,8 @@ def generate_checkout_payload(request):
                 {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
             ),
         }
+    basket = establish_basket(request)
+
     order = PendingOrder.create_from_basket(basket)
     total_price = 0
 
@@ -75,12 +77,13 @@ def generate_checkout_payload(request):
         gateway_order,
         callback_uri,
         callback_uri,
+        merchant_fields=[basket.id],
     )
 
     return payload
 
 
-def apply_user_discounts(user):
+def apply_user_discounts(request):
     """
     Applies user discounts to the current cart. (If there are more than one for some
     reason, this will just do the first one. More logic needs to be added here
@@ -89,7 +92,8 @@ def apply_user_discounts(user):
     Args:
         - user (User): The currently authenticated user.
     """
-    basket = Basket.objects.filter(user=user).get()
+    basket = establish_basket(request)
+    user = request.user
 
     if BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0:
         return True
@@ -114,7 +118,7 @@ def fulfill_completed_order(
     order.fulfill(payment_data)
     order.save()
 
-    if basket:
+    if not order.is_review and (basket and basket.compare_to_order(order)):
         basket.delete()
 
     return redirect_with_user_message(
@@ -124,3 +128,16 @@ def fulfill_completed_order(
             "run": order.lines.first().purchased_object.course.title,
         },
     )
+
+
+def establish_basket(request):
+    """
+    Gets or creates the user's basket. (This may get some more logic later.)
+    """
+    user = request.user
+    (basket, is_new) = Basket.objects.filter(user=user).get_or_create()
+
+    if is_new:
+        basket.save()
+
+    return basket

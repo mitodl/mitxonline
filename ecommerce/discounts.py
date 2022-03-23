@@ -1,6 +1,7 @@
 import abc
 from dataclasses import dataclass
 from reversion.models import Version
+from decimal import Decimal
 
 from ecommerce.models import Discount, Product
 from ecommerce.constants import (
@@ -90,7 +91,6 @@ class DiscountType(abc.ABC):
 
 class PercentDiscount(DiscountType, discount_type=DISCOUNT_TYPE_PERCENT_OFF):
     def get_product_version_price(self, product: Product, version=None):
-        from decimal import Decimal
 
         version = resolve_product_version(product, version)
 
@@ -106,7 +106,7 @@ class DollarsOffDiscount(DiscountType, discount_type=DISCOUNT_TYPE_DOLLARS_OFF):
         version = resolve_product_version(product, version)
 
         if version.price < self.discount.amount:
-            return 0
+            return Decimal(0)
 
         return version.price - self.discount.amount
 

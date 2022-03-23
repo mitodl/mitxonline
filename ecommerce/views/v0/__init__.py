@@ -31,7 +31,6 @@ from django.contrib import messages
 from django.db import transaction
 from django.db.models import Q, Count
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
-
 from django.urls import reverse
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
@@ -273,14 +272,11 @@ class CheckoutApiViewSet(ViewSet):
         Returns:
             - Success message on success
         """
-        basket = Basket.objects.filter(user=request.user).get_or_create()
+        basket = api.establish_basket(request)
 
-        if basket[1]:
-            basket[0].save()
+        BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
-        BasketDiscount.objects.filter(redeemed_basket=basket[0]).delete()
-
-        api.apply_user_discounts(request.user)
+        api.apply_user_discounts(request)
 
         return Response("Discounts cleared")
 
@@ -318,7 +314,7 @@ class CheckoutApiViewSet(ViewSet):
         # don't auto-apply user discounts if they've added their own code
         # this may need to be revisited
         if BasketDiscount.objects.filter(redeemed_basket=basket).count() == 0:
-            api.apply_user_discounts(request.user)
+            api.apply_user_discounts(request)
 
         return Response(BasketWithProductSerializer(basket).data)
 
@@ -423,6 +419,12 @@ class CheckoutCallbackView(View):
                     )
                 else:
                     basket.delete()
+
+            order.review(payment_data)
+            order.save()
+
+            if basket and basket.compare_to_order(order):
+                basket.delete()
 
             return redirect_with_user_message(
                 reverse("user-dashboard"), {"type": USER_MSG_TYPE_PAYMENT_REVIEW}
