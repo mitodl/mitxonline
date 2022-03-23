@@ -471,9 +471,11 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             checkout_payload = api.generate_checkout_payload(request)
         except ObjectDoesNotExist:
             return HttpResponse("No basket")
-
-        if "no_checkout" or "country_blocked" in checkout_payload:
+        if "country_blocked" in checkout_payload:
             return checkout_payload["response"]
+        if "no_checkout" in checkout_payload:
+            return checkout_payload["response"]
+
         return render(
             request,
             self.template_name,
