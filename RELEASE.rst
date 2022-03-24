@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.24.2
+--------------
+
+- Adds logic to avoid stepping on an in-progress basket when processing checkout responses
+- Check for blocked countries during checkout (#477)
+
 Version 0.24.1 (Released March 23, 2022)
 --------------
 
