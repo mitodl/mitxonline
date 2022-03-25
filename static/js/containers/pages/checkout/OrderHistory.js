@@ -8,7 +8,7 @@ import {
 } from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { connectRequest } from "redux-query"
+import { connectRequest, mutateAsync } from "redux-query"
 import { partial, pathOr, without } from "ramda"
 
 import Loader from "../../../components/Loader"
@@ -33,10 +33,39 @@ import type { PaginatedOrderHistory } from "../../../flow/cartTypes"
 type Props = {
   history: RouterHistory,
   isLoading: boolean,
-  orderHistory: PaginatedOrderHistory
+  orderHistory: PaginatedOrderHistory,
+  updateOrderHistory: Function
 }
 
 export class OrderHistory extends React.Component<Props> {
+  offset = 0
+
+  async swapPage(direction: string) {
+    const { updateOrderHistory } = this.props
+
+    switch (direction) {
+    case "previous":
+      if (this.offset <= 0) {
+        this.offset = 0
+      } else {
+        this.offset--
+      }
+      break
+
+    case "next":
+      if (this.offset * 10 < this.props.orderHistory.count) {
+        this.offset++
+      }
+
+      break
+
+    default:
+      break
+    }
+
+    await updateOrderHistory(this.offset * 10)
+  }
+
   renderOrderReceipt(orderReference: string) {
     window.location = `/orders/receipt/${orderReference}/`
   }
@@ -70,6 +99,39 @@ export class OrderHistory extends React.Component<Props> {
       </div>
     )
   }
+
+  renderPaginationNext() {
+    const { orderHistory } = this.props
+
+    return orderHistory && orderHistory.next !== null ? (
+      <a
+        className="history-paginators"
+        href="#"
+        onClick={() => this.swapPage("next")}
+      >
+        Next
+      </a>
+    ) : (
+      "Next"
+    )
+  }
+
+  renderPaginationPrevious() {
+    const { orderHistory } = this.props
+
+    return orderHistory && orderHistory.previous !== null ? (
+      <a
+        className="history-paginators"
+        href="#"
+        onClick={() => this.swapPage("previous")}
+      >
+        Previous
+      </a>
+    ) : (
+      "Previous"
+    )
+  }
+
   render() {
     const { orderHistory, isLoading } = this.props
     const columns = ORDER_HISTORY_COLUMN_TITLES.map((value: string) => (
@@ -97,9 +159,12 @@ export class OrderHistory extends React.Component<Props> {
               : null}
             <div className="row d-flex p-3 mb-4 bg-light border-top border-2 border-dark">
               <div className="col">
+                Page {this.offset + 1} of{" "}
+                {orderHistory ? Math.ceil(orderHistory.count / 10) : 0} |{" "}
                 {orderHistory ? orderHistory.count : "0"} orders total
               </div>
               <div className="col text-right" />
+              {this.renderPaginationPrevious()} | {this.renderPaginationNext()}
             </div>
           </div>
         </Loader>
@@ -108,12 +173,18 @@ export class OrderHistory extends React.Component<Props> {
   }
 }
 
+const updateOrderHistory = (offset: number = 0) => {
+  return mutateAsync(orderHistoryQuery(offset))
+}
+
 const mapStateToProps = createStructuredSelector({
   orderHistory: orderHistorySelector,
   isLoading:    pathOr(true, ["queries", orderHistoryQueryKey, "isPending"])
 })
 
-const mapDispatchToProps = {}
+const mapDispatchToProps = {
+  updateOrderHistory
+}
 
 const mapPropsToConfig = () => [orderHistoryQuery()]
 
