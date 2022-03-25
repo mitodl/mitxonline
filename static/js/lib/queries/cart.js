@@ -62,9 +62,13 @@ export const checkoutFormDataMutation = () => ({
   }
 })
 
-export const orderHistoryQuery = () => ({
-  url:       `/api/orders/history`,
-  queryKey:  orderHistoryQueryKey,
+export const orderHistoryQuery = (offset: number = 0) => ({
+  url:      `/api/orders/history/?o=${offset}`,
+  queryKey: orderHistoryQueryKey,
+  options:  {
+    ...getCsrfOptions(),
+    method: "GET"
+  },
   transform: json => ({
     orderHistory: json
   }),
