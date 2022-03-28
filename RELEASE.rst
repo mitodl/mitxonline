@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.24.2
+Version 0.24.2 (Released March 28, 2022)
 --------------
 
 - Adds logic to avoid stepping on an in-progress basket when processing checkout responses
