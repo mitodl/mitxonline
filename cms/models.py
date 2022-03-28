@@ -309,7 +309,11 @@ class ProductPage(Page):
                 # The solution in #2 is used below.
                 if provider_name == "youtube":
                     config["controls"] = False
-                    config["youtube"] = {"ytControls": 2, "cc_load_policy": 1, "cc_lang_pref": 1}
+                    config["youtube"] = {
+                        "ytControls": 2,
+                        "cc_load_policy": 1,
+                        "cc_lang_pref": 1,
+                    }
 
             except EmbedException:
                 log.info(
