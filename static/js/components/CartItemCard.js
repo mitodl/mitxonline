@@ -61,10 +61,10 @@ export class CartItemCard extends React.Component<Props> {
         className="enrolled-item container card mb-4 rounded-0 flex-grow-1"
         key={cardKey}
       >
-        <div className="row d-flex flex-sm-columm p-md-3">
+        <div className="row d-flex flex-md-columm p-md-3">
           <div className="img-container">{courseImage}</div>
 
-          <div className="flex-grow-1 d-sm-flex flex-column w-50 mx-3">
+          <div className="flex-grow-1 d-md-flex flex-column w-50 mx-3">
             <h5 className="">{title}</h5>
             <div className="detail">
               {readableId}
