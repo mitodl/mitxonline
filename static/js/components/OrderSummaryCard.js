@@ -50,7 +50,7 @@ export class OrderSummaryCard extends React.Component<Props> {
 
     return (
       <div className="row order-summary-total">
-        <div className="col-12 px-3 py-3 py-md-0">
+        <div className="col-12 px-3 py-3 py-lg-0">
           <div className="d-flex justify-content-between">
             <div className="flex-grow-1">
               Coupon applied (
@@ -85,17 +85,17 @@ export class OrderSummaryCard extends React.Component<Props> {
     const title = cardTitle ? cardTitle : "Order Summary"
     return (
       <div
-        className="order-summary container card p-md-3 mb-4 rounded-0"
+        className="order-summary container card p-lg-3 mb-4 rounded-0"
         key="ordersummarycard"
       >
-        <div className="row order-summary-total mt-3 mt-md-0 mb-3">
-          <div className="col-12 col-md-auto px-3 px-md-3">
+        <div className="row order-summary-total mt-3 mt-lg-0 mb-3">
+          <div className="col-12 col-lg-auto px-3 px-lg-3">
             <h5 id="summary-card-title">{title}</h5>
           </div>
         </div>
 
         <div className="row">
-          <div className="col-12 px-3 py-3 py-md-0">
+          <div className="col-12 px-3 py-3 py-lg-0">
             <div className="d-flex justify-content-between">
               <div className="flex-grow-1">Price</div>
               <div className="ml-auto">{fmtPrice}</div>
@@ -112,7 +112,7 @@ export class OrderSummaryCard extends React.Component<Props> {
         </div>
 
         <div className="row order-summary-total">
-          <div className="col-12 px-3 py-3 py-md-0">
+          <div className="col-12 px-3 py-3 py-lg-0">
             <div className="d-flex justify-content-between">
               <div className="flex-grow-1">
                 <h5>Total</h5>
@@ -149,7 +149,7 @@ export class OrderSummaryCard extends React.Component<Props> {
 
         {totalPrice > 0 && !orderFulfilled ? (
           <div className="row">
-            <div className="col-12 px-3 py-3 py-md-0 cart-text-smaller">
+            <div className="col-12 px-3 py-3 py-lg-0 cart-text-smaller">
               By placing my order I agree to the{" "}
               <a href="/terms-of-service/" target="_blank" rel="noreferrer">
                 Terms of Service
