@@ -11,6 +11,7 @@ import { compose } from "redux"
 import { connect } from "react-redux"
 import { connectRequest, mutateAsync } from "redux-query"
 import { createStructuredSelector } from "reselect"
+import { pathOr } from "ramda"
 
 import type { BasketItem, Discount } from "../../../flow/cartTypes"
 
@@ -20,6 +21,7 @@ import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
 
 import {
   cartQuery,
+  cartQueryKey,
   cartSelector,
   totalPriceSelector,
   discountedPriceSelector,
@@ -222,7 +224,7 @@ const mapStateToProps = createStructuredSelector({
   totalPrice:      totalPriceSelector,
   discountedPrice: discountedPriceSelector,
   discounts:       discountSelector,
-  isLoading:       () => false
+  isLoading:       pathOr(true, ["queries", cartQueryKey, "isPending"])
 })
 
 const mapDispatchToProps = {

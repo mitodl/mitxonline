@@ -405,6 +405,11 @@ class PendingOrder(Order):
 class FulfilledOrder(Order):
     """An order that has a fulfilled payment"""
 
+    @transition(field="state", source=Order.STATE.FULFILLED, target=Order.STATE.ERRORED)
+    def error(self):
+        """Error this order"""
+        pass
+
     @transition(
         field="state",
         source=Order.STATE.FULFILLED,
@@ -490,6 +495,11 @@ class CanceledOrder(Order):
     The state of this can't be altered further.
     """
 
+    @transition(field="state", source=Order.STATE.CANCELED, target=Order.STATE.ERRORED)
+    def error(self):
+        """Error this order"""
+        pass
+
     class Meta:
         proxy = True
 
@@ -511,6 +521,11 @@ class DeclinedOrder(Order):
 
     The state of this can't be altered further.
     """
+
+    @transition(field="state", source=Order.STATE.DECLINED, target=Order.STATE.ERRORED)
+    def error(self):
+        """Error this order"""
+        pass
 
     class Meta:
         proxy = True
