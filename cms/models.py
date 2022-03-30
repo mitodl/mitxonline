@@ -300,6 +300,21 @@ class ProductPage(Page):
                 provider_name = embed.provider_name.lower()
                 config["techOrder"] = [provider_name, *config["techOrder"]]
                 config["sources"][0]["type"] = f"video/{provider_name}"
+
+                # As per https://github.com/mitodl/mitxonline/issues/490 we want to use the same controls of youtube in
+                # case of youtube videos for supporting closed captions. We can do it in two possible ways:
+                # 1) We add "Track" key of type `Captions` to the config with a hosted or static transcript file URL
+                # 2) Or we can just disable `video.js` self controls and enable all the youtube controls for the youtube
+                # based videos with embedded support for the closed captioning.
+                # The solution in #2 is used below.
+                if provider_name == "youtube":
+                    config["controls"] = False
+                    config["youtube"] = {
+                        "ytControls": 2,
+                        "cc_load_policy": 1,
+                        "cc_lang_pref": 1,
+                    }
+
             except EmbedException:
                 log.info(
                     f"The embed for the current url {self.video_url} is unavailable."
