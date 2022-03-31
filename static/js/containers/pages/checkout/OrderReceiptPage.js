@@ -17,7 +17,12 @@ import { orderReceiptQuery, receiptQueryKey } from "../../../lib/queries/cart"
 import type { RouterHistory } from "react-router"
 import type { Match } from "react-router"
 import { routes } from "../../../lib/urls"
-import type { Discount, Line, OrderReceipt } from "../../../flow/cartTypes"
+import type {
+  Discount,
+  Line,
+  OrderReceipt,
+  Refund
+} from "../../../flow/cartTypes"
 import { pathOr } from "ramda"
 
 type Props = {
@@ -66,6 +71,7 @@ export class OrderReceiptPage extends React.Component<Props> {
         discountedPrice={totalPaid}
         orderFulfilled={true}
         discounts={discounts}
+        refunds={orderReceipt.refunds}
         cardTitle={`Order Number: ${orderReceipt.reference_number} `}
         discountCodeIsBad={false}
         discountCode=""

@@ -1,16 +1,17 @@
 // @flow
 /* global SETTINGS: false */
 import React from "react"
-import { Button } from "reactstrap"
+import { Button, Badge } from "reactstrap"
 import { formatLocalePrice, isSuccessResponse } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
-import type { Discount } from "../flow/cartTypes"
+import type { Discount, Refund } from "../flow/cartTypes"
 
 type Props = {
   totalPrice: number,
   orderFulfilled: boolean,
   discountedPrice: number,
   discounts: Array<Discount>,
+  refunds: Array<Refund>,
   addDiscount?: Function,
   clearDiscount?: Function,
   discountCode: string,
@@ -50,7 +51,7 @@ export class OrderSummaryCard extends React.Component<Props> {
 
     return (
       <div className="row order-summary-total">
-        <div className="col-12 px-3 py-3 py-lg-0">
+        <div className="col-12 px-3 py-3 py-md-0">
           <div className="d-flex justify-content-between">
             <div className="flex-grow-1">
               Coupon applied (
@@ -69,6 +70,60 @@ export class OrderSummaryCard extends React.Component<Props> {
       </div>
     )
   }
+
+  renderIndividualRefund(refund: Refund) {
+    if (refund === null) {
+      return null
+    }
+
+    const refundAmount = formatLocalePrice(Number(refund.amount))
+
+    return (
+      <div className="row order-summary-total">
+        <div className="col-12 px-3 py-3 py-md-0">
+          <div className="d-flex justify-content-between">
+            <div className="flex-grow-1">
+              <Badge className="bg-danger">Refund applied</Badge>
+            </div>
+            <div className="ml-auto text-primary text-right">
+              {refundAmount}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  renderRefunds() {
+    const { refunds } = this.props
+
+    if (refunds === null || refunds.length === 0) {
+      return null
+    }
+
+    const refundList = []
+
+    for (let refund = 0; refund < refunds.length; refund++) {
+      refundList.push(this.renderIndividualRefund(refunds[refund]))
+    }
+
+    return refundList
+  }
+
+  renderFulfilledTag() {
+    return (
+      <div className="row order-summary-total">
+        <div className="col-12 px-3 py-3 py-md-0">
+          <div className="d-flex justify-content-between">
+            <div className="flex-grow-1">
+              <Badge className="bg-success float-right">Paid</Badge>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   render() {
     const {
       orderFulfilled,
@@ -78,24 +133,25 @@ export class OrderSummaryCard extends React.Component<Props> {
       addDiscount,
       discountCodeIsBad,
       discountCode,
-      cardTitle
+      cardTitle,
+      refunds
     } = this.props
     const fmtPrice = formatLocalePrice(totalPrice)
     const fmtDiscountPrice = formatLocalePrice(discountedPrice)
     const title = cardTitle ? cardTitle : "Order Summary"
     return (
       <div
-        className="order-summary container card p-lg-3 mb-4 rounded-0"
+        className="order-summary container card p-md-3 mb-4 rounded-0"
         key="ordersummarycard"
       >
-        <div className="row order-summary-total mt-3 mt-lg-0 mb-3">
-          <div className="col-12 col-lg-auto px-3 px-lg-3">
+        <div className="row order-summary-total mt-3 mt-md-0 mb-3">
+          <div className="col-12 col-md-auto px-3 px-md-3">
             <h5 id="summary-card-title">{title}</h5>
           </div>
         </div>
 
         <div className="row">
-          <div className="col-12 px-3 py-3 py-lg-0">
+          <div className="col-12 px-3 py-3 py-md-0">
             <div className="d-flex justify-content-between">
               <div className="flex-grow-1">Price</div>
               <div className="ml-auto">{fmtPrice}</div>
@@ -107,12 +163,16 @@ export class OrderSummaryCard extends React.Component<Props> {
           ? this.renderAppliedCoupons()
           : null}
 
+        {refunds === null || refunds.length === 0
+          ? this.renderFulfilledTag()
+          : this.renderRefunds()}
+
         <div className="row my-3 mx-1">
           <div className="col-12 px-3 border-top border-dark" />
         </div>
 
         <div className="row order-summary-total">
-          <div className="col-12 px-3 py-3 py-lg-0">
+          <div className="col-12 px-3 py-3 py-md-0">
             <div className="d-flex justify-content-between">
               <div className="flex-grow-1">
                 <h5>Total</h5>
@@ -149,7 +209,7 @@ export class OrderSummaryCard extends React.Component<Props> {
 
         {totalPrice > 0 && !orderFulfilled ? (
           <div className="row">
-            <div className="col-12 px-3 py-3 py-lg-0 cart-text-smaller">
+            <div className="col-12 px-3 py-3 py-md-0 cart-text-smaller">
               By placing my order I agree to the{" "}
               <a href="/terms-of-service/" target="_blank" rel="noreferrer">
                 Terms of Service

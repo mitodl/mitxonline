@@ -13,7 +13,7 @@ import { connectRequest, mutateAsync } from "redux-query"
 import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
 
-import type { BasketItem, Discount } from "../../../flow/cartTypes"
+import type { BasketItem, Discount, Refund } from "../../../flow/cartTypes"
 
 import Loader from "../../../components/Loader"
 import { CartItemCard } from "../../../components/CartItemCard"
@@ -140,6 +140,7 @@ export class CartPage extends React.Component<Props, CartState> {
 
   renderOrderSummaryCard() {
     const { totalPrice, discountedPrice, discounts } = this.props
+    const refunds = []
 
     return (
       <OrderSummaryCard
@@ -147,6 +148,7 @@ export class CartPage extends React.Component<Props, CartState> {
         orderFulfilled={false}
         discountedPrice={discountedPrice}
         discounts={discounts}
+        refunds={refunds}
         clearDiscount={this.clearDiscount.bind(this)}
         addDiscount={this.addDiscount.bind(this)}
         discountCodeIsBad={this.state.discountCodeIsBad}

@@ -37,6 +37,11 @@ export type Discount = {
   discount_type: string
 }
 
+export type Refund = {
+  amount: number,
+  date: any
+}
+
 export type Line = {
   id: number,
   product: Product,
@@ -51,5 +56,6 @@ export type OrderReceipt = {
   total_price_paid: number,
   state: string,
   reference_number: string,
-  discounts: Array<Discount>
+  discounts: Array<Discount>,
+  refunds: Array<Refund>
 }
