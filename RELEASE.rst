@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.24.3
+Version 0.24.3 (Released March 31, 2022)
 --------------
 
 - Adding pagination to order history page
