@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.24.3 (Released March 31, 2022)
+--------------
+
+- Adding pagination to order history page
+- Bump pillow from 8.3.2 to 9.0.1 (#473)
+
 Version 0.24.2 (Released March 28, 2022)
 --------------
 
