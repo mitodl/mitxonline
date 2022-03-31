@@ -8,6 +8,7 @@ from ecommerce import models
 from courses.models import CourseRun, ProgramRun, Course
 from ecommerce.models import Basket, Product, BasketItem
 from ecommerce.discounts import DiscountType
+from ecommerce.constants import TRANSACTION_TYPE_REFUND
 
 from cms.serializers import CoursePageSerializer
 
@@ -230,12 +231,26 @@ class LineSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     lines = LineSerializer(many=True)
     discounts = serializers.SerializerMethodField()
+    refunds = serializers.SerializerMethodField()
 
     def get_discounts(self, instance):
         discounts = []
         for discount in instance.discounts.all():
             discounts.append(RedeemedDiscountSerializer(discount).data)
         return discounts
+
+    def get_refunds(self, instance):
+        refunds = []
+        for transaction in (
+            models.Transaction.objects.filter(order=instance)
+            .filter(transaction_type=TRANSACTION_TYPE_REFUND)
+            .all()
+        ):
+            refunds.append(
+                {"amount": transaction.amount, "date": transaction.created_on}
+            )
+
+        return refunds
 
     class Meta:
         fields = [
@@ -245,6 +260,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "total_price_paid",
             "lines",
             "discounts",
+            "refunds",
             "reference_number",
         ]
         model = models.Order

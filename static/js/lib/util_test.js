@@ -317,8 +317,8 @@ describe("utility functions", () => {
       assert.equal(formatLocalePrice(testPrice), "$512.25")
     })
 
-    it("formatLocalePrice returns zero when the input is null", () => {
-      assert.equal(formatLocalePrice(null), 0)
+    it("formatLocalePrice returns a US-formatted price string equalling zero when the input is null", () => {
+      assert.equal(formatLocalePrice(null), "$0.00")
     })
   })
 })
