@@ -129,21 +129,14 @@ def test_discounted_price(products):
     """
     product = products[random.randrange(0, len(products), 1)]
 
-    applied_discounts = [
-        UnlimitedUseDiscountFactory.create(),
-        UnlimitedUseDiscountFactory.create(),
-    ]
+    applied_discounts = [UnlimitedUseDiscountFactory.create()]
 
-    manually_discounted_prices = [
-        DiscountType.for_discount(applied_discounts[0]).get_product_price(product),
-        DiscountType.for_discount(applied_discounts[1]).get_product_price(product),
-    ]
+    manually_discounted_prices = DiscountType.for_discount(
+        applied_discounts[0]
+    ).get_product_price(product)
 
     test_discounted_price = DiscountType.get_discounted_price(
         applied_discounts, product
     )
 
-    assert (
-        test_discounted_price == manually_discounted_prices[0]
-        or test_discounted_price == manually_discounted_prices[1]
-    )
+    assert test_discounted_price == manually_discounted_prices

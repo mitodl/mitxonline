@@ -283,7 +283,10 @@ def test_checkout_result(
 
         # create a new basket and then resubmit for acceptance
         # basket should be extant afterwards
-        basket = create_basket(user, products)
+        # also create a new batch of products
+        #  - otherwise it might select one that's being used in the old basket
+        new_products = ProductFactory.create_batch(5)
+        basket = create_basket(user, new_products)
 
         payload["decision"] = "ACCEPT"
         resp = user_client.post(reverse("checkout-result-callback"), payload)

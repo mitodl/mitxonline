@@ -64,7 +64,7 @@ class Product(TimestampedModel):
     )
 
     def __str__(self):
-        return f"{self.description} {self.price}"
+        return f"#{self.id} {self.description} {self.price}"
 
 
 class Basket(TimestampedModel):
