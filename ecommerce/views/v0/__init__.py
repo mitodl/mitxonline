@@ -491,7 +491,12 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Order.objects.filter(purchaser=self.request.user).all()
+        return (
+            Order.objects.filter(purchaser=self.request.user)
+            .filter(state__in=[Order.STATE.FULFILLED, Order.STATE.REFUNDED])
+            .order_by("-created_on")
+            .all()
+        )
 
 
 class OrderReceiptView(RetrieveAPIView):
