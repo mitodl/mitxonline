@@ -119,15 +119,15 @@ export class OrderReceiptPage extends React.Component<Props> {
               </div>
             </div>
 
-            <div className="row d-flex flex-column-reverse flex-md-row">
-              <div className="col-md-8 enrolled-items">
+            <div className="row d-flex flex-column-reverse flex-md-column flex-lg-row">
+              <div className="col-lg-8 enrolled-items">
                 {orderReceipt &&
                 orderReceipt.lines &&
                 orderReceipt.lines.length > 0
                   ? orderReceipt.lines.map(this.renderCartItemCard.bind(this))
                   : this.renderEmptyCartCard()}
               </div>
-              <div className="col-md-4">{this.renderOrderSummaryCard()}</div>
+              <div className="col-lg-4">{this.renderOrderSummaryCard()}</div>
             </div>
           </div>
         </Loader>
