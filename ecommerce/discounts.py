@@ -113,4 +113,4 @@ class DollarsOffDiscount(DiscountType, discount_type=DISCOUNT_TYPE_DOLLARS_OFF):
 
 class FixedPriceDiscount(DiscountType, discount_type=DISCOUNT_TYPE_FIXED_PRICE):
     def get_product_version_price(self, product: Product, version=None):
-        return self.discount.amount
+        return Decimal(self.discount.amount)
