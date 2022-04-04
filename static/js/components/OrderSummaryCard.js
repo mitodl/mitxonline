@@ -111,6 +111,12 @@ export class OrderSummaryCard extends React.Component<Props> {
   }
 
   renderFulfilledTag() {
+    const { orderFulfilled } = this.props
+
+    if (orderFulfilled !== true) {
+      return null
+    }
+
     return (
       <div className="row order-summary-total">
         <div className="col-12 px-3 py-3 py-md-0">
