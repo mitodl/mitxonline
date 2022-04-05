@@ -27,4 +27,7 @@ docker-compose run --rm web ./manage.py configure_wagtail
 # Running, testing, and administering the app
 
 Running, testing, and administering this app follows the same patterns as our other web apps. 
+
+*Note: for js tests, run the commands in `frontend/public`, or run via `yarn workspaces foreach run <command>` from the root.
+
 [See the common OL web app guide](http://mitodl.github.io/handbook/common-web-app-guide.html#running-and-accessing-the-app).
