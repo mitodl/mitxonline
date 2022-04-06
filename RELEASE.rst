@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.25.0
+--------------
+
+- Add support for yarn workspaces
+- Fixing Paid tag display on checkout page
+- Adjusts tests to make them more reliable
+
 Version 0.24.4 (Released April 06, 2022)
 --------------
 
