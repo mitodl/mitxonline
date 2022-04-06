@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.24.4
+Version 0.24.4 (Released April 06, 2022)
 --------------
 
 - Fixing some issues with order history/receipt views
