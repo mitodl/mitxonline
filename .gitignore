@@ -73,7 +73,7 @@ static/bundles
 node_modules
 
 # JS directories
-!src/lib
+!static/js/lib
 .tsbuildinfo
 .jest-cache/
 

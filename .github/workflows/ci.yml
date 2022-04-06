@@ -157,27 +157,25 @@ jobs:
         run: yarn install --immutable
 
       - name: Lints
-        run: yarn workspaces foreach run lint
+        run: npm run lint
 
       - name: Code formatting
-        run: yarn workspaces foreach run fmt:check
+        run: npm run fmt:check
 
       - name: Scss lint
-        run: yarn workspaces foreach run scss_lint
+        run: npm run scss_lint
 
       - name: Flow
-        run: yarn workspaces foreach run flow
+        run: npm run flow
 
       - name: Tests
-        run: yarn workspaces foreach run test
+        run: npm run test
         env:
           CODECOV: true
           NODE_ENV: development
 
       - name: Webpack build
-        run: |
-          cd frontend/public
-          npx webpack --config webpack.config.prod.js --bail
+        run: node node_modules/webpack/bin/webpack.js --config webpack.config.prod.js --bail
 
       - name: Upload test coverage to CodeCov
         uses: codecov/codecov-action@v1
