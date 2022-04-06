@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.24.4 (Released April 06, 2022)
+--------------
+
+- Fixing some issues with order history/receipt views
+- Display refund/paid tags on orde receipts
+- refactor: use youtube controls for youtube videos (#491)
+- styling changes - moving the main breakpoint from md to lg (see #493)
+- added error method to errorable Order states, fixed isLoading on cart page to actually work
+
 Version 0.24.3 (Released March 31, 2022)
 --------------
 
