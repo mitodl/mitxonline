@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.25.0
+Version 0.25.0 (Released April 06, 2022)
 --------------
 
 - Revert "Add support for yarn workspaces"
