@@ -113,7 +113,7 @@ In MITx Online:
 
   * ``Redirect uris``: ``http://<EDX_HOSTNAME>:18000/auth/complete/mitxpro-oauth2/``
 
-    * **[OSX users]** You will need redirect uris for both the local edX host alias and for ``host.docker.internal``. This value should be::
+    * **[macOS users]** You will need redirect uris for both the local edX host alias and for ``host.docker.internal``. This value should be::
 
         http://edx.odl.local:18000/auth/complete/mitxpro-oauth2/
         http://host.docker.internal:18000/auth/complete/mitxpro-oauth2/
@@ -123,8 +123,9 @@ In MITx Online:
         http://edx.odl.local:18000/auth/complete/mitxpro-oauth2/
         http://<GATEWAY_IP>:18000/auth/complete/mitxpro-oauth2/
 
+    * **[WSL 2 users]**: Use the URLs for macOS. You will also have to set ``OPENEDX_IP`` to ``host-gateway`` in your ``.env`` file to make this work. (Networking with WSL 2 works very differently, and the defaults won't work.)
 
-    NOTE:``GATEWAY_IP`` should be something like ``172.19.0.1``.
+    NOTE: ``GATEWAY_IP`` should be something like ``172.19.0.1``.
 
   * ``Client type``: "Confidential"
   * ``Authorization grant type``: "Authorization code"
@@ -135,7 +136,6 @@ In Open edX (derived from instructions `here <https://edx.readthedocs.io/project
 
 * ``make lms-shell`` into the LMS container and ensure the following settings:
     .. code-block:: yaml
-      :caption: /edx/etc/lms.yml
 
       FEATURES:
         ALLOW_PUBLIC_ACCOUNT_CREATION: true
