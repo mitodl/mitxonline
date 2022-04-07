@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.25.1
+Version 0.25.1 (Released April 07, 2022)
 --------------
 
 - Documentation updates post-ecommerce
