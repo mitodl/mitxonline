@@ -90,6 +90,12 @@ CSRF_TRUSTED_ORIGINS = get_delimited_list(
     description="Comma separated string of trusted domains that should be CSRF exempt",
 )
 
+CORS_ALLOWED_ORIGINS = get_delimited_list(
+    name="CORS_ALLOWED_ORIGINS",
+    default=[],
+    description="Comma separated string of trusted domains that should be allowed for CORS",
+)
+
 SECURE_SSL_REDIRECT = get_bool(
     name="MITX_ONLINE_SECURE_SSL_REDIRECT",
     default=True,
@@ -140,6 +146,7 @@ INSTALLED_APPS = (
     "rest_framework",
     "anymail",
     "django_filters",
+    "corsheaders",
     # WAGTAIL
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -201,6 +208,7 @@ MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "oauth2_provider.middleware.OAuth2TokenMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -808,10 +816,17 @@ OAUTH2_PROVIDER_APPLICATION_MODEL = "oauth2_provider.Application"
 OAUTH2_PROVIDER_REFRESH_TOKEN_MODEL = "oauth2_provider.RefreshToken"
 
 OAUTH2_PROVIDER = {
+    "OIDC_ENABLED": True,
+    "OIDC_RSA_PRIVATE_KEY": get_string(
+        name="OIDC_RSA_PRIVATE_KEY",
+        default=None,
+        description="RSA private key for OIDC",
+    ),
     # this is the list of available scopes
     "SCOPES": {
         "read": "Read scope",
         "write": "Write scope",
+        "openid": "OpenID Connect scope",
         "user:read": "Can read user and profile data",
         # "digitalcredentials": "Can read and write Digital Credentials data",
     },

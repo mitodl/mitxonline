@@ -24,7 +24,11 @@ module.exports = {
       ]
     },
     resolve: {
-      modules:    [path.join(__dirname, "src"), path.resolve(__dirname, "../../node_modules")],
+      modules:    [
+        path.join(__dirname, "src"),
+        path.resolve(__dirname, "node_modules"),
+        path.resolve(__dirname, "../../node_modules")
+      ],
       extensions: [".js", ".jsx"]
     },
     performance: {

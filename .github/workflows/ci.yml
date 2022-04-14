@@ -169,7 +169,7 @@ jobs:
         run: yarn workspaces foreach run flow
 
       - name: Tests
-        run: yarn workspaces foreach run test
+        run: yarn workspaces foreach run test --passWithNoTests
         env:
           CODECOV: true
           NODE_ENV: development
