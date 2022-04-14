@@ -85,6 +85,7 @@ django==3.2.12
     # via
     #   -r requirements.in
     #   django-anymail
+    #   django-cors-headers
     #   django-filter
     #   django-fsm-admin
     #   django-oauth-toolkit
@@ -112,6 +113,8 @@ django-compat==1.0.15
     # via
     #   django-hijack
     #   django-hijack-admin
+django-cors-headers==3.11.0
+    # via -r requirements.in
 django-countries==7.2.1
     # via -r requirements.in
 django-filter==2.4.0
@@ -134,7 +137,7 @@ django-ipware==4.0.0
     # via -r requirements.in
 django-modelcluster==5.2
     # via wagtail
-django-oauth-toolkit==1.5.0
+django-oauth-toolkit==1.7.0
     # via -r requirements.in
 django-redis==5.0.0
     # via -r requirements.in
@@ -330,7 +333,6 @@ six==1.16.0
     # via
     #   click-repl
     #   django-compat
-    #   django-oauth-toolkit
     #   html5lib
     #   l18n
     #   pyopenssl

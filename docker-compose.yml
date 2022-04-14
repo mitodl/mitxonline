@@ -99,3 +99,21 @@ services:
       - db
       - redis
     extra_hosts: *default-extra-hosts
+
+  refine:
+    image: node:17.8
+    working_dir: /src
+    command: sh -c 'yarn install --immutable && yarn workspace mitx-online-staff-dashboard run dev'
+    ports:
+       - "8016:8016"
+    environment:
+      PORT: 8016
+      REACT_APP_OIDC_CONFIG_AUTHORITY: ${MITX_ONLINE_BASE_URL:-http://mitxonline.odl.local:8013}/oauth2/
+      REACT_APP_OIDC_CONFIG_CLIENT_ID: refine-local-client-id
+      REACT_APP_OIDC_CONFIG_REDIRECT_URI: http://mitxonline.odl.local:8016/oauth2/login/
+    volumes:
+      - .:/src
+      - npm-cache:/root/.npm
+
+volumes:
+  npm-cache: {}

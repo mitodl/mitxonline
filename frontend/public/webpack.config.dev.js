@@ -13,7 +13,11 @@ const insertHotReload = (host, port, entries) =>
   R.map(
     R.compose(
       R.flatten,
-      v => [v].concat(hotEntry(host, port))
+      entry => [
+        "react-hot-loader/patch",
+        entry,
+        hotEntry(host, port)
+      ]
     ),
     entries
   )

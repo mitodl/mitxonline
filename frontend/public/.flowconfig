@@ -2,6 +2,7 @@
 .*/node_modules/fbjs/.*
 .*/node_modules/draft-js/.*
 .*/node_modules/draftjs-utils/.*
+.*/node_modules/immer/.*
 .*/node_modules/react-event-listener/src/index.js
 .*/node_modules/react-select/.*
 .*/node_modules/resolve/.*
