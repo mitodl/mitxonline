@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.26.0
+--------------
+
+- Adding back yarn workspaces
+
 Version 0.25.1 (Released April 07, 2022)
 --------------
 
