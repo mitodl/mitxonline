@@ -176,6 +176,7 @@ INSTALLED_APPS = (
     "hijack",
     "hijack_admin",
     "ecommerce",
+    "flexiblepricing",
     # ol-dango apps, must be after this project's apps for template precedence
     "mitol.common.apps.CommonApp",
     # "mitol.digitalcredentials.apps.DigitalCredentialsApp",
