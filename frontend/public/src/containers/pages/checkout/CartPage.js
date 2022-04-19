@@ -49,13 +49,11 @@ type Props = {
 
 type CartState = {
   discountCode: string,
-  discountCodeIsBad: boolean
 }
 
 export class CartPage extends React.Component<Props, CartState> {
   state = {
-    discountCode:      "",
-    discountCodeIsBad: false
+    discountCode: "",
   }
 
   async clearDiscount() {
@@ -70,7 +68,7 @@ export class CartPage extends React.Component<Props, CartState> {
       userMessage = "Discount code cleared."
 
       forceRequest()
-      this.setState({ discountCodeIsBad: false, discountCode: "" })
+      this.setState({ discountCode: "" })
     } else {
       // TODO: this should use the banner thingy
       messageType = ALERT_TYPE_DANGER
@@ -87,11 +85,11 @@ export class CartPage extends React.Component<Props, CartState> {
     })
   }
 
-  async addDiscount(ev: Object) {
+  async addDiscount(ev: Object, { setErrors }: any) {
     const subbedCode = ev.couponCode
     const { applyDiscountCode, forceRequest, addUserNotification } = this.props
 
-    this.setState({ discountCode: subbedCode, discountCodeIsBad: false })
+    this.setState({ discountCode: subbedCode })
 
     if (String(subbedCode).trim().length === 0) {
       return
@@ -109,7 +107,9 @@ export class CartPage extends React.Component<Props, CartState> {
       messageType = ALERT_TYPE_DANGER
       userMessage = `Discount code ${this.state.discountCode} is invalid.`
 
-      this.setState({ discountCodeIsBad: true })
+      setErrors({
+        couponCode: userMessage
+      })
     }
   }
   renderCartItemCard(cartItem: BasketItem) {
@@ -149,7 +149,6 @@ export class CartPage extends React.Component<Props, CartState> {
         refunds={refunds}
         clearDiscount={this.clearDiscount.bind(this)}
         addDiscount={this.addDiscount.bind(this)}
-        discountCodeIsBad={this.state.discountCodeIsBad}
         discountCode={this.state.discountCode}
       />
     )

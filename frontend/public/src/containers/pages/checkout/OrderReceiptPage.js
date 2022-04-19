@@ -73,7 +73,6 @@ export class OrderReceiptPage extends React.Component<Props> {
         discounts={discounts}
         refunds={orderReceipt.refunds}
         cardTitle={`Order Number: ${orderReceipt.reference_number} `}
-        discountCodeIsBad={false}
         discountCode=""
       />
     ) : null
