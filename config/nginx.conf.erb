@@ -72,7 +72,7 @@ http {
             uwsgi_param SERVER_ADDR $server_addr;
             uwsgi_param SERVER_PORT $server_port;
             uwsgi_param SERVER_NAME $server_name;
-            uwsgi_pass unix:/tmp/nginx.socket;
+            uwsgi_pass <%= ENV["NGINX_UWSGI_PASS"] || "unix:/tmp/nginx.socket" %>;
             uwsgi_pass_request_headers on;
             uwsgi_pass_request_body on;
             uwsgi_ignore_client_abort on;
