@@ -28,7 +28,9 @@ const ApplyCouponForm = ({
       <Form>
         <div className="row">
           <div className="col-12 mt-4 px-3 py-3 py-md-0">
-            Have a coupon?
+            <label htmlFor="couponCode">
+              <span id="couponCodeDesc">Have a coupon?</span>
+            </label>
             {discountCodeIsBad ? (
               <div
                 id="invalidCode"
@@ -41,10 +43,10 @@ const ApplyCouponForm = ({
               <Field
                 type="text"
                 name="couponCode"
-                id="coupon_code"
+                id="couponCode"
                 className="form-control"
                 autoComplete="given-name"
-                aria-describedby="coupon_code_error"
+                aria-describedby="couponCodeDesc"
               />
 
               <button
