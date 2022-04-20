@@ -47,6 +47,7 @@ urlpatterns = [
     path("", include("users.urls")),
     path("", include("courses.urls")),
     path("", include("ecommerce.urls")),
+    path("", include("flexiblepricing.urls")),
     re_path(r"^dashboard/", index, name="user-dashboard"),
     # social django needs to be here to preempt the login
     path("", include("social_django.urls", namespace="social")),
