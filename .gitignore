@@ -121,4 +121,4 @@ celerybeat-schedule
 /.pants.workdir.file_lock*
 
 # Local Docker customizations
-docker-compose.local.yml
+docker-compose.*.yml
