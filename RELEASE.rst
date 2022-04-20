@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.28.0
+--------------
+
+- fix ecommerce accessibility coupon code field has no label (#521)
+- Porting flex pricing models from MicroMasters
+
 Version 0.27.0 (Released April 20, 2022)
 --------------
 
