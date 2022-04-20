@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.27.0 (Released April 20, 2022)
+--------------
+
+- Added refine admin
+
 Version 0.26.0 (Released April 14, 2022)
 --------------
 
