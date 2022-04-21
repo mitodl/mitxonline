@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.29.0
+--------------
+
+- Adding administrative discount APIs
+- Fix tests on CI
+
 Version 0.28.0 (Released April 21, 2022)
 --------------
 
