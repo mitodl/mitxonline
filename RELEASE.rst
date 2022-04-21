@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.28.0
+Version 0.28.0 (Released April 21, 2022)
 --------------
 
 - fix ecommerce accessibility coupon code field has no label (#521)
