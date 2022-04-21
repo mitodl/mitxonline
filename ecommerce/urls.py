@@ -16,6 +16,10 @@ from ecommerce.views.v0 import (
     OrderHistoryViewSet,
     OrderReceiptView,
     AdminRefundOrderView,
+    DiscountViewSet,
+    NestedDiscountRedemptionViewSet,
+    NestedUserDiscountViewSet,
+    UserDiscountViewSet,
 )
 
 
@@ -27,6 +31,24 @@ router = SimpleRouterWithNesting()
 router.register(r"products", ProductViewSet, basename="products_api")
 router.register(r"checkout", CheckoutApiViewSet, basename="checkout_api")
 router.register(r"orders/history", OrderHistoryViewSet, basename="orderhistory_api")
+router.register(r"discounts/user", UserDiscountViewSet, basename="userdiscounts_api")
+
+discountsRouter = router.register(
+    r"discounts", DiscountViewSet, basename="discounts_api"
+)
+discountsRouter.register(
+    r"redemptions",
+    NestedDiscountRedemptionViewSet,
+    basename="discounts_api-redemptions",
+    parents_query_lookups=["redeemed_discount"],
+)
+discountsRouter.register(
+    r"assignees",
+    NestedUserDiscountViewSet,
+    basename="discounts_api-assignees",
+    parents_query_lookups=["discount"],
+)
+
 
 basketRouter = router.register(r"baskets", BasketViewSet, basename="basket")
 basketRouter.register(

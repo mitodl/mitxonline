@@ -6,6 +6,7 @@ from ecommerce.models import BasketItem
 from main.test_utils import assert_drf_json_equal
 from django.urls import reverse
 from django.conf import settings
+from django.forms.models import model_to_dict
 import operator as op
 import reversion
 import uuid
@@ -15,8 +16,9 @@ from ecommerce.serializers import (
     ProductSerializer,
     BasketSerializer,
     BasketItemSerializer,
+    DiscountSerializer,
 )
-from ecommerce.models import Basket, BasketItem, Order
+from ecommerce.models import Basket, BasketItem, Order, Discount, UserDiscount
 
 from ecommerce.factories import (
     ProductFactory,
@@ -24,6 +26,7 @@ from ecommerce.factories import (
     BasketItemFactory,
     BasketFactory,
 )
+
 
 pytestmark = [pytest.mark.django_db]
 
@@ -320,3 +323,163 @@ def test_checkout_product(user, user_client, cart_exists, cart_empty):
     basket = Basket.objects.get(user=user)
 
     assert [item.product for item in basket.basket_items.all()] == [product]
+
+
+def test_discount_rest_api(admin_drf_client, user_drf_client):
+    """
+    Checks that the admin REST API is only accessible by an admin
+    user, and then checks basic functionality (list, retrieve, create).
+    """
+    discount = DiscountFactory.create()
+    discount_payload = model_to_dict(discount)
+    discount_payload["discount_code"] += "Test"
+    discount_payload["id"] = None
+
+    # checking permissions - these should return 403
+
+    resp = user_drf_client.get(reverse("discounts_api-list"))
+    assert resp.status_code == 403
+
+    resp = user_drf_client.get(
+        reverse("discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    assert resp.status_code == 403
+
+    resp = user_drf_client.post(reverse("discounts_api-list"), discount_payload)
+    assert resp.status_code == 403
+
+    resp = user_drf_client.patch(
+        reverse("discounts_api-detail", kwargs={"pk": discount.id}), discount_payload
+    )
+    assert resp.status_code == 403
+
+    resp = user_drf_client.delete(
+        reverse("discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    assert resp.status_code == 403
+
+    # checking CRUD ops
+
+    resp = admin_drf_client.get(reverse("discounts_api-list"))
+    data = resp.json()
+
+    assert resp.status_code == 200
+    assert len(resp.json()) >= 1
+    assert data["results"][0]["id"] == discount.id
+
+    resp = admin_drf_client.get(
+        reverse("discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    data = resp.json()
+
+    assert resp.status_code == 200
+    assert data["id"] == discount.id
+
+    resp = admin_drf_client.post(reverse("discounts_api-list"), discount_payload)
+    data = resp.json()
+
+    assert resp.status_code == 201
+    assert data["discount_code"] == discount_payload["discount_code"]
+    assert data["id"] is not None
+
+    data["discount_code"] = "New Discount Code"
+    discount_payload = data
+
+    resp = admin_drf_client.patch(
+        reverse("discounts_api-detail", kwargs={"pk": discount_payload["id"]}),
+        discount_payload,
+    )
+    data = resp.json()
+
+    assert resp.status_code == 200
+    assert_drf_json_equal(resp.json(), DiscountSerializer(discount_payload).data)
+
+    resp = admin_drf_client.delete(
+        reverse("discounts_api-detail", kwargs={"pk": discount_payload["id"]})
+    )
+
+    assert resp.status_code == 204
+    assert Discount.objects.filter(pk=discount_payload["id"]).count() == 0
+
+
+def test_discount_redemptions_api(
+    user, products, discounts, admin_drf_client, user_drf_client
+):
+    """
+    Tests pulling redemeptions from a discount after submitting an order with
+    one in it.
+    """
+
+    discount = discounts[random.randrange(0, len(discounts))]
+
+    # permissions testing
+    resp = user_drf_client.get(
+        reverse("discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    assert resp.status_code == 403
+
+    resp = user_drf_client.get(f"/api/v0/discounts/{discount.id}/redemptions/")
+    assert resp.status_code == 403
+
+    # create basket with discount, then check for redemptions
+
+    basket = create_basket(user, products)
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    assert resp.status_code == 200
+
+    resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
+
+    assert resp.status_code == 200
+
+    resp = admin_drf_client.get(f"/api/v0/discounts/{discount.id}/redemptions/")
+    assert resp.status_code == 200
+
+    results = resp.json()
+    assert results["count"] > 0
+
+
+def test_user_discounts_api(user_drf_client, admin_drf_client, discounts, user):
+    """
+    Tests retrieving and creating user discounts via the API.
+    """
+
+    discount = discounts[random.randrange(0, len(discounts))]
+
+    # permissions testing
+
+    resp = user_drf_client.get(
+        reverse("discounts_api-detail", kwargs={"pk": discount.id})
+    )
+    assert resp.status_code == 403
+
+    resp = user_drf_client.get(f"/api/v0/discounts/{discount.id}/assignees/")
+    assert resp.status_code == 403
+
+    # create a user discount using the model first
+
+    user_discount = UserDiscount(discount=discount, user=user)
+    user_discount.save()
+
+    resp = admin_drf_client.get(f"/api/v0/discounts/{discount.id}/assignees/")
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert data["count"] > 0
+
+    # try to post a user discount - that should also work
+    discount = DiscountFactory.create()
+
+    resp = admin_drf_client.post(
+        reverse("userdiscounts_api-list"), {"discount": discount.id, "user": user.id}
+    )
+    assert resp.status_code >= 200 and resp.status_code < 300
+
+    resp = admin_drf_client.get(f"/api/v0/discounts/{discount.id}/assignees/")
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert data["count"] > 0

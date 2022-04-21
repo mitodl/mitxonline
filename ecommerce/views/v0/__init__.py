@@ -15,10 +15,15 @@ from main.utils import redirect_with_user_message
 from rest_framework import mixins, status
 from rest_framework.response import Response
 from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
-from rest_framework.viewsets import ReadOnlyModelViewSet, GenericViewSet, ViewSet
+from rest_framework.viewsets import (
+    ReadOnlyModelViewSet,
+    GenericViewSet,
+    ViewSet,
+    ModelViewSet,
+)
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.decorators import action
 
 from django.views.generic import TemplateView, RedirectView, View
@@ -57,12 +62,17 @@ from ecommerce.serializers import (
     BasketDiscountSerializer,
     BasketWithProductSerializer,
     OrderSerializer,
+    DiscountSerializer,
+    DiscountRedemptionSerializer,
+    UserDiscountSerializer,
+    UserDiscountMetaSerializer,
 )
 from ecommerce.models import (
     Product,
     Basket,
     BasketItem,
     Discount,
+    DiscountRedemption,
     BasketDiscount,
     UserDiscount,
     PendingOrder,
@@ -74,18 +84,15 @@ from ecommerce.forms import AdminRefundOrderForm
 log = logging.getLogger(__name__)
 
 
-class ProductsPagination(LimitOffsetPagination):
-    default_limit = 2
-    limit_query_param = "l"
-    offset_query_param = "o"
-    max_limit = 50
-
-
-class OrderHistoryPagination(LimitOffsetPagination):
+class ECommerceDefaultPagination(LimitOffsetPagination):
     default_limit = 10
     limit_query_param = "l"
     offset_query_param = "o"
     max_limit = 50
+
+
+class ProductsPagination(ECommerceDefaultPagination):
+    default_limit = 2
 
 
 class ProductViewSet(ReadOnlyModelViewSet):
@@ -197,6 +204,48 @@ class BasketDiscountViewSet(ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return BasketDiscount.objects.filter(redeemed_basket__user=self.request.user)
+
+
+class DiscountViewSet(ModelViewSet):
+    """API view set for Discounts"""
+
+    serializer_class = DiscountSerializer
+    queryset = Discount.objects.all()
+    authentication_classes = (SessionAuthentication, TokenAuthentication)
+    permission_classes = (IsAuthenticated, IsAdminUser)
+    pagination_class = ECommerceDefaultPagination
+
+
+class NestedDiscountRedemptionViewSet(NestedViewSetMixin, ModelViewSet):
+    """API view set for Discount Redemptions"""
+
+    serializer_class = DiscountRedemptionSerializer
+    queryset = DiscountRedemption.objects.all()
+    authentication_classes = (SessionAuthentication, TokenAuthentication)
+    permission_classes = (IsAuthenticated, IsAdminUser)
+    pagination_class = ECommerceDefaultPagination
+
+
+class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
+    """
+    API view set for User Discounts. This one is for use within a Discount.
+    """
+
+    serializer_class = UserDiscountMetaSerializer
+    queryset = UserDiscount.objects.all()
+    authentication_classes = (SessionAuthentication, TokenAuthentication)
+    permission_classes = (IsAuthenticated, IsAdminUser)
+    pagination_class = ECommerceDefaultPagination
+
+
+class UserDiscountViewSet(ModelViewSet):
+    """API view set for User Discounts. This one is for working with the set as a whole."""
+
+    serializer_class = UserDiscountSerializer
+    queryset = UserDiscount.objects.all()
+    authentication_classes = (SessionAuthentication, TokenAuthentication)
+    permission_classes = (IsAuthenticated, IsAdminUser)
+    pagination_class = ECommerceDefaultPagination
 
 
 class CheckoutApiViewSet(ViewSet):
@@ -487,7 +536,7 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
 
 class OrderHistoryViewSet(ReadOnlyModelViewSet):
     serializer_class = OrderHistorySerializer
-    pagination_class = OrderHistoryPagination
+    pagination_class = ECommerceDefaultPagination
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
