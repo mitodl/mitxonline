@@ -299,3 +299,58 @@ class OrderHistorySerializer(serializers.ModelSerializer):
         ]
         model = models.Order
         depth = 1
+
+
+class DiscountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.Discount
+        fields = [
+            "id",
+            "amount",
+            "automatic",
+            "discount_type",
+            "redemption_type",
+            "max_redemptions",
+            "discount_code",
+        ]
+        depth = 2
+
+
+class DiscountRedemptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.DiscountRedemption
+        fields = [
+            "id",
+            "redemption_date",
+            "redeemed_by",
+            "redeemed_discount",
+            "redeemed_order",
+        ]
+        read_only_fields = [
+            "redemption_date",
+            "redeemed_by",
+            "redeemed_discount",
+            "redeemed_order",
+        ]
+        depth = 1
+
+
+class UserDiscountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.UserDiscount
+        fields = [
+            "id",
+            "discount",
+            "user",
+        ]
+
+
+class UserDiscountMetaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.UserDiscount
+        fields = [
+            "id",
+            "discount",
+            "user",
+        ]
+        depth = 1
