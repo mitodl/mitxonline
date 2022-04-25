@@ -237,7 +237,7 @@ export class DashboardPage extends React.Component<
     const { currentUser } = this.props
     const { submittingEnrollmentId } = this.state
 
-    let startDate, startDateDescription
+    let startDate, startDateDescription = null
     const title = isLinkableCourseRun(enrollment.run, currentUser) ? (
       <a
         href={enrollment.run.courseware_url}
@@ -251,7 +251,7 @@ export class DashboardPage extends React.Component<
     )
     if (enrollment.run.start_date) {
       const now = moment()
-      startDate = parseDateString(enrollment.run.start_date)
+      const startDate = parseDateString(enrollment.run.start_date)
       const formattedStartDate = formatPrettyDateTimeAmPmTz(startDate)
       startDateDescription = now.isBefore(startDate) ? (
         <span>Starts - {formattedStartDate}</span>
