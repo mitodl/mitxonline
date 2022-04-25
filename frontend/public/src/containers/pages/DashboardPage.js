@@ -237,7 +237,7 @@ export class DashboardPage extends React.Component<
     const { currentUser } = this.props
     const { submittingEnrollmentId } = this.state
 
-    let startDate, startDateDescription = null
+    let startDateDescription = null
     const title = isLinkableCourseRun(enrollment.run, currentUser) ? (
       <a
         href={enrollment.run.courseware_url}
