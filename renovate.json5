@@ -1,0 +1,21 @@
+{
+  "extends": [
+    // automatically merge minor and patch updates
+    //":automergeMinor",
+    ":rebaseStalePrs",
+    // major version bumps
+    ":separateMajorReleases",
+    "config:base",
+    "docker:disable",
+  ],
+  "group": [
+    "group:allNonMajor",
+    "group:nodeJs",
+  ],
+  "schedule": [
+    "every weekday",
+    "after 6pm",
+    "before 11pm",
+  ],
+  "timezone": "US/Eastern",
+}
