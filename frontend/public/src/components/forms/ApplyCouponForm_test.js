@@ -11,7 +11,6 @@ import { findFormikFieldByName } from "../../lib/test_utils"
 
 describe("ApplyCouponForm", () => {
   let sandbox, onSubmitStub, couponCode
-  let discountCodeIsBad = false
   const discounts = []
 
   const renderForm = () =>
@@ -20,7 +19,6 @@ describe("ApplyCouponForm", () => {
         onSubmit={onSubmitStub}
         couponCode={couponCode}
         discounts={discounts}
-        discountCodeIsBad={discountCodeIsBad}
       />
     )
 
@@ -43,20 +41,10 @@ describe("ApplyCouponForm", () => {
     assert.ok(form.find("button[type='submit']").exists())
   })
 
-  it("does not render the error if the discount code is bad flag is not set", () => {
-    discountCodeIsBad = false
-
+  it("does not render the error", () => {
     const wrapper = renderForm()
     const form = wrapper.find("Formik").dive()
-    assert.ok(!form.find("div#invalidCode").exists())
-  })
-
-  it("renders the error if the discount code is bad flag is set", () => {
-    discountCodeIsBad = true
-
-    const wrapper = renderForm()
-    const form = wrapper.find("Formik").dive()
-    assert.ok(form.find("div#invalidCode").exists())
+    assert.ok(!form.find("div#couponCodeError").exists())
   })
 
   it("does not render the overwrite warning text when there aren't discounts", () => {
