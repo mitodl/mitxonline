@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.30.0
+Version 0.30.0 (Released April 28, 2022)
 --------------
 
 - fix video on course page is not screen reader accessible (#520)
