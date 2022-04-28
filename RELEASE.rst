@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.30.1
+--------------
+
+- fixes courses display incorrect date on the dashboard (#538)
+- fixes ecommerce accessibility discount code error message is invisible to screen reader (#526)
+
 Version 0.30.0 (Released April 28, 2022)
 --------------
 
