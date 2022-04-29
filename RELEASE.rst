@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.30.1
+Version 0.30.1 (Released April 29, 2022)
 --------------
 
 - fixes courses display incorrect date on the dashboard (#538)
