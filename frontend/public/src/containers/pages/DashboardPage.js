@@ -330,7 +330,7 @@ export class DashboardPage extends React.Component<
             <h1>My Courses</h1>
             <div className="enrolled-items">
               {enrollments && enrollments.length > 0 ? (
-                enrollments.map(this.renderEnrolledItemCard.bind(this))
+                enrollments.map(enrollment => this.renderEnrolledItemCard(enrollment))
               ) : (
                 <div className="card no-enrollments p-3 p-md-5 rounded-0">
                   <h2>Enroll Now</h2>
