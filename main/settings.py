@@ -81,7 +81,6 @@ DEBUG = get_bool(
     description="Set to True to enable DEBUG mode. Don't turn on in production.",
 )
 
-
 ALLOWED_HOSTS = ["*"]
 
 CSRF_TRUSTED_ORIGINS = get_delimited_list(
@@ -94,6 +93,12 @@ CORS_ALLOWED_ORIGINS = get_delimited_list(
     name="CORS_ALLOWED_ORIGINS",
     default=[],
     description="Comma separated string of trusted domains that should be allowed for CORS",
+)
+
+CORS_ALLOW_CREDENTIALS = get_bool(
+    name="CORS_ALLOW_CREDENTIALS",
+    default=True,
+    description="Allow cookies to be sent in cross-site HTTP requests",
 )
 
 SECURE_SSL_REDIRECT = get_bool(
