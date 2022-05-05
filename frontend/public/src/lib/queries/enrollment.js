@@ -4,8 +4,10 @@ import { getCsrfOptions, nextState } from "./util"
 import { emptyOrNil } from "../util"
 
 export const enrollmentsSelector = pathOr(null, ["entities", "enrollments"])
+export const enrollmentSelector = pathOr(null, ["entities", "enrollment"])
 
 export const enrollmentsQueryKey = "enrollments"
+export const enrollmentQueryKey = "enrollment"
 
 export const enrollmentsQuery = () => ({
   queryKey:  enrollmentsQueryKey,
@@ -15,6 +17,17 @@ export const enrollmentsQuery = () => ({
   }),
   update: {
     enrollments: nextState
+  }
+})
+
+export const enrollmentQuery = (enrollmentId: number) => ({
+  queryKey:  enrollmentQuery,
+  url:       "/api/enrollments/${enrollmentId}",
+  transform: json => ({
+    enrollment: json
+  }),
+  update: {
+    enrollment: nextState
   }
 })
 
