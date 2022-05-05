@@ -67,6 +67,10 @@
       "description": "Comma separated string of trusted domains that should be allowed for CORS",
       "required": false
     },
+    "CORS_ALLOW_CREDENTIALS": {
+      "description": "Allow cookies to be sent in cross-site HTTP requests",
+      "required": false
+    },
     "CRON_COURSERUN_SYNC_DAYS": {
       "description": "day_of_week' value for scheduled task to sync course run data (by default, it will run each day of the week).",
       "required": false

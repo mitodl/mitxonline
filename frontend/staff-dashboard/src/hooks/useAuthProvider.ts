@@ -5,7 +5,7 @@ export function useAuthProvider(): AuthProvider {
   const auth = useAuth()
   return {
     login: async () => {
-      await auth.signinPopup();
+      let result = await auth.signinPopup();
       return Promise.resolve();
     },
     logout: async () => {
