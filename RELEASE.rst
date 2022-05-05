@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.31.0
+--------------
+
+- Refactoring out EnrolledItemCard
+- Adding discounts to the Refine Admin
+- fix course ordering on the dashboard (#546)
+
 Version 0.30.1 (Released April 29, 2022)
 --------------
 
