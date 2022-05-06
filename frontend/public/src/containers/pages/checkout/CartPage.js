@@ -48,12 +48,12 @@ type Props = {
 }
 
 type CartState = {
-  discountCode: string,
+  discountCode: string
 }
 
 export class CartPage extends React.Component<Props, CartState> {
   state = {
-    discountCode: "",
+    discountCode: ""
   }
 
   async clearDiscount() {

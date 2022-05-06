@@ -6,19 +6,15 @@ import FormError from "./elements/FormError"
 type Props = {
   onSubmit: Function,
   couponCode: string,
-  discounts: Array<Object>,
+  discounts: Array<Object>
 }
 
 const getInitialValues = (couponCode, discounts) => ({
-  couponCode:        couponCode,
-  discounts:         discounts,
+  couponCode: couponCode,
+  discounts:  discounts
 })
 
-const ApplyCouponForm = ({
-  onSubmit,
-  couponCode,
-  discounts,
-}: Props) => (
+const ApplyCouponForm = ({ onSubmit, couponCode, discounts }: Props) => (
   <Formik
     onSubmit={onSubmit}
     initialValues={getInitialValues(couponCode, discounts)}
@@ -39,7 +35,12 @@ const ApplyCouponForm = ({
                   autoComplete="given-name"
                   aria-describedby="couponCodeError"
                 />
-                <ErrorMessage name="couponCode" className="form-control" id="couponCodeError" component={FormError} />
+                <ErrorMessage
+                  name="couponCode"
+                  className="form-control"
+                  id="couponCodeError"
+                  component={FormError}
+                />
               </div>
 
               <div>
