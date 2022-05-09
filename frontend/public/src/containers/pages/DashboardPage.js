@@ -250,8 +250,8 @@ export class DashboardPage extends React.Component<
           <Loader isLoading={isLoading}>
             <h1>My Courses</h1>
             <div className="enrolled-items">
-              {enrollments && enrollments.length > 0
-                ? enrollments.map(enrollment => (
+              {enrollments && enrollments.length > 0 ? (
+                enrollments.map(enrollment => (
                   <EnrolledItemCard
                     key={enrollment.id}
                     enrollment={enrollment}
@@ -261,15 +261,15 @@ export class DashboardPage extends React.Component<
                     addUserNotification={addUserNotification}
                   ></EnrolledItemCard>
                 ))
-                : (
-                  <div className="card no-enrollments p-3 p-md-5 rounded-0">
-                    <h2>Enroll Now</h2>
-                    <p>
-                      You are not enrolled in any courses yet. Please{" "}
-                      <a href={routes.root}>browse our courses</a>.
-                    </p>
-                  </div>
-                )}
+              ) : (
+                <div className="card no-enrollments p-3 p-md-5 rounded-0">
+                  <h2>Enroll Now</h2>
+                  <p>
+                    You are not enrolled in any courses yet. Please{" "}
+                    <a href={routes.root}>browse our courses</a>.
+                  </p>
+                </div>
+              )}
             </div>
           </Loader>
         </div>

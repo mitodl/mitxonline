@@ -1,9 +1,10 @@
 // @flow
 /* global SETTINGS:false */
+import React from "react"
 import moment from "moment"
 import { isNil } from "ramda"
 
-import { notNil } from "./util"
+import { notNil, parseDateString, formatPrettyDateTimeAmPmTz } from "./util"
 
 import type Moment from "moment"
 import type { CourseRunDetail } from "../flow/courseTypes"
@@ -33,4 +34,21 @@ export const isWithinEnrollmentPeriod = (run: CourseRunDetail): boolean => {
     now.isAfter(enrollStart) &&
     (isNil(enrollEnd) || now.isBefore(enrollEnd))
   )
+}
+
+export const generateStartDateText = (run: CourseRunDetail) => {
+  if (run.start_date) {
+    const now = moment()
+    const startDate = parseDateString(run.start_date)
+    const formattedStartDate = formatPrettyDateTimeAmPmTz(startDate)
+    return now.isBefore(startDate) ? (
+      <span>Starts - {formattedStartDate}</span>
+    ) : (
+      <span>
+        <strong>Active</strong> from {formattedStartDate}
+      </span>
+    )
+  }
+
+  return null
 }

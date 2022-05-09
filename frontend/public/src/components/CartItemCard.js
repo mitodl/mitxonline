@@ -3,6 +3,7 @@ import React from "react"
 import type { BasketItem, Product } from "../flow/cartTypes"
 import moment from "moment"
 import { formatPrettyDateTimeAmPmTz, parseDateString } from "../lib/util"
+import { generateStartDateText } from "../lib/courseApi"
 
 type Props = {
   product: Product
@@ -34,22 +35,7 @@ export class CartItemCard extends React.Component<Props> {
         ? purchasableObject.readable_id
         : purchasableObject.run_tag
 
-    let startDate = ""
-    let startDateDescription = ""
-
-    if (purchasableObject.start_date) {
-      const now = moment()
-      startDate = parseDateString(purchasableObject.start_date)
-      const formattedStartDate = formatPrettyDateTimeAmPmTz(startDate)
-      startDateDescription = now.isBefore(startDate) ? (
-        <span>Starts - {formattedStartDate}</span>
-      ) : (
-        <span>
-          <strong>Active</strong> from {formattedStartDate}
-        </span>
-      )
-    }
-
+    const startDateDescription = generateStartDateText(purchasableObject)
     const courseImage =
       course !== undefined && course.page !== null ? (
         <img src={course.page.feature_image_src} alt={course.title} />

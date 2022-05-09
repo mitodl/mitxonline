@@ -1,6 +1,10 @@
 /* global SETTINGS: false */
 // @flow
-import { isLinkableCourseRun, isWithinEnrollmentPeriod } from "./courseApi"
+import {
+  isLinkableCourseRun,
+  isWithinEnrollmentPeriod,
+  generateStartDateText
+} from "./courseApi"
 import { assert } from "chai"
 import moment from "moment"
 
@@ -77,6 +81,25 @@ describe("Course API", () => {
         courseRun.enrollment_start = enrollStart
         courseRun.enrollment_end = enrollEnd
         assert.equal(isWithinEnrollmentPeriod(courseRun), expResult)
+      })
+    })
+  })
+
+  describe("generateStartDateText", () => {
+    [
+      [exampleUrl, past, future, "run is in progress", {}],
+      [exampleUrl, past, null, "run is in progress with no end date", {}],
+      [exampleUrl, future, null, "run is not in progress", {}],
+      [exampleUrl, null, null, "run has no start date", null]
+    ].forEach(([coursewareUrl, startDate, endDate, desc, expLinkable]) => {
+      it(`returns ${String(expLinkable)} when ${desc}`, () => {
+        courseRun.courseware_url = coursewareUrl
+        courseRun.start_date = startDate
+        courseRun.end_date = endDate
+        assert.equal(
+          typeof generateStartDateText(courseRun),
+          typeof expLinkable
+        )
       })
     })
   })

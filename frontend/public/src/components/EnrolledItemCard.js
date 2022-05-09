@@ -28,7 +28,7 @@ import {
   courseEmailsSubscriptionMutation
 } from "../lib/queries/enrollment"
 import { currentUserSelector } from "../lib/queries/users"
-import { isLinkableCourseRun } from "../lib/courseApi"
+import { isLinkableCourseRun, generateStartDateText } from "../lib/courseApi"
 import {
   formatPrettyDateTimeAmPmTz,
   isSuccessResponse,
@@ -232,7 +232,6 @@ export class EnrolledItemCard extends React.Component<
       addUserNotification
     } = this.props
 
-    let startDateDescription = null
     const title = isLinkableCourseRun(enrollment.run, currentUser) ? (
       <a
         href={enrollment.run.courseware_url}
@@ -244,18 +243,7 @@ export class EnrolledItemCard extends React.Component<
     ) : (
       enrollment.run.course.title
     )
-    if (enrollment.run.start_date) {
-      const now = moment()
-      const startDate = parseDateString(enrollment.run.start_date)
-      const formattedStartDate = formatPrettyDateTimeAmPmTz(startDate)
-      startDateDescription = now.isBefore(startDate) ? (
-        <span>Starts - {formattedStartDate}</span>
-      ) : (
-        <span>
-          <strong>Active</strong> from {formattedStartDate}
-        </span>
-      )
-    }
+    const startDateDescription = generateStartDateText(enrollment.run)
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
 
     return (
