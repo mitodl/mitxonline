@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.30.2
+--------------
+
+- Reworked generateStartDateText to avoid short circuiting
+- Bump django from 3.2.12 to 3.2.13 (#535)
+- refactored out start date text generation elsewhere, added test for that, fmt caught some other stuff too
+- Refactoring out EnrolledItemCard
+- Adding discounts to the Refine Admin
+- fix course ordering on the dashboard (#546)
+
 Version 0.30.1 (Released April 29, 2022)
 --------------
 
