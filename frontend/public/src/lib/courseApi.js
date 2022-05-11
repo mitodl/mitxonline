@@ -41,13 +41,9 @@ export const generateStartDateText = (run: CourseRunDetail) => {
     const now = moment()
     const startDate = parseDateString(run.start_date)
     const formattedStartDate = formatPrettyDateTimeAmPmTz(startDate)
-    return now.isBefore(startDate) ? (
-      <span>Starts - {formattedStartDate}</span>
-    ) : (
-      <span>
-        <strong>Active</strong> from {formattedStartDate}
-      </span>
-    )
+    return now.isBefore(startDate)
+      ? { active: false, datestr: formattedStartDate }
+      : { active: true, datestr: formattedStartDate }
   }
 
   return null

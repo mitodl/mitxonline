@@ -55,7 +55,18 @@ export class CartItemCard extends React.Component<Props> {
             <div className="detail">
               {readableId}
               <br />
-              {startDateDescription !== undefined ? startDateDescription : ""}
+              {startDateDescription !== null && startDateDescription.active ? (
+                <span>Starts - {startDateDescription.datestr}</span>
+              ) : (
+                <span>
+                  {startDateDescription === null ? null : (
+                    <span>
+                      <strong>Active</strong> from{" "}
+                      {startDateDescription.datestr}
+                    </span>
+                  )}
+                </span>
+              )}
             </div>
           </div>
         </div>{" "}
