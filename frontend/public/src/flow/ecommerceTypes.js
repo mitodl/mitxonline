@@ -11,4 +11,9 @@ export type Basket = {
   items: Array<BasketItem>
 }
 
-export type Product = {}
+export type Product = {
+  description: string,
+  id: number,
+  is_active: boolean,
+  price: number
+}
