@@ -25,3 +25,8 @@ class FlexiblePriceStatus:
         PENDING_MANUAL_APPROVAL: "Pending Approval (Documents Received)",
         SKIPPED: "Skipped",
     }
+
+
+COUNTRY = "country"
+INCOME = "income"
+INCOME_THRESHOLD_FIELDS = [COUNTRY, INCOME]
