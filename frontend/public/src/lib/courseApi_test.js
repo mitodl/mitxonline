@@ -87,9 +87,27 @@ describe("Course API", () => {
 
   describe("generateStartDateText", () => {
     [
-      [exampleUrl, past, future, "run is in progress", {active: true, datestr: ''}],
-      [exampleUrl, past, null, "run is in progress with no end date", {active: true, datestr: ''}],
-      [exampleUrl, future, null, "run is not in progress", {active: true, datestr: ''}],
+      [
+        exampleUrl,
+        past,
+        future,
+        "run is in progress",
+        { active: true, datestr: "" }
+      ],
+      [
+        exampleUrl,
+        past,
+        null,
+        "run is in progress with no end date",
+        { active: true, datestr: "" }
+      ],
+      [
+        exampleUrl,
+        future,
+        null,
+        "run is not in progress",
+        { active: true, datestr: "" }
+      ],
       [exampleUrl, null, null, "run has no start date", null]
     ].forEach(([coursewareUrl, startDate, endDate, desc, expLinkable]) => {
       it(`returns ${String(expLinkable)} when ${desc}`, () => {

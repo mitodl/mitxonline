@@ -1,6 +1,6 @@
 /* global SETTINGS: false */
 // @flow
-import { assert } from "chai"
+import { assert, expect } from "chai"
 
 import IntegrationTestHelper from "../util/integration_test_helper"
 import ProductDetailEnrollApp, {
@@ -10,7 +10,8 @@ import ProductDetailEnrollApp, {
 import { courseRunsSelector } from "../lib/queries/courseRuns"
 import {
   makeCourseRunDetail,
-  makeCourseRunEnrollment
+  makeCourseRunEnrollment,
+  makeCourseRunDetailWithProduct
 } from "../factories/course"
 
 import * as courseApi from "../lib/courseApi"
@@ -137,6 +138,33 @@ describe("ProductDetailEnrollApp", () => {
     assert.equal(
       inner
         .find(".enroll-now")
+        .at(0)
+        .text(),
+      "Enroll now"
+    )
+  })
+
+  it("checks for form-based enrollment form if there is no product", async () => {
+    const courseRun = makeCourseRunDetail()
+    isWithinEnrollmentPeriodStub.returns(true)
+    const { inner } = await renderPage(
+      {
+        entities: {
+          courseRuns: [courseRun]
+        },
+        queries: {
+          courseRuns: {
+            isPending: false,
+            status:    200
+          }
+        }
+      },
+      {}
+    )
+
+    assert.equal(
+      inner
+        .find("form > button.enroll-now")
         .at(0)
         .text(),
       "Enroll now"

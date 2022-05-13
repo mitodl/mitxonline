@@ -132,6 +132,7 @@ export class ProductDetailEnrollApp extends React.Component<
     const { courseRuns, isLoading, status } = this.props
     const csrfToken = getCookie("csrftoken")
     const run = courseRuns ? courseRuns[0] : null
+    const product = run && run.products ? run.products[0] : null
 
     return (
       // $FlowFixMe: isLoading null or undefined
@@ -163,7 +164,7 @@ export class ProductDetailEnrollApp extends React.Component<
                 Enroll now
               </a>
             ) : run && isWithinEnrollmentPeriod(run) ? (
-              SETTINGS.features.upgrade_dialog ? (
+              SETTINGS.features.upgrade_dialog && product ? (
                 <button
                   className="btn btn-primary btn-gradient-red highlight enroll-now"
                   onClick={() => this.toggleUpgradeDialogVisibility()}
