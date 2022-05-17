@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.31.0
+Version 0.31.0 (Released May 17, 2022)
 --------------
 
 - Adds check for product to Enroll button logic
