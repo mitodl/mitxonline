@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.31.0
+--------------
+
+- Adds check for product to Enroll button logic
+- Added heroku deployment workflows
+
 Version 0.30.2 (Released May 17, 2022)
 --------------
 
