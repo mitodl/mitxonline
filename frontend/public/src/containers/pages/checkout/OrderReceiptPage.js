@@ -69,7 +69,6 @@ export class OrderReceiptPage extends React.Component<Props> {
     if (!orderReceipt || !orderReceipt.total_price_paid) {
       return null
     }
-    debugger;
     const totalPaid = parseFloat(orderReceipt.total_price_paid)
     return orderReceipt ? (
       <OrderSummaryCard

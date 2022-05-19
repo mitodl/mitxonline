@@ -1,17 +1,10 @@
 // @flow
 /* global SETTINGS: false */
 import React from "react"
-import type { PaginatedOrderHistory } from "../../../flow/cartTypes"
-
 import {
-    formatLocalePrice,
     parseDateString,
     formatPrettyDate,
 } from "../lib/util"
-
-type Props = {
-    orderHistory: PaginatedOrderHistory,
-}
 
 export class ReceiptPageDetailCard extends React.Component<Props> {    
     render() {
