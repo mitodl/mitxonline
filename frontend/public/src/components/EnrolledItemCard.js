@@ -35,6 +35,7 @@ import {
   parseDateString
 } from "../lib/util"
 import { addUserNotification } from "../actions"
+import { EnrollmentRoleTag } from "./EnrollmentRoleTag"
 
 import type { RunEnrollment } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
@@ -245,6 +246,11 @@ export class EnrolledItemCard extends React.Component<
     )
     const startDateDescription = generateStartDateText(enrollment.run)
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
+    const courseId = enrollment.run.course_number
+    const enrollmentMode = enrollment.enrollment_mode
+    const pageLocation = enrollment.run.page
+    // certLocation is not used yet, just here to test layout
+    const certLocation = false
 
     return (
       <div
@@ -263,8 +269,10 @@ export class EnrolledItemCard extends React.Component<
             </div>
           )}
           <div className="col-12 col-md px-3 py-3 py-md-0">
-            <div className="d-flex justify-content-between align-content-start flex-nowrap mb-3">
-              <h2 className="my-0 mr-3">{title}</h2>
+            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
+              <EnrollmentRoleTag
+                enrollmentMode={enrollmentMode}
+              ></EnrollmentRoleTag>
               <Dropdown
                 isOpen={this.isActiveMenuId(enrollment.id)}
                 toggle={this.toggleActiveMenuId(enrollment.id).bind(this)}
@@ -296,7 +304,12 @@ export class EnrolledItemCard extends React.Component<
                 </DropdownMenu>
               </Dropdown>
             </div>
+
+            <div className="d-flex justify-content-between align-content-start flex-nowrap mb-3">
+              <h2 className="my-0 mr-3">{title}</h2>
+            </div>
             <div className="detail">
+              {courseId} |{" "}
               {startDateDescription !== null && startDateDescription.active ? (
                 <span>Starts - {startDateDescription.datestr}</span>
               ) : (
@@ -309,6 +322,34 @@ export class EnrolledItemCard extends React.Component<
                   )}
                 </span>
               )}
+              <div className="enrollment-extra-links d-flex">
+                {pageLocation ? (
+                  <a href={pageLocation.page_url}>Course details</a>
+                ) : null}
+                {certLocation ? (
+                  <a href={certLocation}>View certificate</a>
+                ) : null}
+                {enrollment.run.products.length > 0 &&
+                enrollmentMode === "audit" ? (
+                    <form
+                      action="/cart/add/"
+                      method="get"
+                      className="text-center ml-auto"
+                    >
+                      <input
+                        type="hidden"
+                        name="product_id"
+                        value={enrollment.run.products[0].id}
+                      />
+                      <button
+                        type="submit"
+                        className="btn btn-primary btn-gradient-red"
+                      >
+                      Get Certificate
+                      </button>
+                    </form>
+                  ) : null}
+              </div>
             </div>
           </div>
         </div>

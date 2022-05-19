@@ -1,4 +1,5 @@
 import type { Product } from "./ecommerceTypes"
+import type { Page } from "./cmsTypes"
 
 export type CourseDetail = {
   id: number,
@@ -17,7 +18,8 @@ export type BaseCourseRun = {
   courseware_id: string,
   run_tag: ?string,
   products: Array<Product>,
-  id: number
+  id: number,
+  page: ?Page
 }
 
 export type EnrollmentFlaggedCourseRun = BaseCourseRun & {
@@ -32,5 +34,6 @@ export type CourseRunDetail = BaseCourseRun & {
 export type RunEnrollment = {
   run: CourseRunDetail,
   id: number,
-  edx_emails_subscription: ?string
+  edx_emails_subscription: ?string,
+  enrollment_mode: string
 }

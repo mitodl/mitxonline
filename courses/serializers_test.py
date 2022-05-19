@@ -10,6 +10,8 @@ import pytz
 from django.contrib.auth.models import AnonymousUser
 
 from cms.factories import CoursePageFactory
+from cms.serializers import CoursePageSerializer
+from cms.models import CoursePage
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -28,6 +30,7 @@ from courses.serializers import (
     ProgramEnrollmentSerializer,
     ProgramSerializer,
 )
+from ecommerce.serializers import BaseProductSerializer
 from main.test_utils import assert_drf_json_equal, drf_datetime
 
 pytestmark = [pytest.mark.django_db]
@@ -165,6 +168,7 @@ def test_serialize_course_with_page_fields(mocker, mock_context):
             "readable_id": course.readable_id,
             "id": course.id,
             "feature_image_src": fake_image_src,
+            "page_url": None,
         },
     )
     patched_get_wagtail_src.assert_called_once_with(course_page.feature_image)
@@ -199,6 +203,7 @@ def test_serialize_course_run_detail():
     """Test CourseRunDetailSerializer serialization"""
     course_run = CourseRunFactory.create()
     data = CourseRunDetailSerializer(course_run).data
+
     assert data == {
         "course": BaseCourseSerializer(course_run.course).data,
         "course_number": course_run.course_number,
@@ -211,6 +216,8 @@ def test_serialize_course_run_detail():
         "enrollment_end": drf_datetime(course_run.enrollment_end),
         "expiration_date": drf_datetime(course_run.expiration_date),
         "id": course_run.id,
+        "products": BaseProductSerializer(course_run.products, many=True).data,
+        "page": None,
     }
 
 
@@ -224,6 +231,7 @@ def test_serialize_course_run_enrollments(settings, receipts_enabled):
         "run": CourseRunDetailSerializer(course_run_enrollment.run).data,
         "id": course_run_enrollment.id,
         "edx_emails_subscription": True,
+        "enrollment_mode": "audit",
     }
 
 
