@@ -14,4 +14,7 @@ echo "-----> Running django migrations"
 python $MANAGE_FILE showmigrations --list 2>&1 | indent
 python $MANAGE_FILE migrate --noinput 2>&1 | indent
 
+echo "-----> load country income thresholds"
+python $MANAGE_FILE load_country_income_thresholds flexiblepricing/data/country_income_thresholds.csv
+
 echo
