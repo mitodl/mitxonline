@@ -72,6 +72,39 @@ $featureImgMobileHeight: 223px;
   .unenroll-denied-msg .tooltip {
     width: 250px;
   }
+
+  .enrollment-mode-container {
+    span.badge {
+      font-weight: normal;
+      padding: .20rem;
+      margin-bottom: .5rem;
+    }
+    span.badge.badge-red {
+        color: $red;
+        background-color: #FAE8E8;
+      }
+
+    span.badge.badge-green {
+        color: $green;
+        background-color: #DBF3E9;
+      }
+  }
+
+  .enrollment-extra-links {
+    margin-top: .5rem;
+    font-size: smaller;
+
+    a {
+      text-decoration: underline;
+      color: $light-gray;
+      margin-right: 2rem;
+    }
+
+    form button.btn-primary {
+      font-size: 14px;
+      padding: 9px 18px;
+    }
+  }
 }
 
 .dashboard h1 {

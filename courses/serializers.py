@@ -5,16 +5,19 @@ from urllib.parse import urljoin
 
 from django.conf import settings
 from django.templatetags.static import static
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from cms.serializers import CoursePageSerializer
+from cms.models import CoursePage
 from courses import models
 from courses.api import create_run_enrollments
 from courses.models import ProgramRun, CourseRun
 from ecommerce.models import Product
 from ecommerce.serializers import ProductSerializer, BaseProductSerializer
 from main import features
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
 def _get_thumbnail_url(page):
@@ -152,9 +155,23 @@ class CourseSerializer(serializers.ModelSerializer):
 
 
 class CourseRunDetailSerializer(serializers.ModelSerializer):
-    """CourseRun model serializer - also serializes the parent Course"""
+    """
+    CourseRun model serializer - also serializes the parent Course
+    Includes the relevant Page (if there is one) and Products (if they exist,
+    just the base product data)
+    """
 
     course = BaseCourseSerializer(read_only=True, context={"include_page_fields": True})
+    products = BaseProductSerializer(read_only=True, many=True)
+    page = serializers.SerializerMethodField()
+
+    def get_page(self, instance):
+        try:
+            return CoursePageSerializer(
+                instance=CoursePage.objects.filter(course=instance.course).get()
+            ).data
+        except ObjectDoesNotExist:
+            return None
 
     class Meta:
         model = models.CourseRun
@@ -170,6 +187,8 @@ class CourseRunDetailSerializer(serializers.ModelSerializer):
             "courseware_url",
             "courseware_id",
             "id",
+            "products",
+            "page",
         ]
 
 
@@ -264,6 +283,9 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
 
     run = CourseRunDetailSerializer(read_only=True)
     run_id = serializers.IntegerField(write_only=True)
+    enrollment_mode = serializers.ChoiceField(
+        (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
+    )
 
     def create(self, validated_data):
         user = self.context["user"]
@@ -281,7 +303,7 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.CourseRunEnrollment
-        fields = ["run", "id", "run_id", "edx_emails_subscription"]
+        fields = ["run", "id", "run_id", "edx_emails_subscription", "enrollment_mode"]
 
 
 class ProgramEnrollmentSerializer(serializers.ModelSerializer):
