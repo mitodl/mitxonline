@@ -1,14 +1,15 @@
 """
 MITxOnline ecommerce serializers
 """
-import json
+from audioop import add
+from this import d
 from rest_framework import serializers
 from decimal import Decimal
 
 from ecommerce import models
 from courses.models import CourseRun, ProgramRun, Course
 from ecommerce.models import Basket, Product, BasketItem, Order
-from ecommerce.discounts import DiscountType
+from users.serializers import ExtendedLegalAddressSerializer
 from ecommerce.constants import TRANSACTION_TYPE_REFUND, CYBERSOURCE_CARD_TYPES
 
 from cms.serializers import CoursePageSerializer
@@ -233,6 +234,9 @@ class OrderSerializer(serializers.ModelSerializer):
     lines = LineSerializer(many=True)
     discounts = serializers.SerializerMethodField()
     refunds = serializers.SerializerMethodField()
+    purchaser = serializers.SerializerMethodField()
+    transactions = serializers.SerializerMethodField()
+    street_address = serializers.SerializerMethodField()
 
     def get_discounts(self, instance):
         discounts = []
@@ -252,6 +256,73 @@ class OrderSerializer(serializers.ModelSerializer):
             )
 
         return refunds
+    
+    def get_transactions(self, instance):
+        """Get transaction information if it exists"""
+        transaction = instance.transactions.order_by("-created_on").first()
+        if transaction:
+            data = {
+                "card_number": None,
+                "card_type": None,
+                "name": None,
+                "bill_to_email": None,
+                "payment_method": None,
+            }
+
+            if "req_card_number" in transaction.data:
+                data["card_number"] = transaction.data["req_card_number"]
+            if (
+                "req_card_type" in transaction.data
+                and transaction.data["req_card_type"] in CYBERSOURCE_CARD_TYPES
+            ):
+                data["card_type"] = CYBERSOURCE_CARD_TYPES[
+                    transaction.data["req_card_type"]
+                ]
+            if "req_payment_method" in transaction.data:
+                data["payment_method"] = transaction.data["req_payment_method"]
+            if "req_bill_to_email" in transaction.data:
+                data["bill_to_email"] = transaction.data["req_bill_to_email"]
+            if (
+                "req_bill_to_forename" in transaction.data
+                or "req_bill_to_surname" in transaction.data
+            ):
+                data[
+                    "name"
+                ] = f"{transaction.data.get('req_bill_to_forename')} {transaction.data.get('req_bill_to_surname')}"
+            return data
+        return None
+
+    def get_street_address(self, instance):
+        """Get the address information from the transaction"""
+        transaction = instance.transactions.order_by("-created_on").first()
+        if transaction:
+            street_address = {
+                "line": [],
+                "postal_code": None,
+                "state": None,
+                "city": None,
+                "country": None,
+            }
+            
+            if "req_bill_to_address_line1" in transaction.data:
+                street_address["line"].append(transaction.data["req_bill_to_address_line1"])
+            if "req_bill_to_address_line2" in transaction.data:
+                street_address["line"].append(transaction.data["req_bill_to_address_line2"])
+            if "req_bill_to_address_postal_code" in transaction.data:
+                street_address["postal_code"] = transaction.data["req_bill_to_address_postal_code"]
+            if "req_bill_to_address_state" in transaction.data:
+                street_address["state"] = transaction.data["req_bill_to_address_state"]
+            if "req_bill_to_address_city" in transaction.data:
+                street_address["city"] = transaction.data["req_bill_to_address_city"]
+            if "req_bill_to_address_country" in transaction.data:
+                street_address["country"] = transaction.data["req_bill_to_address_country"]
+            
+            return street_address
+        return None
+
+    def get_purchaser(self, instance):
+        """Get the purchaser infrmation"""
+        return ExtendedLegalAddressSerializer(instance.purchaser.legal_address).data
 
     class Meta:
         fields = [
@@ -263,6 +334,9 @@ class OrderSerializer(serializers.ModelSerializer):
             "discounts",
             "refunds",
             "reference_number",
+            "created_on",
+            "transactions",
+            "street_address"
         ]
         model = models.Order
 

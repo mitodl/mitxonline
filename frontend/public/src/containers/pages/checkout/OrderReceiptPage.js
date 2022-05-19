@@ -10,6 +10,7 @@ import { connectRequest } from "redux-query"
 import Loader from "../../../components/Loader"
 import { CartItemCard } from "../../../components/CartItemCard"
 import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
+import { ReceiptPageDetailCard } from "../../../components/ReceiptPageDetailCard"
 
 import { createStructuredSelector } from "reselect"
 import { orderReceiptQuery, receiptQueryKey } from "../../../lib/queries/cart"
@@ -25,12 +26,16 @@ import type {
 } from "../../../flow/cartTypes"
 import { pathOr } from "ramda"
 
+import type { PaginatedOrderHistory } from "../../../flow/cartTypes"
+
+
 type Props = {
   history: RouterHistory,
   orderReceipt: OrderReceipt,
   match: Match,
   discounts: Array<Discount>,
   isLoading: boolean,
+  orderHistory: PaginatedOrderHistory,
   forceRequest: () => Promise<*>
 }
 
@@ -64,6 +69,7 @@ export class OrderReceiptPage extends React.Component<Props> {
     if (!orderReceipt || !orderReceipt.total_price_paid) {
       return null
     }
+    debugger;
     const totalPaid = parseFloat(orderReceipt.total_price_paid)
     return orderReceipt ? (
       <OrderSummaryCard
@@ -77,6 +83,21 @@ export class OrderReceiptPage extends React.Component<Props> {
       />
     ) : null
   }
+
+  renderReceiptPageDetailCard() {
+    const { orderReceipt, discounts } = this.props
+    if (!orderReceipt) {
+      return null
+    }
+
+    return (
+    <ReceiptPageDetailCard
+      orderReceipt={orderReceipt}
+      discounts={discounts}
+    />
+    )
+  }
+
   renderEmptyCartCard() {
     return (
       <div
@@ -102,31 +123,12 @@ export class OrderReceiptPage extends React.Component<Props> {
       >
         <Loader isLoading={isLoading}>
           <div className="std-page-body order-receipt container">
-            <div className="row">
-              <div className="col-8 d-flex justify-content-between">
-                <h1 className="flex-grow-1">Order Receipt</h1>
-              </div>
-              <div className="col-md-4 text-right align-middle">
-                <p className="font-weight-normal mt-3">
-                  <a
-                    href={routes.orderHistory}
-                    className="link-text align-middle back-link"
-                  >
-                    Back to Order History
-                  </a>
-                </p>
-              </div>
-            </div>
-
-            <div className="row d-flex flex-column-reverse flex-md-column flex-lg-row">
-              <div className="col-lg-8 enrolled-items">
-                {orderReceipt &&
-                orderReceipt.lines &&
-                orderReceipt.lines.length > 0
-                  ? orderReceipt.lines.map(this.renderCartItemCard.bind(this))
-                  : this.renderEmptyCartCard()}
-              </div>
-              <div className="col-lg-4">{this.renderOrderSummaryCard()}</div>
+            <div className="enrolled-items">
+              {orderReceipt &&
+              orderReceipt.lines &&
+              orderReceipt.lines.length > 0
+                ? this.renderReceiptPageDetailCard()
+                : this.renderEmptyCartCard()}
             </div>
           </div>
         </Loader>

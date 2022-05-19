@@ -1,4 +1,3 @@
-from django.db.models import Prefetch
 from django.utils.functional import cached_property
 from django.conf import settings
 from django.db import models, transaction
@@ -6,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
-from courses.models import CourseRun, CourseRunEnrollment
+from courses.models import CourseRun
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.models import CourseRun
 from django_fsm import FSMField, transition

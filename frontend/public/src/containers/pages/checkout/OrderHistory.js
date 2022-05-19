@@ -76,7 +76,7 @@ export class OrderHistory extends React.Component<Props> {
     const orderDate = formatPrettyDateTimeAmPmTz(
       parseDateString(order.created_on)
     )
-
+    debugger;
     return (
       <div
         className="row d-flex p-3 my-0 bg-light"
