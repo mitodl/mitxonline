@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.31.1
+--------------
+
+- Adding status flags, Get Certificate button to dashboard
+- add financial aid models to admin and load country income thresholds (#563)
+
 Version 0.31.0 (Released May 17, 2022)
 --------------
 
