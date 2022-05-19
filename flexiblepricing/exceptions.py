@@ -5,5 +5,5 @@ Exceptions for flexible pricing
 
 class CountryIncomeThresholdException(Exception):
     """
-    Execption regarding import alumni csv files
+    Execption regarding import country income csv files
     """

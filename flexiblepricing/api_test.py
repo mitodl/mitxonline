@@ -10,7 +10,7 @@ from flexiblepricing.exceptions import CountryIncomeThresholdException
 
 
 def test_parse_country_income_thresholds_no_header(tmp_path):
-    """parse_alumni_csv should throw error if no header is found"""
+    """parse_country_income_thresholds should throw error if no header is found"""
     path = tmp_path / "test.csv"
     open(path, "w")  # create a file
     with pytest.raises(CountryIncomeThresholdException) as exc:
@@ -20,7 +20,7 @@ def test_parse_country_income_thresholds_no_header(tmp_path):
 
 
 def test_parse_country_income_thresholds_missing_header_fields(tmp_path):
-    """parse_alumni_csv should throw error if any of the header field is missing"""
+    """parse_country_income_thresholds should throw error if any of the header field is missing"""
     path = tmp_path / "test.csv"
     with open(path, "w") as file:
         file.write("country\n")
@@ -33,7 +33,7 @@ def test_parse_country_income_thresholds_missing_header_fields(tmp_path):
 
 
 def test_parse_country_income_thresholds(tmp_path):
-    """parse_alumni_csv should convert CSV records into IncomeThreshold objects"""
+    """parse_country_income_thresholds should convert CSV records into IncomeThreshold objects"""
     path = tmp_path / "test.csv"
     with open(path, "w") as file:
         file.write("country,income\n")
@@ -63,6 +63,5 @@ def test_import_country_income_thresholds(tmp_path, caplog):
 
     # second time would rather update records
     import_country_income_thresholds(path)
-    # assert parse_country_income_thresholds.called
     assert "Updated record successfully for country=PK with income 25000"
     assert "Updated record successfully for country=US with income 75000"
