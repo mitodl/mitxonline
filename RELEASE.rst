@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.31.1
+Version 0.31.1 (Released May 20, 2022)
 --------------
 
 - Adding status flags, Get Certificate button to dashboard
