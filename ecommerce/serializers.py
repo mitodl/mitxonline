@@ -256,7 +256,7 @@ class OrderSerializer(serializers.ModelSerializer):
             )
 
         return refunds
-    
+
     def get_transactions(self, instance):
         """Get transaction information if it exists"""
         transaction = instance.transactions.order_by("-created_on").first()
@@ -303,20 +303,28 @@ class OrderSerializer(serializers.ModelSerializer):
                 "city": None,
                 "country": None,
             }
-            
+
             if "req_bill_to_address_line1" in transaction.data:
-                street_address["line"].append(transaction.data["req_bill_to_address_line1"])
+                street_address["line"].append(
+                    transaction.data["req_bill_to_address_line1"]
+                )
             if "req_bill_to_address_line2" in transaction.data:
-                street_address["line"].append(transaction.data["req_bill_to_address_line2"])
+                street_address["line"].append(
+                    transaction.data["req_bill_to_address_line2"]
+                )
             if "req_bill_to_address_postal_code" in transaction.data:
-                street_address["postal_code"] = transaction.data["req_bill_to_address_postal_code"]
+                street_address["postal_code"] = transaction.data[
+                    "req_bill_to_address_postal_code"
+                ]
             if "req_bill_to_address_state" in transaction.data:
                 street_address["state"] = transaction.data["req_bill_to_address_state"]
             if "req_bill_to_address_city" in transaction.data:
                 street_address["city"] = transaction.data["req_bill_to_address_city"]
             if "req_bill_to_address_country" in transaction.data:
-                street_address["country"] = transaction.data["req_bill_to_address_country"]
-            
+                street_address["country"] = transaction.data[
+                    "req_bill_to_address_country"
+                ]
+
             return street_address
         return None
 
@@ -336,7 +344,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "reference_number",
             "created_on",
             "transactions",
-            "street_address"
+            "street_address",
         ]
         model = models.Order
 

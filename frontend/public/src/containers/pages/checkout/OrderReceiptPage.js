@@ -85,15 +85,15 @@ export class OrderReceiptPage extends React.Component<Props> {
 
   renderReceiptPageDetailCard() {
     const { orderReceipt, discounts } = this.props
-    if (!orderReceipt) {
+    if (!orderReceipt || !orderReceipt.total_price_paid) {
       return null
     }
 
     return (
-    <ReceiptPageDetailCard
-      orderReceipt={orderReceipt}
-      discounts={discounts}
-    />
+      <ReceiptPageDetailCard
+        orderReceipt={orderReceipt}
+        discounts={discounts}
+      />
     )
   }
 
