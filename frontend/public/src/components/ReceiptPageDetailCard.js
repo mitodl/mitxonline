@@ -2,6 +2,12 @@
 /* global SETTINGS: false */
 import React from "react"
 import { parseDateString, formatLocalePrice, formatPrettyDate } from "../lib/util"
+import type { OrderReceipt, Discount } from "../flow/cartTypes"
+
+type Props = {
+  orderReceipt: OrderReceipt,
+  discounts: Array<Discount>,
+}
 
 export class ReceiptPageDetailCard extends React.Component<Props> {
   render() {

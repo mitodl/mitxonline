@@ -17,6 +17,13 @@ export type BasketItem = {
   id: number
 }
 
+export type Purchaser = {
+  first_name: ?string,
+  last_name: ?string,
+  email: ?string,
+  country: ?string
+}
+
 export type CartItem = {
   id: number,
   user: number,
@@ -49,6 +56,21 @@ export type Line = {
   item_description: string
 }
 
+export type Transactions = {
+  name: ?string,
+  payment_method: ?string,
+  bill_to_email: ?string,
+  card_type: ?string,
+  card_number: ?string
+}
+
+export type StreetAddress = {
+  city: ?String,
+  postal_code: ?String,
+  country: ?string,
+  line: Array<string>
+}
+
 export type OrderReceipt = {
   order: number,
   lines: Array<Line>,
@@ -57,5 +79,9 @@ export type OrderReceipt = {
   state: string,
   reference_number: string,
   discounts: Array<Discount>,
-  refunds: Array<Refund>
+  refunds: Array<Refund>,
+  created_on: string,
+  transactions: Transactions,
+  street_address: StreetAddress,
+  purchaser: Purchaser,
 }

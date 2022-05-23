@@ -12,22 +12,16 @@ import { CartItemCard } from "../../../components/CartItemCard"
 import { OrderSummaryCard } from "../../../components/OrderSummaryCard"
 import { ReceiptPageDetailCard } from "../../../components/ReceiptPageDetailCard"
 
-import { createStructuredSelector } from "reselect"
 import { orderReceiptQuery, receiptQueryKey } from "../../../lib/queries/cart"
 
 import type { RouterHistory } from "react-router"
 import type { Match } from "react-router"
-import { routes } from "../../../lib/urls"
 import type {
   Discount,
   Line,
   OrderReceipt,
-  Refund
 } from "../../../flow/cartTypes"
 import { pathOr } from "ramda"
-
-import type { PaginatedOrderHistory } from "../../../flow/cartTypes"
-
 
 type Props = {
   history: RouterHistory,
@@ -35,7 +29,6 @@ type Props = {
   match: Match,
   discounts: Array<Discount>,
   isLoading: boolean,
-  orderHistory: PaginatedOrderHistory,
   forceRequest: () => Promise<*>
 }
 

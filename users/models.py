@@ -245,41 +245,13 @@ class LegalAddress(TimestampedModel):
 
     first_name = models.CharField(max_length=60, blank=True)
     last_name = models.CharField(max_length=60, blank=True)
-
-    street_address_1 = models.CharField(max_length=60, blank=True)
-    street_address_2 = models.CharField(max_length=60, blank=True)
-    street_address_3 = models.CharField(max_length=60, blank=True)
-    street_address_4 = models.CharField(max_length=60, blank=True)
-    street_address_5 = models.CharField(max_length=60, blank=True)
-
-    city = models.CharField(max_length=50, blank=True)
     country = models.CharField(
         max_length=2, blank=True, validators=[validate_iso_3166_1_code]
     )  # ISO-3166-1
-    # only required in the US/CA
-    state_or_territory = models.CharField(
-        max_length=6, blank=True, validators=[validate_iso_3166_2_code]
-    )  # ISO 3166-2
-    postal_code = models.CharField(max_length=10, blank=True)
 
     def __str__(self):
         """Str representation for the legal address"""
         return f"Legal address for {self.user}"
-
-    @property
-    def street_address(self):
-        """Return the list of street address lines"""
-        return [
-            line
-            for line in [
-                self.street_address_1,
-                self.street_address_2,
-                self.street_address_3,
-                self.street_address_4,
-                self.street_address_5,
-            ]
-            if line
-        ]
 
 
 class Profile(TimestampedModel):
