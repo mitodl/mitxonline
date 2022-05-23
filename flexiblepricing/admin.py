@@ -10,6 +10,7 @@ from flexiblepricing.models import (
     CurrencyExchangeRate,
     FlexiblePrice,
     FlexiblePricingRequestSubmission,
+    FlexiblePriceTier,
 )
 
 
@@ -45,4 +46,9 @@ class FlexiblePricingRequestSubmissionAdmin(admin.ModelAdmin):
     readonly_fields = ("form_data", "user", "page", "submit_time")
 
 
+class FlexiblePriceTierAdmin(admin.ModelAdmin):
+    model = FlexiblePriceTier
+
+
 admin.site.register(CountryIncomeThreshold, CountryIncomeThresholdAdmin)
+admin.site.register(FlexiblePriceTier, FlexiblePriceTierAdmin)

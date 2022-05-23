@@ -43,6 +43,8 @@ from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
 from cms.constants import COURSE_INDEX_SLUG, CMS_EDITORS_GROUP_NAME
 from courses.api import get_user_relevant_course_run
 
+from flexiblepricing.api import determine_tier_courseware, determine_auto_approval
+from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.models import (
     CurrencyExchangeRate,
     FlexiblePrice,
@@ -676,11 +678,6 @@ class FlexiblePricingRequestForm(AbstractForm):
         return super().serve(request, *args, **kwargs)
 
     def process_form_submission(self, form):
-        form_submission = self.get_submission_class().objects.create(
-            form_data=json.dumps(form.cleaned_data, cls=DjangoJSONEncoder),
-            page=self,
-            user=form.user,
-        )
 
         try:
             exchangerate = CurrencyExchangeRate.objects.filter(
@@ -693,19 +690,32 @@ class FlexiblePricingRequestForm(AbstractForm):
         except CurrencyExchangeRate.DoesNotExist:
             converted_income = form.cleaned_data["your_income"]
 
-        course = self.get_parent_product()
+        courseware = self.get_parent_product()
+        income_usd = round(converted_income, 2)
+        tier = determine_tier_courseware(courseware, income_usd)
 
-        flexprice_submission = FlexiblePrice(
+        form_submission = self.get_submission_class().objects.create(
+            form_data=json.dumps(form.cleaned_data, cls=DjangoJSONEncoder),
+            page=self,
+            user=form.user,
+        )
+
+        flexible_price = FlexiblePrice(
             user=form.user,
             original_income=form.cleaned_data["your_income"],
             original_currency=form.cleaned_data["income_currency"],
+            income_usd=income_usd,
             date_exchange_rate=datetime.datetime.now(),
-            income_usd=round(converted_income, 2),
             cms_submission=form_submission,
-            course=course,
+            courseware_object=courseware,
+            tier=tier,
         )
 
-        flexprice_submission.save()
+        if determine_auto_approval(flexible_price, tier) is True:
+            flexible_price.status = FlexiblePriceStatus.AUTO_APPROVED
+        else:
+            flexible_price.status = FlexiblePriceStatus.PENDING_MANUAL_APPROVAL
+        flexible_price.save()
 
     # Matches the standard page path that Wagtail returns for this page type.
     slugged_page_path_pattern = re.compile(r"(^.*/)([^/]+)(/?$)")

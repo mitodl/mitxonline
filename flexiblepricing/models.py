@@ -1,7 +1,12 @@
-from django.db import models
-import reversion
 import json
+import reversion
 
+from django.db import models
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+
+from courses.models import Program
+from ecommerce.models import Discount
 from main.utils import serialize_model_object
 from main.settings import AUTH_USER_MODEL
 from mitol.common.models import TimestampedModel
@@ -46,6 +51,28 @@ class FlexiblePricingRequestSubmission(AbstractFormSubmission):
         )
 
 
+class FlexiblePriceTier(TimestampedModel):
+    """
+    The tiers for discounted pricing
+    """
+
+    discount = models.ForeignKey(
+        Discount,
+        null=False,
+        related_name="flexible_price_tiers",
+        on_delete=models.PROTECT,
+    )
+    courseware_content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE
+    )  # add a filter to limit this to program/course contenttypes
+    courseware_object_id = models.PositiveIntegerField()
+    courseware_object = GenericForeignKey(
+        "courseware_content_type", "courseware_object_id"
+    )
+    current = models.BooleanField(null=False, default=False)
+    income_threshold_usd = models.FloatField(null=False)
+
+
 @reversion.register()
 class FlexiblePrice(TimestampedModel):
     """
@@ -73,11 +100,13 @@ class FlexiblePrice(TimestampedModel):
         blank=True,
         on_delete=models.CASCADE,
     )
-    course = models.ForeignKey(
-        Course,
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
+    courseware_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    courseware_object_id = models.PositiveIntegerField()
+    courseware_object = GenericForeignKey(
+        "courseware_content_type", "courseware_object_id"
+    )
+    tier = models.ForeignKey(
+        FlexiblePriceTier, null=True, blank=True, on_delete=models.CASCADE
     )
 
     def save(self, *args, **kwargs):  # pylint: disable=signature-differs
