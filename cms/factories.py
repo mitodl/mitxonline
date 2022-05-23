@@ -5,7 +5,13 @@ from django.core.exceptions import ObjectDoesNotExist
 from factory import fuzzy, LazyAttribute
 from wagtail.core.models import Page
 
-from cms.models import HomePage, CoursePage, ResourcePage, CourseIndexPage
+from cms.models import (
+    HomePage,
+    CoursePage,
+    ResourcePage,
+    CourseIndexPage,
+    FlexiblePricingRequestForm,
+)
 from courses.factories import CourseFactory
 
 
@@ -54,3 +60,18 @@ class ResourcePageFactory(wagtail_factories.PageFactory):
 
     class Meta:
         model = ResourcePage
+
+
+class FlexiblePricingFormFactory(wagtail_factories.PageFactory):
+    intro = fuzzy.FuzzyText(prefix="Intro Text - ")
+    thank_you_text = fuzzy.FuzzyText(prefix="Thank You - ")
+    guest_text = fuzzy.FuzzyText(prefix="Not Logged In - ")
+    application_processing_text = fuzzy.FuzzyText(prefix="Application Processing - ")
+    application_approved_text = fuzzy.FuzzyText(prefix="Application Approved - ")
+    application_denied_text = fuzzy.FuzzyText(prefix="Application Denied - ")
+    parent = LazyAttribute(
+        lambda _: CoursePage.objects.first() or CoursePageFactory.create()
+    )
+
+    class Meta:
+        model = FlexiblePricingRequestForm

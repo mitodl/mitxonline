@@ -1,6 +1,8 @@
 """CMS model definitions"""
 import logging
 import re
+import datetime
+import json
 from urllib.parse import quote_plus
 
 from json import dumps
@@ -9,6 +11,9 @@ from django.conf import settings
 from django.db import models
 from django.http import Http404
 from django.urls import reverse
+from django.forms import ChoiceField
+from django.template.response import TemplateResponse
+
 from mitol.common.utils.datetime import now_in_utc
 from modelcluster.fields import ParentalKey
 from wagtail.admin.edit_handlers import (
@@ -19,19 +24,70 @@ from wagtail.admin.edit_handlers import (
 )
 from wagtail.core.blocks import StreamBlock
 from wagtail.core.fields import RichTextField, StreamField
-from wagtail.core.models import Page
 from wagtail.core.models import Page, Orderable
 from wagtail.images.models import Image
 from wagtail.images.edit_handlers import ImageChooserPanel
 from wagtail.embeds.embeds import get_embed
 from wagtail.embeds.exceptions import EmbedException
 from wagtail.search import index
+from wagtail.contrib.forms.forms import FormBuilder
+from wagtail.contrib.forms.models import (
+    AbstractForm,
+    AbstractFormField,
+    AbstractFormSubmission,
+    FORM_FIELD_CHOICES,
+)
+from django.core.serializers.json import DjangoJSONEncoder
 
 from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
 from cms.constants import COURSE_INDEX_SLUG, CMS_EDITORS_GROUP_NAME
 from courses.api import get_user_relevant_course_run
 
+from flexiblepricing.models import (
+    CurrencyExchangeRate,
+    FlexiblePrice,
+    FlexiblePricingRequestSubmission,
+)
+
 log = logging.getLogger()
+
+
+class FormField(AbstractFormField):
+    """
+    Adds support for the Country field (see FlexiblePricingFormBuilder below).
+    """
+
+    CHOICES = FORM_FIELD_CHOICES + (("country", "Country"),)
+
+    page = ParentalKey(
+        "FlexiblePricingRequestForm",
+        on_delete=models.CASCADE,
+        related_name="form_fields",
+    )
+    field_type = models.CharField(
+        verbose_name="Field Type", max_length=20, choices=CHOICES
+    )
+
+
+class FlexiblePricingFormBuilder(FormBuilder):
+    """
+    Creates a Country field type that pulls its choices from the configured
+    exchange rates in the system. (So, no exchange rate = no option.)
+    """
+
+    def create_country_field(self, field, options):
+        exchange_rates = []
+
+        for record in CurrencyExchangeRate.objects.all():
+            desc = record.currency_code
+            if len(record.description) > 0:
+                desc = "{code} - {code_description}".format(
+                    code=record.currency_code, code_description=record.description
+                )
+            exchange_rates.append((record.currency_code, desc))
+
+        options["choices"] = exchange_rates
+        return ChoiceField(**options)
 
 
 class HomePage(Page):
@@ -83,6 +139,7 @@ class HomePage(Page):
         "CoursePage",
         "ResourcePage",
         "CourseIndexPage",
+        "FlexiblePricingRequestForm",
     ]
 
     def _get_child_page_of_type(self, cls):
@@ -374,6 +431,7 @@ class CoursePage(ProductPage):
     """
 
     parent_page_types = ["CourseIndexPage"]
+    subpage_types = ["FlexiblePricingRequestForm"]
 
     course = models.OneToOneField(
         "courses.Course", null=True, on_delete=models.SET_NULL, related_name="page"
@@ -440,6 +498,7 @@ class ResourcePage(Page):
 
     template = "resource_page.html"
     parent_page_types = ["HomePage"]
+    subpage_types = ["FlexiblePricingRequestForm", "InnerResourcePage"]
 
     header_image = models.ForeignKey(
         Image,
@@ -466,3 +525,205 @@ class ResourcePage(Page):
             **super().get_context(request, *args, **kwargs),
             "site_name": settings.SITE_NAME,
         }
+
+
+class InnerResourcePage(ResourcePage):
+    """
+    Interior page - same general format as ResourcePage, but can be nested under a ResourcePage
+    """
+
+    template = "resource_page.html"
+    parent_page_types = ["ResourcePage"]
+
+
+class FlexiblePricingRequestForm(AbstractForm):
+    """
+    Flexible Pricing request form. Allows learners to request flexible pricing
+    for a given purchasable object (right now, just courses) or generally.
+
+    On submission, this will create a FlexiblePrice record and will optionally
+    link to a CoursePage if the form in question is a child page of one.
+    """
+
+    intro = RichTextField(blank=True)
+    thank_you_text = RichTextField(blank=True)
+    guest_text = RichTextField(
+        null=True,
+        blank=True,
+        help_text="What to show if the user isn't logged in.",
+    )
+    application_processing_text = RichTextField(
+        null=True,
+        blank=True,
+        help_text="What to show if the user's request is being processed.",
+    )
+    application_approved_text = RichTextField(
+        null=True,
+        blank=True,
+        help_text="What to show if the user's request has been approved.",
+    )
+    application_denied_text = RichTextField(
+        null=True,
+        blank=True,
+        help_text="What to show if the user's request has been denied.",
+    )
+
+    content_panels = AbstractForm.content_panels + [
+        FieldPanel("intro"),
+        FieldPanel("guest_text"),
+        InlinePanel("form_fields", label="Form Fields"),
+        FieldPanel("thank_you_text"),
+        FieldPanel("application_processing_text"),
+        FieldPanel("application_approved_text"),
+        FieldPanel("application_denied_text"),
+    ]
+
+    parent_page_types = ["cms.HomePage", "cms.ResourcePage", "cms.CoursePage"]
+
+    form_builder = FlexiblePricingFormBuilder
+    template = "flexiblepricing/flexible_pricing_request_form.html"
+    landing_page_template = "flexiblepricing/flexible_pricing_request_form_landing.html"
+
+    def get_submission_class(self):
+        return FlexiblePricingRequestSubmission
+
+    def get_parent_product_page(self):
+        """
+        Returns the parent product (course or program) from the page that this
+        form sits under.
+
+        Flexible Price Request forms can be created as a child page for a
+        course or program in the system. This looks at that and grabs the
+        appropriate course page back (since get_parent returns a Page).
+
+        Returns: CoursePage, or None if not found
+        """
+        # When program pages are in place, this should have some logic added to
+        # grab other product types (program runs specifically).
+        parent_page = self.get_parent()
+        if CoursePage.objects.filter(page_ptr=parent_page).exists():
+            coursepage = CoursePage.objects.filter(page_ptr=parent_page).get()
+            return coursepage
+
+        return None
+
+    def get_parent_product(self):
+        """
+        Returns just the purchasable object part of the parent page (i.e. either
+        the course or the program). (Subject to the caveats above, this just
+        returns a course for now and will need refinement when program pages
+        are in.)
+
+        Returns:
+            Course, or None if not found
+        """
+
+        return (
+            None
+            if self.get_parent_product_page() is None
+            else self.get_parent_product_page().course
+        )
+
+    def get_previous_submission(self, request):
+        """
+        Gets the last submission by the user for this page.
+
+        Returns:
+            FlexiblePrice, or None if not found.
+        """
+        if (
+            self.get_submission_class()
+            .objects.filter(page=self, user__pk=request.user.pk)
+            .exists()
+        ):
+            return (
+                FlexiblePrice.objects.filter(user__pk=request.user.pk)
+                .order_by("-created_on")
+                .first()
+            )
+
+        return None
+
+    def get_context(self, request, *args, **kwargs):
+        context = super().get_context(request, *args, **kwargs)
+        context["course"] = self.get_parent_product_page()
+
+        if (
+            self.get_submission_class()
+            .objects.filter(page=self, user__pk=request.user.pk)
+            .exists()
+        ):
+            fp_request = (
+                FlexiblePrice.objects.filter(user__pk=request.user.pk)
+                .order_by("-created_on")
+                .first()
+            )
+
+            context["has_submission"] = True
+            context["prior_request"] = fp_request
+
+        return context
+
+    def serve(self, request, *args, **kwargs):
+        previous_submission = self.get_previous_submission(request)
+        if request.method == "POST" and previous_submission is not None:
+            form = self.get_form(page=self, user=request.user)
+
+            context = self.get_context(request)
+            context["form"] = form
+            return TemplateResponse(request, self.get_template(request), context)
+
+        return super().serve(request, *args, **kwargs)
+
+    def process_form_submission(self, form):
+        form_submission = self.get_submission_class().objects.create(
+            form_data=json.dumps(form.cleaned_data, cls=DjangoJSONEncoder),
+            page=self,
+            user=form.user,
+        )
+
+        try:
+            exchangerate = CurrencyExchangeRate.objects.filter(
+                currency_code=form.cleaned_data["income_currency"]
+            ).get()
+
+            converted_income = (
+                form.cleaned_data["your_income"] * exchangerate.exchange_rate
+            )
+        except CurrencyExchangeRate.DoesNotExist:
+            converted_income = form.cleaned_data["your_income"]
+
+        course = self.get_parent_product()
+
+        flexprice_submission = FlexiblePrice(
+            user=form.user,
+            original_income=form.cleaned_data["your_income"],
+            original_currency=form.cleaned_data["income_currency"],
+            income_usd=converted_income,
+            date_exchange_rate=datetime.datetime.now(),
+            cms_submission=form_submission,
+            course=course,
+        )
+
+        flexprice_submission.save()
+
+    # Matches the standard page path that Wagtail returns for this page type.
+    slugged_page_path_pattern = re.compile(r"(^.*/)([^/]+)(/?$)")
+
+    def get_url_parts(self, request=None):
+        """
+        Overrides base method for returning the parts of the URL for pages of this class
+
+        See the get_url_parts() method in CoursePage for the underlying theory
+        here. If the form lives under a course or program page, though, this
+        needs to respect the URL of that page or the form's action will be
+        wrong.
+        """
+        if not self.get_parent_product():
+            return super().get_url_parts(request=request)
+
+        url_parts = self.get_parent_product_page().get_url_parts(request=request)
+        if not url_parts:
+            return None
+
+        return (url_parts[0], url_parts[1], r"{}{}/".format(url_parts[2], self.slug))

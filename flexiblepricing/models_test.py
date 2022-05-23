@@ -1,0 +1,33 @@
+import pytest
+import random
+from decimal import Decimal, getcontext
+from mitol.common.utils import now_in_utc
+import reversion
+
+from users.factories import UserFactory
+
+from flexiblepricing.models import FlexiblePrice
+from flexiblepricing.constants import FlexiblePriceStatus
+
+pytestmark = [pytest.mark.django_db]
+
+
+def test_submission_status():
+    """
+    Tests the is_approved and is_denied methods.
+    """
+
+    user = UserFactory.create()
+
+    for status in FlexiblePriceStatus.ALL_STATUSES:
+        submission = FlexiblePrice.objects.create(user=user, status=status)
+
+        if (
+            status == FlexiblePriceStatus.APPROVED
+            or status == FlexiblePriceStatus.AUTO_APPROVED
+        ):
+            assert submission.is_approved()
+        elif status == FlexiblePriceStatus.SKIPPED:
+            assert submission.is_denied()
+        else:
+            assert not submission.is_approved() and not submission.is_denied()

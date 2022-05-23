@@ -7,8 +7,15 @@ from reversion.admin import VersionAdmin
 
 from flexiblepricing.models import (
     CountryIncomeThreshold,
+    CurrencyExchangeRate,
     FlexiblePrice,
+    FlexiblePricingRequestSubmission,
 )
+
+
+@admin.register(CurrencyExchangeRate)
+class CurrencyExchangeRateAdmin(admin.ModelAdmin):
+    model = CurrencyExchangeRate
 
 
 class CountryIncomeThresholdAdmin(admin.ModelAdmin):
@@ -36,6 +43,12 @@ class FlexiblePriceAdmin(VersionAdmin):
         Saves object and logs change to object
         """
         obj.save_and_log(request.user)
+
+
+@admin.register(FlexiblePricingRequestSubmission)
+class FlexiblePricingRequestSubmissionAdmin(admin.ModelAdmin):
+    model = FlexiblePricingRequestSubmission
+    readonly_fields = ("form_data", "user", "page", "submit_time")
 
 
 admin.site.register(CountryIncomeThreshold, CountryIncomeThresholdAdmin)

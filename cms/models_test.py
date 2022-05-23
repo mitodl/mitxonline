@@ -3,14 +3,23 @@ from urllib.parse import quote_plus
 
 import pytest
 import factory
+import json
 from django.contrib.auth.models import AnonymousUser, Group
 from django.urls import resolve
 from django.test.client import RequestFactory
 from mitol.common.factories import UserFactory
+from django.contrib.sessions.middleware import SessionMiddleware
 
 from cms.constants import CMS_EDITORS_GROUP_NAME
-from cms.factories import ResourcePageFactory, CoursePageFactory
+from cms.factories import (
+    ResourcePageFactory,
+    CoursePageFactory,
+    FlexiblePricingFormFactory,
+)
+from cms.models import FlexiblePricingRequestSubmission
 from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
+from flexiblepricing.models import FlexiblePrice
+from flexiblepricing.constants import FlexiblePriceStatus
 
 pytestmark = [pytest.mark.django_db]
 
@@ -139,3 +148,103 @@ def test_course_page_context_edx_access(
     patched_get_relevant_run.assert_called_once_with(
         course=course_page.course, user=request_user
     )
+
+
+def generate_flexible_pricing_response(request_user, flexible_pricing_form):
+    """
+    Generates a fully realized request for the Flexible Pricing tests.
+
+    Args:
+        request_user    User object to use for authentication
+        flexible_pricing_form   The factory-generated form object
+
+    Returns:
+        TemplateResponse - this will call render() for you
+    """
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = request_user
+
+    middleware = SessionMiddleware()
+    middleware.process_request(request)
+    request.session.save()
+
+    response = flexible_pricing_form.serve(request)
+    response.render()
+
+    assert response.is_rendered
+
+    return response
+
+
+@pytest.mark.parametrize(
+    "is_authed,has_submission", [[False, False], [True, False], [True, True]]
+)
+def test_flex_pricing_form_display(mocker, is_authed, has_submission):
+    """
+    Tests the initial display of the flexible pricing form. If the user is not
+    authenticated, they should see the guest text. If they are, they should
+    see the form if they don't have an in-progress submission.
+    """
+    course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
+    flex_form = FlexiblePricingFormFactory()
+
+    if not is_authed:
+        request_user = AnonymousUser()
+    else:
+        request_user = UserFactory.create()
+        if has_submission:
+            submission = FlexiblePricingRequestSubmission.objects.create(
+                form_data=json.dumps([]), page=flex_form, user=request_user
+            )
+            flexprice = FlexiblePrice.objects.create(
+                user=request_user, cms_submission=submission
+            )
+
+    response = generate_flexible_pricing_response(request_user, flex_form)
+
+    # simple string checking for the rendered content
+    # should match what's in the factory
+
+    if not is_authed:
+        assert "Not Logged In" in response.rendered_content
+    else:
+        if has_submission:
+            assert "Application Processing" in response.rendered_content
+        else:
+            assert "csrfmiddlewaretoken" in response.rendered_content
+
+
+@pytest.mark.parametrize(
+    "submission_status",
+    [
+        [FlexiblePriceStatus.CREATED],
+        [FlexiblePriceStatus.APPROVED],
+        [FlexiblePriceStatus.SKIPPED],
+    ],
+)
+def test_flex_pricing_form_state_display(mocker, submission_status):
+    """
+    Tests the display when the user goes to submit a request again - they should
+    get one of three status update pages instead of the form.
+    """
+
+    course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
+    flex_form = FlexiblePricingFormFactory()
+
+    request_user = UserFactory.create()
+    submission = FlexiblePricingRequestSubmission.objects.create(
+        form_data=json.dumps([]), page=flex_form, user=request_user
+    )
+    flexprice = FlexiblePrice.objects.create(
+        user=request_user, cms_submission=submission, status=submission_status
+    )
+
+    response = generate_flexible_pricing_response(request_user, flex_form)
+
+    if submission_status == FlexiblePriceStatus.CREATED:
+        assert "Application Processing" in response.rendered_content
+    elif submission_status == FlexiblePriceStatus.APPROVED:
+        assert "Application Approved" in response.rendered_content
+    elif submission_status == FlexiblePriceStatus.SKIPPED:
+        assert "Application Denied" in response.rendered_content
