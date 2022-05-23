@@ -1,11 +1,15 @@
 from django.db import models
 import reversion
-from rest_framework.exceptions import ValidationError
+import json
 
 from main.utils import serialize_model_object
 from main.settings import AUTH_USER_MODEL
-from ecommerce.models import TimestampedModel
+from mitol.common.models import TimestampedModel
+from courses.models import Course
 from flexiblepricing.constants import FlexiblePriceStatus
+from wagtail.contrib.forms.models import (
+    AbstractFormSubmission,
+)
 
 
 class CurrencyExchangeRate(TimestampedModel):
@@ -14,12 +18,18 @@ class CurrencyExchangeRate(TimestampedModel):
     """
 
     currency_code = models.CharField(null=False, unique=True, max_length=3)
+    description = models.CharField(max_length=100, null=True, blank=True)
     exchange_rate = models.DecimalField(
         null=False,
         decimal_places=3,
         max_digits=4,
         help_text="Indexed to USD at the time the record was created.",
     )  # how much foreign currency is per 1 USD
+
+    def __str__(self):
+        return "{code}: 1 USD = {rate} {code}".format(
+            rate=self.exchange_rate, code=self.currency_code
+        )
 
 
 class CountryIncomeThreshold(TimestampedModel):
@@ -29,6 +39,16 @@ class CountryIncomeThreshold(TimestampedModel):
 
     country_code = models.CharField(null=False, unique=True, max_length=2)
     income_threshold = models.IntegerField(null=False)
+
+
+class FlexiblePricingRequestSubmission(AbstractFormSubmission):
+    user = models.ForeignKey(AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+    def __str__(self):
+        formdata = json.loads(self.form_data)
+        return "Flexible Pricing request from {user}: annual income {income}".format(
+            user=self.user.username, income=formdata["your_income"]
+        )
 
 
 @reversion.register()
@@ -52,6 +72,18 @@ class FlexiblePrice(TimestampedModel):
     date_documents_sent = models.DateField(null=True, blank=True)
     justification = models.TextField(null=True)
     country_of_residence = models.TextField()
+    cms_submission = models.ForeignKey(
+        FlexiblePricingRequestSubmission,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
+    course = models.ForeignKey(
+        Course,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
 
     def save(self, *args, **kwargs):  # pylint: disable=signature-differs
         """
@@ -68,3 +100,12 @@ class FlexiblePrice(TimestampedModel):
         return 'FP for user "{user}" in status "{status}"'.format(
             user=self.user.username, status=self.status
         )
+
+    def is_approved(self):
+        return (
+            self.status == FlexiblePriceStatus.APPROVED
+            or self.status == FlexiblePriceStatus.AUTO_APPROVED
+        )
+
+    def is_denied(self):
+        return self.status == FlexiblePriceStatus.SKIPPED

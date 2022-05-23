@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% load render_bundle wagtailcore_tags %}
+
+{% block title %}{{ site_name }} | {{ page.title }}{% endblock %}
+
+{% block headercontent %}
+<div id="header"></div>
+{% render_bundle 'header' %}
+{% endblock %}
+
+{% block content %}
+
+  <div id="main" class="resource-banner">
+    <div class="container">
+      <h1 class="text-uppercase">{{ page.title }}</h1>
+      {% if page.sub_heading %}
+        <h2>{{ page.sub_heading }}</h2>
+      {% endif %}
+    </div>
+  </div>
+
+<div class="container resource-container">
+  <div class="row">
+    <div class="col-md-2">
+    </div>
+    <div class="col-md-8">
+        <h2 class="text-uppercase" id="{{ page.title|slugify }}">{{ page.title }}</h2>
+
+        {% if course is not None %}
+        <p>Requesting flexible pricing for {{ course.product.title }} ({{ course.product.readable_id }}).</p>
+        {% endif %}
+
+        {{ page.intro|richtext }}
+        
+        {% if user.is_authenticated %}{# is logged in #}
+          {% if has_submission %}{# has submission #}
+            {% if prior_request.is_approved %}{# request status #}
+              {{ page.application_approved_text|richtext }}
+            {% elif prior_request.is_denied %}
+              {{ page.application_denied_text|richtext }}
+            {% else %}
+              {{ page.application_processing_text|richtext }}
+            {% endif %}{# request status #}
+          {% else %}
+            <form action="{% pageurl page %}" method="POST">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <input type="submit">
+            </form>
+          {% endif %}{# has submission #}
+        {% else %}
+        {{ page.guest_text|richtext }}
+        {% endif %} {# is logged in #}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -5,4 +5,5 @@ Ecommerce
    :maxdepth: 2
 
    overview
+   flexible_pricing
    subsystems/index
