@@ -65,8 +65,8 @@ export type Transactions = {
 }
 
 export type StreetAddress = {
-  city: ?String,
-  postal_code: ?String,
+  city: ?string,
+  postal_code: ?string,
   country: ?string,
   line: Array<string>
 }

@@ -6,40 +6,40 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0015_username_length'),
+        ("users", "0015_username_length"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='legaladdress',
-            name='city',
+            model_name="legaladdress",
+            name="city",
         ),
         migrations.RemoveField(
-            model_name='legaladdress',
-            name='postal_code',
+            model_name="legaladdress",
+            name="postal_code",
         ),
         migrations.RemoveField(
-            model_name='legaladdress',
-            name='state_or_territory',
+            model_name="legaladdress",
+            name="state_or_territory",
         ),
         migrations.RemoveField(
-            model_name='legaladdress',
-            name='street_address_1',
+            model_name="legaladdress",
+            name="street_address_1",
         ),
         migrations.RemoveField(
-            model_name='legaladdress',
-            name='street_address_2',
+            model_name="legaladdress",
+            name="street_address_2",
         ),
         migrations.RemoveField(
-            model_name='legaladdress',
-            name='street_address_3',
+            model_name="legaladdress",
+            name="street_address_3",
         ),
         migrations.RemoveField(
-            model_name='legaladdress',
-            name='street_address_4',
+            model_name="legaladdress",
+            name="street_address_4",
         ),
         migrations.RemoveField(
-            model_name='legaladdress',
-            name='street_address_5',
+            model_name="legaladdress",
+            name="street_address_5",
         ),
     ]
