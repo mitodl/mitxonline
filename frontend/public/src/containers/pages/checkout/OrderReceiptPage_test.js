@@ -46,6 +46,5 @@ describe("OrderReceiptPage", () => {
   it("renders the page with a receipt for a logged in user", async () => {
     const { inner } = await renderPage()
     assert.isTrue(inner.find(".order-receipt").exists())
-    assert.equal(inner.find(".back-link").text(), "Back to Order History")
   })
 })

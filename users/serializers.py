@@ -65,8 +65,9 @@ class LegalAddressSerializer(serializers.ModelSerializer):
 
 class ExtendedLegalAddressSerializer(LegalAddressSerializer):
     """Serializer class that includes email address as part of the legal address"""
+
     email = serializers.SerializerMethodField()
-    
+
     def get_email(self, instance):
         """Get email from the linked user object"""
         return instance.user.email
