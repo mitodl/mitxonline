@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.32.0
+Version 0.32.0 (Released May 23, 2022)
 --------------
 
 - Adding flexibile pricing request form functionality
