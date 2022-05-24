@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.32.1
+--------------
+
+- Removed call to save_and_log; VersionAdmin takes care of history tracking
+
 Version 0.32.0 (Released May 23, 2022)
 --------------
 
