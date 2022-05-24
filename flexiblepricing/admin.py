@@ -38,12 +38,6 @@ class FlexiblePriceAdmin(VersionAdmin):
     ):  # pylint: disable=unused-argument, signature-differs
         return False
 
-    def save_model(self, request, obj, form, change):
-        """
-        Saves object and logs change to object
-        """
-        obj.save_and_log(request.user)
-
 
 @admin.register(FlexiblePricingRequestSubmission)
 class FlexiblePricingRequestSubmissionAdmin(admin.ModelAdmin):
