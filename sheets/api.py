@@ -20,7 +20,7 @@ from google.auth.transport.requests import Request  # pylint:disable=no-name-in-
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from mitxpro.utils import now_in_utc
+from mitol.common.utils import now_in_utc
 from sheets.models import GoogleApiAuth, GoogleFileWatch, FileWatchRenewalAttempt
 from sheets.constants import (
     GOOGLE_TOKEN_URI,

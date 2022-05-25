@@ -1,4 +1,4 @@
-# xPRO Google Sheets - Developer Setup
+# MITx Online Google Sheets - Developer Setup
 
 [Sheets README](./README.md)
 
@@ -19,7 +19,7 @@ These are steps that only need to be completed once before you start hacking on 
 1. A Google account
 1. [ngrok](https://ngrok.com/) – This is a tool that makes your localhost accessible
     to the wider internet. This is necessary for authenticating your locally-running
-    xPRO app to make changes to your Google Drive files. If your app is deployed somewhere
+    MITx Online app to make changes to your Google Drive files. If your app is deployed somewhere
     or you have an equivalent tool, ngrok isn't strictly necessary, but these instructions
     assume its use.
 
@@ -29,15 +29,15 @@ These are steps that only need to be completed once before you start hacking on 
 2. Create web application credentials for that project
     1. Visit the credential section of the Google Developer Console: https://console.developers.google.com/apis/credentials
     1. Click Create Credentials > OAuth client ID
-    1. Select "Web application", give the credentials an intuitive name ("xPRO auth", et. al.), and submit.
+    1. Select "Web application", give the credentials an intuitive name ("MITx Online auth", et. al.), and submit.
 1. Enable the Drive API for your project
     1. Visit the API console: https://console.developers.google.com/apis/library
     1. Select your Google Cloud Platform project from the dropdown at the top of the page.
     1. Find the Drive API, click on it, and enable it. 
 
-### 3) Copy an xPRO Drive project folder
+### 3) Copy an MITx Online Drive project folder
 
-An xPRO Drive folder should have the following artifacts:
+An MITx Online Drive folder should have the following artifacts:
 
 1. **Spreadsheets** for each type of "request" we're servicing. As of 7/2020 that includes
   an enrollment code request spreadsheet, and an enrollment change request spreadsheet.
@@ -50,12 +50,12 @@ There is a template folder on the MIT shared drive, or you can ask a fellow deve
 **Just chat or email someone on the team to point you to one of these template folders.** 
 Once you can access a template folder, do the following to make your own copy:
 
-1. Create a folder on your local Drive. Call it something like "Local xPRO Enrollments".
+1. Create a folder on your local Drive. Call it something like "Local MITx Online Enrollments".
 1. Create an empty subfolder for assignment sheets. Call it something like "Local Assignment Sheets".
 1. In the template folder, select the spreadsheets (NOT the forms or any folders), and make a copy of them.
     - *NOTE: This will automatically create copies of the forms since the forms are linked to the spreadsheets already. This is intentional.*
     - *ALSO NOTE: These spreadsheets each have a single test response already entered, and should be visible on the main worksheets. Leave those test responses where they are.*
-1. Select the copied spreadsheets *and* forms, and move them to your xPRO enrollments folder that you created above.
+1. Select the copied spreadsheets *and* forms, and move them to your MITx Online enrollments folder that you created above.
 
 Your Drive folder should look something like this when you're done:
 
@@ -106,7 +106,7 @@ hack on it.
 
 ### Authenticating
 
-Your local xPRO needs permissions to be able to read/write to your Drive. This can
+Your local MITx Online needs permissions to be able to read/write to your Drive. This can
 be done via OAuth with the help of ngrok.
 
 1. Run ngrok using the nginx port for this app: `ngrok http 8053`
@@ -116,7 +116,7 @@ be done via OAuth with the help of ngrok.
     1. Select Alternate Methods > HTML Tag auth, and copy the "content" attribute value from tag (just the value, not the full HTML tag)
 1. Update .env
     ```dotenv
-    MITXPRO_BASE_URL=<Full ngrok HTTPS URL, including protocol; e.g.: https://12345abc6789.ngrok.io/ >
+    MITX_ONLINE_BASE_URL=<Full ngrok HTTPS URL, including protocol; e.g.: https://12345abc6789.ngrok.io/ >
     GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE=<"content" attribute value from step 2.iii>
     ```
 1. (Re)start containers
@@ -132,7 +132,7 @@ be done via OAuth with the help of ngrok.
         1. Click on the name of your web app credential in the OAuth 2.0 Client ID section
         1. In the "Authorized redirect URIs" section, click "Add URI", and enter the ngrok HTTPS URL appended with `/api/sheets/auth-complete/`, e.g.: `https://12345abc6789.ngrok.io/api/sheets/auth-complete/`
         1. **Click Save**
-1. Log into xPRO via Django admin using the ngrok HTTP URL (e.g.: `http://12345abc6789.ngrok.io/admin/`)
+1. Log into MITx Online via Django admin using the ngrok HTTP URL (e.g.: `http://12345abc6789.ngrok.io/admin/`)
 1. Authenticate/authorize the app
     1. Navigate to the sheets admin page (`/sheets/admin/`) with the ngrok HTTP URL (e.g.: `http://12345abc6789.ngrok.io/sheets/admin/`)
     1. Click the Authorize button and go through Google OAuth flow
@@ -141,7 +141,7 @@ be done via OAuth with the help of ngrok.
 ### Usage
 
 In production, we have webhooks (also known as "file watches") set up to make a request
-to xPRO so we can automatically execute some logic when a spreadsheet changes. You can set 
+to MITx Online so we can automatically execute some logic when a spreadsheet changes. You can set 
 those up locally too, but it's probably easier just to use the management commands. 
 
 Here's an example workflow for making a request for enrollment codes and assigning them:
@@ -175,4 +175,4 @@ to your `.env` file:
     `DRIVE_CLIENT_ID`, `DRIVE_CLIENT_SECRET`, `DRIVE_API_PROJECT_ID`
 - Add this setting, and ask a fellow developer or devops for the appropriate value:
     `DRIVE_SERVICE_ACCOUNT_CREDS`.
-    - Example: `DRIVE_SERVICE_ACCOUNT_CREDS={"type": "service_account",  "project_id": "mitxpro",  "private_key_id": "abc123", "private_key": "-----BEGIN PRIVATE KEY-----\n..." ... }`
+    - Example: `DRIVE_SERVICE_ACCOUNT_CREDS={"type": "service_account",  "project_id": "mitxonline",  "private_key_id": "abc123", "private_key": "-----BEGIN PRIVATE KEY-----\n..." ... }`

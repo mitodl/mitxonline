@@ -18,23 +18,6 @@ class GoogleApiAuth(TimestampedModel, SingletonModel):
     refresh_token = models.CharField(null=True, max_length=512)
 
 
-class CouponGenerationRequest(TimestampedModel):
-    """Model that represents a request to create bulk enrollment coupons"""
-
-    purchase_order_id = models.CharField(max_length=100, null=False)
-    coupon_name = models.CharField(max_length=256, db_index=True, null=False)
-    date_completed = models.DateTimeField(null=True, blank=True)
-    raw_data = models.CharField(max_length=300, null=True, blank=True)
-
-    def __str__(self):
-        return "CouponGenerationRequest: id={}, coupon_name={}, purchase_order_id={}, completed={}".format(
-            self.id,
-            self.coupon_name,
-            self.purchase_order_id,
-            self.date_completed is not None,
-        )
-
-
 class EnrollmentChangeRequestModel(TimestampedModel):
     """Model that represents a request to change an enrollment"""
 
@@ -51,15 +34,6 @@ class RefundRequest(EnrollmentChangeRequestModel):
 
     def __str__(self):
         return "RefundRequest: id={}, form_response_id={}, completed={}".format(
-            self.id, self.form_response_id, self.date_completed is not None
-        )
-
-
-class DeferralRequest(EnrollmentChangeRequestModel):
-    """Model that represents a request to defer an enrollment"""
-
-    def __str__(self):
-        return "DeferralRequest: id={}, form_response_id={}, completed={}".format(
             self.id, self.form_response_id, self.date_completed is not None
         )
 

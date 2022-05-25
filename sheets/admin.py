@@ -9,24 +9,10 @@ from mitxpro.admin import SingletonModelAdmin
 from sheets import models
 
 
-class CouponGenerationRequestAdmin(admin.ModelAdmin):
-    """Admin for CouponGenerationRequest"""
-
-    model = models.CouponGenerationRequest
-    list_display = ("id", "purchase_order_id", "coupon_name", "date_completed")
-
-
 class RefundRequestAdmin(admin.ModelAdmin):
     """Admin for RefundRequest"""
 
     model = models.RefundRequest
-    list_display = ("id", "form_response_id", "date_completed")
-
-
-class DeferralRequestAdmin(admin.ModelAdmin):
-    """Admin for DeferralRequest"""
-
-    model = models.DeferralRequest
     list_display = ("id", "form_response_id", "date_completed")
 
 
@@ -82,9 +68,7 @@ class FileWatchRenewalAttemptAdmin(admin.ModelAdmin):
     ordering = ("-date_attempted",)
 
 
-admin.site.register(models.CouponGenerationRequest, CouponGenerationRequestAdmin)
 admin.site.register(models.RefundRequest, RefundRequestAdmin)
-admin.site.register(models.DeferralRequest, DeferralRequestAdmin)
 admin.site.register(models.GoogleApiAuth, GoogleApiAuthAdmin)
 admin.site.register(models.GoogleFileWatch, GoogleFileWatchAdmin)
 admin.site.register(models.FileWatchRenewalAttempt, FileWatchRenewalAttemptAdmin)
