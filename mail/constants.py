@@ -3,6 +3,7 @@
 EMAIL_VERIFICATION = "verification"
 EMAIL_PW_RESET = "password_reset"
 EMAIL_CHANGE_EMAIL = "change_email"
+EMAIL_PRODUCT_ORDER_RECEIPT = "product_order_receipt"
 
 EMAIL_TYPE_DESCRIPTIONS = {
     EMAIL_VERIFICATION: "Verify Email",

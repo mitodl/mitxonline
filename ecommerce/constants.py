@@ -31,3 +31,29 @@ TRANSACTION_TYPE_PAYMENT = "payment"
 ALL_TRANSACTION_TYPES = [TRANSACTION_TYPE_PAYMENT, TRANSACTION_TYPE_REFUND]
 
 TRANSACTION_TYPES = list(zip(ALL_TRANSACTION_TYPES, ALL_TRANSACTION_TYPES))
+
+CYBERSOURCE_CARD_TYPES = {
+    "001": "Visa",
+    "002": "Mastercard",
+    "003": "American Express",
+    "004": "Discover",
+    "005": "Diners Club",
+    "006": "Carte Blanche",
+    "007": "JCB",
+    "014": "Enroute",
+    "021": "JAL",
+    "024": "Maestro (UK)",
+    "031": "Delta",
+    "033": "Visa Electron",
+    "034": "Dankort",
+    "036": "Carte Bancaires",
+    "037": "Carta Si",
+    "039": "EAN",
+    "040": "UATP",
+    "042": "Maestro (Intl)",
+    "050": "Hipercard",
+    "051": "Aura",
+    "054": "Elo",
+    "061": "RuPay",
+    "062": "China UnionPay",
+}
