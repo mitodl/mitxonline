@@ -26,7 +26,8 @@ from ecommerce.constants import (
 )
 from users.models import User
 from decimal import Decimal
-from courses.api import deactivate_run_enrollment
+from courses.api import deactivate_run_enrollment, create_run_enrollments
+from ecommerce.tasks import send_ecommerce_order_receipt
 
 from mitol.common.utils.datetime import now_in_utc
 
@@ -357,7 +358,6 @@ class PendingOrder(Order):
     @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.FULFILLED)
     def fulfill(self, payment_data):
         """Fulfill this order"""
-        from courses.api import create_run_enrollments
 
         # record the transaction
         self.transactions.create(
@@ -372,6 +372,9 @@ class PendingOrder(Order):
             mode=EDX_ENROLLMENT_VERIFIED_MODE,
             keep_failed_enrollments=True,
         )
+
+        # send the receipt emails
+        send_ecommerce_order_receipt.delay(self.id)
 
     @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.CANCELED)
     def cancel(self):

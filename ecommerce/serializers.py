@@ -1,14 +1,15 @@
 """
 MITxOnline ecommerce serializers
 """
-from this import d
+import json
 from rest_framework import serializers
+from decimal import Decimal
 
 from ecommerce import models
 from courses.models import CourseRun, ProgramRun, Course
-from ecommerce.models import Basket, Product, BasketItem
+from ecommerce.models import Basket, Product, BasketItem, Order
 from ecommerce.discounts import DiscountType
-from ecommerce.constants import TRANSACTION_TYPE_REFUND
+from ecommerce.constants import TRANSACTION_TYPE_REFUND, CYBERSOURCE_CARD_TYPES
 
 from cms.serializers import CoursePageSerializer
 
@@ -354,3 +355,208 @@ class UserDiscountMetaSerializer(serializers.ModelSerializer):
             "user",
         ]
         depth = 1
+
+
+class TransactionDataSerializer(serializers.BaseSerializer):
+    """
+    Base serializer for transaction data - pulls just the data from a supplied
+    Order object.
+    """
+
+    def to_representation(self, instance):
+        if not isinstance(instance, Order):
+            raise AttributeError()
+
+        transaction = instance.transactions.order_by("-created_on").first()
+
+        return transaction
+
+
+class TransactionPurchaseSerializer(TransactionDataSerializer):
+    """
+    Serializes the purchase data out of the transaction.
+    """
+
+    def to_representation(self, instance):
+        transaction = super().to_representation(instance).data
+
+        data = {
+            "card_number": None,
+            "card_type": None,
+            "name": None,
+            "bill_to_email": None,
+            "payment_method": None,
+        }
+
+        if "req_card_number" in transaction:
+            data["card_number"] = transaction["req_card_number"]
+        if (
+            "req_card_type" in transaction
+            and transaction["req_card_type"] in CYBERSOURCE_CARD_TYPES
+        ):
+            data["card_type"] = CYBERSOURCE_CARD_TYPES[transaction["req_card_type"]]
+        if "req_payment_method" in transaction:
+            data["payment_method"] = transaction["req_payment_method"]
+        if "req_bill_to_email" in transaction:
+            data["bill_to_email"] = transaction["req_bill_to_email"]
+        if (
+            "req_bill_to_forename" in transaction
+            or "req_bill_to_surname" in transaction
+        ):
+            data[
+                "name"
+            ] = f"{transaction['req_bill_to_forename']} {transaction['req_bill_to_surname']}"
+
+        return data
+
+
+class TransactionPurchaserSerializer(TransactionDataSerializer):
+    def to_representation(self, instance):
+        """
+        Get the purchaser information. Per discussion on this, the extended
+        address data comes from the CyberSource payload.
+        See https://github.com/mitodl/mitxonline/issues/532
+        """
+        transaction = super().to_representation(instance).data
+
+        fields = {
+            "first_name": instance.purchaser.legal_address.first_name,
+            "last_name": instance.purchaser.legal_address.last_name,
+            "country": instance.purchaser.legal_address.country,
+            "email": instance.purchaser.email,
+            "street_address": [],
+            "street_address_1": None,
+            "street_address_2": None,
+            "street_address_3": None,
+            "street_address_4": None,
+            "street_address_5": None,
+            "city": "",
+            "state_or_territory": "",
+            "postal_code": "",
+            "company": "",
+        }
+
+        if "req_bill_to_email" in transaction:
+            fields["email"] = transaction["req_bill_to_email"]
+
+        if "req_bill_to_address_line1" in transaction:
+            fields["street_address_1"] = transaction["req_bill_to_address_line1"]
+
+        if "req_bill_to_address_line2" in transaction:
+            fields["street_address_2"] = transaction["req_bill_to_address_line2"]
+
+        if "req_bill_to_address_line3" in transaction:
+            fields["street_address_3"] = transaction["req_bill_to_address_line3"]
+
+        if "req_bill_to_address_city" in transaction:
+            fields["city"] = transaction["req_bill_to_address_city"]
+
+        if "req_bill_to_address_state" in transaction:
+            fields["state_or_territory"] = transaction["req_bill_to_address_state"]
+
+        if "req_bill_to_address_country" in transaction:
+            fields["country"] = transaction["req_bill_to_address_country"]
+
+        if "req_bill_to_address_postal_code" in transaction:
+            fields["postal_code"] = transaction["req_bill_to_address_postal_code"]
+
+        return fields
+
+    def get_street_address(self, instance):
+        street_address = [
+            line
+            for line in [
+                self.street_address_1,
+                self.street_address_2,
+                self.street_address_3,
+                self.street_address_4,
+                self.street_address_5,
+            ]
+            if line
+        ]
+
+
+class TransactionOrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ["id", "created_on", "reference_number"]
+        read_only_fields = fields
+
+
+class TransactionLineSerializer(serializers.BaseSerializer):
+    def to_representation(self, instance):
+        coupon_redemption = instance.order.discounts.first()
+        discount = 0.0
+
+        if coupon_redemption:
+            discount = instance.product.price - instance.discounted_price
+
+        total_paid = (instance.product.price - Decimal(discount)) * instance.quantity
+
+        content_object = instance.product.purchasable_object
+        (content_title, readable_id) = (None, None)
+
+        if isinstance(content_object, ProgramRun):
+            content_title = content_object.program.title
+            readable_id = content_object.program.readable_id
+        elif isinstance(content_object, CourseRun):
+            readable_id = content_object.course.readable_id
+            content_title = "{} {}".format(
+                content_object.course_number, content_object.title
+            )
+
+        line = dict(
+            quantity=instance.quantity,
+            total_paid=str(total_paid),
+            discount=str(discount),
+            CEUs=None,
+            content_title=content_title,
+            readable_id=readable_id,
+            price=str(instance.product.price),
+            start_date=content_object.start_date,
+            end_date=content_object.end_date,
+        )
+
+        return line
+
+
+class OrderReceiptSerializer(serializers.ModelSerializer):
+    """
+    Serializer for extracting receipt info from an Order object
+    This hews pretty closely to the data format in xPro but modified a bit
+    for MITxOnline's data model.
+    """
+
+    lines = serializers.SerializerMethodField()
+    purchaser = serializers.SerializerMethodField()
+    coupon = serializers.SerializerMethodField()
+    order = serializers.SerializerMethodField()
+    receipt = serializers.SerializerMethodField()
+
+    def get_receipt(self, instance):
+        """
+        Difference from xPRO: here we call it a transaction
+        """
+        return TransactionPurchaseSerializer(instance).data
+
+    def get_lines(self, instance):
+        """Get product information along with applied discounts"""
+        return TransactionLineSerializer(instance.lines, many=True).data
+
+    def get_order(self, instance):
+        """Get order-specific information"""
+        return TransactionOrderSerializer(instance).data
+
+    def get_coupon(self, instance):
+        """Get discount code from the discount redemption if available"""
+        coupon_redemption = instance.discounts.first()
+        if not coupon_redemption:
+            return None
+        return DiscountRedemptionSerializer(coupon_redemption).data
+
+    def get_purchaser(self, instance):
+        return TransactionPurchaserSerializer(instance).data
+
+    class Meta:
+        fields = ["purchaser", "lines", "coupon", "order", "receipt"]
+        model = models.Order
