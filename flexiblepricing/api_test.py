@@ -1,12 +1,16 @@
 """Flexible price api tests"""
 import pytest
 
+from django.test import TestCase
+
 from flexiblepricing.api import (
     parse_country_income_thresholds,
     IncomeThreshold,
     import_country_income_thresholds,
+    update_currency_exchange_rate,
 )
 from flexiblepricing.exceptions import CountryIncomeThresholdException
+from flexiblepricing.models import CurrencyExchangeRate
 
 
 def test_parse_country_income_thresholds_no_header(tmp_path):
@@ -65,3 +69,32 @@ def test_import_country_income_thresholds(tmp_path, caplog):
     import_country_income_thresholds(path)
     assert "Updated record successfully for country=PK with income 25000"
     assert "Updated record successfully for country=US with income 75000"
+
+
+class ExchangeRateAPITests(TestCase):
+    """
+    Tests for flexible pricing exchange rate api backend
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        CurrencyExchangeRate.objects.create(currency_code="ABC", exchange_rate=1.5)
+        CurrencyExchangeRate.objects.create(currency_code="DEF", exchange_rate=1.5)
+
+    def test_update_currency_exchange_rate(self):
+        """
+        Tests updated_currency_exchange_rate()
+        """
+        latest_rates = {"ABC": 12.3, "GHI": 7.89}
+        update_currency_exchange_rate(latest_rates)
+        assert (
+            CurrencyExchangeRate.objects.get(currency_code="ABC").exchange_rate
+            == latest_rates["ABC"]
+        )
+        with self.assertRaises(CurrencyExchangeRate.DoesNotExist):
+            CurrencyExchangeRate.objects.get(currency_code="DEF")
+        assert (
+            CurrencyExchangeRate.objects.get(currency_code="GHI").exchange_rate
+            == latest_rates["GHI"]
+        )

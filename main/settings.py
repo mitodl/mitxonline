@@ -772,6 +772,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "openedx.tasks.retry_failed_edx_enrollments",
         "schedule": RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY,
     },
+    "update-currency-exchange-rates-every-24-hrs": {
+        "task": "flexiblepricing.tasks.sync_currency_exchange_rates",
+        "schedule": crontab(minute=0, hour="3"),
+    },
     "repair-faulty-edx-users": {
         "task": "openedx.tasks.repair_faulty_openedx_users",
         "schedule": OffsettingSchedule(
@@ -993,4 +997,16 @@ MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL = get_string(
     name="MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL",
     default=None,
     description="CyberSource secure acceptance URL",
+)
+
+# Open Exchange Rates
+OPEN_EXCHANGE_RATES_URL = get_string(
+    name="OPEN_EXCHANGE_RATES_URL",
+    default="https://openexchangerates.org/api/",
+    description="open exchange api url for fetching currency exchange rate",
+)
+OPEN_EXCHANGE_RATES_APP_ID = get_string(
+    name="OPEN_EXCHANGE_RATES_APP_ID",
+    default="",
+    description="open exchange app id for fetching currency exchange rate",
 )

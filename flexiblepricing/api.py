@@ -3,9 +3,11 @@ import csv
 from collections import namedtuple
 import logging
 
+from django.db import transaction
+
 from flexiblepricing.constants import INCOME_THRESHOLD_FIELDS, COUNTRY, INCOME
 from flexiblepricing.exceptions import CountryIncomeThresholdException
-from flexiblepricing.models import CountryIncomeThreshold
+from flexiblepricing.models import CountryIncomeThreshold, CurrencyExchangeRate
 
 IncomeThreshold = namedtuple("IncomeThreshold", ["country", "income"])
 log = logging.getLogger(__name__)
@@ -74,3 +76,28 @@ def import_country_income_thresholds(csv_path):
                 country_income.country_code,
                 country_income.income_threshold,
             )
+
+
+@transaction.atomic
+def update_currency_exchange_rate(latest_rates):
+    """
+    Updates all CurrencyExchangeRate objects based on the latest rates.
+    Args:
+        latest_rates (dict): latest exchange rates from Open Exchange Rates API
+    Returns:
+        None
+    """
+    rates = latest_rates.copy()  # So we don't modify the passed parameter
+    currency_exchange_rates = CurrencyExchangeRate.objects.all()
+    for currency_exchange_rate in currency_exchange_rates:
+        if currency_exchange_rate.currency_code in rates:
+            currency_exchange_rate.exchange_rate = rates.pop(
+                currency_exchange_rate.currency_code
+            )
+            currency_exchange_rate.save()
+        else:
+            currency_exchange_rate.delete()
+    for currency in rates:
+        CurrencyExchangeRate.objects.create(
+            currency_code=currency, exchange_rate=rates[currency]
+        )

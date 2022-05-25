@@ -69,7 +69,6 @@ def test_basic_exchange_rates(user_drf_client, exchange_rate):
     assert len(resp.json()) >= 1
 
     random_rate = random.randrange(0, 100, 1) / 100
-
     new_rate = {"currency_code": "XXX", "exchange_rate": random_rate}
 
     resp = user_drf_client.post(reverse("fp_exchangerates_api-list"), new_rate)
@@ -77,9 +76,9 @@ def test_basic_exchange_rates(user_drf_client, exchange_rate):
     assert resp.status_code == 201
     assert len(resp.json()) >= 2
     data = resp.json()
-    assert Decimal(data["exchange_rate"]) == Decimal(random_rate).quantize(
-        Decimal(".001")
-    )
+    assert Decimal(data["exchange_rate"]).quantize(Decimal("0.001")) == Decimal(
+        random_rate
+    ).quantize(Decimal("0.001"))
 
     resp = user_drf_client.get(reverse("fp_exchangerates_api-list"))
     assert resp.status_code == 200
