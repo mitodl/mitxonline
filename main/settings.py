@@ -994,3 +994,155 @@ MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL = get_string(
     default=None,
     description="CyberSource secure acceptance URL",
 )
+
+# Sheets settings
+DRIVE_SERVICE_ACCOUNT_CREDS = get_string(
+    name="DRIVE_SERVICE_ACCOUNT_CREDS",
+    default=None,
+    description="The contents of the Service Account credentials JSON to use for Google API auth",
+)
+DRIVE_CLIENT_ID = get_string(
+    name="DRIVE_CLIENT_ID",
+    default=None,
+    description="Client ID from Google API credentials",
+)
+DRIVE_CLIENT_SECRET = get_string(
+    name="DRIVE_CLIENT_SECRET",
+    default=None,
+    description="Client secret from Google API credentials",
+)
+DRIVE_API_PROJECT_ID = get_string(
+    name="DRIVE_API_PROJECT_ID",
+    default=None,
+    description="ID for the Google API project where the credentials were created",
+)
+DRIVE_WEBHOOK_CHANNEL_ID = get_string(
+    name="DRIVE_WEBHOOK_CHANNEL_ID",
+    default="mitxpro-sheets-app",
+    description="Channel ID to use for requests to get push notifications for file changes",
+)
+DRIVE_SHARED_ID = get_string(
+    name="DRIVE_SHARED_ID",
+    default=None,
+    description="ID of the Shared Drive (a.k.a. Team Drive). This is equal to the top-level folder ID.",
+)
+DRIVE_OUTPUT_FOLDER_ID = get_string(
+    name="DRIVE_OUTPUT_FOLDER_ID",
+    default=None,
+    description="ID of the Drive folder where newly created Sheets should be kept",
+)
+COUPON_REQUEST_SHEET_ID = get_string(
+    name="COUPON_REQUEST_SHEET_ID",
+    default=None,
+    description="ID of the Google Sheet that contains requests for coupons",
+)
+ENROLLMENT_CHANGE_SHEET_ID = get_string(
+    name="ENROLLMENT_CHANGE_SHEET_ID",
+    default=None,
+    description=(
+        "ID of the Google Sheet that contains the enrollment change request worksheets (refunds, transfers, etc)"
+    ),
+)
+REFUND_REQUEST_WORKSHEET_ID = get_string(
+    name="REFUND_REQUEST_WORKSHEET_ID",
+    default="0",
+    description=(
+        "ID of the worksheet within the enrollment change request spreadsheet that contains enrollment refund requests"
+    ),
+)
+DEFERRAL_REQUEST_WORKSHEET_ID = get_string(
+    name="DEFERRAL_REQUEST_WORKSHEET_ID",
+    default=None,
+    description=(
+        "ID of the worksheet within the enrollment change request spreadsheet that contains "
+        "enrollment deferral requests"
+    ),
+)
+GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE = get_string(
+    name="GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE",
+    default=None,
+    description="The value of the meta tag used by Google to verify the owner of a domain (used for enabling push notifications)",
+)
+SHEETS_ADMIN_EMAILS = get_delimited_list(
+    name="SHEETS_ADMIN_EMAILS",
+    default=[],
+    description="Comma-separated list of emails for users that should be added as an editor for all newly created Sheets",
+)
+SHEETS_DATE_FORMAT = get_string(
+    name="SHEETS_DATE_FORMAT",
+    default="%m/%d/%Y %H:%M:%S",
+    description="Python strptime format for datetime columns in enrollment management spreadsheets",
+)
+SHEETS_DATE_ONLY_FORMAT = get_string(
+    name="SHEETS_DATE_ONLY_FORMAT",
+    default="%m/%d/%Y",
+    description="Python strptime format for date columns (no time) in enrollment management spreadsheets",
+)
+_sheets_date_timezone = get_string(
+    name="SHEETS_DATE_TIMEZONE",
+    default="UTC",
+    description=(
+        "The name of the timezone that should be assumed for date/time values in spreadsheets. "
+        "Choose from a value in the TZ database (https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)."
+    ),
+)
+SHEETS_DATE_TIMEZONE = pytz.timezone(_sheets_date_timezone)
+
+SHEETS_REFUND_FIRST_ROW = get_int(
+    name="SHEETS_REFUND_FIRST_ROW",
+    default=4,
+    description=(
+        "The first row (as it appears in the spreadsheet) of data that our scripts should consider "
+        "processing in the refund request spreadsheet"
+    ),
+)
+SHEETS_DEFERRAL_FIRST_ROW = get_int(
+    name="SHEETS_DEFERRAL_FIRST_ROW",
+    default=5,
+    description=(
+        "The first row (as it appears in the spreadsheet) of data that our scripts should consider "
+        "processing in the deferral request spreadsheet"
+    ),
+)
+# Specify the zero-based index of certain request sheet columns
+SHEETS_REQ_EMAIL_COL = 7
+SHEETS_REQ_PROCESSED_COL = 8
+SHEETS_REQ_ERROR_COL = 9
+SHEETS_REQ_CALCULATED_COLUMNS = {
+    SHEETS_REQ_EMAIL_COL,
+    SHEETS_REQ_PROCESSED_COL,
+    SHEETS_REQ_ERROR_COL,
+}
+# Calculate the column letters in the spreadsheet based on those indices
+_uppercase_a_ord = ord("A")
+SHEETS_REQ_PROCESSED_COL_LETTER = chr(SHEETS_REQ_PROCESSED_COL + _uppercase_a_ord)
+SHEETS_REQ_ERROR_COL_LETTER = chr(SHEETS_REQ_ERROR_COL + _uppercase_a_ord)
+
+SHEETS_REFUND_PROCESSOR_COL = get_int(
+    name="SHEETS_REFUND_PROCESSOR_COL",
+    default=11,
+    description=(
+        "The zero-based index of the enrollment change sheet column that contains the user that processed the row"
+    ),
+)
+SHEETS_REFUND_COMPLETED_DATE_COL = get_int(
+    name="SHEETS_REFUND_COMPLETED_DATE_COL",
+    default=12,
+    description=(
+        "The zero-based index of the enrollment change sheet column that contains the row completion date"
+    ),
+)
+SHEETS_REFUND_ERROR_COL = get_int(
+    name="SHEETS_REFUND_ERROR_COL",
+    default=13,
+    description=(
+        "The zero-based index of the enrollment change sheet column that contains row processing error messages"
+    ),
+)
+SHEETS_REFUND_SKIP_ROW_COL = get_int(
+    name="SHEETS_REFUND_SKIP_ROW_COL",
+    default=14,
+    description=(
+        "The zero-based index of the enrollment change sheet column that indicates whether the row should be skipped"
+    ),
+)

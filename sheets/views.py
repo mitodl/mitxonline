@@ -18,7 +18,7 @@ from rest_framework import status
 from google_auth_oauthlib.flow import Flow  # pylint: disable-all
 from google.auth.exceptions import GoogleAuthError  # pylint: disable-all
 
-from mitxpro.utils import now_in_utc
+from mitol.common.utils.datetime import now_in_utc
 from sheets.api import get_sheet_metadata_from_type
 from sheets.models import GoogleApiAuth, GoogleFileWatch
 from sheets.constants import (
@@ -29,8 +29,6 @@ from sheets.constants import (
 )
 from sheets.utils import generate_google_client_config
 from sheets import tasks
-from sheets.coupon_assign_api import CouponAssignmentHandler
-from sheets.coupon_request_api import CouponRequestHandler
 
 log = logging.getLogger(__name__)
 

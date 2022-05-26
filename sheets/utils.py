@@ -9,7 +9,6 @@ import pytz
 from django.conf import settings
 from django.urls import reverse
 
-from mitxpro.utils import matching_item_index
 from sheets.constants import (
     GOOGLE_AUTH_URI,
     GOOGLE_TOKEN_URI,
@@ -25,6 +24,21 @@ from sheets.constants import (
     SHEET_TYPE_ENROLL_CHANGE,
 )
 
+def matching_item_index(iterable, value_to_match):
+    """
+    Returns the index of the given value in the iterable
+
+    Args:
+        iterable (Iterable): The iterable to search
+        value_to_match (Any): The value to match
+
+    Returns:
+        int: The index of the matching value
+
+    Raises:
+        StopIteration: Raised if the value is not found in the iterable
+    """
+    return next(i for i, value in enumerate(iterable) if value == value_to_match)
 
 def generate_google_client_config():
     """Helper method to generate Google client config based on app settings"""

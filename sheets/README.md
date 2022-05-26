@@ -1,4 +1,4 @@
-# xPRO Google Sheets
+# MITx Online Google Sheets
 
 **SECTIONS**
 1. [What Is This?](#what-is-this)
@@ -21,7 +21,7 @@ Using various Google Drive and Sheets APIs, the following is now possible:
 
 ## How It Works
 
-The basic workflow for most flavors of xPRO sheets is roughly as follows:
+The basic workflow for most flavors of MITx Online sheets is roughly as follows:
 
 1. A user fills out a Google Form. That form submission is a request for some work to 
 be done, and it is automatically added to a form responses worksheet within a relevant spreadsheet.
@@ -222,4 +222,4 @@ Depending on the error message and the frequency of emails, we should respond in
 
 ## Development Setup
 
-Instructions can be found here: [xPRO Google Sheets - Developer Setup](./dev-setup.md)
+Instructions can be found here: [MITx Online Google Sheets - Developer Setup](./dev-setup.md)

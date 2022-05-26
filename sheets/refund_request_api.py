@@ -10,7 +10,7 @@ from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.models import CourseRunEnrollment, ProgramEnrollment
 from courses.utils import is_program_text_id
 from ecommerce.models import Order
-from mitxpro.utils import now_in_utc
+from mitol.common.utils.datetime import now_in_utc
 from sheets.constants import (
     REFUND_SHEET_ORDER_TYPE_PAID,
     REFUND_SHEET_ORDER_TYPE_FULL_COUPON,

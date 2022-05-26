@@ -87,6 +87,54 @@
       "description": "The log level for django",
       "required": false
     },
+    "DRIVE_API_PROJECT_ID": {
+      "description": "ID for the Google API project where the credentials were created",
+      "required": false
+    },
+    "DRIVE_CLIENT_ID": {
+      "description": "Client ID from Google API credentials",
+      "required": false
+    },
+    "DRIVE_CLIENT_SECRET": {
+      "description": "Client secret from Google API credentials",
+      "required": false
+    },
+    "DRIVE_OUTPUT_FOLDER_ID": {
+      "description": "ID of the Drive folder where newly created Sheets should be kept",
+      "required": false
+    },
+    "DRIVE_SERVICE_ACCOUNT_CREDS": {
+      "description": "The contents of the Service Account credentials JSON to use for Google API auth",
+      "required": false
+    },
+    "DRIVE_SHARED_ID": {
+      "description": "ID of the Shared Drive (a.k.a. Team Drive). This is equal to the top-level folder ID.",
+      "required": false
+    },
+    "DRIVE_WEBHOOK_ASSIGNMENT_MAX_AGE_DAYS": {
+      "description": "The number of days from the last update that a coupon assignment sheet should still be considered 'fresh', i.e.: should still be monitored for changes via webhook/file watch.",
+      "required": false
+    },
+    "DRIVE_WEBHOOK_ASSIGNMENT_WAIT": {
+      "description": "The number of seconds to wait to process a coupon assignment sheet after we receive a webhook request from that sheet. The task to process the sheet is scheduled this many seconds in the future.",
+      "required": false
+    },
+    "DRIVE_WEBHOOK_CHANNEL_ID": {
+      "description": "Channel ID to use for requests to get push notifications for file changes",
+      "required": false
+    },
+    "DRIVE_WEBHOOK_EXPIRATION_MINUTES": {
+      "description": "The number of minutes after creation that a webhook (push notification) for a Drive file will expire (Google does not accept an expiration beyond 24 hours, and if the expiration is not provided via API, it defaults to 1 hour).",
+      "required": false
+    },
+    "DRIVE_WEBHOOK_RENEWAL_PERIOD_MINUTES": {
+      "description": "The maximum time difference (in minutes) from the present time to a webhook expiration date to consider a webhook 'fresh', i.e.: not in need of renewal. If the time difference is less than this value, the webhook should be renewed.",
+      "required": false
+    },
+    "EDX_API_CLIENT_TIMEOUT": {
+      "description": "Timeout (in seconds) for requests made via the edX API client",
+      "required": false
+    },
     "ECOMMERCE_DEFAULT_PAYMENT_GATEWAY": {
       "description": "The default payment gateway to use. Must match the value of the constant in the mitol.payment_gateway library.",
       "required": false
@@ -97,6 +145,10 @@
     },
     "GA_TRACKING_ID": {
       "description": "Google analytics tracking ID",
+      "required": false
+    },
+    "GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE": {
+      "description": "The value of the meta tag used by Google to verify the owner of a domain (used for enabling push notifications)",
       "required": false
     },
     "GTM_TRACKING_ID": {
