@@ -6,12 +6,7 @@ $label-color: #8a8b8c;
   padding: 20px 15px;
   margin: 0 auto;
   max-width: 1018px;
-  font: 500 18px/23px 'Rajdhani', Times New Roman, serif;
   color: black;
-
-  @media only screen and (max-width: 992px) {
-    font: 500 16px/21px 'Rajdhani', Times New Roman, serif;
-  }
 
   * {
     box-sizing: border-box;
@@ -49,12 +44,10 @@ $label-color: #8a8b8c;
   }
 
   h2 {
-    font: 600 40px/51px 'Rajdhani', Times New Roman, serif;
     margin: 0 0 30px;
     color: black;
 
     @media only screen and (max-width: 767px) {
-      font: 600 30px/41px 'Rajdhani', Times New Roman, serif;
       margin: 0 0 10px;
     }
   }
@@ -100,16 +93,11 @@ $label-color: #8a8b8c;
   }
 
   h3 {
-    font: 600 20px/26px 'Rajdhani', Times New Roman, serif;
     margin: 0 -15px 20px;
     border: none;
     padding: 5px 15px;
     color: black;
     background: lightgrey;
-
-    @media only screen and (max-width: 992px) {
-      font: 600 18px/24px 'Rajdhani', Times New Roman, serif;
-    }
   }
 }
 
@@ -140,7 +128,6 @@ $label-color: #8a8b8c;
   padding: 0 0 15px;
 
   h3 {
-    font: 600 20px/26px 'Rajdhani', Times New Roman, serif;
     margin: 0;
     padding: 5px 15px;
     color: black;
@@ -170,11 +157,6 @@ $label-color: #8a8b8c;
       color: black;
       background: lightgrey;
       white-space: nowrap;
-      font: 600 20px/26px 'Rajdhani', Times New Roman, serif;
-
-      @media only screen and (max-width: 992px) {
-        font: 600 18px/24px 'Rajdhani', Times New Roman, serif;
-      }
     }
 
     td {
@@ -191,7 +173,6 @@ $label-color: #8a8b8c;
         color: black;
         white-space: nowrap;
         padding: 0 10px 0 0;
-        font: 600 18px/24px 'Rajdhani', Times New Roman, serif;
         float: left;
         width: 135px;
 
@@ -246,12 +227,11 @@ $label-color: #8a8b8c;
   .print-btn,
   .print-row,
   .footer,
-  .header-holder {
+  .site-header {
     display: none !important;
   }
 
   .receipt-wrapper {
     padding: 0 15px;
-    font: 500 16px/21px 'Rajdhani', Times New Roman, serif;
   }
 }
