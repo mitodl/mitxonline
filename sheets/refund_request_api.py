@@ -8,7 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from courses.api import deactivate_program_enrollment, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.models import CourseRunEnrollment, ProgramEnrollment
-from courses.utils import is_program_text_id
+from utils import is_program_text_id
 from ecommerce.models import Order
 from mitol.common.utils.datetime import now_in_utc
 from sheets.constants import (

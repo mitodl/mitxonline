@@ -766,6 +766,51 @@ REPAIR_OPENEDX_USERS_FREQUENCY = get_int(
     description="How many seconds between repairing openedx records for faulty users",
 )
 REPAIR_OPENEDX_USERS_OFFSET = int(REPAIR_OPENEDX_USERS_FREQUENCY / 2)
+DRIVE_WEBHOOK_EXPIRATION_MINUTES = get_int(
+    name="DRIVE_WEBHOOK_EXPIRATION_MINUTES",
+    default=60 * 24,
+    description=(
+        "The number of minutes after creation that a webhook (push notification) for a Drive "
+        "file will expire (Google does not accept an expiration beyond 24 hours, and if the "
+        "expiration is not provided via API, it defaults to 1 hour)."
+    ),
+)
+DRIVE_WEBHOOK_RENEWAL_PERIOD_MINUTES = get_int(
+    name="DRIVE_WEBHOOK_RENEWAL_PERIOD_MINUTES",
+    default=60 * 3,
+    description=(
+        "The maximum time difference (in minutes) from the present time to a webhook expiration "
+        "date to consider a webhook 'fresh', i.e.: not in need of renewal. If the time difference "
+        "is less than this value, the webhook should be renewed."
+    ),
+)
+DRIVE_WEBHOOK_ASSIGNMENT_WAIT = get_int(
+    name="DRIVE_WEBHOOK_ASSIGNMENT_WAIT",
+    default=60 * 5,
+    description=(
+        "The number of seconds to wait to process a coupon assignment sheet after we receive "
+        "a webhook request from that sheet. The task to process the sheet is scheduled this many "
+        "seconds in the future."
+    ),
+)
+DRIVE_WEBHOOK_ASSIGNMENT_MAX_AGE_DAYS = get_int(
+    name="DRIVE_WEBHOOK_ASSIGNMENT_MAX_AGE_DAYS",
+    default=30,
+    description=(
+        "The number of days from the last update that a coupon assignment sheet should still be "
+        "considered 'fresh', i.e.: should still be monitored for changes via webhook/file watch."
+    ),
+)
+SHEETS_MONITORING_FREQUENCY = get_int(
+    name="SHEETS_MONITORING_FREQUENCY",
+    default=60 * 60 * 2,
+    description="The frequency that the Drive folder should be checked for bulk coupon Sheets that need processing",
+)
+SHEETS_TASK_OFFSET = get_int(
+    name="SHEETS_TASK_OFFSET",
+    default=60 * 5,
+    description="How many seconds to wait in between executing different Sheets tasks in series",
+)
 
 CELERY_BEAT_SCHEDULE = {
     "retry-failed-edx-enrollments": {
@@ -790,6 +835,38 @@ CELERY_BEAT_SCHEDULE = {
         ),
     },
 }
+if FEATURES.get("COUPON_SHEETS"):
+    CELERY_BEAT_SCHEDULE["renew_all_file_watches"] = {
+        "task": "sheets.tasks.renew_all_file_watches",
+        "schedule": (
+            DRIVE_WEBHOOK_EXPIRATION_MINUTES - DRIVE_WEBHOOK_RENEWAL_PERIOD_MINUTES
+        )
+        * 60,
+    }
+    alt_sheets_processing = FEATURES.get("COUPON_SHEETS_ALT_PROCESSING")
+    if alt_sheets_processing:
+        CELERY_BEAT_SCHEDULE.update(
+            {
+                "handle-coupon-request-sheet": {
+                    "task": "sheets.tasks.handle_unprocessed_coupon_requests",
+                    "schedule": SHEETS_MONITORING_FREQUENCY,
+                }
+            }
+        )
+    CELERY_BEAT_SCHEDULE.update(
+        {
+            "update-assignment-delivery-dates": {
+                "task": "sheets.tasks.update_incomplete_assignment_delivery_statuses",
+                "schedule": OffsettingSchedule(
+                    run_every=timedelta(seconds=SHEETS_MONITORING_FREQUENCY),
+                    offset=timedelta(
+                        seconds=0 if not alt_sheets_processing else SHEETS_TASK_OFFSET
+                    ),
+                ),
+            }
+        }
+    )
+
 
 # Hijack
 HIJACK_ALLOW_GET_REQUESTS = True

@@ -648,3 +648,15 @@ def build_drive_file_email_share_request(file_id, email_to_share):
         supportsTeamDrives=True,
         **added_kwargs,
     )
+
+def is_program_text_id(item_text_id):
+    """
+    Analyzes a text id for some enrollable item and returns True if it's a program id
+
+    Args:
+        item_text_id (str): The text id for some enrollable item (program/course run)
+
+    Returns:
+        bool: True if the given id is a program id
+    """
+    return item_text_id.startswith(PROGRAM_TEXT_ID_PREFIX)
