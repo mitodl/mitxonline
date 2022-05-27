@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from flexiblepricing import models
+from users.serializers import UserSerializer
 
 
 class CurrencyExchangeRateSerializer(serializers.ModelSerializer):
@@ -20,6 +21,8 @@ class CountryIncomeThresholdSerializer(serializers.ModelSerializer):
 
 
 class FlexiblePriceSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
     class Meta:
         model = models.FlexiblePrice
         fields = [

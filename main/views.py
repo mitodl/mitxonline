@@ -6,6 +6,7 @@ from django.http import HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import reverse
+from rest_framework.pagination import LimitOffsetPagination
 
 
 def index(request, **kwargs):
@@ -31,3 +32,14 @@ def handler500(request):
 def cms_signin_redirect_to_site_signin(request):
     """Redirect wagtail admin signin to site signin page"""
     return redirect_to_login(reverse("wagtailadmin_home"), login_url="/signin")
+
+
+class RefinePagination(LimitOffsetPagination):
+    """
+    A pagination class that uses the default Refine limit and offset parameters.
+    """
+
+    default_limit = 10
+    limit_query_param = "l"
+    offset_query_param = "o"
+    max_limit = 50

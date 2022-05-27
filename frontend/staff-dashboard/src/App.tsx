@@ -14,10 +14,11 @@ import {
 import LoginPage from "pages/login";
 import { DashboardPage } from "pages/dashboard";
 import { DiscountList, DiscountEdit, DiscountShow, DiscountCreate } from "pages/discounts";
+import { FlexiblePricingList } from "./pages/flexible_pricing";
 import axios from "axios";
 import useDrfDataProvider from "hooks/useDrfDataProvider";
 
-const {UserOutlined, BarcodeOutlined} = Icons;
+const {UserOutlined, BarcodeOutlined, FormOutlined} = Icons;
 const axiosInterface = axios.create();
 
 axiosInterface.interceptors.request.use((config: any) => {
@@ -56,6 +57,14 @@ export default function App() {
           edit: DiscountEdit,
           create: DiscountCreate,
         },
+        {
+          name: 'flexible_pricing',
+          icon: <FormOutlined/>,
+          options: {
+            label: 'Flexible Pricing'
+          },
+          list: FlexiblePricingList,
+        }
       ]}
       Title={Title}
       Header={Header}

@@ -101,10 +101,13 @@ def test_basic_flex_payments(
 
     resp = user_drf_client.get(reverse("fp_flexiblepricing_api-list"))
     assert resp.status_code == 200
-    assert len(resp.json()) == 1
-    data = resp.json()
-    assert data[0]["user"] == user.id
+    json_response = resp.json()
+    assert len(json_response["results"]) == 1
+    assert json_response["results"][0]["user"]["id"] == user.id
+
+    allapps = models.FlexiblePrice.objects.all()
 
     resp = admin_drf_client.get(reverse("fp_admin_flexiblepricing_api-list"))
+    json_response = resp.json()
     assert resp.status_code == 200
-    assert len(resp.json()) > 1
+    assert json_response["count"] == allapps.count()
