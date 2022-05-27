@@ -231,12 +231,16 @@ class LineSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    lines = LineSerializer(many=True)
+    lines = serializers.SerializerMethodField()
     discounts = serializers.SerializerMethodField()
     refunds = serializers.SerializerMethodField()
     purchaser = serializers.SerializerMethodField()
     transactions = serializers.SerializerMethodField()
     street_address = serializers.SerializerMethodField()
+
+    def get_lines(self, instance):
+        """Get product information along with applied discounts"""
+        return TransactionLineSerializer(instance.lines, many=True).data
 
     def get_discounts(self, instance):
         discounts = []

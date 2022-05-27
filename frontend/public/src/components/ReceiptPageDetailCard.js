@@ -186,17 +186,17 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
             <tbody>
               {orderReceipt.lines.map(line => {
                 const startDate = parseDateString(
-                  line.product.purchasable_object.start_date
+                  line.start_date
                 )
                 const endDate = parseDateString(
-                  line.product.purchasable_object.end_date
+                  line.end_date
                 )
                 return (
-                  <tr key={line.product.purchasable_object.readable_id}>
+                  <tr key={line.readable_id}>
                     <td>
                       <div>
-                        {line.product.purchasable_object.title} <br />
-                        {line.product.purchasable_object.readable_id} <br />
+                        {line.content_title} <br />
+                        {line.readable_id} <br />
                         {startDate && formatPrettyDate(startDate)} -{" "}
                         {endDate && formatPrettyDate(endDate)}
                       </div>
@@ -205,13 +205,13 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                       <div>{line.quantity}</div>
                     </td>
                     <td>
-                      <div>${line.product.price}</div>
+                      <div>${line.price}</div>
                     </td>
                     <td>
                       <div>${discountAmountText}</div>
                     </td>
                     <td>
-                      <div>${totalPaid}</div>
+                      <div>${line.total_paid}</div>
                     </td>
                   </tr>
                 )
