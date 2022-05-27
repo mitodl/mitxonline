@@ -24,6 +24,10 @@ to be usable. You can apply all of those changes by running a management command
 docker-compose run --rm web ./manage.py configure_wagtail
 ```
 
+### Configuring Refine Admin
+
+See [Configure Refine Admin](docs/source/configuration/refine_admin.rst)
+
 # Running, testing, and administering the app
 
 Running, testing, and administering this app follows the same patterns as our other web apps. 
