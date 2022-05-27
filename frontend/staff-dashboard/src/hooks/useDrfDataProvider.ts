@@ -116,12 +116,20 @@ const useDrfDataProvider = (
 
         const uri = `${url}?${stringify(query)}`;
 
-        const { data: { results: data, count: total }, headers } = await httpClient.get(uri);
+        const { data, headers } = await httpClient.get(uri);
 
-        return {
-            data, 
-            total,
-        };
+        if (data.hasOwnProperty('results')) {
+            return {
+                data: data['results'],
+                total: data['total']
+            };
+        } else {
+            return {
+                data: data,
+                total: data.length
+            };
+        }
+
     };
 
     return simpleDataProvider;

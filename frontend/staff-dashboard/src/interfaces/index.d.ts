@@ -19,3 +19,22 @@ export interface IUserDiscount {
     discount: IDiscount;
     user: any;
 }
+
+export interface IFlexiblePriceRequest {
+    id: number;
+    user: number;
+    status: string;
+    income_usd: number;
+    original_income: number;
+    original_currency: string;
+    country_of_income: null;
+    date_exchange_rate: Date;
+    date_documents_sent: Date;
+    justification: string;
+    country_of_residence: string;
+}
+
+export interface IFlexiblePriceStatus {
+    id: string,
+    title: string
+}
