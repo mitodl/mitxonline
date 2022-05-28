@@ -3,8 +3,9 @@ from django.conf import settings
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models import DateTimeField, Model, PositiveSmallIntegerField
+from django.contrib import admin
 
-from mitxpro.models import TimestampedModel, SingletonModel
+from mitol.common.models import TimestampedModel, SingletonModel
 from sheets.constants import VALID_SHEET_TYPES
 
 
@@ -95,3 +96,11 @@ class FileWatchRenewalAttempt(Model):
     date_attempted = DateTimeField(auto_now_add=True)
     result = models.CharField(max_length=300, null=True, blank=True)
     result_status_code = PositiveSmallIntegerField(null=True, blank=True)
+
+
+class SingletonModelAdmin(admin.ModelAdmin):
+    """A ModelAdmin which enforces a singleton model"""
+
+    def has_add_permission(self, request):
+        """Overridden method - prevent adding an object if one already exists"""
+        return self.model.objects.count() == 0

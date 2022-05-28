@@ -242,21 +242,21 @@ markupsafe==2.0.1
     # via jinja2
 matplotlib-inline==0.1.2
     # via ipython
-mitol-django-authentication==1.3.1
+mitol-django-authentication==1.4.1
     # via -r requirements.in
-mitol-django-common==2.1.0
+mitol-django-common==2.2.4
     # via
     #   -r requirements.in
     #   mitol-django-authentication
     #   mitol-django-mail
     #   mitol-django-payment-gateway
-mitol-django-mail==3.0.1
+mitol-django-mail==3.1.0
     # via
     #   -r requirements.in
     #   mitol-django-authentication
 mitol-django-openedx==1.0.0
     # via -r requirements.in
-mitol-django-payment-gateway==1.2.2
+mitol-django-payment-gateway==1.3.0
     # via -r requirements.in
 newrelic==6.4.1.158
     # via -r requirements.in

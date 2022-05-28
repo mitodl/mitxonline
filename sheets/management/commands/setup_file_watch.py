@@ -1,5 +1,5 @@
 """
-Makes a request to receive push notifications when xPro spreadsheets are updated
+Makes a request to receive push notifications when MITx Online spreadsheets are updated
 """
 from collections import namedtuple
 import sys
@@ -24,7 +24,7 @@ FileWatchResult = namedtuple(
 
 class Command(BaseCommand):
     """
-    Makes a request to receive push notifications when xPro spreadsheets are updated
+    Makes a request to receive push notifications when MITx Online spreadsheets are updated
     """
 
     help = __doc__

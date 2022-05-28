@@ -9,6 +9,7 @@ from datetime import timedelta
 from urllib.parse import urljoin, urlparse
 
 import dj_database_url
+import pytz
 from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common.envs import (
@@ -188,6 +189,7 @@ INSTALLED_APPS = (
     "hijack",
     "hijack_admin",
     "ecommerce",
+    "sheets",
     "flexiblepricing",
     # ol-dango apps, must be after this project's apps for template precedence
     "mitol.common.apps.CommonApp",
@@ -1095,7 +1097,7 @@ DRIVE_API_PROJECT_ID = get_string(
 )
 DRIVE_WEBHOOK_CHANNEL_ID = get_string(
     name="DRIVE_WEBHOOK_CHANNEL_ID",
-    default="mitxpro-sheets-app",
+    default="mitxonline-sheets-app",
     description="Channel ID to use for requests to get push notifications for file changes",
 )
 DRIVE_SHARED_ID = get_string(

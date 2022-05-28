@@ -5,7 +5,6 @@ Admin site bindings for sheets models
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 
-from mitxpro.admin import SingletonModelAdmin
 from sheets import models
 
 
@@ -16,7 +15,7 @@ class RefundRequestAdmin(admin.ModelAdmin):
     list_display = ("id", "form_response_id", "date_completed")
 
 
-class GoogleApiAuthAdmin(SingletonModelAdmin):
+class GoogleApiAuthAdmin(models.SingletonModelAdmin):
     """Admin for GoogleApiAuth"""
 
     model = models.GoogleApiAuth
