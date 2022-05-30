@@ -71,9 +71,19 @@ export type StreetAddress = {
   line: Array<string>
 }
 
+export type TransactionalLine = {
+  start_date: ?string,
+  end_date: ?string,
+  readable_id: ?string,
+  content_title: ?string,
+  price: number,
+  total_paid: number,
+  quantity: number
+}
+
 export type OrderReceipt = {
   order: number,
-  lines: Array<Line>,
+  lines: Array<TransactionalLine>,
   id: number,
   total_price_paid: number,
   state: string,
