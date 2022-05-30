@@ -19,7 +19,15 @@ from ecommerce.models import (
     RefundedOrder,
     Line,
     BasketDiscount,
+    Transaction,
 )
+
+
+@admin.register(Transaction)
+class TransactionAdmin(VersionAdmin):
+    """Admin for Product"""
+
+    model = Transaction
 
 
 @admin.register(Product)

@@ -17,6 +17,13 @@ export type BasketItem = {
   id: number
 }
 
+export type Purchaser = {
+  first_name: ?string,
+  last_name: ?string,
+  email: ?string,
+  country: ?string
+}
+
 export type CartItem = {
   id: number,
   user: number,
@@ -49,13 +56,42 @@ export type Line = {
   item_description: string
 }
 
+export type Transactions = {
+  name: ?string,
+  payment_method: ?string,
+  bill_to_email: ?string,
+  card_type: ?string,
+  card_number: ?string
+}
+
+export type StreetAddress = {
+  city: ?string,
+  postal_code: ?string,
+  country: ?string,
+  line: Array<string>
+}
+
+export type TransactionalLine = {
+  start_date: ?string,
+  end_date: ?string,
+  readable_id: ?string,
+  content_title: ?string,
+  price: number,
+  total_paid: number,
+  quantity: number
+}
+
 export type OrderReceipt = {
   order: number,
-  lines: Array<Line>,
+  lines: Array<TransactionalLine>,
   id: number,
   total_price_paid: number,
   state: string,
   reference_number: string,
   discounts: Array<Discount>,
-  refunds: Array<Refund>
+  refunds: Array<Refund>,
+  created_on: string,
+  transactions: Transactions,
+  street_address: StreetAddress,
+  purchaser: Purchaser,
 }
