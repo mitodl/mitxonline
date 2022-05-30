@@ -80,7 +80,7 @@ class FlexiblePricingFormBuilder(FormBuilder):
 
         for record in CurrencyExchangeRate.objects.all():
             desc = record.currency_code
-            if len(record.description) > 0:
+            if record.description is not None and len(record.description) > 0:
                 desc = "{code} - {code_description}".format(
                     code=record.currency_code, code_description=record.description
                 )
