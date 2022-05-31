@@ -7,7 +7,6 @@ from django.conf import settings
 from django.db import transaction
 from django.utils.functional import cached_property
 
-from mitxpro.utils import group_into_dict, item_at_index_or_none
 from sheets.api import get_authorized_pygsheets_client
 from sheets.constants import (
     ENROLL_CHANGE_SHEET_PROCESSOR_NAME,
@@ -18,6 +17,8 @@ from sheets.utils import (
     get_data_rows,
     get_data_rows_after_start,
     format_datetime_for_sheet_formula,
+    group_into_dict,
+    item_at_index_or_none,
     ResultType,
     RowResult,
 )
