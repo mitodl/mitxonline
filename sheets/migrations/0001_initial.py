@@ -15,59 +15,112 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='FileWatchRenewalAttempt',
+            name="FileWatchRenewalAttempt",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('sheet_type', models.CharField(choices=[('enrollrequest', 'enrollrequest'), ('enrollassign', 'enrollassign'), ('enrollchange', 'enrollchange')], db_index=True, max_length=30)),
-                ('sheet_file_id', models.CharField(db_index=True, max_length=100)),
-                ('date_attempted', models.DateTimeField(auto_now_add=True)),
-                ('result', models.CharField(blank=True, max_length=300, null=True)),
-                ('result_status_code', models.PositiveSmallIntegerField(blank=True, null=True)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "sheet_type",
+                    models.CharField(
+                        choices=[
+                            ("enrollrequest", "enrollrequest"),
+                            ("enrollassign", "enrollassign"),
+                            ("enrollchange", "enrollchange"),
+                        ],
+                        db_index=True,
+                        max_length=30,
+                    ),
+                ),
+                ("sheet_file_id", models.CharField(db_index=True, max_length=100)),
+                ("date_attempted", models.DateTimeField(auto_now_add=True)),
+                ("result", models.CharField(blank=True, max_length=300, null=True)),
+                (
+                    "result_status_code",
+                    models.PositiveSmallIntegerField(blank=True, null=True),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='RefundRequest',
+            name="RefundRequest",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_on', models.DateTimeField(auto_now_add=True)),
-                ('updated_on', models.DateTimeField(auto_now=True)),
-                ('form_response_id', models.IntegerField(db_index=True, unique=True)),
-                ('date_completed', models.DateTimeField(blank=True, null=True)),
-                ('raw_data', models.CharField(blank=True, max_length=300, null=True)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("created_on", models.DateTimeField(auto_now_add=True)),
+                ("updated_on", models.DateTimeField(auto_now=True)),
+                ("form_response_id", models.IntegerField(db_index=True, unique=True)),
+                ("date_completed", models.DateTimeField(blank=True, null=True)),
+                ("raw_data", models.CharField(blank=True, max_length=300, null=True)),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='GoogleFileWatch',
+            name="GoogleFileWatch",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_on', models.DateTimeField(auto_now_add=True)),
-                ('updated_on', models.DateTimeField(auto_now=True)),
-                ('file_id', models.CharField(db_index=True, max_length=100)),
-                ('channel_id', models.CharField(db_index=True, max_length=100)),
-                ('version', models.IntegerField(blank=True, db_index=True, null=True)),
-                ('activation_date', models.DateTimeField()),
-                ('expiration_date', models.DateTimeField()),
-                ('last_request_received', models.DateTimeField(blank=True, null=True)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("created_on", models.DateTimeField(auto_now_add=True)),
+                ("updated_on", models.DateTimeField(auto_now=True)),
+                ("file_id", models.CharField(db_index=True, max_length=100)),
+                ("channel_id", models.CharField(db_index=True, max_length=100)),
+                ("version", models.IntegerField(blank=True, db_index=True, null=True)),
+                ("activation_date", models.DateTimeField()),
+                ("expiration_date", models.DateTimeField()),
+                ("last_request_received", models.DateTimeField(blank=True, null=True)),
             ],
             options={
-                'unique_together': {('file_id', 'version')},
+                "unique_together": {("file_id", "version")},
             },
         ),
         migrations.CreateModel(
-            name='GoogleApiAuth',
+            name="GoogleApiAuth",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_on', models.DateTimeField(auto_now_add=True)),
-                ('updated_on', models.DateTimeField(auto_now=True)),
-                ('access_token', models.CharField(max_length=2048)),
-                ('refresh_token', models.CharField(max_length=512, null=True)),
-                ('requesting_user', models.OneToOneField(null=True, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("created_on", models.DateTimeField(auto_now_add=True)),
+                ("updated_on", models.DateTimeField(auto_now=True)),
+                ("access_token", models.CharField(max_length=2048)),
+                ("refresh_token", models.CharField(max_length=512, null=True)),
+                (
+                    "requesting_user",
+                    models.OneToOneField(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
     ]
