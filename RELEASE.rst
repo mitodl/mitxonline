@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.32.2
+Version 0.32.2 (Released May 31, 2022)
 --------------
 
 - Adds custom email receipts to the ecommerce system
