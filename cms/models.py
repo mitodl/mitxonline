@@ -688,7 +688,7 @@ class FlexiblePricingRequestForm(AbstractForm):
             ).get()
 
             converted_income = (
-                form.cleaned_data["your_income"] * exchangerate.exchange_rate
+                float(form.cleaned_data["your_income"]) * exchangerate.exchange_rate
             )
         except CurrencyExchangeRate.DoesNotExist:
             converted_income = form.cleaned_data["your_income"]
