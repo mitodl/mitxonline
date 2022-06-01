@@ -54,7 +54,8 @@ type EnrolledItemCardProps = {
 type EnrolledItemCardState = {
   submittingEnrollmentId: number | null,
   activeMenuIds: number[],
-  emailSettingsModalVisibility: boolean[]
+  emailSettingsModalVisibility: boolean[],
+  verifiedUnenrollmentModalVisibility: boolean[]
 }
 
 export class EnrolledItemCard extends React.Component<
@@ -62,9 +63,10 @@ export class EnrolledItemCard extends React.Component<
   EnrolledItemCardState
 > {
   state = {
-    submittingEnrollmentId:       null,
-    activeMenuIds:                [],
-    emailSettingsModalVisibility: []
+    submittingEnrollmentId:              null,
+    activeMenuIds:                       [],
+    emailSettingsModalVisibility:        [],
+    verifiedUnenrollmentModalVisibility: []
   }
 
   toggleEmailSettingsModalVisibility = (enrollmentId: number) => {
@@ -78,6 +80,20 @@ export class EnrolledItemCard extends React.Component<
     emailSettingsModalVisibility[enrollmentId] = isOpen
     this.setState({
       emailSettingsModalVisibility: emailSettingsModalVisibility
+    })
+  }
+
+  toggleVerifiedUnenrollmentModalVisibility = (enrollmentId: number) => {
+    const { verifiedUnenrollmentModalVisibility } = this.state
+    let isOpen = false
+    if (verifiedUnenrollmentModalVisibility[enrollmentId] === undefined) {
+      isOpen = true
+    } else {
+      isOpen = !verifiedUnenrollmentModalVisibility[enrollmentId]
+    }
+    verifiedUnenrollmentModalVisibility[enrollmentId] = isOpen
+    this.setState({
+      verifiedUnenrollmentModalVisibility: verifiedUnenrollmentModalVisibility
     })
   }
 
@@ -98,6 +114,13 @@ export class EnrolledItemCard extends React.Component<
 
   async onDeactivate(enrollment: RunEnrollment) {
     const { deactivateEnrollment, addUserNotification } = this.props
+
+    if (enrollment.enrollment_mode === "verified") {
+      console.log("enrollment is paid, can't unenroll")
+      this.toggleVerifiedUnenrollmentModalVisibility(enrollment.id)
+      return
+    }
+
     this.setState({ submittingEnrollmentId: enrollment.id })
     try {
       const resp = await deactivateEnrollment(enrollment.id)
@@ -225,6 +248,48 @@ export class EnrolledItemCard extends React.Component<
     )
   }
 
+  renderVerifiedUnenrollmentModal(enrollment: RunEnrollment) {
+    const { verifiedUnenrollmentModalVisibility } = this.state
+    let isOpen = false
+    if (verifiedUnenrollmentModalVisibility[enrollment.id] !== undefined) {
+      isOpen = verifiedUnenrollmentModalVisibility[enrollment.id]
+    }
+
+    return (
+      <Modal
+        id={`verified-unenrollment-${enrollment.id}-modal`}
+        className="text-center"
+        isOpen={isOpen}
+        toggle={() =>
+          this.toggleVerifiedUnenrollmentModalVisibility(enrollment.id)
+        }
+      >
+        <ModalHeader
+          toggle={() =>
+            this.toggleVerifiedUnenrollmentModalVisibility(enrollment.id)
+          }
+        >
+          Unenroll From {enrollment.run.course_number}
+        </ModalHeader>
+        <ModalBody>
+          <p>
+            You are enrolled in the certificate course for{" "}
+            {enrollment.run.course_number} {enrollment.run.title}. You can't
+            unenroll from this course from My Courses.
+          </p>
+
+          <p>
+            To unenroll, please{" "}
+            <a href="https://mitxonline.zendesk.com/hc/en-us/requests/new">
+              contact customer support
+            </a>{" "}
+            for assistance.
+          </p>
+        </ModalBody>
+      </Modal>
+    )
+  }
+
   render() {
     const {
       enrollment,
@@ -289,6 +354,7 @@ export class EnrolledItemCard extends React.Component<
                     >
                       Unenroll
                     </DropdownItem>
+                    {this.renderVerifiedUnenrollmentModal(enrollment)}
                   </span>
                   <span id="subscribeButtonWrapper">
                     <DropdownItem
