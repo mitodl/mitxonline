@@ -1,26 +1,27 @@
-import { IResourceComponentsProps, useMany, CrudFilters, HttpError } from "@pankod/refine-core";
+import { useUpdate, CrudFilters, HttpError } from "@pankod/refine-core";
+import React from "react"
+const {  useState  } = React;
 import {
+    Button,
     List,
     DateField,
-    ShowButton,
     Table,
     useTable,
     Space, 
-    EditButton,
     FilterDropdown,
     Select,
     useSelect,
     FormProps,
     Form,
     Input, 
-    Button,
     Icons,
     Row,
     Col,
     Card,
+    Modal
 } from "@pankod/refine-antd";
 
-import { IFlexiblePriceRequest, IFlexiblePriceStatus, IFlexiblePriceRequestFilters } from "interfaces";
+import { IFlexiblePriceRequest, IFlexiblePriceRequestFilters } from "interfaces";
 
 const FlexiblePricingStatuses = [
     {
@@ -97,6 +98,34 @@ export const FlexiblePricingList: React.FC = () => {
             return filters;
         }
     });
+    const [modaldata, setmodaldata] = useState({} as IFlexiblePriceRequest);
+    const [isModalVisible, setIsModalVisible] = useState(false);
+    const mutationResult = useUpdate<IFlexiblePriceRequest>();
+    const { mutate, isLoading: mutateIsLoading } = mutationResult;
+    const handleUpdate = (item: IFlexiblePriceRequest, status: string) => {
+        mutate({ 
+            resource: "flexible_pricing/applications_admin",
+            id: item.id,
+            mutationMode: "undoable",
+            values: { ...item, status }
+        });
+    };
+
+    const showModal = (record: IFlexiblePriceRequest, action: string) => {
+        const newRecord = {...record, 'action': action}
+        setmodaldata(newRecord);
+        setIsModalVisible(true);
+    };
+
+    const handleOk = () => {
+        handleUpdate(modaldata, modaldata.action)
+        setIsModalVisible(false);
+    };
+
+    const handleCancel = () => {
+        setIsModalVisible(false);
+    };
+
 
     return (
         <div>
@@ -151,10 +180,60 @@ export const FlexiblePricingList: React.FC = () => {
                                 title="Created At"
                                 render={(value) => <DateField format="LLL" value={value} />}
                             />
+                            <Table.Column<IFlexiblePriceRequest>
+                                title="Actions"
+                                dataIndex="actions"
+                                render={(index, record) => {
+                                    return (
+                                        <div>
+                                            <Space>
+                                                <Button
+                                                    type="primary"
+                                                    onClick={() => showModal(record, "approved")}
+                                                >
+                                                    Approve
+                                                </Button>
+                                                <Button
+                                                    type="dashed"
+                                                    onClick={() => showModal(record, "reset")}
+                                                >
+                                                    Reset
+                                                </Button>
+                                            </Space>
+                                            <Modal title="Flexible Pricing | Management" visible={isModalVisible} onOk={() => handleOk()} onCancel={handleCancel}>
+                                                    <div>
+                                                        <strong>Are you sure to perform the <u>{modaldata.action}</u> action?</strong>
+                                                    </div>
+                                                    <br></br>
+                                                    <p>
+                                                        <strong>Current Status:</strong>
+                                                        <div>{modaldata.status}</div>
+                                                    </p>
+                                                    <p>
+                                                        <strong>Income USD:</strong>
+                                                        <div>{modaldata.income_usd}</div>
+                                                    </p>
+                                                    <p>
+                                                        <strong>Original Income:</strong>
+                                                        <div>{modaldata.original_income}</div>
+                                                    </p>
+                                                    <p>
+                                                        <strong>Original Currency:</strong>
+                                                        <div>{modaldata.original_currency}</div>
+                                                    </p>
+                                                    <p>
+                                                        <strong>Country of Income:</strong>
+                                                        <div>{modaldata.country_of_income}</div>
+                                                    </p>
+                                                </Modal>
+                                        </div>
+                                    );
+                                }}
+                            />
                         </Table>
                     </List>
                 </Col>
             </Row>
-        </div>        
+        </div>
     );
 };

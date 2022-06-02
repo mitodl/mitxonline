@@ -1,11 +1,11 @@
 """
 MITxOnline Flexible Pricing/Financial Aid views
 """
-from rest_framework import mixins, status
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db import transaction
 from main.views import RefinePagination
 from django.db.models import Q
 
@@ -60,3 +60,9 @@ class FlexiblePriceAdminViewSet(ModelViewSet):
             queryset = queryset.filter(status=status_search)
 
         return queryset
+    
+    def update(self, request, *args, **kwargs):
+        """Update the flexible pricing status"""
+        with transaction.atomic():
+            update_result = super().update(request, *args, **kwargs)
+            return update_result
