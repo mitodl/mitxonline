@@ -273,7 +273,7 @@ export class EnrolledItemCard extends React.Component<
         </ModalHeader>
         <ModalBody>
           <p>
-            You are enrolled in the certificate course for{" "}
+            You are enrolled in the certificate track for{" "}
             {enrollment.run.course_number} {enrollment.run.title}. You can't
             unenroll from this course from My Courses.
           </p>
