@@ -298,6 +298,14 @@
       "description": "The number of hours until an access token for the Open edX API expires",
       "required": false
     },
+    "OPEN_EXCHANGE_RATES_APP_ID": {
+      "description": "open exchange app id for fetching currency exchange rate",
+      "required": false
+    },
+    "OPEN_EXCHANGE_RATES_URL": {
+      "description": "open exchange api url for fetching currency exchange rate",
+      "required": false
+    },
     "PGBOUNCER_DEFAULT_POOL_SIZE": {
       "value": "50"
     },

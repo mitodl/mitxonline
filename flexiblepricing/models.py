@@ -19,12 +19,7 @@ class CurrencyExchangeRate(TimestampedModel):
 
     currency_code = models.CharField(null=False, unique=True, max_length=3)
     description = models.CharField(max_length=100, null=True, blank=True)
-    exchange_rate = models.DecimalField(
-        null=False,
-        decimal_places=3,
-        max_digits=4,
-        help_text="Indexed to USD at the time the record was created.",
-    )  # how much foreign currency is per 1 USD
+    exchange_rate = models.FloatField()  # how much foreign currency is per 1 USD
 
     def __str__(self):
         return "{code}: 1 USD = {rate} {code}".format(
