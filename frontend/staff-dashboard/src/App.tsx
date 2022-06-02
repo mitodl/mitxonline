@@ -33,8 +33,9 @@ axiosInterface.interceptors.request.use((config: any) => {
 }, (error: any) => Promise.reject(error));
 
 export default function App() {
+  const dataURI = process.env["REACT_APP_MITX_ONLINE_DATASOURCE"] ? process.env["REACT_APP_MITX_ONLINE_DATASOURCE"] : "";
   const authProvider = useAuthProvider();
-  const xonlineProvider = useDrfDataProvider("http://mitxonline.odl.local:8013/api/v0");
+  const xonlineProvider = useDrfDataProvider(dataURI);
 
   return (
     <Refine
