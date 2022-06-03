@@ -87,9 +87,16 @@ export const makeCourseRunDetailWithProduct = (): CourseRunDetail => {
   }
 }
 
+const genEnrollmentMode = () => {
+  const modes = ["audit", "verified"]
+
+  return modes[Math.random() * modes.length]
+}
+
 export const makeCourseRunEnrollment = (): CourseRunEnrollment => ({
   // $FlowFixMe
   id:                      genEnrollmentId.next().value,
   run:                     makeCourseRunDetail(),
-  edx_emails_subscription: true
+  edx_emails_subscription: true,
+  enrollment_mode:         genEnrollmentMode()
 })

@@ -116,7 +116,6 @@ export class EnrolledItemCard extends React.Component<
     const { deactivateEnrollment, addUserNotification } = this.props
 
     if (enrollment.enrollment_mode === "verified") {
-      console.log("enrollment is paid, can't unenroll")
       this.toggleVerifiedUnenrollmentModalVisibility(enrollment.id)
       return
     }
