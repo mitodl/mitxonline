@@ -109,8 +109,9 @@ services:
     environment:
       PORT: 8016
       REACT_APP_OIDC_CONFIG_AUTHORITY: ${MITX_ONLINE_BASE_URL:-http://mitxonline.odl.local:8013}/oauth2/
-      REACT_APP_OIDC_CONFIG_CLIENT_ID: refine-local-client-id
-      REACT_APP_OIDC_CONFIG_REDIRECT_URI: http://mitxonline.odl.local:8016/oauth2/login/
+      REACT_APP_OIDC_CONFIG_CLIENT_ID: ${MITX_ONLINE_ADMIN_CLIENT_ID:-refine-local-client-id}
+      REACT_APP_OIDC_CONFIG_REDIRECT_URI: ${MITX_ONLINE_ADMIN_BASE_URL:-http://mitxonline.odl.local:8016}/oauth2/login/
+      REACT_APP_MITX_ONLINE_DATASOURCE: ${MITX_ONLINE_BASE_URL:-http://mitxonline.odl.local:8013}/api
     volumes:
       - .:/src
       - npm-cache:/root/.npm
