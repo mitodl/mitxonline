@@ -18,6 +18,8 @@ import { FlexiblePricingList } from "./pages/flexible_pricing";
 import axios from "axios";
 import useDrfDataProvider from "hooks/useDrfDataProvider";
 
+import "styles/antd.less";
+
 const {UserOutlined, BarcodeOutlined, FormOutlined} = Icons;
 const axiosInterface = axios.create();
 
