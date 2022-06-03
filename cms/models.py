@@ -43,8 +43,13 @@ from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
 from cms.constants import COURSE_INDEX_SLUG, CMS_EDITORS_GROUP_NAME
 from courses.api import get_user_relevant_course_run
 
-from flexiblepricing.api import determine_tier_courseware, determine_auto_approval
+from flexiblepricing.api import (
+    determine_tier_courseware,
+    determine_auto_approval,
+    determine_income_usd,
+)
 from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.exceptions import NotSupportedException
 from flexiblepricing.models import (
     CurrencyExchangeRate,
     FlexiblePrice,
@@ -680,15 +685,12 @@ class FlexiblePricingRequestForm(AbstractForm):
     def process_form_submission(self, form):
 
         try:
-            exchangerate = CurrencyExchangeRate.objects.filter(
-                currency_code=form.cleaned_data["income_currency"]
-            ).get()
-
-            converted_income = (
-                float(form.cleaned_data["your_income"]) * exchangerate.exchange_rate
+            converted_income = determine_income_usd(
+                float(form.cleaned_data["your_income"]),
+                form.cleaned_data["income_currency"],
             )
-        except CurrencyExchangeRate.DoesNotExist:
-            converted_income = form.cleaned_data["your_income"]
+        except NotSupportedException:
+            raise ValidationError("Currency not supported")
 
         courseware = self.get_parent_product()
         income_usd = round(converted_income, 2)
