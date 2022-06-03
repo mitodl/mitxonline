@@ -1,31 +1,29 @@
 import React from "react";
-import routerProvider from "@pankod/refine-react-router-v6";
-import { TitleProps } from "@pankod/refine-core";
+import { TitleProps, useRouterContext } from "@pankod/refine-core";
 
-const { Link } = routerProvider;
-
-export const Title: React.FC<TitleProps> = ({ collapsed }) => (
-  <Link to="/">
-    {collapsed ? (
+export const Title: React.FC<TitleProps> = ({collapsed}) => {
+  const { Link } = useRouterContext();
+  return collapsed ? (
+    <Link to="/">
       <img
-        src={"/refine-collapsed.svg"}
+        src={"/MIT-logo-black-red-72x38.svg"}
         alt="Refine"
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          width: "80px",
           padding: "12px 24px",
         }}
       />
-    ) : (
+    </Link>
+  ) : (
+    <Link to="/">
       <img
-        src={"/refine.svg"}
+        src={"/MIT-logo-black-red-72x38.svg"}
         alt="Refine"
         style={{
           width: "200px",
           padding: "12px 24px",
         }}
       />
-    )}
-  </Link>
-);
+    </Link>
+  );
+}

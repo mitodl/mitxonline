@@ -1,24 +1,20 @@
 
-import { useLogin } from "@pankod/refine-core";
-import { AntdLayout, Button, Icons, Space, Title } from "@pankod/refine-antd";
+import { useLogin, useTitle } from "@pankod/refine-core";
+import { AntdLayout, Button, Icons, Space, Typography } from "@pankod/refine-antd";
 
 const { LoginOutlined } = Icons;
 
 
 export default function LoginPage() {
+    const Title = useTitle();
     const { mutate: login, isLoading } = useLogin();
     return (
-        <AntdLayout
-            style={{
-                background: `radial-gradient(50% 50% at 50% 50%, #63386A 0%, #310438 100%)`,
-                backgroundSize: "cover",
-            }}
-        >
+        <AntdLayout>
             <div style={{ height: "100vh", display: "flex" }}>
-                <div style={{ maxWidth: "200px", margin: "auto" }}>
-                    <Title collapsed={false}>
-                        MITx Online Internal Dashboard
-                    </Title>
+                <div style={{ maxWidth: "300px", margin: "auto", textAlign: "center" }}>
+                    {Title && <Title collapsed={false} />}
+                    <Space/>
+                    <Typography.Title>MITx Online<br/>Staff Dashboard</Typography.Title>
                     <Space/>
                     <Button
                         type="primary"
