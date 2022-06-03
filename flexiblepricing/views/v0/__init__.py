@@ -7,6 +7,7 @@ from rest_framework.authentication import SessionAuthentication, TokenAuthentica
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django_filters.rest_framework import DjangoFilterBackend
 from main.views import RefinePagination
+from django.db.models import Q
 
 from flexiblepricing import models, serializers
 
@@ -39,7 +40,23 @@ class FlexiblePriceAdminViewSet(ModelViewSet):
     serializer_class = serializers.FlexiblePriceSerializer
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAdminUser,)
-    queryset = models.FlexiblePrice.objects.all()
     pagination_class = RefinePagination
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["status", "user", "country_of_income"]
+
+    def get_queryset(self):
+        queryset = models.FlexiblePrice.objects.all()
+
+        name_search = self.request.query_params.get("q")
+
+        if name_search is not None:
+            queryset = queryset.filter(
+                Q(user__username__contains=name_search)
+                | Q(user__name__contains=name_search)
+                | Q(user__email__contains=name_search)
+            )
+
+        status_search = self.request.query_params.get("status")
+
+        if status_search is not None:
+            queryset = queryset.filter(status=status_search)
+
+        return queryset

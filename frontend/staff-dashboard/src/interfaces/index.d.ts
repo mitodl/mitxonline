@@ -35,6 +35,11 @@ export interface IFlexiblePriceRequest {
 }
 
 export interface IFlexiblePriceStatus {
-    id: string,
-    title: string
+    id: string;
+    title: string;
+}
+
+export interface IFlexiblePriceRequestFilters {
+    q: string;
+    status: string;
 }
