@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.33.0
+Version 0.33.0 (Released June 06, 2022)
 --------------
 
 - asadiqbal08/Updated the Receipt Page with additional Details (#578)
