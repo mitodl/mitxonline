@@ -53,9 +53,9 @@ type EnrolledItemCardProps = {
 
 type EnrolledItemCardState = {
   submittingEnrollmentId: number | null,
-  activeMenuIds: number[],
-  emailSettingsModalVisibility: boolean[],
-  verifiedUnenrollmentModalVisibility: boolean[]
+  emailSettingsModalVisibility: boolean,
+  verifiedUnenrollmentModalVisibility: boolean,
+  menuVisibility: boolean
 }
 
 export class EnrolledItemCard extends React.Component<
@@ -64,59 +64,37 @@ export class EnrolledItemCard extends React.Component<
 > {
   state = {
     submittingEnrollmentId:              null,
-    activeMenuIds:                       [],
-    emailSettingsModalVisibility:        [],
-    verifiedUnenrollmentModalVisibility: []
+    emailSettingsModalVisibility:        false,
+    verifiedUnenrollmentModalVisibility: false,
+    menuVisibility:                      false
   }
 
-  toggleEmailSettingsModalVisibility = (enrollmentId: number) => {
+  toggleEmailSettingsModalVisibility = () => {
     const { emailSettingsModalVisibility } = this.state
-    let isOpen = false
-    if (emailSettingsModalVisibility[enrollmentId] === undefined) {
-      isOpen = true
-    } else {
-      isOpen = !emailSettingsModalVisibility[enrollmentId]
-    }
-    emailSettingsModalVisibility[enrollmentId] = isOpen
     this.setState({
-      emailSettingsModalVisibility: emailSettingsModalVisibility
+      emailSettingsModalVisibility: !emailSettingsModalVisibility
     })
   }
 
-  toggleVerifiedUnenrollmentModalVisibility = (enrollmentId: number) => {
+  toggleVerifiedUnenrollmentModalVisibility = () => {
     const { verifiedUnenrollmentModalVisibility } = this.state
-    let isOpen = false
-    if (verifiedUnenrollmentModalVisibility[enrollmentId] === undefined) {
-      isOpen = true
-    } else {
-      isOpen = !verifiedUnenrollmentModalVisibility[enrollmentId]
-    }
-    verifiedUnenrollmentModalVisibility[enrollmentId] = isOpen
     this.setState({
-      verifiedUnenrollmentModalVisibility: verifiedUnenrollmentModalVisibility
+      verifiedUnenrollmentModalVisibility: !verifiedUnenrollmentModalVisibility
     })
   }
 
-  isActiveMenuId(itemId: number): boolean {
-    return !!this.state.activeMenuIds.find(id => id === itemId)
-  }
-
-  toggleActiveMenuId(itemId: number) {
-    return () => {
-      const isActive = this.isActiveMenuId(itemId)
-      this.setState({
-        activeMenuIds: isActive
-          ? without([itemId], this.state.activeMenuIds)
-          : [...this.state.activeMenuIds, itemId]
-      })
-    }
+  toggleMenuVisibility = () => {
+    const { menuVisibility } = this.state
+    this.setState({
+      menuVisibility: !menuVisibility
+    })
   }
 
   async onDeactivate(enrollment: RunEnrollment) {
     const { deactivateEnrollment, addUserNotification } = this.props
 
     if (enrollment.enrollment_mode === "verified") {
-      this.toggleVerifiedUnenrollmentModalVisibility(enrollment.id)
+      this.toggleVerifiedUnenrollmentModalVisibility()
       return
     }
 
@@ -149,7 +127,7 @@ export class EnrolledItemCard extends React.Component<
   async onSubmit(payload: Object) {
     const { courseEmailsSubscription, addUserNotification } = this.props
     this.setState({ submittingEnrollmentId: payload.enrollmentId })
-    this.toggleEmailSettingsModalVisibility(payload.enrollmentId)
+    this.toggleEmailSettingsModalVisibility()
     try {
       const resp = await courseEmailsSubscription(
         payload.enrollmentId,
@@ -184,21 +162,15 @@ export class EnrolledItemCard extends React.Component<
 
   renderEmailSettingsDialog(enrollment: RunEnrollment) {
     const { emailSettingsModalVisibility } = this.state
-    let isOpen = false
-    if (emailSettingsModalVisibility[enrollment.id] !== undefined) {
-      isOpen = emailSettingsModalVisibility[enrollment.id]
-    }
 
     return (
       <Modal
         id={`enrollment-${enrollment.id}-modal`}
         className="text-center"
-        isOpen={isOpen}
-        toggle={() => this.toggleEmailSettingsModalVisibility(enrollment.id)}
+        isOpen={emailSettingsModalVisibility}
+        toggle={() => this.toggleEmailSettingsModalVisibility()}
       >
-        <ModalHeader
-          toggle={() => this.toggleEmailSettingsModalVisibility(enrollment.id)}
-        >
+        <ModalHeader toggle={() => this.toggleEmailSettingsModalVisibility()}>
           Email Settings for {enrollment.run.course_number}
         </ModalHeader>
         <ModalBody>
@@ -233,9 +205,7 @@ export class EnrolledItemCard extends React.Component<
                   Save Settings
                 </Button>{" "}
                 <Button
-                  onClick={() =>
-                    this.toggleEmailSettingsModalVisibility(enrollment.id)
-                  }
+                  onClick={() => this.toggleEmailSettingsModalVisibility()}
                 >
                   Cancel
                 </Button>
@@ -249,24 +219,16 @@ export class EnrolledItemCard extends React.Component<
 
   renderVerifiedUnenrollmentModal(enrollment: RunEnrollment) {
     const { verifiedUnenrollmentModalVisibility } = this.state
-    let isOpen = false
-    if (verifiedUnenrollmentModalVisibility[enrollment.id] !== undefined) {
-      isOpen = verifiedUnenrollmentModalVisibility[enrollment.id]
-    }
 
     return (
       <Modal
         id={`verified-unenrollment-${enrollment.id}-modal`}
         className="text-center"
-        isOpen={isOpen}
-        toggle={() =>
-          this.toggleVerifiedUnenrollmentModalVisibility(enrollment.id)
-        }
+        isOpen={verifiedUnenrollmentModalVisibility}
+        toggle={() => this.toggleVerifiedUnenrollmentModalVisibility()}
       >
         <ModalHeader
-          toggle={() =>
-            this.toggleVerifiedUnenrollmentModalVisibility(enrollment.id)
-          }
+          toggle={() => this.toggleVerifiedUnenrollmentModalVisibility()}
         >
           Unenroll From {enrollment.run.course_number}
         </ModalHeader>
@@ -296,6 +258,8 @@ export class EnrolledItemCard extends React.Component<
       deactivateEnrollment,
       addUserNotification
     } = this.props
+
+    const { menuVisibility } = this.state
 
     const title = isLinkableCourseRun(enrollment.run, currentUser) ? (
       <a
@@ -338,8 +302,8 @@ export class EnrolledItemCard extends React.Component<
                 enrollmentMode={enrollmentMode}
               ></EnrollmentRoleTag>
               <Dropdown
-                isOpen={this.isActiveMenuId(enrollment.id)}
-                toggle={this.toggleActiveMenuId(enrollment.id).bind(this)}
+                isOpen={menuVisibility}
+                toggle={this.toggleMenuVisibility.bind(this)}
                 id={`enrollmentDropdown-${enrollment.id}`}
               >
                 <DropdownToggle className="d-inline-flex unstyled dot-menu">
@@ -358,9 +322,7 @@ export class EnrolledItemCard extends React.Component<
                   <span id="subscribeButtonWrapper">
                     <DropdownItem
                       className="unstyled d-block"
-                      onClick={() =>
-                        this.toggleEmailSettingsModalVisibility(enrollment.id)
-                      }
+                      onClick={() => this.toggleEmailSettingsModalVisibility()}
                     >
                       Email Settings
                     </DropdownItem>
