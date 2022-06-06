@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.33.0 (Released June 06, 2022)
+--------------
+
+- asadiqbal08/Updated the Receipt Page with additional Details (#578)
+- Adds a check for exchange rate description when constructing the currency list
+- Adds Flexible Pricing list view to Refine admin
+- Added documentation for configuring the Refine Admin
+
 Version 0.32.2 (Released May 31, 2022)
 --------------
 
