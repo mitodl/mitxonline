@@ -24,6 +24,11 @@ class Migration(migrations.Migration):
                 default=1,
                 on_delete=django.db.models.deletion.CASCADE,
                 to="contenttypes.contenttype",
+                limit_choices_to=models.Q(
+                    models.Q(("app_label", "courses"), ("model", "course")),
+                    models.Q(("app_label", "courses"), ("model", "program")),
+                    _connector="OR",
+                ),
             ),
             preserve_default=False,
         ),
@@ -55,6 +60,11 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         to="contenttypes.contenttype",
+                        limit_choices_to=models.Q(
+                            models.Q(("app_label", "courses"), ("model", "course")),
+                            models.Q(("app_label", "courses"), ("model", "program")),
+                            _connector="OR",
+                        ),
                     ),
                 ),
                 (

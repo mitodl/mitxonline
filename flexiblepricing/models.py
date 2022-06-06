@@ -17,6 +17,12 @@ from wagtail.contrib.forms.models import (
 )
 
 
+def valid_courseware_types_list():
+    return models.Q(app_label="courses", model="course") | models.Q(
+        app_label="courses", model="program"
+    )
+
+
 class CurrencyExchangeRate(TimestampedModel):
     """
     Table of currency exchange rates for converting foreign currencies into USD
@@ -56,6 +62,7 @@ class FlexiblePriceTier(TimestampedModel):
     The tiers for discounted pricing
     """
 
+    valid_courseware_types = valid_courseware_types_list()
     discount = models.ForeignKey(
         Discount,
         null=False,
@@ -63,7 +70,7 @@ class FlexiblePriceTier(TimestampedModel):
         on_delete=models.PROTECT,
     )
     courseware_content_type = models.ForeignKey(
-        ContentType, on_delete=models.CASCADE
+        ContentType, on_delete=models.CASCADE, limit_choices_to=valid_courseware_types
     )  # add a filter to limit this to program/course contenttypes
     courseware_object_id = models.PositiveIntegerField()
     courseware_object = GenericForeignKey(
@@ -72,6 +79,9 @@ class FlexiblePriceTier(TimestampedModel):
     current = models.BooleanField(null=False, default=False)
     income_threshold_usd = models.FloatField(null=False)
 
+    def __str__(self):
+        return f"Courseware: {self.courseware_object}, income_threshold={self.income_threshold_usd}, Discount={self.discount}"
+
 
 @reversion.register()
 class FlexiblePrice(TimestampedModel):
@@ -79,6 +89,7 @@ class FlexiblePrice(TimestampedModel):
     An application for flexible pricing
     """
 
+    valid_courseware_types = valid_courseware_types_list()
     user = models.ForeignKey(AUTH_USER_MODEL, null=False, on_delete=models.CASCADE)
     status = models.CharField(
         null=False,
@@ -100,7 +111,9 @@ class FlexiblePrice(TimestampedModel):
         blank=True,
         on_delete=models.CASCADE,
     )
-    courseware_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    courseware_content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE, limit_choices_to=valid_courseware_types
+    )
     courseware_object_id = models.PositiveIntegerField()
     courseware_object = GenericForeignKey(
         "courseware_content_type", "courseware_object_id"
