@@ -32,6 +32,7 @@ export interface IFlexiblePriceRequest {
     date_documents_sent: Date;
     justification: string;
     country_of_residence: string;
+    action: string
 }
 
 export interface IFlexiblePriceStatus {
