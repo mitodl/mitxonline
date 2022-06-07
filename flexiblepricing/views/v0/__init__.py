@@ -60,7 +60,7 @@ class FlexiblePriceAdminViewSet(ModelViewSet):
             queryset = queryset.filter(status=status_search)
 
         return queryset
-    
+
     def update(self, request, *args, **kwargs):
         """Update the flexible pricing status"""
         with transaction.atomic():
