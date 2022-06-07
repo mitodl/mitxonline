@@ -198,7 +198,9 @@ def test_flex_pricing_form_display(mocker, is_authed, has_submission):
                 form_data=json.dumps([]), page=flex_form, user=request_user
             )
             flexprice = FlexiblePrice.objects.create(
-                user=request_user, cms_submission=submission
+                user=request_user,
+                cms_submission=submission,
+                courseware_object=course_page.course,
             )
 
     response = generate_flexible_pricing_response(request_user, flex_form)
@@ -237,7 +239,10 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
         form_data=json.dumps([]), page=flex_form, user=request_user
     )
     flexprice = FlexiblePrice.objects.create(
-        user=request_user, cms_submission=submission, status=submission_status
+        user=request_user,
+        cms_submission=submission,
+        status=submission_status,
+        courseware_object=course_page.course,
     )
 
     response = generate_flexible_pricing_response(request_user, flex_form)

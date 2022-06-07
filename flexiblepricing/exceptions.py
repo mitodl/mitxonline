@@ -19,3 +19,9 @@ class UnexpectedAPIErrorException(Exception):
     """
     Unexpected error in making an API call
     """
+
+
+class NotSupportedException(Exception):
+    """
+    Not supported by current flexible price system.
+    """

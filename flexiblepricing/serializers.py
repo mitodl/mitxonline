@@ -1,6 +1,14 @@
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+from mitol.common.utils.datetime import now_in_utc
 
 from flexiblepricing import models
+from flexiblepricing.api import (
+    determine_income_usd,
+    determine_auto_approval,
+)
+from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.exceptions import NotSupportedException
 from users.serializers import UserSerializer
 
 
@@ -21,6 +29,10 @@ class CountryIncomeThresholdSerializer(serializers.ModelSerializer):
 
 
 class FlexiblePriceSerializer(serializers.ModelSerializer):
+    """
+    Serializer for flexible price requests
+    """
+
     user = UserSerializer(read_only=True)
 
     class Meta:

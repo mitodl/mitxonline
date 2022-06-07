@@ -6,6 +6,7 @@ import reversion
 
 from users.factories import UserFactory
 
+from courses.factories import CourseFactory
 from flexiblepricing.models import FlexiblePrice
 from flexiblepricing.constants import FlexiblePriceStatus
 
@@ -18,9 +19,12 @@ def test_submission_status():
     """
 
     user = UserFactory.create()
+    course = CourseFactory.create()
 
     for status in FlexiblePriceStatus.ALL_STATUSES:
-        submission = FlexiblePrice.objects.create(user=user, status=status)
+        submission = FlexiblePrice.objects.create(
+            user=user, status=status, courseware_object=course
+        )
 
         if (
             status == FlexiblePriceStatus.APPROVED

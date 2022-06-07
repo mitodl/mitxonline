@@ -4,9 +4,11 @@ import faker
 import random
 from mitol.common.utils import now_in_utc
 
+from ecommerce.factories import DiscountFactory
 from flexiblepricing import models
 from flexiblepricing.constants import FlexiblePriceStatus
 
+from courses.factories import CourseFactory
 from users.factories import UserFactory
 
 FAKE = faker.Factory.create()
@@ -28,6 +30,15 @@ class CountryIncomeThresholdFactory(DjangoModelFactory):
         model = models.CountryIncomeThreshold
 
 
+class FlexiblePriceTierFactory(DjangoModelFactory):
+    income_threshold_usd = random.randrange(0, 150000, 1000)
+    courseware_object = SubFactory(CourseFactory)
+    discount = SubFactory(DiscountFactory)
+
+    class Meta:
+        model = models.FlexiblePriceTier
+
+
 class FlexiblePriceFactory(DjangoModelFactory):
     user = SubFactory(UserFactory)
     income_usd = random.randrange(0, 150000, 1000)
@@ -40,6 +51,8 @@ class FlexiblePriceFactory(DjangoModelFactory):
     status = FlexiblePriceStatus.ALL_STATUSES[
         random.randrange(0, len(FlexiblePriceStatus.ALL_STATUSES), 1)
     ]
+    courseware_object = SubFactory(CourseFactory)
+    tier = SubFactory(FlexiblePriceTierFactory)
 
     class Meta:
         model = models.FlexiblePrice

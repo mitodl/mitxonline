@@ -193,6 +193,8 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     )
     live = models.BooleanField(default=False)
     topics = models.ManyToManyField(CourseTopic, blank=True)
+    flexible_prices = GenericRelation("flexiblepricing.FlexiblePrice")
+    tiers = GenericRelation("flexiblepricing.FlexiblePriceTier")
 
     @property
     def page(self):

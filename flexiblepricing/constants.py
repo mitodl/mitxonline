@@ -33,6 +33,7 @@ class FlexiblePriceStatus:
 
 
 COUNTRY = "country"
+DEFAULT_INCOME_THRESHOLD = 75000
 INCOME = "income"
 INCOME_THRESHOLD_FIELDS = [COUNTRY, INCOME]
 
