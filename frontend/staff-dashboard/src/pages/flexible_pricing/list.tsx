@@ -199,10 +199,15 @@ export const FlexiblePricingList: React.FC = () => {
                                                 >
                                                     Reset
                                                 </Button>
+                                                <Button danger
+                                                    onClick={() => showModal(record, "skipped")}
+                                                >
+                                                    Deny
+                                                </Button>
                                             </Space>
                                             <Modal title="Flexible Pricing | Management" visible={isModalVisible} onOk={() => handleOk()} onCancel={handleCancel}>
                                                     <div>
-                                                        <strong>Are you sure to perform the <u>{modaldata.action}</u> action?</strong>
+                                                        <strong>Are you sure to <u>{String(modaldata.action).replace(/d|ped$/, '')}</u> it?</strong>
                                                     </div>
                                                     <br></br>
                                                     <p>
