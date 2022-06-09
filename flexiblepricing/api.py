@@ -11,6 +11,7 @@ from flexiblepricing.constants import (
     COUNTRY,
     INCOME,
     DEFAULT_INCOME_THRESHOLD,
+    FlexiblePriceStatus,
 )
 from flexiblepricing.exceptions import (
     CountryIncomeThresholdException,
@@ -20,6 +21,7 @@ from flexiblepricing.models import (
     CountryIncomeThreshold,
     CurrencyExchangeRate,
     FlexiblePriceTier,
+    FlexiblePrice,
 )
 
 IncomeThreshold = namedtuple("IncomeThreshold", ["country", "income"])
@@ -98,7 +100,7 @@ def determine_tier_courseware(courseware, income):
         courseware (Program / Course): the Courseware to determine a Tier for
         income (numeric): the income of the User
     Returns:
-        TierProgram: the FlexiblePriceTier for the Courseware given the User's income
+        FlexiblePriceTier: the FlexiblePriceTier for the Courseware given the User's income
     """
     # To determine the tier for a user, find the set of every tier whose income threshold is
     # less than or equal to the income of the user. The highest tier out of that set will
@@ -172,6 +174,31 @@ def determine_income_usd(original_income, original_currency):
     exchange_rate = exchange_rate_object.exchange_rate
     income_usd = original_income / exchange_rate
     return income_usd
+
+
+def determine_courseware_flexible_price_discount(product, user):
+    """
+    Determine discount of a product
+    Args:
+        product (Product): ecommerce Product of the cart
+        user (User): the user of the cart
+    Returns:
+        discount: the discount provided in the flexible price tier
+    """
+    course = product.purchasable_object.course
+    flexible_price = FlexiblePrice.objects.filter(
+        courseware_object_id=course.id, user=user
+    ).first()
+    if (
+        flexible_price
+        and flexible_price.tier.current
+        and (
+            flexible_price.status == FlexiblePriceStatus.APPROVED
+            or flexible_price.status == FlexiblePriceStatus.AUTO_APPROVED
+        )
+    ):
+        return flexible_price.tier.discount
+    return None
 
 
 @transaction.atomic

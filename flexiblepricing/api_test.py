@@ -9,6 +9,7 @@ from django.test import TestCase
 from mitol.common.utils.datetime import now_in_utc
 
 from courses.factories import ProgramFactory, CourseFactory, CourseRunFactory
+from ecommerce.factories import ProductFactory
 from flexiblepricing.api import (
     parse_country_income_thresholds,
     IncomeThreshold,
@@ -17,6 +18,7 @@ from flexiblepricing.api import (
     determine_tier_courseware,
     determine_income_usd,
     determine_auto_approval,
+    determine_courseware_flexible_price_discount,
 )
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.exceptions import CountryIncomeThresholdException
@@ -26,6 +28,7 @@ from flexiblepricing.models import (
     CurrencyExchangeRate,
     # FlexiblePriceTier,
 )
+from users.factories import UserFactory
 
 
 def test_parse_country_income_thresholds_no_header(tmp_path):
@@ -275,8 +278,39 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
             income_usd=income_usd,
             country_of_income=country_code,
         )
-        courseware = determine_tier_courseware(self.course, income_usd)
-        assert determine_auto_approval(flexible_price, courseware) is expected
+        courseware_tier = determine_tier_courseware(self.course, income_usd)
+        assert determine_auto_approval(flexible_price, courseware_tier) is expected
+
+    @ddt.data(
+        [0, "0", True],
+        [1, "0", True],
+        [0, "50", False],
+        [49999, "50", False],
+        [50000, "50", False],
+        [50001, "50", True],
+    )
+    @ddt.unpack
+    def test_determine_courseware_flexible_price_discount(
+        self, income_usd, country_code, expected
+    ):
+        user = UserFactory.create()
+        flexibe_price = FlexiblePriceFactory.create(
+            income_usd=income_usd,
+            country_of_income=country_code,
+            user=user,
+            courseware_object=self.course,
+            status=FlexiblePriceStatus.APPROVED
+            if expected
+            else FlexiblePriceStatus.PENDING_MANUAL_APPROVAL,
+        )
+        courseware_tier = determine_tier_courseware(self.course, income_usd)
+        course_run = CourseRunFactory.create(course=self.course)
+        product = ProductFactory.create(purchasable_object=course_run)
+        discount = determine_courseware_flexible_price_discount(product, user)
+        if expected:
+            assert discount.amount == courseware_tier.discount.amount
+        else:
+            assert discount is None
 
     def test_determine_income_usd_from_not_usd(self):
         """

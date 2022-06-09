@@ -18,7 +18,14 @@ from mitol.payment_gateway.api import (
 from mitol.common.utils.datetime import now_in_utc
 from ipware import get_client_ip
 
-from ecommerce.models import Basket, PendingOrder, UserDiscount, BasketDiscount
+from ecommerce.models import (
+    Basket,
+    BasketItem,
+    PendingOrder,
+    UserDiscount,
+    BasketDiscount,
+)
+from flexiblepricing.api import determine_courseware_flexible_price_discount
 
 
 def generate_checkout_payload(request):
@@ -94,18 +101,28 @@ def apply_user_discounts(request):
     """
     basket = establish_basket(request)
     user = request.user
+    discount = None
 
     if BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0:
         return True
 
-    user_discounts = UserDiscount.objects.filter(user=user).all()
+    product = BasketItem.objects.get(basket=basket).product
+    flexible_price_discount = determine_courseware_flexible_price_discount(
+        product, user
+    )
+    if flexible_price_discount:
+        discount = flexible_price_discount
+    else:
+        user_discount = UserDiscount.objects.filter(user=user).first()
+        if user_discount:
+            discount = user_discount.discount
 
-    for discount in user_discounts:
+    if discount:
         bd = BasketDiscount(
             redeemed_basket=basket,
             redemption_date=now_in_utc(),
             redeemed_by=user,
-            redeemed_discount=discount.discount,
+            redeemed_discount=discount,
         )
         bd.save()
 
