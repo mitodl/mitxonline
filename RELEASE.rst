@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.34.0
+Version 0.34.0 (Released June 09, 2022)
 --------------
 
 - asadiqbal08/Added Approve and Reset button to Refine Admin (#603)
