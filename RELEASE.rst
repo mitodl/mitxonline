@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.34.0 (Released June 09, 2022)
+--------------
+
+- asadiqbal08/Added Approve and Reset button to Refine Admin (#603)
+- Flexible Pricing: Automatically approve if the Learner is elligible when they request it (#580)
+- Adjust styles of Refine dashboard to be more MIT
+- Adds free-form text searching and status searching to Refine admin for flexible pricing records
+- Updated docker-compose to pull some stuff out of .env file, updated data source to use .env for base URI
+- load currency exchange rate (#590)
+
 Version 0.33.0 (Released June 06, 2022)
 --------------
 
