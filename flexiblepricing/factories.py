@@ -34,6 +34,7 @@ class FlexiblePriceTierFactory(DjangoModelFactory):
     income_threshold_usd = random.randrange(0, 150000, 1000)
     courseware_object = SubFactory(CourseFactory)
     discount = SubFactory(DiscountFactory)
+    current = True
 
     class Meta:
         model = models.FlexiblePriceTier
