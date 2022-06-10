@@ -1,12 +1,16 @@
 // @flow
 /* global SETTINGS: false */
 import React from "react"
-import { parseDateString, formatLocalePrice, formatPrettyDate } from "../lib/util"
+import {
+  parseDateString,
+  formatLocalePrice,
+  formatPrettyDate
+} from "../lib/util"
 import type { OrderReceipt, Discount } from "../flow/cartTypes"
 
 type Props = {
   orderReceipt: OrderReceipt,
-  discounts: Array<Discount>,
+  discounts: Array<Discount>
 }
 
 export class ReceiptPageDetailCard extends React.Component<Props> {
@@ -34,9 +38,7 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
       discountAmountText = `-${formatLocalePrice(discountAmount)}`
       break
     default:
-      discountAmountText = `Fixed Price: ${formatLocalePrice(
-        discountAmount
-      )}`
+      discountAmountText = `Fixed Price: ${formatLocalePrice(discountAmount)}`
       break
     }
 
@@ -185,12 +187,8 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
             </thead>
             <tbody>
               {orderReceipt.lines.map(line => {
-                const startDate = parseDateString(
-                  line.start_date
-                )
-                const endDate = parseDateString(
-                  line.end_date
-                )
+                const startDate = parseDateString(line.start_date)
+                const endDate = parseDateString(line.end_date)
                 return (
                   <tr key={line.readable_id}>
                     <td>

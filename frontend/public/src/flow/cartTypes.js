@@ -93,5 +93,5 @@ export type OrderReceipt = {
   created_on: string,
   transactions: Transactions,
   street_address: StreetAddress,
-  purchaser: Purchaser,
+  purchaser: Purchaser
 }
