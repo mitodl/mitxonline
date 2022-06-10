@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.35.0 (Released June 10, 2022)
+--------------
+
+- Cleanup and simplify configuration/localdev
+
 Version 0.34.0 (Released June 09, 2022)
 --------------
 
