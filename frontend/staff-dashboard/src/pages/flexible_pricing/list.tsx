@@ -207,7 +207,8 @@ export const FlexiblePricingList: React.FC = () => {
                                             </Space>
                                             <Modal title="Flexible Pricing | Management" visible={isModalVisible} onOk={() => handleOk()} onCancel={handleCancel}>
                                                     <div>
-                                                        <strong>Are you sure to <u>{String(modaldata.action).replace(/d|ped$/, '')}</u> it?</strong>
+                                                        <strong>Are you sure you want to <u>{modaldata.action == "skipped" ? "deny": String(modaldata.action).replace(/d|ped$/, '') }</u> the request?</strong>
+                                                        {modaldata.action == "skipped" ? <div>User will be notified by email of the denial </div> : null}
                                                     </div>
                                                     <br></br>
                                                     <p>
