@@ -23,7 +23,7 @@ const ApplyCouponForm = ({ onSubmit, couponCode, discounts }: Props) => (
         <div className="row">
           <div className="col-12 mt-4 px-3 py-3 py-md-0">
             <label htmlFor="couponCode">
-              <span>Have a coupon?</span>
+              <span>Coupon code</span>
             </label>
             <div className="d-flex justify-content-between flex-sm-column flex-md-row">
               <div className="pt-2">
