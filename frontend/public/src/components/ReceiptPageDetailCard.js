@@ -24,7 +24,6 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
       return null
     }
     if (discounts.length > 0) {
-
       discountAmount = Number(discounts[0].amount)
       switch (discounts[0].discount_type) {
       case "percent-off":
@@ -147,7 +146,7 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                     <dd>{discounts[0].discount_code}</dd>
                   </dl>
                 ) : null}
-                
+
                 <dl>
                   <dt>Address:</dt>
                   <dd>
@@ -209,9 +208,9 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                       <div>${line.price}</div>
                     </td>
                     {discountAmountText !== null ? (
-                    <td>
-                      <div>${discountAmountText}</div>
-                    </td>
+                      <td>
+                        <div>${discountAmountText}</div>
+                      </td>
                     ) : null }
                     <td>
                       <div>${line.total_paid}</div>
