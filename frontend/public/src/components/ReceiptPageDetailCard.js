@@ -16,32 +16,32 @@ type Props = {
 export class ReceiptPageDetailCard extends React.Component<Props> {
   render() {
     const { orderReceipt, discounts } = this.props
+    let discountAmount = null
+    let discountAmountText = null
+    const stateCode = null
 
     if (!orderReceipt || !orderReceipt.total_price_paid) {
       return null
     }
-    if (discounts === null || discounts.length === 0) {
-      return null
+    if (discounts.length > 0) {
+
+      discountAmount = Number(discounts[0].amount)
+      switch (discounts[0].discount_type) {
+      case "percent-off":
+        discountAmountText = `${discountAmount}% off`
+        break
+      case "dollars-off":
+        discountAmountText = `-${formatLocalePrice(discountAmount)}`
+        break
+      default:
+        discountAmountText = `Fixed Price: ${formatLocalePrice(
+          discountAmount
+        )}`
+        break
+      }
     }
 
-    const totalPaid = parseFloat(orderReceipt.total_price_paid)
     const orderDate = parseDateString(orderReceipt.created_on)
-    const discountAmount = Number(discounts[0].amount)
-    const stateCode = null
-    let discountAmountText = null
-
-    switch (discounts[0].discount_type) {
-    case "percent-off":
-      discountAmountText = `${discountAmount}% off`
-      break
-    case "dollars-off":
-      discountAmountText = `-${formatLocalePrice(discountAmount)}`
-      break
-    default:
-      discountAmountText = `Fixed Price: ${formatLocalePrice(discountAmount)}`
-      break
-    }
-
     return (
       <div className="receipt-wrapper">
         <div className="receipt-row p-b-80">
@@ -141,10 +141,13 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                   </div>
                 ) : null}
               <div>
-                <dl>
-                  <dt>Discount Code:</dt>
-                  <dd>{discounts[0].discount_code}</dd>
-                </dl>
+                {discounts.length > 0 ? (
+                  <dl>
+                    <dt>Discount Code:</dt>
+                    <dd>{discounts[0].discount_code}</dd>
+                  </dl>
+                ) : null}
+                
                 <dl>
                   <dt>Address:</dt>
                   <dd>
@@ -181,7 +184,7 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                 <th>Product Description</th>
                 <th>Quantity</th>
                 <th>Unit Price</th>
-                <th>Discount</th>
+                {discountAmountText !== null ? (<th>Discount</th>) : null }
                 <th>Total Paid</th>
               </tr>
             </thead>
@@ -205,9 +208,11 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                     <td>
                       <div>${line.price}</div>
                     </td>
+                    {discountAmountText !== null ? (
                     <td>
                       <div>${discountAmountText}</div>
                     </td>
+                    ) : null }
                     <td>
                       <div>${line.total_paid}</div>
                     </td>
