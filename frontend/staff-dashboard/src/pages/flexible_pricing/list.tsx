@@ -22,6 +22,7 @@ import {
 } from "@pankod/refine-antd";
 
 import { IFlexiblePriceRequest, IFlexiblePriceRequestFilters } from "interfaces";
+import { Type } from "typescript";
 
 const FlexiblePricingStatuses = [
     {
@@ -49,6 +50,31 @@ const FlexiblePricingStatuses = [
         value: 'reset'
     }
 ];
+
+const All_Justifications = [
+    {
+        label: 'OK',
+        value: 'Documents in order'
+    },
+    {
+        label: 'NOT_NOTARIZED',
+        value: 'Docs not notarized'
+    },
+    {
+        label: 'INSUFFICIENT',
+        value: 'Insufficient docs'
+    },
+    {
+        label: 'INCOME_INACCURATE',
+        value: 'Inaccurate income reported'
+    },
+    { 
+        label: 'COUNTRY_INACCURATE',
+        value: 'Inaccurate country reported'
+    },
+];
+
+
 const FlexiblePricingStatusText = "Select Status";
 
 const FlexiblePricingFilterForm: React.FC<{ formProps: FormProps }> = ({ formProps }) => {
@@ -101,6 +127,7 @@ export const FlexiblePricingList: React.FC = () => {
     const [modaldata, setmodaldata] = useState({} as IFlexiblePriceRequest);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const mutationResult = useUpdate<IFlexiblePriceRequest>();
+    const [justification, setJustification] = useState("OK");
     const { mutate, isLoading: mutateIsLoading } = mutationResult;
     const handleUpdate = (item: IFlexiblePriceRequest, status: string) => {
         mutate({ 
@@ -118,6 +145,7 @@ export const FlexiblePricingList: React.FC = () => {
     };
 
     const handleOk = () => {
+        modaldata['justification'] = justification
         handleUpdate(modaldata, modaldata.action)
         setIsModalVisible(false);
     };
@@ -125,6 +153,10 @@ export const FlexiblePricingList: React.FC = () => {
     const handleCancel = () => {
         setIsModalVisible(false);
     };
+
+    const handleChange = (e: any) => {
+        setJustification(e.target.options[e.target.selectedIndex].text)
+      }
 
 
     return (
@@ -174,11 +206,10 @@ export const FlexiblePricingList: React.FC = () => {
                                 title="Documents Sent"
                                 render={(value) => value ? <DateField format="LLL" value={value} /> : 'No Documents Sent'}
                             />
-
                             <Table.Column
-                                dataIndex="createdAt"
-                                title="Created At"
-                                render={(value) => <DateField format="LLL" value={value} />}
+                                dataIndex="justification"
+                                title="Justification"
+                                render={(value) => value}
                             />
                             <Table.Column<IFlexiblePriceRequest>
                                 title="Actions"
@@ -230,6 +261,16 @@ export const FlexiblePricingList: React.FC = () => {
                                                     <p>
                                                         <strong>Country of Income:</strong>
                                                         <div>{modaldata.country_of_income}</div>
+                                                    </p>
+                                                    <p>
+                                                        <span>
+                                                            <strong>Justification:</strong>
+                                                        </span>
+                                                        <select onChange={(e) => handleChange(e)} style={{ marginLeft: "20px" }}>
+                                                            {All_Justifications.map((option) => (
+                                                            <option value={option.value} selected={justification == option.value}>{option.label}</option>
+                                                            ))}
+                                                        </select>
                                                     </p>
                                                 </Modal>
                                         </div>
