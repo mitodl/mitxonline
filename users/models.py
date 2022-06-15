@@ -1,6 +1,7 @@
 """User models"""
 import uuid
 from datetime import timedelta
+import unicodedata
 
 import pycountry
 from django.conf import settings
@@ -144,6 +145,7 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     # NOTE: Username max length was set to 50 before we lowered it. We're hardcoding this
     # value here now until we are ready to migrate the max length at the database level.
     username = models.CharField(unique=True, max_length=USERNAME_MAX_LEN)
+    normalized_username = models.CharField(max_length=USERNAME_MAX_LEN, blank=False, unique=True)
     email = models.EmailField(blank=False, unique=True)
     name = models.TextField(blank=True, default="")
     is_staff = models.BooleanField(
@@ -159,6 +161,12 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     def get_full_name(self):
         """Returns the user's fullname"""
         return self.name
+
+    def make_normalized_username(self):
+        """Strips non-ASCII characters from the username."""
+        normalized_username = unicodedata.normalize('NFD', self.username)
+        normalized_username = normalized_username.encode('ascii', 'ignore').decode('utf-8')
+        self.normalized_username = str(normalized_username)
 
     @property
     def is_editor(self) -> bool:
