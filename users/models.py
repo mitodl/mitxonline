@@ -1,7 +1,6 @@
 """User models"""
 import uuid
 from datetime import timedelta
-import unicodedata
 
 import pycountry
 from django.conf import settings
@@ -88,7 +87,11 @@ class UserManager(BaseUserManager):
         email = self.normalize_email(email)
         fields = {**extra_fields, "email": email}
         if username is not None:
+            from users.api import make_normalized_username
+
+            normalized_username = make_normalized_username(username)
             fields["username"] = username
+            fields["normalized_username"] = normalized_username
         user = self.model(**fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -165,12 +168,8 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
         return self.name
 
     def make_normalized_username(self):
-        """Strips non-ASCII characters from the username."""
-        normalized_username = unicodedata.normalize("NFD", self.username)
-        normalized_username = normalized_username.encode("ascii", "ignore").decode(
-            "utf-8"
-        )
-        self.normalized_username = str(normalized_username)
+        """Calls the API make_normalized_username and stores the result"""
+        self.normalized_username = make_normalized_username(self.username)
 
     @property
     def is_editor(self) -> bool:

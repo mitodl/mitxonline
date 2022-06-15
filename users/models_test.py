@@ -2,6 +2,7 @@
 # pylint: disable=too-many-arguments, redefined-outer-name
 import factory
 import pytest
+import unicodedata
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -12,6 +13,13 @@ from users.factories import UserFactory
 from users.models import LegalAddress, User
 
 pytestmark = pytest.mark.django_db
+
+
+def normalize_username(username):
+    """Strips non-ASCII characters from the username."""
+    normalized_username = unicodedata.normalize("NFD", username)
+    normalized_username = normalized_username.encode("ascii", "ignore").decode("utf-8")
+    return str(normalized_username)
 
 
 @pytest.mark.parametrize(
@@ -33,6 +41,7 @@ def test_create_user(
         user = create_func(username, email=email, name=name, password=password)
 
     assert user.username == username
+    assert user.normalized_username == normalize_username(username)
     assert user.email == "uSer@example.com"
     assert user.name == name
     assert user.get_full_name() == name
@@ -123,3 +132,16 @@ def test_user_is_editor(is_staff, is_superuser, has_editor_group, exp_is_editor)
         user.groups.add(Group.objects.get(name=CMS_EDITORS_GROUP_NAME))
         user.save()
     assert user.is_editor is exp_is_editor
+
+
+@pytest.mark.django_db
+def test_username_normalization():
+    """
+    Tests the make_normalized_username function for proper functionality. This
+    doesn't strictly require a User object, so this uses a set string with
+    accented characters that should be normalized to low-ASCII characters.
+    (For completeness, this also tests the version of the function here.)
+    """
+
+    accented_string = "åéîøüäëïñç"
+    unaccented_string = "aeiouaeinc"
