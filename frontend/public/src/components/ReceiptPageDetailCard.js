@@ -209,7 +209,7 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                     </td>
                     {discountAmountText !== null ? (
                       <td>
-                        <div>${discountAmountText}</div>
+                        <div>{discountAmountText}</div>
                       </td>
                     ) : null }
                     <td>
