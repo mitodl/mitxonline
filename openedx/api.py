@@ -108,7 +108,7 @@ def create_edx_user(user):
         resp = req_session.post(
             edx_url(OPENEDX_REGISTER_USER_PATH),
             data=dict(
-                username=user.username,
+                username=user.normalized_username,
                 email=user.email,
                 name=user.name,
                 provider=settings.MITX_ONLINE_OAUTH_PROVIDER,
