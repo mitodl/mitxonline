@@ -155,7 +155,7 @@ export const FlexiblePricingList: React.FC = () => {
     };
 
     const handleChange = (e: any) => {
-        setJustification(e.target.options[e.target.selectedIndex].text)
+        setJustification(e.target.options[e.target.selectedIndex].value)
       }
 
 
@@ -268,7 +268,7 @@ export const FlexiblePricingList: React.FC = () => {
                                                         </span>
                                                         <select onChange={(e) => handleChange(e)} style={{ marginLeft: "20px" }}>
                                                             {All_Justifications.map((option) => (
-                                                            <option value={option.value} selected={justification == option.value}>{option.label}</option>
+                                                            <option value={option.value} selected={justification == option.value}>{option.value}</option>
                                                             ))}
                                                         </select>
                                                     </p>
