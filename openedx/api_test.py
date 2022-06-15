@@ -111,7 +111,7 @@ def test_create_edx_user(user, settings, application, access_token_count):
         == settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN
     )
     assert dict(parse_qsl(responses.calls[0].request.body)) == {
-        "username": user.username,
+        "username": user.normalized_username,
         "email": user.email,
         "name": user.name,
         "provider": settings.MITX_ONLINE_OAUTH_PROVIDER,
