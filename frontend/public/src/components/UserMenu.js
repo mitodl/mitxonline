@@ -82,6 +82,11 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
           </MixedLink>
         </li>
         <li {...(menuChildProps.li || {})}>
+          <MixedLink dest={routes.orderHistory} aria-label="Order History">
+            Order History
+          </MixedLink>
+        </li>
+        <li {...(menuChildProps.li || {})}>
           <a href={routes.logout} aria-label="Sign Out">
             Sign Out
           </a>
