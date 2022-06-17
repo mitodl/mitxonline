@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.36.0
+Version 0.36.0 (Released June 17, 2022)
 --------------
 
 - asadiqbal08/A button to deny the flexible pricing request (#611)
