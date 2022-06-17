@@ -26,6 +26,7 @@ from ecommerce.factories import (
     BasketItemFactory,
     BasketFactory,
 )
+from courses.factories import CourseRunFactory
 
 
 pytestmark = [pytest.mark.django_db]
@@ -304,9 +305,13 @@ def test_checkout_result(
 @pytest.mark.parametrize(
     "cart_exists, cart_empty", [(True, False), (True, True), (False, True)]
 )
-def test_checkout_product(user, user_client, cart_exists, cart_empty):
+@pytest.mark.parametrize("is_external_checkout", [True, False])
+def test_checkout_product(
+    user, user_client, cart_exists, cart_empty, is_external_checkout
+):
     """
-    Verifies the /cart/add?product_id=? url adds the product to the cart and redirect to checkout
+    Verifies that both /cart/add?product_id=? and /cart/add?course_id=? url adds the product to the cart
+    and redirect to checkout
     """
     basket = BasketFactory.create() if cart_exists else None
 
@@ -315,7 +320,17 @@ def test_checkout_product(user, user_client, cart_exists, cart_empty):
 
     product = ProductFactory.create()
 
-    resp = user_client.get(reverse("checkout-product"), {"product_id": product.id})
+    # Case 1: For in app checkout we have the product id at hand so this API is called with "product_id"
+    # Case 2: For external checkout e.g. edX we only have Course Id so this api is called with "course_id" which is then
+    # converted into product
+    if is_external_checkout:
+        course_run = CourseRunFactory.create()
+        course_run.products.add(product)
+        api_payload = {"course_id": course_run.courseware_id}
+    else:
+        api_payload = {"product_id": product.id}
+
+    resp = user_client.get(reverse("checkout-product"), api_payload)
 
     assert resp.status_code == 302
     assert resp.url == reverse("cart")

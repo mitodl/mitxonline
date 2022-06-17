@@ -506,9 +506,20 @@ class CheckoutProductView(LoginRequiredMixin, RedirectView):
             )
             basket.basket_items.all().delete()
 
-            for product in Product.objects.filter(
-                id__in=self.request.GET.getlist("product_id")
-            ):
+            # Incoming product ids from internal checkout
+            all_product_ids = self.request.GET.getlist("product_id")
+
+            # If the request is from an external source we would have course_id as query param
+            course_ids = self.request.GET.getlist("course_id")
+
+            all_product_ids.extend(
+                list(
+                    CourseRun.objects.filter(courseware_id__in=course_ids).values_list(
+                        "products__id", flat=True
+                    )
+                )
+            )
+            for product in Product.objects.filter(id__in=all_product_ids):
                 BasketItem.objects.create(basket=basket, product=product)
 
         return super().get_redirect_url(*args, **kwargs)
