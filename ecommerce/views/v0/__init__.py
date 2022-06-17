@@ -54,6 +54,7 @@ from courses.models import (
 )
 
 from ecommerce import api
+from ecommerce.discounts import DiscountType
 from ecommerce.serializers import (
     OrderHistorySerializer,
     ProductSerializer,
@@ -80,6 +81,7 @@ from ecommerce.models import (
     Order,
 )
 from ecommerce.forms import AdminRefundOrderForm
+from flexiblepricing.api import determine_courseware_flexible_price_discount
 
 log = logging.getLogger(__name__)
 
@@ -291,6 +293,16 @@ class CheckoutApiViewSet(ViewSet):
         # If you try to redeem a second code, clear out the discounts that
         # have been redeemed.
         BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+
+        product = BasketItem.objects.get(basket=basket).product
+        flexible_price_discount = determine_courseware_flexible_price_discount(
+            product, request.user
+        )
+        if flexible_price_discount:
+            flexible_price = DiscountType.get_discounted_price([flexible_price_discount], product)
+            discounted_price = DiscountType.get_discounted_price([discount], product)
+            if flexible_price < discounted_price:
+                discount = flexible_price_discount
 
         basket_discount = BasketDiscount(
             redemption_date=now_in_utc(),
