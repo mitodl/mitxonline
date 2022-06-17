@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.36.0 (Released June 17, 2022)
+--------------
+
+- asadiqbal08/A button to deny the flexible pricing request (#611)
+- flexible pricing should be applied automatically when a course is added to the cart (#614)
+- Refactored menu and dialog toggles to be simple booleans
+- formatting, adding verification modal tests
+- Updating wording on dialog
+- Added modal that is displayed when a user tries to unenroll from a certificate course
+
 Version 0.35.0 (Released June 10, 2022)
 --------------
 
