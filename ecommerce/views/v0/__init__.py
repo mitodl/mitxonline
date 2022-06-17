@@ -299,7 +299,9 @@ class CheckoutApiViewSet(ViewSet):
             product, request.user
         )
         if flexible_price_discount:
-            flexible_price = DiscountType.get_discounted_price([flexible_price_discount], product)
+            flexible_price = DiscountType.get_discounted_price(
+                [flexible_price_discount], product
+            )
             discounted_price = DiscountType.get_discounted_price([discount], product)
             if flexible_price < discounted_price:
                 discount = flexible_price_discount
