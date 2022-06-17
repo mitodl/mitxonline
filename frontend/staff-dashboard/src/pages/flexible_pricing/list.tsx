@@ -1,6 +1,6 @@
 import { useUpdate, CrudFilters, HttpError } from "@pankod/refine-core";
 import React from "react"
-const {  useState  } = React;
+const {  useState, useEffect  } = React;
 import {
     Button,
     List,
@@ -127,7 +127,7 @@ export const FlexiblePricingList: React.FC = () => {
     const [modaldata, setmodaldata] = useState({} as IFlexiblePriceRequest);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const mutationResult = useUpdate<IFlexiblePriceRequest>();
-    const [justification, setJustification] = useState("OK");
+    const [justification, setJustification] = useState('');
     const { mutate, isLoading: mutateIsLoading } = mutationResult;
     const handleUpdate = (item: IFlexiblePriceRequest, status: string) => {
         mutate({ 
@@ -155,9 +155,14 @@ export const FlexiblePricingList: React.FC = () => {
     };
 
     const handleChange = (e: any) => {
-        setJustification(e.target.options[e.target.selectedIndex].value)
+        setJustification(e.target.options[e.target.selectedIndex].text)
       }
 
+    useEffect(() => {
+        if (tableProps.dataSource && justification == '') {
+            setJustification(tableProps.dataSource[0].justification)
+        }
+    });
 
     return (
         <div>
