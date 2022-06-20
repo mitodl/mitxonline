@@ -198,8 +198,7 @@ def test_redeem_discount_with_higher_discount(
         current=True,
         discount__amount=50,
     )
-    tier_discount_amount = tier.discount.amount
-    flexibe_price = FlexiblePriceFactory.create(
+    flexible_price = FlexiblePriceFactory.create(
         income_usd=50000,
         country_of_income="US",
         user=user,
@@ -219,24 +218,19 @@ def test_redeem_discount_with_higher_discount(
     resp_json = resp.json()
     assert (
         float(resp_json["discounts"][0]["redeemed_discount"]["amount"])
-        == tier_discount_amount
+        == tier.discount.amount
     )
 
     resp = user_drf_client.post(
         reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
     )
     assert "message" in resp.json()
-
     resp_json = resp.json()
-
     assert resp_json["message"] == "Discount applied"
 
     # check flexible price discount is applied
-    flexible_price_discount = determine_courseware_flexible_price_discount(
-        product, user
-    )
-    flexible_price = DiscountType.get_discounted_price(
-        [flexible_price_discount], product
+    flexible_discounted_price = DiscountType.get_discounted_price(
+        [tier.discount], product
     )
     discounted_price = DiscountType.get_discounted_price([discount], product)
     resp = user_drf_client.get(reverse("checkout_api-cart"))
@@ -244,7 +238,7 @@ def test_redeem_discount_with_higher_discount(
     assert (
         float(resp_json["discounts"][0]["redeemed_discount"]["amount"])
         == tier.discount.amount
-        if flexible_price > discounted_price
+        if flexible_discounted_price > discounted_price
         else discount.amount
     )
 
