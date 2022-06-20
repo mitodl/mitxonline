@@ -12,19 +12,21 @@ import reversion
 import uuid
 
 from courses.factories import CourseRunFactory
-from ecommerce.serializers import (
-    ProductSerializer,
-    BasketSerializer,
-    BasketItemSerializer,
-    DiscountSerializer,
-)
-from ecommerce.models import Basket, BasketItem, Order, Discount, UserDiscount
+from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
     ProductFactory,
     DiscountFactory,
     BasketItemFactory,
     BasketFactory,
 )
+from ecommerce.models import Basket, BasketItem, Order, Discount, UserDiscount
+from ecommerce.serializers import (
+    ProductSerializer,
+    BasketSerializer,
+    BasketItemSerializer,
+    DiscountSerializer,
+)
+from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from users.factories import UserFactory
@@ -180,7 +182,9 @@ def test_redeem_discount(user, user_drf_client, products, discounts):
     assert resp_json["message"] == "Discount applied"
 
 
-def test_redeem_discount_with_higher_discount(user, user_drf_client, products, discounts):
+def test_redeem_discount_with_higher_discount(
+    user, user_drf_client, products, discounts
+):
     """
     Bootstraps a basket (see create_basket) and then attempts to redeem a
     discount on it. Should get back a success message. (The API call returns an
@@ -201,7 +205,7 @@ def test_redeem_discount_with_higher_discount(user, user_drf_client, products, d
         user=user,
         courseware_object=course,
         status=FlexiblePriceStatus.APPROVED,
-        tier=tier
+        tier=tier,
     )
     basket = create_basket(user, [product])
 
@@ -213,7 +217,10 @@ def test_redeem_discount_with_higher_discount(user, user_drf_client, products, d
     # check flexible price discount is applied
     resp = user_drf_client.get(reverse("checkout_api-cart"))
     resp_json = resp.json()
-    assert float(resp_json["discounts"][0]["redeemed_discount"]["amount"]) == tier_discount_amount
+    assert (
+        float(resp_json["discounts"][0]["redeemed_discount"]["amount"])
+        == tier_discount_amount
+    )
 
     resp = user_drf_client.post(
         reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
@@ -225,9 +232,21 @@ def test_redeem_discount_with_higher_discount(user, user_drf_client, products, d
     assert resp_json["message"] == "Discount applied"
 
     # check flexible price discount is applied
+    flexible_price_discount = determine_courseware_flexible_price_discount(
+        product, user
+    )
+    flexible_price = DiscountType.get_discounted_price(
+        [flexible_price_discount], product
+    )
+    discounted_price = DiscountType.get_discounted_price([discount], product)
     resp = user_drf_client.get(reverse("checkout_api-cart"))
     resp_json = resp.json()
-    assert float(resp_json["discounts"][0]["redeemed_discount"]["amount"]) == tier.discount.amount if tier_discount_amount > discount.amount else discount.amount
+    assert (
+        float(resp_json["discounts"][0]["redeemed_discount"]["amount"])
+        == tier.discount.amount
+        if flexible_price > discounted_price
+        else discount.amount
+    )
 
 
 def test_clear_discounts(user, user_drf_client, products, discounts):
