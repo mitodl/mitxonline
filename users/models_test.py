@@ -132,16 +132,3 @@ def test_user_is_editor(is_staff, is_superuser, has_editor_group, exp_is_editor)
         user.groups.add(Group.objects.get(name=CMS_EDITORS_GROUP_NAME))
         user.save()
     assert user.is_editor is exp_is_editor
-
-
-@pytest.mark.django_db
-def test_username_normalization():
-    """
-    Tests the make_normalized_username function for proper functionality. This
-    doesn't strictly require a User object, so this uses a set string with
-    accented characters that should be normalized to low-ASCII characters.
-    (For completeness, this also tests the version of the function here.)
-    """
-
-    accented_string = "åéîøüäëïñç"
-    unaccented_string = "aeiouaeinc"
