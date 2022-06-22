@@ -169,6 +169,7 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
 
     def make_normalized_username(self):
         """Calls the API make_normalized_username and stores the result"""
+        from users.api import make_normalized_username
         self.normalized_username = make_normalized_username(self.username)
 
     @property
