@@ -10,6 +10,7 @@ export const routes = {
   profile:         "/profile/",
   accountSettings: "/account-settings/",
   logout:          "/logout/",
+  orderHistory:    "/orders/history",
 
   // authentication related routes
   login: include("/signin/", {
@@ -35,10 +36,6 @@ export const routes = {
   }),
 
   cart: include("/cart/", {
-    begin: ""
-  }),
-
-  orderHistory: include("/orders/history", {
     begin: ""
   }),
 
