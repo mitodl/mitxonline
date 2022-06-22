@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.36.1 (Released June 22, 2022)
+--------------
+
+- feat: update cart to handle products from external checkout (#626)
+- Fixes: Receipt page is empty when there is no discount code (#621)
+- Show justification once status changed (#622)
+- Adds Order History to the top menu
+- Updates mitol-django packages
+- Changing coupon code label to "Coupon code" from "Have a code?"
+
 Version 0.36.0 (Released June 17, 2022)
 --------------
 
