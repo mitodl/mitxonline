@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.36.1
+Version 0.36.1 (Released June 22, 2022)
 --------------
 
 - feat: update cart to handle products from external checkout (#626)
