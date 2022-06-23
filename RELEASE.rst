@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.36.2
+--------------
+
+- Bump pyjwt from 2.1.0 to 2.4.0 (#588)
+- Adds management command to find possible username conflicts
+- If a coupon is entered it should replace the financial aid discount only if it's a higher discount. (#630)
+- Moved orderHistory route and reworked it so it renders properly
+
 Version 0.36.1 (Released June 22, 2022)
 --------------
 
