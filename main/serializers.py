@@ -1,13 +1,11 @@
 """MITx Online serializers"""
 from django.conf import settings
-from mitol.common.utils.webpack import webpack_public_path
 from rest_framework import serializers
 
 
 class AppContextSerializer(serializers.Serializer):
     """Serializer for the application context"""
 
-    public_path = serializers.SerializerMethodField()
     gtm_tracking_id = serializers.SerializerMethodField()
     ga_tracking_id = serializers.SerializerMethodField()
     environment = serializers.SerializerMethodField()
@@ -33,10 +31,6 @@ class AppContextSerializer(serializers.Serializer):
     def get_environment(self, request):
         """Returns a dictionary of features"""
         return settings.ENVIRONMENT
-
-    def get_public_path(self, request):
-        """Returns the public_path"""
-        return webpack_public_path(request)
 
 
 class WriteableSerializerMethodField(serializers.SerializerMethodField):

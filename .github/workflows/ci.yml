@@ -81,6 +81,9 @@ jobs:
         with:
           stack-version: 6.7.1
 
+      - name: Create test local state
+        run: ./scripts/test/stub-data.sh
+
       - name: Running Celery
         run: |
           celery -A main worker -B -l INFO &
@@ -109,7 +112,6 @@ jobs:
           CELERY_BROKER_URL: redis://localhost:6379/4
           CELERY_RESULT_BACKEND: redis://localhost:6379/4
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
-          DISABLE_WEBPACK_LOADER_STATS: 'True'
           ELASTICSEARCH_URL: localhost:9200
           MAILGUN_KEY: fake_mailgun_key
           MAILGUN_SENDER_DOMAIN: other.fake.site
@@ -174,10 +176,11 @@ jobs:
           CODECOV: true
           NODE_ENV: development
 
-      - name: Webpack build
+      - name: Webpack production build
         run: |
-          cd frontend/public
-          npx webpack --config webpack.config.prod.js --bail
+          yarn workspaces foreach run build --bail --mode production
+        env:
+          NODE_ENV: production
 
       - name: Upload test coverage to CodeCov
         uses: codecov/codecov-action@v1

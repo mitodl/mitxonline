@@ -15,9 +15,6 @@ import UpsellCardApp from "../containers/UpsellCardApp"
 // Object.entries polyfill
 import entries from "object.entries"
 
-/* global SETTINGS:false */
-__webpack_public_path__ = SETTINGS.public_path // eslint-disable-line no-undef, camelcase
-
 if (!Object.entries) {
   entries.shim()
 }

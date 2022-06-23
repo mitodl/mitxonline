@@ -1,0 +1,41 @@
+{
+  "status": "done",
+  "assets": {
+    "static/js/bundle.js": {
+      "name": "static/js/bundle.js",
+      "path": "/app/frontend/staff-dashboard/build/static/js/bundle.js",
+      "publicPath": "http://mitxonline.odl.local:8016/static/js/bundle.js"
+    },
+    "static/js/node_modules_web-vitals_dist_web-vitals_js.chunk.js": {
+      "name": "static/js/node_modules_web-vitals_dist_web-vitals_js.chunk.js",
+      "path": "/app/frontend/staff-dashboard/build/static/js/node_modules_web-vitals_dist_web-vitals_js.chunk.js",
+      "publicPath": "http://mitxonline.odl.local:8016/static/js/node_modules_web-vitals_dist_web-vitals_js.chunk.js"
+    },
+    "static/js/bundle.js.map": {
+      "name": "static/js/bundle.js.map",
+      "path": "/app/frontend/staff-dashboard/build/static/js/bundle.js.map",
+      "publicPath": "http://mitxonline.odl.local:8016/static/js/bundle.js.map"
+    },
+    "static/js/node_modules_web-vitals_dist_web-vitals_js.chunk.js.map": {
+      "name": "static/js/node_modules_web-vitals_dist_web-vitals_js.chunk.js.map",
+      "path": "/app/frontend/staff-dashboard/build/static/js/node_modules_web-vitals_dist_web-vitals_js.chunk.js.map",
+      "publicPath": "http://mitxonline.odl.local:8016/static/js/node_modules_web-vitals_dist_web-vitals_js.chunk.js.map"
+    },
+    "index.html": {
+      "name": "index.html",
+      "path": "/app/frontend/staff-dashboard/build/index.html",
+      "publicPath": "http://mitxonline.odl.local:8016/index.html"
+    },
+    "asset-manifest.json": {
+      "name": "asset-manifest.json",
+      "path": "/app/frontend/staff-dashboard/build/asset-manifest.json",
+      "publicPath": "http://mitxonline.odl.local:8016/asset-manifest.json"
+    }
+  },
+  "chunks": {
+    "main": [
+      "static/js/bundle.js"
+    ]
+  },
+  "publicPath": "http://mitxonline.odl.local:8016/"
+}

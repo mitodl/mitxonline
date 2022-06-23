@@ -19,6 +19,16 @@ def index(request, **kwargs):
     )
 
 
+def refine(request, **kwargs):
+    """
+    The refine view for the staff dashboard
+    """
+    return render(
+        request,
+        "refine.html",
+    )
+
+
 def handler404(request, exception):  # pylint: disable=unused-argument
     """404: NOT FOUND ERROR handler"""
     return HttpResponseNotFound(render_to_string("404.html", request=request))

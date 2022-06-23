@@ -28,6 +28,7 @@ def cleanup_settings():
     """Cleanup settings after a test"""
     envs.env.reload()
     importlib.reload(sys.modules["main.settings"])
+    importlib.reload(sys.modules["mitol.authentication.settings.djoser_settings"])
 
 
 class TestSettings(TestCase):

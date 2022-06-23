@@ -22,15 +22,14 @@ from mitol.common.envs import (
 
 from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 
-# wildcard import boilerplate digital credentials settings
-# from mitol.digitalcredentials.settings import *  # pylint: disable=wildcard-import,unused-wildcard-import
-from mitol.common.settings.webpack import *  # pylint: disable=wildcard-import,unused-wildcard-import
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 
 VERSION = "0.36.1"
+
+log = logging.getLogger()
 
 ENVIRONMENT = get_string(
     name="MITX_ONLINE_ENVIRONMENT",
@@ -117,12 +116,18 @@ SECURE_SSL_HOST = get_string(
 WEBPACK_LOADER = {
     "DEFAULT": {
         "CACHE": not DEBUG,
-        "BUNDLE_DIR_NAME": "bundles/",
-        "STATS_FILE": os.path.join(BASE_DIR, "webpack-stats.json"),
+        "STATS_FILE": os.path.join(BASE_DIR, "webpack-stats/default.json"),
         "POLL_INTERVAL": 0.1,
         "TIMEOUT": None,
         "IGNORE": [r".+\.hot-update\.+", r".+\.js\.map"],
-    }
+    },
+    "STAFF_DASHBOARD": {
+        "CACHE": not DEBUG,
+        "STATS_FILE": os.path.join(BASE_DIR, "webpack-stats/staff-dashboard.json"),
+        "POLL_INTERVAL": 0.1,
+        "TIMEOUT": None,
+        "IGNORE": [r".+\.hot-update\.+", r".+\.js\.map"],
+    },
 }
 
 SITE_ID = get_string(
@@ -152,6 +157,7 @@ INSTALLED_APPS = (
     "anymail",
     "django_filters",
     "corsheaders",
+    "webpack_loader",
     # WAGTAIL
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -199,16 +205,6 @@ INSTALLED_APPS = (
 # Only include the seed data app if this isn't running in prod
 # if ENVIRONMENT not in ("production", "prod"):
 #     INSTALLED_APPS += ("localdev.seed",)
-
-
-DISABLE_WEBPACK_LOADER_STATS = get_bool(
-    name="DISABLE_WEBPACK_LOADER_STATS",
-    default=False,
-    dev_only=True,
-    description="Disables the webpack loader, development environment only.",
-)
-if not DISABLE_WEBPACK_LOADER_STATS:
-    INSTALLED_APPS += ("webpack_loader",)
 
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
@@ -416,7 +412,17 @@ STATICFILES_FINDERS = [
 ]
 
 STATIC_ROOT = "staticfiles"
-STATICFILES_DIRS = (os.path.join(BASE_DIR, "static"),)
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "static"),
+]
+for name, path in [
+    ("mitx-online", os.path.join(BASE_DIR, "frontend/public/build")),
+    ("staff-dashboard", os.path.join(BASE_DIR, "frontend/staff-dashboard/build")),
+]:
+    if os.path.exists(path):
+        STATICFILES_DIRS.append((name, path))
+    else:
+        log.warn(f"Static file directory was missing: {path}")
 
 # Important to define this so DEBUG works properly
 INTERNAL_IPS = (
@@ -890,12 +896,6 @@ MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the leg
 MITOL_AUTHENTICATION_FROM_EMAIL = MAILGUN_FROM_EMAIL
 MITOL_AUTHENTICATION_REPLY_TO_EMAIL = MITX_ONLINE_REPLY_TO_ADDRESS
 
-# mitol-django-digital-credentials
-# MITOL_DIGITAL_CREDENTIALS_BUILD_CREDENTIAL_FUNC = (
-#     "courses.credentials.build_digital_credential"
-# )
-
-
 MITX_ONLINE_OAUTH_PROVIDER = "mitxpro-oauth2"
 OPENEDX_OAUTH_APP_NAME = get_string(
     name="OPENEDX_OAUTH_APP_NAME",
@@ -1008,5 +1008,26 @@ OPEN_EXCHANGE_RATES_URL = get_string(
 OPEN_EXCHANGE_RATES_APP_ID = get_string(
     name="OPEN_EXCHANGE_RATES_APP_ID",
     default="",
+    description="open exchange app id for fetching currency exchange rate",
+)
+
+MITX_ONLINE_REFINE_OIDC_CONFIG_CLIENT_ID = get_string(
+    name="MITX_ONLINE_REFINE_OIDC_CONFIG_CLIENT_ID",
+    default=None,
+    description="open exchange app id for fetching currency exchange rate",
+)
+MITX_ONLINE_REFINE_OIDC_CONFIG_AUTHORITY = get_string(
+    name="MITX_ONLINE_REFINE_OIDC_CONFIG_AUTHORITY",
+    default=f"{SITE_BASE_URL}/oauth2/",
+    description="open exchange app id for fetching currency exchange rate",
+)
+MITX_ONLINE_REFINE_OIDC_CONFIG_REDIRECT_URI = get_string(
+    name="MITX_ONLINE_REFINE_OIDC_CONFIG_REDIRECT_URI",
+    default=f"{SITE_BASE_URL}/staff-dashboard/oauth2/login/",
+    description="Url to redirect the user to",
+)
+MITX_ONLINE_REFINE_MITX_ONLINE_DATASOURCE = get_string(
+    name="MITX_ONLINE_REFINE_MITX_ONLINE_DATASOURCE",
+    default=f"{SITE_BASE_URL}/api",
     description="open exchange app id for fetching currency exchange rate",
 )
