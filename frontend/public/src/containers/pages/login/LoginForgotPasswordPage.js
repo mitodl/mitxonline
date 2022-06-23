@@ -128,12 +128,12 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
                   </li>
                   <li>
                     <b>Is your email correct?</b> If you made a typo, no
-                    problem,{" "}
+                    problem, just try to{" "}
                     <Link
                       to={routes.login.forgot.begin}
                       onClick={this.resetEmailLinkSent.bind(this)}
                     >
-                      create an account
+                      reset your password
                     </Link>{" "}
                     again.
                   </li>
