@@ -279,7 +279,7 @@ pycparser==2.20
     # via cffi
 pygments==2.9.0
     # via ipython
-pyjwt==2.1.0
+pyjwt==2.4.0
     # via
     #   djangorestframework-simplejwt
     #   social-auth-core
