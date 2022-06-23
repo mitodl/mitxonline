@@ -1,6 +1,5 @@
 """Utils tests"""
 from mitol.common.utils.urls import remove_password_from_url
-from mitol.common.utils.webpack import webpack_public_path
 
 from main.models import AuditModel
 from main.utils import get_field_names, get_js_settings, get_partitioned_set_difference
@@ -25,7 +24,6 @@ def test_get_js_settings(settings, rf):
     settings.ENVIRONMENT = "test"
     settings.VERSION = "4.5.6"
     settings.EMAIL_SUPPORT = "support@text.com"
-    settings.USE_WEBPACK_DEV_SERVER = False
     settings.RECAPTCHA_SITE_KEY = "fake_key"
     settings.ENABLE_UPGRADE_DIALOG = False
     settings.DISABLE_DISCOUNT_UI = False
@@ -34,7 +32,6 @@ def test_get_js_settings(settings, rf):
 
     assert get_js_settings(request) == {
         "gaTrackingID": "fake",
-        "public_path": webpack_public_path(request),
         "environment": settings.ENVIRONMENT,
         "sentry_dsn": remove_password_from_url(settings.SENTRY_DSN),
         "release_version": settings.VERSION,

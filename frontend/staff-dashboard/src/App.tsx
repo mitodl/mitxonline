@@ -34,14 +34,22 @@ axiosInterface.interceptors.request.use((config: any) => {
   return config;
 }, (error: any) => Promise.reject(error));
 
+
+const { RouterComponent : RefineRouterComponent } = routerProvider;
+
+const RouterComponent = () => <RefineRouterComponent basename="/staff-dashboard" />;
+
 export default function App() {
-  const dataURI = process.env["REACT_APP_MITX_ONLINE_DATASOURCE"] ? process.env["REACT_APP_MITX_ONLINE_DATASOURCE"] : "";
+  const dataURI = DATASOURCES_CONFIG?.mitxOnline ?? "";
   const authProvider = useAuthProvider();
   const xonlineProvider = useDrfDataProvider(dataURI);
 
   return (
     <Refine
-      routerProvider={routerProvider}
+      routerProvider={{
+        ...routerProvider,
+        RouterComponent,
+      }}
       notificationProvider={notificationProvider}
       dataProvider={xonlineProvider}
       authProvider={authProvider}

@@ -1,0 +1,60 @@
+{
+  "status": "done",
+  "assets": {
+    "root.js": {
+      "name": "root.js",
+      "path": "/app/frontend/public/build/root.js",
+      "publicPath": "http://mitxonline.odl.local:8012/root.js"
+    },
+    "header.js": {
+      "name": "header.js",
+      "path": "/app/frontend/public/build/header.js",
+      "publicPath": "http://mitxonline.odl.local:8012/header.js"
+    },
+    "style.js": {
+      "name": "style.js",
+      "path": "/app/frontend/public/build/style.js",
+      "publicPath": "http://mitxonline.odl.local:8012/style.js"
+    },
+    "django.js": {
+      "name": "django.js",
+      "path": "/app/frontend/public/build/django.js",
+      "publicPath": "http://mitxonline.odl.local:8012/django.js"
+    },
+    "root.js.map": {
+      "name": "root.js.map",
+      "path": "/app/frontend/public/build/root.js.map",
+      "publicPath": "http://mitxonline.odl.local:8012/root.js.map"
+    },
+    "header.js.map": {
+      "name": "header.js.map",
+      "path": "/app/frontend/public/build/header.js.map",
+      "publicPath": "http://mitxonline.odl.local:8012/header.js.map"
+    },
+    "style.js.map": {
+      "name": "style.js.map",
+      "path": "/app/frontend/public/build/style.js.map",
+      "publicPath": "http://mitxonline.odl.local:8012/style.js.map"
+    },
+    "django.js.map": {
+      "name": "django.js.map",
+      "path": "/app/frontend/public/build/django.js.map",
+      "publicPath": "http://mitxonline.odl.local:8012/django.js.map"
+    }
+  },
+  "chunks": {
+    "root": [
+      "root.js"
+    ],
+    "header": [
+      "header.js"
+    ],
+    "style": [
+      "style.js"
+    ],
+    "django": [
+      "django.js"
+    ]
+  },
+  "publicPath": "http://mitxonline.odl.local:8012/"
+}

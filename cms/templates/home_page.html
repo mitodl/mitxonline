@@ -1,14 +1,9 @@
 {% extends "base.html" %}
 
-{% load static wagtail_img_src render_bundle feature_img_src %}
+{% load static wagtail_img_src feature_img_src %}
 {% load wagtailcore_tags wagtailembeds_tags %}
 
 {% block title %}{{ site_name }}{% endblock %}
-
-{% block headercontent %}
-  <div id="header"></div>
-  {% render_bundle 'header' %}
-{% endblock %}
 
 {% block content %}
 <div id="main" class="hero-container" style="background-image: url('{% wagtail_img_src page.hero%}')">

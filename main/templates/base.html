@@ -1,4 +1,5 @@
-{% load static hijack_tags render_bundle js_interop %}
+{% load static hijack_tags js_interop %}
+{% load render_bundle from webpack_loader %}
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -32,6 +33,8 @@
     {% include "partials/gtm_body.html" %}
     {% hijack_notification %}
     {% block headercontent %}
+      <div id="header"></div>
+      {% render_bundle 'header' %}
     {% endblock %}
     {% block content %}
         {% block banner %}

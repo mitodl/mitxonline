@@ -4,7 +4,11 @@ import json
 from django import template
 from django.utils.safestring import mark_safe
 
-from main.utils import get_js_settings
+from main.utils import (
+    get_js_settings,
+    get_refine_oidc_settings,
+    get_refine_datasources_settings,
+)
 
 register = template.Library()
 
@@ -18,5 +22,20 @@ def js_settings(context):
     return mark_safe(
         f"""<script type="text/javascript">
 var SETTINGS = {js_settings_json};
+</script>"""
+    )
+
+
+@register.simple_tag(takes_context=True)
+def refine_settings(context):
+    """Renders the JS settings object to a script tag"""
+    request = context["request"]
+    oidc_settings_json = json.dumps(get_refine_oidc_settings(request))
+    datasources_settings_json = json.dumps(get_refine_datasources_settings(request))
+
+    return mark_safe(
+        f"""<script type="text/javascript">
+var OIDC_CONFIG = {oidc_settings_json};
+var DATASOURCES_CONFIG = {datasources_settings_json}
 </script>"""
     )

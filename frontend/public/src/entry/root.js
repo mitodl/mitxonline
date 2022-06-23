@@ -1,3 +1,4 @@
+/* global SETTINGS:false */
 import "core-js/stable"
 import "regenerator-runtime/runtime"
 import React from "react"
@@ -12,9 +13,6 @@ import { AppTypeContext, SPA_APP_CONTEXT } from "../contextDefinitions"
 import * as Sentry from "@sentry/browser"
 // Object.entries polyfill
 import entries from "object.entries"
-
-/* global SETTINGS:false */
-__webpack_public_path__ = SETTINGS.public_path // eslint-disable-line no-undef, camelcase
 
 Sentry.init({
   dsn:         SETTINGS.sentry_dsn,

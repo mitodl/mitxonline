@@ -1,0 +1,20 @@
+{% load js_interop %}
+{% load render_bundle from webpack_loader %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Web site created using refine" />
+    <title>
+      MITx Online Staff Dashboard
+    </title>
+    {% refine_settings %}
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+  {% render_bundle 'main' config='STAFF_DASHBOARD' %}
+</html>

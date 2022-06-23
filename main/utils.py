@@ -9,7 +9,6 @@ from django.core.serializers import serialize
 from django.http import HttpRequest, HttpResponseRedirect
 from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME
 from mitol.common.utils.urls import remove_password_from_url
-from mitol.common.utils.webpack import webpack_public_path
 from rest_framework import status
 from rest_framework.response import Response
 from main import features
@@ -39,7 +38,6 @@ def get_js_settings(request: HttpRequest):
     return {
         "gaTrackingID": settings.GA_TRACKING_ID,
         "environment": settings.ENVIRONMENT,
-        "public_path": webpack_public_path(request),
         "release_version": settings.VERSION,
         "recaptchaKey": settings.RECAPTCHA_SITE_KEY,
         "sentry_dsn": remove_password_from_url(settings.SENTRY_DSN),
@@ -49,6 +47,38 @@ def get_js_settings(request: HttpRequest):
             "upgrade_dialog": features.is_enabled(features.ENABLE_UPGRADE_DIALOG),
             "disable_discount_ui": features.is_enabled(features.DISABLE_DISCOUNT_UI),
         },
+    }
+
+
+def get_refine_oidc_settings(request: HttpRequest):
+    """
+    Get the set of JS settings for refine OIDC
+
+    Args:
+        request (django.http.HttpRequest) the current request
+
+    Returns:
+        dict: the settings object
+    """
+    return {
+        "client_id": settings.MITX_ONLINE_REFINE_OIDC_CONFIG_CLIENT_ID,
+        "authority": settings.MITX_ONLINE_REFINE_OIDC_CONFIG_AUTHORITY,
+        "redirect_uri": settings.MITX_ONLINE_REFINE_OIDC_CONFIG_REDIRECT_URI,
+    }
+
+
+def get_refine_datasources_settings(request: HttpRequest):
+    """
+    Get the set of JS settings for refine datasources
+
+    Args:
+        request (django.http.HttpRequest) the current request
+
+    Returns:
+        dict: the settings object
+    """
+    return {
+        "mitxOnline": settings.MITX_ONLINE_REFINE_MITX_ONLINE_DATASOURCE,
     }
 
 

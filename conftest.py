@@ -8,7 +8,6 @@ from main import features
 @pytest.fixture(autouse=True)
 def default_settings(settings):
     """Set default settings for all tests"""
-    settings.DISABLE_WEBPACK_LOADER_STATS = True
     settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
     settings.FEATURES[features.SYNC_ON_DASHBOARD_LOAD] = False
     settings.FEATURES[features.ENABLE_UPGRADE_DIALOG] = False

@@ -6,6 +6,7 @@
     "type": "git",
     "url": "https://github.com/mitodl/mitx-online.git"
   },
+  "private": true,
   "dependencies": {
     "@babel/cli": "^7.17.6",
     "@babel/core": "^7.17.8",
@@ -115,16 +116,18 @@
     "waait": "^1.0.4",
     "webpack": "^5.71.0",
     "webpack-bundle-tracker": "^1.4.0",
-    "webpack-cli": "^4.9.2",
+    "webpack-cli": "^4.10.0",
     "webpack-dev-middleware": "^5.3.1",
+    "webpack-dev-server": "^4.9.2",
     "webpack-hot-middleware": "^2.25.1",
+    "webpack-merge": "^5.8.0",
     "yup": "^0.31.0"
   },
   "engines": {
     "node": ">=17.8 <18"
   },
   "scripts": {
-    "build": "./webpack_if_prod.sh",
+    "build": "node ../../node_modules/.bin/webpack --bail",
     "postinstall": "yarn build",
     "lint": "eslint ./src",
     "scss_lint": "sass-lint --verbose --no-exit",
@@ -132,7 +135,7 @@
     "coverage": "COVERAGE=1 ./../../scripts/test/js_test.sh",
     "codecov": "CODECOV=1 ./../../scripts/test/js_test.sh",
     "watch": "WATCH=1 ./../../scripts/test/js_test.sh",
-    "dev-server": "node ./hot-reload-dev-server.js",
+    "dev-server": "node ../../node_modules/.bin/webpack serve",
     "flow": "flow check",
     "fmt": "LOG_LEVEL= prettier-eslint --write --no-semi --ignore 'src/flow/**/*.js' $PWD/'src/**/*.js'",
     "fmt:check": "LOG_LEVEL= prettier-eslint --list-different --no-semi --ignore 'src/flow/**/*.js' $PWD/'src/**/*.js'"
