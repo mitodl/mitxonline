@@ -49,26 +49,26 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
             </p>
             <p>
               <b>
-                If you do NOT receive your password reset email, here's what to
+                If you do NOT receive your verification email, here's what to
                 do:
               </b>
             </p>
             <ul>
               <li>
                 <b>Wait a few moments.</b> It might take several minutes to
-                receive your password reset email.
+                receive your verification email.
               </li>
               <li>
                 <b>Check your spam folder.</b> It might be there.
               </li>
               <li>
-                <b>Is your email correct?</b> If you made a typo, no problem,{" "}
-                <Link to={routes.register.begin}>create an account</Link> again.
+                <b>Is your email correct?</b> If you made a typo, no problem, just try {" "}
+                <Link to={routes.register.begin}>creating an account</Link> again.
               </li>
             </ul>
             <div className="contact-support">
               <hr />
-              <b>Still no password reset email? </b>
+              <b>Still no verification email? </b>
               <br />
               Please contact our {` ${SETTINGS.site_name} `}
               <a href={`mailto:${SETTINGS.support_email}`}>
