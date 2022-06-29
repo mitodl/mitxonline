@@ -58,7 +58,7 @@ export class NotificationContainer extends React.Component<Props, State> {
     const { hiddenNotifications } = this.state
 
     return (
-      <div className="notifications">
+      <div className="notifications order-2" id="notifications-container">
         {Object.keys(userNotifications).map((notificationKey, i) => {
           const dismiss = partial(this.onDismiss, [notificationKey])
           const notification = userNotifications[notificationKey]
@@ -80,7 +80,7 @@ export class NotificationContainer extends React.Component<Props, State> {
               toggle={dismiss}
               fade={true}
             >
-              <AlertBodyComponent dismiss={dismiss} {...notification.props} />
+              <AlertBodyComponent aria-live="assertive" dismiss={dismiss} {...notification.props} />
             </Alert>
           )
         })}
