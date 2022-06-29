@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.36.2
+Version 0.36.2 (Released June 29, 2022)
 --------------
 
 - Add never_cache() decorator to react views
