@@ -1,6 +1,6 @@
 import { useUpdate, CrudFilters, HttpError } from "@pankod/refine-core";
 import React from "react"
-const {  useState, useEffect  } = React;
+const {  useState } = React;
 import {
     Button,
     List,
