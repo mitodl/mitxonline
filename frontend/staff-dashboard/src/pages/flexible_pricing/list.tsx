@@ -158,12 +158,6 @@ export const FlexiblePricingList: React.FC = () => {
         setJustification(e.target.options[e.target.selectedIndex].text)
       }
 
-    useEffect(() => {
-        if (tableProps.dataSource && justification == '') {
-            setJustification(tableProps.dataSource[0].justification)
-        }
-    });
-
     return (
         <div>
             <Row gutter={[10, 10]}>
@@ -273,7 +267,7 @@ export const FlexiblePricingList: React.FC = () => {
                                                         </span>
                                                         <select onChange={(e) => handleChange(e)} style={{ marginLeft: "20px" }}>
                                                             {All_Justifications.map((option) => (
-                                                            <option value={option.value} selected={justification == option.value}>{option.value}</option>
+                                                            <option value={option.value} selected={modaldata['justification'] == option.value}>{option.value}</option>
                                                             ))}
                                                         </select>
                                                     </p>
