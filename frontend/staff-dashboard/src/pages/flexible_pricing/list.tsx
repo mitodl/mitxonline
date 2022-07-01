@@ -1,6 +1,6 @@
 import { useUpdate, CrudFilters, HttpError } from "@pankod/refine-core";
 import React from "react"
-const {  useState  } = React;
+const { useState } = React;
 import {
     Button,
     List,
@@ -10,7 +10,6 @@ import {
     Space, 
     FilterDropdown,
     Select,
-    useSelect,
     FormProps,
     Form,
     Input, 
@@ -127,7 +126,7 @@ export const FlexiblePricingList: React.FC = () => {
     const [modaldata, setmodaldata] = useState({} as IFlexiblePriceRequest);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const mutationResult = useUpdate<IFlexiblePriceRequest>();
-    const [justification, setJustification] = useState("OK");
+    const [justification, setJustification] = useState('');
     const { mutate, isLoading: mutateIsLoading } = mutationResult;
     const handleUpdate = (item: IFlexiblePriceRequest, status: string) => {
         mutate({ 
@@ -155,9 +154,8 @@ export const FlexiblePricingList: React.FC = () => {
     };
 
     const handleChange = (e: any) => {
-        setJustification(e.target.options[e.target.selectedIndex].value)
+        setJustification(e.target.options[e.target.selectedIndex].text)
       }
-
 
     return (
         <div>
@@ -268,7 +266,7 @@ export const FlexiblePricingList: React.FC = () => {
                                                         </span>
                                                         <select onChange={(e) => handleChange(e)} style={{ marginLeft: "20px" }}>
                                                             {All_Justifications.map((option) => (
-                                                            <option value={option.value} selected={justification == option.value}>{option.value}</option>
+                                                            <option value={option.value} selected={modaldata['justification'] == option.value}>{option.value}</option>
                                                             ))}
                                                         </select>
                                                     </p>
