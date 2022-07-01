@@ -181,7 +181,6 @@ def test_redeem_discount(user, user_drf_client, products, discounts):
     assert resp_json["message"] == "Discount applied"
 
 
-@pytest.mark.flaky(max_runs=5)
 def test_redeem_discount_with_higher_discount(
     user, user_drf_client, products, discounts
 ):
@@ -235,11 +234,16 @@ def test_redeem_discount_with_higher_discount(
     discounted_price = DiscountType.get_discounted_price([discount], product)
     resp = user_drf_client.get(reverse("checkout_api-cart"))
     resp_json = resp.json()
+
+    resolved_discount_amount = (
+        tier.discount.amount
+        if flexible_discounted_price < discounted_price
+        else discount.amount
+    )
+
     assert (
         float(resp_json["discounts"][0]["redeemed_discount"]["amount"])
-        == tier.discount.amount
-        if flexible_discounted_price > discounted_price
-        else discount.amount
+        == resolved_discount_amount
     )
 
 
