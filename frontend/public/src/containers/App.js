@@ -66,7 +66,7 @@ export class App extends React.Component<Props, void> {
     }
 
     return (
-      <div className="app">
+      <div className="app" aria-flowto="notifications-container">
         <Header currentUser={currentUser} location={location} />
         <div id="main" className="main-page-content">
           <Switch>

@@ -183,7 +183,7 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                 <th>Product Description</th>
                 <th>Quantity</th>
                 <th>Unit Price</th>
-                {discountAmountText !== null ? (<th>Discount</th>) : null }
+                {discountAmountText !== null ? <th>Discount</th> : null}
                 <th>Total Paid</th>
               </tr>
             </thead>
@@ -211,7 +211,7 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                       <td>
                         <div>{discountAmountText}</div>
                       </td>
-                    ) : null }
+                    ) : null}
                     <td>
                       <div>${line.total_paid}</div>
                     </td>
