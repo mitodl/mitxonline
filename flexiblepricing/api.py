@@ -121,26 +121,26 @@ def determine_tier_courseware(courseware, income):
     return tier
 
 
-def determine_auto_approval(flexible_price, tier):
+def determine_auto_approval(flexibe_price, tier):
     """
     Takes income and country code and returns a boolean if auto-approved. Logs an error if the country of
-    flexible_price does not exist in CountryIncomeThreshold.
+    flexibe_price does not exist in CountryIncomeThreshold.
     Args:
-        flexible_price (FlexiblePrice): the flexibe price object to determine auto-approval
+        flexibe_price (FlexiblePrice): the flexibe price object to determine auto-approval
         tier (FlexiblePriceTier): the FlexiblePrice for the user's income level
     Returns:
         boolean: True if auto-approved, False if not
     """
     try:
         country_income_threshold = CountryIncomeThreshold.objects.get(
-            country_code=flexible_price.country_of_income
+            country_code=flexibe_price.country_of_income
         )
         income_threshold = country_income_threshold.income_threshold
     except CountryIncomeThreshold.DoesNotExist:
         log.error(
             "Country code %s does not exist in CountryIncomeThreshold for flexible price id %s",
-            flexible_price.country_of_income,
-            flexible_price.id,
+            flexibe_price.country_of_income,
+            flexibe_price.id,
         )
         income_threshold = DEFAULT_INCOME_THRESHOLD
     if tier.discount.amount == 0:
@@ -150,7 +150,7 @@ def determine_auto_approval(flexible_price, tier):
         # There is no income which we need to check the financial aid application
         return True
     else:
-        return flexible_price.income_usd > income_threshold
+        return flexibe_price.income_usd > income_threshold
 
 
 def determine_income_usd(original_income, original_currency):

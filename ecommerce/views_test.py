@@ -1,6 +1,8 @@
+from ecommerce.api import generate_checkout_payload
 import pytest
 import random
 
+from ecommerce.models import BasketItem
 from main.test_utils import assert_drf_json_equal
 from django.urls import reverse
 from django.conf import settings
@@ -10,7 +12,6 @@ import reversion
 import uuid
 
 from courses.factories import CourseRunFactory
-from ecommerce.api import generate_checkout_payload
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
     ProductFactory,
@@ -181,7 +182,6 @@ def test_redeem_discount(user, user_drf_client, products, discounts):
     assert resp_json["message"] == "Discount applied"
 
 
-@pytest.mark.flaky(max_runs=5)
 def test_redeem_discount_with_higher_discount(
     user, user_drf_client, products, discounts
 ):

@@ -31,7 +31,10 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.template.loader import render_to_string
 
-from mail.exceptions import MultiEmailValidationError, EmailSendFailureException
+from mail.exceptions import (
+    MultiEmailValidationError,
+    EmailSendFailureException,
+)
 
 log = logging.getLogger()
 
