@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 0.37.0
+--------------
+
+- Revert "Flexible Pricing: email notifications should be sent when statuses change"
+- Sends email notifications when Flexible Pricing request statuses change
+- asadiqbal08/Dropdown Justification is not maintaining the state after refresh (#632)
+- Reworked the test a bit so it doesn't fail
+- Updated refine configuration docs for deploys
+- - format on ReceiptPageDetailCard - Moves the NotificationContainer inside the Header component and adds flexbox styling so alerts logically appear before the header (and are thus read first by screen readers)
+- Capture learner's country when saving flexible pricing request
+- Updated country_of_residence to be blankable
+- Updated receipt sending stuff to parse order created date (was being passed as a string, not a datetime, and broke the filter); updated email copy
+
 Version 0.36.2 (Released June 29, 2022)
 --------------
 
