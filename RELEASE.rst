@@ -1,6 +1,27 @@
 Release Notes
 =============
 
+Version 0.37.0
+--------------
+
+- Sends email notifications when Flexible Pricing request statuses change
+- asadiqbal08/Dropdown Justification is not maintaining the state after refresh (#632)
+- Reworked the test a bit so it doesn't fail
+- Updated refine configuration docs for deploys
+- - format on ReceiptPageDetailCard - Moves the NotificationContainer inside the Header component and adds flexbox styling so alerts logically appear before the header (and are thus read first by screen readers)
+- Release date for 0.36.2
+- Capture learner's country when saving flexible pricing request
+- Updated country_of_residence to be blankable
+- Release 0.36.2
+- Add never_cache() decorator to react views
+- Updated build system so refine builds for deploys
+- Updates copy on Forgot Password and Email Verification screens
+- Updated receipt sending stuff to parse order created date (was being passed as a string, not a datetime, and broke the filter); updated email copy
+- Bump pyjwt from 2.1.0 to 2.4.0 (#588)
+- Adds management command to find possible username conflicts
+- If a coupon is entered it should replace the financial aid discount only if it's a higher discount. (#630)
+- Moved orderHistory route and reworked it so it renders properly
+
 Version 0.36.1 (Released June 22, 2022)
 --------------
 
