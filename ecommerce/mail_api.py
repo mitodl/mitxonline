@@ -2,22 +2,23 @@
 import pycountry
 import logging
 
+from dateutil import parser
 from ecommerce.messages import OrderReceiptMessage
 from mitol.mail.api import get_message_sender
 
 log = logging.getLogger()
 
 
-def send_ecommerce_order_receipt(order):
+def send_ecommerce_order_receipt(order_record):
     """
     Send emails receipt summarizing the user purchase detail.
 
     Args:
-        order: An order.
+        order_record: An order.
     """
     from ecommerce.serializers import OrderReceiptSerializer
 
-    data = OrderReceiptSerializer(instance=order).data
+    data = OrderReceiptSerializer(instance=order_record).data
     purchaser = data.get("purchaser")
     coupon = data.get("coupon")
     lines = data.get("lines")
@@ -38,7 +39,10 @@ def send_ecommerce_order_receipt(order):
                         sum(float(line["total_paid"]) for line in lines),
                         ".2f",
                     ),
-                    "order": order,
+                    "order": {
+                        "reference_number": order.get("reference_number"),
+                        "created_on": parser.parse(order.get("created_on")),
+                    },
                     "receipt": receipt,
                     "purchaser": {
                         "name": " ".join(

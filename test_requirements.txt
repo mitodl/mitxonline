@@ -5,6 +5,7 @@ ddt
 django-debug-toolbar
 factory_boy~=3.2
 faker
+flaky
 freezegun==0.3.14
 hypothesis==4.23.9
 ipdb

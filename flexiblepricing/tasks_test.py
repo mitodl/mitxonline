@@ -1,25 +1,16 @@
 """
 Test for flexible pricing celery tasks
 """
-from flexiblepricing.mail_api import generate_flexible_price_email
-import pytest
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
-from django.urls import reverse
 
 from flexiblepricing.exceptions import (
     ExceededAPICallsException,
     UnexpectedAPIErrorException,
 )
 from flexiblepricing.models import CurrencyExchangeRate
-from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.tasks import sync_currency_exchange_rates
-from flexiblepricing.factories import FlexiblePriceFactory
-from flexiblepricing.serializers import FlexiblePriceSerializer
-
-from ecommerce.factories import ProductFactory
-from courses.factories import CourseRunFactory
 
 
 class TaskConfigurationTest(TestCase):
@@ -128,47 +119,3 @@ class TasksTest(TestCase):
         with self.assertRaises(ExceededAPICallsException) as context:
             sync_currency_exchange_rates.apply(args=()).get()
         assert str(context.exception) == "Too many calls"
-
-
-pytestmark = [pytest.mark.django_db]
-
-
-@pytest.fixture()
-def flexprice():
-    """
-    This does a little extra processing to make sure there is a product
-    associated with the courseware object that the FlexiblePriceFactory creates
-    as some of the status change emails reference it.
-    """
-    flexible_price_request = FlexiblePriceFactory.create()
-    product = ProductFactory.create()
-    courserun = CourseRunFactory.create()
-
-    flexible_price_request.courseware_object = courserun.course
-    flexible_price_request.save()
-
-    product.purchasable_object = courserun
-    product.save()
-
-    return flexible_price_request
-
-
-@pytest.mark.parametrize(
-    "status",
-    [
-        FlexiblePriceStatus.APPROVED,
-        FlexiblePriceStatus.RESET,
-        FlexiblePriceStatus.PENDING_MANUAL_APPROVAL,
-    ],
-)
-def test_flexible_price_status_change_email(status, flexprice, admin_drf_client):
-    with patch(
-        "flexiblepricing.tasks.notify_flexible_price_status_change_email.delay"
-    ) as mocked_mailer:
-        response = admin_drf_client.patch(
-            "/api/v0/flexible_pricing/applications_admin/{}/".format(flexprice.id),
-            {"status": status},
-        )
-
-        assert response.status_code < 300
-        mocked_mailer.assert_called()

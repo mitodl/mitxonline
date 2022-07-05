@@ -37,43 +37,6 @@ DEFAULT_INCOME_THRESHOLD = 75000
 INCOME = "income"
 INCOME_THRESHOLD_FIELDS = [COUNTRY, INCOME]
 
-FLEXIBLE_PRICE_EMAIL_BODY = (
-    "Dear {first_name},\n\n"
-    "{message}\n\n"
-    "Thank you,\n"
-    "The {program_name} MITxOnline team"
-)
-
-FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT = (
-    "Update to your personalized course price for {program_name} MITxOnline"
-)
-FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE = (
-    "As requested, we have reset your personalized course price. Please visit "
-    "the MITxOnline dashboard and re-submit your annual income information."
-)
-
-FLEXIBLE_PRICE_EMAIL_APPROVAL_SUBJECT = (
-    "Your personalized course price for {program_name} MITxOnline"
-)
-FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE = (
-    "After reviewing your income documentation, the {program_name} MITxOnline team has determined "
-    "that your personalized course price is ${price}.\n\n"
-    "You can pay for MITxOnline courses through the MITxOnline portal "
-    "(https://MITxOnline.mit.edu/dashboard). All coursework will be conducted on mitxonline.mit.edu"
-)
-
-FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_SUBJECT = (
-    "Documents received for {program_name} MITxOnline"
-)
-FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_MESSAGE = (
-    "We have received your documents verifying your income. We will review and process them within "
-    "5 working days. If you have not received a confirmation email within one week, please feel free "
-    "to reply to this email. Otherwise you should receive a confirmation email with your course price. "
-    "\n\n"
-    "While you are waiting, we encourage you to enroll now and pay later, when a decision has been "
-    "reached."
-)
-
 
 def get_currency_exchange_rate_api_request_url():
     """

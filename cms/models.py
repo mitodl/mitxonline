@@ -706,6 +706,7 @@ class FlexiblePricingRequestForm(AbstractForm):
             user=form.user,
             original_income=form.cleaned_data["your_income"],
             original_currency=form.cleaned_data["income_currency"],
+            country_of_income=form.user.legal_address.country,
             income_usd=income_usd,
             date_exchange_rate=datetime.datetime.now(),
             cms_submission=form_submission,

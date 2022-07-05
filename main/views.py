@@ -6,9 +6,11 @@ from django.http import HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.views.decorators.cache import never_cache
 from rest_framework.pagination import LimitOffsetPagination
 
 
+@never_cache
 def index(request, **kwargs):
     """
     The index view. Display available programs
@@ -19,6 +21,7 @@ def index(request, **kwargs):
     )
 
 
+@never_cache
 def refine(request, **kwargs):
     """
     The refine view for the staff dashboard

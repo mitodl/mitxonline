@@ -10,7 +10,6 @@ from main.views import RefinePagination
 from django.db.models import Q
 
 from flexiblepricing import models, serializers
-from flexiblepricing.tasks import notify_flexible_price_status_change_email
 
 
 class CurrencyExchangeRateViewSet(ModelViewSet):
@@ -66,7 +65,4 @@ class FlexiblePriceAdminViewSet(ModelViewSet):
         """Update the flexible pricing status"""
         with transaction.atomic():
             update_result = super().update(request, *args, **kwargs)
-
-            # Send email notification
-            notify_flexible_price_status_change_email.delay(self.get_object().id)
             return update_result

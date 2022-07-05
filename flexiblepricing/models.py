@@ -104,7 +104,7 @@ class FlexiblePrice(TimestampedModel):
     date_exchange_rate = models.DateTimeField(null=True)
     date_documents_sent = models.DateField(null=True, blank=True)
     justification = models.TextField(null=True)
-    country_of_residence = models.TextField()
+    country_of_residence = models.TextField(blank=True)
     cms_submission = models.ForeignKey(
         FlexiblePricingRequestSubmission,
         null=True,
