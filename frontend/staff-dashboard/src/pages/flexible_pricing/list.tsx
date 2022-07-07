@@ -16,12 +16,11 @@ import {
     Icons,
     Row,
     Col,
-    Card,
-    Modal
+    Card
 } from "@pankod/refine-antd";
 
 import { IFlexiblePriceRequest, IFlexiblePriceRequestFilters } from "interfaces";
-import { Type } from "typescript";
+import { FlexiblePricingStatusModal } from "components/flexiblepricing/statusmodal";
 
 const FlexiblePricingStatuses = [
     {
@@ -49,34 +48,6 @@ const FlexiblePricingStatuses = [
         value: 'reset'
     }
 ];
-
-const All_Justifications = [
-    {
-        label: '',
-        value: '',
-    },
-    {
-        label: 'OK',
-        value: 'Documents in order'
-    },
-    {
-        label: 'NOT_NOTARIZED',
-        value: 'Docs not notarized'
-    },
-    {
-        label: 'INSUFFICIENT',
-        value: 'Insufficient docs'
-    },
-    {
-        label: 'INCOME_INACCURATE',
-        value: 'Inaccurate income reported'
-    },
-    { 
-        label: 'COUNTRY_INACCURATE',
-        value: 'Inaccurate country reported'
-    },
-];
-
 
 const FlexiblePricingStatusText = "Select Status";
 
@@ -129,55 +100,18 @@ export const FlexiblePricingList: React.FC = () => {
             return filters;
         }
     });
-    const [modaldata, setmodaldata] = useState({} as IFlexiblePriceRequest);
+
+    const [modaldata, setModalData] = useState({} as IFlexiblePriceRequest);
+    const [approveStatus, setApproveStatus] = useState('');
+
     const [isModalVisible, setIsModalVisible] = useState(false);
-    const mutationResult = useUpdate<IFlexiblePriceRequest>();
-    const [justification, setJustification] = useState('');
-    const { mutate, isLoading: mutateIsLoading } = mutationResult;
-    const handleUpdate = (item: IFlexiblePriceRequest, status: string) => {
-        mutate({ 
-            resource: "flexible_pricing/applications_admin",
-            id: item.id,
-            mutationMode: "undoable",
-            values: { ...item, status }
-        });
-    };
-
+    
     const showModal = (record: IFlexiblePriceRequest, action: string) => {
-        const newRecord = {...record, 'action': action}
-        setmodaldata(newRecord);
+        setModalData(record);
+        setApproveStatus(action);
         setIsModalVisible(true);
+
     };
-
-    const handleOk = () => {
-        if (justification.length === 0) {
-            displayToast({
-                message: "Please choose a justification.",
-                description: "Error",
-                key: "bad-justification-error",
-                type: "error",
-                undoableTimeout: 3000,
-            });
-
-            return;
-        }
-
-        let settable_modaldata = modaldata;
-        settable_modaldata.justification = justification;
-        setmodaldata(settable_modaldata)
-        
-        handleUpdate(modaldata, modaldata.action)
-        setIsModalVisible(false);
-    };
-
-    const handleCancel = () => {
-        setIsModalVisible(false);
-    };
-
-    const handleChange = (e: string) => {
-        console.log(e);
-        setJustification(e)
-    }
 
     return (
         <div>
@@ -251,43 +185,6 @@ export const FlexiblePricingList: React.FC = () => {
                                                     Deny
                                                 </Button>
                                             </Space>
-                                            <Modal title="Flexible Pricing | Management" visible={isModalVisible} onOk={() => handleOk()} onCancel={handleCancel}>
-                                                    <div>
-                                                        <strong>Are you sure you want to <u>{modaldata.action == "skipped" ? "deny": String(modaldata.action).replace(/d|ped$/, '') }</u> the request?</strong>
-                                                        {modaldata.action == "skipped" ? <div>User will be notified by email of the denial </div> : null}
-                                                    </div>
-                                                    <br></br>
-                                                    <p>
-                                                        <strong>Current Status:</strong>
-                                                        <div>{modaldata.status}</div>
-                                                    </p>
-                                                    <p>
-                                                        <strong>Income USD:</strong>
-                                                        <div>{modaldata.income_usd}</div>
-                                                    </p>
-                                                    <p>
-                                                        <strong>Original Income:</strong>
-                                                        <div>{modaldata.original_income}</div>
-                                                    </p>
-                                                    <p>
-                                                        <strong>Original Currency:</strong>
-                                                        <div>{modaldata.original_currency}</div>
-                                                    </p>
-                                                    <p>
-                                                        <strong>Country of Income:</strong>
-                                                        <div>{modaldata.country_of_income}</div>
-                                                    </p>
-                                                    <p>
-                                                        <span>
-                                                            <strong>Justification:</strong>
-                                                        </span>
-                                                        <Select onChange={(e) => handleChange(e)} style={{ marginLeft: "20px", 'width': '20rem' }} defaultValue={modaldata['justification']}>
-                                                            {All_Justifications.map((option) => (
-                                                            <option value={option.value} selected={option.value === modaldata.justification}>{option.value}</option>
-                                                            ))}
-                                                        </Select>
-                                                    </p>
-                                                </Modal>
                                         </div>
                                     );
                                 }}
@@ -296,6 +193,7 @@ export const FlexiblePricingList: React.FC = () => {
                     </List>
                 </Col>
             </Row>
+            {isModalVisible ? <FlexiblePricingStatusModal record={modaldata} status={approveStatus} onClose={() => {setIsModalVisible(false);}}></FlexiblePricingStatusModal> : null}
         </div>
     );
 };
