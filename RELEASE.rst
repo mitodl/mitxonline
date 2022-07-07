@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.37.0
+Version 0.37.0 (Released July 07, 2022)
 --------------
 
 - Revert "Flexible Pricing: email notifications should be sent when statuses change"
