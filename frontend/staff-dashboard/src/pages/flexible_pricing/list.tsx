@@ -156,13 +156,16 @@ export const FlexiblePricingList: React.FC = () => {
                 description: "Error",
                 key: "bad-justification-error",
                 type: "error",
+                undoableTimeout: 3000,
             });
 
             return;
         }
-        console.log(justification);
-        setmodaldata({...modaldata, justification: justification})
-        console.log(modaldata);
+
+        let settable_modaldata = modaldata;
+        settable_modaldata.justification = justification;
+        setmodaldata(settable_modaldata)
+        
         handleUpdate(modaldata, modaldata.action)
         setIsModalVisible(false);
     };
