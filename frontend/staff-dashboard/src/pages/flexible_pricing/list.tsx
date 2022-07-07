@@ -1,4 +1,4 @@
-import { useUpdate, CrudFilters, HttpError } from "@pankod/refine-core";
+import { useUpdate, useNotification, CrudFilters, HttpError } from "@pankod/refine-core";
 import React from "react"
 const { useState } = React;
 import {
@@ -52,6 +52,10 @@ const FlexiblePricingStatuses = [
 
 const All_Justifications = [
     {
+        label: '',
+        value: '',
+    },
+    {
         label: 'OK',
         value: 'Documents in order'
     },
@@ -98,6 +102,8 @@ const FlexiblePricingFilterForm: React.FC<{ formProps: FormProps }> = ({ formPro
 }
 
 export const FlexiblePricingList: React.FC = () => {
+    const { open: displayToast } = useNotification();
+
     const {tableProps, searchFormProps} = useTable<
         IFlexiblePriceRequest,
         HttpError, 
@@ -144,7 +150,19 @@ export const FlexiblePricingList: React.FC = () => {
     };
 
     const handleOk = () => {
-        modaldata['justification'] = justification
+        if (justification.length === 0) {
+            displayToast({
+                message: "Please choose a justification.",
+                description: "Error",
+                key: "bad-justification-error",
+                type: "error",
+            });
+
+            return;
+        }
+        console.log(justification);
+        setmodaldata({...modaldata, justification: justification})
+        console.log(modaldata);
         handleUpdate(modaldata, modaldata.action)
         setIsModalVisible(false);
     };
@@ -153,9 +171,10 @@ export const FlexiblePricingList: React.FC = () => {
         setIsModalVisible(false);
     };
 
-    const handleChange = (e: any) => {
-        setJustification(e.target.options[e.target.selectedIndex].text)
-      }
+    const handleChange = (e: string) => {
+        console.log(e);
+        setJustification(e)
+    }
 
     return (
         <div>
@@ -259,11 +278,11 @@ export const FlexiblePricingList: React.FC = () => {
                                                         <span>
                                                             <strong>Justification:</strong>
                                                         </span>
-                                                        <select onChange={(e) => handleChange(e)} style={{ marginLeft: "20px" }}>
+                                                        <Select onChange={(e) => handleChange(e)} style={{ marginLeft: "20px", 'width': '20rem' }} defaultValue={modaldata['justification']}>
                                                             {All_Justifications.map((option) => (
-                                                            <option value={option.value} selected={modaldata['justification'] == option.value}>{option.value}</option>
+                                                            <option value={option.value} selected={option.value === modaldata.justification}>{option.value}</option>
                                                             ))}
-                                                        </select>
+                                                        </Select>
                                                     </p>
                                                 </Modal>
                                         </div>
