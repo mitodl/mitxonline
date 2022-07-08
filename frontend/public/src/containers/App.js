@@ -99,11 +99,11 @@ export class App extends React.Component<Props, void> {
               path={urljoin(match.url, String(routes.cart))}
               component={CartPage}
             />
-            <Route
+            <PrivateRoute
               path={urljoin(match.url, String(routes.orderHistory))}
               component={OrderHistory}
             />
-            <Route
+            <PrivateRoute
               path={urljoin(match.url, String(routes.orderReceipt))}
               component={OrderReceiptPage}
             />
