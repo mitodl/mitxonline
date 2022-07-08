@@ -9,6 +9,8 @@ from flexiblepricing.exceptions import (
     ExceededAPICallsException,
     UnexpectedAPIErrorException,
 )
+from flexiblepricing.models import FlexiblePrice
+from flexiblepricing.mail_api import generate_flexible_price_email
 from main.celery import app
 
 
@@ -37,3 +39,12 @@ def sync_currency_exchange_rates():
         raise UnexpectedAPIErrorException(resp_json["description"])
     latest_rates = resp_json["rates"]
     update_currency_exchange_rate(latest_rates)
+
+
+@app.task
+def notify_flexible_price_status_change_email(flexible_price_id):
+    """
+    Sends email notifications when the flexible price status changes.
+    """
+    flexible_price = FlexiblePrice.objects.get(id=flexible_price_id)
+    generate_flexible_price_email(flexible_price)

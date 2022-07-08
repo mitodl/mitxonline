@@ -389,7 +389,7 @@ class ProductPage(Page):
         FieldPanel("description"),
         FieldPanel("length"),
         FieldPanel("effort"),
-        FieldPanel("price"),
+        StreamFieldPanel("price"),
         FieldPanel("prerequisites"),
         FieldPanel("about"),
         FieldPanel("what_you_learn"),
