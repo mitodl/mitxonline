@@ -21,6 +21,7 @@ import {
 } from "../../../lib/queries/cart"
 
 import type { RouterHistory } from "react-router"
+import { Redirect } from "react-router-dom"
 import moment from "moment"
 import {
   formatLocalePrice,
@@ -33,6 +34,7 @@ import type { PaginatedOrderHistory } from "../../../flow/cartTypes"
 type Props = {
   history: RouterHistory,
   isLoading: boolean,
+  httpStatus: number,
   orderHistory: PaginatedOrderHistory,
   updateOrderHistory: Function
 }
@@ -132,12 +134,17 @@ export class OrderHistory extends React.Component<Props> {
   }
 
   render() {
-    const { orderHistory, isLoading } = this.props
+    const { orderHistory, isLoading, httpStatus } = this.props
     const columns = ORDER_HISTORY_COLUMN_TITLES.map((value: string) => (
       <div key={value} className="col">
         <strong>{value}</strong>
       </div>
     ))
+
+    if (httpStatus >= 400) {
+      return (<Redirect to="/signin/"></Redirect>)
+    }
+
     return (
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${ORDER_HISTORY_DISPLAY_PAGE_TITLE}`}
@@ -178,7 +185,8 @@ const updateOrderHistory = (offset: number = 0) => {
 
 const mapStateToProps = createStructuredSelector({
   orderHistory: orderHistorySelector,
-  isLoading:    pathOr(true, ["queries", orderHistoryQueryKey, "isPending"])
+  isLoading:    pathOr(true, ["queries", orderHistoryQueryKey, "isPending"]),
+  httpStatus:   pathOr(false, ["queries", orderHistoryQueryKey, "status"]),
 })
 
 const mapDispatchToProps = {
