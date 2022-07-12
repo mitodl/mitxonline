@@ -3,7 +3,6 @@ mitX Online
 
 **SECTIONS**
 1. [Initial Setup](#initial-setup)
-1. [Optional Setup](#optional-setup)
 
 # Initial Setup
 
