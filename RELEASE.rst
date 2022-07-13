@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.38.0
+--------------
+
+- Adds order ID to the data that gets sent to the receipt email
+- OrderHistory and OrderReceiptPage to PrivateRoute
+- Flexible Pricing: email notifications should be sent when statuses change
+
 Version 0.37.1 (Released July 13, 2022)
 --------------
 
