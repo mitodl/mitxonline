@@ -134,7 +134,7 @@ In MITx Online:
 
 In Open edX (derived from instructions `here <https://edx.readthedocs.io/projects/edx-installing-configuring-and-running/en/latest/configuration/tpa/tpa_integrate_open/tpa_oauth.html#additional-oauth2-providers-advanced>`_):
 
-* ``make lms-shell`` into the LMS container and ensure the following settings:
+* ``make lms-shell`` into the LMS container and ensure the following settings are set in ``/edx/etc/lms.yml`` if you are using Juniper or a more recent Open edX release, otherwise they should be in ``/edx/app/edxapp/cms.env.json``:
     .. code-block:: yaml
 
       FEATURES:
