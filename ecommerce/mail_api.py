@@ -42,6 +42,7 @@ def send_ecommerce_order_receipt(order_record):
                     "order": {
                         "reference_number": order.get("reference_number"),
                         "created_on": parser.parse(order.get("created_on")),
+                        "id": order.get("id"),
                     },
                     "receipt": receipt,
                     "purchaser": {
