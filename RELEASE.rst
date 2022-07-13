@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.37.1 (Released July 13, 2022)
+--------------
+
+- fix(warning): use StreamFieldPanel instead of FieldPanel (#662)
+- Bump django from 3.2.13 to 3.2.14 (#661)
+
 Version 0.37.0 (Released July 07, 2022)
 --------------
 
