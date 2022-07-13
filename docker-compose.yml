@@ -95,6 +95,12 @@ services:
     volumes:
       - .:/app
       - yarn-cache:/home/mitodl/.cache/yarn
+    healthcheck:
+      test: curl -f http://watch:8012/health || exit 1
+      interval: 5s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
 
   celery:
     build:
@@ -128,6 +134,16 @@ services:
     volumes:
       - .:/app
       - npm-cache:/root/.npm
+    depends_on:
+      # this doesn't really depend on watch but they step on each other if they start at the same time
+      watch:
+        condition: service_healthy
+    healthcheck:
+      test: curl -f http://refine:8016/health || exit 1
+      interval: 5s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
 
   notebook:
     build:
