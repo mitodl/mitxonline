@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.37.1
+Version 0.37.1 (Released July 13, 2022)
 --------------
 
 - fix(warning): use StreamFieldPanel instead of FieldPanel (#662)
