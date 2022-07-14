@@ -38,6 +38,12 @@ export const DiscountEdit = () => {
                     <Form.Item label="Amount" name="amount">
                         <InputNumber precision={2} />
                     </Form.Item>
+                    <Form.Item label="Flexible Pricing" name="for_flexible_pricing">
+                    <Select options={[
+                        { label: 'Regular Discount', value: false },
+                        { label: 'Flexible Pricing Tier Discount', value: true }
+                    ]}></Select>
+                </Form.Item>
                 </Form>
             </Edit>
         </div>

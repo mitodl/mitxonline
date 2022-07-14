@@ -157,11 +157,18 @@ def create_basket(user, products):
     return basket
 
 
-def test_redeem_discount(user, user_drf_client, products, discounts):
+@pytest.mark.parametrize("try_flex_pricing_discount", [True, False])
+def test_redeem_discount(
+    user, user_drf_client, products, discounts, try_flex_pricing_discount
+):
     """
     Bootstraps a basket (see create_basket) and then attempts to redeem a
     discount on it. Should get back a success message. (The API call returns an
     ID so this doesn't just do json_equal.)
+
+    The try_flex_pricing_discount sets whether or not the discount should be
+    flagged to be used with a Flexible Pricing tier. If it is, then the
+    redemption attempt should fail.
     """
     basket = create_basket(user, products)
 
@@ -170,15 +177,22 @@ def test_redeem_discount(user, user_drf_client, products, discounts):
 
     discount = discounts[random.randrange(0, len(discounts))]
 
+    if try_flex_pricing_discount:
+        discount.for_flexible_pricing = True
+        discount.save()
+        discount.refresh_from_db()
+
     resp = user_drf_client.post(
         reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
     )
 
-    assert "message" in resp.json()
-
     resp_json = resp.json()
 
-    assert resp_json["message"] == "Discount applied"
+    if try_flex_pricing_discount:
+        assert "not found" in resp_json
+    else:
+        assert "message" in resp_json
+        assert resp_json["message"] == "Discount applied"
 
 
 def test_redeem_discount_with_higher_discount(
@@ -252,7 +266,7 @@ def test_clear_discounts(user, user_drf_client, products, discounts):
     Bootstraps a basket (see create_basket) and then attempts to redeem a
     discount on it, then clears it. Should get back a success message.
     """
-    test_redeem_discount(user, user_drf_client, products, discounts)
+    test_redeem_discount(user, user_drf_client, products, discounts, False)
 
     resp = user_drf_client.post(reverse("checkout_api-clear_discount"))
 
@@ -281,7 +295,7 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
     Applies a discount, then hits the start checkout view, which should create
     an Order record and its associated line items.
     """
-    test_redeem_discount(user, user_drf_client, products, discounts)
+    test_redeem_discount(user, user_drf_client, products, discounts, False)
 
     resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
 
