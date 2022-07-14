@@ -35,6 +35,7 @@ class DiscountFactory(DjangoModelFactory):
     redemption_type = ALL_REDEMPTION_TYPES[
         random.randrange(0, len(ALL_REDEMPTION_TYPES), 1)
     ]
+    for_flexible_pricing = False
 
     class Meta:
         model = models.Discount

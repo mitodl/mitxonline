@@ -5,6 +5,7 @@ export interface IDiscount {
     discount_type: string;
     redemption_type: string;
     max_redemptions: int;
+    for_flexible_pricing: boolean;
 }
 
 export interface IDiscountRedemption {
