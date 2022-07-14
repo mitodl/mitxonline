@@ -5,14 +5,14 @@
 
 {% block content %}
 
-<div class="container resource-container">
-  <div class="row">
-    <div class="col-md-2">
-    </div>
-    <div class="col-md-8">
-        <h1 class="text-uppercase" id="{{ page.title|slugify }}">{{ page.title }}</h1>
-
-        {{ self.thank_you_text|richtext }}
+<div id="main" class="main-page-content">
+  <div class="std-page-body container auth-page">
+    <div class="auth-card card-shadow auth-form">
+      <div class="auth-header">
+        <h1 class="text-uppercase" id="{{ page.title|slugify }}">Request Flexible Pricing</h1>
+        <p>{{ page.title }}</p>
+        <b>{{ self.thank_you_text|richtext }}</b>
+      </div>
     </div>
   </div>
 </div>
