@@ -78,7 +78,7 @@ const FlexiblePricingStatusText = "Select Status";
 
 const FlexiblePricingFilterForm: React.FC<{ formProps: FormProps }> = ({ formProps }) => {
     return (
-        <Form layout="vertical" {...formProps}>
+        <Form layout="inline" {...formProps}>
             <Form.Item label="Search by Name" name="q">
                 <Input placeholder="Name, username, email address" prefix={<Icons.SearchOutlined />}></Input>
             </Form.Item>
@@ -160,12 +160,15 @@ export const FlexiblePricingList: React.FC = () => {
     return (
         <div>
             <Row gutter={[10, 10]}>
-                <Col sm={6}>
+                <Col sm={24}>
                     <Card title="Find Records">
                         <FlexiblePricingFilterForm formProps={searchFormProps} />
                     </Card>
                 </Col>
-                <Col sm={18}>
+            </Row>
+
+            <Row gutter={[10, 10]}>
+                <Col sm={24}>
                     <List title="Flexible Pricing Requests">
                         <Table {...tableProps} rowKey="id">
                             <Table.Column 
@@ -176,14 +179,6 @@ export const FlexiblePricingList: React.FC = () => {
                             <Table.Column
                                 dataIndex="status"
                                 title="Status"
-                                filterDropdown={(props) => (
-                                    <FilterDropdown {...props}>
-                                        <Select mode="multiple" 
-                                            style={{ minWidth: 300 }}
-                                            placeholder={FlexiblePricingStatusText}
-                                            options={FlexiblePricingStatuses} />
-                                    </FilterDropdown>
-                                )}
                             />
                             <Table.Column
                                 dataIndex="income_usd"
