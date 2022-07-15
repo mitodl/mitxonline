@@ -20,11 +20,11 @@
           {% if user.is_authenticated %}{# is logged in #}
             {% if has_submission %}{# has submission #}
               {% if prior_request.is_approved %}{# request status #}
-                <b>{{ page.application_approved_text|richtext }}</b>
+                {{ page.application_approved_text|richtext }}
               {% elif prior_request.is_denied %}
-                <b>{{ page.application_denied_text|richtext }}</b>
+                {{ page.application_denied_text|richtext }}
               {% else %}
-                <b>{{ page.application_processing_text|richtext }}</b>
+                {{ page.application_processing_text|richtext }}
               {% endif %}{# request status #}
             {% else %}
               <form action="{% pageurl page %}" method="POST">
@@ -53,7 +53,7 @@
               </form>
             {% endif %}{# has submission #}
           {% else %}
-            <b>{{ page.guest_text|richtext }}</b>
+            {{ page.guest_text|richtext }}
           {% endif %} {# is logged in #}
       </div>
     </div>
