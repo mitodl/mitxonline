@@ -628,7 +628,9 @@ class ProgramEnrollment(EnrollmentModel):
     Link between User and Program indicating a user's enrollment
     """
 
-    program = models.ForeignKey("courses.Program", on_delete=models.CASCADE)
+    program = models.ForeignKey(
+        "courses.Program", on_delete=models.CASCADE, related_name="enrollments"
+    )
 
     class Meta:
         unique_together = ("user", "program")

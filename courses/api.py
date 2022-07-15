@@ -30,6 +30,7 @@ from courses.models import (
     CourseRunEnrollment,
     CourseRunGrade,
     Program,
+    ProgramRun,
     ProgramEnrollment,
     Course,
 )
@@ -110,6 +111,50 @@ def get_user_relevant_course_run_qset(
     return runs
 
 
+def get_user_relevant_program_run_qset(
+    program: Program, user: Optional[User], now: Optional[datetime] = None
+) -> QuerySet:
+    """
+    Returns a QuerySet of relevant program runs
+    """
+    now = now or now_in_utc()
+    run_qset = program.programruns.exclude(start_date=None).filter(
+        Q(end_date=None) | Q(end_date__gt=now)
+    )
+    if user and user.is_authenticated:
+        user_enrollments = Count(
+            "enrollments",
+            filter=Q(
+                enrollments__user=user,
+                enrollments__active=True,
+                enrollments__edx_enrolled=True,
+            ),
+        )
+        run_qset = run_qset.annotate(user_enrollments=user_enrollments).order_by(
+            "-user_enrollments", "enrollment_start"
+        )
+
+        verified_enrollments = Count(
+            "enrollments",
+            filter=Q(
+                enrollments__user=user,
+                enrollments__active=True,
+                enrollments__edx_enrolled=True,
+                enrollments__enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            ),
+        )
+        run_qset = run_qset.annotate(verified_enrollments=verified_enrollments)
+
+        runs = run_qset.filter(
+            Q(user_enrollments__gt=0)
+            | Q(enrollment_end=None)
+            | Q(enrollment_end__gt=now)
+        )
+    else:
+        runs = run_qset.filter(start_date__gt=now).order_by("start_date")
+    return runs
+
+
 def get_user_relevant_course_run(
     course: Course, user: Optional[User], now: Optional[datetime] = None
 ) -> CourseRun:
@@ -119,6 +164,19 @@ def get_user_relevant_course_run(
     For logged-in users, this means an active course run that they're enrolled in, or the soonest enrollable course run.
     """
     runs = get_user_relevant_course_run_qset(course, user, now)
+    run = first_or_none(runs)
+    return run
+
+
+def get_user_relevant_program_run(
+    program: Program, user: Optional[User], now: Optional[datetime] = None
+) -> ProgramRun:
+    """
+    For a given Program, finds the program run that is the most relevant to the user.
+    For anonymous users, this means the soonest enrollable program run.
+    For logged-in users, this means an active program run that they're enrolled in, or the soonest enrollable program run.
+    """
+    runs = get_user_relevant_program_run_qset(program, user, now)
     run = first_or_none(runs)
     return run
 

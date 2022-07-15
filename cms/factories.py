@@ -10,9 +10,11 @@ from cms.models import (
     CoursePage,
     ResourcePage,
     CourseIndexPage,
+    ProgramIndexPage,
+    ProgramPage,
     FlexiblePricingRequestForm,
 )
-from courses.factories import CourseFactory
+from courses.factories import CourseFactory, ProgramFactory
 
 
 class HomePageFactory(wagtail_factories.PageFactory):
@@ -37,6 +39,18 @@ class CourseIndexPageFactory(wagtail_factories.PageFactory):
         model = CourseIndexPage
 
 
+class ProgramIndexPageFactory(wagtail_factories.PageFactory):
+    """ProgramIndexPage factory class"""
+
+    title = "Programs"
+    parent = LazyAttribute(
+        lambda _: HomePage.objects.first() or HomePageFactory.create()
+    )
+
+    class Meta:
+        model = ProgramIndexPage
+
+
 class CoursePageFactory(wagtail_factories.PageFactory):
     """CoursePage factory class"""
 
@@ -51,6 +65,22 @@ class CoursePageFactory(wagtail_factories.PageFactory):
 
     class Meta:
         model = CoursePage
+
+
+class ProgramPageFactory(wagtail_factories.PageFactory):
+    """ProgramPage factory class"""
+
+    description = fuzzy.FuzzyText(prefix="Description ")
+    length = fuzzy.FuzzyText(prefix="Length ")
+    feature_image = factory.SubFactory(wagtail_factories.ImageFactory)
+    program = factory.SubFactory(ProgramFactory)
+    slug = fuzzy.FuzzyText(prefix="my-page-")
+    parent = LazyAttribute(
+        lambda _: ProgramIndexPage.objects.first() or ProgramIndexPageFactory.create()
+    )
+
+    class Meta:
+        model = ProgramPage
 
 
 class ResourcePageFactory(wagtail_factories.PageFactory):

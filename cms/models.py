@@ -40,9 +40,9 @@ from wagtail.contrib.forms.models import (
 from django.core.serializers.json import DjangoJSONEncoder
 
 from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
-from cms.constants import COURSE_INDEX_SLUG
-from courses.api import get_user_relevant_course_run
-from main.views import get_base_context
+from cms.constants import COURSE_INDEX_SLUG, PROGRAM_INDEX_SLUG, CMS_EDITORS_GROUP_NAME
+from courses.api import get_user_relevant_course_run, get_user_relevant_program_run
+
 from flexiblepricing.api import (
     determine_tier_courseware,
     determine_auto_approval,
@@ -154,7 +154,9 @@ class HomePage(Page):
     subpage_types = [
         "CoursePage",
         "ResourcePage",
+        "ProgramPage",
         "CourseIndexPage",
+        "ProgramIndexPage",
         "FlexiblePricingRequestForm",
     ]
 
@@ -229,7 +231,7 @@ class HomeProductLink(models.Model):
     ]
 
 
-class CourseObjectIndexPage(Page):
+class CoursewareObjectIndexPage(Page):
     """
     A placeholder class to group courseware object pages as children.
     This class logically acts as no more than a "folder" to organize
@@ -280,7 +282,7 @@ class CourseObjectIndexPage(Page):
         raise Http404
 
 
-class CourseIndexPage(CourseObjectIndexPage):
+class CourseIndexPage(CoursewareObjectIndexPage):
     """
     An index page for CoursePages
     """
@@ -290,6 +292,18 @@ class CourseIndexPage(CourseObjectIndexPage):
     def get_child_by_readable_id(self, readable_id):
         """Fetch a child page by the related Course's readable_id value"""
         return self.get_children().get(coursepage__course__readable_id=readable_id)
+
+
+class ProgramIndexPage(CoursewareObjectIndexPage):
+    """
+    An index page for CoursePages
+    """
+
+    slug = PROGRAM_INDEX_SLUG
+
+    def get_child_by_readable_id(self, readable_id):
+        """Fetch a child page by the related Course's readable_id value"""
+        return self.get_children().get(programpage__program__readable_id=readable_id)
 
 
 class ProductPage(Page):
@@ -506,6 +520,74 @@ class CoursePage(ProductPage):
 
     content_panels = [
         FieldPanel("course"),
+    ] + ProductPage.content_panels
+
+
+class ProgramPage(ProductPage):
+    """
+    Detail page for courses
+    """
+
+    parent_page_types = ["ProgramIndexPage"]
+    subpage_types = ["FlexiblePricingRequestForm"]
+
+    program = models.OneToOneField(
+        "courses.Program", null=True, on_delete=models.SET_NULL, related_name="page"
+    )
+
+    search_fields = Page.search_fields + [
+        index.RelatedFields(
+            "program",
+            [
+                index.SearchField("readable_id", partial_match=True),
+            ],
+        )
+    ]
+
+    @property
+    def product(self):
+        """Gets the product associated with this page"""
+        return self.program
+
+    template = "product_page.html"
+
+    def get_admin_display_title(self):
+        """Gets the title of the program in the specified format"""
+        return f"{self.program.readable_id} | {self.title}"
+
+    def get_context(self, request, *args, **kwargs):
+        relevant_run = (
+            self.program.programruns.filter(
+                models.Q(start_date=None) | models.Q(start_date__lte=now_in_utc())
+            )
+            .filter(models.Q(end_date=None) | models.Q(end_date__gte=now_in_utc()))
+            .first()
+            if self.program.programruns
+            else None
+        )
+        is_enrolled = (
+            False
+            if self.program.enrollments.filter(user=request.user).count() == 0
+            else True
+        )
+        sign_in_url = (
+            None
+            if request.user.is_authenticated
+            else f'{reverse("login")}?next={quote_plus(self.get_url())}'
+        )
+        start_date = relevant_run.start_date if relevant_run else None
+        can_access_edx_course = False
+        return {
+            **super().get_context(request, *args, **kwargs),
+            "run": relevant_run,
+            "is_enrolled": is_enrolled,
+            "sign_in_url": sign_in_url,
+            "start_date": start_date,
+            "can_access_edx_course": can_access_edx_course,
+        }
+
+    content_panels = [
+        FieldPanel("program"),
     ] + ProductPage.content_panels
 
 
