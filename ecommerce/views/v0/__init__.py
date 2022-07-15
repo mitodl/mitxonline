@@ -266,6 +266,11 @@ class CheckoutApiViewSet(ViewSet):
         they'll be converted to attach to the resulting Order (as Baskets are
         ephemeral).
 
+        Discount application is subject to these rules:
+        - The discount can't be flagged for use with flexible pricing.
+        - If the discount is tied to a product, the product must already be in
+          the basket.
+
         POST Args:
             - discount (str): Discount Code to apply
 
@@ -280,8 +285,11 @@ class CheckoutApiViewSet(ViewSet):
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 
         try:
-            discount = Discount.objects.filter(for_flexible_pricing=False).get(
-                discount_code=request.data["discount"]
+            basket_item_products = [item.product for item in basket.basket_items.all()]
+            discount = (
+                Discount.objects.filter(for_flexible_pricing=False)
+                .filter(Q(product=None) | Q(product__in=basket_item_products))
+                .get(discount_code=request.data["discount"])
             )
             if not discount.check_validity(request.user):
                 raise ObjectDoesNotExist()
