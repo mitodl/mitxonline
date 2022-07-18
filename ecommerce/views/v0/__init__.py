@@ -64,6 +64,7 @@ from ecommerce.serializers import (
     OrderSerializer,
     DiscountSerializer,
     DiscountRedemptionSerializer,
+    DiscountProductSerializer,
     UserDiscountSerializer,
     UserDiscountMetaSerializer,
 )
@@ -213,6 +214,16 @@ class DiscountViewSet(ModelViewSet):
 
     serializer_class = DiscountSerializer
     queryset = Discount.objects.all()
+    authentication_classes = (SessionAuthentication, TokenAuthentication)
+    permission_classes = (IsAuthenticated, IsAdminUser)
+    pagination_class = ECommerceDefaultPagination
+
+
+class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
+    """API view set for Discounts"""
+
+    serializer_class = DiscountProductSerializer
+    queryset = DiscountProduct.objects.all()
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated, IsAdminUser)
     pagination_class = ECommerceDefaultPagination
