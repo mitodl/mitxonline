@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.38.0 (Released July 18, 2022)
+--------------
+
+- Adds flexible pricing flag to Discount objects
+- fixes a typo ("you will find a copy of youR receipt"); adds a slash that got removed due to local config
+- Adds order ID to the data that gets sent to the receipt email
+- Adds healthcheck to watch and refine containers; makes refine "depend" on watch
+- Remove missing section link
+- OrderHistory and OrderReceiptPage to PrivateRoute
+- Flexible Pricing: email notifications should be sent when statuses change
+- Removes the Status inline filter (since there's another one); makes the Find Records box horizontal
+
 Version 0.37.1 (Released July 13, 2022)
 --------------
 
