@@ -36,9 +36,14 @@ from ecommerce.models import (
     PendingOrder,
     UserDiscount,
     BasketDiscount,
+<<<<<<< HEAD
     FulfilledOrder,
     Transaction,
     Order,
+=======
+    Discount,
+    DiscountProduct,
+>>>>>>> 33ce99e (refactored out a check into an api call, now checks flexprice and user discounts for products too)
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 
@@ -107,6 +112,37 @@ def generate_checkout_payload(request):
     return payload
 
 
+def check_discount_for_products(discount, basket):
+    """
+    Checks the validity of the discount against what's in the basket.
+
+    If the discount either has no products associated with it, or the products
+    in the basket are applicable to the discount, this returns True.
+    Otherwise, returns False.
+
+    Args:
+        - basket (Basket): the current basket
+        - discount (Discount|string: the discount to apply (if a string, loads the discount code specified)
+    Returns:
+        boolean
+    """
+    if not isinstance(discount, Discount):
+        discount = Discount.objects.filter(discount_code=discount).first()
+
+    basket_item_products = [item.product for item in basket.basket_items.all()]
+
+    if (
+        not discount.products.count() == 0
+        and DiscountProduct.objects.filter(product__in=basket_item_products)
+        .filter(discount=discount)
+        .count()
+        == 0
+    ):
+        return False
+
+    return True
+
+
 def apply_user_discounts(request):
     """
     Applies user discounts to the current cart. (If there are more than one for some
@@ -135,6 +171,10 @@ def apply_user_discounts(request):
             discount = user_discount.discount
 
     if discount:
+        # check for product specificity in the discount
+        if not check_discount_for_products(discount, basket):
+            return True
+
         bd = BasketDiscount(
             redeemed_basket=basket,
             redemption_date=now_in_utc(),

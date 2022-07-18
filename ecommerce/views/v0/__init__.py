@@ -286,18 +286,11 @@ class CheckoutApiViewSet(ViewSet):
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 
         try:
-            basket_item_products = [item.product for item in basket.basket_items.all()]
             discount = Discount.objects.filter(for_flexible_pricing=False).get(
                 discount_code=request.data["discount"]
             )
 
-            if (
-                not discount.products.count() == 0
-                and DiscountProduct.objects.filter(product__in=basket_item_products)
-                .filter(discount=discount)
-                .count()
-                == 0
-            ):
+            if not api.check_discount_for_products(discount, basket):
                 raise ObjectDoesNotExist()
 
             if not discount.check_validity(request.user):
