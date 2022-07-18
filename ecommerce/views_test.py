@@ -18,7 +18,14 @@ from ecommerce.factories import (
     BasketItemFactory,
     BasketFactory,
 )
-from ecommerce.models import Basket, BasketItem, Order, Discount, UserDiscount
+from ecommerce.models import (
+    Basket,
+    BasketItem,
+    Order,
+    Discount,
+    UserDiscount,
+    DiscountProduct,
+)
 from ecommerce.serializers import (
     ProductSerializer,
     BasketSerializer,
@@ -216,13 +223,15 @@ def test_redeem_product_discount(
     discount = discounts[random.randrange(0, len(discounts))]
 
     if try_product_discount:
-        discount.product = basket.basket_items.first().product
-        discount.save()
+        discount_product = DiscountProduct(
+            discount=discount, product=basket.basket_items.first().product
+        ).save()
         discount.refresh_from_db()
     else:
         new_product = ProductFactory.create()
-        discount.product = new_product
-        discount.save()
+        discount_product = DiscountProduct(
+            discount=discount, product=new_product
+        ).save()
         discount.refresh_from_db()
 
     resp = user_drf_client.post(

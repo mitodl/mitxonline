@@ -164,9 +164,6 @@ class Discount(TimestampedModel):
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
     discount_code = models.CharField(max_length=50)
     for_flexible_pricing = models.BooleanField(null=False, default=True)
-    product = models.ForeignKey(
-        Product, on_delete=models.PROTECT, related_name="+", blank=True, null=True
-    )
 
     def __str__(self):
         return f"{self.amount} {self.discount_type} {self.redemption_type} - {self.discount_code}"
@@ -203,6 +200,22 @@ class Discount(TimestampedModel):
             return False
 
         return True
+
+
+class DiscountProduct(TimestampedModel):
+    discount = models.ForeignKey(
+        Discount, on_delete=models.CASCADE, related_name="products"
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="discounts",
+        blank=True,
+        null=True,
+    )
+
+    def __str__(self):
+        return f"Discount {self.discount.discount_code} for product {self.product.purchasable_object}"
 
 
 class UserDiscount(TimestampedModel):

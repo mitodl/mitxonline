@@ -73,6 +73,7 @@ from ecommerce.models import (
     BasketItem,
     Discount,
     DiscountRedemption,
+    DiscountProduct,
     BasketDiscount,
     UserDiscount,
     PendingOrder,
@@ -286,11 +287,19 @@ class CheckoutApiViewSet(ViewSet):
 
         try:
             basket_item_products = [item.product for item in basket.basket_items.all()]
-            discount = (
-                Discount.objects.filter(for_flexible_pricing=False)
-                .filter(Q(product=None) | Q(product__in=basket_item_products))
-                .get(discount_code=request.data["discount"])
+            discount = Discount.objects.filter(for_flexible_pricing=False).get(
+                discount_code=request.data["discount"]
             )
+
+            if (
+                not discount.products.count() == 0
+                and DiscountProduct.objects.filter(product__in=basket_item_products)
+                .filter(discount=discount)
+                .count()
+                == 0
+            ):
+                raise ObjectDoesNotExist()
+
             if not discount.check_validity(request.user):
                 raise ObjectDoesNotExist()
         except ObjectDoesNotExist:
