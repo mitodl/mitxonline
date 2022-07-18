@@ -134,7 +134,7 @@ In MITx Online:
 
 In Open edX (derived from instructions `here <https://edx.readthedocs.io/projects/edx-installing-configuring-and-running/en/latest/configuration/tpa/tpa_integrate_open/tpa_oauth.html#additional-oauth2-providers-advanced>`_):
 
-* ``make lms-shell`` into the LMS container and ensure the following settings are configured in ``/edx/etc/lms.yml``.  Search for the setting names before appending anything new to the file.:
+* ``make lms-shell`` into the LMS container and ensure the following settings:
     .. code-block:: yaml
 
       FEATURES:
@@ -149,7 +149,7 @@ In Open edX (derived from instructions `here <https://edx.readthedocs.io/project
        - social_auth_mitxpro.backends.MITxProOAuth2
 
 * ``make lms-restart`` to pick up the configuration changes
-* Login to django-admin (default username and password can be found `here <https://github.com/openedx/devstack#usernames-and-passwords>`_), go to ``http://<EDX_HOSTNAME>:18000/admin/third_party_auth/oauth2providerconfig/``, and create a new config:
+* Login to django-admin, go to ``http://<EDX_HOSTNAME>:18000/admin/third_party_auth/oauth2providerconfig/``, and create a new config:
 
   * Select the default example site
   * The slug field **MUST** match the the backend's name, which for us is ``mitxpro-oauth2``
@@ -160,7 +160,6 @@ In Open edX (derived from instructions `here <https://edx.readthedocs.io/project
     * Skip registration form
     * Sync learner profile data
     * Enable SSO id verification
-  * Set Backend name to: ``mitxpro-oauth2``
 
   * In "Other settings", put:
 
@@ -177,9 +176,6 @@ In Open edX (derived from instructions `here <https://edx.readthedocs.io/project
 
     * Linux users: The gateway IP of the docker-compose networking setup for mitxonline as found via ``docker network inspect mitx-online_default``
     * OSX users: Use ``host.docker.internal``
-    
-  * Save the configuration.  Then, while on the ``/admin/third_party_auth/oauth2providerconfig/`` page, select 'update' for the configuration you just created.
-    * Check the 'enabled' box at the top, and save the configuration.
 
 
 
