@@ -200,6 +200,7 @@ Configure Open edX to support OAuth2 authentication from MITx Online
 
   * Set ``OPENEDX_API_CLIENT_ID`` to the client id
   * Set ``OPENEDX_API_CLIENT_SECRET`` to the client secret
+  * Set ``OPENEDX_API_BASE_URL`` to ``http://host.docker.internal:18000`` when running ``devstack`` and ``mitxonline`` locally through Docker
 
 Configure Logout
 ################
