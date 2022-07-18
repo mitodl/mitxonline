@@ -4,48 +4,58 @@
 {% block title %}{{ site_name }} | {{ page.title }}{% endblock %}
 
 {% block content %}
+<div id="main" class="main-page-content">
+  <div class="std-page-body container auth-page">
+    <div class="auth-card card-shadow auth-form">
+    
+      <div class="auth-header">
+          <h1 class="text-uppercase" id="{{ page.title|slugify }}">Request Flexible Pricing</h1>
 
-  <div id="main" class="resource-banner">
-    <div class="container">
-      <h1 class="text-uppercase">{{ page.title }}</h1>
-      {% if page.sub_heading %}
-        <h2>{{ page.sub_heading }}</h2>
-      {% endif %}
-    </div>
-  </div>
+          {% if course is not None %}
+          <p>Requesting flexible pricing for {{ course.product.title }} ({{ course.product.readable_id }}).</p>
+          {% endif %}
 
-<div class="container resource-container">
-  <div class="row">
-    <div class="col-md-2">
-    </div>
-    <div class="col-md-8">
-        <h2 class="text-uppercase" id="{{ page.title|slugify }}">{{ page.title }}</h2>
-
-        {% if course is not None %}
-        <p>Requesting flexible pricing for {{ course.product.title }} ({{ course.product.readable_id }}).</p>
-        {% endif %}
-
-        {{ page.intro|richtext }}
-        
-        {% if user.is_authenticated %}{# is logged in #}
-          {% if has_submission %}{# has submission #}
-            {% if prior_request.is_approved %}{# request status #}
-              {{ page.application_approved_text|richtext }}
-            {% elif prior_request.is_denied %}
-              {{ page.application_denied_text|richtext }}
+          {{ page.intro|richtext }}
+          
+          {% if user.is_authenticated %}{# is logged in #}
+            {% if has_submission %}{# has submission #}
+              {% if prior_request.is_approved %}{# request status #}
+                {{ page.application_approved_text|richtext }}
+              {% elif prior_request.is_denied %}
+                {{ page.application_denied_text|richtext }}
+              {% else %}
+                {{ page.application_processing_text|richtext }}
+              {% endif %}{# request status #}
             {% else %}
-              {{ page.application_processing_text|richtext }}
-            {% endif %}{# request status #}
+              <form action="{% pageurl page %}" method="POST">
+                  {% csrf_token %}
+                  <div class="form-group">
+                    <label for="your_income">Your Income</label>
+                    <input type="number" name="your_income" step="any" class="form-control" id="your_income" aria-describedby="your_incomeError">
+                    {% for error in form.your_income.errors %}
+                      <div class="form-error" id="your_incomeError" role="alert">{{error}}</div>
+                    {% endfor %}
+                  </div>
+                  <div class="form-group">
+                    <label for="income_currency">Income Currency</label>
+                    <select name="income_currency" id="income_currency" class="form-control" >
+                      {% for choice in form.fields.income_currency.choices %}
+                        <option value="{{ choice.0 }}">{{ choice.1 }}</option>  
+                      {%  endfor %}
+                    </select>
+                    {% for error in form.income_currency.errors %}
+                      <div class="form-error" id="income_currencyError" role="alert">{{error}}</div>
+                    {% endfor %}
+                  </div>
+                  <div class="row submit-row no-gutters justify-content-end">
+                    <button type="submit" class="btn btn-primary btn-gradient-red large">Submit</button>
+                  </div>
+              </form>
+            {% endif %}{# has submission #}
           {% else %}
-            <form action="{% pageurl page %}" method="POST">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <input type="submit">
-            </form>
-          {% endif %}{# has submission #}
-        {% else %}
-        {{ page.guest_text|richtext }}
-        {% endif %} {# is logged in #}
+            {{ page.guest_text|richtext }}
+          {% endif %} {# is logged in #}
+      </div>
     </div>
   </div>
 </div>

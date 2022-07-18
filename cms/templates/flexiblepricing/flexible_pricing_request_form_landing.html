@@ -5,23 +5,14 @@
 
 {% block content %}
 
-  <div id="main" class="resource-banner">
-    <div class="container">
-      <h1 class="text-uppercase">{{ page.title }}</h1>
-      {% if page.sub_heading %}
-        <h2>{{ page.sub_heading }}</h2>
-      {% endif %}
-    </div>
-  </div>
-
-<div class="container resource-container">
-  <div class="row">
-    <div class="col-md-2">
-    </div>
-    <div class="col-md-8">
-        <h2 class="text-uppercase" id="{{ page.title|slugify }}">{{ page.title }}</h2>
-
+<div id="main" class="main-page-content">
+  <div class="std-page-body container auth-page">
+    <div class="auth-card card-shadow auth-form">
+      <div class="auth-header">
+        <h1 class="text-uppercase" id="{{ page.title|slugify }}">Request Flexible Pricing</h1>
+        <p>{{ page.title }}</p>
         {{ self.thank_you_text|richtext }}
+      </div>
     </div>
   </div>
 </div>
