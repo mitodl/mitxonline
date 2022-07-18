@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.38.0
+Version 0.38.0 (Released July 18, 2022)
 --------------
 
 - Adds flexible pricing flag to Discount objects
