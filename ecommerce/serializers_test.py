@@ -103,7 +103,8 @@ def test_product_program_serializer(mock_context):
             "purchasable_object": run_serialized,
         },
     )
-    
+
+
 def test_product_flexible_price_serializer(mock_context):
     """
     Tests serialization of a product that has an associated flexible price for the user.
@@ -129,7 +130,8 @@ def test_product_flexible_price_serializer(mock_context):
                 "redemption_type": flexible_price.tier.discount.redemption_type,
                 "max_redemptions": None,
                 "discount_code": flexible_price.tier.discount.discount_code,
-                "for_flexible_pricing": flexible_price.tier.discount.for_flexible_pricing}
+                "for_flexible_pricing": flexible_price.tier.discount.for_flexible_pricing,
+            },
         },
     )
 
