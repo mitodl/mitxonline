@@ -15,7 +15,7 @@ from courses import models
 from courses.api import create_run_enrollments
 from courses.models import ProgramRun, CourseRun
 from ecommerce.models import Product
-from ecommerce.serializers import ProductSerializer, BaseProductSerializer
+from ecommerce.serializers import ProductFlexibilePriceSerializer, BaseProductSerializer
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
@@ -59,8 +59,8 @@ class BaseCourseSerializer(serializers.ModelSerializer):
 class ProductRelatedField(serializers.RelatedField):
     """serializer for the Product generic field"""
 
-    def to_representation(self, value):
-        serializer = BaseProductSerializer(value)
+    def to_representation(self, instance):
+        serializer = ProductFlexibilePriceSerializer(instance=instance, context=self.context)
         return serializer.data
 
 

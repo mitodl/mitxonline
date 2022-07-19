@@ -63,7 +63,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
             <h2>Get a certificate</h2>
           </div>
           <div className="text-right align-self-end">
-            <h2>${product.price}</h2>
+            <h2>${product.price - product.product_flexible_price.amount}</h2>
           </div>
         </div>
         <div className="row">
