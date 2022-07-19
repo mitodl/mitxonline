@@ -15,12 +15,12 @@ from ecommerce.views.v0 import (
     CheckoutProductView,
     OrderHistoryViewSet,
     OrderReceiptView,
-    AdminRefundOrderView,
     DiscountViewSet,
     NestedDiscountRedemptionViewSet,
     NestedUserDiscountViewSet,
     UserDiscountViewSet,
 )
+from ecommerce.admin import AdminRefundOrderView
 
 
 class SimpleRouterWithNesting(NestedRouterMixin, SimpleRouter):

@@ -31,11 +31,10 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.db.models import Q, Count
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
@@ -80,7 +79,7 @@ from ecommerce.models import (
     FulfilledOrder,
     Order,
 )
-from ecommerce.forms import AdminRefundOrderForm
+
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 
 log = logging.getLogger(__name__)
@@ -581,103 +580,3 @@ class OrderReceiptView(RetrieveAPIView):
 
     def get_queryset(self):
         return Order.objects.filter(purchaser=self.request.user).all()
-
-
-class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
-    template_name = "refund_order_confirm.html"
-    permission_required = "is_superuser"
-
-    def post(self, request):
-        try:
-            refund_form = AdminRefundOrderForm(request.POST)
-            order = FulfilledOrder.objects.get(pk=request.POST["order"])
-
-            if refund_form.is_valid():
-                unenrolled = order.refund(
-                    request.POST["refund_amount"],
-                    request.POST["refund_reason"],
-                    True
-                    if "perform_unenrolls" in request.POST
-                    and request.POST["perform_unenrolls"]
-                    else False,
-                )
-                order.save()
-
-                if unenrolled:
-                    messages.success(
-                        request, f"Order {order.reference_number} refunded."
-                    )
-                else:
-                    messages.warning(
-                        request,
-                        f"Order {order.reference_number} refunded, but could not unenroll the learner. Unenrollments will be reattempted later.",
-                    )
-
-                return HttpResponseRedirect(
-                    reverse("admin:ecommerce_refundedorder_change", args=(order.id,))
-                )
-
-            errors = []
-            error_messages = {}
-
-            for whatever in refund_form.errors:
-                errors.append(whatever)
-                error_messages[whatever] = refund_form.errors[whatever]
-
-            return render(
-                request,
-                self.template_name,
-                {
-                    "refund_form": refund_form,
-                    "order": order,
-                    "form_valid": refund_form.is_valid(),
-                    "errors": errors,
-                    "error_messages": error_messages,
-                },
-            )
-        except NotImplementedError:
-            messages.error(request, f"Order {request.POST['order']} can't be refunded.")
-            return HttpResponseRedirect(
-                reverse("admin:ecommerce_refundedorder_changelist")
-            )
-        except ObjectDoesNotExist:
-            messages.error(
-                request,
-                f"Order {request.POST['order']} could not be found - is it Fulfilled?",
-            )
-            return HttpResponseRedirect(
-                reverse("admin:ecommerce_fulfilledorder_changelist")
-            )
-
-    def get(self, request):
-        try:
-            order = FulfilledOrder.objects.get(pk=request.GET["order"])
-
-            if order.state != Order.STATE.FULFILLED:
-                raise ObjectDoesNotExist()
-        except ObjectDoesNotExist:
-            messages.error(
-                request,
-                f"Order {request.GET['order']} could not be found - is it Fulfilled?",
-            )
-            return HttpResponseRedirect(
-                reverse("admin:ecommerce_fulfilledorder_changelist")
-            )
-
-        refund_form = AdminRefundOrderForm(
-            initial={
-                "_selected_action": order.id,
-                "refund_amount": order.total_price_paid,
-            }
-        )
-
-        return render(
-            request,
-            self.template_name,
-            {
-                "refund_form": refund_form,
-                "order": order,
-                "form_valid": True,
-                "errors": {},
-            },
-        )

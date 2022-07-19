@@ -9,3 +9,16 @@ def send_ecommerce_order_receipt(order_id):
     order = Order.objects.get(pk=order_id)
 
     send_ecommerce_order_receipt(order)
+
+
+@app.task(acks_late=True)
+def perform_unenrollment_from_order(order_id):
+    """
+    Task to perform unenrollment from courses against a specific order
+
+    Args:
+       order_id (int): Id of the order
+    """
+    from ecommerce.api import unenroll_learner_from_order
+
+    unenroll_learner_from_order(order_id)
