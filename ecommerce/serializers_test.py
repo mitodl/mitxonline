@@ -124,6 +124,7 @@ def test_product_flexible_price_serializer(mock_context):
             "price": str(product.price),
             "purchasable_object": run_serialized,
             "product_flexible_price": {
+                "id": flexible_price.tier.discount.id,
                 "amount": flexible_price.tier.discount.amount,
                 "automatic": None,
                 "discount_type": flexible_price.tier.discount.discount_type,
