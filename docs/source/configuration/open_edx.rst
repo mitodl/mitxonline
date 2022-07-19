@@ -23,18 +23,8 @@ Clone edx/devstack
 
   git clone https://github.com/edx/devstack
   cd devstack
-  git checkout open-release/ironwood.master
   make requirements
-  export OPENEDX_RELEASE=ironwood.master
   make dev.clone
-
-Clone and checkout edx-platform (if not already)
-------------------------------------------------
-
-.. code-block:: shell
-
-  git clone https://github.com/mitodl/edx-platform
-  git checkout master
 
 Pull latest images and run provision
 ------------------------------------
