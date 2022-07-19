@@ -1,3 +1,4 @@
+from flexiblepricing.factories import FlexiblePriceFactory
 import pytest
 import json
 from main.test_utils import assert_drf_json_equal
@@ -100,6 +101,35 @@ def test_product_program_serializer(mock_context):
             "is_active": product.is_active,
             "price": str(product.price),
             "purchasable_object": run_serialized,
+        },
+    )
+    
+def test_product_flexible_price_serializer(mock_context):
+    """
+    Tests serialization of a product that has an associated flexible price for the user.
+    """
+    run = ProgramRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
+    product_serialized = ProductSerializer(instance=product).data
+    run_serialized = ProgramRunProductPurchasableObjectSerializer(instance=run).data
+    flexible_price = FlexiblePriceFactory.create()
+
+    assert_drf_json_equal(
+        product_serialized,
+        {
+            "description": product.description,
+            "id": product.id,
+            "is_active": product.is_active,
+            "price": str(product.price),
+            "purchasable_object": run_serialized,
+            "product_flexible_price": {
+                "amount": flexible_price.tier.discount.amount,
+                "automatic": None,
+                "discount_type": flexible_price.tier.discount.discount_type,
+                "redemption_type": flexible_price.tier.discount.redemption_type,
+                "max_redemptions": None,
+                "discount_code": flexible_price.tier.discount.discount_code,
+                "for_flexible_pricing": flexible_price.tier.discount.for_flexible_pricing}
         },
     )
 
