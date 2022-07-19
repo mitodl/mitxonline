@@ -16,6 +16,7 @@ from cms.serializers import CoursePageSerializer
 
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 
+
 class ProgramRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProgramRun
@@ -92,12 +93,15 @@ class ProductSerializer(BaseProductSerializer):
             "purchasable_object",
         ]
         model = models.Product
-        
+
+
 class ProductFlexibilePriceSerializer(BaseProductSerializer):
     product_flexible_price = serializers.SerializerMethodField()
-    
+
     def get_product_flexible_price(self, instance):
-        discount_record = determine_courseware_flexible_price_discount(instance, self.context["request"].user)
+        discount_record = determine_courseware_flexible_price_discount(
+            instance, self.context["request"].user
+        )
         return DiscountSerializer(discount_record, context=self.context).data
 
     class Meta:

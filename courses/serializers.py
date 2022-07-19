@@ -60,7 +60,9 @@ class ProductRelatedField(serializers.RelatedField):
     """serializer for the Product generic field"""
 
     def to_representation(self, instance):
-        serializer = ProductFlexibilePriceSerializer(instance=instance, context=self.context)
+        serializer = ProductFlexibilePriceSerializer(
+            instance=instance, context=self.context
+        )
         return serializer.data
 
 
