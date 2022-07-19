@@ -199,7 +199,8 @@ INSTALLED_APPS = (
     "mitol.common.apps.CommonApp",
     # "mitol.digitalcredentials.apps.DigitalCredentialsApp",
     "mitol.mail.apps.MailApp",
-    "mitol.authentication.apps.TransitionalAuthenticationApp"
+    "mitol.authentication.apps.TransitionalAuthenticationApp",
+    "mitol.payment_gateway.apps.PaymentGatewayApp"
     # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
 )
 # Only include the seed data app if this isn't running in prod
@@ -874,7 +875,11 @@ PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"
 
 # ol-django configuration
 
-import_settings_modules(globals(), "mitol.authentication.settings.djoser_settings")
+import_settings_modules(
+    globals(),
+    "mitol.authentication.settings.djoser_settings",
+    "mitol.payment_gateway.settings.cybersource",
+)
 
 # mitol-django-common
 MITOL_COMMON_USER_FACTORY = "users.factories.UserFactory"
@@ -968,36 +973,6 @@ if DEBUG:
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
-# eCommerce settings
-ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = get_string(
-    name="ECOMMERCE_DEFAULT_PAYMENT_GATEWAY",
-    default=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
-    description="The default payment gateway to use. Must match the value of the constant in the mitol.payment_gateway library.",
-)
-
-MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = get_string(
-    name="MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY",
-    default=None,
-    description="CyberSource access key",
-)
-
-MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = get_string(
-    name="MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID",
-    default=None,
-    description="CyberSource profile ID",
-)
-
-MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = get_string(
-    name="MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY",
-    default=None,
-    description="CyberSource security key",
-)
-
-MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL = get_string(
-    name="MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL",
-    default=None,
-    description="CyberSource secure acceptance URL",
-)
 
 # Open Exchange Rates
 OPEN_EXCHANGE_RATES_URL = get_string(
