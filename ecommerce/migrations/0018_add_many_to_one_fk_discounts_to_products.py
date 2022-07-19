@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("ecommerce", "0016_update_discounts_add_flex_pricing_flag"),
+        ("ecommerce", "0017_add_blank_reason_field"),
     ]
 
     operations = [
