@@ -59,6 +59,15 @@ export const makeCourseRunWithProduct = (): CourseRun => ({
       id:          genProductId.next().value,
       is_active:   true,
       price:       casual.integer(1, 200)
+      product_flexible_price: {
+        amount:              null,
+        automatic:           false,
+        discount_type:       null,
+        redemption_type:     null,
+        max_redemptions:     null,
+        discount_code:       "",
+        for_flexible_pricing:false
+      }
     }
   ]
 })
