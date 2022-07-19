@@ -55,18 +55,18 @@ export const makeCourseRunWithProduct = (): CourseRun => ({
   course_number:    casual.word,
   products:         [
     {
-      description: casual.text,
-      id:          genProductId.next().value,
-      is_active:   true,
-      price:       casual.integer(1, 200),
+      description:            casual.text,
+      id:                     genProductId.next().value,
+      is_active:              true,
+      price:                  casual.integer(1, 200),
       product_flexible_price: {
-        amount:              null,
-        automatic:           false,
-        discount_type:       null,
-        redemption_type:     null,
-        max_redemptions:     null,
-        discount_code:       "",
-        for_flexible_pricing:false
+        amount:               null,
+        automatic:            false,
+        discount_type:        null,
+        redemption_type:      null,
+        max_redemptions:      null,
+        discount_code:        "",
+        for_flexible_pricing: false
       }
     }
   ]
