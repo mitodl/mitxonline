@@ -58,7 +58,7 @@ export const makeCourseRunWithProduct = (): CourseRun => ({
       description: casual.text,
       id:          genProductId.next().value,
       is_active:   true,
-      price:       casual.integer(1, 200)
+      price:       casual.integer(1, 200),
       product_flexible_price: {
         amount:              null,
         automatic:           false,
