@@ -139,18 +139,18 @@ In Open edX (derived from instructions `here <https://edx.readthedocs.io/project
        - social_auth_mitxpro.backends.MITxProOAuth2
 
 * ``make lms-restart`` to pick up the configuration changes
-* Login to django-admin, go to ``http://<EDX_HOSTNAME>:18000/admin/third_party_auth/oauth2providerconfig/``, and create a new config:
+* Login to django-admin (default username and password can be found `here <https://github.com/openedx/devstack#usernames-and-passwords>`_), go to ``http://<EDX_HOSTNAME>:18000/admin/third_party_auth/oauth2providerconfig/``, and create a new config:
 
   * Select the default example site
   * The slug field **MUST** match the the backend's name, which for us is ``mitxpro-oauth2``
   * Client Id should be the client id from the MITx Online Django Oauth Toolkit Application
   * Check the following checkboxes:
 
+    * Enabled
     * Skip hinted login dialog
     * Skip registration form
     * Sync learner profile data
     * Enable SSO id verification
-    * Enabled
   * Set Backend name to: ``mitxpro-oauth2``
 
   * In "Other settings", put:
@@ -190,6 +190,7 @@ Configure Open edX to support OAuth2 authentication from MITx Online
 
   * Set ``OPENEDX_API_CLIENT_ID`` to the client id
   * Set ``OPENEDX_API_CLIENT_SECRET`` to the client secret
+  * Set ``OPENEDX_API_BASE_URL`` to ``http://host.docker.internal:18000`` when running ``devstack`` and ``mitxonline`` locally through Docker
 
 Configure Logout
 ################
