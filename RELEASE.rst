@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.39.1
+--------------
+
+- Revert "Update steps for accessing and configuring devstack"
+- feat: refund orders CyberSource - Integrate [mitol-django-payment-gateway] (#599)
+- Add instruction to define edx base url
+- Update steps for accessing and configuring devstack
+- Revert "Update steps for accessing and configuring devstack"
+- Update steps for accessing and configuring devstack
+- Use master branch and don't clone mitodl edx
+
 Version 0.39.0 (Released July 19, 2022)
 --------------
 
