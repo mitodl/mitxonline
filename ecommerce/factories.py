@@ -103,3 +103,26 @@ class BasketItemFactory(DjangoModelFactory):
 
     class Meta:
         model = models.BasketItem
+
+
+class OrderFactory(DjangoModelFactory):
+    total_price_paid = fuzzy.FuzzyDecimal(10.00, 10.00)
+    purchaser = SubFactory(UserFactory)
+
+    class Meta:
+        model = models.Order
+
+
+class TransactionFactory(DjangoModelFactory):
+    order = SubFactory(OrderFactory)
+    amount = fuzzy.FuzzyDecimal(10.00, 10.00)
+
+    class Meta:
+        model = models.Transaction
+
+
+class LineFactory(DjangoModelFactory):
+    quantity = 1
+
+    class Meta:
+        model = models.Line

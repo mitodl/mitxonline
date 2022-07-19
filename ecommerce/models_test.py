@@ -216,7 +216,12 @@ def test_order_refund():
 
     assert fulfilled_order.transactions.count() == 1
 
-    fulfilled_order.refund(fulfilled_order.total_price_paid, "Test refund", True)
+    fulfilled_order.refund(
+        api_response_data={},
+        amount=fulfilled_order.total_price_paid,
+        reason="Test refund",
+        unenroll_learner=True,
+    )
     fulfilled_order.save()
 
     fulfilled_order.refresh_from_db()

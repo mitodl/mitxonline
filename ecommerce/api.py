@@ -1,9 +1,18 @@
 """Ecommerce APIs"""
 
+import json
+import logging
+
 from functools import total_ordering
 from django.urls import reverse
+from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
+from ecommerce.constants import TRANSACTION_TYPE_REFUND, REFUND_SUCCESS_STATES
+from ecommerce.tasks import perform_unenrollment_from_order
+from courses.api import deactivate_run_enrollment
+from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
@@ -14,7 +23,10 @@ from mitol.payment_gateway.api import (
     CartItem as GatewayCartItem,
     Order as GatewayOrder,
     PaymentGateway,
+    Refund as GatewayRefund,
 )
+from mitol.payment_gateway.exceptions import RefundDuplicateException
+
 from mitol.common.utils.datetime import now_in_utc
 from ipware import get_client_ip
 
@@ -24,8 +36,13 @@ from ecommerce.models import (
     PendingOrder,
     UserDiscount,
     BasketDiscount,
+    FulfilledOrder,
+    Transaction,
+    Order,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
+
+log = logging.getLogger(__name__)
 
 
 def generate_checkout_payload(request):
@@ -158,3 +175,107 @@ def establish_basket(request):
         basket.save()
 
     return basket
+
+
+def refund_order(*, order_id: int, **kwargs):
+    """
+    A function that performs refund for a given order id
+
+    Args:
+       order_id (int): Id of the order which is being refunded
+       kwargs (dict): Dictionary of the other attributes that are passed e.g. refund amount, refund reason, unenroll
+       If no refund_amount is provided it will use refund amount from Transaction obj
+       unenroll will never be performed if the refund fails
+
+    Returns:
+        bool : A boolean identifying if an order refund was successful
+    """
+    refund_amount = kwargs.get("refund_amount")
+    refund_reason = kwargs.get("refund_reason", "")
+    unenroll = kwargs.get("unenroll", False)
+
+    with transaction.atomic():
+
+        order = FulfilledOrder.objects.select_for_update().get(id=order_id)
+
+        if order.state != Order.STATE.FULFILLED:
+            log.debug(f"Order with order_id {order_id} is not in fulfilled state.")
+            return False
+
+        order_recent_transaction = Transaction.objects.filter(order=order_id).first()
+
+        if not order_recent_transaction:
+            log.error(
+                f"There is no associated transaction against order_id {order_id}."
+            )
+            return False
+
+        transaction_dict = order_recent_transaction.data
+
+        # The refund amount can be different then the payment amount, so we override
+        # that before PaymentGateway processing.
+        # e.g. While refunding order from Django Admin we can select custom amount.
+        if refund_amount:
+            transaction_dict["req_amount"] = refund_amount
+
+        refund_transaction = order.refund(
+            api_response_data={},
+            amount=transaction_dict["req_amount"],
+            reason=refund_reason,
+        )
+
+        refund_gateway_request = PaymentGateway.create_refund_request(
+            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, transaction_dict
+        )
+
+        try:
+            response = PaymentGateway.start_refund(
+                ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+                refund_gateway_request,
+            )
+            if response.state in REFUND_SUCCESS_STATES:
+                # Update the above created refund transaction with PaymentGateway's refund response
+                refund_transaction.data = response.response_data
+                refund_transaction.save()
+
+            else:
+                log.error(
+                    f"There was an error with the Refund API request {response.message}"
+                )
+                # PaymentGateway didn't raise an exception and instead gave a Response but the response status was not
+                # success so we manually rollback the transaction in this case.
+                transaction.set_rollback()
+                # Just return here if the refund failed, no matter if unenroll was requested or not
+                return False
+
+        except RefundDuplicateException:
+            # Duplicate refund error during the API call will be treated as success, we just log it
+            log.info(f"Duplicate refund request for order_id {order_id}")
+
+    # If unenroll requested, perform unenrollment after successful refund
+    if unenroll:
+        perform_unenrollment_from_order.delay(order_id)
+
+    return True
+
+
+def unenroll_learner_from_order(order_id):
+    """
+    A function that un-enrolls a learner from all the courses associated with specific order
+    """
+    order = Order.objects.get(pk=order_id)
+
+    for run in order.purchased_runs:
+        for enrollment in run.enrollments.filter(user=order.purchaser).all():
+            try:
+                if (
+                    deactivate_run_enrollment(enrollment, ENROLL_CHANGE_STATUS_REFUNDED)
+                    is None
+                ):
+                    deactivate_run_enrollment(
+                        enrollment,
+                        ENROLL_CHANGE_STATUS_REFUNDED,
+                        keep_failed_enrollments=True,
+                    )
+            except ObjectDoesNotExist:
+                pass

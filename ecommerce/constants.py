@@ -1,4 +1,5 @@
 """Constants for ecommerce."""
+from mitol.payment_gateway.api import ProcessorResponse
 
 REFERENCE_NUMBER_PREFIX = "mitxonline-"
 
@@ -57,3 +58,9 @@ CYBERSOURCE_CARD_TYPES = {
     "061": "RuPay",
     "062": "China UnionPay",
 }
+
+REFUND_SUCCESS_STATES = [
+    ProcessorResponse.STATE_ACCEPTED,
+    ProcessorResponse.STATE_DUPLICATE,
+    ProcessorResponse.STATE_PENDING,
+]

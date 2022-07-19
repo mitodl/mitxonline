@@ -4,9 +4,7 @@ from django.db import models, transaction
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ObjectDoesNotExist
 from courses.models import CourseRun
-from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.models import CourseRun
 from django_fsm import FSMField, transition
 from mitol.common.models import TimestampedModel
@@ -17,6 +15,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPES,
     REDEMPTION_TYPES,
     TRANSACTION_TYPE_PAYMENT,
+    TRANSACTION_TYPE_REFUND,
     TRANSACTION_TYPES,
     REFERENCE_NUMBER_PREFIX,
     REDEMPTION_TYPE_ONE_TIME,
@@ -25,7 +24,7 @@ from ecommerce.constants import (
 )
 from users.models import User
 from decimal import Decimal
-from courses.api import deactivate_run_enrollment, create_run_enrollments
+from courses.api import create_run_enrollments
 from ecommerce.tasks import send_ecommerce_order_receipt
 
 from mitol.common.utils.datetime import now_in_utc
@@ -280,7 +279,7 @@ class Order(TimestampedModel):
         """Error this order"""
         raise NotImplementedError()
 
-    def refund(self, amount, reason, unenroll_learner):
+    def refund(self, *, api_response_data, **kwargs):
         """Issue a refund"""
         raise NotImplementedError()
 
@@ -419,48 +418,35 @@ class FulfilledOrder(Order):
         target=Order.STATE.REFUNDED,
         custom=dict(admin=False),
     )
-    def refund(self, amount: float, reason: str, unenroll_learner: bool):
+    def refund(self, *, api_response_data: dict = None, **kwargs):
         """
         Records the refund, and optionally attempts to unenroll the learner from
         the things they bought.
 
         Args:
-            amount (float): the amount that was refunded
-            reason (str): reason for refunding the order
-            unenroll_learner (bool): also unenroll the learner (if possible)
+            api_response_data (dict): In case of API response we will have the response data dictionary
+            kwargs: Ideally it should have named parameters such as
+            1- amount: that was refunded
+            2- reason: for refunding the order
+
+            at hand with enough details, So when the dict is passed we would save it as is,
+            otherwise fallback to default dict creation below
         Returns:
-            boolean: if unenroll_learner is set to True and the unenrollment
-            fails, the unenrollment will still happen but this will return False
-            to signify that it failed.
+            Object (Transaction): return the refund transaction object for the refund.
         """
-        self.transactions.create(
-            data={"reason": reason}, amount=amount, transaction_type="refund"
+        amount = kwargs.get("amount")
+        reason = kwargs.get("reason")
+
+        refund_transaction = self.transactions.create(
+            data=api_response_data,
+            amount=amount,
+            transaction_type=TRANSACTION_TYPE_REFUND,
+            reason=reason,
         )
 
         self.state = Order.STATE.REFUNDED
-
-        unenrolls_successful = True
-
-        if unenroll_learner:
-            for run in self.purchased_runs:
-                for enrollment in run.enrollments.filter(user=self.purchaser).all():
-                    try:
-                        if (
-                            deactivate_run_enrollment(
-                                enrollment, ENROLL_CHANGE_STATUS_REFUNDED
-                            )
-                            is None
-                        ):
-                            unenrolls_successful = False
-                            deactivate_run_enrollment(
-                                enrollment,
-                                ENROLL_CHANGE_STATUS_REFUNDED,
-                                keep_failed_enrollments=True,
-                            )
-                    except ObjectDoesNotExist:
-                        pass
-
-        return unenrolls_successful
+        self.save()
+        return refund_transaction
 
     class Meta:
         proxy = True
@@ -645,6 +631,7 @@ class Transaction(TimestampedModel):
         null=False,
         max_length=20,
     )
+    reason = models.CharField(max_length=255, blank=True)
 
 
 class BasketDiscount(TimestampedModel):

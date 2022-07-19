@@ -39,6 +39,7 @@ celery-redbeat==2.0.0
     # via -r requirements.in
 certifi==2021.5.30
     # via
+    #   cybersource-rest-client-python
     #   requests
     #   sentry-sdk
 cffi==1.14.5
@@ -64,6 +65,7 @@ coreschema==0.0.4
     # via coreapi
 cryptography==3.4.7
     # via
+    #   cybersource-rest-client-python
     #   jwcrypto
     #   pyopenssl
     #   social-auth-core
@@ -71,6 +73,10 @@ cssselect==1.1.0
     # via premailer
 cssutils==2.3.0
     # via premailer
+cybersource-rest-client-python==0.0.37
+    # via mitol-django-payment-gateway
+datetime==4.4
+    # via cybersource-rest-client-python
 decorator==5.0.9
     # via ipython
 defusedxml==0.7.1
@@ -222,21 +228,21 @@ markupsafe==2.0.1
     # via jinja2
 matplotlib-inline==0.1.2
     # via ipython
-mitol-django-authentication==1.4.1
+mitol-django-authentication==1.5.0
     # via -r requirements.in
-mitol-django-common==2.2.4
+mitol-django-common==2.5.0
     # via
     #   -r requirements.in
     #   mitol-django-authentication
     #   mitol-django-mail
     #   mitol-django-payment-gateway
-mitol-django-mail==3.1.0
+mitol-django-mail==3.2.0
     # via
     #   -r requirements.in
     #   mitol-django-authentication
 mitol-django-openedx==1.0.0
     # via -r requirements.in
-mitol-django-payment-gateway==1.4.0
+mitol-django-payment-gateway==1.6.0
     # via -r requirements.in
 newrelic==6.4.1.158
     # via -r requirements.in
@@ -277,16 +283,21 @@ pycountry==19.7.15
     # via -r requirements.in
 pycparser==2.20
     # via cffi
+pycryptodome==3.15.0
+    # via cybersource-rest-client-python
 pygments==2.9.0
     # via ipython
 pyjwt==2.4.0
     # via
+    #   cybersource-rest-client-python
     #   djangorestframework-simplejwt
     #   social-auth-core
 pymongo==4.0.1
     # via edx-opaque-keys
 pyopenssl==17.5.0
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   cybersource-rest-client-python
 pyparsing==2.4.7
     # via packaging
 pytest==6.1.2
@@ -302,6 +313,7 @@ python3-openid==3.2.0
 pytz==2021.1
     # via
     #   celery
+    #   datetime
     #   django
     #   django-modelcluster
     #   l18n
@@ -332,6 +344,7 @@ sentry-sdk==1.4.2
 six==1.16.0
     # via
     #   click-repl
+    #   cybersource-rest-client-python
     #   django-compat
     #   html5lib
     #   l18n
@@ -377,6 +390,7 @@ uritemplate==3.0.1
 urllib3==1.26.5
     # via
     #   botocore
+    #   cybersource-rest-client-python
     #   requests
     #   sentry-sdk
 user-agents==2.2.0
@@ -406,6 +420,8 @@ xlsxwriter==1.4.4
     # via wagtail
 xlwt==1.3.0
     # via tablib
+zope-interface==5.4.0
+    # via datetime
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
