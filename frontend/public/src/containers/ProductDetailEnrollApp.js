@@ -55,7 +55,7 @@ export class ProductDetailEnrollApp extends React.Component<
     const { courseRuns } = this.props
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run.products ? run.products[0] : null
-    const flexPriceDiscountAmount = product && product.product_flexible_price ? product.product_flexible_price.amount : 0
+    const flexPriceDiscountAmount = product.product_flexible_price ?? 0
     return product ? (
       <Modal
         id={`upgrade-enrollment-dialog`}
