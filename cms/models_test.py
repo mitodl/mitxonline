@@ -22,6 +22,7 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramEnrollmentFactory,
+    ProgramRunFactory,
 )
 from flexiblepricing.models import FlexiblePrice
 from flexiblepricing.constants import FlexiblePriceStatus
@@ -137,28 +138,26 @@ def test_program_page_context(
     request = rf.get("/")
     request.user = staff_user if is_authenticated else AnonymousUser()
     if has_relevant_run:
-        run = ProgramRunFactory.create(
-            course__readable_id=FAKE_READABLE_ID, in_future=True
-        )
-        course_page_kwargs = dict(course=run.course)
+        run = ProgramRunFactory.create(program__readable_id=FAKE_READABLE_ID)
+        program_page_kwargs = dict(program=run.program)
     else:
         run = None
-        course_page_kwargs = dict(course__readable_id=FAKE_READABLE_ID)
-    course_page = ProgramPageFactory.create(**course_page_kwargs)
+        program_page_kwargs = dict(program__readable_id=FAKE_READABLE_ID)
+    program_page = ProgramPageFactory.create(**program_page_kwargs)
     if enrolled:
-        ProgramEnrollmentFactory.create(user=staff_user, run=run)
-    context = course_page.get_context(request=request)
+        ProgramEnrollmentFactory.create(user=staff_user, program=run.program)
+    context = program_page.get_context(request=request)
     assert context == {
-        "self": course_page,
-        "page": course_page,
+        "self": program_page,
+        "page": program_page,
         "request": request,
         "run": run,
         "is_enrolled": exp_is_enrolled,
-        "sign_in_url": f"/signin/?next={quote_plus(course_page.get_url())}"
+        "sign_in_url": f"/signin/?next={quote_plus(program_page.get_url())}"
         if exp_sign_in_url
         else None,
         "start_date": getattr(run, "start_date", None),
-        "can_access_edx_course": is_authenticated and has_relevant_run,
+        "can_access_edx_course": False,
     }
 
 

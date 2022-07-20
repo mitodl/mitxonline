@@ -567,7 +567,8 @@ class ProgramPage(ProductPage):
         )
         is_enrolled = (
             False
-            if self.program.enrollments.filter(user=request.user).count() == 0
+            if not request.user.is_authenticated
+            or self.program.enrollments.filter(user=request.user).count() == 0
             else True
         )
         sign_in_url = (
