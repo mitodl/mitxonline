@@ -24,7 +24,7 @@ describe("ProductDetailEnrollApp", () => {
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
-    courseRun = makeCourseRunDetail()
+    courseRun = makeCourseRunDetailWithProduct()
     currentUser = makeUser()
     courseRun["products"] = [{ id: 1 }]
     renderPage = helper.configureHOCRenderer(
