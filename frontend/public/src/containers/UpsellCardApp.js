@@ -54,6 +54,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
       run.products && !run.is_verified && run.is_enrolled
         ? run.products[0]
         : null
+    const flexPriceDiscountAmount = product.product_flexible_price ? product.product_flexible_price.amount : 0
 
     return product ? (
       <div className="card">
@@ -63,7 +64,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
             <h2>Get a certificate</h2>
           </div>
           <div className="text-right align-self-end">
-            <h2>${product.price - product.product_flexible_price.amount}</h2>
+            <h2>${product.price - flexPriceDiscountAmount}</h2>
           </div>
         </div>
         <div className="row">
