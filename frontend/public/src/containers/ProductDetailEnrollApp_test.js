@@ -207,6 +207,7 @@ describe("ProductDetailEnrollApp", () => {
     [false, 400]
   ].forEach(([success, returnedStatusCode]) => {
     it(`shows dialog to upgrade user enrollment and handles ${returnedStatusCode} response`, async () => {
+      courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 1 }}]
       isWithinEnrollmentPeriodStub.returns(true)
       SETTINGS.features.upgrade_dialog = true
       const { inner } = await renderPage()
@@ -227,6 +228,15 @@ describe("ProductDetailEnrollApp", () => {
       assert.isTrue(upgradeForm.exists())
 
       assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
+
+      assert.equal(
+        inner
+          .find(".text-right")
+          .at(0)
+          .text()
+          .at(1),
+        "9"
+      )
     })
   })
 })
