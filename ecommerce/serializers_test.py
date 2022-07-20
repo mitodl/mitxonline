@@ -124,13 +124,14 @@ def test_product_flexible_price_serializer(mock_context):
             "price": str(product.price),
             "purchasable_object": run_serialized,
             "product_flexible_price": {
-                "id": flexible_price.tier.discount.id,
                 "amount": flexible_price.tier.discount.amount,
                 "automatic": None,
-                "discount_type": flexible_price.tier.discount.discount_type,
-                "redemption_type": flexible_price.tier.discount.redemption_type,
-                "max_redemptions": None,
                 "discount_code": flexible_price.tier.discount.discount_code,
+                "discount_type": flexible_price.tier.discount.discount_type,
+                "for_flexible_pricing": None
+                "id": flexible_price.tier.discount.id,
+                "max_redemptions": None,
+                "redemption_type": flexible_price.tier.discount.redemption_type,
             },
         },
     )
