@@ -4,59 +4,62 @@
 {% block title %}{{ site_name }} | {{ page.title }}{% endblock %}
 
 {% block content %}
-<div id="main" class="main-page-content">
-  <div class="std-page-body container auth-page">
-    <div class="auth-card card-shadow auth-form">
-    
-      <div class="auth-header">
-          <h1 class="text-uppercase" id="{{ page.title|slugify }}">Request Flexible Pricing</h1>
-
-          {% if course is not None %}
-          <p>Requesting flexible pricing for {{ course.product.title }} ({{ course.product.readable_id }}).</p>
-          {% endif %}
-
-          {{ page.intro|richtext }}
-          
-          {% if user.is_authenticated %}{# is logged in #}
-            {% if has_submission %}{# has submission #}
-              {% if prior_request.is_approved %}{# request status #}
-                {{ page.application_approved_text|richtext }}
-              {% elif prior_request.is_denied %}
-                {{ page.application_denied_text|richtext }}
-              {% else %}
-                {{ page.application_processing_text|richtext }}
-              {% endif %}{# request status #}
-            {% else %}
-              <form action="{% pageurl page %}" method="POST">
-                  {% csrf_token %}
-                  <div class="form-group">
-                    <label for="your_income">Your Income</label>
-                    <input type="number" name="your_income" step="any" class="form-control" id="your_income" aria-describedby="your_incomeError">
-                    {% for error in form.your_income.errors %}
-                      <div class="form-error" id="your_incomeError" role="alert">{{error}}</div>
-                    {% endfor %}
-                  </div>
-                  <div class="form-group">
-                    <label for="income_currency">Income Currency</label>
-                    <select name="income_currency" id="income_currency" class="form-control" >
-                      {% for choice in form.fields.income_currency.choices %}
-                        <option value="{{ choice.0 }}">{{ choice.1 }}</option>  
-                      {%  endfor %}
-                    </select>
-                    {% for error in form.income_currency.errors %}
-                      <div class="form-error" id="income_currencyError" role="alert">{{error}}</div>
-                    {% endfor %}
-                  </div>
-                  <div class="row submit-row no-gutters justify-content-end">
-                    <button type="submit" class="btn btn-primary btn-gradient-red large">Submit</button>
-                  </div>
-              </form>
-            {% endif %}{# has submission #}
-          {% else %}
-            {{ page.guest_text|richtext }}
-          {% endif %} {# is logged in #}
+<div id="main" class="main-page-content container">
+  <h1>Flexible Pricing Request</h1>
+  {{ page.intro|richtext }}
+  <div class="std-page-body">
+  {% if user.is_authenticated %}{# is logged in #}
+    {% if has_submission %}{# has submission #}
+      {% if prior_request.is_approved %}{# request status #}
+        {{ page.application_approved_text|richtext }}
+      {% elif prior_request.is_denied %}
+        {{ page.application_denied_text|richtext }}
+      {% else %}
+        {{ page.application_processing_text|richtext }}
+      {% endif %}{# request status #}
+    {% else %}
+      <div class="container auth-page">
+        <div class="auth-card card-shadow auth-form">
+          <div class="auth-header">
+            <h1 class="" id="{{ page.title|slugify }}">Tell us about your income</h1>
+            <form action="{% pageurl page %}" method="POST">
+              {% csrf_token %}
+              <div class="form-group">
+                <label for="your_income" id="your_income_label">Yearly Income</label>
+                <input type="number" name="your_income" step="any" class="form-control {%if form.your_income.errors %}errored{% endif %}" id="your_income" aria-describedby="your_incomeError">
+                {% for error in form.your_income.errors %}
+                  <div class="form-error" id="your_incomeError" role="alert">{{error}}</div>
+                {% endfor %}
+              </div>
+              <div class="form-group">
+                <label for="income_currency">Income Currency</label>
+                <span class="income_currency_label">The currency you’re paid in.</span>
+                <select name="income_currency" id="income_currency" class="form-control {%if form.income_currency.errors %}errored{% endif %}">
+                  <option value="">Choose</option>
+                  {% for choice in form.fields.income_currency.choices %}
+                    <option value="{{ choice.0 }}">{{ choice.1 }}</option>  
+                  {%  endfor %}
+                </select>
+                {% for error in form.income_currency.errors %}
+                  <div class="form-error" id="income_currencyError" role="alert">{{error}}</div>
+                {% endfor %}
+              </div>
+              <div class="form-group">
+                <input id="" type="checkbox" required="required" />
+                <span>I testify that the income I reported is true and accurate. I am aware that I may be asked to verify the reported income with documentation.</span>
+              </div>
+              <div class="row submit-row no-gutters justify-content-center">
+                <button type="submit" class="btn btn-primary btn-gradient-red large">Submit request</button>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
-    </div>
+    {% endif %}{# has submission #}
+    {% else %}
+      {{ page.guest_text|richtext }}
+    {% endif %} {# is logged in #}
   </div>
+
 </div>
 {% endblock %}
