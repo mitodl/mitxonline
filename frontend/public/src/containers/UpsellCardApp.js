@@ -54,7 +54,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
       run.products && !run.is_verified && run.is_enrolled
         ? run.products[0]
         : null
-    const flexPriceDiscountAmount = product?.product_flexible_price ? product.product_flexible_price.amount : 0
+    const flexPriceDiscountAmount = product ? product.product_flexible_price.amount : 0
 
     return product ? (
       <div className="card">
