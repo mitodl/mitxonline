@@ -21,6 +21,8 @@ from mitol.common.envs import (
 )
 
 from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+from mitol.google_sheets.settings.google_sheets import *
+from mitol.google_sheets_refunds.settings.google_sheets_refunds import *
 
 from redbeat import RedBeatScheduler
 
@@ -197,6 +199,8 @@ INSTALLED_APPS = (
     "flexiblepricing",
     # ol-dango apps, must be after this project's apps for template precedence
     "mitol.common.apps.CommonApp",
+    "mitol.google_sheets.apps.GoogleSheetsApp",
+    "mitol.google_sheets_refunds.apps.GoogleSheetsRefundsApp",
     # "mitol.digitalcredentials.apps.DigitalCredentialsApp",
     "mitol.mail.apps.MailApp",
     "mitol.authentication.apps.TransitionalAuthenticationApp",
@@ -1006,3 +1010,10 @@ MITX_ONLINE_REFINE_MITX_ONLINE_DATASOURCE = get_string(
     default=f"{SITE_BASE_URL}/api",
     description="open exchange app id for fetching currency exchange rate",
 )
+GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE = get_string(
+    name="GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE",
+    default=None,
+    description="The value of the meta tag used by Google to verify the owner of a domain (used for enabling push notifications)",
+)
+
+MITOL_GOOGLE_SHEETS_REFUNDS_PLUGINS = ["sheets.plugins.RefundPlugin"]
