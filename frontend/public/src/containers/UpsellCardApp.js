@@ -126,7 +126,6 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
   }
 
 
-
   render() {
     const { courseRuns, isLoading, status } = this.props
     const csrfToken = getCookie("csrftoken")
