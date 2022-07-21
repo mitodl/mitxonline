@@ -8,6 +8,12 @@ import { connect } from "react-redux"
 import { connectRequest } from "redux-query"
 import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
+import {
+  DISCOUNT_TYPE_DOLLARS_OFF,
+  DISCOUNT_TYPE_PERCENT_OFF,
+  DISCOUNT_TYPE_FIXED_PRICE
+} from "../constants"
+
 import Loader from "../components/Loader"
 import { routes } from "../lib/urls"
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
@@ -36,6 +42,17 @@ type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean
 }
 
+function calculateCoursePriceWithFlex(coursePrice, flexDiscountAmount, flexDiscountType) {
+  switch (flexDiscountType) {
+  case DISCOUNT_TYPE_DOLLARS_OFF:
+    return coursePrice - flexDiscountAmount
+  case DISCOUNT_TYPE_PERCENT_OFF:
+    return coursePrice - ((flexDiscountAmount / 100) * coursePrice)
+  case DISCOUNT_TYPE_FIXED_PRICE:
+    return flexDiscountAmount
+  }
+}
+
 export class ProductDetailEnrollApp extends React.Component<
   Props,
   ProductDetailState
@@ -55,7 +72,9 @@ export class ProductDetailEnrollApp extends React.Component<
     const { courseRuns } = this.props
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run.products ? run.products[0] : null
-    const flexPriceDiscountAmount = product && product.product_flexible_price ? product.product_flexible_price.amount : 0
+    const flexDiscountAmount = product && product.product_flexible_price ? product.product_flexible_price.amount : 0
+    const flexDiscountType = product && product.product_flexible_price ? product.product_flexible_price.discount_type : null
+    const flexAdjustedCoursePrice = Number(calculateCoursePriceWithFlex(product.price, flexDiscountAmount, flexDiscountType)).toFixed(2)
     return product ? (
       <Modal
         id={`upgrade-enrollment-dialog`}
@@ -71,7 +90,7 @@ export class ProductDetailEnrollApp extends React.Component<
             <div className="flex-grow-1 align-self-end">
               Learn online and get a certificate
             </div>
-            <div className="text-right align-self-end">${product.price - flexPriceDiscountAmount}</div>
+            <div className="text-right align-self-end">${flexAdjustedCoursePrice}</div>
           </div>
           <div className="row">
             <div className="col-12">

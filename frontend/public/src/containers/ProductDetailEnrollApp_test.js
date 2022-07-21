@@ -14,6 +14,12 @@ import {
   makeCourseRunDetailWithProduct
 } from "../factories/course"
 
+import {
+  DISCOUNT_TYPE_DOLLARS_OFF,
+  DISCOUNT_TYPE_PERCENT_OFF,
+  DISCOUNT_TYPE_FIXED_PRICE
+} from "../constants"
+
 import * as courseApi from "../lib/courseApi"
 
 import sinon from "sinon"
@@ -206,8 +212,74 @@ describe("ProductDetailEnrollApp", () => {
     [true, 201],
     [false, 400]
   ].forEach(([success, returnedStatusCode]) => {
-    it(`shows dialog to upgrade user enrollment and handles ${returnedStatusCode} response`, async () => {
-      courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 1 }}]
+    it(`shows dialog to upgrade user enrollment with flexible dollars-off discount and handles ${returnedStatusCode} response`, async () => {
+      courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 1, discount_type: DISCOUNT_TYPE_DOLLARS_OFF}}]
+      isWithinEnrollmentPeriodStub.returns(true)
+      SETTINGS.features.upgrade_dialog = true
+      const { inner } = await renderPage()
+
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        "/api/course_runs/?relevant_to=",
+        "GET"
+      )
+      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      await enrollBtn.prop("onClick")()
+
+      const modal = inner.find(".upgrade-enrollment-modal")
+      const upgradeForm = modal.find("form").at(0)
+      assert.isTrue(upgradeForm.exists())
+
+      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
+
+      assert.equal(
+        inner
+          .find(".text-right")
+          .at(0)
+          .text()
+          .at(1),
+        "9"
+      )
+    })
+
+    it(`shows dialog to upgrade user enrollment with flexible percent-off discount and handles ${returnedStatusCode} response`, async () => {
+      courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 10, discount_type: DISCOUNT_TYPE_PERCENT_OFF}}]
+      isWithinEnrollmentPeriodStub.returns(true)
+      SETTINGS.features.upgrade_dialog = true
+      const { inner } = await renderPage()
+
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        "/api/course_runs/?relevant_to=",
+        "GET"
+      )
+      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      await enrollBtn.prop("onClick")()
+
+      const modal = inner.find(".upgrade-enrollment-modal")
+      const upgradeForm = modal.find("form").at(0)
+      assert.isTrue(upgradeForm.exists())
+
+      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
+
+      assert.equal(
+        inner
+          .find(".text-right")
+          .at(0)
+          .text()
+          .at(1),
+        "9"
+      )
+    })
+
+    it(`shows dialog to upgrade user enrollment with flexible fixed-price discount and handles ${returnedStatusCode} response`, async () => {
+      courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 9, discount_type: DISCOUNT_TYPE_FIXED_PRICE}}]
       isWithinEnrollmentPeriodStub.returns(true)
       SETTINGS.features.upgrade_dialog = true
       const { inner } = await renderPage()
