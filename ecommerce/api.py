@@ -36,14 +36,11 @@ from ecommerce.models import (
     PendingOrder,
     UserDiscount,
     BasketDiscount,
-<<<<<<< HEAD
     FulfilledOrder,
     Transaction,
     Order,
-=======
     Discount,
     DiscountProduct,
->>>>>>> 33ce99e (refactored out a check into an api call, now checks flexprice and user discounts for products too)
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 
@@ -129,7 +126,7 @@ def check_discount_for_products(discount, basket):
     if not isinstance(discount, Discount):
         discount = Discount.objects.filter(discount_code=discount).first()
 
-    basket_item_products = [item.product for item in basket.basket_items.all()]
+    basket_item_products = basket.get_products()
 
     if (
         not discount.products.count() == 0

@@ -115,6 +115,13 @@ class Basket(TimestampedModel):
 
         return True
 
+    def get_products(self):
+        """
+        Returns the products that have been added to the basket so far.
+        """
+
+        return [item.product for item in self.basket_items.all()]
+
 
 class BasketItem(TimestampedModel):
     """Represents one or more products in a user's basket."""
@@ -352,8 +359,7 @@ class PendingOrder(Order):
                 redeemed_discount=basket_discount.redeemed_discount,
             )
 
-        for basket_item in basket.basket_items.all():
-            product = basket_item.product
+        for product in basket.get_products():
             product_version = Version.objects.get_for_object(product).first()
 
             line = order.lines.create(
