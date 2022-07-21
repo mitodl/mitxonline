@@ -75,7 +75,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
         : null
     const flexDiscountAmount = product && product.product_flexible_price ? product.product_flexible_price.amount : 0
     const flexDiscountType = product && product.product_flexible_price ? product.product_flexible_price.discount_type : null
-    const flexAdjustedCoursePrice = product.price ? Number(calculateCoursePriceWithFlex(product.price, flexDiscountAmount, flexDiscountType)).toFixed(2) : null
+    const flexAdjustedCoursePrice = product ? Number(calculateCoursePriceWithFlex(product.price, flexDiscountAmount, flexDiscountType)).toFixed(2) : null
     return product ? (
       <div className="card">
         <div className="row d-flex upsell-header">
