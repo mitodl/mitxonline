@@ -50,6 +50,8 @@ function calculateCoursePriceWithFlex(coursePrice, flexDiscountAmount, flexDisco
     return coursePrice - ((flexDiscountAmount / 100) * coursePrice)
   case DISCOUNT_TYPE_FIXED_PRICE:
     return flexDiscountAmount
+  default:
+    return coursePrice
   }
 }
 
