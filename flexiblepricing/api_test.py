@@ -8,7 +8,13 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 from mitol.common.utils.datetime import now_in_utc
 
-from courses.factories import ProgramFactory, CourseFactory, CourseRunFactory
+from courses.factories import (
+    ProgramFactory,
+    CourseFactory,
+    CourseRunFactory,
+    ProgramRunFactory,
+)
+from courses.models import Program
 from ecommerce.factories import ProductFactory
 from flexiblepricing.api import (
     parse_country_income_thresholds,
@@ -26,7 +32,7 @@ from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFac
 from flexiblepricing.models import (
     CountryIncomeThreshold,
     CurrencyExchangeRate,
-    # FlexiblePriceTier,
+    FlexiblePriceTier,
 )
 from users.factories import UserFactory
 
@@ -120,7 +126,12 @@ class ExchangeRateAPITests(TestCase):
 
 def create_courseware(create_tiers=True, past=False):
     """
-    Helper function to create a flexible pricing courseware
+    Helper function to create a flexible pricing courseware. Defaults to
+    creating a CourseRun.
+    Arguments:
+        create_tiers: boolean, also create some tiers for the courseware object
+        past: boolean, cause the courseware object to end in the past
+        create_program: boolean, cause the courseware object to be a Program
     Returns:
         courses.models.Program: A new program
     """
@@ -133,14 +144,16 @@ def create_courseware(create_tiers=True, past=False):
     else:
         end_date = now_in_utc() + timedelta(days=100)
 
+    ProgramRunFactory.create(end_date=end_date, program=program)
     CourseRunFactory.create(
         end_date=end_date,
         enrollment_end=now_in_utc() + timedelta(hours=1),
         course=course,
     )
-    tiers = None
+
+    course_tiers = program_tiers = None
     if create_tiers:
-        tiers = {
+        course_tiers = {
             "0k": FlexiblePriceTierFactory.create(
                 courseware_object=course, income_threshold_usd=0, current=True
             ),
@@ -157,7 +170,25 @@ def create_courseware(create_tiers=True, past=False):
                 discount__amount=0,
             ),
         }
-    return course, tiers
+        program_tiers = {
+            "0k": FlexiblePriceTierFactory.create(
+                courseware_object=program, income_threshold_usd=0, current=True
+            ),
+            "25k": FlexiblePriceTierFactory.create(
+                courseware_object=program, income_threshold_usd=25000, current=True
+            ),
+            "50k": FlexiblePriceTierFactory.create(
+                courseware_object=program, income_threshold_usd=50000, current=True
+            ),
+            "75k": FlexiblePriceTierFactory.create(
+                courseware_object=program,
+                income_threshold_usd=75000,
+                current=True,
+                discount__amount=0,
+            ),
+        }
+
+    return course, course_tiers, program, program_tiers
 
 
 class FlexiblePriceBaseTestCase(TestCase):
@@ -170,7 +201,12 @@ class FlexiblePriceBaseTestCase(TestCase):
         # replace imported thresholds with fake ones created here
         CountryIncomeThreshold.objects.all().delete()
 
-        cls.course, cls.tiers = create_courseware()
+        (
+            cls.course,
+            cls.course_tiers,
+            cls.program,
+            cls.program_tiers,
+        ) = create_courseware()
         cls.country_income_threshold_0 = CountryIncomeThreshold.objects.create(
             country_code="0",
             income_threshold=0,
@@ -183,7 +219,12 @@ class FlexiblePriceBaseTestCase(TestCase):
         # Create a FinancialAid with a reset status to verify that it is ignored
         FlexiblePriceFactory.create(
             # user="US",
-            tier=cls.tiers["75k"],
+            tier=cls.course_tiers["75k"],
+            status=FlexiblePriceStatus.RESET,
+        )
+        FlexiblePriceFactory.create(
+            # user="US",
+            tier=cls.program_tiers["75k"],
             status=FlexiblePriceStatus.RESET,
         )
 
@@ -216,9 +257,27 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
     Tests for financialaid api backend
     """
 
-    def setUp(self):
+    def setUp(self, test_program=True):
+        self.test_program = test_program
+
         super().setUp()
+
+        if test_program:
+            self.courseware_object = self.program
+            self.tiers = self.program_tiers
+        else:
+            self.courseware_object = self.course
+            self.tiers = self.course_tiers
+
+        self.program.refresh_from_db()
         self.course.refresh_from_db()
+
+    def select_course_or_program(self, test_program=False):
+        """
+        Helper to swap between a course or program for testing.
+        """
+        self.courseware_object = self.program if test_program else self.course
+        self.tiers = self.program_tiers if test_program else self.course_tiers
 
     @ddt.data(
         [0, "0k"],
@@ -237,18 +296,33 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
         income threshold is equal to or less than income.
         """
         assert (
+            determine_tier_courseware(self.program, income)
+            == self.program_tiers[expected_tier_key]
+        )
+        assert (
             determine_tier_courseware(self.course, income)
-            == self.tiers[expected_tier_key]
+            == self.program_tiers[expected_tier_key]
+        )
+        self.course.program = None
+        self.course.save()
+        self.program.delete()
+        assert (
+            determine_tier_courseware(self.course, income)
+            == self.course_tiers[expected_tier_key]
         )
 
-    def test_determine_tier_courseware_not_current(self):
+    @ddt.data(True, False)
+    def test_determine_tier_courseware_not_current(self, test_program=False):
         """
         A current=False tier should be ignored
         """
+        courseware_object = self.program if test_program else self.course
         not_current = FlexiblePriceTierFactory.create(
-            courseware_object=self.course, income_threshold_usd=75000, current=False
+            courseware_object=courseware_object,
+            income_threshold_usd=75000,
+            current=False,
         )
-        assert determine_tier_courseware(self.course, 34938234) != not_current
+        assert determine_tier_courseware(courseware_object, 34938234) != not_current
 
     def test_determine_tier_courseware_improper_setup(self):
         """
@@ -267,19 +341,98 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
         [49999, "50", False],
         [50000, "50", False],
         [50001, "50", True],
+        [0, "0", True, True],
+        [1, "0", True, True],
+        [0, "50", False, True],
+        [49999, "50", False, True],
+        [50000, "50", False, True],
+        [50001, "50", True, True],
     )
     @ddt.unpack
-    def test_determine_auto_approval(self, income_usd, country_code, expected):
+    def test_determine_auto_approval(
+        self, income_usd, country_code, expected, test_program=False
+    ):
         """
         Tests determine_auto_approval() assigning the correct auto-approval status. This should return True
         if income is strictly greater than the threshold (or if the threshold is 0, which is inclusive of 0).
         """
+        self.select_course_or_program(test_program)
+
         flexible_price = FlexiblePriceFactory.create(
             income_usd=income_usd,
             country_of_income=country_code,
         )
-        courseware_tier = determine_tier_courseware(self.course, income_usd)
+        courseware_tier = determine_tier_courseware(self.courseware_object, income_usd)
         assert determine_auto_approval(flexible_price, courseware_tier) is expected
+
+    def create_run_and_product_and_discount(self, user, courseware_object):
+        """
+        Helper function to pull out creating the course/program run and the
+        product for the tests that follow.
+        """
+        if type(courseware_object) is Program:
+            run_obj = ProgramRunFactory.create(program=courseware_object)
+        else:
+            run_obj = CourseRunFactory.create(course=courseware_object)
+
+        product = ProductFactory.create(purchasable_object=run_obj)
+
+        return determine_courseware_flexible_price_discount(product, user)
+
+    def create_fp_and_compare_tiers(
+        self, courseware_object, income_usd, country_code, user, expected
+    ):
+        """
+        Helper function to pull out the actual FP record creation and
+        orchestration to DRY up some tests. This does not do the assertions
+        since that changes from test to test.
+        """
+        flexible_price = FlexiblePriceFactory.create(
+            income_usd=income_usd,
+            country_of_income=country_code,
+            user=user,
+            courseware_object=courseware_object,
+            status=FlexiblePriceStatus.APPROVED
+            if expected
+            else FlexiblePriceStatus.PENDING_MANUAL_APPROVAL,
+        )
+        courseware_tier = determine_tier_courseware(courseware_object, income_usd)
+        discount = self.create_run_and_product_and_discount(user, courseware_object)
+
+        return courseware_tier, discount
+
+    @ddt.data(
+        [0, "0", True],
+        [1, "0", True],
+        [0, "50", False],
+        [49999, "50", False],
+        [50000, "50", False],
+        [50001, "50", True],
+        [0, "0", True, True],
+        [1, "0", True, True],
+        [0, "50", False, True],
+        [49999, "50", False, True],
+        [50000, "50", False, True],
+        [50001, "50", True, True],
+    )
+    @ddt.unpack
+    def test_determine_courseware_flexible_price_discount(
+        self, income_usd, country_code, expected, test_program=False
+    ):
+        """
+        Tests for the correct application of the flexible price discount.
+        """
+        self.select_course_or_program(test_program)
+
+        user = UserFactory.create()
+        courseware_tier, discount = self.create_fp_and_compare_tiers(
+            self.courseware_object, income_usd, country_code, user, expected
+        )
+
+        if expected:
+            assert discount.amount == courseware_tier.discount.amount
+        else:
+            assert discount is None
 
     @ddt.data(
         [0, "0", True],
@@ -290,25 +443,63 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
         [50001, "50", True],
     )
     @ddt.unpack
-    def test_determine_courseware_flexible_price_discount(
+    def test_determine_courseware_flexible_pricing_hierarchy(
         self, income_usd, country_code, expected
     ):
+        """
+        Tests the application hierarchy for flexible pricing requests.
+        Courses with a program attached should grab the tier for the program if
+        they belong to a program.
+        Courses with a program attached and that have their own tier should use
+        the program tier unless the program has no tiers.
+        Courses that are standalone should grab a tier that they're attached to
+        directly.
+
+        Program application is covered in the preceding test.
+        """
         user = UserFactory.create()
-        flexibe_price = FlexiblePriceFactory.create(
-            income_usd=income_usd,
-            country_of_income=country_code,
-            user=user,
-            courseware_object=self.course,
-            status=FlexiblePriceStatus.APPROVED
-            if expected
-            else FlexiblePriceStatus.PENDING_MANUAL_APPROVAL,
+
+        # Step 1: course that belongs to a program - should get back the program tiers
+        course, course_tiers, program, program_tiers = create_courseware()
+        course.program = program
+        course.save()
+        course.refresh_from_db()
+        courseware_tier, discount = self.create_fp_and_compare_tiers(
+            course, income_usd, country_code, user, expected
         )
-        courseware_tier = determine_tier_courseware(self.course, income_usd)
-        course_run = CourseRunFactory.create(course=self.course)
-        product = ProductFactory.create(purchasable_object=course_run)
-        discount = determine_courseware_flexible_price_discount(product, user)
+
         if expected:
             assert discount.amount == courseware_tier.discount.amount
+            assert courseware_tier.courseware_object == program
+        else:
+            assert discount is None
+
+        # Step 2: we'll remove the program tiers - should now get back the course tiers
+        FlexiblePriceTier.objects.filter(courseware_object_id=program.id).delete()
+        course.refresh_from_db()
+        courseware_tier, discount = self.create_fp_and_compare_tiers(
+            course, income_usd, country_code, user, expected
+        )
+
+        if expected:
+            assert discount.amount == courseware_tier.discount.amount
+            assert courseware_tier.courseware_object == course
+        else:
+            assert discount is None
+
+        # Step 3: standalone course
+        course.program = None
+        course.save()
+        program.delete()
+        course.refresh_from_db()
+        course.refresh_from_db()
+        courseware_tier, discount = self.create_fp_and_compare_tiers(
+            course, income_usd, country_code, user, expected
+        )
+
+        if expected:
+            assert discount.amount == courseware_tier.discount.amount
+            assert courseware_tier.courseware_object == course
         else:
             assert discount is None
 
