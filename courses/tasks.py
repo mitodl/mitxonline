@@ -9,14 +9,9 @@ from django.conf import settings
 from django.db.models import Q
 from requests.exceptions import HTTPError
 
-from courses.api import sync_course_runs
+from courses.api import sync_course_runs, process_course_run_grade_certificate
 
-from courses.models import CourseRun  # CourseRunCertificate
-from courses.utils import (
-    # ensure_course_run_grade,
-    process_course_run_grade_certificate,
-    # sync_course_runs,
-)
+from courses.models import CourseRun, CourseRunCertificate
 from courses.api import ensure_course_run_grade
 
 from mitol.common.utils.datetime import now_in_utc
@@ -51,10 +46,10 @@ def generate_course_certificates():
     course_runs = (
         CourseRun.objects.live()
         # Commenting for testing only (Lets run for active ones too)
-        # .filter(
-        #     end_date__lt=now
-        #     - timedelta(hours=settings.CERTIFICATE_CREATION_DELAY_IN_HOURS)
-        # )
+        .filter(
+            end_date__lt=now
+            - timedelta(hours=settings.CERTIFICATE_CREATION_DELAY_IN_HOURS)
+        )
         # .exclude(
         #     id__in=CourseRunCertificate.objects.values_list("course_run__id", flat=True)
         # )

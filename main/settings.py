@@ -715,7 +715,7 @@ FEATURES = get_features()
 
 CERTIFICATE_CREATION_DELAY_IN_HOURS = get_int(
     name="CERTIFICATE_CREATION_DELAY_IN_HOURS",
-    default=48,
+    default=0,
     description="The number of hours to delay automated certificate creation after a course run ends.",
 )
 
@@ -813,6 +813,16 @@ CELERY_BEAT_SCHEDULE = {
             minute=0,
             hour=CRON_COURSERUN_SYNC_HOURS,
             day_of_week=CRON_COURSERUN_SYNC_DAYS,
+            day_of_month="*",
+            month_of_year="*",
+        ),
+    },
+    "generate-course-certificate": {
+        "task": "courses.tasks.generate_course_certificates",
+        "schedule": crontab(
+            minute=0,
+            hour=CRON_COURSE_CERTIFICATES_HOURS,
+            day_of_week=CRON_COURSE_CERTIFICATES_DAYS or "*",
             day_of_month="*",
             month_of_year="*",
         ),
