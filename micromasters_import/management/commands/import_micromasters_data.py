@@ -47,7 +47,18 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("Connected to database"))
 
             for sql in sqls:
-                self.stdout.write(f"Executing SQL query: {sql.file_name}")
+                self.stdout.write("="*20)
+
+                self.stdout.write(f"Running: {sql.file_name}")
+
+                self.stdout.write("-"*20)
+                self.stdout.write(f"Executing SQL:")
+                self.stdout.write(sql.raw_sql)
+                self.stdout.write("-"*20)
+
                 cursor.execute(sql.raw_sql)
+
+                self.stdout.write(f"Rows added/updated: {cursor.rowcount}")
+                self.stdout.write("="*20)
 
         self.stdout.write(self.style.SUCCESS("Successfully imported MicroMasters data"))
