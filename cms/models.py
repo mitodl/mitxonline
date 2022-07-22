@@ -40,9 +40,9 @@ from wagtail.contrib.forms.models import (
 from django.core.serializers.json import DjangoJSONEncoder
 
 from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
-from cms.constants import COURSE_INDEX_SLUG, CMS_EDITORS_GROUP_NAME
+from cms.constants import COURSE_INDEX_SLUG
 from courses.api import get_user_relevant_course_run
-
+from main.views import get_base_context
 from flexiblepricing.api import (
     determine_tier_courseware,
     determine_auto_approval,
@@ -192,6 +192,7 @@ class HomePage(Page):
     def get_context(self, request, *args, **kwargs):
         return {
             **super().get_context(request),
+            **get_base_context(request),
             "product_cards_section_title": self.product_section_title,
             "products": self.products,
         }
@@ -486,6 +487,7 @@ class CoursePage(ProductPage):
         )
         return {
             **super().get_context(request, *args, **kwargs),
+            **get_base_context(request),
             "run": relevant_run,
             "is_enrolled": is_enrolled,
             "sign_in_url": sign_in_url,
@@ -530,6 +532,7 @@ class ResourcePage(Page):
     def get_context(self, request, *args, **kwargs):
         return {
             **super().get_context(request, *args, **kwargs),
+            **get_base_context(request),
             "site_name": settings.SITE_NAME,
         }
 

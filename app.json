@@ -95,6 +95,10 @@
       "description": "Google analytics tracking ID",
       "required": false
     },
+    "GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE": {
+      "description": "The value of the meta tag used by Google to verify the owner of a domain (used for enabling push notifications)",
+      "required": false
+    },
     "GTM_TRACKING_ID": {
       "description": "Google Tag Manager container ID",
       "required": false
