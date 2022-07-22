@@ -339,3 +339,8 @@ class ProgramEnrollmentSerializer(serializers.ModelSerializer):
             "program",
             "course_run_enrollments",
         ]
+
+
+class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
+    program = ProgramSerializer()
+    enrollments = CourseRunEnrollmentSerializer(many=True)

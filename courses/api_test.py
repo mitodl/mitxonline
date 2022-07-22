@@ -225,6 +225,24 @@ def test_get_user_enrollments(user):
         key=key_func,
     )
 
+    # Create a separate Course and Program and then just enroll in the course
+    # The program ought to still show up as an enrollment
+    separate_program = ProgramFactory.create()
+    separate_courserun = CourseRunFactory.create(course__program=separate_program)
+    separate_courserun_enrollment = CourseRunEnrollmentFactory.create(
+        run=separate_courserun, user=user
+    )
+
+    user_enrollments = get_user_enrollments(user)
+    assert len(list(user_enrollments.programs)) == 2
+
+    user_enrollments = get_user_enrollments(user)
+    enrollment_programs = [
+        enrollment.program for enrollment in user_enrollments.programs
+    ]
+    assert program_enrollment.program in enrollment_programs
+    assert separate_program in enrollment_programs
+
 
 def test_create_run_enrollments(mocker, user):
     """
