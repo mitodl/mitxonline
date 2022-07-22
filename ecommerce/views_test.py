@@ -18,7 +18,14 @@ from ecommerce.factories import (
     BasketItemFactory,
     BasketFactory,
 )
-from ecommerce.models import Basket, BasketItem, Order, Discount, UserDiscount
+from ecommerce.models import (
+    Basket,
+    BasketItem,
+    Order,
+    Discount,
+    UserDiscount,
+    DiscountProduct,
+)
 from ecommerce.serializers import (
     ProductSerializer,
     BasketSerializer,
@@ -193,6 +200,51 @@ def test_redeem_discount(
     else:
         assert "message" in resp_json
         assert resp_json["message"] == "Discount applied"
+
+
+@pytest.mark.parametrize("try_product_discount", [True, False])
+def test_redeem_product_discount(
+    user, user_drf_client, products, discounts, try_product_discount
+):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it that is linked to an existing product. The result depends
+    on try_product_discount.
+
+    The try_product_discount parameter sets whether or not the discount should
+    apply to the product that gets generated. If True, the discount application
+    should succeed. If False, it won't.
+    """
+    basket = create_basket(user, products)
+
+    assert basket is not None
+    assert len(basket.basket_items.all()) > 0
+
+    discount = discounts[random.randrange(0, len(discounts))]
+
+    if try_product_discount:
+        discount_product = DiscountProduct(
+            discount=discount, product=basket.basket_items.first().product
+        ).save()
+        discount.refresh_from_db()
+    else:
+        new_product = ProductFactory.create()
+        discount_product = DiscountProduct(
+            discount=discount, product=new_product
+        ).save()
+        discount.refresh_from_db()
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    resp_json = resp.json()
+
+    if try_product_discount:
+        assert "message" in resp_json
+        assert resp_json["message"] == "Discount applied"
+    else:
+        assert "not found" in resp_json
 
 
 def test_redeem_discount_with_higher_discount(
