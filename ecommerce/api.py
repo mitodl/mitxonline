@@ -126,18 +126,14 @@ def check_discount_for_products(discount, basket):
     if not isinstance(discount, Discount):
         discount = Discount.objects.filter(discount_code=discount).first()
 
-    basket_item_products = basket.get_products()
+    basket_products = basket.get_products()
 
-    if (
-        not discount.products.count() == 0
-        and DiscountProduct.objects.filter(product__in=basket_item_products)
+    return (
+        not discount.products.exists()
+        or DiscountProduct.objects.filter(product__in=basket_products)
         .filter(discount=discount)
-        .count()
-        == 0
-    ):
-        return False
-
-    return True
+        .exists()
+    )
 
 
 def apply_user_discounts(request):
@@ -148,6 +144,9 @@ def apply_user_discounts(request):
 
     Args:
         - user (User): The currently authenticated user.
+
+    Returns:
+        True
     """
     basket = establish_basket(request)
     user = request.user
