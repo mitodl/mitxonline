@@ -234,7 +234,7 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
     """Admin for CourseRunGrade"""
 
     model = CourseRunGrade
-    list_display = ["id", "get_user_email", "get_run_courseware_id", "grade"]
+    list_display = ["id", "get_user_email", "get_user_username", "get_run_courseware_id", "grade"]
     list_filter = ["passed", "set_by_admin", "course_run__courseware_id"]
     raw_id_fields = ("user",)
     search_fields = ["user__email", "user__username"]
@@ -245,6 +245,10 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
     def get_user_email(self, obj):
         """Returns the related User email"""
         return obj.user.email
+
+    def get_user_username(self, obj):
+        """Returns the related User email"""
+        return obj.user.username
 
     get_user_email.short_description = "User Email"
     get_user_email.admin_order_field = "user__email"
@@ -334,7 +338,6 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         return self.model.all_objects.get_queryset().select_related(
             "user", "course_run"
         )
-
 
 
 admin.site.register(Program, ProgramAdmin)

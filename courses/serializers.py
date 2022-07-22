@@ -339,11 +339,3 @@ class ProgramEnrollmentSerializer(serializers.ModelSerializer):
             "program",
             "course_run_enrollments",
         ]
-
-
-class CourseRunCertificateSerializer(serializers.ModelSerializer):
-    """CourseRunCertificate model serializer"""
-
-    class Meta:
-        model = models.CourseRunCertificate
-        fields = ["uuid", "link"]

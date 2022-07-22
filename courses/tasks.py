@@ -60,7 +60,6 @@ def generate_course_certificates():
         # )
     )
 
-    breakpoint()
     for run in course_runs:
         edx_grade_user_iter = exception_logging_generator(
             get_edx_grades_with_users(run)

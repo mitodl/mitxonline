@@ -742,6 +742,19 @@ class BaseCertificate(models.Model):
         return NotImplementedError
 
 
+class ActiveCertificates(models.Manager):
+    """
+    Return the active certificates only
+    """
+
+    def get_queryset(self):
+        """
+        Returns:
+            QuerySet: queryset for un-revoked certificates
+        """
+        return super().get_queryset().filter(is_revoked=False)
+
+
 class CourseRunCertificate(TimestampedModel, BaseCertificate):
     """
     Model for storing course run certificates
