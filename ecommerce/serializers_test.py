@@ -1,45 +1,46 @@
-import pytest
 import json
-from main.test_utils import assert_drf_json_equal
-from django.urls import reverse
-import reversion
 from decimal import Decimal
+
+from django.test import RequestFactory
+from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.models import FlexiblePrice
+
+import pytest
+import reversion
 from dateutil.parser import parse
+from django.contrib.auth.models import AnonymousUser
+from django.urls import reverse
+from mitol.common.utils import now_in_utc
 
-from courses.factories import (
-    CourseRunFactory,
-    ProgramFactory,
-    ProgramRunFactory,
-)
-from courses.models import ProgramRun, CourseRun
-
-from ecommerce.serializers import (
-    BasketWithProductSerializer,
-    ProductSerializer,
-    CourseRunProductPurchasableObjectSerializer,
-    ProgramRunProductPurchasableObjectSerializer,
-    BasketSerializer,
-    BasketItemSerializer,
-    BaseProductSerializer,
-    OrderReceiptSerializer,
-    TransactionPurchaseSerializer,
-    TransactionPurchaserSerializer,
-    TransactionOrderSerializer,
-    TransactionLineSerializer,
-)
+from courses.factories import CourseRunFactory, ProgramFactory, ProgramRunFactory
+from courses.models import CourseRun, ProgramRun
+from ecommerce.constants import CYBERSOURCE_CARD_TYPES
+from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
-    ProductFactory,
     BasketItemFactory,
+    ProductFactory,
     UnlimitedUseDiscountFactory,
 )
 from ecommerce.models import BasketDiscount, Order
-from ecommerce.discounts import DiscountType
-from ecommerce.constants import CYBERSOURCE_CARD_TYPES
+from ecommerce.serializers import (
+    BaseProductSerializer,
+    BasketItemSerializer,
+    BasketSerializer,
+    BasketWithProductSerializer,
+    CourseRunProductPurchasableObjectSerializer,
+    OrderReceiptSerializer,
+    ProductFlexibilePriceSerializer,
+    ProductSerializer,
+    ProgramRunProductPurchasableObjectSerializer,
+    TransactionLineSerializer,
+    TransactionOrderSerializer,
+    TransactionPurchaserSerializer,
+    TransactionPurchaseSerializer,
+)
 from ecommerce.views_test import create_basket, payment_gateway_settings
-
+from flexiblepricing.factories import FlexiblePriceFactory
+from main.test_utils import assert_drf_json_equal
 from users.factories import UserFactory
-
-from mitol.common.utils import now_in_utc
 
 pytestmark = [pytest.mark.django_db]
 
@@ -100,6 +101,45 @@ def test_product_program_serializer(mock_context):
             "is_active": product.is_active,
             "price": str(product.price),
             "purchasable_object": run_serialized,
+        },
+    )
+
+
+def test_product_flexible_price_serializer(mock_context):
+    """
+    Tests serialization of a product that has an associated flexible price for the user.
+    """
+    program = ProgramFactory.create()
+    run = CourseRunFactory.create(course__program=program)
+    product = ProductFactory.create(purchasable_object=run)
+    flexible_price = FlexiblePriceFactory.create(
+        courseware_object=run.course,
+        user=mock_context["request"].user,
+        status=FlexiblePriceStatus.APPROVED,
+    )
+    product_serialized = ProductFlexibilePriceSerializer(
+        context={**mock_context}, instance=product
+    ).data
+    product_serialized["product_flexible_price"]["amount"] = float(
+        product_serialized["product_flexible_price"]["amount"]
+    )
+    assert_drf_json_equal(
+        product_serialized,
+        {
+            "description": product.description,
+            "id": product.id,
+            "is_active": product.is_active,
+            "price": str(product.price),
+            "product_flexible_price": {
+                "amount": float(flexible_price.tier.discount.amount),
+                "automatic": flexible_price.tier.discount.automatic,
+                "discount_code": flexible_price.tier.discount.discount_code,
+                "discount_type": flexible_price.tier.discount.discount_type,
+                "for_flexible_pricing": flexible_price.tier.discount.for_flexible_pricing,
+                "id": flexible_price.tier.discount.id,
+                "max_redemptions": flexible_price.tier.discount.max_redemptions,
+                "redemption_type": flexible_price.tier.discount.redemption_type,
+            },
         },
     )
 

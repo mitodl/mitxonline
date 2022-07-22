@@ -8,6 +8,12 @@ import { connect } from "react-redux"
 import { connectRequest } from "redux-query"
 import { Badge } from "reactstrap"
 
+import {
+  DISCOUNT_TYPE_DOLLARS_OFF,
+  DISCOUNT_TYPE_PERCENT_OFF,
+  DISCOUNT_TYPE_FIXED_PRICE
+} from "../constants"
+
 import Loader from "../components/Loader"
 import { routes } from "../lib/urls"
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
@@ -36,6 +42,19 @@ type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean
 }
 
+function calculateCoursePriceWithFlex(coursePrice, flexDiscountAmount, flexDiscountType) {
+  switch (flexDiscountType) {
+  case DISCOUNT_TYPE_DOLLARS_OFF:
+    return coursePrice - flexDiscountAmount
+  case DISCOUNT_TYPE_PERCENT_OFF:
+    return coursePrice - ((flexDiscountAmount / 100) * coursePrice)
+  case DISCOUNT_TYPE_FIXED_PRICE:
+    return flexDiscountAmount
+  default:
+    return coursePrice
+  }
+}
+
 export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
   state = {
     upgradeEnrollmentDialogVisibility: false
@@ -54,7 +73,9 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
       run.products && !run.is_verified && run.is_enrolled
         ? run.products[0]
         : null
-
+    const flexDiscountAmount = product && product.product_flexible_price ? product.product_flexible_price.amount : 0
+    const flexDiscountType = product && product.product_flexible_price ? product.product_flexible_price.discount_type : null
+    const flexAdjustedCoursePrice = product ? Number(calculateCoursePriceWithFlex(product.price, flexDiscountAmount, flexDiscountType)).toFixed(2) : null
     return product ? (
       <div className="card">
         <div className="row d-flex upsell-header">
@@ -63,7 +84,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
             <h2>Get a certificate</h2>
           </div>
           <div className="text-right align-self-end">
-            <h2>${product.price}</h2>
+            <h2>${flexAdjustedCoursePrice}</h2>
           </div>
         </div>
         <div className="row">
@@ -103,6 +124,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
       </form>
     )
   }
+
 
   render() {
     const { courseRuns, isLoading, status } = this.props
