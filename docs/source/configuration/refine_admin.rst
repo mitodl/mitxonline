@@ -37,7 +37,7 @@ Step 2: Configuring MITxOnline
 You will need to add a new Application in the Django Oauth Toolkit section in Django Admin (``/admin/oauth2_provider/application/``). Navigate there and create a new Application. Use these values (overwriting the defaults where necessary):
 
 * **Client Id**: ``refine-local-client-id``
-* **Redirect uris**: ``http://mitxonline.odl.local:8013/staff-dashboard/oauth2/login/``
+* **Redirect uris**: ``http://mitxonline.odl.local:8013//staff-dashboard/oauth2/login/``
 * **Client type**: Public
 * **Authorization grants**: Authorization Code
 * **Skip authorization**: checked
