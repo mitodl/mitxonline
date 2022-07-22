@@ -1,6 +1,7 @@
 """Users api"""
 import operator
 import re
+import unicodedata
 from functools import reduce
 
 from django.contrib.auth import get_user_model
@@ -206,3 +207,10 @@ def find_available_username(initial_username_base):
         )
         # If there is space for 4 digits for the suffix, the minimum value it could be is 1000, or 10^3
         current_min_suffix = 10 ** (available_suffix_digits - 1)
+
+
+def make_normalized_username(username):
+    """Strips non-ASCII characters from the username."""
+    normalized_username = unicodedata.normalize("NFD", username)
+    normalized_username = normalized_username.encode("ascii", "ignore").decode("utf-8")
+    return str(normalized_username)
