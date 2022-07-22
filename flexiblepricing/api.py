@@ -5,6 +5,7 @@ import logging
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
+from django.contrib.contenttypes.models import ContentType
 
 from flexiblepricing.constants import (
     INCOME_THRESHOLD_FIELDS,
@@ -23,6 +24,8 @@ from flexiblepricing.models import (
     FlexiblePriceTier,
     FlexiblePrice,
 )
+
+from courses.models import CourseRun, Course, ProgramRun
 
 IncomeThreshold = namedtuple("IncomeThreshold", ["country", "income"])
 log = logging.getLogger(__name__)
@@ -93,9 +96,28 @@ def import_country_income_thresholds(csv_path):
             )
 
 
+def get_ordered_eligible_coursewares(courseware):
+    """
+    Returns the courseware(s) eligible for a flexible pricing tier in order
+    (program first, then course)
+    """
+    if isinstance(courseware, CourseRun):
+        # recurse using the course run's course ;-)
+        return get_ordered_eligible_coursewares(courseware.course)
+    if isinstance(courseware, (Course, ProgramRun)) and courseware.program is not None:
+        return [courseware.program, courseware]
+    return [courseware]
+
+
 def determine_tier_courseware(courseware, income):
     """
     Determines and returns the FlexiblePriceTier for a given income.
+
+    If the courseware object is a program, this will look for tiers associated
+    with that particular program. If it's a course, it'll look for tiers
+    associated with the program first, then the course specified if there aren't
+    any program tiers.
+
     Args:
         courseware (Program / Course): the Courseware to determine a Tier for
         income (numeric): the income of the User
@@ -105,20 +127,29 @@ def determine_tier_courseware(courseware, income):
     # To determine the tier for a user, find the set of every tier whose income threshold is
     # less than or equal to the income of the user. The highest tier out of that set will
     # be the tier assigned to the user.
-    tiers_set = FlexiblePriceTier.objects.filter(
-        current=True,
-        income_threshold_usd__lte=income,
-        courseware_object_id=courseware.id,
-    )
-    tier = tiers_set.order_by("-income_threshold_usd").first()
-    if tier is None:
-        message = (
-            "$0-income-threshold Tier has not yet been configured for Courseware "
-            "with id {courseware_id}.".format(courseware_id=courseware.id)
+
+    for eligible_courseware in get_ordered_eligible_coursewares(courseware):
+        content_type = ContentType.objects.get_for_model(eligible_courseware)
+        tier = (
+            FlexiblePriceTier.objects.filter(
+                current=True,
+                income_threshold_usd__lte=income,
+                courseware_content_type=content_type,
+                courseware_object_id=eligible_courseware.id,
+            )
+            .order_by("-income_threshold_usd")
+            .first()
         )
-        log.error(message)
-        raise ImproperlyConfigured(message)
-    return tier
+
+        if tier is not None:
+            return tier
+
+    message = (
+        "$0-income-threshold Tier has not yet been configured for Courseware "
+        "with id {courseware_id}.".format(courseware_id=courseware.id)
+    )
+    log.error(message)
+    raise ImproperlyConfigured(message)
 
 
 def determine_auto_approval(flexible_price, tier):
@@ -179,25 +210,40 @@ def determine_income_usd(original_income, original_currency):
 def determine_courseware_flexible_price_discount(product, user):
     """
     Determine discount of a product
+
+    The Product the learner is trying to purchase may have a course run or a
+    program run attached to it. For this, if the product is for a program run,
+    we look for a FlexiblePrice that is for the program. If the product is for
+    a course run, we look for the course, or for the program that the course
+    belongs to (if it belongs to one). This way, learners that apply for
+    Flexible Pricing for an entire program get their discount on any course that
+    is in the program.
+
     Args:
         product (Product): ecommerce Product of the cart
         user (User): the user of the cart
     Returns:
         discount: the discount provided in the flexible price tier
     """
-    course = product.purchasable_object.course
-    flexible_price = FlexiblePrice.objects.filter(
-        courseware_object_id=course.id, user=user
-    ).first()
-    if (
-        flexible_price
-        and flexible_price.tier.current
-        and (
-            flexible_price.status == FlexiblePriceStatus.APPROVED
-            or flexible_price.status == FlexiblePriceStatus.AUTO_APPROVED
-        )
+
+    for eligible_courseware in get_ordered_eligible_coursewares(
+        product.purchasable_object
     ):
-        return flexible_price.tier.discount
+        content_type = ContentType.objects.get_for_model(eligible_courseware)
+        flexible_price = FlexiblePrice.objects.filter(
+            courseware_content_type=content_type,
+            courseware_object_id=eligible_courseware.id,
+            user=user,
+        ).first()
+
+        if (
+            flexible_price
+            and flexible_price.tier.current
+            and flexible_price.status
+            in (FlexiblePriceStatus.APPROVED, FlexiblePriceStatus.AUTO_APPROVED)
+        ):
+            return flexible_price.tier.discount
+
     return None
 
 
