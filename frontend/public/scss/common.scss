@@ -275,3 +275,28 @@ button.btn-secondary.unstyled {
   box-shadow: none;
   cursor: pointer;
 }
+
+.income_currency_label {
+  float: right;
+  margin: 5px;
+  height: 16px;
+  width: 192px;
+  color: #666666;
+  font-family: Montserrat;
+  font-size: 14px;
+  letter-spacing: 0;
+  line-height: 16px;
+  text-align: right;
+
+  @include media-breakpoint-down(sm) {
+    font-size: 12px;
+    margin: -27px 0 0 0;
+  }
+}
+
+#your_income_label {
+  margin-top: 5px;
+  @include media-breakpoint-down(sm) {
+    margin-top: 15px;
+  }
+}
