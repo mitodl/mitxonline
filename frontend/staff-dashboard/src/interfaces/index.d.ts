@@ -45,3 +45,9 @@ export interface IFlexiblePriceRequestFilters {
     q: string;
     status: string;
 }
+
+export interface IFlexiblePriceStatusModalProps {
+    record: IFlexiblePriceRequest;
+    status: string;
+    onClose: Function;
+}
