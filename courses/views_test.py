@@ -18,7 +18,7 @@ from courses.factories import (
     ProgramFactory,
     BlockedCountryFactory,
 )
-from courses.models import CourseRun
+from courses.models import CourseRun, ProgramEnrollment
 from courses.serializers import (
     CourseRunSerializer,
     CourseSerializer,
@@ -584,3 +584,44 @@ def test_update_user_enrollment_failure(
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
     patched_email_subscription.assert_called_once_with(user, run_enrollment.run)
     patched_log_exception.assert_called_once()
+
+
+@pytest.mark.parametrize("test_implicit_enrollments", [True, False])
+def test_program_enrollments(
+    user_drf_client, user, programs, test_implicit_enrollments
+):
+    """
+    Tests the program enrollments API, which should show the user's enrollment
+    in programs with the course runs that apply. If test_implicit_enrollments is
+    False, then this will make explicit enrollments in the programs. If it is
+    True, it won't and there will just be a CourseRunEnrollment for a course
+    that has been added to one of the programs.
+    """
+
+    if not test_implicit_enrollments:
+        enrollments = []
+        for program in programs:
+            enrollment = ProgramEnrollment(user=user, program=program)
+            enrollment.save()
+            enrollments.append(enrollment)
+
+    course = CourseFactory.create(program=programs[1])
+    course_run = CourseRunFactory.create(course=course)
+    course_run_enrollment = CourseRunEnrollmentFactory.create(run=course_run, user=user)
+
+    resp = user_drf_client.get(reverse("user-program-enrollments-api"))
+
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_data = resp.json()
+
+    if test_implicit_enrollments:
+        assert len(resp_data) == 1
+    else:
+        assert len(resp_data) == len(programs)
+
+    for program_detail in resp_data:
+        if program_detail["program"]["id"] == programs[1].id:
+            assert program_detail["enrollments"][0]["id"] == course_run_enrollment.id
+        else:
+            assert len(program_detail["enrollments"]) == 0
