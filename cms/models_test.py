@@ -15,9 +15,15 @@ from cms.factories import (
     ResourcePageFactory,
     CoursePageFactory,
     FlexiblePricingFormFactory,
+    ProgramPageFactory,
 )
 from cms.models import FlexiblePricingRequestSubmission
-from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
+from courses.factories import (
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramEnrollmentFactory,
+    ProgramRunFactory,
+)
 from flexiblepricing.models import FlexiblePrice
 from flexiblepricing.constants import FlexiblePriceStatus
 
@@ -41,12 +47,22 @@ def test_custom_detail_page_urls(fully_configured_wagtail):
         2, course__readable_id=factory.Iterator([FAKE_READABLE_ID, "non-matching-id"])
     )
     assert course_pages[0].get_url() == "/courses/{}/".format(FAKE_READABLE_ID)
+    program_pages = ProgramPageFactory.create_batch(
+        2, program__readable_id=factory.Iterator([FAKE_READABLE_ID, "non-matching-id"])
+    )
+    assert program_pages[0].get_url() == "/programs/{}/".format(FAKE_READABLE_ID)
 
 
 def test_custom_detail_page_urls_handled(fully_configured_wagtail):
     """Verify that custom URL paths for our course pages are served by the standard Wagtail view"""
     CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
     resolver_match = resolve("/courses/{}/".format(FAKE_READABLE_ID))
+    assert (
+        resolver_match.func.__module__ == "wagtail.core.views"
+    )  # pylint: disable=protected-access
+    assert resolver_match.func.__name__ == "serve"  # pylint: disable=protected-access
+    ProgramPageFactory.create(program__readable_id=FAKE_READABLE_ID)
+    resolver_match = resolve("/programs/{}/".format(FAKE_READABLE_ID))
     assert (
         resolver_match.func.__module__ == "wagtail.core.views"
     )  # pylint: disable=protected-access
@@ -97,6 +113,51 @@ def test_course_page_context(
         else None,
         "start_date": getattr(run, "start_date", None),
         "can_access_edx_course": is_authenticated and has_relevant_run,
+    }
+
+
+@pytest.mark.parametrize(
+    "is_authenticated,has_relevant_run,enrolled,exp_sign_in_url,exp_is_enrolled",
+    [
+        [True, True, True, False, True],
+        [False, False, False, True, False],
+        [False, True, True, True, False],
+    ],
+)
+def test_program_page_context(
+    staff_user,
+    fully_configured_wagtail,
+    is_authenticated,
+    has_relevant_run,
+    enrolled,
+    exp_sign_in_url,
+    exp_is_enrolled,
+):
+    """ProgramPage.get_context should return expected values"""
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = staff_user if is_authenticated else AnonymousUser()
+    if has_relevant_run:
+        run = ProgramRunFactory.create(program__readable_id=FAKE_READABLE_ID)
+        program_page_kwargs = dict(program=run.program)
+    else:
+        run = None
+        program_page_kwargs = dict(program__readable_id=FAKE_READABLE_ID)
+    program_page = ProgramPageFactory.create(**program_page_kwargs)
+    if enrolled:
+        ProgramEnrollmentFactory.create(user=staff_user, program=run.program)
+    context = program_page.get_context(request=request)
+    assert context == {
+        "self": program_page,
+        "page": program_page,
+        "request": request,
+        "run": run,
+        "is_enrolled": exp_is_enrolled,
+        "sign_in_url": f"/signin/?next={quote_plus(program_page.get_url())}"
+        if exp_sign_in_url
+        else None,
+        "start_date": getattr(run, "start_date", None),
+        "can_access_edx_course": False,
     }
 
 

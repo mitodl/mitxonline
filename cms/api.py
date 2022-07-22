@@ -21,6 +21,7 @@ DEFAULT_HOMEPAGE_PROPS = dict(
 )
 DEFAULT_SITE_PROPS = dict(hostname="localhost", port=80)
 COURSE_INDEX_PAGE_PROPERTIES = dict(title="Courses")
+PROGRAM_INDEX_PAGE_PROPERTIES = dict(title="Programs")
 RESOURCE_PAGE_TITLES = [
     "About Us",
     "Terms of Service",
@@ -128,6 +129,8 @@ def ensure_product_index() -> cms_models.CourseIndexPage:
     nested under it.
     """
     home_page = get_home_page()
+
+    # courses
     course_index = Page.objects.filter(
         content_type=ContentType.objects.get_for_model(cms_models.CourseIndexPage)
     ).first()
@@ -141,6 +144,22 @@ def ensure_product_index() -> cms_models.CourseIndexPage:
     ).values_list("id", flat=True):
         page = Page.objects.get(id=page_id)
         page.move(course_index, "last-child")
+
+    # programs
+    program_index = Page.objects.filter(
+        content_type=ContentType.objects.get_for_model(cms_models.ProgramIndexPage)
+    ).first()
+    if not program_index:
+        program_index = cms_models.ProgramIndexPage(**PROGRAM_INDEX_PAGE_PROPERTIES)
+        home_page.add_child(instance=program_index)
+        program_index.save_revision().publish()
+    # Move course detail pages to be children of the course index pages
+    for page_id in cms_models.ProgramPage.objects.exclude(
+        path__startswith=program_index.path
+    ).values_list("id", flat=True):
+        page = Page.objects.get(id=page_id)
+        page.move(program_index, "last-child")
+
     return course_index
 
 
