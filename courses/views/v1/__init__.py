@@ -275,7 +275,7 @@ def get_user_program_enrollments(request):
                 )
             else:
                 program_list[enrollment.run.course.program.id] = {
-                    "enrollments": [],
+                    "enrollments": [enrollment],
                     "program": enrollment.run.course.program,
                 }
 
@@ -286,9 +286,9 @@ def get_user_program_enrollments(request):
         .all()
     )
 
+    program_list = list(program_list.values())
+
     for enrollment in non_course_programs:
         program_list.append({"enrollments": [], "program": enrollment.program})
 
-    return Response(
-        UserProgramEnrollmentDetailSerializer(program_list.values(), many=True).data
-    )
+    return Response(UserProgramEnrollmentDetailSerializer(program_list, many=True).data)
