@@ -58,7 +58,9 @@ def generate_flexible_price_email(flexible_price):
             program_name=flexible_price.courseware_object.title
         )
     elif flexible_price.status == FlexiblePriceStatus.RESET:
-        message = FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE
+        message = FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE.format(
+            program_name=flexible_price.courseware_object.title
+        )
         subject = FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT.format(
             program_name=flexible_price.courseware_object.title
         )
@@ -66,16 +68,11 @@ def generate_flexible_price_email(flexible_price):
         raise ValidationError(
             "Invalid status on FlexiblePrice for generate_flexible_price_email()"
         )
-    body = FLEXIBLE_PRICE_EMAIL_BODY.format(
-        first_name=flexible_price.user.legal_address.first_name,
-        message=message,
-        program_name=flexible_price.courseware_object.title,
-    )
     try:
         with get_message_sender(FlexiblePriceStatusChangeMessage) as sender:
             sender.build_and_send_message(
                 flexible_price.user.email,
-                {"subject": subject, "body": body},
+                {"subject": subject, "first_name": flexible_price.user.legal_address.first_name, "message": message, "program_name": flexible_price.courseware_object.title,},
             )
     except:
         log.exception("Error sending flexible price request status change email")
