@@ -712,6 +712,13 @@ FEATURES_DEFAULT = get_bool(
 )
 FEATURES = get_features()
 
+
+CERTIFICATE_CREATION_DELAY_IN_HOURS = get_int(
+    name="CERTIFICATE_CREATION_DELAY_IN_HOURS",
+    default=0,
+    description="The number of hours to delay automated certificate creation after a course run ends.",
+)
+
 # Redis
 REDISCLOUD_URL = get_string(
     name="REDISCLOUD_URL", default=None, description="RedisCloud connection url"
@@ -762,6 +769,16 @@ CRON_COURSERUN_SYNC_DAYS = get_string(
     default="*",
     description="day_of_week' value for scheduled task to sync course run data (by default, it will run each day of the week).",
 )
+CRON_COURSE_CERTIFICATES_HOURS = get_string(
+    name="CRON_COURSE_CERTIFICATES_HOURS",
+    default=0,
+    description="'hours' value for the 'generate-course-certificate' scheduled task (defaults to midnight)",
+)
+CRON_COURSE_CERTIFICATES_DAYS = get_string(
+    name="CRON_COURSE_CERTIFICATES_DAYS",
+    default=None,
+    description="'day_of_week' value for 'generate-course-certificate' scheduled task (default will run once a day).",
+)
 RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY = get_int(
     name="RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY",
     default=60 * 30,
@@ -796,6 +813,16 @@ CELERY_BEAT_SCHEDULE = {
             minute=0,
             hour=CRON_COURSERUN_SYNC_HOURS,
             day_of_week=CRON_COURSERUN_SYNC_DAYS,
+            day_of_month="*",
+            month_of_year="*",
+        ),
+    },
+    "generate-course-certificate": {
+        "task": "courses.tasks.generate_course_certificates",
+        "schedule": crontab(
+            minute=0,
+            hour=CRON_COURSE_CERTIFICATES_HOURS,
+            day_of_week=CRON_COURSE_CERTIFICATES_DAYS or "*",
             day_of_month="*",
             month_of_year="*",
         ),

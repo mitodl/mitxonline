@@ -14,6 +14,7 @@ from courses.models import (
     CourseRunEnrollmentAudit,
     CourseRunGrade,
     CourseRunGradeAudit,
+    CourseRunCertificate,
     CourseTopic,
     BlockedCountry,
     Program,
@@ -233,7 +234,13 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
     """Admin for CourseRunGrade"""
 
     model = CourseRunGrade
-    list_display = ["id", "get_user_email", "get_run_courseware_id", "grade"]
+    list_display = [
+        "id",
+        "get_user_email",
+        "get_user_username",
+        "get_run_courseware_id",
+        "grade",
+    ]
     list_filter = ["passed", "set_by_admin", "course_run__courseware_id"]
     raw_id_fields = ("user",)
     search_fields = ["user__email", "user__username"]
@@ -244,6 +251,10 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
     def get_user_email(self, obj):
         """Returns the related User email"""
         return obj.user.email
+
+    def get_user_username(self, obj):
+        """Returns the related User email"""
+        return obj.user.username
 
     get_user_email.short_description = "User Email"
     get_user_email.admin_order_field = "user__email"
@@ -308,6 +319,33 @@ class BlockedCountryAdmin(TimestampedModelAdmin):
     raw_id_fields = ("course",)
 
 
+class CourseRunCertificateAdmin(TimestampedModelAdmin):
+    """Admin for CourseRunCertificate"""
+
+    model = CourseRunCertificate
+    include_timestamps_in_list = True
+    list_display = ["uuid", "user", "course_run", "get_revoked_state"]
+    search_fields = [
+        "course_run__courseware_id",
+        "course_run__title",
+        "user__username",
+        "user__email",
+    ]
+    raw_id_fields = ("user",)
+
+    def get_revoked_state(self, obj):
+        """return the revoked state"""
+        return obj.is_revoked is not True
+
+    get_revoked_state.short_description = "Active"
+    get_revoked_state.boolean = True
+
+    def get_queryset(self, request):
+        return self.model.all_objects.get_queryset().select_related(
+            "user", "course_run"
+        )
+
+
 admin.site.register(Program, ProgramAdmin)
 admin.site.register(ProgramRun, ProgramRunAdmin)
 admin.site.register(Course, CourseAdmin)
@@ -318,5 +356,6 @@ admin.site.register(CourseRunEnrollment, CourseRunEnrollmentAdmin)
 admin.site.register(CourseRunEnrollmentAudit, CourseRunEnrollmentAuditAdmin)
 admin.site.register(CourseRunGrade, CourseRunGradeAdmin)
 admin.site.register(CourseRunGradeAudit, CourseRunGradeAuditAdmin)
+admin.site.register(CourseRunCertificate, CourseRunCertificateAdmin)
 admin.site.register(CourseTopic, CourseTopicAdmin)
 admin.site.register(BlockedCountry, BlockedCountryAdmin)

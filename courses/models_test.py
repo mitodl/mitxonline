@@ -567,3 +567,13 @@ def test_enrollment_is_ended():
 
     assert program_enrollment.is_ended
     assert course_enrollment.is_ended
+
+
+def test_course_run_certificate_start_end_dates():
+    """
+    Test that the CourseRunCertificate start_end_dates property works properly
+    """
+    certificate = CourseRunCertificateFactory.create()
+    start_date, end_date = certificate.start_end_dates
+    assert start_date == certificate.course_run.start_date
+    assert end_date == certificate.course_run.end_date

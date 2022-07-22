@@ -59,6 +59,10 @@
       "description": "Early executed tasks propagate exceptions",
       "required": false
     },
+    "CERTIFICATE_CREATION_DELAY_IN_HOURS": {
+      "description": "The number of hours to delay automated certificate creation after a course run ends.",
+      "required": false
+    },
     "CLOUDFRONT_DIST": {
       "description": "The Cloundfront distribution to use for static assets",
       "required": false
@@ -79,12 +83,24 @@
       "description": "'hours' value for scheduled task to sync course run data (by default, it will run at midnight",
       "required": false
     },
+    "CRON_COURSE_CERTIFICATES_DAYS": {
+      "description": "'day_of_week' value for 'generate-course-certificate' scheduled task (default will run once a day).",
+      "required": false
+    },
+    "CRON_COURSE_CERTIFICATES_HOURS": {
+      "description": "'hours' value for the 'generate-course-certificate' scheduled task (defaults to midnight)",
+      "required": false
+    },
     "CSRF_TRUSTED_ORIGINS": {
       "description": "Comma separated string of trusted domains that should be CSRF exempt",
       "required": false
     },
     "DJANGO_LOG_LEVEL": {
       "description": "The log level for django",
+      "required": false
+    },
+    "ECOMMERCE_DEFAULT_PAYMENT_GATEWAY": {
+      "description": "The default payment gateway to use. Must match the value of the constant in the mitol.payment_gateway library.",
       "required": false
     },
     "EDX_API_CLIENT_TIMEOUT": {
@@ -137,6 +153,38 @@
     },
     "MITOL_AUTHENTICATION_REPLY_TO_ADDRESS": {
       "description": "E-mail to use for reply-to address of emails",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY": {
+      "description": "CyberSource access key",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_ID": {
+      "description": "CyberSource merchant ID",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET": {
+      "description": "CyberSource merchant secret key",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET_KEY_ID": {
+      "description": "CyberSource merchant secret key ID",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID": {
+      "description": "CyberSource profile ID",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT": {
+      "description": "CyberSource REST API Environment",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL": {
+      "description": "CyberSource secure acceptance URL",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY": {
+      "description": "CyberSource security key",
       "required": false
     },
     "MITX_ONLINE_ADMIN_EMAIL": {
