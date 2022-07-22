@@ -234,7 +234,13 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
     """Admin for CourseRunGrade"""
 
     model = CourseRunGrade
-    list_display = ["id", "get_user_email", "get_user_username", "get_run_courseware_id", "grade"]
+    list_display = [
+        "id",
+        "get_user_email",
+        "get_user_username",
+        "get_run_courseware_id",
+        "grade",
+    ]
     list_filter = ["passed", "set_by_admin", "course_run__courseware_id"]
     raw_id_fields = ("user",)
     search_fields = ["user__email", "user__username"]
@@ -328,7 +334,7 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
     raw_id_fields = ("user",)
 
     def get_revoked_state(self, obj):
-        """ return the revoked state"""
+        """return the revoked state"""
         return obj.is_revoked is not True
 
     get_revoked_state.short_description = "Active"

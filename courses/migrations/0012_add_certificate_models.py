@@ -10,23 +10,53 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('courses', '0011_fix_default_enrollment_mode_for_existing_enrollments'),
+        ("courses", "0011_fix_default_enrollment_mode_for_existing_enrollments"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='CourseRunCertificate',
+            name="CourseRunCertificate",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_on', models.DateTimeField(auto_now_add=True)),
-                ('updated_on', models.DateTimeField(auto_now=True)),
-                ('uuid', models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
-                ('is_revoked', models.BooleanField(default=False, help_text='Indicates whether or not the certificate is revoked', verbose_name='revoked')),
-                ('course_run', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='courses.courserun')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("created_on", models.DateTimeField(auto_now_add=True)),
+                ("updated_on", models.DateTimeField(auto_now=True)),
+                (
+                    "uuid",
+                    models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
+                ),
+                (
+                    "is_revoked",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Indicates whether or not the certificate is revoked",
+                        verbose_name="revoked",
+                    ),
+                ),
+                (
+                    "course_run",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="courses.courserun",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('user', 'course_run')},
+                "unique_together": {("user", "course_run")},
             },
         ),
     ]
