@@ -1,4 +1,4 @@
-import { useUpdate, useNotification, CrudFilters, HttpError } from "@pankod/refine-core";
+import { CrudFilters, HttpError } from "@pankod/refine-core";
 import React from "react"
 const { useState } = React;
 import {
@@ -73,8 +73,6 @@ const FlexiblePricingFilterForm: React.FC<{ formProps: FormProps }> = ({ formPro
 }
 
 export const FlexiblePricingList: React.FC = () => {
-    const { open: displayToast } = useNotification();
-
     const {tableProps, searchFormProps} = useTable<
         IFlexiblePriceRequest,
         HttpError, 
