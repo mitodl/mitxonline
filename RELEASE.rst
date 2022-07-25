@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.39.2
+--------------
+
+- This is to adapt to a bug, that should be fixed later
+- Flexible Pricing approved requests should apply to programs
+- Bump lxml from 4.6.5 to 4.9.1 (#666)
+- Move enabled, add default credentials/base URL
+- Make suggested changes
+
 Version 0.39.1 (Released July 25, 2022)
 --------------
 
