@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.39.1
+Version 0.39.1 (Released July 25, 2022)
 --------------
 
 - Revert "Update steps for accessing and configuring devstack"
