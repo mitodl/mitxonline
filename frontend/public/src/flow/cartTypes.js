@@ -8,7 +8,8 @@ export type Product = {
   price: number,
   description: string,
   purchasable_object: any,
-  is_active: boolean
+  is_active: boolean,
+  product_flexible_price: Discount
 }
 
 export type BasketItem = {
