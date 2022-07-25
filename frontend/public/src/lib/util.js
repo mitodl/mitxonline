@@ -231,10 +231,9 @@ export const formatLocalePrice = (amount: number | null) => {
   return amount.toLocaleString("en-US", { style: "currency", currency: "USD" })
 }
 
-export const getFlexiblePriceForProduct = product => {
+export const getFlexiblePriceForProduct = (product:any) => {
   const flexDiscountAmount = product && product.product_flexible_price ? product.product_flexible_price.amount : 0
   const flexDiscountType = product && product.product_flexible_price ? product.product_flexible_price.discount_type : null
-  const flexAdjustedCoursePrice = product ? formatLocalePrice(product.price, flexDiscountAmount, flexDiscountType) : null
 
   switch (flexDiscountType) {
   case DISCOUNT_TYPE_DOLLARS_OFF:
