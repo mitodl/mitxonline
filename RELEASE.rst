@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.39.3 (Released July 26, 2022)
+--------------
+
+- Adds support for tying a discount to a specific product
+- Flexible pricing display personalized price (#720)
+- Updating docs to add in path to the file you need to edit for lms settings
+
 Version 0.39.2 (Released July 26, 2022)
 --------------
 
