@@ -49,7 +49,7 @@ from cms.blocks import (
     PriceBlock,
     FacultyBlock,
     CourseRunCertificateOverrides,
-    validate_unique_readable_ids
+    validate_unique_readable_ids,
 )
 from cms.constants import (
     COURSE_INDEX_SLUG,
@@ -116,7 +116,6 @@ class SignatoryIndexPage(SignatoryObjectIndexPage):
     """
 
     slug = SIGNATORY_INDEX_SLUG
-
 
 
 class CertificateIndexPage(RoutablePageMixin, Page):
@@ -216,7 +215,9 @@ class CertificatePage(CourseProgramChildPage):
     """
 
     template = "certificate_page.html"
-    parent_page_types = ["CoursePage", ]
+    parent_page_types = [
+        "CoursePage",
+    ]
 
     product_name = models.CharField(
         max_length=250,
@@ -340,7 +341,7 @@ class CertificatePage(CourseProgramChildPage):
                 "learner_name": self.certificate.user.get_full_name(),
                 "start_date": start_date,
                 "end_date": end_date,
-                "CEUs": CEUs
+                "CEUs": CEUs,
             }
         else:
             raise Http404()
@@ -769,7 +770,10 @@ class CoursePage(ProductPage):
     """
 
     parent_page_types = ["CourseIndexPage"]
-    subpage_types = ["cms.FlexiblePricingRequestForm", "CertificatePage", ]
+    subpage_types = [
+        "cms.FlexiblePricingRequestForm",
+        "CertificatePage",
+    ]
 
     course = models.OneToOneField(
         "courses.Course", null=True, on_delete=models.SET_NULL, related_name="page"
@@ -1212,7 +1216,7 @@ class FlexiblePricingRequestForm(AbstractForm):
 
 
 class SignatoryPage(Page):
-    """ CMS page representing a Signatory. """
+    """CMS page representing a Signatory."""
 
     promote_panels = []
     parent_page_types = [SignatoryIndexPage]
