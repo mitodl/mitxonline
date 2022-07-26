@@ -72,7 +72,12 @@ def generate_flexible_price_email(flexible_price):
         with get_message_sender(FlexiblePriceStatusChangeMessage) as sender:
             sender.build_and_send_message(
                 flexible_price.user.email,
-                {"subject": subject, "first_name": flexible_price.user.legal_address.first_name, "message": message, "program_name": flexible_price.courseware_object.title,},
+                {
+                    "subject": subject,
+                    "first_name": flexible_price.user.legal_address.first_name,
+                    "message": message,
+                    "program_name": flexible_price.courseware_object.title,
+                },
             )
     except:
         log.exception("Error sending flexible price request status change email")
