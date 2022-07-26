@@ -5,7 +5,7 @@ import { Show, Typography, Tag,
     Space,
  } from "@pankod/refine-antd";
 import { IDiscountRedemption } from "interfaces";
-import { RedemptionList, UserAssignments } from "components/discounts";
+import { RedemptionList, UserAssignments, Products } from "components/discounts";
 const { Title, Text } = Typography;
 
 export const DiscountShow = () => {
@@ -34,6 +34,8 @@ export const DiscountShow = () => {
             {record ? <UserAssignments record={record} key={record?.user} /> : null}
 
             {record ? <RedemptionList record={record} key={record?.id} /> : null}
+
+            {record ? <Products record={record} key={record?.id} /> : null}
         </Show>
     );
 };

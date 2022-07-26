@@ -64,6 +64,7 @@ from ecommerce.serializers import (
     OrderSerializer,
     DiscountSerializer,
     DiscountRedemptionSerializer,
+    DiscountProductSerializer,
     UserDiscountSerializer,
     UserDiscountMetaSerializer,
 )
@@ -73,6 +74,7 @@ from ecommerce.models import (
     BasketItem,
     Discount,
     DiscountRedemption,
+    DiscountProduct,
     BasketDiscount,
     UserDiscount,
     PendingOrder,
@@ -217,6 +219,16 @@ class DiscountViewSet(ModelViewSet):
     pagination_class = ECommerceDefaultPagination
 
 
+class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
+    """API view set for Discounts"""
+
+    serializer_class = DiscountProductSerializer
+    queryset = DiscountProduct.objects.all()
+    authentication_classes = (SessionAuthentication, TokenAuthentication)
+    permission_classes = (IsAuthenticated, IsAdminUser)
+    pagination_class = ECommerceDefaultPagination
+
+
 class NestedDiscountRedemptionViewSet(NestedViewSetMixin, ModelViewSet):
     """API view set for Discount Redemptions"""
 
@@ -266,6 +278,11 @@ class CheckoutApiViewSet(ViewSet):
         they'll be converted to attach to the resulting Order (as Baskets are
         ephemeral).
 
+        Discount application is subject to these rules:
+        - The discount can't be flagged for use with flexible pricing.
+        - If the discount is tied to a product, the product must already be in
+          the basket.
+
         POST Args:
             - discount (str): Discount Code to apply
 
@@ -283,6 +300,10 @@ class CheckoutApiViewSet(ViewSet):
             discount = Discount.objects.filter(for_flexible_pricing=False).get(
                 discount_code=request.data["discount"]
             )
+
+            if not api.check_discount_for_products(discount, basket):
+                raise ObjectDoesNotExist()
+
             if not discount.check_validity(request.user):
                 raise ObjectDoesNotExist()
         except ObjectDoesNotExist:

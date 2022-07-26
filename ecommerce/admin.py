@@ -20,6 +20,7 @@ from ecommerce.models import (
     Product,
     Discount,
     UserDiscount,
+    DiscountProduct,
     DiscountRedemption,
     Order,
     PendingOrder,
@@ -71,6 +72,13 @@ class DiscountAdmin(admin.ModelAdmin):
     model = Discount
     search_fields = ["discount_type", "redemption_type"]
     list_display = ["id", "discount_code", "discount_type", "amount", "redemption_type"]
+
+
+@admin.register(DiscountProduct)
+class DiscountProductAdmin(admin.ModelAdmin):
+    model = DiscountProduct
+    search_fields = ["discount", "product"]
+    list_display = ["id", "discount", "product"]
 
 
 @admin.register(UserDiscount)
