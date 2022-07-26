@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.39.3
+Version 0.39.3 (Released July 26, 2022)
 --------------
 
 - Adds support for tying a discount to a specific product
