@@ -1,10 +1,18 @@
+export interface IProduct {
+    id: number;
+    price: number;
+    description: string;
+    is_active: boolean;
+    purchasable_object: object;
+}
+
 export interface IDiscount {
-    id: int;
+    id: number;
     discount_code: string;
     amount: float;
     discount_type: string;
     redemption_type: string;
-    max_redemptions: int;
+    max_redemptions: number;
     for_flexible_pricing: boolean;
 }
 
@@ -16,9 +24,21 @@ export interface IDiscountRedemption {
 }
 
 export interface IUserDiscount {
-    id: int;
+    id: number;
     discount: IDiscount;
     user: any;
+}
+
+export interface IDiscountProduct {
+    id: number;
+    discount: IDiscount;
+    product: any;
+}
+
+export interface IDiscountProductRaw {
+    id: number|null;
+    discount_id: number|null;
+    product_id: number|null;
 }
 
 export interface IFlexiblePriceRequest {

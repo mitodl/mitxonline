@@ -19,6 +19,7 @@ from ecommerce.views.v0 import (
     NestedDiscountRedemptionViewSet,
     NestedUserDiscountViewSet,
     UserDiscountViewSet,
+    NestedDiscountProductViewSet,
 )
 from ecommerce.admin import AdminRefundOrderView
 
@@ -48,7 +49,12 @@ discountsRouter.register(
     basename="discounts_api-assignees",
     parents_query_lookups=["discount"],
 )
-
+discountsRouter.register(
+    r"products",
+    NestedDiscountProductViewSet,
+    basename="discounts_api-products",
+    parents_query_lookups=["discount"],
+)
 
 basketRouter = router.register(r"baskets", BasketViewSet, basename="basket")
 basketRouter.register(

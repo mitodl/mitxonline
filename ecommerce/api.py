@@ -39,6 +39,8 @@ from ecommerce.models import (
     FulfilledOrder,
     Transaction,
     Order,
+    Discount,
+    DiscountProduct,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 
@@ -107,6 +109,33 @@ def generate_checkout_payload(request):
     return payload
 
 
+def check_discount_for_products(discount, basket):
+    """
+    Checks the validity of the discount against what's in the basket.
+
+    If the discount either has no products associated with it, or the products
+    in the basket are applicable to the discount, this returns True.
+    Otherwise, returns False.
+
+    Args:
+        - basket (Basket): the current basket
+        - discount (Discount|string: the discount to apply (if a string, loads the discount code specified)
+    Returns:
+        boolean
+    """
+    if not isinstance(discount, Discount):
+        discount = Discount.objects.filter(discount_code=discount).first()
+
+    basket_products = basket.get_products()
+
+    return (
+        not discount.products.exists()
+        or DiscountProduct.objects.filter(product__in=basket_products)
+        .filter(discount=discount)
+        .exists()
+    )
+
+
 def apply_user_discounts(request):
     """
     Applies user discounts to the current cart. (If there are more than one for some
@@ -115,13 +144,16 @@ def apply_user_discounts(request):
 
     Args:
         - user (User): The currently authenticated user.
+
+    Returns:
+        None
     """
     basket = establish_basket(request)
     user = request.user
     discount = None
 
     if BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0:
-        return True
+        return
 
     product = BasketItem.objects.get(basket=basket).product
     flexible_price_discount = determine_courseware_flexible_price_discount(
@@ -135,6 +167,10 @@ def apply_user_discounts(request):
             discount = user_discount.discount
 
     if discount:
+        # check for product specificity in the discount
+        if not check_discount_for_products(discount, basket):
+            return
+
         bd = BasketDiscount(
             redeemed_basket=basket,
             redemption_date=now_in_utc(),
@@ -143,7 +179,7 @@ def apply_user_discounts(request):
         )
         bd.save()
 
-    return True
+    return
 
 
 def fulfill_completed_order(

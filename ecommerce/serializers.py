@@ -441,6 +441,19 @@ class DiscountRedemptionSerializer(serializers.ModelSerializer):
         depth = 1
 
 
+class DiscountProductSerializer(serializers.ModelSerializer):
+    product = ProductSerializer()
+    discount = DiscountSerializer()
+
+    class Meta:
+        model = models.DiscountProduct
+        fields = [
+            "id",
+            "discount",
+            "product",
+        ]
+
+
 class UserDiscountSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.UserDiscount
