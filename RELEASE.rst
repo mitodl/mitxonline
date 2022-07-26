@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.39.4
+--------------
+
+- Adds code to group course run enrollments by program
+
 Version 0.39.3 (Released July 26, 2022)
 --------------
 
