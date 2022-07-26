@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.39.2
+Version 0.39.2 (Released July 26, 2022)
 --------------
 
 - This is to adapt to a bug, that should be fixed later
