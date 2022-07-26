@@ -14,7 +14,6 @@ from flexiblepricing.constants import (
     FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT,
     FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_SUBJECT,
     FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_MESSAGE,
-    FLEXIBLE_PRICE_EMAIL_BODY,
     FlexiblePriceStatus,
 )
 from flexiblepricing.messages import FlexiblePriceStatusChangeMessage
