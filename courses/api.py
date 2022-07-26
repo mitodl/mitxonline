@@ -127,17 +127,61 @@ def get_user_enrollments(user):
     """
     Fetches a user's enrollments
 
+    If the user is enrolled in a course that belongs to a program, we count that
+    as an enrollment in the program (and we create an ephemeral
+    ProgramEnrollment for that) unless the user is already enrolled in the
+    program directly.
+
     Args:
         user (User): A user
     Returns:
         UserEnrollments: An object representing a user's program and course run enrollments
     """
+    course_run_enrollments = (
+        CourseRunEnrollment.objects.filter(user=user).order_by("run__start_date").all()
+    )
+
+    all_course_run_programs = []  # all the programs that the course runs belong to
+    filtered_course_run_programs = (
+        []
+    )  # just the programs we don't have distinct ProgramEnrollments for
+
+    for program in [
+        cre.run.course.program
+        for cre in course_run_enrollments
+        if cre.run.course.program is not None
+    ]:
+        if program not in all_course_run_programs:
+            all_course_run_programs.append(program)
+
     program_enrollments = (
         ProgramEnrollment.objects.prefetch_related("program__courses")
         .select_related("user")
         .filter(user=user)
         .all()
     )
+
+    for program in all_course_run_programs:
+        found = False
+
+        for enrollment in program_enrollments:
+            if enrollment.program == program:
+                found = True
+                break
+
+        if not found:
+            filtered_course_run_programs.append(program)
+
+    program_enrollments = list(
+        itertools.chain(
+            program_enrollments,
+            [
+                ProgramEnrollment(user=user, program=program)
+                for program in filtered_course_run_programs
+            ],
+        )
+    )
+
     program_courses = itertools.chain(
         *(
             program_enrollment.program.courses.all()
@@ -145,9 +189,6 @@ def get_user_enrollments(user):
         )
     )
     program_course_ids = set(course.id for course in program_courses)
-    course_run_enrollments = (
-        CourseRunEnrollment.objects.filter(user=user).order_by("run__start_date").all()
-    )
     non_program_run_enrollments, program_run_enrollments = partition(
         course_run_enrollments,
         lambda course_run_enrollment: (
