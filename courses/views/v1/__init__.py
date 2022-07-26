@@ -21,12 +21,19 @@ from courses.api import (
     get_user_relevant_course_run_qset,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
-from courses.models import Course, CourseRun, Program, CourseRunEnrollment
+from courses.models import (
+    Course,
+    CourseRun,
+    Program,
+    CourseRunEnrollment,
+    ProgramEnrollment,
+)
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
     CourseRunSerializer,
     CourseSerializer,
     ProgramSerializer,
+    UserProgramEnrollmentDetailSerializer,
 )
 from main import features
 from main.constants import (
@@ -177,6 +184,7 @@ class UserEnrollmentsApiViewSet(
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
             .select_related("run__course__page")
+            .select_related("run__course__program")
             .all()
         )
 
@@ -240,3 +248,47 @@ class UserEnrollmentsApiViewSet(
             # to update the rest of the fields in the PATCH request
             # or separate out the APIs into function-based views.
             raise NotImplementedError
+
+
+@api_view()
+@permission_classes([IsAuthenticated])
+def get_user_program_enrollments(request):
+    """
+    Returns a unified set of program and course enrollments for the current
+    user.
+    """
+
+    courseruns = (
+        CourseRunEnrollment.objects.filter(user=request.user)
+        .select_related("run__course__page")
+        .select_related("run__course__program")
+        .all()
+    )
+
+    program_list = {}
+
+    for enrollment in courseruns:
+        if enrollment.run.course.program is not None:
+            if enrollment.run.course.program.id in program_list:
+                program_list[enrollment.run.course.program.id]["enrollments"].append(
+                    enrollment
+                )
+            else:
+                program_list[enrollment.run.course.program.id] = {
+                    "enrollments": [enrollment],
+                    "program": enrollment.run.course.program,
+                }
+
+    non_course_programs = (
+        ProgramEnrollment.objects.filter(user=request.user)
+        .exclude(program_id__in=program_list.keys())
+        .select_related("program")
+        .all()
+    )
+
+    program_list = list(program_list.values())
+
+    for enrollment in non_course_programs:
+        program_list.append({"enrollments": [], "program": enrollment.program})
+
+    return Response(UserProgramEnrollmentDetailSerializer(program_list, many=True).data)

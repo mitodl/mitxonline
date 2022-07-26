@@ -15,5 +15,11 @@ router.register(
 urlpatterns = [
     re_path(r"^api/v1/", include(router.urls)),
     re_path(r"^api/", include(router.urls)),
+    re_path(
+        r"^api//v1/program_enrollments",
+        v1.get_user_program_enrollments,
+        name="user-program-enrollments-api",
+    ),
+    re_path(r"^api/program_enrollments", v1.get_user_program_enrollments),
     path("enrollments/", v1.create_enrollment_view, name="create-enrollment-via-form"),
 ]
