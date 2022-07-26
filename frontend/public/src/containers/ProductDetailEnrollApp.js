@@ -10,6 +10,7 @@ import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 import Loader from "../components/Loader"
 import { routes } from "../lib/urls"
+import { getFlexiblePriceForProduct } from "../lib/util"
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
   courseRunsSelector,
@@ -70,7 +71,7 @@ export class ProductDetailEnrollApp extends React.Component<
             <div className="flex-grow-1 align-self-end">
               Learn online and get a certificate
             </div>
-            <div className="text-right align-self-end">${product.price}</div>
+            <div className="text-right align-self-end">${getFlexiblePriceForProduct(product)}</div>
           </div>
           <div className="row">
             <div className="col-12">

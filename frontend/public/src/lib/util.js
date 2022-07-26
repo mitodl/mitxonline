@@ -23,6 +23,13 @@ import moment from "moment-timezone"
 import type Moment from "moment"
 
 import type { HttpRespErrorMessage, HttpResponse } from "../flow/httpTypes"
+import type { Product } from "../flow/cartTypes"
+
+import {
+  DISCOUNT_TYPE_DOLLARS_OFF,
+  DISCOUNT_TYPE_PERCENT_OFF,
+  DISCOUNT_TYPE_FIXED_PRICE
+} from "../constants"
 
 /**
  * Returns a promise which resolves after a number of milliseconds have elapsed
@@ -223,4 +230,20 @@ export const formatLocalePrice = (amount: number | null) => {
   if (amount === null) amount = 0
 
   return amount.toLocaleString("en-US", { style: "currency", currency: "USD" })
+}
+
+export const getFlexiblePriceForProduct = (product: Product) => {
+  const flexDiscountAmount = product && product.product_flexible_price ? product.product_flexible_price.amount : 0
+  const flexDiscountType = product && product.product_flexible_price ? product.product_flexible_price.discount_type : null
+
+  switch (flexDiscountType) {
+  case DISCOUNT_TYPE_DOLLARS_OFF:
+    return product.price - flexDiscountAmount
+  case DISCOUNT_TYPE_PERCENT_OFF:
+    return product.price - ((flexDiscountAmount / 100) * product.price)
+  case DISCOUNT_TYPE_FIXED_PRICE:
+    return flexDiscountAmount
+  default:
+    return product.price
+  }
 }

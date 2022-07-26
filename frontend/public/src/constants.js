@@ -163,3 +163,7 @@ export const ORDER_HISTORY_COLUMN_TITLES = [
   "Order number",
   "Order details"
 ]
+
+export const DISCOUNT_TYPE_FIXED_PRICE = "fixed-price"
+export const DISCOUNT_TYPE_DOLLARS_OFF = "dollars-off"
+export const DISCOUNT_TYPE_PERCENT_OFF = "percent-off"

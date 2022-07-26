@@ -14,6 +14,8 @@ from ecommerce.constants import TRANSACTION_TYPE_REFUND, CYBERSOURCE_CARD_TYPES
 
 from cms.serializers import CoursePageSerializer
 
+from flexiblepricing.api import determine_courseware_flexible_price_discount
+
 
 class ProgramRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
     class Meta:
@@ -89,6 +91,22 @@ class ProductSerializer(BaseProductSerializer):
     class Meta:
         fields = BaseProductSerializer.Meta.fields + [
             "purchasable_object",
+        ]
+        model = models.Product
+
+
+class ProductFlexibilePriceSerializer(BaseProductSerializer):
+    product_flexible_price = serializers.SerializerMethodField()
+
+    def get_product_flexible_price(self, instance):
+        discount_record = determine_courseware_flexible_price_discount(
+            instance, self.context["request"].user
+        )
+        return DiscountSerializer(discount_record, context=self.context).data
+
+    class Meta:
+        fields = BaseProductSerializer.Meta.fields + [
+            "product_flexible_price",
         ]
         model = models.Product
 
