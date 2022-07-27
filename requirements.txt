@@ -265,7 +265,7 @@ mitol-django-google-sheets==2.2.6
     # via
     #   -r requirements.in
     #   mitol-django-google-sheets-refunds
-mitol-django-google-sheets-refunds==0.3.1
+mitol-django-google-sheets-refunds==0.3.3
     # via -r requirements.in
 mitol-django-mail==3.2.0
     # via
