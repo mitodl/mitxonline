@@ -662,7 +662,9 @@ class FlexiblePricingRequestForm(AbstractForm):
 
     def serve(self, request, *args, **kwargs):
         previous_submission = self.get_previous_submission(request)
-        if request.method == "POST" and (previous_submission is not None and not previous_submission.is_reset()):
+        if request.method == "POST" and (
+            previous_submission is not None and not previous_submission.is_reset()
+        ):
             form = self.get_form(page=self, user=request.user)
 
             context = self.get_context(request)
