@@ -220,9 +220,10 @@ def test_flex_pricing_form_display(mocker, is_authed, has_submission):
 @pytest.mark.parametrize(
     "submission_status",
     [
-        [FlexiblePriceStatus.CREATED],
-        [FlexiblePriceStatus.APPROVED],
-        [FlexiblePriceStatus.SKIPPED],
+        FlexiblePriceStatus.CREATED,
+        FlexiblePriceStatus.APPROVED,
+        FlexiblePriceStatus.SKIPPED,
+        FlexiblePriceStatus.RESET,
     ],
 )
 def test_flex_pricing_form_state_display(mocker, submission_status):
@@ -246,6 +247,7 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
     )
 
     response = generate_flexible_pricing_response(request_user, flex_form)
+    
 
     if submission_status == FlexiblePriceStatus.CREATED:
         assert "Application Processing" in response.rendered_content
@@ -253,3 +255,5 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
         assert "Application Approved" in response.rendered_content
     elif submission_status == FlexiblePriceStatus.SKIPPED:
         assert "Application Denied" in response.rendered_content
+    elif submission_status == FlexiblePriceStatus.RESET:
+        assert "csrfmiddlewaretoken" in response.rendered_content, response.rendered_content
