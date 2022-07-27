@@ -1,7 +1,10 @@
 {% extends "email_base.html" %}
 
 {% block content %}
-
-{{body}}
-
+    <br>
+    <div style="text-align: left; font-weight: normal; margin: 0 0 20px;">
+        <p>Dear {{ first_name }},</p>
+        <p>{{ message }}</p>
+        <p>Thank you,<br> "The {{program_name}} MITxOnline team"</p>
+    </div>
 {% endblock %}

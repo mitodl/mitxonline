@@ -37,13 +37,6 @@ DEFAULT_INCOME_THRESHOLD = 75000
 INCOME = "income"
 INCOME_THRESHOLD_FIELDS = [COUNTRY, INCOME]
 
-FLEXIBLE_PRICE_EMAIL_BODY = (
-    "Dear {first_name},\n\n"
-    "{message}\n\n"
-    "Thank you,\n"
-    "The {program_name} MITxOnline team"
-)
-
 FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT = (
     "Update to your personalized course price for {program_name} MITxOnline"
 )
