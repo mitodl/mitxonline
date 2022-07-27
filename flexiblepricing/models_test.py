@@ -33,5 +33,7 @@ def test_submission_status():
             assert submission.is_approved()
         elif status == FlexiblePriceStatus.SKIPPED:
             assert submission.is_denied()
+        elif status == FlexiblePriceStatus.RESET:
+            assert submission.is_reset()
         else:
             assert not submission.is_approved() and not submission.is_denied()
