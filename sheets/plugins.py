@@ -15,6 +15,6 @@ class RefundPlugin:
             order_id=refund_request_row.order_id, unenroll=True
         )
         if refund_api_success:
-            return RefundResult(ResultType.PROCESSED.value)
+            return RefundResult(ResultType.PROCESSED)
 
-        return RefundResult(ResultType.FAILED.value)
+        return RefundResult(ResultType.FAILED)
