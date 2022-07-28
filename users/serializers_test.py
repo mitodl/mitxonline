@@ -1,9 +1,12 @@
 """Tests for users.serializers"""
+from openedx.api import OPENEDX_VALIDATION_REGISTRATION_PATH
 import pytest
+import responses
 from django.contrib.auth.models import AnonymousUser
 
 from django.test.client import RequestFactory
 from rest_framework.exceptions import ValidationError
+from rest_framework import status
 
 from users.factories import UserFactory
 from users.models import ChangeEmailRequest, LegalAddress
@@ -26,6 +29,22 @@ def sample_address():
         "last_name": "User",
         "country": "US",
     }
+
+
+@pytest.fixture()
+def application(settings):
+    """Test data and settings needed for create_edx_user tests"""
+    settings.OPENEDX_OAUTH_APP_NAME = "test_app_name"
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    settings.MITX_ONLINE_OAUTH_PROVIDER = "test_provider"
+    settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN = "access_token"
+    return Application.objects.create(
+        name=settings.OPENEDX_OAUTH_APP_NAME,
+        user=None,
+        client_type="confidential",
+        authorization_grant_type="authorization-code",
+        skip_authorization=True,
+    )
 
 
 def test_validate_legal_address(sample_address):
@@ -63,9 +82,16 @@ def test_update_user_serializer(settings, user, sample_address):
     assert isinstance(user.legal_address, LegalAddress)
 
 
+@responses.activate
 @pytest.mark.django_db
 def test_create_user_serializer(settings, sample_address):
     """Test that a UserSerializer can be created properly"""
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        json={"validation_decisions": {"username": ""}},
+        status=status.HTTP_200_OK,
+    )
     serializer = UserSerializer(
         data={
             "username": "fakename",
@@ -135,6 +161,7 @@ def test_update_user_email(
     mock_change_edx_user_email_task.apply_async.assert_not_called()
 
 
+@responses.activate
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     "new_username, expect_valid, expect_saved_username",
@@ -147,13 +174,19 @@ def test_update_user_email(
     ],
 )
 def test_username_validation(
-    sample_address, new_username, expect_valid, expect_saved_username
+    sample_address, new_username, expect_valid, expect_saved_username, settings
 ):
     """
     UserSerializer should raise a validation error if the given username has invalid characters,
     or if there is already a user with that username after trimming and ignoring case. The saved
     username should have whitespace trimmed.
     """
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        json={"validation_decisions": {"username": ""}},
+        status=status.HTTP_200_OK,
+    )
     # Seed an initial user with a constant username
     UserFactory.create(username=USERNAME)
     serializer = UserSerializer(
@@ -171,8 +204,43 @@ def test_username_validation(
         assert instance.username == expect_saved_username
 
 
+@responses.activate
+def test_username_validation_exception(user, settings):
+    """
+    UserSerializer should raise a validation error if the given username has invalid characters,
+    or if there is already a user with that username after trimming and ignoring case. The saved
+    username should have whitespace trimmed.
+    """
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        json={
+            "validation_decisions": {
+                "username": f"It looks like {user.username} belongs to an existing account. Try again with a different username."
+            }
+        },
+        status=status.HTTP_200_OK,
+    )
+    # Seed an initial user with a constant username
+    UserFactory.create(username=USERNAME)
+    serializer = UserSerializer(
+        data={
+            "username": user.username,
+            "email": "email@example.com",
+            "password": "abcdefghi123",
+            "legal_address": sample_address,
+        }
+    )
+    assert serializer.is_valid() is False
+    assert (
+        str(serializer.errors["username"][0])
+        == "A user already exists with this username. Please try a different one."
+    )
+
+
+@responses.activate
 @pytest.mark.django_db
-def test_user_create_required_fields_post(sample_address):
+def test_user_create_required_fields_post(sample_address, settings):
     """
     UserSerializer should raise a validation error if a new User is being created and certain fields aren't
     included in the data.
@@ -185,6 +253,12 @@ def test_user_create_required_fields_post(sample_address):
     # Request path does not matter here
     request = rf.post("/")
     request.user = AnonymousUser()
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        json={"validation_decisions": {"username": ""}},
+        status=status.HTTP_200_OK,
+    )
     serializer = UserSerializer(
         data={**base_data, "username": USERNAME}, context={"request": request}
     )
