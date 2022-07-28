@@ -553,7 +553,6 @@ class FlexiblePricingRequestForm(AbstractForm):
     """
 
     intro = RichTextField(blank=True)
-    thank_you_text = RichTextField(blank=True)
     guest_text = RichTextField(
         null=True,
         blank=True,
@@ -579,7 +578,6 @@ class FlexiblePricingRequestForm(AbstractForm):
         FieldPanel("intro"),
         FieldPanel("guest_text"),
         InlinePanel("form_fields", label="Form Fields"),
-        FieldPanel("thank_you_text"),
         FieldPanel("application_processing_text"),
         FieldPanel("application_approved_text"),
         FieldPanel("application_denied_text"),

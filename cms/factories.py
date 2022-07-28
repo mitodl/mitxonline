@@ -64,7 +64,6 @@ class ResourcePageFactory(wagtail_factories.PageFactory):
 
 class FlexiblePricingFormFactory(wagtail_factories.PageFactory):
     intro = fuzzy.FuzzyText(prefix="Intro Text - ")
-    thank_you_text = fuzzy.FuzzyText(prefix="Thank You - ")
     guest_text = fuzzy.FuzzyText(prefix="Not Logged In - ")
     application_processing_text = fuzzy.FuzzyText(prefix="Application Processing - ")
     application_approved_text = fuzzy.FuzzyText(prefix="Application Approved - ")

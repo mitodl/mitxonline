@@ -20,7 +20,6 @@ To create a Flexible Pricing request form for a particular course:
  
    1. The Intro field text is displayed on the form regardless of the state of the request. 
    2. The Guest text is displayed if the learner isn't logged in yet.
-   3. The Thank You text is displayed if the learner is automatically approved for flexible pricing. (The text for the document request state is not customizable.)
    4. The Application Processing text is displayed if the learner navigates to the form again and their application is still being processed.
    5. The Application Approved text is displayed if the learner navigates to the form and their application has been approved.
    6. The Application Denied text is displayed if the learner navigates to the form and their application has been denied.
