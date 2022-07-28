@@ -714,3 +714,24 @@ class CourseRunGradeAudit(AuditModel):
     @classmethod
     def get_related_field_name(cls):
         return "course_run_grade"
+
+
+class PaidCourseRun(TimestampedModel):
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="paid_course_runs"
+    )
+
+    course_run = models.ForeignKey(
+        CourseRun, on_delete=models.CASCADE, related_name="paid_course_runs"
+    )
+
+    order = models.ForeignKey(
+        "ecommerce.Order", on_delete=models.CASCADE, related_name="paid_course_runs"
+    )
+
+    class Meta:
+        unique_together = ("user", "course_run", "order")
+
+    def __str__(self):
+        return f"Paid Course Run - {self.course_run.courseware_id} by {self.user.name}"

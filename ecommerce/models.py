@@ -4,8 +4,7 @@ from django.db import models, transaction
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from courses.models import CourseRun
-from courses.models import CourseRun
+from courses.models import CourseRun, PaidCourseRun
 from django_fsm import FSMField, transition
 from mitol.common.models import TimestampedModel
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
@@ -275,12 +274,17 @@ class Order(TimestampedModel):
         decimal_places=5,
         max_digits=20,
     )
+
     # Flag to determine if the order is in review status - if it is, then
     # we need to not step on the basket that may or may not exist when it is
     # accepted
     @property
     def is_review(self):
         return self.state == Order.STATE.REVIEW
+
+    @property
+    def is_fulfilled(self):
+        return self.state == Order.STATE.FULFILLED
 
     def fulfill(self, payment_data):
         """Fulfill this order"""
@@ -329,7 +333,51 @@ class Order(TimestampedModel):
         return refno.replace(f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-", "")
 
 
-class PendingOrder(Order):
+class FulfillableOrder:
+    """class to handle common logics like fulfill, enrollment etc"""
+
+    def create_transaction(self, payment_data):
+        self.transactions.create(
+            data=payment_data,
+            amount=self.total_price_paid,
+        )
+
+    def create_paid_courseruns(self):
+        for run in self.purchased_runs:
+            PaidCourseRun.objects.get_or_create(
+                order=self, course_run=run, user=self.purchaser
+            )
+
+    def create_enrollments(self):
+        # create enrollments for what the learner has paid for
+        create_run_enrollments(
+            self.purchaser,
+            self.purchased_runs,
+            mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            keep_failed_enrollments=True,
+        )
+
+    @transition(
+        field="state",
+        source=(Order.STATE.PENDING, Order.STATE.REVIEW),
+        target=Order.STATE.FULFILLED,
+    )
+    def fulfill(self, payment_data):
+
+        # record the transaction
+        self.create_transaction(payment_data)
+
+        # create enrollments for what the learner has paid for
+        self.create_enrollments()
+
+        # record all the courseruns in the order
+        self.create_paid_courseruns()
+
+        # send the receipt emails
+        send_ecommerce_order_receipt.delay(self.id)
+
+
+class PendingOrder(FulfillableOrder, Order):
     """An order that is pending payment"""
 
     @classmethod
@@ -376,27 +424,6 @@ class PendingOrder(Order):
 
         return order
 
-    @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.FULFILLED)
-    def fulfill(self, payment_data):
-        """Fulfill this order"""
-
-        # record the transaction
-        self.transactions.create(
-            data=payment_data,
-            amount=self.total_price_paid,
-        )
-
-        # create enrollments for what the learner has paid for
-        create_run_enrollments(
-            self.purchaser,
-            self.purchased_runs,
-            mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            keep_failed_enrollments=True,
-        )
-
-        # send the receipt emails
-        send_ecommerce_order_receipt.delay(self.id)
-
     @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.CANCELED)
     def cancel(self):
         """Cancel this order"""
@@ -420,7 +447,10 @@ class PendingOrder(Order):
         to store the transaction data, since there will technically be two of
         them).
         """
-        self.transactions.create(data=payment_data, amount=self.total_price_paid)
+        self.create_transaction(payment_data)
+
+        # record all the courserun in the order
+        self.create_paid_courseruns()
 
     class Meta:
         proxy = True
@@ -474,26 +504,8 @@ class FulfilledOrder(Order):
         proxy = True
 
 
-class ReviewOrder(Order):
+class ReviewOrder(FulfillableOrder, Order):
     """An order that has been placed under review by the payment processor."""
-
-    @transition(field="state", source=Order.STATE.REVIEW, target=Order.STATE.FULFILLED)
-    def fulfill(self, payment_data):
-        """Fulfill this order"""
-        from courses.api import create_run_enrollments
-
-        # record the transaction
-        self.transactions.create(
-            data=payment_data,
-            amount=self.total_price_paid,
-        )
-
-        # create enrollments for what the learner has paid for
-        create_run_enrollments(
-            self.purchaser,
-            self.purchased_runs,
-            mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        )
 
     class Meta:
         proxy = True
