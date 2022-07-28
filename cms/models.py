@@ -655,25 +655,16 @@ class FlexiblePricingRequestForm(AbstractForm):
         context = super().get_context(request, *args, **kwargs)
         context["course"] = self.get_parent_product_page()
 
-        if (
-            self.get_submission_class()
-            .objects.filter(page=self, user__pk=request.user.pk)
-            .exists()
-        ):
-            fp_request = (
-                FlexiblePrice.objects.filter(user__pk=request.user.pk)
-                .order_by("-created_on")
-                .first()
-            )
-
-            context["has_submission"] = True
-            context["prior_request"] = fp_request
+        fp_request = self.get_previous_submission(request)
+        context["prior_request"] = fp_request
 
         return context
 
     def serve(self, request, *args, **kwargs):
         previous_submission = self.get_previous_submission(request)
-        if request.method == "POST" and previous_submission is not None:
+        if request.method == "POST" and (
+            previous_submission is not None and not previous_submission.is_reset()
+        ):
             form = self.get_form(page=self, user=request.user)
 
             context = self.get_context(request)
