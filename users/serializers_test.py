@@ -34,17 +34,7 @@ def sample_address():
 @pytest.fixture()
 def application(settings):
     """Test data and settings needed for create_edx_user tests"""
-    settings.OPENEDX_OAUTH_APP_NAME = "test_app_name"
     settings.OPENEDX_API_BASE_URL = "http://example.com"
-    settings.MITX_ONLINE_OAUTH_PROVIDER = "test_provider"
-    settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN = "access_token"
-    return Application.objects.create(
-        name=settings.OPENEDX_OAUTH_APP_NAME,
-        user=None,
-        client_type="confidential",
-        authorization_grant_type="authorization-code",
-        skip_authorization=True,
-    )
 
 
 def test_validate_legal_address(sample_address):
