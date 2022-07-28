@@ -32,7 +32,9 @@ USER_GIVEN_NAME_RE = re.compile(
 USERNAME_RE_PARTIAL = r"[\w ._+-]+"
 USERNAME_RE = re.compile(rf"(?P<username>{USERNAME_RE_PARTIAL})")
 USERNAME_ERROR_MSG = "Username can only contain letters, numbers, spaces, and the following characters: _+-"
-USERNAME_ALREADY_EXISTS_MSG = "A user already exists with this username. Please try a different one."
+USERNAME_ALREADY_EXISTS_MSG = (
+    "A user already exists with this username. Please try a different one."
+)
 
 
 class LegalAddressSerializer(serializers.ModelSerializer):
@@ -112,7 +114,8 @@ class UserSerializer(serializers.ModelSerializer):
     def validate_username(self, value):
         """Validates the username field"""
         trimmed_value = value.strip()
-        if username_exists_in_openedx(trimmed_value): raise serializers.ValidationError(USERNAME_ALREADY_EXISTS_MSG)
+        if username_exists_in_openedx(trimmed_value):
+            raise serializers.ValidationError(USERNAME_ALREADY_EXISTS_MSG)
         if not re.fullmatch(USERNAME_RE, trimmed_value):
             raise serializers.ValidationError(USERNAME_ERROR_MSG)
         return trimmed_value

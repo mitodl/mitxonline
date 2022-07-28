@@ -123,6 +123,7 @@ class UnknownEdxApiEmailSettingsException(Exception):
             )
         super().__init__(msg)
 
+
 class EdxApiRegistrationValidationException(Exception):
     """An edX Registration Validation API call resulted in an error response"""
 
