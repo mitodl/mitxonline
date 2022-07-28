@@ -42,6 +42,7 @@ from openedx.exceptions import (
     UserNameUpdateFailedException,
     EdxApiEmailSettingsErrorException,
     UnknownEdxApiEmailSettingsException,
+    EdxApiRegistrationValidationException,
 )
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
 from openedx.utils import edx_url, SyncResult
@@ -50,6 +51,7 @@ log = logging.getLogger(__name__)
 User = get_user_model()
 
 OPENEDX_REGISTER_USER_PATH = "/user_api/v1/account/registration/"
+OPENEDX_VALIDATION_REGISTRATION_PATH = "/api/user/v1/validation/registration"
 OPENEDX_REQUEST_DEFAULTS = dict(country="US", honor_code=True)
 
 OPENEDX_SOCIAL_LOGIN_XPRO_PATH = "/auth/login/mitxpro-oauth2/?auth_entry=login"
@@ -712,3 +714,32 @@ def unsubscribe_from_edx_course_emails(user, course_run):
     except Exception as exc:
         raise UnknownEdxApiEmailSettingsException(user, course_run, exc) from exc
     return result
+
+def username_exists_in_openedx(username):
+    """
+    Returns true if the username exists within Open edX.
+    Returns false if the username does not exists in Open edX.
+
+    Args:
+        username (str): the username
+        
+    Raises:
+        EdxApiRegistrationValidationException: Raised if the edX API HTTP request fails
+    """
+    
+    req_session = requests.Session()
+    req_session.headers.update(
+                {
+                    ACCESS_TOKEN_HEADER_NAME: settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN
+                }
+            )
+    resp = req_session.post(
+        edx_url(OPENEDX_VALIDATION_REGISTRATION_PATH),
+        data=dict(
+            username=username,
+        ),
+    )
+    if resp.status_code != status.HTTP_200_OK:
+            raise EdxApiRegistrationValidationException(username, resp)
+    result = resp.json()
+    return result['validation_decisions']['username'] == "It looks like {} belongs to an existing account. Try again with a different username.".format(username) 

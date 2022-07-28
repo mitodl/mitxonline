@@ -14,6 +14,7 @@ from mail import verification_api
 from main.serializers import WriteableSerializerMethodField
 from openedx.tasks import change_edx_user_email_async
 from users.models import ChangeEmailRequest, LegalAddress, Profile, User
+from openedx.api import username_exists_in_openedx
 
 log = logging.getLogger()
 
@@ -31,6 +32,7 @@ USER_GIVEN_NAME_RE = re.compile(
 USERNAME_RE_PARTIAL = r"[\w ._+-]+"
 USERNAME_RE = re.compile(rf"(?P<username>{USERNAME_RE_PARTIAL})")
 USERNAME_ERROR_MSG = "Username can only contain letters, numbers, spaces, and the following characters: _+-"
+USERNAME_ALREADY_EXISTS_MSG = "A user already exists with this username. Please try a different one."
 
 
 class LegalAddressSerializer(serializers.ModelSerializer):
@@ -95,7 +97,7 @@ class UserSerializer(serializers.ModelSerializer):
         validators=[
             UniqueValidator(
                 queryset=User.objects.all(),
-                message="A user already exists with this username. Please try a different one.",
+                message=USERNAME_ALREADY_EXISTS_MSG,
                 lookup="iexact",
             )
         ],
@@ -110,6 +112,7 @@ class UserSerializer(serializers.ModelSerializer):
     def validate_username(self, value):
         """Validates the username field"""
         trimmed_value = value.strip()
+        if username_exists_in_openedx(trimmed_value): raise serializers.ValidationError(USERNAME_ALREADY_EXISTS_MSG)
         if not re.fullmatch(USERNAME_RE, trimmed_value):
             raise serializers.ValidationError(USERNAME_ERROR_MSG)
         return trimmed_value

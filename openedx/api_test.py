@@ -20,6 +20,7 @@ from main.test_utils import MockHttpError, MockResponse
 from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
     OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS,
+    OPENEDX_VALIDATION_REGISTRATION_PATH,
     create_edx_auth_token,
     create_edx_user,
     create_user,
@@ -34,6 +35,7 @@ from openedx.api import (
     retry_failed_edx_enrollments,
     subscribe_to_edx_course_emails,
     unsubscribe_from_edx_course_emails,
+    username_exists_in_openedx,
 )
 from openedx.constants import (
     EDX_ENROLLMENT_AUDIT_MODE,
@@ -43,6 +45,7 @@ from openedx.constants import (
 )
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
+    EdxApiRegistrationValidationException,
     OpenEdxUserCreateError,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
@@ -93,6 +96,12 @@ def test_create_edx_user(user, settings, application, access_token_count):
         json=dict(success=True),
         status=status.HTTP_200_OK,
     )
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        json={"validation_decisions": { "username": ""}},
+        status=status.HTTP_200_OK,
+    )
 
     for _ in range(access_token_count):
         AccessToken.objects.create(
@@ -137,12 +146,41 @@ def test_create_edx_user_conflict(settings, user):
         json=dict(username="exists"),
         status=status.HTTP_409_CONFLICT,
     )
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        json={"validation_decisions": { "username": ""}},
+        status=status.HTTP_200_OK,
+    )
 
     with pytest.raises(OpenEdxUserCreateError):
         create_edx_user(user)
 
     assert OpenEdxUser.objects.count() == 0
 
+@responses.activate
+def test_validate_edx_username_conflict(settings, user):
+    """Test that username_exists_in_openedx handles a username validation conflict"""
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        json={"validation_decisions": { "username": f"It looks like {user.username} belongs to an existing account. Try again with a different username."}},
+        status=status.HTTP_200_OK,
+    )
+
+    assert username_exists_in_openedx(user.username) == True
+
+@responses.activate
+def test_validate_edx_username_conflict(settings, user):
+    """Test that username_exists_in_openedx raises an exception for non-200 response"""
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        json={"validation_decisions": { "username": f"It looks like {user.username} belongs to an existing account. Try again with a different username."}},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+    with pytest.raises(EdxApiRegistrationValidationException):
+        username_exists_in_openedx(user.username)
 
 @responses.activate
 @freeze_time("2019-03-24 11:50:36")
@@ -210,6 +248,13 @@ def test_update_edx_user_email(settings, user):
         json=dict(success=True),
         status=status.HTTP_200_OK,
     )
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        json={"validation_decisions": { "username": ""}},
+        status=status.HTTP_200_OK,
+    )
+    
 
     create_edx_user(user)
 
