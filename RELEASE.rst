@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.39.6
+--------------
+
+- Add data models and command to import MM data
+- Adding Google Sheets Refunds functionality to mitxonline (#723)
+
 Version 0.39.5 (Released July 28, 2022)
 --------------
 
