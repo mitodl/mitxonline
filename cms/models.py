@@ -589,7 +589,7 @@ class FlexiblePricingRequestForm(AbstractForm):
 
     form_builder = FlexiblePricingFormBuilder
     template = "flexiblepricing/flexible_pricing_request_form.html"
-    landing_page_template = "flexiblepricing/flexible_pricing_request_form_landing.html"
+    landing_page_template = "flexiblepricing/flexible_pricing_request_form.html"
 
     def get_submission_class(self):
         return FlexiblePricingRequestSubmission
