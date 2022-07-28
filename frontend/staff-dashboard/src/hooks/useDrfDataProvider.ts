@@ -121,7 +121,7 @@ const useDrfDataProvider = (
         if (data.hasOwnProperty('results')) {
             return {
                 data: data['results'],
-                total: data['total']
+                total: data['count']
             };
         } else {
             return {
