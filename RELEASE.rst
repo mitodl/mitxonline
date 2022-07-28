@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.39.5
+Version 0.39.5 (Released July 28, 2022)
 --------------
 
 - Use count instead of total from the API response (#752)
