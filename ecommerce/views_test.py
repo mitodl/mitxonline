@@ -26,6 +26,7 @@ from ecommerce.models import (
     UserDiscount,
     DiscountProduct,
 )
+from courses.models import PaidCourseRun
 from ecommerce.serializers import (
     ProductSerializer,
     BasketSerializer,
@@ -430,8 +431,32 @@ def test_checkout_result(
         resp = user_client.post(reverse("checkout-result-callback"), payload)
         assert resp.status_code == 302
         assert resp.url == expected_redirect_url
+
+        # test if course run is recorded in PaidCourseRun for fulfilled order
+        course_run = order.purchased_runs[0]
+        paid_courserun_count = PaidCourseRun.objects.filter(
+            order=order, course_run=course_run, user=order.purchaser
+        ).count()
+        assert paid_courserun_count == 1
+
+    elif decision == "ACCEPT":
+
+        # test if course run is recorded in PaidCourseRun for review order
+        course_run = order.purchased_runs[0]
+        paid_courserun_count = PaidCourseRun.objects.filter(
+            order=order, course_run=course_run, user=order.purchaser
+        ).count()
+        assert paid_courserun_count == 1
+
     else:
         assert order.state == expected_state
+
+        # there should be no record in PaidCourseRun if order is in other states
+        course_run = order.purchased_runs[0]
+        paid_courserun_count = PaidCourseRun.objects.filter(
+            order=order, course_run=course_run, user=order.purchaser
+        ).count()
+        assert paid_courserun_count == 0
 
     assert Basket.objects.filter(id=basket.id).exists() is basket_exists
 
