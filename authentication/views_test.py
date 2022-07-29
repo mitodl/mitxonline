@@ -122,7 +122,6 @@ def noop():
     yield
 
 
-@pytest.mark.usefixtures("validate_username")
 class AuthStateMachine(RuleBasedStateMachine):
     """
     State machine for auth flows
