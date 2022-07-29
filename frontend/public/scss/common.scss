@@ -275,3 +275,101 @@ button.btn-secondary.unstyled {
   box-shadow: none;
   cursor: pointer;
 }
+
+.flexible-pricing-head {
+  margin-left: 15px;
+
+  h1 {
+    font-size: 32px;
+    line-height: 38px;
+    font-weight: bold;
+  }
+
+  p {
+    line-height: 24px;
+    font-size: 18px;
+    font-weight: 100;
+  }
+}
+
+.flexible-price-certificate-btn {
+  float: left;
+  margin-top: 28px;
+  background-color: #A41E34;
+  margin-left: 15px;
+  @include media-breakpoint-down(sm) {
+    margin-bottom: 100px;
+  }
+}
+
+.flexible-pricing-form {
+  margin-top: 44px;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 425px;
+  padding: 24px 24px 32px 24px !important;
+  border-width: 0 !important;
+
+  .auth-header {
+    .tell-us-about-your-income {
+      font-size: 22px;
+      line-height: 22px;
+    }
+  }
+
+  div {
+    button {
+      line-height: 59px;
+      width: 285px;
+      padding: 0 50px !important;
+      margin-top: 7px;
+    }
+  }
+
+  .form-group {
+    margin-bottom: 24px;
+
+    input[type=number], select {
+      height: 48px;
+      max-width: 377px;
+    }
+
+    #your_income_label {
+      margin-top: 16px;
+      font-size: 16px;
+      line-height: 16px;
+      @include media-breakpoint-down(sm) {
+        margin-top: 15px;
+      }
+    }
+
+    .income_currency_label {
+      float: right;
+      margin: 5px 0;
+      height: 16px;
+      width: 192px;
+      color: #666666;
+      font-size: 14px;
+      letter-spacing: 0;
+      line-height: 16px;
+      text-align: right;
+
+      @include media-breakpoint-down(sm) {
+        font-size: 12px;
+        margin: -27px 0 0 0;
+      }
+    }
+
+    .financial-assist-testify {
+      color: grey;
+      max-width: 350px;
+      line-height: 16px;
+      display: inline-flex;
+      text-align: left;
+      font-size: 14px;
+      @include media-breakpoint-down(sm) {
+        max-width: 275px;
+      }
+    }
+  }
+}

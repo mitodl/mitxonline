@@ -6,13 +6,10 @@
 {% block content %}
 
 <div id="main" class="main-page-content">
-  <div class="std-page-body container auth-page">
-    <div class="auth-card card-shadow auth-form">
-      <div class="auth-header">
-        <h1 class="text-uppercase" id="{{ page.title|slugify }}">Request Flexible Pricing</h1>
-        <p>{{ page.title }}</p>
-        {{ self.thank_you_text|richtext }}
-      </div>
+  <div class="std-page-body container">
+    <div class="flexible-pricing-head">
+      <h1>{{ page.title|richtext }}</h1>
+      {{ self.thank_you_text|richtext }}
     </div>
   </div>
 </div>
