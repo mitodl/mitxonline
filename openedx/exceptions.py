@@ -132,7 +132,7 @@ class EdxApiRegistrationValidationException(Exception):
         Sets exception properties and adds a default message
 
         Args:
-            username (str): The user for which the enrollment failed
+            username (str): The username being compared for uniqueness
             http_error (requests.exceptions.HTTPError): The exception from the API call which contains
                 request and response data.
         """
