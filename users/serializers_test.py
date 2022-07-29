@@ -232,7 +232,10 @@ def test_username_validation_exception(user, settings):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("exception_raised", [EdxApiRegistrationValidationException, RequestsConnectionError, HTTPError])
+@pytest.mark.parametrize(
+    "exception_raised",
+    [EdxApiRegistrationValidationException, RequestsConnectionError, HTTPError],
+)
 def test_username_validation_connection_exception(
     mocker, exception_raised, sample_address
 ):
