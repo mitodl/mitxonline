@@ -122,6 +122,7 @@ def noop():
     yield
 
 
+@pytest.mark.usefixtures("validate_username")
 class AuthStateMachine(RuleBasedStateMachine):
     """
     State machine for auth flows
@@ -151,6 +152,10 @@ class AuthStateMachine(RuleBasedStateMachine):
     email_send_patcher = patch(
         "mail.verification_api.send_verification_email", autospec=True
     )
+    mock_api_patcher = patch(
+        "users.serializers.UserSerializer.validate_username",
+        return_value="dummy-username",
+    )
     openedx_api_patcher = patch("authentication.pipeline.user.openedx_api")
     openedx_tasks_patcher = patch("authentication.pipeline.user.openedx_tasks")
 
@@ -163,6 +168,7 @@ class AuthStateMachine(RuleBasedStateMachine):
 
         # wrap the execution in a patch()
         self.mock_email_send = self.email_send_patcher.start()
+        self.mock_api = self.mock_api_patcher.start()
         self.mock_openedx_api = self.openedx_api_patcher.start()
         self.mock_openedx_tasks = self.openedx_tasks_patcher.start()
 
@@ -186,6 +192,7 @@ class AuthStateMachine(RuleBasedStateMachine):
         self.email_send_patcher.stop()
         self.openedx_api_patcher.stop()
         self.openedx_tasks_patcher.stop()
+        self.mock_api_patcher.stop()
 
         # end the transaction with a rollback to cleanup any state
         transaction.set_rollback(True)
