@@ -229,9 +229,12 @@ def test_username_validation_exception(user, settings):
         == "A user already exists with this username. Please try a different one."
     )
 
+
 @pytest.mark.django_db
 @pytest.mark.parametrize("exception_raised", [RequestsConnectionError, HTTPError])
-def test_username_validation_connection_exception(mocker, exception_raised, sample_address):
+def test_username_validation_connection_exception(
+    mocker, exception_raised, sample_address
+):
     """
     UserSerializer should raise a RequestsConnectionError or HTTPError if the connection to OpenEdx
     fails.  The serializer should still be valid.
