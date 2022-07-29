@@ -118,17 +118,19 @@ class UserSerializer(serializers.ModelSerializer):
     def validate_username(self, value):
         """Validates the username field"""
         trimmed_value = value.strip()
+        openedx_username_taken = False
         try:
-            username_exists_in_openedx(trimmed_value)
+            openedx_username_taken = username_exists_in_openedx(trimmed_value)
         except (
             HTTPError,
             RequestsConnectionError,
+            EdxApiRegistrationValidationException,
         ):
             log.exception(
                 "edX username verification failure for username: %s",
                 trimmed_value,
             )
-        except EdxApiRegistrationValidationException:
+        if openedx_username_taken:
             raise serializers.ValidationError(USERNAME_ALREADY_EXISTS_MSG)
         if not re.fullmatch(USERNAME_RE, trimmed_value):
             raise serializers.ValidationError(USERNAME_ERROR_MSG)

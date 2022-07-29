@@ -1,6 +1,7 @@
 """Tests for users.serializers"""
 from requests import HTTPError
 from openedx.api import OPENEDX_VALIDATION_REGISTRATION_PATH
+from openedx.exceptions import EdxApiRegistrationValidationException
 import pytest
 import responses
 from django.contrib.auth.models import AnonymousUser
@@ -231,7 +232,7 @@ def test_username_validation_exception(user, settings):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("exception_raised", [RequestsConnectionError, HTTPError])
+@pytest.mark.parametrize("exception_raised", [EdxApiRegistrationValidationException, RequestsConnectionError, HTTPError])
 def test_username_validation_connection_exception(
     mocker, exception_raised, sample_address
 ):
