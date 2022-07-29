@@ -6,6 +6,7 @@ from django.contrib import admin
 from django.db import models
 from django.forms import TextInput
 from mitol.common.admin import TimestampedModelAdmin
+from django.contrib.admin.decorators import display
 
 from courses.models import (
     Course,
@@ -20,6 +21,7 @@ from courses.models import (
     ProgramEnrollment,
     ProgramEnrollmentAudit,
     ProgramRun,
+    PaidCourseRun,
 )
 from main.admin import AuditableModelAdmin
 from main.utils import get_field_names
@@ -308,6 +310,36 @@ class BlockedCountryAdmin(TimestampedModelAdmin):
     raw_id_fields = ("course",)
 
 
+class PaidCourseRunAdmin(TimestampedModelAdmin):
+    """Admin for PaidCourseRun"""
+
+    model = PaidCourseRun
+    list_display = [
+        "id",
+        "get_user_email",
+        "get_courseware_id",
+        "get_order_id",
+        "get_order_state",
+    ]
+    search_fields = ["course_run__courseware_id", "user__username", "user__email"]
+
+    @display(description="User")
+    def get_user_email(self, obj):
+        return obj.user.email
+
+    @display(description="Course Run")
+    def get_courseware_id(self, obj):
+        return obj.course_run.courseware_id
+
+    @display(description="Order ID")
+    def get_order_id(self, obj):
+        return obj.order.id
+
+    @display(description="Order State")
+    def get_order_state(self, obj):
+        return obj.order.state
+
+
 admin.site.register(Program, ProgramAdmin)
 admin.site.register(ProgramRun, ProgramRunAdmin)
 admin.site.register(Course, CourseAdmin)
@@ -320,3 +352,4 @@ admin.site.register(CourseRunGrade, CourseRunGradeAdmin)
 admin.site.register(CourseRunGradeAudit, CourseRunGradeAuditAdmin)
 admin.site.register(CourseTopic, CourseTopicAdmin)
 admin.site.register(BlockedCountry, BlockedCountryAdmin)
+admin.site.register(PaidCourseRun, PaidCourseRunAdmin)

@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.39.5 (Released July 28, 2022)
+--------------
+
+- Use count instead of total from the API response (#752)
+- 728: flexible pricing learner cant resubmit income after request has been denied reset (#746)
+- Flexible pricing clean up email template (#743)
+- Bump moment from 2.29.2 to 2.29.4 (#712)
+
 Version 0.39.4 (Released July 27, 2022)
 --------------
 

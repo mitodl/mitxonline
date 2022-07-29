@@ -11,7 +11,7 @@ from django.conf import settings
 from django.db import models
 from django.http import Http404
 from django.urls import reverse
-from django.forms import ChoiceField
+from django.forms import ChoiceField, DecimalField
 from django.template.response import TemplateResponse
 
 from mitol.common.utils.datetime import now_in_utc
@@ -40,9 +40,9 @@ from wagtail.contrib.forms.models import (
 from django.core.serializers.json import DjangoJSONEncoder
 
 from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
-from cms.constants import COURSE_INDEX_SLUG, CMS_EDITORS_GROUP_NAME
+from cms.constants import COURSE_INDEX_SLUG
 from courses.api import get_user_relevant_course_run
-
+from main.views import get_base_context
 from flexiblepricing.api import (
     determine_tier_courseware,
     determine_auto_approval,
@@ -82,6 +82,12 @@ class FlexiblePricingFormBuilder(FormBuilder):
     exchange rates in the system. (So, no exchange rate = no option.)
     """
 
+    def create_number_field(self, field, options):
+        options["error_messages"] = {
+            "required": f"{options['label']} is a required field."
+        }
+        return DecimalField(**options)
+
     def create_country_field(self, field, options):
         exchange_rates = []
 
@@ -94,6 +100,9 @@ class FlexiblePricingFormBuilder(FormBuilder):
             exchange_rates.append((record.currency_code, desc))
 
         options["choices"] = exchange_rates
+        options["error_messages"] = {
+            "required": f"{options['label']} is a required field."
+        }
         return ChoiceField(**options)
 
 
@@ -192,6 +201,7 @@ class HomePage(Page):
     def get_context(self, request, *args, **kwargs):
         return {
             **super().get_context(request),
+            **get_base_context(request),
             "product_cards_section_title": self.product_section_title,
             "products": self.products,
         }
@@ -486,6 +496,7 @@ class CoursePage(ProductPage):
         )
         return {
             **super().get_context(request, *args, **kwargs),
+            **get_base_context(request),
             "run": relevant_run,
             "is_enrolled": is_enrolled,
             "sign_in_url": sign_in_url,
@@ -530,6 +541,7 @@ class ResourcePage(Page):
     def get_context(self, request, *args, **kwargs):
         return {
             **super().get_context(request, *args, **kwargs),
+            **get_base_context(request),
             "site_name": settings.SITE_NAME,
         }
 
@@ -552,6 +564,21 @@ class FlexiblePricingRequestForm(AbstractForm):
     link to a CoursePage if the form in question is a child page of one.
     """
 
+    RICH_TEXT_FIELD_FEATURES = [
+        "h1",
+        "h2",
+        "h3",
+        "ol",
+        "ul",
+        "hr",
+        "bold",
+        "italic",
+        "link",
+        "document-link",
+        "image",
+        "embed",
+    ]
+
     intro = RichTextField(blank=True)
     guest_text = RichTextField(
         null=True,
@@ -562,16 +589,19 @@ class FlexiblePricingRequestForm(AbstractForm):
         null=True,
         blank=True,
         help_text="What to show if the user's request is being processed.",
+        features=RICH_TEXT_FIELD_FEATURES,
     )
     application_approved_text = RichTextField(
         null=True,
         blank=True,
         help_text="What to show if the user's request has been approved.",
+        features=RICH_TEXT_FIELD_FEATURES,
     )
     application_denied_text = RichTextField(
         null=True,
         blank=True,
         help_text="What to show if the user's request has been denied.",
+        features=RICH_TEXT_FIELD_FEATURES,
     )
 
     content_panels = AbstractForm.content_panels + [

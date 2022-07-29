@@ -1,6 +1,7 @@
 """
 mitx_online views
 """
+from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
 from django.http import HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
@@ -10,15 +11,25 @@ from django.views.decorators.cache import never_cache
 from rest_framework.pagination import LimitOffsetPagination
 
 
+def get_base_context(request):
+    """
+    Returns the template context key/values needed for the base template and all templates that extend it
+    """
+    context = {}
+    if settings.GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE:
+        context[
+            "domain_verification_tag"
+        ] = settings.GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE
+    return context
+
+
 @never_cache
 def index(request, **kwargs):
     """
     The index view. Display available programs
     """
-    return render(
-        request,
-        "index.html",
-    )
+    context = get_base_context(request)
+    return render(request, "index.html", context=context)
 
 
 @never_cache
@@ -26,20 +37,22 @@ def refine(request, **kwargs):
     """
     The refine view for the staff dashboard
     """
-    return render(
-        request,
-        "refine.html",
-    )
+    return render(request, "refine.html", context=get_base_context(request))
 
 
 def handler404(request, exception):  # pylint: disable=unused-argument
     """404: NOT FOUND ERROR handler"""
-    return HttpResponseNotFound(render_to_string("404.html", request=request))
+    context = get_base_context(request)
+    return HttpResponseNotFound(
+        render_to_string("404.html", request=request, context=get_base_context(request))
+    )
 
 
 def handler500(request):
     """500 INTERNAL SERVER ERROR handler"""
-    return HttpResponseServerError(render_to_string("500.html", request=request))
+    return HttpResponseServerError(
+        render_to_string("500.html", request=request, context=get_base_context(request))
+    )
 
 
 def cms_signin_redirect_to_site_signin(request):
