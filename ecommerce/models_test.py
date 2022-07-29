@@ -14,6 +14,7 @@ from ecommerce.models import (
     UserDiscount,
     BasketDiscount,
     PendingOrder,
+    Product,
     FulfilledOrder,
     RefundedOrder,
     Transaction,
@@ -255,3 +256,21 @@ def test_basket_order_equivalency(user, basket, unlimited_discount):
     basket.refresh_from_db()
 
     assert basket.compare_to_order(order) is False
+
+
+def test_product_delete_protection_inactive():
+    """Test that deleting product(s) instead de-activates it"""
+    single_product = ProductFactory.create()
+    single_product.delete()
+
+    # Assert single product delete
+    assert Product.all_objects.filter(is_active=False).count() == 1
+
+    multiple_products = ProductFactory.create_batch(5)
+    Product.objects.all().delete()
+
+    # Assert multiple products delete (QuerySet)
+    assert (
+        Product.all_objects.filter(is_active=False).count()
+        == len(multiple_products) + 1
+    )  # Additional 1 from above
