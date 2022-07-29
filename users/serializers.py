@@ -127,9 +127,9 @@ class UserSerializer(serializers.ModelSerializer):
             RequestsConnectionError,
         ):
             log.exception(
-            "edX username verification failure for username: %s",
-            trimmed_value,
-        )
+                "edX username verification failure for username: %s",
+                trimmed_value,
+            )
         if username_exist_in_openedx:
             raise serializers.ValidationError(USERNAME_ALREADY_EXISTS_MSG)
         if not re.fullmatch(USERNAME_RE, trimmed_value):

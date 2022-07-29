@@ -197,9 +197,8 @@ def test_username_validation(
 @responses.activate
 def test_username_validation_exception(user, settings):
     """
-    UserSerializer should raise a validation error if the given username has invalid characters,
-    or if there is already a user with that username after trimming and ignoring case. The saved
-    username should have whitespace trimmed.
+    UserSerializer should raise a EdxApiRegistrationValidationException if the username already exists
+    in OpenEdx.
     """
     responses.add(
         responses.POST,
