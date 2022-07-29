@@ -1,4 +1,5 @@
 """Tests for users.serializers"""
+from requests import HTTPError
 from openedx.api import OPENEDX_VALIDATION_REGISTRATION_PATH
 import pytest
 import responses
@@ -7,6 +8,8 @@ from django.contrib.auth.models import AnonymousUser
 from django.test.client import RequestFactory
 from rest_framework.exceptions import ValidationError
 from rest_framework import status
+
+from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from users.factories import UserFactory
 from users.models import ChangeEmailRequest, LegalAddress
@@ -225,6 +228,25 @@ def test_username_validation_exception(user, settings):
         str(serializer.errors["username"][0])
         == "A user already exists with this username. Please try a different one."
     )
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("exception_raised", [RequestsConnectionError, HTTPError])
+def test_username_validation_connection_exception(mocker, exception_raised, sample_address):
+    """
+    UserSerializer should raise a RequestsConnectionError or HTTPError if the connection to OpenEdx
+    fails.  The serializer should still be valid.
+    """
+    mocker.patch("openedx.api.username_exists_in_openedx", side_effect=exception_raised)
+
+    serializer = UserSerializer(
+        data={
+            "username": "unique-username",
+            "email": "email11111@example.com",
+            "password": "abcdefghi123",
+            "legal_address": sample_address,
+        }
+    )
+    assert serializer.is_valid() is True
 
 
 @responses.activate
