@@ -3,6 +3,10 @@ import logging
 import re
 from collections import defaultdict
 
+from requests import HTTPError
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from openedx.exceptions import EdxApiRegistrationValidationException
+
 import pycountry
 from django.db import transaction
 from rest_framework import serializers
@@ -114,7 +118,19 @@ class UserSerializer(serializers.ModelSerializer):
     def validate_username(self, value):
         """Validates the username field"""
         trimmed_value = value.strip()
-        if username_exists_in_openedx(trimmed_value):
+        username_exist_in_openedx = False
+        try:
+            username_exist_in_openedx = username_exists_in_openedx(trimmed_value)
+        except (
+            EdxApiRegistrationValidationException,
+            HTTPError,
+            RequestsConnectionError,
+        ):
+            log.exception(
+            "edX username verification failure for username: %s",
+            trimmed_value,
+        )
+        if username_exist_in_openedx:
             raise serializers.ValidationError(USERNAME_ALREADY_EXISTS_MSG)
         if not re.fullmatch(USERNAME_RE, trimmed_value):
             raise serializers.ValidationError(USERNAME_ERROR_MSG)
