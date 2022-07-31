@@ -86,7 +86,7 @@
                         {% for signatory in page.signatory_pages %}
                             <div class="col-sm-4 col-24 certify-by">
                                 <div class="signature-area">
-                                    <img src="{% image_version_url signatory.signature_image "max-150x50" %}" alt="{{ signatory.name }} signature" />
+                                    <img src="{% image_version_url signatory.signature_image 'max-150x50' %}" alt="{{ signatory.name }} signature" />
                                 </div>
                                 <span class="title">{{ signatory.name }}</span>
                                 {% if signatory.title_1 %}
@@ -117,7 +117,7 @@
         <div class="col cer-footer">
             <div class="certificate-logo">
                 <a href="https://web.mit.edu/" class="mit"></a>
-                <a href="/" class="xpro"></a>
+                <a href="/" class="xonline"></a>
                 <img src="{% static 'images/certificates/transparent-mit-xonline-logo.png' %}" alt="MIT xOnline">
             </div>
             <div class="cer-footer-info">

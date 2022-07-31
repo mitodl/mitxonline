@@ -59,7 +59,7 @@ from cms.constants import (
 )
 from cms.forms import CertificatePageForm
 from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset
-from courses.models import Course, Program
+from courses.models import Course, CourseRunCertificate, Program
 from main.views import get_base_context
 from flexiblepricing.api import (
     determine_tier_courseware,
@@ -139,6 +139,31 @@ class CertificateIndexPage(RoutablePageMixin, Page):
             super().can_create_at(parent)
             and not parent.get_children().type(cls).exists()
         )
+
+    @route(r"^([A-Fa-f0-9-]+)/?$")
+    def course_certificate(
+        self, request, uuid, *args, **kwargs
+    ):  # pylint: disable=unused-argument
+        """
+        Serve a course certificate by uuid
+        """
+        # Try to fetch a certificate by the uuid passed in the URL
+        try:
+            certificate = CourseRunCertificate.objects.get(uuid=uuid)
+        except CourseRunCertificate.DoesNotExist:
+            raise Http404()
+
+        # Get a CertificatePage to serve this request
+        certificate_page = (
+            certificate.course_run.course.page.certificate_page
+            if certificate.course_run.course.page
+            else None
+        )
+        if not certificate_page:
+            raise Http404()
+
+        certificate_page.certificate = certificate
+        return certificate_page.serve(request)
 
     @route(r"^$")
     def index_route(self, request, *args, **kwargs):
