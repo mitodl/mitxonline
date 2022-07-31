@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("courses", "0011_fix_default_enrollment_mode_for_existing_enrollments"),
+        ("courses", "0012_paidcourserun"),
     ]
 
     operations = [
