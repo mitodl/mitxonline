@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.39.6
+Version 0.39.6 (Released August 01, 2022)
 --------------
 
 - Add data models and command to import MM data
