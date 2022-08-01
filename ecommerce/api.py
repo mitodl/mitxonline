@@ -17,6 +17,7 @@ from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
 )
 
 from mitol.payment_gateway.api import (
@@ -57,6 +58,16 @@ def generate_checkout_payload(request):
                 {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
             ),
         }
+
+    if basket.has_user_purchased_same_courserun(request.user):
+        return {
+            "purchased_same_courserun": True,
+            "response": redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},
+            ),
+        }
+
     basket = establish_basket(request)
 
     order = PendingOrder.create_from_basket(basket)

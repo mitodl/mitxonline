@@ -2,6 +2,11 @@ import pytest
 import random
 
 from main.test_utils import assert_drf_json_equal
+from main.constants import (
+    USER_MSG_COOKIE_NAME,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
+)
+from main.utils import encode_json_cookie_value
 from django.urls import reverse
 from django.conf import settings
 from django.forms.models import model_to_dict
@@ -25,6 +30,7 @@ from ecommerce.models import (
     Discount,
     UserDiscount,
     DiscountProduct,
+    PendingOrder,
 )
 from courses.models import PaidCourseRun
 from ecommerce.serializers import (
@@ -37,7 +43,6 @@ from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from users.factories import UserFactory
-
 
 pytestmark = [pytest.mark.django_db]
 
@@ -160,6 +165,19 @@ def create_basket(user, products):
     basket_item = BasketItem(
         product=products[random.randrange(0, len(products))], basket=basket, quantity=1
     )
+    basket_item.save()
+
+    return basket
+
+
+def create_basket_with_product(user, product):
+    """
+    Bootstraps a basket with a specific product in it
+    """
+    basket = Basket(user=user)
+    basket.save()
+
+    basket_item = BasketItem(product=product, basket=basket, quantity=1)
     basket_item.save()
 
     return basket
@@ -657,3 +675,38 @@ def test_user_discounts_api(user_drf_client, admin_drf_client, discounts, user):
 
     data = resp.json()
     assert data["count"] > 0
+
+
+def test_paid_and_unpaid_courserun_checkout(
+    user, user_client, user_drf_client, products
+):
+    """
+    Tests checking out a paid or unpaid course run:
+     - If a course run is already paid, it should redirect to cart with 302 status code including a user message in the response cookies
+     - Otherwise, it should be successful with 200 status code
+    """
+    product = products[0]
+    basket = create_basket_with_product(user, product)
+    order = PendingOrder.create_from_basket(basket)
+    order.fulfill({"result": "Payment succeeded"})
+    order.save()
+
+    basket.delete()
+
+    # recreate basket with the same product and then call checkout/to_payment
+    basket = create_basket_with_product(user, product)
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_ENROLL_DUPLICATED}
+    )
+
+    basket.delete()
+
+    unpaid_product = products[1]
+    # create basket with different unpaid product
+    basket = create_basket_with_product(user, unpaid_product)
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+    assert resp.status_code == 200
