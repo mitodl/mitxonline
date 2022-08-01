@@ -109,6 +109,7 @@ export const USER_MSG_COOKIE_NAME = "user-message"
 export const USER_MSG_TYPE_ENROLLED = "enrolled"
 export const USER_MSG_TYPE_ENROLL_FAILED = "enroll-failed"
 export const USER_MSG_TYPE_ENROLL_BLOCKED = "enroll-blocked"
+export const USER_MSG_TYPE_ENROLL_DUPLICATED = "enroll-duplicated"
 export const USER_MSG_TYPE_COMPLETED_AUTH = "completed-auth"
 
 export const USER_MSG_TYPE_PAYMENT_DECLINED = "payment-declined"

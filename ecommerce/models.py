@@ -80,6 +80,25 @@ class Basket(TimestampedModel):
             ]
         )
 
+    def has_user_purchased_same_courserun(self, user):
+        """
+        Return true if any of the courses in the basket has already purchased
+        """
+        basket_items = self.basket_items.prefetch_related("product")
+        for item in basket_items:
+            purchased_object = item.product.purchasable_object
+            if isinstance(purchased_object, CourseRun):
+                # PaidCourseRun should only contain fulfilled or review orders
+                # but in order to avoid false positive passing in order__state__in here
+                if PaidCourseRun.objects.filter(
+                    user=user,
+                    course_run=purchased_object,
+                    order__state__in=[Order.STATE.FULFILLED, Order.STATE.REVIEW],
+                ).exists():
+                    return True
+
+        return False
+
     def compare_to_order(self, order):
         """
         Compares this basket with the specified order. An order is considered
@@ -363,7 +382,6 @@ class FulfillableOrder:
         target=Order.STATE.FULFILLED,
     )
     def fulfill(self, payment_data):
-
         # record the transaction
         self.create_transaction(payment_data)
 
