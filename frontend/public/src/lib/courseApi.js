@@ -48,3 +48,7 @@ export const generateStartDateText = (run: CourseRunDetail) => {
 
   return null
 }
+
+export const isFinancialAssistanceAvailable = (run: CourseRunDetail) => {
+  return !!run.page.financial_assistance_form_url;
+}

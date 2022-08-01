@@ -28,7 +28,7 @@ import {
   courseEmailsSubscriptionMutation
 } from "../lib/queries/enrollment"
 import { currentUserSelector } from "../lib/queries/users"
-import { isLinkableCourseRun, generateStartDateText } from "../lib/courseApi"
+import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText } from "../lib/courseApi"
 import {
   formatPrettyDateTimeAmPmTz,
   isSuccessResponse,
@@ -272,6 +272,52 @@ export class EnrolledItemCard extends React.Component<
     ) : (
       enrollment.run.course.title
     )
+    const certificateLinks = (
+      enrollment.run.products.length > 0 &&
+      enrollment.enrollment_mode === "audit" &&
+      isFinancialAssistanceAvailable(enrollment.run)
+    ) ? (
+      <div className="pricing-links">
+        <a className="financial-assist-link" href={enrollment.run.page.financial_assistance_form_url}>
+          Financial assistance?
+        </a>
+        <form
+          action="/cart/add/"
+          method="get"
+          className="text-center ml-auto"
+        >
+          <input
+            type="hidden"
+            name="product_id"
+            value={enrollment.run.products[0].id}
+          />
+          <button
+            type="submit"
+            className="btn btn-primary btn-gradient-red"
+          >
+            Get Certificate
+          </button>
+        </form>
+      </div>
+    ) : (
+      <form
+        action="/cart/add/"
+        method="get"
+        className="text-center ml-auto"
+      >
+        <input
+          type="hidden"
+          name="product_id"
+          value={enrollment.run.products[0].id}
+        />
+        <button
+          type="submit"
+          className="btn btn-primary btn-gradient-red"
+        >
+          Get Certificate
+        </button>
+      </form>
+    )
     const startDateDescription = generateStartDateText(enrollment.run)
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
     const courseId = enrollment.run.course_number
@@ -356,26 +402,7 @@ export class EnrolledItemCard extends React.Component<
                 {certLocation ? (
                   <a href={certLocation}>View certificate</a>
                 ) : null}
-                {enrollment.run.products.length > 0 &&
-                enrollmentMode === "audit" ? (
-                    <form
-                      action="/cart/add/"
-                      method="get"
-                      className="text-center ml-auto"
-                    >
-                      <input
-                        type="hidden"
-                        name="product_id"
-                        value={enrollment.run.products[0].id}
-                      />
-                      <button
-                        type="submit"
-                        className="btn btn-primary btn-gradient-red"
-                      >
-                      Get Certificate
-                      </button>
-                    </form>
-                  ) : null}
+                {certificateLinks}
               </div>
             </div>
           </div>

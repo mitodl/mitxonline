@@ -344,6 +344,9 @@
           color: #b43e3e;
         }
       }
+      form {
+        margin-bottom: 20px;
+      }
     }
   }
 
@@ -414,5 +417,23 @@
     text-decoration: underline;
     box-shadow: none;
     font-weight: bold;
+  }
+  form {
+    margin-bottom: 20px;
+  }
+}
+
+.financial-assistance-link {
+  height: 22px;
+  font-size: 18px;
+  font-weight: bold;
+  letter-spacing: 0;
+  line-height: 20px;
+  text-align: right;
+  text-decoration: underline;
+  margin-bottom: 0;
+
+  a {
+    color: black;
   }
 }

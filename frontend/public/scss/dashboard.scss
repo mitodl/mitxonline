@@ -29,7 +29,7 @@ $featureImgMobileHeight: 223px;
 
     @include media-breakpoint-up(md) {
       .row {
-        height: $featureImgHeight;
+        height: auto;
 
         > * {
           height: 100%;
@@ -97,12 +97,32 @@ $featureImgMobileHeight: 223px;
     a {
       text-decoration: underline;
       color: $light-gray;
-      margin-right: 2rem;
+      margin: auto 0;
     }
 
     form button.btn-primary {
       font-size: 14px;
       padding: 9px 18px;
+    }
+
+    .pricing-links {
+      display: flex;
+      margin-left: auto;
+
+      form button.btn-primary {
+        font-size: 14px;
+        padding: 0 18px;
+        margin-top: 0;
+        font-weight: 500;
+        height: 36px;
+        @include media-breakpoint-down(sm) {
+          height: auto;
+        }
+      }
+
+      .financial-assist-link {
+        margin: auto 23px auto auto;
+      }
     }
   }
 }
