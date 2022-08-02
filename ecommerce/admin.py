@@ -46,7 +46,17 @@ class ProductAdmin(VersionAdmin):
 
     model = Product
     search_fields = ["description", "price"]
-    list_display = ["id", "description", "price"]
+    list_display = ["id", "description", "price", "is_active"]
+
+    def has_delete_permission(self, request, obj=None):
+        """Disable the delete permission for Product models"""
+        return False
+
+    def get_queryset(self, request):
+        """
+        Return the all objects for the Product Admin
+        """
+        return self.model.all_objects.get_queryset()
 
 
 @admin.register(Basket)

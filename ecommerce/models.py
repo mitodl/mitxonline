@@ -37,6 +37,20 @@ def valid_purchasable_objects_list():
     )
 
 
+class ProductsQuerySet(models.QuerySet):
+    def delete(self):
+        self.update(is_active=False)
+
+
+class ActiveUndeleteManager(models.Manager):
+    """Query manager for active objects"""
+
+    # This can be used generally, for the models that have `is_active` field
+    def get_queryset(self):
+        """Getting the active queryset for manager"""
+        return ProductsQuerySet(self.model, using=self._db)
+
+
 @reversion.register(exclude=("created_on", "updated_on"))
 class Product(TimestampedModel):
     """
@@ -60,6 +74,13 @@ class Product(TimestampedModel):
         null=False,
         help_text="Controls visibility of the product in the app.",
     )
+
+    objects = ActiveUndeleteManager()
+    all_objects = models.Manager()
+
+    def delete(self):
+        self.is_active = False
+        self.save(update_fields=("is_active",))
 
     def __str__(self):
         return f"#{self.id} {self.description} {self.price}"
