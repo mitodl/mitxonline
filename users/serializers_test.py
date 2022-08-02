@@ -1,6 +1,6 @@
 """Tests for users.serializers"""
 from requests import HTTPError
-from openedx.api import OPENEDX_VALIDATION_REGISTRATION_PATH
+from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
 from openedx.exceptions import EdxApiRegistrationValidationException
 import pytest
 import responses
@@ -82,7 +82,7 @@ def test_create_user_serializer(settings, sample_address):
     """Test that a UserSerializer can be created properly"""
     responses.add(
         responses.POST,
-        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
         json={"validation_decisions": {"username": ""}},
         status=status.HTTP_200_OK,
     )
@@ -177,7 +177,7 @@ def test_username_validation(
     """
     responses.add(
         responses.POST,
-        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
         json={"validation_decisions": {"username": ""}},
         status=status.HTTP_200_OK,
     )
@@ -206,7 +206,7 @@ def test_username_validation_exception(user, settings):
     """
     responses.add(
         responses.POST,
-        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
         json={
             "validation_decisions": {
                 "username": f"It looks like {user.username} belongs to an existing account. Try again with a different username."
@@ -273,7 +273,7 @@ def test_user_create_required_fields_post(sample_address, settings):
     request.user = AnonymousUser()
     responses.add(
         responses.POST,
-        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
         json={"validation_decisions": {"username": ""}},
         status=status.HTTP_200_OK,
     )

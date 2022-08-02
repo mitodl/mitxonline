@@ -51,7 +51,7 @@ log = logging.getLogger(__name__)
 User = get_user_model()
 
 OPENEDX_REGISTER_USER_PATH = "/user_api/v1/account/registration/"
-OPENEDX_VALIDATION_REGISTRATION_PATH = "/api/user/v1/validation/registration"
+OPENEDX_REGISTRATION_VALIDATION_PATH = "/api/user/v1/validation/registration"
 OPENEDX_REQUEST_DEFAULTS = dict(country="US", honor_code=True)
 
 OPENEDX_SOCIAL_LOGIN_XPRO_PATH = "/auth/login/mitxpro-oauth2/?auth_entry=login"
@@ -733,7 +733,7 @@ def username_exists_in_openedx(username):
         {ACCESS_TOKEN_HEADER_NAME: settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN}
     )
     resp = req_session.post(
-        edx_url(OPENEDX_VALIDATION_REGISTRATION_PATH),
+        edx_url(OPENEDX_REGISTRATION_VALIDATION_PATH),
         data=dict(
             username=username,
         ),

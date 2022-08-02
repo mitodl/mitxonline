@@ -1,7 +1,7 @@
 """Tests of user pipeline actions"""
 # pylint: disable=redefined-outer-name
 
-from openedx.api import OPENEDX_VALIDATION_REGISTRATION_PATH
+from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
 import pytest
 import responses
 from django.contrib.auth import get_user_model
@@ -260,7 +260,7 @@ def test_create_user_via_email(
     """
     responses.add(
         responses.POST,
-        settings.OPENEDX_API_BASE_URL + OPENEDX_VALIDATION_REGISTRATION_PATH,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
         json={"validation_decisions": {"username": ""}},
         status=status.HTTP_200_OK,
     )
