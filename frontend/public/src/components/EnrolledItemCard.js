@@ -282,27 +282,27 @@ export class EnrolledItemCard extends React.Component<
       enrollment.run.products.length > 0 &&
       enrollment.enrollment_mode === "audit"
     ) ? (
-      <div className="pricing-links">
-        {financialAssistanceLink}
-        <form
-          action="/cart/add/"
-          method="get"
-          className="text-center ml-auto"
-        >
-          <input
-            type="hidden"
-            name="product_id"
-            value={enrollment.run.products[0].id}
-          />
-          <button
-            type="submit"
-            className="btn btn-primary btn-gradient-red"
+        <div className="pricing-links">
+          {financialAssistanceLink}
+          <form
+            action="/cart/add/"
+            method="get"
+            className="text-center ml-auto"
           >
+            <input
+              type="hidden"
+              name="product_id"
+              value={enrollment.run.products[0].id}
+            />
+            <button
+              type="submit"
+              className="btn btn-primary btn-gradient-red"
+            >
             Get Certificate
-          </button>
-        </form>
-      </div>
-    ) : null
+            </button>
+          </form>
+        </div>
+      ) : null
 
     const startDateDescription = generateStartDateText(enrollment.run)
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
