@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.40.0
+Version 0.40.0 (Released August 02, 2022)
 --------------
 
 - fix: protect Product model from deletion (#753)
