@@ -272,15 +272,18 @@ export class EnrolledItemCard extends React.Component<
     ) : (
       enrollment.run.course.title
     )
+
+    const financialAssistanceLink = isFinancialAssistanceAvailable(enrollment.run) ? (
+      <a className="financial-assist-link" href={enrollment.run.page.financial_assistance_form_url}>
+        Financial assistance?
+      </a>
+    ) : null
     const certificateLinks = (
       enrollment.run.products.length > 0 &&
-      enrollment.enrollment_mode === "audit" &&
-      isFinancialAssistanceAvailable(enrollment.run)
+      enrollment.enrollment_mode === "audit"
     ) ? (
       <div className="pricing-links">
-        <a className="financial-assist-link" href={enrollment.run.page.financial_assistance_form_url}>
-          Financial assistance?
-        </a>
+        {financialAssistanceLink}
         <form
           action="/cart/add/"
           method="get"
@@ -299,25 +302,8 @@ export class EnrolledItemCard extends React.Component<
           </button>
         </form>
       </div>
-    ) : (
-      <form
-        action="/cart/add/"
-        method="get"
-        className="text-center ml-auto"
-      >
-        <input
-          type="hidden"
-          name="product_id"
-          value={enrollment.run.products[0].id}
-        />
-        <button
-          type="submit"
-          className="btn btn-primary btn-gradient-red"
-        >
-          Get Certificate
-        </button>
-      </form>
-    )
+    ) : null
+
     const startDateDescription = generateStartDateText(enrollment.run)
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
     const courseId = enrollment.run.course_number
