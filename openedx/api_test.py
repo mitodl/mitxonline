@@ -182,7 +182,7 @@ def test_create_edx_user_conflict(settings, user):
 
 @responses.activate
 def test_validate_edx_username_conflict(settings, user):
-    """Test that username_exists_in_openedx handles a username validation conflict"""
+    """Test that check_username_exists_in_edx handles a username validation conflict"""
     edx_username_validation_response_mock(True, settings, user.username)
 
     assert check_username_exists_in_edx(user.username) == True
@@ -190,7 +190,7 @@ def test_validate_edx_username_conflict(settings, user):
 
 @responses.activate
 def test_validate_edx_username_conflict(settings, user):
-    """Test that username_exists_in_openedx raises an exception for non-200 response"""
+    """Test that check_username_exists_in_edx raises an exception for non-200 response"""
     responses.add(
         responses.POST,
         settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
