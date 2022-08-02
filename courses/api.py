@@ -33,11 +33,11 @@ from courses.models import (
     ProgramEnrollment,
     Course,
 )
+from courses.tasks import subscribe_edx_course_emails
 from openedx.api import (
     enroll_in_edx_course_runs,
     get_edx_api_course_detail_client,
     unenroll_edx_course_run,
-    subscribe_to_edx_course_emails,
 )
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
@@ -258,11 +258,21 @@ def create_run_enrollments(
                 run=run,
                 defaults=dict(edx_enrolled=edx_request_success, enrollment_mode=mode),
             )
-            if not created and not enrollment.active:
-                enrollment.edx_enrolled = edx_request_success
-                subscribed = subscribe_to_edx_course_emails(user, run)
-                enrollment.edx_emails_subscription = True if subscribed else False
-                enrollment.reactivate_and_save()
+
+            if not created:
+                enrollment_mode_changed = mode != enrollment.enrollment_mode
+                # Case (Upgrade): When user was enrolled in free mode and now enrolls in paid mode (e.g. Verified)
+                # So, User has an active enrollment and the only changing thing is going to be enrollment mode
+                if enrollment.active and enrollment_mode_changed:
+                    enrollment.update_mode_and_save(mode=mode)
+
+                elif not enrollment.active:
+                    enrollment.edx_enrolled = edx_request_success
+                    if enrollment_mode_changed:
+                        enrollment.enrollment_mode = mode
+                    enrollment.reactivate_and_save()
+                    subscribe_edx_course_emails.delay(enrollment_id=enrollment.id)
+
         except:  # pylint: disable=bare-except
             mail_api.send_enrollment_failure_message(user, run, details=format_exc())
             log.exception(

@@ -36,7 +36,7 @@ from courses.factories import (
 # pylint: disable=redefined-outer-name
 from courses.models import CourseRunEnrollment, ProgramEnrollment
 from main.test_utils import MockHttpError
-from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
     NoEdxApiAuthError,
@@ -244,7 +244,10 @@ def test_get_user_enrollments(user):
     assert separate_program in enrollment_programs
 
 
-def test_create_run_enrollments(mocker, user):
+@pytest.mark.parametrize(
+    "enrollment_mode", [EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE]
+)
+def test_create_run_enrollments(mocker, user, enrollment_mode):
     """
     create_run_enrollments should call the edX API to create enrollments, create or reactivate local
     enrollment records, and notify enrolled users via email
@@ -262,17 +265,12 @@ def test_create_run_enrollments(mocker, user):
     patched_send_enrollment_email = mocker.patch(
         "courses.api.mail_api.send_course_run_enrollment_email"
     )
-    patched_edx_email_subscribe = mocker.patch(
-        "courses.api.subscribe_to_edx_course_emails"
-    )
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
 
     successful_enrollments, edx_request_success = create_run_enrollments(
-        user,
-        runs,
+        user, runs, mode=enrollment_mode
     )
-    patched_edx_enroll.assert_called_once_with(
-        user, runs, mode=EDX_DEFAULT_ENROLLMENT_MODE
-    )
+    patched_edx_enroll.assert_called_once_with(user, runs, mode=enrollment_mode)
 
     assert patched_send_enrollment_email.call_count == num_runs
     assert edx_request_success is True
@@ -284,7 +282,39 @@ def test_create_run_enrollments(mocker, user):
         assert enrollment.edx_enrolled is True
         assert enrollment.edx_emails_subscription is True
         assert enrollment.run == run
+        assert enrollment.enrollment_mode == enrollment_mode
         patched_send_enrollment_email.assert_any_call(enrollment)
+
+
+@pytest.mark.parametrize("is_active", [True, False])
+def test_create_run_enrollments_upgrade(mocker, user, is_active):
+    """
+    create_run_enrollments should call the edX API to create/update enrollments, and set the enrollment mode properly
+    in case od upgrade e.g a user moving from Audit to Verified mode
+    """
+    test_enrollment = CourseRunEnrollmentFactory.create(
+        user=user,
+        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
+        active=is_active,
+        edx_enrolled=True,
+    )
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    patched_send_enrollment_email = mocker.patch(
+        "courses.api.mail_api.send_course_run_enrollment_email"
+    )
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    successful_enrollments, edx_request_success = create_run_enrollments(
+        user, runs=[test_enrollment.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    patched_edx_enroll.assert_called_once_with(
+        user, [test_enrollment.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    patched_send_enrollment_email.assert_called_once()
+    assert edx_request_success is True
+    test_enrollment.refresh_from_db()
+    assert test_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
 
 
 @pytest.mark.parametrize(

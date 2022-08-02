@@ -554,8 +554,13 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
 
     def reactivate_and_save(self, no_user=False):
         """Sets an enrollment to be active again and saves"""
+
         self.active = True
         self.change_status = None
+        return self.save_and_log(None if no_user else self.user)
+
+    def update_mode_and_save(self, mode, no_user=False):
+        self.enrollment_mode = mode
         return self.save_and_log(None if no_user else self.user)
 
 
