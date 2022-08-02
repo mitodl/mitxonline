@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 0.40.0
+--------------
+
+- fix: protect Product model from deletion (#753)
+- added validation to prevent duplicated payment for paid courserun
+- 751-flexible-pricing-remove-thank-you-page (#755)
+- online-709 Financial Assistance: Update Financial Assistance Request Form (#718)
+- added a tracking table for course run purchases
+- Cleaning up some old unused imports
+- Refactored action modal into its own component
+- Added an error toast if the justification isn't set, updated mutation code to set state properly before mutating
+- Reworked some of the state logic; using the antdesign Select rather than a bare html select
+
 Version 0.39.6 (Released August 01, 2022)
 --------------
 
