@@ -26,7 +26,7 @@ import sinon from "sinon"
 import { makeUser } from "../factories/user"
 
 describe("ProductDetailEnrollApp", () => {
-  let helper, renderPage, isWithinEnrollmentPeriodStub, courseRun, currentUser
+  let helper, renderPage, isWithinEnrollmentPeriodStub, isFinancialAssistanceAvailableStub, courseRun, currentUser
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
@@ -49,6 +49,10 @@ describe("ProductDetailEnrollApp", () => {
     isWithinEnrollmentPeriodStub = helper.sandbox.stub(
       courseApi,
       "isWithinEnrollmentPeriod"
+    )
+    isFinancialAssistanceAvailableStub = helper.sandbox.stub(
+      courseApi,
+      "isFinancialAssistanceAvailable"
     )
   })
 
@@ -281,6 +285,7 @@ describe("ProductDetailEnrollApp", () => {
     it(`shows dialog to upgrade user enrollment with flexible fixed-price discount and handles ${returnedStatusCode} response`, async () => {
       courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 9, discount_type: DISCOUNT_TYPE_FIXED_PRICE}}]
       isWithinEnrollmentPeriodStub.returns(true)
+      isFinancialAssistanceAvailableStub.returns(false)
       SETTINGS.features.upgrade_dialog = true
       const { inner } = await renderPage()
 
