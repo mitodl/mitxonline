@@ -77,6 +77,9 @@ class Product(TimestampedModel):
 
     objects = ActiveUndeleteManager()
     all_objects = models.Manager()
+    
+    class Meta:
+        unique_together = ('object_id', 'is_active',)
 
     def delete(self):
         self.is_active = False
