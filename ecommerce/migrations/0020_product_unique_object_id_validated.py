@@ -6,12 +6,16 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ecommerce', '0019_db_protect_product'),
+        ("ecommerce", "0019_db_protect_product"),
     ]
 
     operations = [
         migrations.AddConstraint(
-            model_name='product',
-            constraint=models.UniqueConstraint(condition=models.Q(('is_active', True)), fields=('object_id', 'is_active'), name='unique_object_id_validated'),
+            model_name="product",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("is_active", True)),
+                fields=("object_id", "is_active"),
+                name="unique_object_id_validated",
+            ),
         ),
     ]
