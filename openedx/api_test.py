@@ -86,6 +86,17 @@ def test_create_user(user, mocker):
     mock_create_edx_auth_token.assert_called_with(user)
 
 
+"""
+    Adds a mocked response from the EdX username validation API. 
+
+    Args:
+       username_exists (boolean): Determines whether the mocked response will indicate a matched EdX username (True), or not (False).
+       settings (pytest.fixture): Application settings.
+       user (str): The username being passed to the EdX username validation API.  This is required if username_exists is True.
+
+    """
+
+
 def edx_username_validation_response_mock(username_exists, settings, username=None):
     if username_exists:
         validation_decisions = {"username": ""}
