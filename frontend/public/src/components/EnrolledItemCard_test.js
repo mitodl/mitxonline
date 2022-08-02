@@ -44,7 +44,7 @@ describe("EnrolledItemCard", () => {
         .stub()
         .withArgs(userEnrollment.id, "test")
         .returns(Promise),
-      addUserNotification: helper.sandbox.stub().returns(Function),
+      addUserNotification:                helper.sandbox.stub().returns(Function),
       isFinancialAssistanceAvailableStub: helper.sandbox.stub(
         courseApi,
         "isFinancialAssistanceAvailable"
