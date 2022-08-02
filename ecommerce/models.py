@@ -79,10 +79,9 @@ class Product(TimestampedModel):
     all_objects = models.Manager()
 
     class Meta:
-        unique_together = (
-            "object_id",
-            "is_active",
-        )
+        constraints = [
+            models.UniqueConstraint(fields=["object_id", "is_active"], condition=models.Q(is_active=True), name='unique_object_id_validated')
+        ]
 
     def delete(self):
         self.is_active = False
