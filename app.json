@@ -79,6 +79,10 @@
       "description": "'hours' value for scheduled task to sync course run data (by default, it will run at midnight",
       "required": false
     },
+    "CRON_PROCESS_REFUND_REQUESTS_MINUTES": {
+      "description": "'minute' value for scheduled task to process refund requests",
+      "required": false
+    },
     "CSRF_TRUSTED_ORIGINS": {
       "description": "Comma separated string of trusted domains that should be CSRF exempt",
       "required": false
