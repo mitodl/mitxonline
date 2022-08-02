@@ -9,9 +9,7 @@ import pytest
 import pytz
 from django.contrib.auth.models import AnonymousUser
 
-from cms.factories import CoursePageFactory
-from cms.serializers import CoursePageSerializer
-from cms.models import CoursePage
+from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -19,7 +17,7 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
-from courses.models import CourseRun, CourseTopic
+from courses.models import CourseTopic
 from courses.serializers import (
     BaseCourseSerializer,
     BaseProgramSerializer,
@@ -150,13 +148,26 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
     )
 
 
-def test_serialize_course_with_page_fields(mocker, mock_context):
-    """ """
+@pytest.mark.parametrize("financial_assistance_available", [True, False])
+def test_serialize_course_with_page_fields(
+    mocker, mock_context, financial_assistance_available
+):
+    """
+    Tests course serialization with Page fields and Financial Assistance form.
+    """
     fake_image_src = "http://example.com/my.img"
     patched_get_wagtail_src = mocker.patch(
         "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
     )
-    course_page = CoursePageFactory.create()
+    if financial_assistance_available:
+        financial_assistance_form = FlexiblePricingFormFactory()
+        course_page = financial_assistance_form.get_parent()
+        expected_financial_assistance_url = (
+            f"{course_page.get_url()}{financial_assistance_form.slug}/"
+        )
+    else:
+        course_page = CoursePageFactory.create()
+        expected_financial_assistance_url = ""
     course = course_page.course
     data = BaseCourseSerializer(
         instance=course, context={**mock_context, "include_page_fields": True}
@@ -169,7 +180,7 @@ def test_serialize_course_with_page_fields(mocker, mock_context):
             "id": course.id,
             "feature_image_src": fake_image_src,
             "page_url": None,
-            "financial_assistance_form_url": ""
+            "financial_assistance_form_url": expected_financial_assistance_url,
         },
     )
     patched_get_wagtail_src.assert_called_once_with(course_page.feature_image)
@@ -177,7 +188,6 @@ def test_serialize_course_with_page_fields(mocker, mock_context):
 
 def test_serialize_course_run():
     """Test CourseRun serialization"""
-    faculty_names = ["Emma Jones", "Joe Smith"]
     course_run = CourseRunFactory.create()
     course_run.refresh_from_db()
 
