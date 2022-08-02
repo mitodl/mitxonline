@@ -35,7 +35,7 @@ from openedx.api import (
     retry_failed_edx_enrollments,
     subscribe_to_edx_course_emails,
     unsubscribe_from_edx_course_emails,
-    username_exists_in_openedx,
+    check_username_exists_in_edx,
 )
 from openedx.constants import (
     EDX_ENROLLMENT_AUDIT_MODE,
@@ -185,7 +185,7 @@ def test_validate_edx_username_conflict(settings, user):
     """Test that username_exists_in_openedx handles a username validation conflict"""
     edx_username_validation_response_mock(True, settings, user.username)
 
-    assert username_exists_in_openedx(user.username) == True
+    assert check_username_exists_in_edx(user.username) == True
 
 
 @responses.activate
@@ -202,7 +202,7 @@ def test_validate_edx_username_conflict(settings, user):
         status=status.HTTP_400_BAD_REQUEST,
     )
     with pytest.raises(EdxApiRegistrationValidationException):
-        username_exists_in_openedx(user.username)
+        check_username_exists_in_edx(user.username)
 
 
 @responses.activate

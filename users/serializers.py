@@ -18,7 +18,7 @@ from mail import verification_api
 from main.serializers import WriteableSerializerMethodField
 from openedx.tasks import change_edx_user_email_async
 from users.models import ChangeEmailRequest, LegalAddress, Profile, User
-from openedx.api import username_exists_in_openedx
+from openedx.api import check_username_exists_in_edx
 
 log = logging.getLogger()
 
@@ -120,7 +120,7 @@ class UserSerializer(serializers.ModelSerializer):
         trimmed_value = value.strip()
         openedx_username_taken = False
         try:
-            openedx_username_taken = username_exists_in_openedx(trimmed_value)
+            openedx_username_taken = check_username_exists_in_edx(trimmed_value)
         except (
             HTTPError,
             RequestsConnectionError,

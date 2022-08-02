@@ -716,7 +716,7 @@ def unsubscribe_from_edx_course_emails(user, course_run):
     return result
 
 
-def username_exists_in_openedx(username):
+def check_username_exists_in_edx(username):
     """
     Returns true if the username exists within Open edX.
     Returns false if the username does not exists in Open edX.
