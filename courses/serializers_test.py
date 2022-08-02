@@ -169,6 +169,7 @@ def test_serialize_course_with_page_fields(mocker, mock_context):
             "id": course.id,
             "feature_image_src": fake_image_src,
             "page_url": None,
+            "financial_assistance_form_url": ""
         },
     )
     patched_get_wagtail_src.assert_called_once_with(course_page.feature_image)
@@ -195,6 +196,7 @@ def test_serialize_course_run():
             "expiration_date": drf_datetime(course_run.expiration_date),
             "id": course_run.id,
             "products": [],
+            "page": None,
         },
     )
 
