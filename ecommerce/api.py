@@ -117,9 +117,9 @@ def generate_checkout_payload(request):
     payload = PaymentGateway.start_payment(
         ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
         gateway_order,
+        callback_uri,
+        callback_uri,
         backoffice_callback_uri,
-        callback_uri,
-        callback_uri,
         merchant_fields=[basket.id],
     )
 
