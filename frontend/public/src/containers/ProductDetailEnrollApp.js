@@ -58,7 +58,7 @@ export class ProductDetailEnrollApp extends React.Component<
       (
         <p className="text-center financial-assistance-link">
           <a href={run.page.financial_assistance_form_url}>
-            Need financial assistance??
+            Need financial assistance?
           </a>
         </p>
       ) : null
