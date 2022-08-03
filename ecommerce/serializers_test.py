@@ -201,7 +201,7 @@ def test_basket_with_product_serializer():
     serialized_basket = BasketWithProductSerializer(basket_item.basket).data
 
     logic = DiscountType.for_discount(discount)
-    discount_price = logic.get_product_price(basket_item.product)
+    discount_price = logic.get_discounted_price([discount], basket_item.product)
 
     assert serialized_basket["total_price"] == basket_item.product.price
     assert serialized_basket["discounted_price"] == discount_price

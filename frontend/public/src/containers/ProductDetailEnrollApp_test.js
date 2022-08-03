@@ -243,9 +243,8 @@ describe("ProductDetailEnrollApp", () => {
         inner
           .find(".text-right")
           .at(0)
-          .text()
-          .at(1),
-        "9"
+          .text(),
+        "$9.00"
       )
     })
 

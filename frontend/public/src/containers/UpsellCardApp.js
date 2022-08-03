@@ -16,7 +16,7 @@ import {
   courseRunsQuery,
   courseRunsQueryKey
 } from "../lib/queries/courseRuns"
-import { getFlexiblePriceForProduct } from "../lib/util"
+import { getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
 
 import {isFinancialAssistanceAvailable, isWithinEnrollmentPeriod} from "../lib/courseApi"
 
@@ -71,7 +71,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
             <h2>Get a certificate</h2>
           </div>
           <div className="text-right align-self-end">
-            <h2>${getFlexiblePriceForProduct(product)}</h2>
+            <h2>{formatLocalePrice(getFlexiblePriceForProduct(product))}</h2>
           </div>
         </div>
         <div className="row">
