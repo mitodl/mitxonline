@@ -251,6 +251,9 @@ def test_create_run_enrollments(mocker, user, enrollment_mode):
     """
     create_run_enrollments should call the edX API to create enrollments, create or reactivate local
     enrollment records, and notify enrolled users via email
+
+    In addition, there should be a ProgramEnrollment for the program that the
+    course belongs to.
     """
     num_runs = 3
     runs = CourseRunFactory.create_batch(num_runs)
@@ -285,12 +288,18 @@ def test_create_run_enrollments(mocker, user, enrollment_mode):
         assert enrollment.enrollment_mode == enrollment_mode
         patched_send_enrollment_email.assert_any_call(enrollment)
 
+        assert ProgramEnrollment.objects.filter(
+            user=user, program=runs[0].course.program
+        ).exists()
+
 
 @pytest.mark.parametrize("is_active", [True, False])
 def test_create_run_enrollments_upgrade(mocker, user, is_active):
     """
     create_run_enrollments should call the edX API to create/update enrollments, and set the enrollment mode properly
     in case od upgrade e.g a user moving from Audit to Verified mode
+
+    In addition, tests to make sure there's a ProgramEnrollment for the course.
     """
     test_enrollment = CourseRunEnrollmentFactory.create(
         user=user,
@@ -315,6 +324,9 @@ def test_create_run_enrollments_upgrade(mocker, user, is_active):
     assert edx_request_success is True
     test_enrollment.refresh_from_db()
     assert test_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert ProgramEnrollment.objects.filter(
+        user=user, program=test_enrollment.run.course.program
+    ).exists()
 
 
 @pytest.mark.parametrize(
@@ -324,6 +336,8 @@ def test_create_run_enrollments_api_fail(mocker, user, exception_cls):
     """
     create_run_enrollments should log a message and still create local enrollment records when certain exceptions
     are raised if a flag is set to true
+
+    In addition, a ProgramEnrollment should also be created.
     """
     patched_edx_enroll = mocker.patch(
         "courses.api.enroll_in_edx_course_runs", side_effect=exception_cls
@@ -346,6 +360,10 @@ def test_create_run_enrollments_api_fail(mocker, user, exception_cls):
     assert len(successful_enrollments) == 1
     assert edx_request_success is False
 
+    assert ProgramEnrollment.objects.filter(
+        user=user, program=run.course.program
+    ).exists()
+
 
 @pytest.mark.parametrize("keep_failed_enrollments", [True, False])
 @pytest.mark.parametrize(
@@ -361,6 +379,8 @@ def test_create_run_enrollments_enroll_api_fail(
     """
     create_run_enrollments should log a message and still create local enrollment records when an enrollment exception
     is raised if a flag is set to true
+
+    In addition, a ProgramEnrollment should also exist.
     """
     num_runs = 3
     runs = CourseRunFactory.create_batch(num_runs)
@@ -386,6 +406,14 @@ def test_create_run_enrollments_enroll_api_fail(
     expected_enrollments = 0 if not keep_failed_enrollments else num_runs
     assert len(successful_enrollments) == expected_enrollments
     assert edx_request_success is False
+
+    for run in runs:
+        assert (
+            ProgramEnrollment.objects.filter(
+                user=user, program=run.course.program
+            ).exists()
+            == keep_failed_enrollments
+        )
 
 
 def test_create_run_enrollments_creation_fail(mocker, user):
