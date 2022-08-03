@@ -241,7 +241,7 @@ describe("ProductDetailEnrollApp", () => {
           .at(0)
           .text()
           .at(1),
-        "9"
+        "$9.00"
       )
     })
 

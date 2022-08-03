@@ -238,12 +238,12 @@ export const getFlexiblePriceForProduct = (product: Product) => {
 
   switch (flexDiscountType) {
   case DISCOUNT_TYPE_DOLLARS_OFF:
-    return product.price - flexDiscountAmount
+    return Number(product.price - flexDiscountAmount)
   case DISCOUNT_TYPE_PERCENT_OFF:
-    return product.price - ((flexDiscountAmount / 100) * product.price)
+    return Number(product.price - ((flexDiscountAmount / 100) * product.price))
   case DISCOUNT_TYPE_FIXED_PRICE:
-    return flexDiscountAmount
+    return Number(flexDiscountAmount)
   default:
-    return product.price
+    return Number(product.price)
   }
 }
