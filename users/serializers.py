@@ -118,6 +118,9 @@ class UserSerializer(serializers.ModelSerializer):
     def validate_username(self, value):
         """Validates the username field"""
         trimmed_value = value.strip()
+        if not re.fullmatch(USERNAME_RE, trimmed_value):
+            raise serializers.ValidationError(USERNAME_ERROR_MSG)
+        
         openedx_username_taken = False
         try:
             openedx_username_taken = check_username_exists_in_edx(trimmed_value)
@@ -132,8 +135,6 @@ class UserSerializer(serializers.ModelSerializer):
             )
         if openedx_username_taken:
             raise serializers.ValidationError(USERNAME_ALREADY_EXISTS_MSG)
-        if not re.fullmatch(USERNAME_RE, trimmed_value):
-            raise serializers.ValidationError(USERNAME_ERROR_MSG)
         return trimmed_value
 
     def get_email(self, instance):
