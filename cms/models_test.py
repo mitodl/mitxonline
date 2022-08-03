@@ -222,7 +222,7 @@ def test_flex_pricing_form_display(mocker, is_authed, has_submission):
     [
         FlexiblePriceStatus.CREATED,
         FlexiblePriceStatus.APPROVED,
-        FlexiblePriceStatus.SKIPPED,
+        FlexiblePriceStatus.DENIED,
         FlexiblePriceStatus.RESET,
     ],
 )
@@ -252,7 +252,7 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
         assert "Application Processing" in response.rendered_content
     elif submission_status == FlexiblePriceStatus.APPROVED:
         assert "Application Approved" in response.rendered_content
-    elif submission_status == FlexiblePriceStatus.SKIPPED:
+    elif submission_status == FlexiblePriceStatus.DENIED:
         assert "Application Denied" in response.rendered_content
     elif submission_status == FlexiblePriceStatus.RESET:
         assert (

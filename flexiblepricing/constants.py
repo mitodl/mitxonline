@@ -10,7 +10,7 @@ class FlexiblePriceStatus:
     AUTO_APPROVED = "auto-approved"
     CREATED = "created"
     PENDING_MANUAL_APPROVAL = "pending-manual-approval"
-    SKIPPED = "skipped"
+    DENIED = "denied"
     RESET = "reset"
 
     ALL_STATUSES = [
@@ -18,17 +18,17 @@ class FlexiblePriceStatus:
         AUTO_APPROVED,
         CREATED,
         PENDING_MANUAL_APPROVAL,
-        SKIPPED,
+        DENIED,
         RESET,
     ]
-    TERMINAL_STATUSES = [APPROVED, AUTO_APPROVED, SKIPPED]
+    TERMINAL_STATUSES = [APPROVED, AUTO_APPROVED, DENIED]
 
     STATUS_MESSAGES_DICT = {
         APPROVED: "Approved",
         AUTO_APPROVED: "Auto-Approved",
         CREATED: "--",
         PENDING_MANUAL_APPROVAL: "Pending Approval (Documents Received)",
-        SKIPPED: "Skipped",
+        DENIED: "Denied",
     }
 
 

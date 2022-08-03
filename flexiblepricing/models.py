@@ -145,7 +145,7 @@ class FlexiblePrice(TimestampedModel):
         )
 
     def is_denied(self):
-        return self.status == FlexiblePriceStatus.SKIPPED
+        return self.status == FlexiblePriceStatus.DENIED
 
     def is_reset(self):
         return self.status == FlexiblePriceStatus.RESET

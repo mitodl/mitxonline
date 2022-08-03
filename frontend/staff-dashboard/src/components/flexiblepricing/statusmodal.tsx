@@ -79,8 +79,8 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
     return (
         <Modal title="Flexible Pricing | Management" visible={true} onOk={() => handleOk()} onCancel={handleCancel}>
             <div>
-                <strong>Are you sure you want to <u>{status == "skipped" ? "deny": String(status).replace(/d|ped$/, '') }</u> the request?</strong>
-                {status == "skipped" ? <div>User will be notified by email of the denial </div> : null}
+                <strong>Are you sure you want to <u>{status == "denied" ? "deny": String(status).replace(/d|ped$/, '') }</u> the request?</strong>
+                {status == "denied" ? <div>User will be notified by email of the denial </div> : null}
             </div>
             <br></br>
             <p>
