@@ -812,8 +812,8 @@ CELERY_BEAT_SCHEDULE = {
     },
     "process_refund_requests": {
         "task": "sheets.tasks.process_refund_requests",
-        "schedule": crontab(minute=CRON_PROCESS_REFUND_REQUESTS_MINUTES)
-    }
+        "schedule": crontab(minute=CRON_PROCESS_REFUND_REQUESTS_MINUTES),
+    },
 }
 
 # Hijack
