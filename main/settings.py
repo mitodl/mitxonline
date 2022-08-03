@@ -810,7 +810,7 @@ CELERY_BEAT_SCHEDULE = {
             month_of_year="*",
         ),
     },
-    "process_refund_requests": {
+    "process-refund-requests": {
         "task": "sheets.tasks.process_refund_requests",
         "schedule": crontab(minute=CRON_PROCESS_REFUND_REQUESTS_MINUTES),
     },
