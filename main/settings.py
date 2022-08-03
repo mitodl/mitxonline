@@ -189,6 +189,7 @@ INSTALLED_APPS = (
     "mail.apps.MailApp",
     "users",
     "cms",
+    "sheets",
     # "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
