@@ -31,7 +31,7 @@ def test_submission_status():
             or status == FlexiblePriceStatus.AUTO_APPROVED
         ):
             assert submission.is_approved()
-        elif status == FlexiblePriceStatus.SKIPPED:
+        elif status == FlexiblePriceStatus.DENIED:
             assert submission.is_denied()
         elif status == FlexiblePriceStatus.RESET:
             assert submission.is_reset()

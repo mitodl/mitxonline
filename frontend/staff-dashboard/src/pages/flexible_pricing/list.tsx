@@ -8,7 +8,6 @@ import {
     Table,
     useTable,
     Space, 
-    FilterDropdown,
     Select,
     FormProps,
     Form,
@@ -23,6 +22,10 @@ import { IFlexiblePriceRequest, IFlexiblePriceRequestFilters } from "interfaces"
 import { FlexiblePricingStatusModal } from "components/flexiblepricing/statusmodal";
 
 const FlexiblePricingStatuses = [
+    {
+        label: null,
+        value: null,
+    },
     {
         label: 'Created',
         value: 'created'
@@ -40,8 +43,8 @@ const FlexiblePricingStatuses = [
         value: 'pending-manual-approval'
     },
     { 
-        label: 'Skipped',
-        value: 'skipped'
+        label: 'Denied',
+        value: 'denied'
     },
     { 
         label: 'Reset',
@@ -108,8 +111,17 @@ export const FlexiblePricingList: React.FC = () => {
         setModalData(record);
         setApproveStatus(action);
         setIsModalVisible(true);
-
     };
+
+    const formatStatus = (status: string) => {
+        const result = FlexiblePricingStatuses.find((elem) => elem.value === status);
+
+        if (result) {
+            return result.label
+        }
+
+        return null
+    }
 
     return (
         <div>
@@ -133,6 +145,7 @@ export const FlexiblePricingList: React.FC = () => {
                             <Table.Column
                                 dataIndex="status"
                                 title="Status"
+                                render={(value) => formatStatus(value)}
                             />
                             <Table.Column
                                 dataIndex="income_usd"
@@ -178,7 +191,7 @@ export const FlexiblePricingList: React.FC = () => {
                                                     Reset
                                                 </Button>
                                                 <Button danger
-                                                    onClick={() => showModal(record, "skipped")}
+                                                    onClick={() => showModal(record, "denied")}
                                                 >
                                                     Deny
                                                 </Button>
