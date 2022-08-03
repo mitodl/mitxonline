@@ -120,7 +120,7 @@ class UserSerializer(serializers.ModelSerializer):
         trimmed_value = value.strip()
         if not re.fullmatch(USERNAME_RE, trimmed_value):
             raise serializers.ValidationError(USERNAME_ERROR_MSG)
-        
+
         openedx_username_taken = False
         try:
             openedx_username_taken = check_username_exists_in_edx(trimmed_value)
