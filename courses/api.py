@@ -259,6 +259,11 @@ def create_run_enrollments(
                 defaults=dict(edx_enrolled=edx_request_success, enrollment_mode=mode),
             )
 
+            if run.course.program is not None:
+                related_program = ProgramEnrollment.objects.get_or_create(
+                    user=user, program=run.course.program
+                )
+
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
                 # Case (Upgrade): When user was enrolled in free mode and now enrolls in paid mode (e.g. Verified)
@@ -272,7 +277,6 @@ def create_run_enrollments(
                         enrollment.enrollment_mode = mode
                     enrollment.reactivate_and_save()
                     subscribe_edx_course_emails.delay(enrollment_id=enrollment.id)
-
         except:  # pylint: disable=bare-except
             mail_api.send_enrollment_failure_message(user, run, details=format_exc())
             log.exception(
