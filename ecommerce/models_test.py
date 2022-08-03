@@ -4,6 +4,8 @@ from decimal import Decimal, getcontext
 from mitol.common.utils import now_in_utc
 import reversion
 
+from django.db import IntegrityError, transaction
+
 from users.factories import UserFactory
 
 from ecommerce.models import (
@@ -274,3 +276,15 @@ def test_product_delete_protection_inactive():
         Product.all_objects.filter(is_active=False).count()
         == len(multiple_products) + 1
     )  # Additional 1 from above
+
+
+def test_product_multiple_active_for_single_course_ID_validation():
+    """Test that creating multiple Products with the same Course ID
+    and are active is not allowed"""
+    first_product = ProductFactory.create()
+    try:
+        with transaction.atomic():
+            ProductFactory.create(purchasable_object=first_product.purchasable_object)
+        pytest.fail("Two active Products for the same course were allowed.")
+    except IntegrityError:
+        pass
