@@ -25,7 +25,8 @@ describe("EnrolledItemCard", () => {
     userEnrollment,
     currentUser,
     isLinkableStub,
-    enrollmentCardProps
+    enrollmentCardProps,
+    isFinancialAssistanceAvailableStub
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
@@ -43,7 +44,11 @@ describe("EnrolledItemCard", () => {
         .stub()
         .withArgs(userEnrollment.id, "test")
         .returns(Promise),
-      addUserNotification: helper.sandbox.stub().returns(Function)
+      addUserNotification:                helper.sandbox.stub().returns(Function),
+      isFinancialAssistanceAvailableStub: helper.sandbox.stub(
+        courseApi,
+        "isFinancialAssistanceAvailable"
+      )
     }
 
     renderedCard = () =>

@@ -3,7 +3,7 @@
 import {
   isLinkableCourseRun,
   isWithinEnrollmentPeriod,
-  generateStartDateText
+  generateStartDateText, isFinancialAssistanceAvailable
 } from "./courseApi"
 import { assert } from "chai"
 import moment from "moment"
@@ -118,6 +118,19 @@ describe("Course API", () => {
           typeof generateStartDateText(courseRun),
           typeof expLinkable
         )
+      })
+    })
+  })
+
+  describe("isFinancialAssistanceAvailable", () => {
+    [
+      ["", false],
+      [null, false],
+      ["/courses/course-v1:MITx+14.310x/financial-assistance-request/", true],
+    ].forEach(([url, expResult]) => {
+      it(`returns ${String(expResult)}`, () => {
+        courseRun["page"] = {financial_assistance_form_url: url}
+        assert.equal(isFinancialAssistanceAvailable(courseRun), expResult)
       })
     })
   })

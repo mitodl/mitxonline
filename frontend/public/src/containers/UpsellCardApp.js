@@ -18,7 +18,7 @@ import {
 } from "../lib/queries/courseRuns"
 import { getFlexiblePriceForProduct } from "../lib/util"
 
-import { isWithinEnrollmentPeriod } from "../lib/courseApi"
+import {isFinancialAssistanceAvailable, isWithinEnrollmentPeriod} from "../lib/courseApi"
 
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
@@ -51,6 +51,14 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
 
   renderUpgradeEnrollmentDialog(run: EnrollmentFlaggedCourseRun) {
     const { courseRuns } = this.props
+    const needFinancialAssistanceLink = isFinancialAssistanceAvailable(run) ?
+      (
+        <p className="text-center financial-assistance-link">
+          <a href={run.page.financial_assistance_form_url}>
+            Need financial assistance?
+          </a>
+        </p>
+      ) : null
     const product =
       run.products && !run.is_verified && run.is_enrolled
         ? run.products[0]
@@ -84,6 +92,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
                 Get Certificate
               </button>
             </form>
+            {needFinancialAssistanceLink}
           </div>
         </div>
       </div>

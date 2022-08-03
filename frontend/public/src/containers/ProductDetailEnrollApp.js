@@ -18,7 +18,7 @@ import {
   courseRunsQueryKey
 } from "../lib/queries/courseRuns"
 
-import { isWithinEnrollmentPeriod } from "../lib/courseApi"
+import {isFinancialAssistanceAvailable, isWithinEnrollmentPeriod} from "../lib/courseApi"
 
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
@@ -54,6 +54,14 @@ export class ProductDetailEnrollApp extends React.Component<
 
   renderUpgradeEnrollmentDialog(run: EnrollmentFlaggedCourseRun) {
     const { courseRuns } = this.props
+    const needFinancialAssistanceLink = isFinancialAssistanceAvailable(run) ?
+      (
+        <p className="text-center financial-assistance-link">
+          <a href={run.page.financial_assistance_form_url}>
+            Need financial assistance?
+          </a>
+        </p>
+      ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run.products ? run.products[0] : null
     return product ? (
@@ -98,6 +106,7 @@ export class ProductDetailEnrollApp extends React.Component<
                   Continue
                 </button>
               </form>
+              {needFinancialAssistanceLink}
             </div>
           </div>
           <div className="cancel-link">{this.getEnrollmentForm()}</div>

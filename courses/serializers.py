@@ -4,18 +4,17 @@ Course model serializers
 from urllib.parse import urljoin
 
 from django.conf import settings
-from django.templatetags.static import static
 from django.core.exceptions import ObjectDoesNotExist
+from django.templatetags.static import static
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from cms.serializers import CoursePageSerializer
 from cms.models import CoursePage
+from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
-from courses.models import ProgramRun, CourseRun
 from ecommerce.models import Product
-from ecommerce.serializers import ProductFlexibilePriceSerializer, BaseProductSerializer
+from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSerializer
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
@@ -89,10 +88,11 @@ class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
     products = ProductRelatedField(many=True, queryset=Product.objects.all())
+    page = serializers.SerializerMethodField()
 
     class Meta:
         model = models.CourseRun
-        fields = BaseCourseRunSerializer.Meta.fields + ["products"]
+        fields = BaseCourseRunSerializer.Meta.fields + ["products", "page"]
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -105,6 +105,14 @@ class CourseRunSerializer(BaseCourseRunSerializer):
                 },
             }
         return data
+
+    def get_page(self, instance):
+        try:
+            return CoursePageSerializer(
+                instance=CoursePage.objects.filter(course=instance.course).get()
+            ).data
+        except ObjectDoesNotExist:
+            return None
 
 
 class CourseSerializer(serializers.ModelSerializer):
