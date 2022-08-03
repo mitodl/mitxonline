@@ -7,6 +7,7 @@ from functools import total_ordering
 from django.urls import reverse
 from django.db import transaction
 from django.core.exceptions import ObjectDoesNotExist
+from django.conf import settings
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
 from ecommerce.constants import TRANSACTION_TYPE_REFUND, REFUND_SUCCESS_STATES
@@ -109,9 +110,14 @@ def generate_checkout_payload(request):
 
     callback_uri = request.build_absolute_uri(reverse("checkout-result-callback"))
 
+    backoffice_callback_uri = (
+        callback_uri if settings.PAYMENT_GATEWAY_CYBERSOURCE_BACKOFFICE_URL else None
+    )
+
     payload = PaymentGateway.start_payment(
         ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
         gateway_order,
+        backoffice_callback_uri,
         callback_uri,
         callback_uri,
         merchant_fields=[basket.id],
