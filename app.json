@@ -200,7 +200,7 @@
       "required": false
     },
     "MITOL_GOOGLE_SHEETS_REFUNDS_PLUGINS": {
-      "description": "The path to your refund plugin, example: app.plugins.RefundPlugin",
+      "description": "The path to your refund plugin",
       "required": false
     },
     "MITOL_GOOGLE_SHEETS_REFUNDS_PROCESSOR_COL": {
@@ -422,6 +422,10 @@
       "description": "open exchange api url for fetching currency exchange rate",
       "required": false
     },
+    "PAYMENT_GATEWAY_CYBERSOURCE_BACKOFFICE_URL": {
+      "description": "The value of the meta tag used by Google to verify the owner of a domain (used for enabling push notifications)",
+      "required": false
+    },
     "PGBOUNCER_DEFAULT_POOL_SIZE": {
       "value": "50"
     },
@@ -479,10 +483,6 @@
     },
     "USE_X_FORWARDED_HOST": {
       "description": "Set HOST header to original domain accessed by user",
-      "required": false
-    },
-    "PAYMENT_GATEWAY_CYBERSOURCE_BACKOFFICE_URL": {
-      "description": "Set the Cybersource payment response backend callback URL",
       "required": false
     }
   },
