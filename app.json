@@ -480,6 +480,10 @@
     "USE_X_FORWARDED_HOST": {
       "description": "Set HOST header to original domain accessed by user",
       "required": false
+    },
+    "PAYMENT_GATEWAY_CYBERSOURCE_BACKOFFICE_URL": {
+      "description": "Set the Cybersource payment response backend callback URL",
+      "required": false
     }
   },
   "keywords": [
