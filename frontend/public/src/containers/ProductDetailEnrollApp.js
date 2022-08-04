@@ -43,7 +43,7 @@ export class ProductDetailEnrollApp extends React.Component<
 > {
   state = {
     upgradeEnrollmentDialogVisibility: false,
-    currentCourseRun: null,
+    currentCourseRun:                  null,
   }
 
   toggleUpgradeDialogVisibility = () => {
