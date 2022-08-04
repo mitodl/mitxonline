@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+Version 0.40.2
+--------------
+
+- fix flow
+- linting issue
+- JS linting fix
+- More dates for course enrollment
+- 734 - registration validate username against openedx (#757)
+- Updates "skipped" to "denied" in flexible pricing
+- Updates courses API to explicitly create ProgramEnrollments when enrolling in a course
+- 770 - flexible pricing: too many decimal places (#772)
+- online-677 Indicate Financial Assistance links if available for a course (#764)
+- Added backfill migration for new table paid courserun
+
 Version 0.40.1 (Released August 04, 2022)
 --------------
 
