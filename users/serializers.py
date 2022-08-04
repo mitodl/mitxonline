@@ -3,6 +3,10 @@ import logging
 import re
 from collections import defaultdict
 
+from requests import HTTPError
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from openedx.exceptions import EdxApiRegistrationValidationException
+
 import pycountry
 from django.db import transaction
 from rest_framework import serializers
@@ -14,6 +18,7 @@ from mail import verification_api
 from main.serializers import WriteableSerializerMethodField
 from openedx.tasks import change_edx_user_email_async
 from users.models import ChangeEmailRequest, LegalAddress, Profile, User
+from openedx.api import check_username_exists_in_edx
 
 log = logging.getLogger()
 
@@ -31,6 +36,9 @@ USER_GIVEN_NAME_RE = re.compile(
 USERNAME_RE_PARTIAL = r"[\w ._+-]+"
 USERNAME_RE = re.compile(rf"(?P<username>{USERNAME_RE_PARTIAL})")
 USERNAME_ERROR_MSG = "Username can only contain letters, numbers, spaces, and the following characters: _+-"
+USERNAME_ALREADY_EXISTS_MSG = (
+    "A user already exists with this username. Please try a different one."
+)
 
 
 class LegalAddressSerializer(serializers.ModelSerializer):
@@ -95,7 +103,7 @@ class UserSerializer(serializers.ModelSerializer):
         validators=[
             UniqueValidator(
                 queryset=User.objects.all(),
-                message="A user already exists with this username. Please try a different one.",
+                message=USERNAME_ALREADY_EXISTS_MSG,
                 lookup="iexact",
             )
         ],
@@ -112,6 +120,21 @@ class UserSerializer(serializers.ModelSerializer):
         trimmed_value = value.strip()
         if not re.fullmatch(USERNAME_RE, trimmed_value):
             raise serializers.ValidationError(USERNAME_ERROR_MSG)
+
+        openedx_username_taken = False
+        try:
+            openedx_username_taken = check_username_exists_in_edx(trimmed_value)
+        except (
+            HTTPError,
+            RequestsConnectionError,
+            EdxApiRegistrationValidationException,
+        ):
+            log.exception(
+                "edX username verification failure for username: %s",
+                trimmed_value,
+            )
+        if openedx_username_taken:
+            raise serializers.ValidationError(USERNAME_ALREADY_EXISTS_MSG)
         return trimmed_value
 
     def get_email(self, instance):

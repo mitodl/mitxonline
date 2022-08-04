@@ -1,12 +1,15 @@
 """Tests of user pipeline actions"""
 # pylint: disable=redefined-outer-name
 
+from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
 import pytest
+import responses
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.db import IntegrityError
 from social_core.backends.email import EmailAuth
 from social_django.utils import load_backend, load_strategy
+from rest_framework import status
 
 from authentication.exceptions import (
     EmailBlockedException,
@@ -58,6 +61,12 @@ def mock_create_user_strategy(mocker):
         },
     }
     return strategy
+
+
+@pytest.fixture()
+def application(settings):
+    """Test data and settings needed for create_edx_user tests"""
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
 
 
 def validate_email_auth_request_not_email_backend(mocker):
@@ -240,12 +249,21 @@ def test_create_user_via_email_exit(mocker, backend_name, flow):
     mock_strategy.request_data.assert_not_called()
 
 
+@responses.activate
 @pytest.mark.django_db
-def test_create_user_via_email(mocker, mock_email_backend, mock_create_user_strategy):
+def test_create_user_via_email(
+    mocker, mock_email_backend, mock_create_user_strategy, settings
+):
     """
     Tests that create_user_via_email creates a user via social_core.pipeline.user.create_user_via_email
     and sets a name and password
     """
+    responses.add(
+        responses.POST,
+        settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
+        json={"validation_decisions": {"username": ""}},
+        status=status.HTTP_200_OK,
+    )
     email = "user@example.com"
     response = user_actions.create_user_via_email(
         mock_create_user_strategy,
