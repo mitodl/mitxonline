@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.40.1
+Version 0.40.1 (Released August 04, 2022)
 --------------
 
 - fix: enrollment upgrade from free to paid version (#763)
