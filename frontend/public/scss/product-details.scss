@@ -234,6 +234,21 @@
         }
       }
 
+      .more-dates {
+        padding-bottom: 6px;
+        width: 100%;
+        font-size: 12px;
+
+        .dates-tooltip {
+          color: $link-blue !important;
+          text-decoration: underline;
+        }
+      }
+
+      .date-links-text {
+        padding-bottom: 7px !important;
+      }
+
       .title {
         background-color: $sirocco;
         font-weight: 500;

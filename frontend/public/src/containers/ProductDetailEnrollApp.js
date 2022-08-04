@@ -19,7 +19,7 @@ import {
 } from "../lib/queries/courseRuns"
 
 import {isFinancialAssistanceAvailable, isWithinEnrollmentPeriod} from "../lib/courseApi"
-
+import { formatPrettyDate, parseDateString } from "../lib/util"
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
@@ -42,7 +42,8 @@ export class ProductDetailEnrollApp extends React.Component<
   ProductDetailState
 > {
   state = {
-    upgradeEnrollmentDialogVisibility: false
+    upgradeEnrollmentDialogVisibility: false,
+    currentCourseRun: null
   }
 
   toggleUpgradeDialogVisibility = () => {
@@ -52,8 +53,19 @@ export class ProductDetailEnrollApp extends React.Component<
     })
   }
 
-  renderUpgradeEnrollmentDialog(run: EnrollmentFlaggedCourseRun) {
+  setCurrentCourseRun = (courseRun) => {
+    this.setState({
+      currentCourseRun: courseRun
+    })
+  }
+
+  getCurrentCourseRun = () => {
+    return this.state.currentCourseRun
+  }
+
+  renderUpgradeEnrollmentDialog() {
     const { courseRuns } = this.props
+    const run = !this.getCurrentCourseRun() && courseRuns ? courseRuns[0] : this.getCurrentCourseRun()
     const needFinancialAssistanceLink = isFinancialAssistanceAvailable(run) ?
       (
         <p className="text-center financial-assistance-link">
@@ -109,7 +121,7 @@ export class ProductDetailEnrollApp extends React.Component<
               {needFinancialAssistanceLink}
             </div>
           </div>
-          <div className="cancel-link">{this.getEnrollmentForm()}</div>
+          <div className="cancel-link">{this.getEnrollmentForm(run)}</div>
           <div className="faq-link">
             <a
               href="https://mitxonline.zendesk.com/hc/en-us"
@@ -123,10 +135,8 @@ export class ProductDetailEnrollApp extends React.Component<
       </Modal>
     ) : null
   }
-  getEnrollmentForm() {
+  getEnrollmentForm(run) {
     const csrfToken = getCookie("csrftoken")
-    const { courseRuns } = this.props
-    const run = courseRuns ? courseRuns[0] : null
     return (
       <form action="/enrollments/" method="post">
         <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
@@ -141,8 +151,21 @@ export class ProductDetailEnrollApp extends React.Component<
   render() {
     const { courseRuns, isLoading, status } = this.props
     const csrfToken = getCookie("csrftoken")
-    const run = courseRuns ? courseRuns[0] : null
-    const product = run && run.products ? run.products[0] : null
+    let run = !this.getCurrentCourseRun() && courseRuns ? courseRuns[0] : this.getCurrentCourseRun()
+    let product = run && run.products ? run.products[0] : null
+    if (courseRuns) {
+      let thisScope = this
+      courseRuns.map(courseRun => {
+        document.addEventListener('click', function(e){
+          if(e.target && e.target.id== courseRun.courseware_id){
+            thisScope.setCurrentCourseRun(courseRun)
+            run = thisScope.getCurrentCourseRun()
+            product = run && run.products ? run.products[0] : null
+            document.getElementById('start_date').innerHTML = '<strong>'+formatPrettyDate(parseDateString(courseRun.start_date))+'</strong>'
+          }
+        })
+      })
+    }
 
     return (
       // $FlowFixMe: isLoading null or undefined
@@ -201,7 +224,7 @@ export class ProductDetailEnrollApp extends React.Component<
               )
             ) : null}
             {SETTINGS.features.upgrade_dialog && run
-              ? this.renderUpgradeEnrollmentDialog(run)
+              ? this.renderUpgradeEnrollmentDialog()
               : null}
           </Fragment>
         )}
