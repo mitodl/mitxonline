@@ -43,7 +43,7 @@ export class ProductDetailEnrollApp extends React.Component<
 > {
   state = {
     upgradeEnrollmentDialogVisibility: false,
-    currentCourseRun: null
+    currentCourseRun: null,
   }
 
   toggleUpgradeDialogVisibility = () => {
@@ -53,7 +53,7 @@ export class ProductDetailEnrollApp extends React.Component<
     })
   }
 
-  setCurrentCourseRun = (courseRun) => {
+  setCurrentCourseRun = courseRun => {
     this.setState({
       currentCourseRun: courseRun
     })
@@ -154,14 +154,14 @@ export class ProductDetailEnrollApp extends React.Component<
     let run = !this.getCurrentCourseRun() && courseRuns ? courseRuns[0] : this.getCurrentCourseRun()
     let product = run && run.products ? run.products[0] : null
     if (courseRuns) {
-      let thisScope = this
+      const thisScope = this
       courseRuns.map(courseRun => {
-        document.addEventListener('click', function(e){
-          if(e.target && e.target.id== courseRun.courseware_id){
+        document.addEventListener('click', function(e) {
+          if (e.target && e.target.id === courseRun.courseware_id) {
             thisScope.setCurrentCourseRun(courseRun)
             run = thisScope.getCurrentCourseRun()
             product = run && run.products ? run.products[0] : null
-            document.getElementById('start_date').innerHTML = '<strong>'+formatPrettyDate(parseDateString(courseRun.start_date))+'</strong>'
+            document.getElementById('start_date').innerHTML = `<strong>${formatPrettyDate(parseDateString(courseRun.start_date))}</strong>`
           }
         })
       })
