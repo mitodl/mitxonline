@@ -34,7 +34,8 @@ type Props = {
   currentUser: User
 }
 type ProductDetailState = {
-  upgradeEnrollmentDialogVisibility: boolean
+  upgradeEnrollmentDialogVisibility: boolean,
+  currentCourseRun:                  ?EnrollmentFlaggedCourseRun
 }
 
 export class ProductDetailEnrollApp extends React.Component<
@@ -53,13 +54,13 @@ export class ProductDetailEnrollApp extends React.Component<
     })
   }
 
-  setCurrentCourseRun = courseRun => {
+  setCurrentCourseRun = (courseRun: EnrollmentFlaggedCourseRun) => {
     this.setState({
       currentCourseRun: courseRun
     })
   }
 
-  getCurrentCourseRun = () => {
+  getCurrentCourseRun = (): EnrollmentFlaggedCourseRun => {
     return this.state.currentCourseRun
   }
 
@@ -135,7 +136,7 @@ export class ProductDetailEnrollApp extends React.Component<
       </Modal>
     ) : null
   }
-  getEnrollmentForm(run) {
+  getEnrollmentForm(run: EnrollmentFlaggedCourseRun) {
     const csrfToken = getCookie("csrftoken")
     return (
       <form action="/enrollments/" method="post">
@@ -156,11 +157,13 @@ export class ProductDetailEnrollApp extends React.Component<
     if (courseRuns) {
       const thisScope = this
       courseRuns.map(courseRun => {
+        // $FlowFixMe
         document.addEventListener('click', function(e) {
           if (e.target && e.target.id === courseRun.courseware_id) {
             thisScope.setCurrentCourseRun(courseRun)
             run = thisScope.getCurrentCourseRun()
             product = run && run.products ? run.products[0] : null
+            // $FlowFixMe
             document.getElementById('start_date').innerHTML = `<strong>${formatPrettyDate(parseDateString(courseRun.start_date))}</strong>`
           }
         })
