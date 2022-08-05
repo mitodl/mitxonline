@@ -55,13 +55,15 @@ export class ProductDetailEnrollApp extends React.Component<
   }
 
   setCurrentCourseRun = (courseRun: EnrollmentFlaggedCourseRun) => {
+    sessionStorage.setItem('currentCourseRun', JSON.stringify(courseRun))
     this.setState({
       currentCourseRun: courseRun
     })
   }
 
   getCurrentCourseRun = (): EnrollmentFlaggedCourseRun => {
-    return this.state.currentCourseRun
+    const sessionCourseRun = JSON.parse(sessionStorage.getItem('currentCourseRun'))
+    return sessionCourseRun ? sessionCourseRun : this.state.currentCourseRun
   }
 
   renderUpgradeEnrollmentDialog() {
@@ -149,10 +151,28 @@ export class ProductDetailEnrollApp extends React.Component<
     )
   }
 
+  updateDate(run) {
+    const date = parseDateString(new Date(run.start_date)).utc()
+    document.getElementById('start_date').innerHTML = `<strong>${formatPrettyDate(date)}</strong>`
+  }
+
   render() {
     const { courseRuns, isLoading, status } = this.props
     const csrfToken = getCookie("csrftoken")
-    let run = !this.getCurrentCourseRun() && courseRuns ? courseRuns[0] : this.getCurrentCourseRun()
+    let run = !this.getCurrentCourseRun() && courseRuns ? (
+      courseRuns[0]
+    ) : (
+      this.getCurrentCourseRun() && courseRuns ? (
+        courseRuns[0].page.page_url === this.getCurrentCourseRun().page.page_url ? (
+          this.getCurrentCourseRun()
+        ) : (
+          courseRuns[0]
+        )
+      ) : (
+        null
+      )
+    )
+    if (run) this.updateDate(run)
     let product = run && run.products ? run.products[0] : null
     if (courseRuns) {
       const thisScope = this
@@ -164,7 +184,7 @@ export class ProductDetailEnrollApp extends React.Component<
             run = thisScope.getCurrentCourseRun()
             product = run && run.products ? run.products[0] : null
             // $FlowFixMe
-            document.getElementById('start_date').innerHTML = `<strong>${formatPrettyDate(parseDateString(courseRun.start_date))}</strong>`
+            thisScope.updateDate(run)
           }
         })
       })

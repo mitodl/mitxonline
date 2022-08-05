@@ -42,7 +42,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 
 from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
 from cms.constants import COURSE_INDEX_SLUG
-from courses.api import get_user_relevant_course_run
+from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset
 from courses.models import Course, Program
 from main.views import get_base_context
 from flexiblepricing.api import (
@@ -480,6 +480,9 @@ class CoursePage(ProductPage):
         relevant_run = get_user_relevant_course_run(
             course=self.product, user=request.user
         )
+        relevant_runs = get_user_relevant_course_run_qset(
+            course=self.product, user=request.user
+        ).values('courseware_id', 'start_date')
         is_enrolled = (
             False
             if (relevant_run is None or not request.user.is_authenticated)
@@ -500,6 +503,7 @@ class CoursePage(ProductPage):
             **super().get_context(request, *args, **kwargs),
             **get_base_context(request),
             "run": relevant_run,
+            "course_runs": relevant_runs,
             "is_enrolled": is_enrolled,
             "sign_in_url": sign_in_url,
             "start_date": start_date,
