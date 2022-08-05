@@ -261,11 +261,11 @@ mitol-django-common==2.5.0
     #   mitol-django-google-sheets-refunds
     #   mitol-django-mail
     #   mitol-django-payment-gateway
-mitol-django-google-sheets==2.3.0
+mitol-django-google-sheets==2.4.0
     # via
     #   -r requirements.in
     #   mitol-django-google-sheets-refunds
-mitol-django-google-sheets-refunds==0.4.0
+mitol-django-google-sheets-refunds==0.5.0
     # via -r requirements.in
 mitol-django-mail==3.2.0
     # via

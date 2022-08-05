@@ -79,12 +79,20 @@
       "description": "'hours' value for scheduled task to sync course run data (by default, it will run at midnight",
       "required": false
     },
+    "CRON_PROCESS_REFUND_REQUESTS_MINUTES": {
+      "description": "minute value for scheduled task to process refund requests",
+      "required": false
+    },
     "CSRF_TRUSTED_ORIGINS": {
       "description": "Comma separated string of trusted domains that should be CSRF exempt",
       "required": false
     },
     "DJANGO_LOG_LEVEL": {
       "description": "The log level for django",
+      "required": false
+    },
+    "ECOMMERCE_DEFAULT_PAYMENT_GATEWAY": {
+      "description": "The default payment gateway to use. Must match the value of the constant in the mitol.payment_gateway library.",
       "required": false
     },
     "EDX_API_CLIENT_TIMEOUT": {
@@ -141,6 +149,106 @@
     },
     "MITOL_AUTHENTICATION_REPLY_TO_ADDRESS": {
       "description": "E-mail to use for reply-to address of emails",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DATE_FORMAT": {
+      "description": "Python strptime format for date columns (no time) in enrollment management spreadsheets",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DATE_TIMEZONE": {
+      "description": "The name of the timezone that should be assumed for date/time values in spreadsheets. Choose from a value in the TZ database (https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DRIVE_API_PROJECT_ID": {
+      "description": "ID for the Google API project where the credentials were created",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DRIVE_CLIENT_ID": {
+      "description": "Client ID from Google API credentials",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DRIVE_CLIENT_SECRET": {
+      "description": "Client secret from Google API credentials",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DRIVE_SERVICE_ACCOUNT_CREDS": {
+      "description": "The contents of the Service Account credentials JSON to use for Google API auth",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DRIVE_SHARED_ID": {
+      "description": "ID of the Shared Drive (a.k.a. Team Drive). This is equal to the top-level folder ID.",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_ENROLLMENT_CHANGE_SHEET_ID": {
+      "description": "ID of the Google Sheet that contains the enrollment change request worksheets (refunds, transfers, etc)",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_GOOGLE_ACCOUNT_EMAIL_DOMAIN": {
+      "description": "Email domain of the google service account",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_REFUNDS_COMPLETED_DATE_COL": {
+      "description": "The zero-based index of the enrollment change sheet column that contains the row completion date",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_REFUNDS_ERROR_COL": {
+      "description": "The zero-based index of the enrollment change sheet column that contains row processing error messages",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_REFUNDS_FIRST_ROW": {
+      "description": "The first row (as it appears in the spreadsheet) of data that our scripts should consider processing in the refund request spreadsheet",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_REFUNDS_PLUGINS": {
+      "description": "The path to your refund plugin, example: app.plugins.RefundPlugin",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_REFUNDS_PROCESSOR_COL": {
+      "description": "The zero-based index of the enrollment change sheet column that contains the user that processed the row",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_REFUNDS_REQUEST_WORKSHEET_ID": {
+      "description": "ID of the worksheet within the enrollment change request spreadsheet that contains enrollment refund requests",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_REFUNDS_SKIP_ROW_COL": {
+      "description": "The zero-based index of the enrollment change sheet column that indicates whether the row should be skipped",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEET_PROCESSOR_APP_NAME": {
+      "description": "Name of the app processing the request",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY": {
+      "description": "CyberSource access key",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_ID": {
+      "description": "CyberSource merchant ID",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET": {
+      "description": "CyberSource merchant secret key",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_MERCHANT_SECRET_KEY_ID": {
+      "description": "CyberSource merchant secret key ID",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID": {
+      "description": "CyberSource profile ID",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_REST_API_ENVIRONMENT": {
+      "description": "CyberSource REST API Environment",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL": {
+      "description": "CyberSource secure acceptance URL",
+      "required": false
+    },
+    "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY": {
+      "description": "CyberSource security key",
       "required": false
     },
     "MITX_ONLINE_ADMIN_EMAIL": {

@@ -189,6 +189,7 @@ INSTALLED_APPS = (
     "mail.apps.MailApp",
     "users",
     "cms",
+    "sheets",
     # "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
@@ -767,6 +768,11 @@ CRON_COURSERUN_SYNC_DAYS = get_string(
     default="*",
     description="day_of_week' value for scheduled task to sync course run data (by default, it will run each day of the week).",
 )
+CRON_PROCESS_REFUND_REQUESTS_MINUTES = get_string(
+    name="CRON_PROCESS_REFUND_REQUESTS_MINUTES",
+    default="*",
+    description="minute value for scheduled task to process refund requests",
+)
 RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY = get_int(
     name="RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY",
     default=60 * 30,
@@ -804,6 +810,10 @@ CELERY_BEAT_SCHEDULE = {
             day_of_month="*",
             month_of_year="*",
         ),
+    },
+    "process-refund-requests": {
+        "task": "sheets.tasks.process_refund_requests",
+        "schedule": crontab(minute=CRON_PROCESS_REFUND_REQUESTS_MINUTES),
     },
 }
 

@@ -29,6 +29,11 @@ def cleanup_settings():
     envs.env.reload()
     importlib.reload(sys.modules["main.settings"])
     importlib.reload(sys.modules["mitol.authentication.settings.djoser_settings"])
+    importlib.reload(sys.modules["mitol.google_sheets.settings.google_sheets"])
+    importlib.reload(
+        sys.modules["mitol.google_sheets_refunds.settings.google_sheets_refunds"]
+    )
+    importlib.reload(sys.modules["mitol.payment_gateway.settings.cybersource"])
 
 
 class TestSettings(TestCase):
