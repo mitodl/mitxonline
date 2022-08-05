@@ -1,16 +1,15 @@
 """
 MITxOnline Flexible Pricing/Financial Aid views
 """
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction
-from main.views import RefinePagination
 from django.db.models import Q
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.viewsets import ModelViewSet
 
 from flexiblepricing import models, serializers
 from flexiblepricing.tasks import notify_flexible_price_status_change_email
+from main.views import RefinePagination
 
 
 class CurrencyExchangeRateViewSet(ModelViewSet):
@@ -38,7 +37,7 @@ class FlexiblePriceViewSet(ModelViewSet):
 
 
 class FlexiblePriceAdminViewSet(ModelViewSet):
-    serializer_class = serializers.FlexiblePriceSerializer
+    serializer_class = serializers.FlexiblePriceAdminSerializer
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAdminUser,)
     pagination_class = RefinePagination

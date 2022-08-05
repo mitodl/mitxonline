@@ -9,7 +9,7 @@ export interface IProduct {
 export interface IDiscount {
     id: number;
     discount_code: string;
-    amount: float;
+    amount: string;
     discount_type: string;
     redemption_type: string;
     max_redemptions: number;
@@ -41,19 +41,29 @@ export interface IDiscountProductRaw {
     product_id: number|null;
 }
 
+export interface ICourseware {
+    id: number;
+    title: string;
+    readable_id: string;
+}
+
+
 export interface IFlexiblePriceRequest {
     id: number;
     user: number;
+    courseware: ICourseware;
     status: string;
     income_usd: number;
     original_income: number;
     original_currency: string;
     country_of_income: null;
     date_exchange_rate: Date;
+    discount: IDiscount;
     date_documents_sent: Date;
     justification: string;
     country_of_residence: string;
-    action: string
+    action: string;
+    applicable_discounts: IDiscount[]
 }
 
 export interface IFlexiblePriceStatus {
