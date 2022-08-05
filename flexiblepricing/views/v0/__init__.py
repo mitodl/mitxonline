@@ -60,7 +60,7 @@ class FlexiblePriceAdminViewSet(ModelViewSet):
         if status_search is not None:
             queryset = queryset.filter(status=status_search)
 
-        return queryset
+        return queryset.order_by("-created_on")
 
     def update(self, request, *args, **kwargs):
         """Update the flexible pricing status"""
