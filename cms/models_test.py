@@ -17,7 +17,12 @@ from cms.factories import (
     FlexiblePricingFormFactory,
 )
 from cms.models import FlexiblePricingRequestSubmission
-from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
+from courses.factories import (
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramFactory,
+    CourseFactory,
+)
 from flexiblepricing.models import FlexiblePrice
 from flexiblepricing.constants import FlexiblePriceStatus
 
@@ -258,3 +263,42 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
         assert (
             "csrfmiddlewaretoken" in response.rendered_content
         ), response.rendered_content
+
+
+def test_flex_pricing_form_courseware_object():
+    """
+    Tests to make sure the correct courseware objects are returned when hitting
+    the get_parent_courseware method.
+    """
+
+    course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
+    flex_form = FlexiblePricingFormFactory()
+
+    program = ProgramFactory.create()
+    secondary_course = CourseFactory.create(program=program)
+
+    # no set courseware object, so get it from the parent page
+
+    assert flex_form.get_parent_courseware() == course_page.course
+    assert flex_form.selected_course is None
+    assert flex_form.selected_program is None
+
+    # setting a specific course (but not a program) - should return the set course
+
+    flex_form.selected_course = secondary_course
+    flex_form.save()
+    flex_form.refresh_from_db()
+
+    assert flex_form.get_parent_courseware() == secondary_course
+    assert flex_form.selected_course == secondary_course
+    assert flex_form.selected_program is None
+
+    # setting a specific program - should override everything
+
+    flex_form.selected_program = program
+    flex_form.save()
+    flex_form.refresh_from_db()
+
+    assert flex_form.get_parent_courseware() == program
+    assert flex_form.selected_course == secondary_course
+    assert flex_form.selected_program == program
