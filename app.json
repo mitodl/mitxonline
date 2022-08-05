@@ -200,7 +200,7 @@
       "required": false
     },
     "MITOL_GOOGLE_SHEETS_REFUNDS_PLUGINS": {
-      "description": "The path to your refund plugin",
+      "description": "The path to your refund plugin, example: app.plugins.RefundPlugin",
       "required": false
     },
     "MITOL_GOOGLE_SHEETS_REFUNDS_PROCESSOR_COL": {
