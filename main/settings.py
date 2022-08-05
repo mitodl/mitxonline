@@ -1026,9 +1026,9 @@ GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE = get_string(
     default=None,
     description="The value of the meta tag used by Google to verify the owner of a domain (used for enabling push notifications)",
 )
-PAYMENT_GATEWAY_CYBERSOURCE_BACKOFFICE_URL = get_string(
-    name="PAYMENT_GATEWAY_CYBERSOURCE_BACKOFFICE_URL",
-    default=None,
-    description="The value of the meta tag used by Google to verify the owner of a domain (used for enabling push notifications)",
+PAYMENT_GATEWAY_CYBERSOURCE_BACKOFFICE_URL_ENABLED = get_bool(
+    name="PAYMENT_GATEWAY_CYBERSOURCE_BACKOFFICE_URL_ENABLED",
+    default=False,
+    description="Boolean flag indicating whether to have Cybersource POST to the callback API endpoint (True), or not (False)",
 )
 MITOL_GOOGLE_SHEETS_REFUNDS_PLUGINS = ["sheets.plugins.RefundPlugin"]

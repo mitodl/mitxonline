@@ -422,8 +422,8 @@
       "description": "open exchange api url for fetching currency exchange rate",
       "required": false
     },
-    "PAYMENT_GATEWAY_CYBERSOURCE_BACKOFFICE_URL": {
-      "description": "The value of the meta tag used by Google to verify the owner of a domain (used for enabling push notifications)",
+    "PAYMENT_GATEWAY_CYBERSOURCE_BACKOFFICE_URL_ENABLED": {
+      "description": "Boolean flag indicating whether to have Cybersource POST to the callback API endpoint (True), or not (False)",
       "required": false
     },
     "PGBOUNCER_DEFAULT_POOL_SIZE": {

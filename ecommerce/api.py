@@ -111,7 +111,7 @@ def generate_checkout_payload(request):
     callback_uri = request.build_absolute_uri(reverse("checkout-result-callback"))
 
     backoffice_callback_uri = (
-        callback_uri if settings.PAYMENT_GATEWAY_CYBERSOURCE_BACKOFFICE_URL else None
+        callback_uri if settings.PAYMENT_GATEWAY_CYBERSOURCE_BACKOFFICE_URL_ENABLED else None
     )
 
     payload = PaymentGateway.start_payment(
