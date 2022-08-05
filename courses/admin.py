@@ -82,7 +82,8 @@ class CourseRunAdmin(TimestampedModelAdmin):
     raw_id_fields = ("course",)
 
     formfield_overrides = {
-        models.CharField: {"widget": TextInput(attrs={"size": "80"})}
+        models.CharField: {"widget": TextInput(attrs={"size": "80"})},
+        models.TextField: {"widget": TextInput(attrs={"size": "100"})},
     }
 
 

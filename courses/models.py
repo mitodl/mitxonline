@@ -336,8 +336,8 @@ class CourseRun(TimestampedModel):
         help_text=f"The title of the course. {SYNCED_COURSE_RUN_FIELD_MSG}",
     )
     courseware_id = models.CharField(max_length=255, unique=True)
-    run_tag = models.CharField(
-        max_length=10,
+    run_tag = models.TextField(
+        max_length=100,
         help_text="A string that identifies the set of runs that this run belongs to (example: 'R2')",
     )
     courseware_url_path = models.CharField(max_length=500, blank=True, null=True)
