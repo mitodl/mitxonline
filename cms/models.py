@@ -42,6 +42,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
 from cms.constants import COURSE_INDEX_SLUG
 from courses.api import get_user_relevant_course_run
+from courses.models import Course, Program
 from main.views import get_base_context
 from flexiblepricing.api import (
     determine_tier_courseware,
@@ -448,7 +449,7 @@ class CoursePage(ProductPage):
     """
 
     parent_page_types = ["CourseIndexPage"]
-    subpage_types = ["FlexiblePricingRequestForm"]
+    subpage_types = ["cms.FlexiblePricingRequestForm"]
 
     course = models.OneToOneField(
         "courses.Course", null=True, on_delete=models.SET_NULL, related_name="page"
@@ -585,6 +586,14 @@ class FlexiblePricingRequestForm(AbstractForm):
         blank=True,
         help_text="What to show if the user isn't logged in.",
     )
+
+    selected_course = models.ForeignKey(
+        Course, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    selected_program = models.ForeignKey(
+        Program, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+
     application_processing_text = RichTextField(
         null=True,
         blank=True,
@@ -606,6 +615,8 @@ class FlexiblePricingRequestForm(AbstractForm):
 
     content_panels = AbstractForm.content_panels + [
         FieldPanel("intro"),
+        FieldPanel("selected_course"),
+        FieldPanel("selected_program"),
         FieldPanel("guest_text"),
         InlinePanel("form_fields", label="Form Fields"),
         FieldPanel("application_processing_text"),
@@ -642,22 +653,34 @@ class FlexiblePricingRequestForm(AbstractForm):
 
         return None
 
-    def get_parent_product(self):
+    def get_parent_courseware(self):
         """
-        Returns just the purchasable object part of the parent page (i.e. either
-        the course or the program). (Subject to the caveats above, this just
-        returns a course for now and will need refinement when program pages
-        are in.)
+        Returns the valid courseware object that is associated with the form.
+        The rules for this are:
+        - If there's a Program selected, return that.
+        - If there's a Course selected, return that.
+        - If there's no selection, get the parent from get_parent_product_page.
+          Then, repeat the first two steps.
+
+        (At this point, there aren't Product pages so if it hits step 3 it will
+        return a Course if there's one to be returned.)
 
         Returns:
-            Course, or None if not found
+            Course, Program, or None if not found
         """
 
-        return (
-            None
-            if self.get_parent_product_page() is None
-            else self.get_parent_product_page().course
-        )
+        if (
+            self.get_parent_product_page() is None
+            and self.selected_course is None
+            and self.selected_program is None
+        ):
+            return None
+        elif self.selected_program is not None:
+            return self.selected_program
+        elif self.selected_course is not None:
+            return self.selected_course
+        else:
+            return self.get_parent_product_page().course
 
     def get_previous_submission(self, request):
         """
@@ -681,7 +704,6 @@ class FlexiblePricingRequestForm(AbstractForm):
 
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
-        context["course"] = self.get_parent_product_page()
 
         fp_request = self.get_previous_submission(request)
         context["prior_request"] = fp_request
@@ -711,7 +733,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         except NotSupportedException:
             raise ValidationError("Currency not supported")
 
-        courseware = self.get_parent_product()
+        courseware = self.get_parent_courseware()
         income_usd = round(converted_income, 2)
         tier = determine_tier_courseware(courseware, income_usd)
 
@@ -751,7 +773,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         needs to respect the URL of that page or the form's action will be
         wrong.
         """
-        if not self.get_parent_product():
+        if not self.get_parent_courseware():
             return super().get_url_parts(request=request)
 
         url_parts = self.get_parent_product_page().get_url_parts(request=request)
