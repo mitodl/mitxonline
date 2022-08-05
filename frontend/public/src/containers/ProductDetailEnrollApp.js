@@ -19,7 +19,8 @@ import {
 } from "../lib/queries/courseRuns"
 
 import {isFinancialAssistanceAvailable, isWithinEnrollmentPeriod} from "../lib/courseApi"
-import { formatPrettyDate, parseDateString } from "../lib/util"
+import { formatPrettyDate, emptyOrNil} from "../lib/util"
+import moment from "moment-timezone"
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
@@ -62,7 +63,7 @@ export class ProductDetailEnrollApp extends React.Component<
   }
 
   getCurrentCourseRun = (): EnrollmentFlaggedCourseRun => {
-    const sessionCourseRun = JSON.parse(sessionStorage.getItem('currentCourseRun'))
+    const sessionCourseRun = JSON.parse(sessionStorage.getItem('currentCourseRun') || '{}')
     return sessionCourseRun ? sessionCourseRun : this.state.currentCourseRun
   }
 
@@ -151,9 +152,11 @@ export class ProductDetailEnrollApp extends React.Component<
     )
   }
 
-  updateDate(run) {
-    const date = parseDateString(new Date(run.start_date)).utc()
-    document.getElementById('start_date').innerHTML = `<strong>${formatPrettyDate(date)}</strong>`
+  updateDate(run: EnrollmentFlaggedCourseRun) {
+    let date = emptyOrNil(run.start_date) ? undefined : moment(new Date(run.start_date))
+    date = date ? date.utc() : date
+    const dateElem = document.getElementById('start_date')
+    if (dateElem) dateElem.innerHTML = `<strong>${formatPrettyDate(date)}</strong>`
   }
 
   render() {
