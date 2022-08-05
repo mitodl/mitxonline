@@ -54,7 +54,7 @@ Setting Up a Product
 ####################
 
 1. Log into MITxOnline Django Admin.
-2. Under Ecommerce, open Products and create a new Product. Set *Content type* to Course Run and *Object Id* to the ID of the course run you created earlier (it's probably 1 if you're working from a new install). Price should ideally be set to a non-zero value, that is less than $999. Description needs to be filled in but can be anything - for clarity, it's recommended to use the course name. Make sure Is active is checked.
+2. Under Ecommerce, open Products and create a new Product. Set *Content type* to Course Run and *Object Id* to the ID of the course run you created earlier (it's probably 1 if you're working from a new install). Price should ideally be set to a non-zero value, that is less than $999, in RC/Sandbox environments. Description needs to be filled in but can be anything - for clarity, it's recommended to use the course name. Make sure Is active is checked.
 
 You should now be able to enroll in the upgraded course. 
 
