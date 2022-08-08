@@ -54,7 +54,7 @@ Setting Up a Product
 ####################
 
 1. Log into MITxOnline Django Admin.
-2. Under Ecommerce, open Products and create a new Product. Set *Content type* to Course Run and *Object Id* to the ID of the course run you created earlier (it's probably 1 if you're working from a new install). Price should ideally be set to a non-zero value. Description needs to be filled in but can be anything - for clarity, it's recommended to use the course name. Make sure Is active is checked.
+2. Under Ecommerce, open Products and create a new Product. Set *Content type* to Course Run and *Object Id* to the ID of the course run you created earlier (it's probably 1 if you're working from a new install). Price should ideally be set to a non-zero value, that is less than $999, in RC/Sandbox environments. Description needs to be filled in but can be anything - for clarity, it's recommended to use the course name. Make sure Is active is checked.
 
 You should now be able to enroll in the upgraded course. 
 
@@ -74,5 +74,5 @@ The test CyberSource credentials won't actually process a charge that has been r
 - American Express: 378282246310005
 - Discover: 6011111111111117
 
-Supply any expiration date in the future. The CVN code should be any three-digit (not AmEx) or 4 digit (AmEx) number. What card types are allowed and whether or not the CVN code is required depends on the settings in the CyberSource account - currently, the MIT test account does require an expiration date and CVN code and supports the four card types listed above. Transactions are logged and can be found in the test EBC. You can additionally adjust the settings in the EBC to email the payment data to you while you're testing - but you should ask around before doing this in case someone else is testing eCommerce elsewhere. 
+Supply any expiration date in the future. The CVN code should be any three-digit (not AmEx) or 4 digit (AmEx) number that is fairly unique (not like 123, 111). What card types are allowed and whether or not the CVN code is required depends on the settings in the CyberSource account - currently, the MIT test account does require an expiration date and CVN code and supports the four card types listed above. Transactions are logged and can be found in the test EBC. You can additionally adjust the settings in the EBC to email the payment data to you while you're testing - but you should ask around before doing this in case someone else is testing eCommerce elsewhere. 
 
