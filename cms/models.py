@@ -761,7 +761,7 @@ class FlexiblePricingRequestForm(AbstractForm):
             flexible_price.status = FlexiblePriceStatus.PENDING_MANUAL_APPROVAL
         flexible_price.save()
         if flexible_price.courseware_content_type != tier.courseware_content_type:
-            flexible_price.courseware_content_type=tier.courseware_content_type
+            flexible_price.courseware_content_type = tier.courseware_content_type
             flexible_price.save()
 
     # Matches the standard page path that Wagtail returns for this page type.
