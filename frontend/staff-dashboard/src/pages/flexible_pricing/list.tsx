@@ -23,10 +23,6 @@ import { FlexiblePricingStatusModal } from "components/flexiblepricing/statusmod
 
 const FlexiblePricingStatuses = [
     {
-        label: null,
-        value: null,
-    },
-    {
         label: 'Created',
         value: 'created'
     },
@@ -64,7 +60,8 @@ const FlexiblePricingFilterForm: React.FC<{ formProps: FormProps }> = ({ formPro
                 <Select
                     style={{ minWidth: 200 }}
                     placeholder={FlexiblePricingStatusText}
-                    options={FlexiblePricingStatuses} />
+                    options={FlexiblePricingStatuses}
+                    allowClear={true} />
             </Form.Item>
             <Form.Item>
                 <Button htmlType="submit" type="primary">
