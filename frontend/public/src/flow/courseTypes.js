@@ -19,7 +19,8 @@ export type BaseCourseRun = {
   run_tag: ?string,
   products: Array<Product>,
   id: number,
-  page: ?Page
+  page: ?Page,
+  course_number: ?string
 }
 
 export type EnrollmentFlaggedCourseRun = BaseCourseRun & {
@@ -36,4 +37,20 @@ export type RunEnrollment = {
   id: number,
   edx_emails_subscription: ?string,
   enrollment_mode: string
+}
+
+export type CourseDetailWithRuns = CourseDetail & {
+  courseruns: Array<BaseCourseRun>
+}
+
+export type Program = {
+  id: number,
+  title: string,
+  readable_id: string,
+  courses: Array<CourseDetailWithRuns>
+}
+
+export type ProgramEnrollment = {
+  program: Program,
+  enrollments: Array<RunEnrollment>
 }

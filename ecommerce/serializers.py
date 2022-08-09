@@ -99,6 +99,9 @@ class ProductFlexibilePriceSerializer(BaseProductSerializer):
     product_flexible_price = serializers.SerializerMethodField()
 
     def get_product_flexible_price(self, instance):
+        if not "request" in self.context:
+            return None
+
         discount_record = determine_courseware_flexible_price_discount(
             instance, self.context["request"].user
         )

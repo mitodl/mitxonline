@@ -115,7 +115,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             return None
 
 
-class CourseSerializer(serializers.ModelSerializer):
+class CourseSerializer(BaseCourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
     courseruns = serializers.SerializerMethodField()
@@ -222,8 +222,11 @@ class ProgramSerializer(serializers.ModelSerializer):
     def get_courses(self, instance):
         """Serializer for courses"""
         return CourseSerializer(
-            instance.courses.filter(live=True).order_by("position_in_program"),
+            instance.courses.filter(live=True)
+            .order_by("position_in_program")
+            .select_related("page"),
             many=True,
+            context={"include_page_fields": True},
         ).data
 
     def get_start_date(self, instance):
