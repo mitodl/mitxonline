@@ -31,6 +31,9 @@ import {
   enrollmentsSelector,
   enrollmentsQuery,
   enrollmentsQueryKey,
+  programEnrollmentsQuery,
+  programEnrollmentsQueryKey,
+  programEnrollmentsSelector,
   deactivateEnrollmentMutation,
   courseEmailsSubscriptionMutation
 } from "../../lib/queries/enrollment"
@@ -44,12 +47,15 @@ import {
 import { routes } from "../../lib/urls"
 import { addUserNotification } from "../../actions"
 import { EnrolledItemCard } from "../../components/EnrolledItemCard"
+import { ProgramEnrollmentCard } from "../../components/ProgramEnrollmentCard"
+import { ProgramEnrollmentDrawer } from "../../components/ProgramEnrollmentDrawer"
 
-import type { RunEnrollment } from "../../flow/courseTypes"
+import type { RunEnrollment, ProgramEnrollment } from "../../flow/courseTypes"
 import type { CurrentUser } from "../../flow/authTypes"
 
 type DashboardPageProps = {
   enrollments: RunEnrollment[],
+  programEnrollments: ProgramEnrollment[],
   currentUser: CurrentUser,
   isLoading: boolean,
   deactivateEnrollment: (enrollmentId: number) => Promise<any>,
@@ -63,7 +69,9 @@ type DashboardPageProps = {
 type DashboardPageState = {
   submittingEnrollmentId: number | null,
   activeMenuIds: number[],
-  emailSettingsModalVisibility: boolean[]
+  emailSettingsModalVisibility: boolean[],
+  programDrawerVisibility: boolean,
+  programDrawerEnrollments: any[],
 }
 
 export class DashboardPage extends React.Component<
@@ -73,7 +81,9 @@ export class DashboardPage extends React.Component<
   state = {
     submittingEnrollmentId:       null,
     activeMenuIds:                [],
-    emailSettingsModalVisibility: []
+    emailSettingsModalVisibility: [],
+    programDrawerVisibility:      false,
+    programDrawerEnrollments:     [],
   }
 
   toggleEmailSettingsModalVisibility = (enrollmentId: number) => {
@@ -103,6 +113,13 @@ export class DashboardPage extends React.Component<
           : [...this.state.activeMenuIds, itemId]
       })
     }
+  }
+
+  toggleDrawer(enrollments: any) {
+    this.setState({
+      programDrawerEnrollments: enrollments,
+      programDrawerVisibility:  !this.state.programDrawerVisibility
+    })
   }
 
   async onDeactivate(enrollment: RunEnrollment) {
@@ -234,14 +251,44 @@ export class DashboardPage extends React.Component<
     )
   }
 
+  renderEnrolledItemCard(enrollment: RunEnrollment) {
+    const {
+      programEnrollments,
+      currentUser,
+      deactivateEnrollment,
+      courseEmailsSubscription,
+      addUserNotification,
+    } = this.props
+
+    if (programEnrollments) {
+      const enrollmentMatches = programEnrollments.map(programEnrollment => programEnrollment.enrollments.some(elem => elem.id === enrollment.id))
+
+      if (enrollmentMatches.includes(true)) {
+        return null
+      }
+    }
+
+    return (
+      <EnrolledItemCard
+        key={enrollment.id}
+        enrollment={enrollment}
+        currentUser={currentUser}
+        deactivateEnrollment={deactivateEnrollment}
+        courseEmailsSubscription={courseEmailsSubscription}
+        addUserNotification={addUserNotification}
+      ></EnrolledItemCard>
+    )
+  }
+
   render() {
     const {
       enrollments,
+      programEnrollments,
       isLoading,
       currentUser,
       deactivateEnrollment,
       courseEmailsSubscription,
-      addUserNotification
+      addUserNotification,
     } = this.props
 
     return (
@@ -250,17 +297,20 @@ export class DashboardPage extends React.Component<
           <Loader isLoading={isLoading}>
             <h1>My Courses</h1>
             <div className="enrolled-items">
-              {enrollments && enrollments.length > 0 ? (
-                enrollments.map(enrollment => (
-                  <EnrolledItemCard
-                    key={enrollment.id}
-                    enrollment={enrollment}
+              {programEnrollments && programEnrollments.length > 0 ? (
+                programEnrollments.map(programEnrollment => (
+                  <ProgramEnrollmentCard
+                    key={programEnrollment.program.readable_id}
+                    enrollment={programEnrollment}
                     currentUser={currentUser}
                     deactivateEnrollment={deactivateEnrollment}
                     courseEmailsSubscription={courseEmailsSubscription}
                     addUserNotification={addUserNotification}
-                  ></EnrolledItemCard>
-                ))
+                    showDrawer={this.toggleDrawer.bind(this)}
+                  ></ProgramEnrollmentCard>
+                ))) : null}
+              {enrollments && enrollments.length > 0 ? (
+                enrollments.map(enrollment => this.renderEnrolledItemCard(enrollment))
               ) : (
                 <div className="card no-enrollments p-3 p-md-5 rounded-0">
                   <h2>Enroll Now</h2>
@@ -271,6 +321,14 @@ export class DashboardPage extends React.Component<
                 </div>
               )}
             </div>
+            <ProgramEnrollmentDrawer
+              currentUser={currentUser}
+              deactivateEnrollment={deactivateEnrollment}
+              courseEmailsSubscription={courseEmailsSubscription}
+              addUserNotification={addUserNotification}
+              isHidden={this.state.programDrawerVisibility}
+              enrollments={this.state.programDrawerEnrollments}
+              showDrawer={() => this.setState({programDrawerVisibility: false})}></ProgramEnrollmentDrawer>
           </Loader>
         </div>
       </DocumentTitle>
@@ -279,12 +337,13 @@ export class DashboardPage extends React.Component<
 }
 
 const mapStateToProps = createStructuredSelector({
-  enrollments: enrollmentsSelector,
-  currentUser: currentUserSelector,
-  isLoading:   pathOr(true, ["queries", enrollmentsQueryKey, "isPending"])
+  enrollments:        enrollmentsSelector,
+  programEnrollments: programEnrollmentsSelector,
+  currentUser:        currentUserSelector,
+  isLoading:          pathOr(true, ["queries", enrollmentsQueryKey, "isPending"])
 })
 
-const mapPropsToConfig = () => [enrollmentsQuery()]
+const mapPropsToConfig = () => [enrollmentsQuery(), programEnrollmentsQuery()]
 
 const deactivateEnrollment = (enrollmentId: number) =>
   mutateAsync(deactivateEnrollmentMutation(enrollmentId))

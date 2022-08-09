@@ -4,6 +4,11 @@ $featureImgWidth: 202px;
 $featureImgHeight: 143px;
 $featureImgMobileWidth: 345px;
 $featureImgMobileHeight: 223px;
+$sidenav-bg: #f5f5f5;
+$sidenav-separator: rgba(255, 255, 255, 0.2);
+
+$program-badge-fg: #305987;
+$program-badge-bg: #DBF2F3;
 
 .enrolled-items {
   .card {
@@ -78,6 +83,7 @@ $featureImgMobileHeight: 223px;
       font-weight: normal;
       padding: .20rem;
       margin-bottom: .5rem;
+      margin-right: .5rem;
     }
     span.badge.badge-red {
         color: $red;
@@ -88,6 +94,11 @@ $featureImgMobileHeight: 223px;
         color: $green;
         background-color: #DBF3E9;
       }
+
+    span.badge.badge-program {
+      color: $program-badge-fg;
+      background-color: $program-badge-bg;
+    }
   }
 
   .enrollment-extra-links {
@@ -137,4 +148,47 @@ $featureImgMobileHeight: 223px;
 
 .modal-title {
   width: 500px;
+}
+
+.nav-drawer {
+  position: fixed;
+  z-index: 1000;
+  width: 55%;
+  height: 100%;
+  right: -55%;
+  top: 0;
+  background-color: $sidenav-bg;
+  transition: right 0.2s ease-in-out ;
+  padding: 15px 36px;
+
+  &.open {
+    box-shadow: 0 3px 0 10px rgba(0,0,0,.2);
+    right: 0;
+  }
+
+  button {
+    float: right;
+    margin-left: auto;
+  }
+
+  .row.chrome {
+    margin-top: 15px !important;
+    margin-bottom: 15px !important;
+  }
+}
+
+.drawer-background {
+  display: none;
+  
+  &.open {
+    display: block;
+    position: fixed;
+    height: 100%;
+    width: 100%;
+    top: 0;
+    left: 0;
+    z-index: 999;
+
+    background-color: rgba(0,0,0,.2);
+  }
 }

@@ -328,6 +328,16 @@ export class EnrolledItemCard extends React.Component<
               </div>
             </div>
           )}
+          {!enrollment.run.course.feature_image_src && enrollment.run.page.feature_image_src && (
+            <div className="col-12 col-md-auto px-0 px-md-3">
+              <div className="img-container">
+                <img
+                  src={enrollment.run.page.feature_image_src}
+                  alt="Preview image"
+                />
+              </div>
+            </div>
+          )}
           <div className="col-12 col-md px-3 py-3 py-md-0">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
               <EnrollmentRoleTag

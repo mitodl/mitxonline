@@ -5,9 +5,11 @@ import { emptyOrNil } from "../util"
 
 export const enrollmentsSelector = pathOr(null, ["entities", "enrollments"])
 export const enrollmentSelector = pathOr(null, ["entities", "enrollment"])
+export const programEnrollmentsSelector = pathOr(null, ["entities", "program_enrollments"])
 
 export const enrollmentsQueryKey = "enrollments"
 export const enrollmentQueryKey = "enrollment"
+export const programEnrollmentsQueryKey = "program_enrollments"
 
 export const enrollmentsQuery = () => ({
   queryKey:  enrollmentsQueryKey,
@@ -17,6 +19,17 @@ export const enrollmentsQuery = () => ({
   }),
   update: {
     enrollments: nextState
+  }
+})
+
+export const programEnrollmentsQuery = () => ({
+  queryKey:   programEnrollmentsQueryKey,
+  url:        "/api/program_enrollments/",
+  transform:  json => ({
+    program_enrollments: json
+  }),
+  update: {
+    program_enrollments: nextState
   }
 })
 
