@@ -464,7 +464,13 @@ class CheckoutCallbackView(View):
         elif cybersource_payment_response_state == ProcessorResponse.STATE_ACCEPTED:
             # It actually worked here
             basket = Basket.objects.filter(user=order.purchaser).first()
-            return api.fulfill_completed_order(order, request.POST, basket)
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {
+                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
+                    "run": order.lines.first().purchased_object.course.title,
+                },
+            )
         else:
             return redirect_with_user_message(
                 reverse("user-dashboard"), {"type": USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN}
@@ -472,8 +478,6 @@ class CheckoutCallbackView(View):
 
 
 class BackofficeCallbackView(APIView):
-    authentication_classes = ()
-
     def post(self, request, *args, **kwargs):
         order = api.get_order_from_cybersource_payment_response(request)
         if order != None:

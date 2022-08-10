@@ -85,7 +85,7 @@ urlpatterns = [
         name="order_receipt_api",
     ),
     re_path(
-        r"^api/checkout/result/(?P<pk>\d+)/$",
+        r"^api/checkout/result/",
         BackofficeCallbackView.as_view(),
         name="checkout_result_api",
     ),

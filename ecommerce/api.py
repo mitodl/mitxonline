@@ -194,22 +194,12 @@ def apply_user_discounts(request):
     return
 
 
-def fulfill_completed_order(
-    order, payment_data, basket, message_type=USER_MSG_TYPE_PAYMENT_ACCEPTED
-):
+def fulfill_completed_order(order, payment_data, basket):
     order.fulfill(payment_data)
     order.save()
 
     if not order.is_review and (basket and basket.compare_to_order(order)):
         basket.delete()
-
-    return redirect_with_user_message(
-        reverse("user-dashboard"),
-        {
-            "type": message_type,
-            "run": order.lines.first().purchased_object.course.title,
-        },
-    )
 
 
 def get_order_from_cybersource_payment_response(request):
@@ -290,6 +280,8 @@ def process_cybersource_payment_response(request, order):
     elif processor_response.state == ProcessorResponse.STATE_ACCEPTED:
         # It actually worked here
         log.debug("Transaction accepted!: {msg}".format(msg=processor_response.message))
+        basket = Basket.objects.filter(user=order.purchaser).first()
+        fulfill_completed_order(order, request.POST, basket)
     else:
         order.cancel()
         order.save()
