@@ -838,5 +838,5 @@ def test_checkout_api_result_verification_failure(
 
     resp = user_client.post(reverse("checkout_result_api"), payload)
 
-    # checkout_result_api will always respond with a 200 unless validate_processor_response returns false
+    # checkout_result_api will always respond with a 403 if validate_processor_response returns False
     assert resp.status_code == 403

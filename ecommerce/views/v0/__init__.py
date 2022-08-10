@@ -39,13 +39,9 @@ from django.db import transaction
 from django.db.models import Q, Count
 from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
-from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
 from mitol.common.utils import now_in_utc
 from rest_framework_extensions.mixins import NestedViewSetMixin
-from mitol.payment_gateway.api import (
-    ProcessorResponse,
-)
 
 from courses.models import (
     CourseRun,

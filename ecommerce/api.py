@@ -22,7 +22,7 @@ from main.constants import (
     USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
     USER_MSG_TYPE_PAYMENT_REVIEW,
     USER_MSG_TYPE_ENROLL_BLOCKED,
-    USER_MSG_TYPE_ENROLL_DUPLICATED
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
 )
 
 from mitol.payment_gateway.api import (
@@ -232,7 +232,7 @@ def process_cybersource_payment_response(request, order):
     processor_response = PaymentGateway.get_formatted_response(
         ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
     )
-    
+
     return_message = ""
 
     if processor_response.state == ProcessorResponse.STATE_DECLINED:
@@ -295,7 +295,7 @@ def process_cybersource_payment_response(request, order):
         order.cancel()
         order.save()
         return_message = USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN
-        
+
     return return_message
 
 
