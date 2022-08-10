@@ -5,12 +5,10 @@ from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
-from courses.models import Program
 from ecommerce.models import Discount
 from main.utils import serialize_model_object
 from main.settings import AUTH_USER_MODEL
 from mitol.common.models import TimestampedModel
-from courses.models import Course
 from flexiblepricing.constants import FlexiblePriceStatus
 from wagtail.contrib.forms.models import (
     AbstractFormSubmission,
@@ -121,6 +119,14 @@ class FlexiblePrice(TimestampedModel):
     tier = models.ForeignKey(
         FlexiblePriceTier, null=True, blank=True, on_delete=models.CASCADE
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "courseware_content_type", "courseware_object_id"],
+                name="unique_user_courseware_object",
+            )
+        ]
 
     def save(self, *args, **kwargs):  # pylint: disable=signature-differs
         """

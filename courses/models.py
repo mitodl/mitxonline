@@ -90,7 +90,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
     live = models.BooleanField(default=False)
-    # products = GenericRelation(Product, related_query_name="programs")
 
     @property
     def page(self):

@@ -71,6 +71,7 @@ class FlexiblePricingFormFactory(wagtail_factories.PageFactory):
     parent = LazyAttribute(
         lambda _: CoursePage.objects.first() or CoursePageFactory.create()
     )
+    slug = fuzzy.FuzzyText(prefix="my-flex-price-form-")
 
     class Meta:
         model = FlexiblePricingRequestForm

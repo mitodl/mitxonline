@@ -13,6 +13,7 @@ from django.http import Http404
 from django.urls import reverse
 from django.forms import ChoiceField, DecimalField
 from django.template.response import TemplateResponse
+from django.contrib.contenttypes.models import ContentType
 
 from mitol.common.utils.datetime import now_in_utc
 from modelcluster.fields import ParentalKey
@@ -678,29 +679,60 @@ class FlexiblePricingRequestForm(AbstractForm):
         elif self.selected_program is not None:
             return self.selected_program
         elif self.selected_course is not None:
+            if self.selected_course.program is not None:
+                return self.selected_course.program
+
             return self.selected_course
         else:
-            return self.get_parent_product_page().course
+            parent_page_course = self.get_parent_product_page().course
+            return (
+                parent_page_course
+                if parent_page_course.program is None
+                else parent_page_course.program
+            )
 
     def get_previous_submission(self, request):
         """
-        Gets the last submission by the user for this page.
+        Gets the last submission by the user for the courseware object the page
+        is associated with. If the object is a Course that has an attached
+        Program, this returns the first FlexiblePrice that's for either the
+        Course or the Program.
 
         Returns:
             FlexiblePrice, or None if not found.
         """
+        parent_courseware = self.get_parent_courseware()
+
+        if parent_courseware is None or request.user.id is None:
+            return None
+
+        sub_qset = FlexiblePrice.objects.filter(user=request.user)
+        course_ct = ContentType.objects.get(app_label="courses", model="course")
+        program_ct = ContentType.objects.get(app_label="courses", model="program")
+
         if (
-            self.get_submission_class()
-            .objects.filter(page=self, user__pk=request.user.pk)
-            .exists()
+            isinstance(parent_courseware, Course)
+            and parent_courseware.program is not None
         ):
-            return (
-                FlexiblePrice.objects.filter(user__pk=request.user.pk)
-                .order_by("-created_on")
-                .first()
+            sub_qset = sub_qset.filter(
+                models.Q(
+                    courseware_object_id=parent_courseware.id,
+                    courseware_content_type=course_ct,
+                )
+                | models.Q(
+                    courseware_object_id=parent_courseware.program.id,
+                    courseware_content_type=program_ct,
+                )
+            )
+        else:
+            sub_qset = sub_qset.filter(
+                courseware_object_id=parent_courseware.id,
+                courseware_content_type=course_ct
+                if isinstance(parent_courseware, Course)
+                else program_ct,
             )
 
-        return None
+        return sub_qset.order_by("-created_on").first()
 
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
@@ -724,7 +756,6 @@ class FlexiblePricingRequestForm(AbstractForm):
         return super().serve(request, *args, **kwargs)
 
     def process_form_submission(self, form):
-
         try:
             converted_income = determine_income_usd(
                 float(form.cleaned_data["your_income"]),
@@ -743,17 +774,23 @@ class FlexiblePricingRequestForm(AbstractForm):
             user=form.user,
         )
 
-        flexible_price = FlexiblePrice(
-            user=form.user,
-            original_income=form.cleaned_data["your_income"],
-            original_currency=form.cleaned_data["income_currency"],
-            country_of_income=form.user.legal_address.country,
-            income_usd=income_usd,
-            date_exchange_rate=datetime.datetime.now(),
-            cms_submission=form_submission,
-            courseware_object=courseware,
-            tier=tier,
-        )
+        flexible_price = self.get_previous_submission(form)
+
+        if flexible_price is None:
+            flexible_price = FlexiblePrice(user=form.user, courseware_object=courseware)
+        else:
+            if flexible_price.status is not FlexiblePriceStatus.RESET:
+                raise ValidationError(
+                    "A Flexible Price request already exists for this user and course or program."
+                )
+
+        flexible_price.original_income = form.cleaned_data["your_income"]
+        flexible_price.original_currency = form.cleaned_data["income_currency"]
+        flexible_price.country_of_income = form.user.legal_address.country
+        flexible_price.income_usd = income_usd
+        flexible_price.date_exchange_rate = datetime.datetime.now()
+        flexible_price.cms_submission = form_submission
+        flexible_price.tier = tier
 
         if determine_auto_approval(flexible_price, tier) is True:
             flexible_price.status = FlexiblePriceStatus.AUTO_APPROVED

@@ -18,10 +18,9 @@ def test_submission_status():
     Tests the is_approved and is_denied methods.
     """
 
-    user = UserFactory.create()
-    course = CourseFactory.create()
-
     for status in FlexiblePriceStatus.ALL_STATUSES:
+        user = UserFactory.create()
+        course = CourseFactory.create()
         submission = FlexiblePrice.objects.create(
             user=user, status=status, courseware_object=course
         )
