@@ -1008,17 +1008,17 @@ MITX_ONLINE_REFINE_OIDC_CONFIG_CLIENT_ID = get_string(
 )
 MITX_ONLINE_REFINE_OIDC_CONFIG_AUTHORITY = get_string(
     name="MITX_ONLINE_REFINE_OIDC_CONFIG_AUTHORITY",
-    default=f"{SITE_BASE_URL}/oauth2/",
+    default=urljoin(SITE_BASE_URL, "/oauth2/"),
     description="open exchange app id for fetching currency exchange rate",
 )
 MITX_ONLINE_REFINE_OIDC_CONFIG_REDIRECT_URI = get_string(
     name="MITX_ONLINE_REFINE_OIDC_CONFIG_REDIRECT_URI",
-    default=f"{SITE_BASE_URL}/staff-dashboard/oauth2/login/",
+    default=urljoin(SITE_BASE_URL, "/staff-dashboard/oauth2/login/"),
     description="Url to redirect the user to",
 )
 MITX_ONLINE_REFINE_MITX_ONLINE_DATASOURCE = get_string(
     name="MITX_ONLINE_REFINE_MITX_ONLINE_DATASOURCE",
-    default=f"{SITE_BASE_URL}/api",
+    default=urljoin(SITE_BASE_URL, "/api"),
     description="open exchange app id for fetching currency exchange rate",
 )
 GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE = get_string(
