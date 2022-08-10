@@ -2,15 +2,6 @@
 MITxOnline ecommerce views
 """
 import logging
-from main.constants import (
-    USER_MSG_TYPE_PAYMENT_ACCEPTED,
-    USER_MSG_TYPE_PAYMENT_CANCELLED,
-    USER_MSG_TYPE_PAYMENT_DECLINED,
-    USER_MSG_TYPE_PAYMENT_ERROR,
-    USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
-    USER_MSG_TYPE_PAYMENT_REVIEW,
-    USER_MSG_TYPE_ENROLL_BLOCKED,
-)
 from main.utils import redirect_with_user_message
 from rest_framework import mixins, status
 from rest_framework.response import Response
@@ -27,6 +18,16 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.decorators import action
+
+from main.constants import (
+    USER_MSG_TYPE_PAYMENT_ACCEPTED,
+    USER_MSG_TYPE_PAYMENT_CANCELLED,
+    USER_MSG_TYPE_PAYMENT_DECLINED,
+    USER_MSG_TYPE_PAYMENT_ERROR,
+    USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
+    USER_MSG_TYPE_PAYMENT_REVIEW,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
+)
 
 from django.views.generic import TemplateView, RedirectView, View
 from django.http import HttpResponse, HttpResponseRedirect
@@ -433,47 +434,29 @@ class CheckoutCallbackView(View):
         cybersource_payment_response_state = api.process_cybersource_payment_response(
             request, order
         )
-
-        if cybersource_payment_response_state == ProcessorResponse.STATE_DECLINED:
-            # Transaction declined for some reason
-            # This probably means the order needed to go through the process
-            # again so maybe tell the user to do a thing.
+        if cybersource_payment_response_state in [
+            USER_MSG_TYPE_PAYMENT_DECLINED,
+            USER_MSG_TYPE_PAYMENT_ERROR,
+            USER_MSG_TYPE_PAYMENT_CANCELLED,
+        ]:
             return redirect_with_user_message(
-                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_ERROR}
+                reverse("cart"), {"type": cybersource_payment_response_state}
             )
-        elif cybersource_payment_response_state == ProcessorResponse.STATE_ERROR:
+        elif cybersource_payment_response_state in [
+            USER_MSG_TYPE_PAYMENT_REVIEW,
+            USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
+            USER_MSG_TYPE_ENROLL_BLOCKED,
+        ]:
             return redirect_with_user_message(
-                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_ERROR}
+                reverse("user-dashboard"), {"type": cybersource_payment_response_state}
             )
-        elif cybersource_payment_response_state == ProcessorResponse.STATE_CANCELLED:
-            # Transaction cancelled
-            # Transaction could be cancelled for reasons that don't necessarily
-            # mean that the entire order is invalid, so we'll do nothing with
-            # the order here (other than set it to Cancelled)
-            return redirect_with_user_message(
-                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
-            )
-        elif cybersource_payment_response_state == ProcessorResponse.STATE_REVIEW:
-            # Transaction held for review in the payment processor's system
-            # The transaction is in limbo here - it may be approved or denied
-            # at a later time
-
-            return redirect_with_user_message(
-                reverse("user-dashboard"), {"type": USER_MSG_TYPE_PAYMENT_REVIEW}
-            )
-        elif cybersource_payment_response_state == ProcessorResponse.STATE_ACCEPTED:
-            # It actually worked here
-            basket = Basket.objects.filter(user=order.purchaser).first()
+        elif cybersource_payment_response_state == USER_MSG_TYPE_PAYMENT_ACCEPTED:
             return redirect_with_user_message(
                 reverse("user-dashboard"),
                 {
                     "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
                     "run": order.lines.first().purchased_object.course.title,
                 },
-            )
-        else:
-            return redirect_with_user_message(
-                reverse("user-dashboard"), {"type": USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN}
             )
 
 

@@ -722,7 +722,7 @@ def test_paid_and_unpaid_courserun_checkout(
         ("ACCEPT", Order.STATE.FULFILLED, False),
     ],
 )
-def test_checkout_result(
+def test_checkout_api_result(
     user,
     user_client,
     mocker,
@@ -809,3 +809,34 @@ def test_checkout_result(
         assert paid_courserun_count == 0
 
     assert Basket.objects.filter(id=basket.id).exists() is basket_exists
+
+
+def test_checkout_api_result_verification_failure(
+    user_client,
+    mocker,
+    user,
+    products,
+):
+    """
+    Generates an order (using the API endpoint) and then cancels it using the endpoint.
+    There shouldn't be any PendingOrders after that happens.
+    """
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=False,
+    )
+
+    create_basket(user, products)
+    resp = user_client.post(reverse("checkout_api-start_checkout"))
+
+    payload = resp.json()["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": Order.STATE.FULFILLED,
+        "message": "payment processor message",
+    }
+    
+    resp = user_client.post(reverse("checkout_result_api"), payload)
+
+    # checkout_result_api will always respond with a 200 unless validate_processor_response returns false
+    assert resp.status_code == 403

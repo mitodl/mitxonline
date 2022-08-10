@@ -6,18 +6,23 @@ import logging
 from functools import total_ordering
 from django.urls import reverse
 from django.db import transaction
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
 from ecommerce.constants import TRANSACTION_TYPE_REFUND, REFUND_SUCCESS_STATES
 from ecommerce.tasks import perform_unenrollment_from_order
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
+
 from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+    USER_MSG_TYPE_PAYMENT_CANCELLED,
+    USER_MSG_TYPE_PAYMENT_DECLINED,
+    USER_MSG_TYPE_PAYMENT_ERROR,
+    USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
+    USER_MSG_TYPE_PAYMENT_REVIEW,
     USER_MSG_TYPE_ENROLL_BLOCKED,
-    USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_ENROLL_DUPLICATED
 )
 
 from mitol.payment_gateway.api import (
@@ -227,6 +232,8 @@ def process_cybersource_payment_response(request, order):
     processor_response = PaymentGateway.get_formatted_response(
         ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
     )
+    
+    return_message = ""
 
     if processor_response.state == ProcessorResponse.STATE_DECLINED:
         # Transaction declined for some reason
@@ -235,6 +242,7 @@ def process_cybersource_payment_response(request, order):
         log.debug("Transaction declined: {msg}".format(msg=processor_response.message))
         order.decline()
         order.save()
+        return_message = USER_MSG_TYPE_PAYMENT_DECLINED
     elif processor_response.state == ProcessorResponse.STATE_ERROR:
         # Error - something went wrong with the request
         log.debug(
@@ -244,6 +252,7 @@ def process_cybersource_payment_response(request, order):
         )
         order.error()
         order.save()
+        return_message = USER_MSG_TYPE_PAYMENT_ERROR
     elif processor_response.state == ProcessorResponse.STATE_CANCELLED:
         # Transaction cancelled
         # Transaction could be cancelled for reasons that don't necessarily
@@ -252,6 +261,7 @@ def process_cybersource_payment_response(request, order):
         log.debug("Transaction cancelled: {msg}".format(msg=processor_response.message))
         order.cancel()
         order.save()
+        return_message = USER_MSG_TYPE_PAYMENT_CANCELLED
     elif processor_response.state == ProcessorResponse.STATE_REVIEW:
         # Transaction held for review in the payment processor's system
         # The transaction is in limbo here - it may be approved or denied
@@ -262,12 +272,10 @@ def process_cybersource_payment_response(request, order):
             )
         )
         basket = Basket.objects.filter(user=order.purchaser).first()
+        return_message = USER_MSG_TYPE_PAYMENT_REVIEW
         if basket:
             if basket.has_user_blocked_products(order.purchaser):
-                return redirect_with_user_message(
-                    reverse("user-dashboard"),
-                    {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
-                )
+                return_message = USER_MSG_TYPE_ENROLL_BLOCKED
             else:
                 basket.delete()
 
@@ -282,10 +290,13 @@ def process_cybersource_payment_response(request, order):
         log.debug("Transaction accepted!: {msg}".format(msg=processor_response.message))
         basket = Basket.objects.filter(user=order.purchaser).first()
         fulfill_completed_order(order, request.POST, basket)
+        return_message = USER_MSG_TYPE_PAYMENT_ACCEPTED
     else:
         order.cancel()
         order.save()
-    return processor_response.state
+        return_message = USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN
+        
+    return return_message
 
 
 def establish_basket(request):
