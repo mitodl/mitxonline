@@ -288,3 +288,19 @@ def test_product_multiple_active_for_single_course_ID_validation():
         pytest.fail("Two active Products for the same course were allowed.")
     except IntegrityError:
         pass
+
+
+def test_order_update_reference_number(user):
+    """Test when order is created/updated, reference_number is updated in db"""
+    order = Order(purchaser=user, total_price_paid=10)
+    order.save()
+
+    assert order.reference_number == order._generate_reference_number()
+
+    existing_order = Order.objects.get(pk=order.id)
+    existing_order.reference_number = None
+    existing_order.save()
+
+    assert (
+        existing_order.reference_number == existing_order._generate_reference_number()
+    )

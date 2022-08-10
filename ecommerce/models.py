@@ -323,6 +323,21 @@ class Order(TimestampedModel):
         decimal_places=5,
         max_digits=20,
     )
+    reference_number = models.CharField(max_length=255, null=True, blank=True)
+
+    # override save method to auto-fill generated_rerefence_number
+    def save(self, *args, **kwargs):
+
+        # initial save in order to get primary key for new order
+        super().save(*args, **kwargs)
+
+        # can't insert twice because it'll try to insert with a PK now
+        kwargs.pop("force_insert", None)
+
+        # if we don't have a generated reference number, we generate one and save again
+        if self.reference_number is None:
+            self.reference_number = self._generate_reference_number()
+            super().save(*args, **kwargs)
 
     # Flag to determine if the order is in review status - if it is, then
     # we need to not step on the basket that may or may not exist when it is
@@ -359,8 +374,7 @@ class Order(TimestampedModel):
         """Issue a refund"""
         raise NotImplementedError()
 
-    @property
-    def reference_number(self):
+    def _generate_reference_number(self):
         return f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{self.id}"
 
     @property
