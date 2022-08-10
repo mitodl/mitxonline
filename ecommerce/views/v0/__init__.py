@@ -441,6 +441,10 @@ class CheckoutCallbackView(View):
             return redirect_with_user_message(
                 reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_ERROR}
             )
+        elif processor_response.state == ProcessorResponse.STATE_ERROR:
+            return redirect_with_user_message(
+                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_ERROR}
+            )
         elif cybersource_payment_response_state == ProcessorResponse.STATE_CANCELLED:
             # Transaction cancelled
             # Transaction could be cancelled for reasons that don't necessarily
