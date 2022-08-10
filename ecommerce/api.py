@@ -25,6 +25,7 @@ from mitol.payment_gateway.api import (
     Order as GatewayOrder,
     PaymentGateway,
     Refund as GatewayRefund,
+    ProcessorResponse,
 )
 from mitol.payment_gateway.exceptions import RefundDuplicateException
 
@@ -209,6 +210,100 @@ def fulfill_completed_order(
             "run": order.lines.first().purchased_object.course.title,
         },
     )
+    
+def get_order_from_cybersource_payment_response(request):
+    payment_data = request.POST
+    converted_order = PaymentGateway.get_gateway_class(
+        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+    ).convert_to_order(payment_data)
+    order_id = Order.decode_reference_number(converted_order.reference)
+
+    try:
+        order = Order.objects.get(pk=order_id)
+    except ObjectDoesNotExist:
+        return HttpResponse("Order not found")
+    
+def process_cybersource_payment_response(request):
+    if not PaymentGateway.validate_processor_response(
+            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+        ):
+            raise PermissionDenied(
+                "Could not validate response from the payment processor."
+            )
+
+    processor_response = PaymentGateway.get_formatted_response(
+        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+    )
+
+    order_id = Order.decode_reference_number(converted_order.reference)
+
+    try:
+        order = Order.objects.get(pk=order_id)
+    except ObjectDoesNotExist:
+        return HttpResponse("Order not found")
+
+    if processor_response.state == ProcessorResponse.STATE_DECLINED:
+        # Transaction declined for some reason
+        # This probably means the order needed to go through the process
+        # again so maybe tell the user to do a thing.
+        log.debug(
+            "Transaction declined: {msg}".format(msg=processor_response.message)
+        )
+        order.decline()
+        order.save()
+    elif processor_response.state == ProcessorResponse.STATE_ERROR:
+        # Error - something went wrong with the request
+        log.debug(
+            "Error happened submitting the transaction: {msg}".format(
+                msg=processor_response.message
+            )
+        )
+        order.error()
+        order.save()
+    elif processor_response.state == ProcessorResponse.STATE_CANCELLED:
+        # Transaction cancelled
+        # Transaction could be cancelled for reasons that don't necessarily
+        # mean that the entire order is invalid, so we'll do nothing with
+        # the order here (other than set it to Cancelled)
+        log.debug(
+            "Transaction cancelled: {msg}".format(msg=processor_response.message)
+        )
+        order.cancel()
+        order.save()
+    elif processor_response.state == ProcessorResponse.STATE_REVIEW:
+        # Transaction held for review in the payment processor's system
+        # The transaction is in limbo here - it may be approved or denied
+        # at a later time
+        log.debug(
+            "Transaction flagged for review: {msg}".format(
+                msg=processor_response.message
+            )
+        )
+        basket = Basket.objects.filter(user=order.purchaser).first()
+        if basket:
+            if basket.has_user_blocked_products(order.purchaser):
+                return redirect_with_user_message(
+                    reverse("user-dashboard"),
+                    {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+                )
+            else:
+                basket.delete()
+
+        order.review(payment_data)
+        order.save()
+
+        if basket and basket.compare_to_order(order):
+            basket.delete()
+
+    elif processor_response.state == ProcessorResponse.STATE_ACCEPTED:
+        # It actually worked here
+        log.debug(
+            "Transaction accepted!: {msg}".format(msg=processor_response.message)
+        )
+    else:
+        order.cancel()
+        order.save()
+    return processor_response.state
 
 
 def establish_basket(request):
