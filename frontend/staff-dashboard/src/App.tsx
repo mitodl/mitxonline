@@ -56,10 +56,10 @@ export default function App() {
       LoginPage={LoginPage}
       DashboardPage={DashboardPage}
       resources={[
-        {
-          name: "learners", 
-          icon: <UserOutlined/>
-        },
+        // {
+        //   name: "learners", 
+        //   icon: <UserOutlined/>
+        // },
         {
           name: "discounts",
           icon: <BarcodeOutlined/>,
