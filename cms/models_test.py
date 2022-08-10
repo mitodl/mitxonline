@@ -192,7 +192,7 @@ def test_flex_pricing_form_display(mocker, is_authed, has_submission):
     see the form if they don't have an in-progress submission.
     """
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
-    flex_form = FlexiblePricingFormFactory()
+    flex_form = FlexiblePricingFormFactory(selected_course=course_page.course)
 
     if not is_authed:
         request_user = AnonymousUser()
@@ -205,7 +205,7 @@ def test_flex_pricing_form_display(mocker, is_authed, has_submission):
             flexprice = FlexiblePrice.objects.create(
                 user=request_user,
                 cms_submission=submission,
-                courseware_object=course_page.course,
+                courseware_object=course_page.course.program,
             )
 
     response = generate_flexible_pricing_response(request_user, flex_form)
@@ -238,7 +238,7 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
     """
 
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
-    flex_form = FlexiblePricingFormFactory()
+    flex_form = FlexiblePricingFormFactory(selected_course=course_page.course)
 
     request_user = UserFactory.create()
     submission = FlexiblePricingRequestSubmission.objects.create(
@@ -248,7 +248,7 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
         user=request_user,
         cms_submission=submission,
         status=submission_status,
-        courseware_object=course_page.course,
+        courseware_object=course_page.course.program,
     )
 
     response = generate_flexible_pricing_response(request_user, flex_form)
@@ -279,17 +279,17 @@ def test_flex_pricing_form_courseware_object():
 
     # no set courseware object, so get it from the parent page
 
-    assert flex_form.get_parent_courseware() == course_page.course
+    assert flex_form.get_parent_courseware() == course_page.course.program
     assert flex_form.selected_course is None
     assert flex_form.selected_program is None
 
-    # setting a specific course (but not a program) - should return the set course
+    # setting a specific course (but not a program) - should return the program
 
     flex_form.selected_course = secondary_course
     flex_form.save()
     flex_form.refresh_from_db()
 
-    assert flex_form.get_parent_courseware() == secondary_course
+    assert flex_form.get_parent_courseware() == program
     assert flex_form.selected_course == secondary_course
     assert flex_form.selected_program is None
 
@@ -302,3 +302,60 @@ def test_flex_pricing_form_courseware_object():
     assert flex_form.get_parent_courseware() == program
     assert flex_form.selected_course == secondary_course
     assert flex_form.selected_program == program
+
+
+@pytest.mark.parametrize("test_course_first", [True, False])
+def test_flex_pricing_single_submission(mocker, test_course_first):
+    """
+    Tests multiple submissions for the same course/program.
+
+    If the FlexiblePricingRequestForm is associated with a course, it should
+    check for a submission for that course or the program the course belongs to.
+    If it's associated with a program, it should check for submissions in the
+    program. A submission for a course in the program should exist for the program.
+    """
+    program = ProgramFactory.create()
+    course = CourseFactory.create(program=program)
+
+    course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
+
+    if test_course_first:
+        first_sub_form = FlexiblePricingFormFactory(
+            parent=course_page, selected_course=course
+        )
+        second_sub_form = FlexiblePricingFormFactory(
+            parent=course_page, selected_program=program
+        )
+    else:
+        second_sub_form = FlexiblePricingFormFactory(
+            parent=course_page, selected_course=course
+        )
+        first_sub_form = FlexiblePricingFormFactory(
+            parent=course_page, selected_program=program
+        )
+
+    request_user = UserFactory.create()
+    submission = FlexiblePricingRequestSubmission.objects.create(
+        form_data=json.dumps([]), page=first_sub_form, user=request_user
+    )
+
+    flexprice = FlexiblePrice.objects.create(
+        user=request_user,
+        cms_submission=submission,
+        courseware_object=program,
+        status=FlexiblePriceStatus.CREATED,
+    )
+
+    # test to make sure we get back a status message from the first form
+
+    response = generate_flexible_pricing_response(request_user, first_sub_form)
+
+    assert "Application Processing" in response.rendered_content
+
+    # then test to make sure we get a status message back from the second form too
+
+    response = generate_flexible_pricing_response(request_user, second_sub_form)
+
+    # should not get a form here - should get Application Processing
+
+    assert "Application Processing" in response.rendered_content

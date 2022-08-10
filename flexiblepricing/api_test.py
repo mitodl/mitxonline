@@ -7,6 +7,7 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 from mitol.common.utils.datetime import now_in_utc
+from django.contrib.contenttypes.models import ContentType
 
 from courses.factories import (
     ProgramFactory,
@@ -33,6 +34,7 @@ from flexiblepricing.models import (
     CountryIncomeThreshold,
     CurrencyExchangeRate,
     FlexiblePriceTier,
+    FlexiblePrice,
 )
 from users.factories import UserFactory
 
@@ -387,15 +389,28 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
         orchestration to DRY up some tests. This does not do the assertions
         since that changes from test to test.
         """
-        flexible_price = FlexiblePriceFactory.create(
-            income_usd=income_usd,
-            country_of_income=country_code,
-            user=user,
-            courseware_object=courseware_object,
-            status=FlexiblePriceStatus.APPROVED
-            if expected
-            else FlexiblePriceStatus.PENDING_MANUAL_APPROVAL,
+
+        content_type = (
+            ContentType.objects.get(app_label="courses", model="program")
+            if isinstance(courseware_object, Program)
+            else ContentType.objects.get(app_label="courses", model="course")
         )
+
+        if not FlexiblePrice.objects.filter(
+            user=user,
+            courseware_content_type=content_type,
+            courseware_object_id=courseware_object.id,
+        ).exists():
+            flexible_price = FlexiblePriceFactory.create(
+                income_usd=income_usd,
+                country_of_income=country_code,
+                user=user,
+                courseware_object=courseware_object,
+                status=FlexiblePriceStatus.APPROVED
+                if expected
+                else FlexiblePriceStatus.PENDING_MANUAL_APPROVAL,
+            )
+
         courseware_tier = determine_tier_courseware(courseware_object, income_usd)
         discount = self.create_run_and_product_and_discount(user, courseware_object)
 
