@@ -63,7 +63,8 @@ export class ProductDetailEnrollApp extends React.Component<
   }
 
   getCurrentCourseRun = (): EnrollmentFlaggedCourseRun => {
-    const sessionCourseRun = JSON.parse(sessionStorage.getItem('currentCourseRun') || '{}')
+    const courseRun = sessionStorage.getItem('currentCourseRun')
+    const sessionCourseRun = courseRun ? JSON.parse(courseRun) : null
     return sessionCourseRun ? sessionCourseRun : this.state.currentCourseRun
   }
 
@@ -166,8 +167,12 @@ export class ProductDetailEnrollApp extends React.Component<
       courseRuns[0]
     ) : (
       this.getCurrentCourseRun() && courseRuns ? (
-        courseRuns[0].page.page_url === this.getCurrentCourseRun().page.page_url ? (
-          this.getCurrentCourseRun()
+        courseRuns[0].page && this.getCurrentCourseRun().page ? (
+          courseRuns[0].page.page_url === this.getCurrentCourseRun().page.page_url ? (
+            this.getCurrentCourseRun()
+          ) : (
+            courseRuns[0]
+          )
         ) : (
           courseRuns[0]
         )

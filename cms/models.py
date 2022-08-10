@@ -480,9 +480,11 @@ class CoursePage(ProductPage):
         relevant_run = get_user_relevant_course_run(
             course=self.product, user=request.user
         )
-        relevant_runs = get_user_relevant_course_run_qset(
-            course=self.product, user=request.user
-        ).values("courseware_id", "start_date")
+        relevant_runs = list(
+            get_user_relevant_course_run_qset(
+                course=self.product, user=request.user
+            ).values("courseware_id", "start_date")
+        )
         is_enrolled = (
             False
             if (relevant_run is None or not request.user.is_authenticated)

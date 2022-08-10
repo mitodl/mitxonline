@@ -1,5 +1,6 @@
 """Tests for Wagtail models"""
 from urllib.parse import quote_plus
+from courses.models import CourseRun
 
 import pytest
 import factory
@@ -87,6 +88,7 @@ def test_course_page_context(
     else:
         run = None
         course_page_kwargs = dict(course__readable_id=FAKE_READABLE_ID)
+    relevant_runs = list(CourseRun.objects.values("courseware_id", "start_date"))
     course_page = CoursePageFactory.create(**course_page_kwargs)
     if enrolled:
         CourseRunEnrollmentFactory.create(user=staff_user, run=run)
@@ -96,6 +98,7 @@ def test_course_page_context(
         "page": course_page,
         "request": request,
         "run": run,
+        "course_runs": relevant_runs,
         "is_enrolled": exp_is_enrolled,
         "sign_in_url": f"/signin/?next={quote_plus(course_page.get_url())}"
         if exp_sign_in_url
