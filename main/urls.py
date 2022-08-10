@@ -13,20 +13,16 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from mitol.common.decorators import cache_control_max_age_jitter
 
 from django.conf import settings
 from django.conf.urls import include
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, re_path
-from django.views.decorators.cache import cache_control
 from oauth2_provider.urls import base_urlpatterns, oidc_urlpatterns
 from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.core import urls as wagtail_urls
-from wagtail.images.views.serve import ServeView
 from wagtail.documents import urls as wagtaildocs_urls
-from wagtail.utils.urlpatterns import decorate_urlpatterns
 
 from main.views import cms_signin_redirect_to_site_signin, index, refine
 
@@ -93,18 +89,6 @@ urlpatterns = (
         # Example view
         path("", index, name="main-index"),
     ]
-    + decorate_urlpatterns(
-        # NOTE: This route enables dynamic Wagtail image loading. It comes directly from the Wagtail docs:
-        #       https://docs.wagtail.io/en/v2.7/advanced_topics/images/image_serve_view.html#setup
-        [
-            re_path(
-                r"^images/([^/]*)/(\d*)/([^/]*)/[^/]*$",
-                ServeView.as_view(),
-                name="wagtailimages_serve",
-            )
-        ],
-        cache_control_max_age_jitter(cache_control, max_age=WAGTAIL_IMG_CACHE_AGE),
-    )
     + (
         static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
         + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

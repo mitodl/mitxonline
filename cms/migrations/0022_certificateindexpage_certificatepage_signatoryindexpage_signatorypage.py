@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("wagtailimages", "0023_add_choose_permissions"),
         ("wagtailcore", "0066_collection_management_permissions"),
-        ("cms", "0019_remove_flexiblepricingrequestform_thank_you_text"),
+        ("cms", "0021_flexiblepricingrequestform_selected_program"),
     ]
 
     operations = [

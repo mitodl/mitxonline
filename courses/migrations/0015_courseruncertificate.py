@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("courses", "0012_paidcourserun"),
+        ("courses", "0014_alter_courserun_run_tag"),
     ]
 
     operations = [

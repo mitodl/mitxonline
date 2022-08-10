@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static wagtailimages_tags image_version_url %}
+{% load static wagtailimages_tags %}
 
 {% block title %}{{ site_name }} | Certificate for: {{ page.product_name }}{% endblock %}
 
@@ -60,7 +60,7 @@
             <div class="certificate">
                 <div class="certificate-holder">
                     <div class="certificate-logo">
-                        <img src="{% static 'images/certificates/transparent-mit-xonline-logo.png' %}" alt="MIT xOnline">
+                        <img src="{% static 'images/mitx-online-logo.png' %}" alt="MIT xOnline">
                     </div>
                     <span class="institute-text">Massachusetts Institute of Technology</span>
                     <div class="institute-logo">
@@ -86,7 +86,7 @@
                         {% for signatory in page.signatory_pages %}
                             <div class="col-sm-4 col-24 certify-by">
                                 <div class="signature-area">
-                                    <img src="{% image_version_url signatory.signature_image 'max-150x50' %}" alt="{{ signatory.name }} signature" />
+                                    {% image signatory.signature_image max-150x50 %}
                                 </div>
                                 <span class="title">{{ signatory.name }}</span>
                                 {% if signatory.title_1 %}
@@ -118,7 +118,7 @@
             <div class="certificate-logo">
                 <a href="https://web.mit.edu/" class="mit"></a>
                 <a href="/" class="xonline"></a>
-                <img src="{% static 'images/certificates/transparent-mit-xonline-logo.png' %}" alt="MIT xOnline">
+                <img src="{% static 'images/mitx-online-logo.png' %}" alt="MIT xOnline">
             </div>
             <div class="cer-footer-info">
                 <ul class="links">
