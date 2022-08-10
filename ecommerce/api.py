@@ -210,7 +210,8 @@ def fulfill_completed_order(
             "run": order.lines.first().purchased_object.course.title,
         },
     )
-    
+
+
 def get_order_from_cybersource_payment_response(request):
     payment_data = request.POST
     converted_order = PaymentGateway.get_gateway_class(
@@ -221,34 +222,27 @@ def get_order_from_cybersource_payment_response(request):
     try:
         order = Order.objects.get(pk=order_id)
     except ObjectDoesNotExist:
-        return HttpResponse("Order not found")
-    
-def process_cybersource_payment_response(request):
+        order = None
+    return order
+
+
+def process_cybersource_payment_response(request, order):
     if not PaymentGateway.validate_processor_response(
-            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
-        ):
-            raise PermissionDenied(
-                "Could not validate response from the payment processor."
-            )
+        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+    ):
+        raise PermissionDenied(
+            "Could not validate response from the payment processor."
+        )
 
     processor_response = PaymentGateway.get_formatted_response(
         ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
     )
 
-    order_id = Order.decode_reference_number(converted_order.reference)
-
-    try:
-        order = Order.objects.get(pk=order_id)
-    except ObjectDoesNotExist:
-        return HttpResponse("Order not found")
-
     if processor_response.state == ProcessorResponse.STATE_DECLINED:
         # Transaction declined for some reason
         # This probably means the order needed to go through the process
         # again so maybe tell the user to do a thing.
-        log.debug(
-            "Transaction declined: {msg}".format(msg=processor_response.message)
-        )
+        log.debug("Transaction declined: {msg}".format(msg=processor_response.message))
         order.decline()
         order.save()
     elif processor_response.state == ProcessorResponse.STATE_ERROR:
@@ -265,9 +259,7 @@ def process_cybersource_payment_response(request):
         # Transaction could be cancelled for reasons that don't necessarily
         # mean that the entire order is invalid, so we'll do nothing with
         # the order here (other than set it to Cancelled)
-        log.debug(
-            "Transaction cancelled: {msg}".format(msg=processor_response.message)
-        )
+        log.debug("Transaction cancelled: {msg}".format(msg=processor_response.message))
         order.cancel()
         order.save()
     elif processor_response.state == ProcessorResponse.STATE_REVIEW:
@@ -289,7 +281,7 @@ def process_cybersource_payment_response(request):
             else:
                 basket.delete()
 
-        order.review(payment_data)
+        order.review(request.POST)
         order.save()
 
         if basket and basket.compare_to_order(order):
@@ -297,9 +289,7 @@ def process_cybersource_payment_response(request):
 
     elif processor_response.state == ProcessorResponse.STATE_ACCEPTED:
         # It actually worked here
-        log.debug(
-            "Transaction accepted!: {msg}".format(msg=processor_response.message)
-        )
+        log.debug("Transaction accepted!: {msg}".format(msg=processor_response.message))
     else:
         order.cancel()
         order.save()

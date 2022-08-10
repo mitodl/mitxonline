@@ -43,7 +43,6 @@ from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from mitol.common.utils import now_in_utc
 from rest_framework_extensions.mixins import NestedViewSetMixin
 from mitol.payment_gateway.api import (
-    PaymentGateway,
     ProcessorResponse,
 )
 
@@ -87,6 +86,7 @@ from ecommerce.models import (
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 
 log = logging.getLogger(__name__)
+
 
 class ECommerceDefaultPagination(LimitOffsetPagination):
     default_limit = 10
@@ -426,20 +426,13 @@ class CheckoutCallbackView(View):
         clear out the stored basket)
         3. Perform any enrollments, account status changes, etc.
         """
-        cybersource_payment_response_state = api.process_cybersource_payment_response(request)
 
-        payment_data = request.POST
-
-        converted_order = PaymentGateway.get_gateway_class(
-            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
-        ).convert_to_order(payment_data)
-
-        order_id = Order.decode_reference_number(converted_order.reference)
-
-        try:
-            order = Order.objects.get(pk=order_id)
-        except ObjectDoesNotExist:
+        order = api.get_order_from_cybersource_payment_response(request)
+        if order == None:
             return HttpResponse("Order not found")
+        cybersource_payment_response_state = api.process_cybersource_payment_response(
+            request, order
+        )
 
         if cybersource_payment_response_state == ProcessorResponse.STATE_DECLINED:
             # Transaction declined for some reason
@@ -466,19 +459,23 @@ class CheckoutCallbackView(View):
             )
         elif cybersource_payment_response_state == ProcessorResponse.STATE_ACCEPTED:
             # It actually worked here
-
-            return api.fulfill_completed_order(order, payment_data, basket)
+            basket = Basket.objects.filter(user=order.purchaser).first()
+            return api.fulfill_completed_order(order, request.POST, basket)
         else:
             return redirect_with_user_message(
                 reverse("user-dashboard"), {"type": USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN}
             )
 
+
 class BackofficeCallbackView(APIView):
     authentication_classes = ()
 
     def post(self, request, *args, **kwargs):
-        validate_cybersource_payment_response(request)
+        order = api.get_order_from_cybersource_payment_response(request)
+        if order != None:
+            api.process_cybersource_payment_response(request, order)
         return Response(status=HTTP_200_OK)
+
 
 class CheckoutProductView(LoginRequiredMixin, RedirectView):
     """View to add products to the cart and proceed to the checkout page"""
