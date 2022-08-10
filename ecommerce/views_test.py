@@ -835,7 +835,7 @@ def test_checkout_api_result_verification_failure(
         "decision": Order.STATE.FULFILLED,
         "message": "payment processor message",
     }
-    
+
     resp = user_client.post(reverse("checkout_result_api"), payload)
 
     # checkout_result_api will always respond with a 200 unless validate_processor_response returns false
