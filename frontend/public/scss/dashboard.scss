@@ -160,6 +160,7 @@ $program-badge-bg: #DBF2F3;
   background-color: $sidenav-bg;
   transition: right 0.2s ease-in-out ;
   padding: 15px 36px;
+  overflow-y: scroll;
 
   &.open {
     box-shadow: 0 3px 0 10px rgba(0,0,0,.2);
