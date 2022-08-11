@@ -53,6 +53,7 @@ export const makeCourseRunWithProduct = (): CourseRun => ({
   // $FlowFixMe
   id:               genCourseRunId.next().value,
   course_number:    casual.word,
+  page:             null,
   products:         [
     {
       description:            casual.text,
