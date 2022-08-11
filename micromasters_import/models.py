@@ -32,3 +32,25 @@ class ProgramId(models.Model):
     program = models.OneToOneField(
         "courses.Program", unique=True, null=False, on_delete=models.CASCADE
     )
+
+
+class ProgramTierId(models.Model):
+    """
+    Map primary keys from MicroMasters financial aid to MITx Online flexible price tier
+    """
+
+    micromasters_tier_program_id = models.IntegerField(
+        unique=True,
+        null=False,
+        help_text="The primary key of Tier Program in MicroMasters",
+    )
+
+    flexible_price_tier = models.OneToOneField(
+        "flexiblepricing.FlexiblePriceTier",
+        unique=True,
+        null=False,
+        on_delete=models.CASCADE,
+    )
+
+    def __str__(self):
+        return f"Mapping MicroMaster Tier Program ID - {self.micromasters_tier_program_id} to MITxOnline Flexible Price Tier ID - {self.flexible_price_tier.id}"
