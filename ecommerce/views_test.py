@@ -13,6 +13,7 @@ from django.forms.models import model_to_dict
 import operator as op
 import reversion
 import uuid
+from rest_framework.decorators import api_view
 
 from courses.factories import CourseRunFactory
 from ecommerce.api import generate_checkout_payload
@@ -391,6 +392,7 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
 def test_checkout_result(
     user,
     user_client,
+    api_client,
     mocker,
     products,
     decision,
@@ -432,6 +434,11 @@ def test_checkout_result(
     assert resp.status_code == 302
     assert resp.url == expected_redirect_url
     print(resp.cookies)
+
+    resp = api_client.post(reverse("checkout_result_api"), payload)
+
+    # checkout_result_api will always respond with a 200 unless validate_processor_response returns false
+    assert resp.status_code == 200
 
     order.refresh_from_db()
 
@@ -725,6 +732,7 @@ def test_paid_and_unpaid_courserun_checkout(
 def test_checkout_api_result(
     user,
     user_client,
+    api_client,
     mocker,
     products,
     decision,
@@ -732,8 +740,7 @@ def test_checkout_api_result(
     basket_exists,
 ):
     """
-    Generates an order (using the API endpoint) and then cancels it using the endpoint.
-    There shouldn't be any PendingOrders after that happens.
+    Tests the proper handling of an order after receiving a valid Cybersource payment response.
     """
     mocker.patch(
         "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
@@ -761,7 +768,7 @@ def test_checkout_api_result(
     # signed, but here we're just passing the payload as we got it back from
     # the start checkout call.
 
-    resp = user_client.post(reverse("checkout_result_api"), payload)
+    resp = api_client.post(reverse("checkout_result_api"), payload)
 
     # checkout_result_api will always respond with a 200 unless validate_processor_response returns false
     assert resp.status_code == 200
@@ -779,7 +786,7 @@ def test_checkout_api_result(
         basket = create_basket(user, new_products)
 
         payload["decision"] = "ACCEPT"
-        resp = user_client.post(reverse("checkout_result_api"), payload)
+        resp = api_client.post(reverse("checkout_result_api"), payload)
         assert resp.status_code == 200
 
         # test if course run is recorded in PaidCourseRun for fulfilled order
@@ -813,13 +820,13 @@ def test_checkout_api_result(
 
 def test_checkout_api_result_verification_failure(
     user_client,
+    api_client,
     mocker,
     user,
     products,
 ):
     """
-    Generates an order (using the API endpoint) and then cancels it using the endpoint.
-    There shouldn't be any PendingOrders after that happens.
+    Tests the failure of verifying of messages from expected from Cybersource.
     """
     mocker.patch(
         "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
@@ -832,11 +839,11 @@ def test_checkout_api_result_verification_failure(
     payload = resp.json()["payload"]
     payload = {
         **{f"req_{key}": value for key, value in payload.items()},
-        "decision": Order.STATE.FULFILLED,
+        "decision": Order.STATE.PENDING,
         "message": "payment processor message",
     }
 
-    resp = user_client.post(reverse("checkout_result_api"), payload)
+    resp = api_client.post(reverse("checkout_result_api"), payload)
 
     # checkout_result_api will always respond with a 403 if validate_processor_response returns False
     assert resp.status_code == 403

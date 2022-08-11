@@ -12,12 +12,13 @@ from rest_framework.viewsets import (
     ViewSet,
     ModelViewSet,
 )
-from rest_framework.views import APIView
 from rest_framework.status import HTTP_200_OK
+from rest_framework.views import APIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.decorators import action
+from rest_framework.decorators import api_view, renderer_classes
 
 from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
@@ -427,9 +428,13 @@ class CheckoutCallbackView(View):
         order = api.get_order_from_cybersource_payment_response(request)
         if order == None:
             return HttpResponse("Order not found")
-        cybersource_payment_response_state = api.process_cybersource_payment_response(
-            request, order
-        )
+        # We only want to process responses related to orders which are PENDING
+        # otherwise we can conclude that we already received a resonse through
+        # BackofficeCallbackView.
+        if order.state == Order.STATE.PENDING:
+            cybersource_payment_response_state = (
+                api.process_cybersource_payment_response(request, order)
+            )
         if cybersource_payment_response_state in [
             USER_MSG_TYPE_PAYMENT_DECLINED,
             USER_MSG_TYPE_PAYMENT_ERROR,
@@ -456,10 +461,18 @@ class CheckoutCallbackView(View):
             )
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class BackofficeCallbackView(APIView):
+    authentication_classes = []  # disables authentication
+    permission_classes = []  # disables permission
+
     def post(self, request, *args, **kwargs):
         order = api.get_order_from_cybersource_payment_response(request)
-        if order != None:
+
+        # We only want to process responses related to orders which are PENDING
+        # otherwise we can conclude that we already received a resonse through
+        # the user's browser.
+        if order is not None and order.state == Order.STATE.PENDING:
             api.process_cybersource_payment_response(request, order)
         return Response(status=HTTP_200_OK)
 

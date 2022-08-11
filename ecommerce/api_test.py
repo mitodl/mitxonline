@@ -1,11 +1,24 @@
 """Tests for Ecommerce api"""
 
+import random
+from main.constants import (
+    USER_MSG_TYPE_PAYMENT_ACCEPTED,
+    USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
+)
 import pytest
 import reversion
+from django.http import HttpRequest
+from django.urls import reverse
+from django.conf import settings
+import uuid
 from reversion.models import Version
 from courses.factories import CourseRunEnrollmentFactory
-from ecommerce.api import refund_order, unenroll_learner_from_order
-from ecommerce.models import FulfilledOrder, Order, Transaction
+from ecommerce.api import (
+    process_cybersource_payment_response,
+    refund_order,
+    unenroll_learner_from_order,
+)
+from ecommerce.models import Basket, BasketItem, FulfilledOrder, Order, Transaction
 from ecommerce.factories import (
     OrderFactory,
     TransactionFactory,
@@ -19,6 +32,7 @@ from ecommerce.constants import (
 )
 from mitol.payment_gateway.api import ProcessorResponse
 from CyberSource.rest import ApiException
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -46,11 +60,52 @@ def fulfilled_transaction(fulfilled_order):
     )
 
 
+@pytest.fixture()
+def products():
+    with reversion.create_revision():
+        return ProductFactory.create_batch(5)
+
+
+@pytest.fixture
+def user(db):
+    """Creates a user"""
+    return UserFactory.create()
+
+
+@pytest.fixture(autouse=True)
+def payment_gateway_settings():
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
+    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
+
+
+@pytest.fixture(autouse=True)
+def mock_create_run_enrollments(mocker):
+    return mocker.patch("courses.api.create_run_enrollments", autospec=True)
+
+
 def test_cybersource_refund_no_order():
     """Tests that refund_order throws FulfilledOrder.DoesNotExist exception when the order doesn't exist"""
 
     with pytest.raises(FulfilledOrder.DoesNotExist):
         refund_order(order_id=1)  # Caling refund with random Id
+
+
+def create_basket(user, products):
+    """
+    Bootstraps a basket with a product in it for testing the discount
+    redemption APIs
+    TODO: this should probably just be a factory
+    """
+    basket = Basket(user=user)
+    basket.save()
+
+    basket_item = BasketItem(
+        product=products[random.randrange(0, len(products))], basket=basket, quantity=1
+    )
+    basket_item.save()
+
+    return basket
 
 
 @pytest.mark.parametrize(
@@ -201,3 +256,38 @@ def test_unenrollment_unenrolls_learner(mocker, user):
     )
     unenroll_learner_from_order(order_id=order.id)
     unenroll_mock.assert_called()
+
+
+def test_process_cybersource_payment_response(mocker, user_client, user, products):
+    """Test that ensures the response from Cybersource for an ACCEPTed payment updates the orders state"""
+
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    create_basket(user, products)
+
+    resp = user_client.post(reverse("checkout_api-start_checkout"))
+
+    payload = resp.json()["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "ACCEPT",
+        "message": "payment processor message",
+    }
+
+    order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)
+
+    assert order.reference_number == payload["req_reference_number"]
+
+    request = HttpRequest()
+    request.method = "POST"
+    request.POST = payload
+
+    # This is checked on the BackofficeCallbackView and CheckoutCallbackView POST endpoints
+    # since we expect to receive a response to both from Cybersource.  If the current state is
+    # PENDING, then we should process the response.
+    assert order.state == Order.STATE.PENDING
+    result = process_cybersource_payment_response(request, order)
+    assert result == USER_MSG_TYPE_PAYMENT_ACCEPTED
+    assert order.state == Order.STATE.FULFILLED
