@@ -1,6 +1,33 @@
 Release Notes
 =============
 
+Version 0.41.0
+--------------
+
+- More Dates: Tooltip title text, style, irrelevant dates bug fixes #767 (PR #798)
+- added reference_number to Order model, backfill
+- Updates flexible pricing to add a unique constraint on submissions
+- Adds program support to the dashboard
+- Updates status filtering to make it clearable
+- Switch some settings to use urljoin
+- Updated ecommerce docs to include max product price and unique CVN (#785)
+- added migration queries to migrate MicroMaster courserun and enrollment
+- Adds explicit binding of flexible price request forms to courseware objects
+- Add a scheduled task to process_refund_requests (#773)
+- altered course_run.run_tag to textfield with max_length 100
+- Restrict single active product per course ID (#774)
+- online-778 Order flexible prices by most recent first (#782)
+- fix flow
+- linting issue
+- JS linting fix
+- More dates for course enrollment
+- 734 - registration validate username against openedx (#757)
+- Updates "skipped" to "denied" in flexible pricing
+- Updates courses API to explicitly create ProgramEnrollments when enrolling in a course
+- 770 - flexible pricing: too many decimal places (#772)
+- online-677 Indicate Financial Assistance links if available for a course (#764)
+- Added backfill migration for new table paid courserun
+
 Version 0.40.1 (Released August 04, 2022)
 --------------
 
