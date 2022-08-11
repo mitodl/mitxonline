@@ -1,10 +1,6 @@
 """Tests for Ecommerce api"""
 
 import random
-from main.constants import (
-    USER_MSG_TYPE_PAYMENT_ACCEPTED,
-    USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
-)
 import pytest
 import reversion
 from django.http import HttpRequest

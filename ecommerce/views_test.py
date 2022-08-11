@@ -13,7 +13,6 @@ from django.forms.models import model_to_dict
 import operator as op
 import reversion
 import uuid
-from rest_framework.decorators import api_view
 
 from courses.factories import CourseRunFactory
 from ecommerce.api import generate_checkout_payload
