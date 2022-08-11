@@ -289,5 +289,4 @@ def test_process_cybersource_payment_response(mocker, user_client, user, product
     # PENDING, then we should process the response.
     assert order.state == Order.STATE.PENDING
     result = process_cybersource_payment_response(request, order)
-    assert result == USER_MSG_TYPE_PAYMENT_ACCEPTED
-    assert order.state == Order.STATE.FULFILLED
+    assert result == Order.STATE.FULFILLED

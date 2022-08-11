@@ -431,33 +431,46 @@ class CheckoutCallbackView(View):
         # We only want to process responses related to orders which are PENDING
         # otherwise we can conclude that we already received a resonse through
         # BackofficeCallbackView.
+        order_state = None
         if order.state == Order.STATE.PENDING:
-            cybersource_payment_response_state = (
-                api.process_cybersource_payment_response(request, order)
-            )
-        if cybersource_payment_response_state in [
-            USER_MSG_TYPE_PAYMENT_DECLINED,
-            USER_MSG_TYPE_PAYMENT_ERROR,
-            USER_MSG_TYPE_PAYMENT_CANCELLED,
-        ]:
+            order_state = api.process_cybersource_payment_response(request, order)
+
+        if order_state == Order.STATE.CANCELED:
             return redirect_with_user_message(
-                reverse("cart"), {"type": cybersource_payment_response_state}
+                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
             )
-        elif cybersource_payment_response_state in [
-            USER_MSG_TYPE_PAYMENT_REVIEW,
-            USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
-            USER_MSG_TYPE_ENROLL_BLOCKED,
-        ]:
+        elif order_state == Order.STATE.ERRORED:
             return redirect_with_user_message(
-                reverse("user-dashboard"), {"type": cybersource_payment_response_state}
+                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_ERROR}
             )
-        elif cybersource_payment_response_state == USER_MSG_TYPE_PAYMENT_ACCEPTED:
+        elif order_state == Order.STATE.DECLINED:
+            return redirect_with_user_message(
+                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
+            )
+        elif order_state == Order.STATE.REVIEW:
+            basket = Basket.objects.filter(user=order.purchaser).first()
+            if basket:
+                if basket.has_user_blocked_products(order.purchaser):
+                    return redirect_with_user_message(
+                        reverse("user-dashboard"),
+                        {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+                    )
+                else:
+                    return redirect_with_user_message(
+                        reverse("user-dashboard"),
+                        {"type": USER_MSG_TYPE_PAYMENT_REVIEW},
+                    )
+        elif order_state == Order.STATE.FULFILLED:
             return redirect_with_user_message(
                 reverse("user-dashboard"),
                 {
                     "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
                     "run": order.lines.first().purchased_object.course.title,
                 },
+            )
+        else:
+            return redirect_with_user_message(
+                reverse("user-dashboard"), {"type": USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN}
             )
 
 
@@ -467,6 +480,10 @@ class BackofficeCallbackView(APIView):
     permission_classes = []  # disables permission
 
     def post(self, request, *args, **kwargs):
+        """
+        This endpoint is called by Cybersource as a server-to-server call
+        in order to respond with the payment details.
+        """
         order = api.get_order_from_cybersource_payment_response(request)
 
         # We only want to process responses related to orders which are PENDING
