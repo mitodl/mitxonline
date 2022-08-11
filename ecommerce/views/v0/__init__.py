@@ -18,7 +18,6 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.decorators import action
-from rest_framework.decorators import api_view, renderer_classes
 
 from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED,

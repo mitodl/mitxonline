@@ -1,6 +1,5 @@
 """Ecommerce APIs"""
 
-import json
 import logging
 
 from functools import total_ordering
@@ -15,12 +14,6 @@ from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 
 from main.constants import (
-    USER_MSG_TYPE_PAYMENT_ACCEPTED,
-    USER_MSG_TYPE_PAYMENT_CANCELLED,
-    USER_MSG_TYPE_PAYMENT_DECLINED,
-    USER_MSG_TYPE_PAYMENT_ERROR,
-    USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
-    USER_MSG_TYPE_PAYMENT_REVIEW,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
 )
