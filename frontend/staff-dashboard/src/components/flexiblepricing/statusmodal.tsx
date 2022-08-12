@@ -43,7 +43,8 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
     const { mutate } = mutationResult;
 
     let [ justification, setJustification ] = useState(modaldata.justification);
-    justification = justification || status !== "approved" ? justification : "Documents in order"
+
+    !justification && status === "approved" ? setJustification("Documents in order") : null
 
     const handleCancel = () => {
         onClose();
