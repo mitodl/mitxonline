@@ -1,20 +1,16 @@
-import pytest
 import random
-
-from main.utils import serialize_model_object
-from main.test_utils import assert_drf_json_equal
-from django.urls import reverse
-from django.conf import settings
-import operator as op
 from decimal import Decimal
 
-from users.factories import UserFactory
+import pytest
+from django.urls import reverse
+
+from flexiblepricing import models
 from flexiblepricing.factories import (
     CountryIncomeThresholdFactory,
     CurrencyExchangeRateFactory,
     FlexiblePriceFactory,
+    FlexiblePriceTierFactory,
 )
-from flexiblepricing import models
 
 pytestmark = [pytest.mark.django_db]
 
@@ -86,13 +82,16 @@ def test_basic_exchange_rates(user_drf_client, exchange_rate):
 
 
 def test_basic_flex_payments(
-    user_drf_client, admin_drf_client, user, flexible_price_application
+    user_drf_client, admin_drf_client, user, flexible_price_application, mocker
 ):
     """
     Tests flexible payment applications. This clones the one that's made in the
     factory, then sets it to the user_drf_client user, then tests - the regular
     client should just see theirs and the admin one should see more than one.
     """
+    mocker.patch(
+        "flexiblepricing.tasks.notify_flexible_price_status_change_email.delay"
+    )
     myapp = flexible_price_application
     myapp.user = user
     myapp.pk = None
@@ -110,3 +109,26 @@ def test_basic_flex_payments(
     json_response = resp.json()
     assert resp.status_code == 200
     assert json_response["count"] == allapps.count()
+
+    new_discount = FlexiblePriceTierFactory(
+        courseware_object=flexible_price_application.courseware_object
+    ).discount
+    financial_assistance_request_data = {
+        "status": "approved",
+        "justification": "Documents in order",
+        "discount": {"id": new_discount.id},
+    }
+    resp = admin_drf_client.patch(
+        reverse(
+            "fp_admin_flexiblepricing_api-detail",
+            kwargs={"pk": flexible_price_application.id},
+        ),
+        financial_assistance_request_data,
+    )
+    assert resp.status_code == 200
+    assert (
+        models.FlexiblePrice.objects.get(
+            id=flexible_price_application.id
+        ).tier.discount_id
+        == new_discount.id
+    )

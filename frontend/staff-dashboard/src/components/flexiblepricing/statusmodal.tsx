@@ -6,7 +6,8 @@ import {
     Modal
 } from "@pankod/refine-antd";
 
-import { IFlexiblePriceRequest, IFlexiblePriceStatusModalProps } from "interfaces";
+import {IDiscount, IFlexiblePriceRequest, IFlexiblePriceStatusModalProps} from "interfaces";
+import { formatDiscount } from "utils";
 
 const All_Justifications = [
     {
@@ -43,8 +44,18 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
     const { mutate } = mutationResult;
 
     let [ justification, setJustification ] = useState(modaldata.justification);
-
     !justification && status === "approved" ? setJustification("Documents in order") : null
+
+    const [ discount, setDiscount ] = useState(modaldata.discount);
+    let discount_choices = [];
+    for (let applicable_discount of modaldata.applicable_discounts) {
+        discount_choices.push(
+            {
+                "value": applicable_discount.id,
+                "label": formatDiscount(applicable_discount)
+            }
+        )
+    }
 
     const handleCancel = () => {
         onClose();
@@ -52,6 +63,13 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
 
     const handleChangeJustification = (e: string) => {
         setJustification(e);
+    }
+
+    const handleChangeDiscount = (e: number) => {
+        const selected_discount_label = modaldata.applicable_discounts.find(discount_option => {
+            return discount_option.id === e
+        })
+        setDiscount(selected_discount_label as IDiscount);
     }
 
     const handleOk = () => {
@@ -67,7 +85,7 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
             return;
         }
 
-        const sendableData = { ...modaldata, status: status, justification: justification };
+        const sendableData = { ...modaldata, status: status, justification: justification, discount: discount };
 
         mutate({ 
             resource: "flexible_pricing/applications_admin",
@@ -85,6 +103,10 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
                 {status == "denied" ? <div>User will be notified by email of the denial </div> : null}
             </div>
             <br></br>
+            <p>
+                <strong>Courseware:</strong>
+                <div>{modaldata.courseware.readable_id}</div>
+            </p>
             <p>
                 <strong>Current Status:</strong>
                 <div>{modaldata.status}</div>
@@ -104,6 +126,20 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
             <p>
                 <strong>Country of Income:</strong>
                 <div>{modaldata.country_of_income}</div>
+            </p>
+            <p>
+                <span><strong>Discount:</strong></span>
+                {
+                    status !== "approved" ?
+                        <div>{ formatDiscount(modaldata.discount) }</div> :
+                        <Select
+                            onChange={(e) => handleChangeDiscount(e)}
+                            style={{ marginLeft: "44px", 'width': '20rem' }}
+                            options={discount_choices}
+                            defaultValue={modaldata.discount.id}
+                        >
+                        </Select>
+                }
             </p>
             <p>
                 <span>

@@ -20,6 +20,7 @@ import {
 
 import { IFlexiblePriceRequest, IFlexiblePriceRequestFilters } from "interfaces";
 import { FlexiblePricingStatusModal } from "components/flexiblepricing/statusmodal";
+import { formatDiscount } from "utils";
 
 const FlexiblePricingStatuses = [
     {
@@ -145,6 +146,11 @@ export const FlexiblePricingList: React.FC = () => {
                                 render={(value) => formatStatus(value)}
                             />
                             <Table.Column
+                                dataIndex="courseware"
+                                title="Courseware"
+                                render={(value) => value.readable_id}
+                            />
+                            <Table.Column
                                 dataIndex="income_usd"
                                 title="Income (USD)"
                                 render={(value) => parseFloat(value).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
@@ -153,6 +159,11 @@ export const FlexiblePricingList: React.FC = () => {
                                 dataIndex="date_exchange_rate"
                                 title="Date Calculated"
                                 render={(value) => <DateField format="LLL" value={value} />}
+                            />
+                            <Table.Column
+                                dataIndex="discount"
+                                title="Discount"
+                                render={(value) => <div>{ formatDiscount(value) }</div>}
                             />
                             <Table.Column
                                 dataIndex="original_currency"
