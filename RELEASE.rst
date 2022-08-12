@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.41.0
+Version 0.41.0 (Released August 12, 2022)
 --------------
 
 - Fixes scrolling within the program drawer
