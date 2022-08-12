@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.41.1
+--------------
+
+- Fixes some conditionals to return good values if there's no CMS page for a courseware object
+- Online-664 Show courseware and discount info for a financial assistance request (#796)
+- online-779 Display `Documents in order` as default (#781)
+- Adding an extra retry and extending startup grace period to 45s; should help with starting up on Apple Silicon
+
 Version 0.41.0 (Released August 12, 2022)
 --------------
 
