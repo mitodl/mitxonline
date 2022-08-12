@@ -68,18 +68,6 @@ def user(db):
     return UserFactory.create()
 
 
-@pytest.fixture(autouse=True)
-def payment_gateway_settings():
-    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
-    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
-    settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
-
-
-@pytest.fixture(autouse=True)
-def mock_create_run_enrollments(mocker):
-    return mocker.patch("courses.api.create_run_enrollments", autospec=True)
-
-
 def test_cybersource_refund_no_order():
     """Tests that refund_order throws FulfilledOrder.DoesNotExist exception when the order doesn't exist"""
 
