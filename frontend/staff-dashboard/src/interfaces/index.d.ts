@@ -49,8 +49,8 @@ export interface ICourseware {
 
 
 export interface IFlexiblePriceIncome {
-    income_usd: number;
-    original_income: number;
+    income_usd: string;
+    original_income: string;
     original_currency: string;
 }
 
