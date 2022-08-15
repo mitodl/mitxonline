@@ -229,7 +229,7 @@ def refund_order(*, order_id: int, **kwargs):
     A function that performs refund for a given order id
 
     Args:
-       order_id (int): Id of the order which is being refunded
+       order_id (int): Id or reference_number of the order which is being refunded
        kwargs (dict): Dictionary of the other attributes that are passed e.g. refund amount, refund reason, unenroll
        If no refund_amount is provided it will use refund amount from Transaction obj
        unenroll will never be performed if the refund fails
@@ -242,8 +242,10 @@ def refund_order(*, order_id: int, **kwargs):
     unenroll = kwargs.get("unenroll", False)
 
     with transaction.atomic():
-
-        order = FulfilledOrder.objects.select_for_update().get(id=order_id)
+        if type(order_id) is int:
+            order = FulfilledOrder.objects.select_for_update().get(pk=order_id)
+        else:
+            order = FulfilledOrder.objects.select_for_update().get(reference_number=order_id)
 
         if order.state != Order.STATE.FULFILLED:
             log.debug(f"Order with order_id {order_id} is not in fulfilled state.")
