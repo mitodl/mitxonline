@@ -115,8 +115,8 @@ export class ProgramEnrollmentCard extends React.Component<
     const title = (
       <a
         href="#"
-        target="_blank"
         rel="noopener noreferrer"
+        onClick={() => this.hndOpenDrawer()}
       >
         {enrollment.program.title}
       </a>
