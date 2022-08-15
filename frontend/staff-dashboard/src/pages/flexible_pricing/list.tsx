@@ -153,7 +153,7 @@ export const FlexiblePricingList: React.FC = () => {
                             <Table.Column
                                 dataIndex="income_usd"
                                 title="Income (USD)"
-                                render={(value) => parseFloat(value).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                                render={(value) => <div className="income-usd"><span>{parseFloat(value).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span></div>}
                             />
                             <Table.Column
                                 dataIndex="date_exchange_rate"
