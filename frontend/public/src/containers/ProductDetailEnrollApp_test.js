@@ -1,6 +1,6 @@
 /* global SETTINGS: false */
 // @flow
-import { assert, expect } from "chai"
+import { assert } from "chai"
 
 import IntegrationTestHelper from "../util/integration_test_helper"
 import ProductDetailEnrollApp, {
@@ -26,7 +26,7 @@ import sinon from "sinon"
 import { makeUser } from "../factories/user"
 
 describe("ProductDetailEnrollApp", () => {
-  let helper, renderPage, isWithinEnrollmentPeriodStub, isFinancialAssistanceAvailableStub, courseRun, currentUser
+  let helper, renderPage, isWithinEnrollmentPeriodStub, isFinancialAssistanceAvailableStub, isUpgradableStub, courseRun, currentUser
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
@@ -53,6 +53,10 @@ describe("ProductDetailEnrollApp", () => {
     isFinancialAssistanceAvailableStub = helper.sandbox.stub(
       courseApi,
       "isFinancialAssistanceAvailable"
+    )
+    isUpgradableStub = helper.sandbox.stub(
+      courseApi,
+      "isUpgradable"
     )
   })
 
@@ -219,6 +223,7 @@ describe("ProductDetailEnrollApp", () => {
     it(`shows dialog to upgrade user enrollment with flexible dollars-off discount and handles ${returnedStatusCode} response`, async () => {
       courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 1, discount_type: DISCOUNT_TYPE_DOLLARS_OFF}}]
       isWithinEnrollmentPeriodStub.returns(true)
+      isUpgradableStub.returns(true)
       SETTINGS.features.upgrade_dialog = true
       const { inner } = await renderPage()
 
@@ -251,6 +256,7 @@ describe("ProductDetailEnrollApp", () => {
     it(`shows dialog to upgrade user enrollment with flexible percent-off discount and handles ${returnedStatusCode} response`, async () => {
       courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 10, discount_type: DISCOUNT_TYPE_PERCENT_OFF}}]
       isWithinEnrollmentPeriodStub.returns(true)
+      isUpgradableStub.returns(true)
       SETTINGS.features.upgrade_dialog = true
       const { inner } = await renderPage()
 
@@ -285,6 +291,7 @@ describe("ProductDetailEnrollApp", () => {
       courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 9, discount_type: DISCOUNT_TYPE_FIXED_PRICE}}]
       isWithinEnrollmentPeriodStub.returns(true)
       isFinancialAssistanceAvailableStub.returns(false)
+      isUpgradableStub.returns(true)
       SETTINGS.features.upgrade_dialog = true
       const { inner } = await renderPage()
 
@@ -314,5 +321,22 @@ describe("ProductDetailEnrollApp", () => {
         "9"
       )
     })
+  })
+
+  it(`shows form based enrollment button when upgrade deadline has passed but course is within enrollment period`, async () => {
+    isWithinEnrollmentPeriodStub.returns(true)
+    isUpgradableStub.returns(false)
+    SETTINGS.features.upgrade_dialog = true
+    const { inner } = await renderPage()
+
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/course_runs/?relevant_to=",
+      "GET"
+    )
+    sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+
+    const enrollBtn = inner.find("form > button.enroll-now")
+    assert.isTrue(enrollBtn.exists())
   })
 })

@@ -1,7 +1,6 @@
 // @flow
 /* global SETTINGS:false */
 import React from "react"
-import { connect } from "react-redux"
 import { Formik, Form, Field } from "formik"
 import {
   Dropdown,
@@ -13,28 +12,11 @@ import {
   ModalHeader,
   ModalBody
 } from "reactstrap"
-import { createStructuredSelector } from "reselect"
-import { compose } from "redux"
-import { connectRequest, mutateAsync } from "redux-query"
-import { partial, pathOr, without } from "ramda"
-import moment from "moment"
+import { partial } from "ramda"
 
 import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../constants"
-import {
-  enrollmentSelector,
-  enrollmentQuery,
-  enrollmentQueryKey,
-  deactivateEnrollmentMutation,
-  courseEmailsSubscriptionMutation
-} from "../lib/queries/enrollment"
-import { currentUserSelector } from "../lib/queries/users"
-import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText } from "../lib/courseApi"
-import {
-  formatPrettyDateTimeAmPmTz,
-  isSuccessResponse,
-  parseDateString
-} from "../lib/util"
-import { addUserNotification } from "../actions"
+import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText, isUpgradable } from "../lib/courseApi"
+import { isSuccessResponse } from "../lib/util"
 import { EnrollmentRoleTag } from "./EnrollmentRoleTag"
 
 import type { RunEnrollment } from "../flow/courseTypes"
@@ -280,7 +262,8 @@ export class EnrolledItemCard extends React.Component<
     ) : null
     const certificateLinks = (
       enrollment.run.products.length > 0 &&
-      enrollment.enrollment_mode === "audit"
+      enrollment.enrollment_mode === "audit" &&
+      isUpgradable(enrollment.run)
     ) ? (
         <div className="pricing-links">
           {financialAssistanceLink}

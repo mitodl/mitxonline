@@ -15,7 +15,8 @@ import {
   USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
   USER_MSG_TYPE_PAYMENT_ACCEPTED,
   USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE,
-  USER_MSG_TYPE_PAYMENT_REVIEW
+  USER_MSG_TYPE_PAYMENT_REVIEW,
+  USER_MSG_TYPE_COURSE_NON_UPGRADABLE
 } from "../constants"
 
 type UserMessage = {
@@ -55,6 +56,11 @@ export function parseStoredUserMessage(
     alertType = ALERT_TYPE_DANGER
     msgText =
         "We're sorry, your country is currently blocked from enrolling in this course."
+    break
+  case USER_MSG_TYPE_COURSE_NON_UPGRADABLE:
+    alertType = ALERT_TYPE_DANGER
+    msgText =
+        "The upgrade deadline for a course in your cart has passed. Please try later."
     break
   case USER_MSG_TYPE_ENROLL_DUPLICATED:
     alertType = ALERT_TYPE_DANGER

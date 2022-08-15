@@ -111,6 +111,7 @@ export const USER_MSG_TYPE_ENROLL_FAILED = "enroll-failed"
 export const USER_MSG_TYPE_ENROLL_BLOCKED = "enroll-blocked"
 export const USER_MSG_TYPE_ENROLL_DUPLICATED = "enroll-duplicated"
 export const USER_MSG_TYPE_COMPLETED_AUTH = "completed-auth"
+export const USER_MSG_TYPE_COURSE_NON_UPGRADABLE = "course-non-upgradable"
 
 export const USER_MSG_TYPE_PAYMENT_DECLINED = "payment-declined"
 export const USER_MSG_TYPE_PAYMENT_ERROR = "payment-error"

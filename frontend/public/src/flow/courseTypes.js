@@ -14,6 +14,7 @@ export type BaseCourseRun = {
   end_date: ?string,
   enrollment_start: ?string,
   enrollment_end: ?string,
+  upgrade_deadline: ?string,
   courseware_url: ?string,
   courseware_id: string,
   run_tag: ?string,
