@@ -113,15 +113,15 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
             </p>
             <p>
                 <strong>Income USD:</strong>
-                <div>{modaldata.income_usd}</div>
+                <div>{modaldata.income.income_usd}</div>
             </p>
             <p>
                 <strong>Original Income:</strong>
-                <div>{modaldata.original_income}</div>
+                <div>{modaldata.income.original_income}</div>
             </p>
             <p>
                 <strong>Original Currency:</strong>
-                <div>{modaldata.original_currency}</div>
+                <div>{modaldata.income.original_currency}</div>
             </p>
             <p>
                 <strong>Country of Income:</strong>

@@ -16,3 +16,8 @@ export const formatDiscount = (discount: IDiscount) => {
     }
     return formattedDiscount;
 }
+
+
+export const formatIncome = (income: string, currency: string) => {
+    return currency + " " + parseFloat(income).toLocaleString(undefined, {maximumFractionDigits: 2})
+}
