@@ -16,8 +16,9 @@ from cms.factories import (
     ResourcePageFactory,
     CoursePageFactory,
     FlexiblePricingFormFactory,
+    ProgramPageFactory,
 )
-from cms.models import FlexiblePricingRequestSubmission
+from cms.models import FlexiblePricingRequestSubmission, CoursePage, ProgramPage
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -266,6 +267,31 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
         assert (
             "csrfmiddlewaretoken" in response.rendered_content
         ), response.rendered_content
+
+
+@pytest.mark.parametrize("course_or_program", [True, False])
+def test_flex_pricing_parent_resources(course_or_program):
+    """
+    Tests the get_parent_product and get_parent_product_page methods in the
+    FlexiblePricingRequestForm to make sure the right things are returned based
+    on whether the form is under a CoursePage or a ProgramPage.
+
+    Args:
+    - course_or_program: boolean, True to test with a CoursePage, False for ProgramPage.
+    """
+
+    if course_or_program:
+        parent_page = CoursePageFactory.create()
+    else:
+        parent_page = ProgramPageFactory.create()
+
+    flex_form = FlexiblePricingFormFactory(parent=parent_page)
+
+    assert (
+        isinstance(flex_form.get_parent_product_page(), CoursePage)
+        if course_or_program
+        else isinstance(flex_form.get_parent_product_page(), ProgramPage)
+    )
 
 
 def test_flex_pricing_form_courseware_object():

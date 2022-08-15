@@ -11,10 +11,17 @@ from cms.api import (
     ensure_product_index,
     get_home_page,
     RESOURCE_PAGE_TITLES,
+    ensure_program_product_index,
 )
 from cms.exceptions import WagtailSpecificPageError
-from cms.factories import HomePageFactory, CoursePageFactory
-from cms.models import HomePage, ResourcePage, CourseIndexPage, HomeProductLink
+from cms.factories import HomePageFactory, CoursePageFactory, ProgramPageFactory
+from cms.models import (
+    HomePage,
+    ResourcePage,
+    CourseIndexPage,
+    HomeProductLink,
+    ProgramIndexPage,
+)
 
 
 @pytest.mark.django_db
@@ -134,6 +141,32 @@ def test_ensure_product_index(mocker):
     # Make sure the function is idempotent
     ensure_product_index()
     assert list(course_index_children_qset.all()) == [existing_course_page.page_ptr]
+
+
+@pytest.mark.django_db
+def test_ensure_program_product_index(mocker):
+    """
+    Same as test_ensure_product_index, but operates on ProgramPages instead.
+    """
+    home_page = HomePageFactory.create()
+    patched_get_home_page = mocker.patch(
+        "cms.api.get_home_page", return_value=home_page
+    )
+    existing_program_page = ProgramPageFactory.create(parent=home_page)
+    program_index_qset = Page.objects.filter(
+        content_type=ContentType.objects.get_for_model(ProgramIndexPage)
+    )
+    assert existing_program_page.get_parent() == home_page
+    assert program_index_qset.exists() is False
+    ensure_program_product_index()
+    patched_get_home_page.assert_called_once()
+    program_index_page = program_index_qset.first()
+    assert program_index_page is not None
+    program_index_children_qset = program_index_page.get_children()
+    assert list(program_index_children_qset.all()) == [existing_program_page.page_ptr]
+    # Make sure the function is idempotent
+    ensure_program_product_index()
+    assert list(program_index_children_qset.all()) == [existing_program_page.page_ptr]
 
 
 @pytest.mark.django_db

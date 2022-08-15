@@ -13,7 +13,11 @@ def test_configure_wagtail(mocker):
     patched_ensure_product_index = mocker.patch(
         "cms.management.commands.configure_wagtail.ensure_product_index"
     )
+    patched_ensure_program_product_index = mocker.patch(
+        "cms.management.commands.configure_wagtail.ensure_program_product_index"
+    )
     call_command("configure_wagtail")
     patched_ensure_home_page.assert_called_once()
     patched_ensure_resource_pages.assert_called_once()
     patched_ensure_product_index.assert_called_once()
+    patched_ensure_program_product_index.assert_called_once()
