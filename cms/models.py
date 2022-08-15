@@ -8,6 +8,7 @@ from urllib.parse import quote_plus
 from json import dumps
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.http import Http404
 from django.urls import reverse
@@ -785,7 +786,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         if flexible_price is None:
             flexible_price = FlexiblePrice(user=form.user, courseware_object=courseware)
         else:
-            if flexible_price.status is not FlexiblePriceStatus.RESET:
+            if flexible_price.status != FlexiblePriceStatus.RESET:
                 raise ValidationError(
                     "A Flexible Price request already exists for this user and course or program."
                 )
@@ -797,6 +798,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         flexible_price.date_exchange_rate = datetime.datetime.now()
         flexible_price.cms_submission = form_submission
         flexible_price.tier = tier
+        flexible_price.justification = ""
 
         if determine_auto_approval(flexible_price, tier) is True:
             flexible_price.status = FlexiblePriceStatus.AUTO_APPROVED
