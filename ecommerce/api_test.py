@@ -254,7 +254,7 @@ def test_unenrollment_unenrolls_learner(mocker, user):
     unenroll_mock.assert_called()
 
 
-def test_process_cybersource_payment_response(mocker, user_client, user, products):
+def test_process_cybersource_payment_response(rf, mocker, user_client, user, products):
     """Test that ensures the response from Cybersource for an ACCEPTed payment updates the orders state"""
 
     mocker.patch(
@@ -276,9 +276,7 @@ def test_process_cybersource_payment_response(mocker, user_client, user, product
 
     assert order.reference_number == payload["req_reference_number"]
 
-    request = HttpRequest()
-    request.method = "POST"
-    request.POST = payload
+    request = rf.post(reverse("checkout_result_api"), payload)
 
     # This is checked on the BackofficeCallbackView and CheckoutCallbackView POST endpoints
     # since we expect to receive a response to both from Cybersource.  If the current state is

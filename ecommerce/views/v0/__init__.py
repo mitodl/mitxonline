@@ -489,12 +489,9 @@ class BackofficeCallbackView(APIView):
         # otherwise we can conclude that we already received a response through
         # the user's browser.
         result_status = status.HTTP_200_OK
-        try:
-            if order is not None and order.state == Order.STATE.PENDING:
-                api.process_cybersource_payment_response(request, order)
-            elif order is None:
-                raise ObjectDoesNotExist()
-        except ObjectDoesNotExist:
+        if order is not None and order.state == Order.STATE.PENDING:
+            api.process_cybersource_payment_response(request, order)
+        elif order is None:
             result_status = status.HTTP_404_NOT_FOUND
 
         return Response(status=result_status)
