@@ -521,11 +521,21 @@ class CheckoutProductView(LoginRequiredMixin, RedirectView):
             all_product_ids = self.request.GET.getlist("product_id")
 
             # If the request is from an external source we would have course_id as query param
+            course_run_ids = self.request.GET.getlist("course_run_id")
             course_ids = self.request.GET.getlist("course_id")
+            program_ids = self.request.GET.getlist("program_id")
 
             all_product_ids.extend(
                 list(
-                    CourseRun.objects.filter(courseware_id__in=course_ids).values_list(
+                    CourseRun.objects.filter(
+                        Q(courseware_id__in=course_run_ids)
+                        | Q(course__id__in=course_ids)
+                    ).values_list("products__id", flat=True)
+                )
+            )
+            all_product_ids.extend(
+                list(
+                    ProgramRun.objects.filter(program__id__in=program_ids).values_list(
                         "products__id", flat=True
                     )
                 )

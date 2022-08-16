@@ -161,6 +161,7 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
     run_tag = models.CharField(max_length=10, validators=[validate_url_path_field])
     start_date = models.DateTimeField(null=True, blank=True, db_index=True)
     end_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    products = GenericRelation("ecommerce.Product", related_query_name="programruns")
 
     class Meta:
         unique_together = ("program", "run_tag")

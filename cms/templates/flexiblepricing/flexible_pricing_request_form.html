@@ -55,17 +55,24 @@
         <div class="flexible-pricing-head">
           {{ page.application_approved_no_discount_text|richtext }}
         </div>
-        <a href="/" class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
-          Get certificate
-        </a>
         {% else %}
         <div class="flexible-pricing-head">
           {{ page.application_approved_text|richtext }}
         </div>
-        <a href="/" class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
-          Get certificate at reduced rate
-        </a>
         {% endif %}{# end discount amount text #}
+          <form action="/cart/add/" method="get" className="text-center">
+          {% if page.selected_program %}
+            <input type="hidden" name="program_id" value={{ page.selected_program.id }} />
+          {% elif page.selected_course %}
+             <input type="hidden" name="course_id" value={{ page.selected_course.id }} />
+          {% endif %}
+            <button
+              type="submit"
+              class="btn btn-primary btn-gradient-red flexible-price-certificate-btn"
+            >
+              Get Certificate
+            </button>
+          </form>
       {% elif prior_request.is_denied %}
         <div class="flexible-pricing-head">
           {{ page.application_denied_text|richtext }}

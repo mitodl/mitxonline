@@ -20,7 +20,7 @@ import operator as op
 import reversion
 import uuid
 
-from courses.factories import CourseRunFactory
+from courses.factories import CourseRunFactory, ProgramRunFactory
 from ecommerce.api import generate_checkout_payload
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
@@ -601,7 +601,7 @@ def test_checkout_product(
     if is_external_checkout:
         course_run = CourseRunFactory.create()
         course_run.products.add(product)
-        api_payload = {"course_id": course_run.courseware_id}
+        api_payload = {"course_run_id": course_run.courseware_id}
     else:
         api_payload = {"product_id": product.id}
 
@@ -643,6 +643,27 @@ def test_checkout_product_cart(
         assert resp.data == expected_message
     else:
         assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
+
+def test_checkout_product_with_program_id(user, user_client):
+    """
+    Verifies that /cart/add?program_id=? url adds the program to the cart
+    and redirect to checkout
+    """
+    BasketFactory.create(user=user)
+    program_run = ProgramRunFactory.create()
+    product = ProductFactory.create()
+
+    program_run.products.add(product)
+    api_payload = {"program_id": program_run.program.id}
+
+    resp = user_client.get(reverse("checkout-product"), api_payload)
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+
+    basket = Basket.objects.get(user=user)
+
+    assert [item.product for item in basket.basket_items.all()] == [product]
 
 
 def test_discount_rest_api(admin_drf_client, user_drf_client):
