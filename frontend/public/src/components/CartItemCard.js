@@ -21,7 +21,7 @@ export class CartItemCard extends React.Component<Props> {
 
     const title =
       course !== undefined ? (
-        <a href="#" target="_blank" rel="noopener noreferrer">
+        <a href={course.page !== null ? course.page.page_url : "#"} target="_blank" rel="noopener noreferrer">
           {course.title}
         </a>
       ) : (
