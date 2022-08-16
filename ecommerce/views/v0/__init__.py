@@ -486,11 +486,18 @@ class BackofficeCallbackView(APIView):
         order = api.get_order_from_cybersource_payment_response(request)
 
         # We only want to process responses related to orders which are PENDING
-        # otherwise we can conclude that we already received a resonse through
+        # otherwise we can conclude that we already received a response through
         # the user's browser.
-        if order is not None and order.state == Order.STATE.PENDING:
-            api.process_cybersource_payment_response(request, order)
-        return Response(status=HTTP_200_OK)
+        result_status=status.HTTP_200_OK
+        try:
+            if order is not None and order.state == Order.STATE.PENDING:
+                api.process_cybersource_payment_response(request, order)
+            elif order is None:
+                raise ObjectDoesNotExist()
+        except ObjectDoesNotExist:
+            result_status=status.HTTP_404_NOT_FOUND
+            
+        return Response(status=result_status)
 
 
 class CheckoutProductView(LoginRequiredMixin, RedirectView):
