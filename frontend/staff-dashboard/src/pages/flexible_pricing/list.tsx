@@ -20,7 +20,7 @@ import {
 
 import { IFlexiblePriceRequest, IFlexiblePriceRequestFilters } from "interfaces";
 import { FlexiblePricingStatusModal } from "components/flexiblepricing/statusmodal";
-import { formatDiscount } from "utils";
+import { formatDiscount, formatIncome } from "utils";
 
 const FlexiblePricingStatuses = [
     {
@@ -138,7 +138,7 @@ export const FlexiblePricingList: React.FC = () => {
                             <Table.Column 
                                 dataIndex="user" 
                                 title="Name/Location"
-                                render={(value) => <div><strong>{value.name}</strong> <br /> {value.legal_address.country}</div>}
+                                render={(value) => <div><strong>{value.name}</strong> <br /> {value.email} <br /> {value.legal_address.country}</div>}
                             />
                             <Table.Column
                                 dataIndex="status"
@@ -151,28 +151,27 @@ export const FlexiblePricingList: React.FC = () => {
                                 render={(value) => value.readable_id}
                             />
                             <Table.Column
-                                dataIndex="income_usd"
-                                title="Income (USD)"
-                                render={(value) => <div className="income-usd"><span>{parseFloat(value).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span></div>}
+                                dataIndex="income"
+                                title="Income"
+                                render={
+                                (value) => <div className="income-usd">
+                                    <span>
+                                        { formatIncome(value.income_usd, "USD") }
+                                        <br />
+                                        { formatIncome(value.original_income, value.original_currency) }
+                                    </span>
+                                </div>
+                            }
                             />
                             <Table.Column
                                 dataIndex="date_exchange_rate"
                                 title="Date Calculated"
-                                render={(value) => <DateField format="LLL" value={value} />}
+                                render={(value) => <DateField format="l" value={value.toLocaleString()} />}
                             />
                             <Table.Column
                                 dataIndex="discount"
                                 title="Discount"
                                 render={(value) => <div>{ formatDiscount(value) }</div>}
-                            />
-                            <Table.Column
-                                dataIndex="original_currency"
-                                title="Original Currency"
-                            />
-                            <Table.Column
-                                dataIndex="date_documents_sent"
-                                title="Documents Sent"
-                                render={(value) => value ? <DateField format="LLL" value={value} /> : 'No Documents Sent'}
                             />
                             <Table.Column
                                 dataIndex="justification"

@@ -8,11 +8,16 @@ export const formatDiscount = (discount: IDiscount) => {
             formattedDiscount = parseFloat(discount.amount).toFixed(2) + "% off"
             break
         case "dollars-off":
-            formattedDiscount = parseFloat(discount.amount).toLocaleString('en-US', { style: 'currency', currency: 'USD' }) + " off"
+            formattedDiscount = formatIncome(discount.amount, "USD") + " off"
             break
         case "fixed-price":
-            formattedDiscount = parseFloat(discount.amount).toLocaleString('en-US', { style: 'currency', currency: 'USD' }) + " fixed-price"
+            formattedDiscount = formatIncome(discount.amount, "USD") + " fixed-price"
             break
     }
     return formattedDiscount;
+}
+
+
+export const formatIncome = (income: string, currency: string) => {
+    return parseFloat(income).toLocaleString("en-US", {style: "currency", currency: currency})
 }

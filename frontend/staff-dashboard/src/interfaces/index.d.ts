@@ -48,14 +48,18 @@ export interface ICourseware {
 }
 
 
+export interface IFlexiblePriceIncome {
+    income_usd: string;
+    original_income: string;
+    original_currency: string;
+}
+
+
 export interface IFlexiblePriceRequest {
     id: number;
     user: number;
     courseware: ICourseware;
     status: string;
-    income_usd: number;
-    original_income: number;
-    original_currency: string;
     country_of_income: null;
     date_exchange_rate: Date;
     discount: IDiscount;
@@ -63,7 +67,8 @@ export interface IFlexiblePriceRequest {
     justification: string;
     country_of_residence: string;
     action: string;
-    applicable_discounts: IDiscount[]
+    applicable_discounts: IDiscount[];
+    income: IFlexiblePriceIncome
 }
 
 export interface IFlexiblePriceStatus {

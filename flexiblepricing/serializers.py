@@ -49,6 +49,20 @@ class FlexiblePriceSerializer(serializers.ModelSerializer):
         ]
 
 
+class FlexiblePriceIncomeSerializer(serializers.ModelSerializer):
+    """
+    Financial Assistance Requests income serializer
+    """
+
+    class Meta:
+        model = models.FlexiblePrice
+        fields = [
+            "income_usd",
+            "original_income",
+            "original_currency",
+        ]
+
+
 class FlexiblePriceAdminSerializer(serializers.ModelSerializer):
     """
     Serializer for Financial Assistance Requests
@@ -61,6 +75,7 @@ class FlexiblePriceAdminSerializer(serializers.ModelSerializer):
 
     courseware = serializers.SerializerMethodField()
     discount = serializers.SerializerMethodField()
+    income = serializers.SerializerMethodField()
     user = UserSerializer(read_only=True)
     applicable_discounts = serializers.SerializerMethodField()
 
@@ -70,9 +85,6 @@ class FlexiblePriceAdminSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "status",
-            "income_usd",
-            "original_income",
-            "original_currency",
             "country_of_income",
             "date_exchange_rate",
             "date_documents_sent",
@@ -81,6 +93,7 @@ class FlexiblePriceAdminSerializer(serializers.ModelSerializer):
             "courseware",
             "discount",
             "applicable_discounts",
+            "income",
         ]
 
     def update(self, instance, validated_data):
@@ -142,3 +155,9 @@ class FlexiblePriceAdminSerializer(serializers.ModelSerializer):
             discounts,
             many=True,
         ).data
+
+    def get_income(self, instance):
+        """
+        Returns income information associated with a flexible price request.
+        """
+        return FlexiblePriceIncomeSerializer(instance=instance).data
