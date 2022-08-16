@@ -58,7 +58,7 @@ def notify_financial_assistance_request_denied_email(
     flexible_price_id, email_subject, email_body
 ):
     """
-    Sends email notifications when the financial assistance request is denied.
+    Sends email notification when the financial assistance request is denied.
     """
     flexible_price = FlexiblePrice.objects.get(id=flexible_price_id)
     send_financial_assistance_request_denied_email(
