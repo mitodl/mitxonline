@@ -12,7 +12,7 @@ class RefundPlugin:
     ) -> RefundResult:
 
         refund_api_success = refund_order(
-            order_id=refund_request_row.order_id, unenroll=True
+            reference_number=refund_request_row.order_id, unenroll=True
         )
         if refund_api_success:
             return RefundResult(ResultType.PROCESSED)

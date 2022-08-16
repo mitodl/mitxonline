@@ -224,12 +224,13 @@ def establish_basket(request):
     return basket
 
 
-def refund_order(*, order_id: int, **kwargs):
+def refund_order(*, order_id: int = None, reference_number=None, **kwargs):
     """
     A function that performs refund for a given order id
 
     Args:
        order_id (int): Id or reference_number of the order which is being refunded
+       reference_number (str): Reference number of the order
        kwargs (dict): Dictionary of the other attributes that are passed e.g. refund amount, refund reason, unenroll
        If no refund_amount is provided it will use refund amount from Transaction obj
        unenroll will never be performed if the refund fails
@@ -242,20 +243,22 @@ def refund_order(*, order_id: int, **kwargs):
     unenroll = kwargs.get("unenroll", False)
 
     with transaction.atomic():
-        if type(order_id) is int:
+        if reference_number is not None:
+            order = FulfilledOrder.objects.select_for_update().get(reference_number=reference_number)
+        elif order_id is not None:
             order = FulfilledOrder.objects.select_for_update().get(pk=order_id)
         else:
-            order = FulfilledOrder.objects.select_for_update().get(reference_number=order_id)
-
+            log.debug(f"Either order_id or reference_number is required to fetch the Order. ")
+            return False
         if order.state != Order.STATE.FULFILLED:
-            log.debug(f"Order with order_id {order_id} is not in fulfilled state.")
+            log.debug(f"Order with order_id {order.id} is not in fulfilled state.")
             return False
 
-        order_recent_transaction = Transaction.objects.filter(order=order_id).first()
+        order_recent_transaction = Transaction.objects.filter(order=order.id).first()
 
         if not order_recent_transaction:
             log.error(
-                f"There is no associated transaction against order_id {order_id}."
+                f"There is no associated transaction against order_id {order.id}."
             )
             return False
 
@@ -299,11 +302,11 @@ def refund_order(*, order_id: int, **kwargs):
 
         except RefundDuplicateException:
             # Duplicate refund error during the API call will be treated as success, we just log it
-            log.info(f"Duplicate refund request for order_id {order_id}")
+            log.info(f"Duplicate refund request for order_id {order.id}")
 
     # If unenroll requested, perform unenrollment after successful refund
     if unenroll:
-        perform_unenrollment_from_order.delay(order_id)
+        perform_unenrollment_from_order.delay(order.id)
 
     return True
 

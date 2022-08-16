@@ -74,6 +74,15 @@ def test_cybersource_refund_no_fulfilled_order(order_state):
     assert refund_response is False
 
 
+def test_cybersource_refund_no_order_id():
+    """Test that refund_order returns logs properly and False when there is no Fulfilled order against
+    the given order_id"""
+
+    refund_response = refund_order()
+    assert f"Either order_id or reference_number is required to fetch the Order."
+    assert refund_response is False
+
+
 def test_cybersource_order_no_transaction(fulfilled_order):
     """
     Test that refund_order returns False when there is no transaction against a fulfilled order
@@ -122,6 +131,66 @@ def test_order_refund_success(mocker, order_state, unenroll, fulfilled_transacti
     if order_state == ProcessorResponse.STATE_DUPLICATE:
         assert f"Duplicate refund request for order_id {fulfilled_transaction.order.id}"
 
+    # There should be two transaction objects (One for payment and other for refund)
+    assert (
+        Transaction.objects.filter(
+            order=fulfilled_transaction.order.id,
+            transaction_type=TRANSACTION_TYPE_PAYMENT,
+        ).count()
+        == 1
+    )
+    assert (
+        Transaction.objects.filter(
+            order=fulfilled_transaction.order.id,
+            transaction_type=TRANSACTION_TYPE_REFUND,
+        ).count()
+        == 1
+    )
+    assert refund_success is True
+
+    # Unenrollment task should only run if unenrollment was requested
+    if unenroll:
+        unenroll_task_mock.assert_called_once_with(fulfilled_transaction.order.id)
+    else:
+        assert not unenroll_task_mock.called
+
+    # Refund transaction object should have appropriate data
+    refund_transaction = Transaction.objects.filter(
+        order=fulfilled_transaction.order.id, transaction_type=TRANSACTION_TYPE_REFUND
+    ).first()
+
+    assert refund_transaction.data == sample_response_data
+    assert refund_transaction.amount == fulfilled_transaction.amount
+
+    # The state of the order should be REFUNDED after a successful refund
+    fulfilled_transaction.order.refresh_from_db()
+    assert fulfilled_transaction.order.state == Order.STATE.REFUNDED
+
+
+@pytest.mark.parametrize("unenroll", [True, False])
+def test_order_refund_success_with_ref_num(mocker, unenroll, fulfilled_transaction):
+    """Test a successful refund based only on reference number"""
+    sample_response_data = {
+        "refundAmountDetails": {"refundAmount": float(fulfilled_transaction.amount)}
+    }
+    sample_response = ProcessorResponse(
+        state=ProcessorResponse.STATE_PENDING,
+        response_data=sample_response_data,
+        transaction_id="1234",
+        message="",
+        response_code="",
+    )
+    unenroll_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_unenrollment_from_order.delay"
+    )
+
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.start_refund",
+        return_value=sample_response,
+    )
+    refund_success = refund_order(
+        reference_number=fulfilled_transaction.order.reference_number, unenroll=unenroll
+    )
     # There should be two transaction objects (One for payment and other for refund)
     assert (
         Transaction.objects.filter(
