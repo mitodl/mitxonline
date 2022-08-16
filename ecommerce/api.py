@@ -244,11 +244,15 @@ def refund_order(*, order_id: int = None, reference_number=None, **kwargs):
 
     with transaction.atomic():
         if reference_number is not None:
-            order = FulfilledOrder.objects.select_for_update().get(reference_number=reference_number)
+            order = FulfilledOrder.objects.select_for_update().get(
+                reference_number=reference_number
+            )
         elif order_id is not None:
             order = FulfilledOrder.objects.select_for_update().get(pk=order_id)
         else:
-            log.debug(f"Either order_id or reference_number is required to fetch the Order. ")
+            log.debug(
+                f"Either order_id or reference_number is required to fetch the Order. "
+            )
             return False
         if order.state != Order.STATE.FULFILLED:
             log.debug(f"Order with order_id {order.id} is not in fulfilled state.")
