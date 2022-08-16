@@ -9,8 +9,11 @@ from flexiblepricing.exceptions import (
     ExceededAPICallsException,
     UnexpectedAPIErrorException,
 )
+from flexiblepricing.mail_api import (
+    generate_flexible_price_email,
+    send_financial_assistance_request_denied_email,
+)
 from flexiblepricing.models import FlexiblePrice
-from flexiblepricing.mail_api import generate_flexible_price_email
 from main.celery import app
 
 
@@ -48,3 +51,16 @@ def notify_flexible_price_status_change_email(flexible_price_id):
     """
     flexible_price = FlexiblePrice.objects.get(id=flexible_price_id)
     generate_flexible_price_email(flexible_price)
+
+
+@app.task
+def notify_financial_assistance_request_denied_email(
+    flexible_price_id, email_subject, email_body
+):
+    """
+    Sends email notifications when the financial assistance request is denied.
+    """
+    flexible_price = FlexiblePrice.objects.get(id=flexible_price_id)
+    send_financial_assistance_request_denied_email(
+        flexible_price, email_subject, email_body
+    )

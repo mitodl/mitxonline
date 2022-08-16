@@ -95,8 +95,8 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
             status: status,
             justification: justification,
             discount: discount,
-            emailSubject: emailSubject,
-            emailBody: emailBody
+            email_subject: emailSubject,
+            email_body: emailBody
         };
 
         mutate({
