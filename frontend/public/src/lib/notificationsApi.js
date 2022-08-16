@@ -60,7 +60,7 @@ export function parseStoredUserMessage(
   case USER_MSG_TYPE_COURSE_NON_UPGRADABLE:
     alertType = ALERT_TYPE_DANGER
     msgText =
-        "The upgrade deadline for a course in your cart has passed. Please try later."
+        "The upgrade deadline for a course in your cart has passed. You can retake and pay for this course the next time it runs."
     break
   case USER_MSG_TYPE_ENROLL_DUPLICATED:
     alertType = ALERT_TYPE_DANGER

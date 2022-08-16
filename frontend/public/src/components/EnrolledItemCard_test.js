@@ -18,8 +18,7 @@ describe("EnrolledItemCard", () => {
     userEnrollment,
     currentUser,
     isLinkableStub,
-    enrollmentCardProps,
-    isUpgradableStub
+    enrollmentCardProps
 
 
   beforeEach(() => {
@@ -44,10 +43,6 @@ describe("EnrolledItemCard", () => {
         "isFinancialAssistanceAvailable"
       )
     }
-    isUpgradableStub = helper.sandbox.stub(
-      courseApi,
-      "isUpgradable"
-    )
 
     renderedCard = () =>
       shallow(
@@ -73,7 +68,6 @@ describe("EnrolledItemCard", () => {
     "verified"
   ].forEach(([mode]) => {
     it("renders the card", async () => {
-      isUpgradableStub.returns(true)
       const testEnrollment = makeCourseRunEnrollmentWithProduct()
       userEnrollment = testEnrollment
       enrollmentCardProps.enrollment = testEnrollment
@@ -97,7 +91,6 @@ describe("EnrolledItemCard", () => {
     "verified"
   ].forEach(([mode]) => {
     it("does not render the pricing links when upgrade deadline has passed", async () => {
-      isUpgradableStub.returns(false)
       enrollmentCardProps.enrollment.enrollment_mode = mode
       const inner = await renderedCard()
       const enrolledItems = inner.find(".enrolled-item")

@@ -56,6 +56,7 @@ export const makeCourseRunWithProduct = (): CourseRun => ({
   id:               genCourseRunId.next().value,
   course_number:    casual.word,
   page:             null,
+  is_upgradable:    true,
   products:         [
     {
       description:            casual.text,

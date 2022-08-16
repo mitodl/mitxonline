@@ -52,9 +52,3 @@ export const generateStartDateText = (run: CourseRunDetail) => {
 export const isFinancialAssistanceAvailable = (run: CourseRunDetail) => {
   return run.page ? !!run.page.financial_assistance_form_url : false
 }
-
-export const isUpgradable = (run: CourseRunDetail) => {
-  const upgradeDeadline = run.upgrade_deadline ? moment(run.upgrade_deadline) : null
-  const now = moment()
-  return isNil(upgradeDeadline) || now.isBefore(upgradeDeadline)
-}

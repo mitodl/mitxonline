@@ -176,7 +176,7 @@ def test_course_run_past(end_days, expected):
 )
 def test_course_run_upgradeable(upgrade_deadline_days, expected):
     """
-    Test that CourseRun.is_past returns the expected boolean value
+    Test that CourseRun.is_upgradable returns the expected boolean value
     """
     now = now_in_utc()
     upgrade_deadline = (

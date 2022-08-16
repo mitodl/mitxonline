@@ -80,6 +80,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "courseware_url",
             "courseware_id",
             "upgrade_deadline",
+            "is_upgradable",
             "run_tag",
             "id",
         ]
@@ -198,6 +199,7 @@ class CourseRunDetailSerializer(serializers.ModelSerializer):
             "courseware_url",
             "courseware_id",
             "upgrade_deadline",
+            "is_upgradable",
             "id",
             "products",
             "page",

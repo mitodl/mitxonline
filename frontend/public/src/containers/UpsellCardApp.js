@@ -18,7 +18,7 @@ import {
 } from "../lib/queries/courseRuns"
 import { getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
 
-import {isUpgradable, isFinancialAssistanceAvailable, isWithinEnrollmentPeriod} from "../lib/courseApi"
+import { isFinancialAssistanceAvailable, isWithinEnrollmentPeriod} from "../lib/courseApi"
 
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
@@ -60,7 +60,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
         </p>
       ) : null
     const product =
-      run.products && !run.is_verified && run.is_enrolled && isUpgradable(run)
+      run.products && !run.is_verified && run.is_enrolled && run.is_upgradable
         ? run.products[0]
         : null
     return product ? (

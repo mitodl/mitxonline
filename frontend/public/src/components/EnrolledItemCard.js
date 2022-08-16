@@ -15,7 +15,7 @@ import {
 import { partial } from "ramda"
 
 import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../constants"
-import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText, isUpgradable } from "../lib/courseApi"
+import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 import { EnrollmentRoleTag } from "./EnrollmentRoleTag"
 
@@ -263,7 +263,7 @@ export class EnrolledItemCard extends React.Component<
     const certificateLinks = (
       enrollment.run.products.length > 0 &&
       enrollment.enrollment_mode === "audit" &&
-      isUpgradable(enrollment.run)
+      enrollment.run.is_upgradable
     ) ? (
         <div className="pricing-links">
           {financialAssistanceLink}
