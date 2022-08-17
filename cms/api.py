@@ -12,6 +12,8 @@ from wagtail.core.models import Page, Site
 
 from cms import models as cms_models
 from cms.exceptions import WagtailSpecificPageError
+from cms.models import Page
+
 
 log = logging.getLogger(__name__)
 DEFAULT_HOMEPAGE_PROPS = dict(
