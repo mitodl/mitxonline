@@ -33,14 +33,18 @@ class CoursePageSerializer(serializers.ModelSerializer):
         Returns URL of the Financial Assistance Form.
         """
         financial_assistance_page = None
+        base_url = None
         if instance.product.program:
+            print("CP", instance.product.program)
+            program_page = ProgramPage.objects.filter(
+                program_id=instance.product.program
+            ).first()
+            base_url = program_page.get_url()
+
             financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
                 selected_program=instance.product.program
             ).first()
             if financial_assistance_page is None:
-                program_page = ProgramPage.objects.filter(
-                    program_id=instance.product.program
-                ).first()
                 financial_assistance_page = (
                     program_page.get_children()
                     .type(FlexiblePricingRequestForm)
@@ -49,17 +53,21 @@ class CoursePageSerializer(serializers.ModelSerializer):
                 )
 
         if financial_assistance_page is None:
+            base_url = instance.get_url()
             financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
                 selected_course=instance.product
             ).first()
-            
+
         if financial_assistance_page is None:
-            financial_assistance_page = instance.get_children().type(FlexiblePricingRequestForm).live().first()
-            
+            base_url = instance.get_url()
+            financial_assistance_page = (
+                instance.get_children().type(FlexiblePricingRequestForm).live().first()
+            )
+
         print("CP", " 64 ", financial_assistance_page)
 
         return (
-            f"{instance.get_url()}{financial_assistance_page.slug}/"
+            f"{base_url}{financial_assistance_page.slug}/"
             if financial_assistance_page
             else ""
         )
