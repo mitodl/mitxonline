@@ -1203,7 +1203,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         flexible_price.original_currency = form.cleaned_data["income_currency"]
         flexible_price.country_of_income = form.user.legal_address.country
         flexible_price.income_usd = income_usd
-        flexible_price.date_exchange_rate = datetime.datetime.now()
+        flexible_price.date_exchange_rate = datetime.now()
         flexible_price.cms_submission = form_submission
         flexible_price.tier = tier
         flexible_price.justification = ""
