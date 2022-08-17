@@ -3,11 +3,13 @@ import React from "react"
 const { useState } = React;
 import {
     Select,
-    Modal
+    Modal,
+    Input
 } from "@pankod/refine-antd";
 
-import {IDiscount, IFlexiblePriceRequest, IFlexiblePriceStatusModalProps} from "interfaces";
-import {formatDiscount, formatIncome} from "utils";
+import { IDiscount, IFlexiblePriceRequest, IFlexiblePriceStatusModalProps } from "interfaces";
+import { formatDiscount } from "utils";
+import { financialAssistanceRequestStatus } from "../../constants";
 
 const All_Justifications = [
     {
@@ -42,9 +44,11 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
     const { open: displayToast } = useNotification();
     const mutationResult = useUpdate<IFlexiblePriceRequest>();
     const { mutate } = mutationResult;
+    let [ emailSubject, setEmailSubject ] = useState("");
+    let [ emailBody, setEmailBody ] = useState("");
 
     let [ justification, setJustification ] = useState(modaldata.justification);
-    !justification && status === "approved" ? setJustification("Documents in order") : null
+    !justification && status === financialAssistanceRequestStatus.approved ? setJustification("Documents in order") : null
 
     const [ discount, setDiscount ] = useState(modaldata.discount);
     let discount_choices = [];
@@ -61,17 +65,6 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
         onClose();
     }
 
-    const handleChangeJustification = (e: string) => {
-        setJustification(e);
-    }
-
-    const handleChangeDiscount = (e: number) => {
-        const selected_discount_label = modaldata.applicable_discounts.find(discount_option => {
-            return discount_option.id === e
-        })
-        setDiscount(selected_discount_label as IDiscount);
-    }
-
     const handleOk = () => {
         if (justification.length === 0) {
             displayToast({
@@ -85,9 +78,28 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
             return;
         }
 
-        const sendableData = { ...modaldata, status: status, justification: justification, discount: discount };
+        if (status === financialAssistanceRequestStatus.denied && (emailBody.length === 0 || emailSubject.length === 0)) {
+            displayToast({
+                message: "Please add email subject and body.",
+                description: "Error",
+                key: "bad-email-content-error",
+                type: "error",
+                undoableTimeout: 3000,
+            });
 
-        mutate({ 
+            return;
+        }
+
+        const sendableData = {
+            ...modaldata,
+            status: status,
+            justification: justification,
+            discount: discount,
+            email_subject: emailSubject,
+            email_body: emailBody
+        };
+
+        mutate({
             resource: "flexible_pricing/applications_admin",
             id: sendableData.id,
             mutationMode: "undoable",
@@ -96,11 +108,29 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
         handleCancel();
     }
 
+    const handleChangeJustification = (e: string) => {
+        setJustification(e);
+    }
+
+    const handleChangeDiscount = (e: number) => {
+        const selected_discount_label = modaldata.applicable_discounts.find(discount_option => {
+            return discount_option.id === e
+        })
+        setDiscount(selected_discount_label as IDiscount);
+    }
+
+    const handleChangeEmailSubject = (e: string) => {
+        setEmailSubject(e);
+    }
+
+    const handleChangeEmailBody = (e: string) => {
+        setEmailBody(e);
+    }
+
     return (
         <Modal title="Flexible Pricing | Management" visible={true} onOk={() => handleOk()} onCancel={handleCancel}>
             <div>
-                <strong>Are you sure you want to <u>{status == "denied" ? "deny": String(status).replace(/d|ped$/, '') }</u> the request?</strong>
-                {status == "denied" ? <div>User will be notified by email of the denial </div> : null}
+                <strong>Are you sure you want to <u>{status == financialAssistanceRequestStatus.denied ? "deny": String(status).replace(/d|ped$/, '') }</u> the request?</strong>
             </div>
             <br></br>
             <p>
@@ -112,25 +142,9 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
                 <div>{modaldata.status}</div>
             </p>
             <p>
-                <strong>Income USD:</strong>
-                <div>{formatIncome(modaldata.income.income_usd, "USD")}</div>
-            </p>
-            <p>
-                <strong>Original Income:</strong>
-                <div>{formatIncome(modaldata.income.original_income, modaldata.income.original_currency)}</div>
-            </p>
-            <p>
-                <strong>Original Currency:</strong>
-                <div>{modaldata.income.original_currency}</div>
-            </p>
-            <p>
-                <strong>Country of Income:</strong>
-                <div>{modaldata.country_of_income}</div>
-            </p>
-            <p>
                 <span><strong>Discount:</strong></span>
                 {
-                    status !== "approved" ?
+                    status !== financialAssistanceRequestStatus.approved ?
                         <div>{ formatDiscount(modaldata.discount) }</div> :
                         <Select
                             onChange={(e) => handleChangeDiscount(e)}
@@ -153,6 +167,19 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
                 >
                 </Select>
             </p>
+            {status === financialAssistanceRequestStatus.denied ? (
+                <div>
+                    <div>
+                        <strong>Email Subject:</strong>
+                        <Input value={emailSubject} onChange={(e) => handleChangeEmailSubject(e.target.value)}/>
+                    </div>
+                    <div>
+                        <strong>Email Body:</strong>
+                        <textarea rows={4} className="email-subject" value={emailBody} onChange={(e) => handleChangeEmailBody(e.target.value)}/>
+                    </div>
+                </div>
+            ) : null}
+
         </Modal>
     );
 }

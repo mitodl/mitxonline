@@ -8,7 +8,11 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
 from flexiblepricing import models, serializers
-from flexiblepricing.tasks import notify_flexible_price_status_change_email
+from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.tasks import (
+    notify_financial_assistance_request_denied_email,
+    notify_flexible_price_status_change_email,
+)
 from main.views import RefinePagination
 
 
@@ -67,5 +71,16 @@ class FlexiblePriceAdminViewSet(ModelViewSet):
             update_result = super().update(request, *args, **kwargs)
 
             # Send email notification
-            notify_flexible_price_status_change_email.delay(self.get_object().id)
+            financial_assistance_request = self.get_object()
+            if financial_assistance_request.status != FlexiblePriceStatus.DENIED:
+                notify_flexible_price_status_change_email.delay(
+                    financial_assistance_request.id
+                )
+                return update_result
+
+            email_subject = request.data.get("email_subject", None)
+            email_body = request.data.get("email_body", None)
+            notify_financial_assistance_request_denied_email.delay(
+                financial_assistance_request.id, email_subject, email_body
+            )
             return update_result

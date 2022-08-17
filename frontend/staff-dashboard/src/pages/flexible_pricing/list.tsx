@@ -21,6 +21,7 @@ import {
 import { IFlexiblePriceRequest, IFlexiblePriceRequestFilters } from "interfaces";
 import { FlexiblePricingStatusModal } from "components/flexiblepricing/statusmodal";
 import { formatDiscount, formatIncome } from "utils";
+import { financialAssistanceRequestStatus } from "../../constants";
 
 const FlexiblePricingStatuses = [
     {
@@ -187,18 +188,18 @@ export const FlexiblePricingList: React.FC = () => {
                                             <Space>
                                                 <Button
                                                     type="primary"
-                                                    onClick={() => showModal(record, "approved")}
+                                                    onClick={() => showModal(record, financialAssistanceRequestStatus.approved)}
                                                 >
                                                     Approve
                                                 </Button>
                                                 <Button
                                                     type="dashed"
-                                                    onClick={() => showModal(record, "reset")}
+                                                    onClick={() => showModal(record, financialAssistanceRequestStatus.reset)}
                                                 >
                                                     Reset
                                                 </Button>
                                                 <Button danger
-                                                    onClick={() => showModal(record, "denied")}
+                                                    onClick={() => showModal(record, financialAssistanceRequestStatus.denied)}
                                                 >
                                                     Deny
                                                 </Button>
