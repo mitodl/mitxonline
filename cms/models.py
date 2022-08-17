@@ -42,7 +42,7 @@ from wagtail.contrib.forms.models import (
 from django.core.serializers.json import DjangoJSONEncoder
 
 from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
-from cms.constants import COURSE_INDEX_SLUG
+from cms.constants import COURSE_INDEX_SLUG, PROGRAM_INDEX_SLUG
 from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset
 from courses.models import Course, Program
 from main.views import get_base_context
@@ -295,6 +295,16 @@ class CourseIndexPage(CourseObjectIndexPage):
         return self.get_children().get(coursepage__course__readable_id=readable_id)
 
 
+class ProgramIndexPage(CourseObjectIndexPage):
+    """Index page for ProgramPages."""
+
+    slug = PROGRAM_INDEX_SLUG
+
+    def get_child_by_readable_id(self, readable_id):
+        """Fetch a child page by the related Program's readable_id value"""
+        return self.get_children().get(programpage__program__readable_id=readable_id)
+
+
 class ProductPage(Page):
     """
     Abstract detail page for course runs and any other "product" that a user can enroll in
@@ -518,6 +528,63 @@ class CoursePage(ProductPage):
     ] + ProductPage.content_panels
 
 
+class ProgramPage(ProductPage):
+    """
+    Detail page for programs
+    """
+
+    parent_page_types = ["ProgramIndexPage"]
+    subpage_types = ["FlexiblePricingRequestForm"]
+
+    program = models.OneToOneField(
+        "courses.Program", null=True, on_delete=models.SET_NULL, related_name="page"
+    )
+
+    search_fields = Page.search_fields + [
+        index.RelatedFields(
+            "program",
+            [
+                index.SearchField("readable_id", partial_match=True),
+            ],
+        )
+    ]
+
+    @property
+    def product(self):
+        """Gets the product associated with this page"""
+        return self.program
+
+    template = "product_page.html"
+
+    def get_admin_display_title(self):
+        """Gets the title of the course in the specified format"""
+        return f"{self.program.readable_id} | {self.title}"
+
+    def get_context(self, request, *args, **kwargs):
+        relevant_run = None
+        is_enrolled = False
+        sign_in_url = (
+            None
+            if request.user.is_authenticated
+            else f'{reverse("login")}?next={quote_plus(self.get_url())}'
+        )
+        start_date = None
+        can_access_edx_course = False
+        return {
+            **super().get_context(request, *args, **kwargs),
+            **get_base_context(request),
+            "run": relevant_run,
+            "is_enrolled": is_enrolled,
+            "sign_in_url": sign_in_url,
+            "start_date": start_date,
+            "can_access_edx_course": can_access_edx_course,
+        }
+
+    content_panels = [
+        FieldPanel("program"),
+    ] + ProductPage.content_panels
+
+
 class ResourcePage(Page):
     """
     Basic resource page class for pages containing basic information (FAQ, etc.)
@@ -632,7 +699,12 @@ class FlexiblePricingRequestForm(AbstractForm):
         FieldPanel("application_denied_text"),
     ]
 
-    parent_page_types = ["cms.HomePage", "cms.ResourcePage", "cms.CoursePage"]
+    parent_page_types = [
+        "cms.HomePage",
+        "cms.ResourcePage",
+        "cms.CoursePage",
+        "cms.ProgramPage",
+    ]
 
     form_builder = FlexiblePricingFormBuilder
     template = "flexiblepricing/flexible_pricing_request_form.html"
@@ -650,14 +722,15 @@ class FlexiblePricingRequestForm(AbstractForm):
         course or program in the system. This looks at that and grabs the
         appropriate course page back (since get_parent returns a Page).
 
-        Returns: CoursePage, or None if not found
+        Returns: CoursePage, ProgramPage, or None if not found
         """
-        # When program pages are in place, this should have some logic added to
-        # grab other product types (program runs specifically).
+
         parent_page = self.get_parent()
         if CoursePage.objects.filter(page_ptr=parent_page).exists():
-            coursepage = CoursePage.objects.filter(page_ptr=parent_page).get()
-            return coursepage
+            return CoursePage.objects.filter(page_ptr=parent_page).get()
+
+        if ProgramPage.objects.filter(page_ptr=parent_page).exists():
+            return ProgramPage.objects.filter(page_ptr=parent_page).get()
 
         return None
 
@@ -690,6 +763,8 @@ class FlexiblePricingRequestForm(AbstractForm):
                 return self.selected_course.program
 
             return self.selected_course
+        elif isinstance(self.get_parent_product_page(), ProgramPage):
+            return self.get_parent_product_page().program
         else:
             parent_page_course = self.get_parent_product_page().course
             return (

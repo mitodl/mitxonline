@@ -16,7 +16,7 @@ from django.conf.urls import url
 from wagtail.core import views
 from wagtail.core.utils import WAGTAIL_APPEND_SLASH
 
-from cms.constants import COURSE_INDEX_SLUG
+from cms.constants import COURSE_INDEX_SLUG, PROGRAM_INDEX_SLUG
 
 
 detail_path_char_pattern = r"\w\-\.+:"
@@ -28,10 +28,26 @@ if WAGTAIL_APPEND_SLASH:
             resource_pattern=detail_path_char_pattern,
         )
     )
+
+    program_custom_serve_pattern = (
+        r"^({index_page_pattern}/(?:[{resource_pattern}]+/)*)$".format(
+            index_page_pattern=PROGRAM_INDEX_SLUG,
+            resource_pattern=detail_path_char_pattern,
+        )
+    )
 else:
     custom_serve_pattern = r"^({index_page_pattern}/[{resource_pattern}/]*)$".format(
         index_page_pattern=COURSE_INDEX_SLUG, resource_pattern=detail_path_char_pattern
     )
+    program_custom_serve_pattern = (
+        r"^({index_page_pattern}/[{resource_pattern}/]*)$".format(
+            index_page_pattern=PROGRAM_INDEX_SLUG,
+            resource_pattern=detail_path_char_pattern,
+        )
+    )
 
 
-urlpatterns = [url(custom_serve_pattern, views.serve, name="wagtail_serve_custom")]
+urlpatterns = [
+    url(custom_serve_pattern, views.serve, name="wagtail_serve_custom"),
+    url(program_custom_serve_pattern, views.serve, name="wagtail_serve_custom"),
+]
