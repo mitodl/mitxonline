@@ -1014,6 +1014,12 @@ class FlexiblePricingRequestForm(AbstractForm):
         help_text="What to show if the user's request has been approved.",
         features=RICH_TEXT_FIELD_FEATURES,
     )
+    application_approved_no_discount_text = RichTextField(
+        null=True,
+        blank=True,
+        help_text="What to show if the user's request has been approved, but their discount is zero.",
+        features=RICH_TEXT_FIELD_FEATURES,
+    )
     application_denied_text = RichTextField(
         null=True,
         blank=True,
@@ -1029,6 +1035,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         InlinePanel("form_fields", label="Form Fields"),
         FieldPanel("application_processing_text"),
         FieldPanel("application_approved_text"),
+        FieldPanel("application_approved_no_discount_text"),
         FieldPanel("application_denied_text"),
     ]
 
