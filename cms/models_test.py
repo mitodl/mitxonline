@@ -27,6 +27,8 @@ from courses.factories import (
 )
 from flexiblepricing.models import FlexiblePrice
 from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.factories import FlexiblePriceTierFactory
+from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
 
 pytestmark = [pytest.mark.django_db]
 
@@ -388,3 +390,48 @@ def test_flex_pricing_single_submission(mocker, test_course_first):
     # should not get a form here - should get Application Processing
 
     assert "Application Processing" in response.rendered_content
+
+
+def test_flex_pricing_form_state_display_no_discount_tier(mocker):
+    """
+    Tests the status display when the user is assigned to the no-discount tier.
+    """
+
+    course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
+    flex_form = FlexiblePricingFormFactory(
+        selected_course=course_page.course,
+        application_approved_no_discount_text="No Discount Text",
+        application_approved_text="Application Approved",
+    )
+    tier = FlexiblePriceTierFactory(
+        courseware_object=course_page.course.program, discount__amount=0
+    )
+    other_tier = FlexiblePriceTierFactory(
+        courseware_object=course_page.course.program,
+        discount__amount=50,
+        discount__discount_type=DISCOUNT_TYPE_FIXED_PRICE,
+    )
+
+    request_user = UserFactory.create()
+    submission = FlexiblePricingRequestSubmission.objects.create(
+        form_data=json.dumps([]), page=flex_form, user=request_user
+    )
+    flexprice = FlexiblePrice.objects.create(
+        user=request_user,
+        cms_submission=submission,
+        status=FlexiblePriceStatus.APPROVED,
+        courseware_object=course_page.course.program,
+        tier=tier,
+    )
+
+    response = generate_flexible_pricing_response(request_user, flex_form)
+
+    assert "No Discount Text" in response.rendered_content
+
+    flexprice.tier = other_tier
+    flexprice.save()
+    flexprice.refresh_from_db()
+
+    response = generate_flexible_pricing_response(request_user, flex_form)
+
+    assert "Approved" in response.rendered_content
