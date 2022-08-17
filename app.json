@@ -99,6 +99,14 @@
       "description": "Timeout (in seconds) for requests made via the edX API client",
       "required": false
     },
+    "FASTLY_AUTH_TOKEN": {
+      "description": "Optional token for the Fastly purge API.",
+      "required": false
+    },
+    "FASTLY_URL": {
+      "description": "The URL to the Fastly API.",
+      "required": false
+    },
     "GA_TRACKING_ID": {
       "description": "Google analytics tracking ID",
       "required": false
