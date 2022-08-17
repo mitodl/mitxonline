@@ -25,8 +25,6 @@ from wagtail.documents import urls as wagtaildocs_urls
 
 from main.views import cms_signin_redirect_to_site_signin, index, refine
 
-WAGTAIL_IMG_CACHE_AGE = 31_536_000  # 1 year
-
 handler500 = "main.views.handler500"
 handler404 = "main.views.handler404"
 
