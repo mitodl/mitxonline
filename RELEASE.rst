@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+Version 0.41.2
+--------------
+
+- feat: Add Certificate Template using Wagtail CMS (#740)
+- feat: add course run upgrade deadline (#820)
+- Online-841 Adds support for Financial Assistance Request denied email (#851)
+- Online-839 Improve Financial Assistance Request List View (#845)
+- Adds program pages to the CMS
+- Bump django from 3.2.14 to 3.2.15 (#824)
+- Online-843 Fix import and reset state bugs for financial assistance (#844)
+- Online-829 Open program drawer when program title is clicked (#846)
+- Update (#835)
+- Online-815 Fix styling for income field (#833)
+
 Version 0.41.1 (Released August 17, 2022)
 --------------
 
