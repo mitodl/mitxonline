@@ -224,7 +224,7 @@ def establish_basket(request):
     return basket
 
 
-def refund_order(*, order_id: int = None, reference_number=None, **kwargs):
+def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs):
     """
     A function that performs refund for a given order id
 
@@ -250,19 +250,19 @@ def refund_order(*, order_id: int = None, reference_number=None, **kwargs):
         elif order_id is not None:
             order = FulfilledOrder.objects.select_for_update().get(pk=order_id)
         else:
-            log.debug(
-                f"Either order_id or reference_number is required to fetch the Order. "
+            log.error(
+                "Either order_id or reference_number is required to fetch the Order."
             )
             return False
         if order.state != Order.STATE.FULFILLED:
-            log.debug(f"Order with order_id {order.id} is not in fulfilled state.")
+            log.debug("Order with order_id %s is not in fulfilled state.", order.id)
             return False
 
-        order_recent_transaction = Transaction.objects.filter(order=order.id).first()
+        order_recent_transaction = order.transactions.first()
 
         if not order_recent_transaction:
             log.error(
-                f"There is no associated transaction against order_id {order.id}."
+                "There is no associated transaction against order_id %s", order.id
             )
             return False
 
@@ -296,7 +296,8 @@ def refund_order(*, order_id: int = None, reference_number=None, **kwargs):
 
             else:
                 log.error(
-                    f"There was an error with the Refund API request {response.message}"
+                    "There was an error with the Refund API request %s",
+                    response.message,
                 )
                 # PaymentGateway didn't raise an exception and instead gave a Response but the response status was not
                 # success so we manually rollback the transaction in this case.
@@ -306,7 +307,7 @@ def refund_order(*, order_id: int = None, reference_number=None, **kwargs):
 
         except RefundDuplicateException:
             # Duplicate refund error during the API call will be treated as success, we just log it
-            log.info(f"Duplicate refund request for order_id {order.id}")
+            log.info("Duplicate refund request for order_id %s", order.id)
 
     # If unenroll requested, perform unenrollment after successful refund
     if unenroll:
