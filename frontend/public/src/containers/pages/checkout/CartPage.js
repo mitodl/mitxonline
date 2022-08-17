@@ -157,7 +157,12 @@ export class CartPage extends React.Component<Props, CartState> {
 
   renderFinancialAssistanceOffer() {
     const { cartItems, discounts } = this.props
-    const userFlexiblePriceExists = discounts && discounts.length > 0 ? discounts.find(discount => discount.for_flexible_pricing === true) : false
+    let userFlexiblePriceExists = false
+    // Check if there are any discounts, and if those discounts are for flexible pricing.
+    if ((discounts && discounts.length > 0) && typeof discounts.find(discount => discount.for_flexible_pricing === true) !== "undefined") {
+      userFlexiblePriceExists = true
+    }
+
     if (cartItems && cartItems.length > 0 && userFlexiblePriceExists === false) {
       if (isFinancialAssistanceAvailable(cartItems[0].product.purchasable_object.course)) {
         return (
