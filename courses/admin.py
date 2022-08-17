@@ -11,6 +11,7 @@ from django.contrib.admin.decorators import display
 from courses.models import (
     Course,
     CourseRun,
+    CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunEnrollmentAudit,
     CourseRunGrade,
@@ -343,6 +344,33 @@ class PaidCourseRunAdmin(TimestampedModelAdmin):
         return obj.order.state
 
 
+class CourseRunCertificateAdmin(TimestampedModelAdmin):
+    """Admin for CourseRunCertificate"""
+
+    model = CourseRunCertificate
+    include_timestamps_in_list = True
+    list_display = ["uuid", "user", "course_run", "get_revoked_state"]
+    search_fields = [
+        "course_run__courseware_id",
+        "course_run__title",
+        "user__username",
+        "user__email",
+    ]
+    raw_id_fields = ("user",)
+
+    def get_revoked_state(self, obj):
+        """return the revoked state"""
+        return obj.is_revoked is not True
+
+    get_revoked_state.short_description = "Active"
+    get_revoked_state.boolean = True
+
+    def get_queryset(self, request):
+        return self.model.all_objects.get_queryset().select_related(
+            "user", "course_run"
+        )
+
+
 admin.site.register(Program, ProgramAdmin)
 admin.site.register(ProgramRun, ProgramRunAdmin)
 admin.site.register(Course, CourseAdmin)
@@ -356,3 +384,4 @@ admin.site.register(CourseRunGradeAudit, CourseRunGradeAuditAdmin)
 admin.site.register(CourseTopic, CourseTopicAdmin)
 admin.site.register(BlockedCountry, BlockedCountryAdmin)
 admin.site.register(PaidCourseRun, PaidCourseRunAdmin)
+admin.site.register(CourseRunCertificate, CourseRunCertificateAdmin)

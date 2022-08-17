@@ -3,6 +3,7 @@ Course models
 """
 import logging
 import operator as op
+import uuid
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
@@ -30,6 +31,19 @@ from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 User = get_user_model()
 
 log = logging.getLogger(__name__)
+
+
+class ActiveCertificates(models.Manager):
+    """
+    Return the active certificates only
+    """
+
+    def get_queryset(self):
+        """
+        Returns:
+            QuerySet: queryset for un-revoked certificates
+        """
+        return super().get_queryset().filter(is_revoked=False)
 
 
 class ProgramQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
@@ -504,6 +518,78 @@ class CourseRun(TimestampedModel):
             force_update=force_update,
             using=using,
             update_fields=update_fields,
+        )
+
+
+class BaseCertificate(models.Model):
+    """
+    Common properties for certificate models
+    """
+
+    user = models.ForeignKey(User, null=False, on_delete=models.CASCADE)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    is_revoked = models.BooleanField(
+        default=False,
+        help_text="Indicates whether or not the certificate is revoked",
+        verbose_name="revoked",
+    )
+
+    class Meta:
+        abstract = True
+
+    def get_certified_object_id(self):
+        """Gets the id of the certificate's program/run"""
+        raise NotImplementedError
+
+    def get_courseware_object_readable_id(self):
+        """Get the readable id of the certificate's run/program"""
+        return NotImplementedError
+
+
+class CourseRunCertificate(TimestampedModel, BaseCertificate):
+    """
+    Model for storing course run certificates
+    """
+
+    course_run = models.ForeignKey(CourseRun, null=False, on_delete=models.CASCADE)
+
+    objects = ActiveCertificates()
+    all_objects = models.Manager()
+
+    class Meta:
+        unique_together = ("user", "course_run")
+
+    def get_certified_object_id(self):
+        return self.course_run_id
+
+    def get_courseware_object_id(self):
+        """Gets the course id instead of the course run id"""
+        return self.course_run.course_id
+
+    def get_courseware_object_readable_id(self):
+        return self.course_run.courseware_id
+
+    @property
+    def link(self):
+        """
+        Get the link at which this certificate will be served
+        Format: /certificate/<uuid>/
+        Example: /certificate/93ebd74e-5f88-4b47-bb09-30a6d575328f/
+        """
+        return "/certificate/{}/".format(str(self.uuid))
+
+    @property
+    def start_end_dates(self):
+        """Returns the start and end date for courseware object duration"""
+        return self.course_run.start_date, self.course_run.end_date
+
+    def __str__(self):
+        return (
+            'CourseRunCertificate for user={user}, run={course_run} ({uuid})"'.format(
+                user=self.user.username,
+                course_run=self.course_run.text_id,
+                uuid=self.uuid,
+            )
         )
 
 
