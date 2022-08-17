@@ -538,6 +538,7 @@ class CheckoutProductView(LoginRequiredMixin, RedirectView):
                 user=self.request.user
             )
             basket.basket_items.all().delete()
+            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
             # Incoming product ids from internal checkout
             all_product_ids = self.request.GET.getlist("product_id")
