@@ -374,10 +374,6 @@ class CertificatePage(CourseProgramChildPage):
         # The share image url needs to be absolute
         return {
             "site_name": settings.SITE_NAME,
-            "share_image_url": urljoin(
-                request.build_absolute_uri("///"),
-                static("images/certificates/share-image.png"),
-            ),
             "share_image_width": "1665",
             "share_image_height": "1291",
             "share_text": "I just earned a certificate in {} from {}".format(

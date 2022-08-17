@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("courses", "0016_add_productpage_and_base_tables"),
+        ("courses", "0017_add_upgrade_deadline"),
     ]
 
     operations = [
