@@ -77,6 +77,7 @@ class CourseRunAdmin(TimestampedModelAdmin):
         "start_date",
         "end_date",
         "enrollment_start",
+        "upgrade_deadline",
     )
     list_filter = ["live", "course"]
     raw_id_fields = ("course",)

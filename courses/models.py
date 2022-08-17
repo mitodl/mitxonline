@@ -370,6 +370,13 @@ class CourseRun(TimestampedModel):
         db_index=True,
         help_text="The date beyond which the learner should not see link to this course run on their dashboard.",
     )
+    upgrade_deadline = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="The date beyond which the learner can not enroll in paid course mode.",
+    )
+
     live = models.BooleanField(default=False)
     products = GenericRelation("ecommerce.Product", related_query_name="courseruns")
 
@@ -426,6 +433,14 @@ class CourseRun(TimestampedModel):
             and self.start_date <= now
             and (self.end_date is None or self.end_date > now)
         )
+
+    @property
+    def is_upgradable(self):
+        """
+        Checks if the course can be upgraded
+        A null value means that the upgrade window is always open
+        """
+        return self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
 
     @property
     def courseware_url(self):

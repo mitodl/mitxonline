@@ -3,19 +3,12 @@
 import React from "react"
 
 import { assert } from "chai"
-import moment from "moment"
-import sinon from "sinon"
-import { Formik } from "formik"
 import { shallow } from "enzyme"
 
-import EnrolledItemCard, {
-  EnrolledItemCard as InnerEnrolledItemCard
-} from "./EnrolledItemCard"
-import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../constants"
-import { formatPrettyDateTimeAmPmTz } from "../lib/util"
-import { shouldIf, isIf } from "../lib/test_utils"
+import EnrolledItemCard from "./EnrolledItemCard"
+import { shouldIf } from "../lib/test_utils"
 import IntegrationTestHelper from "../util/integration_test_helper"
-import { makeCourseRunEnrollment } from "../factories/course"
+import { makeCourseRunEnrollment, makeCourseRunEnrollmentWithProduct } from "../factories/course"
 import { makeUser } from "../factories/user"
 import * as courseApi from "../lib/courseApi"
 
@@ -25,8 +18,8 @@ describe("EnrolledItemCard", () => {
     userEnrollment,
     currentUser,
     isLinkableStub,
-    enrollmentCardProps,
-    isFinancialAssistanceAvailableStub
+    enrollmentCardProps
+
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
@@ -70,15 +63,46 @@ describe("EnrolledItemCard", () => {
     helper.cleanup()
   })
 
-  it("renders the card", async () => {
-    const inner = await renderedCard()
-    const enrolledItems = inner.find(".enrolled-item")
-    assert.lengthOf(enrolledItems, 1)
-    const enrolledItem = enrolledItems.at(0)
-    assert.equal(
-      enrolledItem.find("h2").text(),
-      userEnrollment.run.course.title
-    )
+  ;[
+    "audit",
+    "verified"
+  ].forEach(([mode]) => {
+    it("renders the card", async () => {
+      const testEnrollment = makeCourseRunEnrollmentWithProduct()
+      userEnrollment = testEnrollment
+      enrollmentCardProps.enrollment = testEnrollment
+      const inner = await renderedCard()
+      const enrolledItems = inner.find(".enrolled-item")
+      assert.lengthOf(enrolledItems, 1)
+      const enrolledItem = enrolledItems.at(0)
+      assert.equal(
+        enrolledItem.find("h2").text(),
+        userEnrollment.run.course.title
+      )
+      if (mode === "verified") {
+        const pricingLinks = inner.find(".pricing-links")
+        assert.isFalse(pricingLinks.exists())
+      }
+    })
+  })
+
+  ;[
+    "audit",
+    "verified"
+  ].forEach(([mode]) => {
+    it("does not render the pricing links when upgrade deadline has passed", async () => {
+      enrollmentCardProps.enrollment.enrollment_mode = mode
+      const inner = await renderedCard()
+      const enrolledItems = inner.find(".enrolled-item")
+      assert.lengthOf(enrolledItems, 1)
+      const enrolledItem = enrolledItems.at(0)
+      assert.equal(
+        enrolledItem.find("h2").text(),
+        userEnrollment.run.course.title
+      )
+      const pricingLinks = inner.find(".pricing-links")
+      assert.isFalse(pricingLinks.exists())
+    })
   })
 
   it("renders the unenrollment verification modal", async () => {

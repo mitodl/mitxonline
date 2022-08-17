@@ -1,6 +1,6 @@
 /* global SETTINGS: false */
 // @flow
-import { assert, expect } from "chai"
+import { assert } from "chai"
 
 import IntegrationTestHelper from "../util/integration_test_helper"
 import ProductDetailEnrollApp, {
@@ -314,5 +314,22 @@ describe("ProductDetailEnrollApp", () => {
         "9"
       )
     })
+  })
+
+  it(`shows form based enrollment button when upgrade deadline has passed but course is within enrollment period`, async () => {
+    isWithinEnrollmentPeriodStub.returns(true)
+    courseRun.is_upgradable = false
+    SETTINGS.features.upgrade_dialog = true
+    const { inner } = await renderPage()
+
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/course_runs/?relevant_to=",
+      "GET"
+    )
+    sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+
+    const enrollBtn = inner.find("form > button.enroll-now")
+    assert.isTrue(enrollBtn.exists())
   })
 })

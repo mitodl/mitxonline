@@ -18,6 +18,7 @@ from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
 )
 
 from mitol.payment_gateway.api import (
@@ -50,6 +51,7 @@ log = logging.getLogger(__name__)
 
 def generate_checkout_payload(request):
     basket = Basket.objects.filter(user=request.user).get()
+
     if basket.has_user_blocked_products(request.user):
         return {
             "country_blocked": True,
@@ -65,6 +67,15 @@ def generate_checkout_payload(request):
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},
+            ),
+        }
+
+    if basket.has_user_purchased_non_upgradable_courserun():
+        return {
+            "purchased_non_upgradeable_courserun": True,
+            "response": redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_COURSE_NON_UPGRADABLE},
             ),
         }
 

@@ -575,6 +575,8 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             return checkout_payload["response"]
         if "purchased_same_courserun" in checkout_payload:
             return checkout_payload["response"]
+        if "purchased_non_upgradeable_courserun" in checkout_payload:
+            return checkout_payload["response"]
 
         return render(
             request,
