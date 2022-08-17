@@ -55,7 +55,7 @@ from cms.constants import (
     COURSE_INDEX_SLUG,
     PROGRAM_INDEX_SLUG,
     CERTIFICATE_INDEX_SLUG,
-    SIGNATORY_INDEX_SLUG
+    SIGNATORY_INDEX_SLUG,
 )
 from cms.forms import CertificatePageForm
 from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset

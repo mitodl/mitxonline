@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("courses", "0014_alter_courserun_run_tag"),
+        ("courses", "0016_add_productpage_and_base_tables"),
     ]
 
     operations = [
