@@ -163,6 +163,9 @@ def apply_user_discounts(request):
     user = request.user
     discount = None
 
+    BasketDiscount.objects.filter(
+        redeemed_basket=basket, redeemed_discount__for_flexible_pricing=True
+    ).delete()
     if BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0:
         return
 
