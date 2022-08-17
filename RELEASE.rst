@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.41.1
+Version 0.41.1 (Released August 17, 2022)
 --------------
 
 - Fixes some conditionals to return good values if there's no CMS page for a courseware object
