@@ -897,8 +897,6 @@ class FlexiblePricingRequestForm(AbstractForm):
             return super().get_url_parts(request=request)
 
         url_parts = self.get_parent_product_page().get_url_parts(request=request)
-        print("CP ", self.get_parent_product_page().url_path)
-        print("CP ", Site.get_site_root_paths())
         if not url_parts:
             return None
 

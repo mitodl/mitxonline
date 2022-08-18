@@ -1,6 +1,8 @@
 """
 Tests for cms serializers
 """
+from cms.models import FlexiblePricingRequestForm
+import pytest
 from cms.factories import (
     CoursePageFactory,
     FlexiblePricingFormFactory,
@@ -9,9 +11,14 @@ from cms.factories import (
 from cms.serializers import CoursePageSerializer
 from courses.factories import CourseFactory, ProgramFactory
 from main.test_utils import assert_drf_json_equal
+from django.test.client import RequestFactory
+
+pytestmark = [pytest.mark.django_db]
 
 
-def test_serialize_course_page(mocker, mock_context):
+def test_serialize_course_page(
+    mocker, fully_configured_wagtail, staff_user, mock_context
+):
     """
     Tests course page serialization with Financial Assistance form with a parent-child relationship
     with a course, but no program.
@@ -21,23 +28,35 @@ def test_serialize_course_page(mocker, mock_context):
         "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
     )
 
-    financial_assistance_form = FlexiblePricingFormFactory()
-    course_page = financial_assistance_form.get_parent()
-    course_page.product.program = None
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = staff_user
 
-    data = CoursePageSerializer(instance=course_page).data
+    course_page = CoursePageFactory()
+    course_page.product.program = None
+    FlexiblePricingFormFactory(parent=course_page)
+
+    financial_assistance_page = (
+        course_page.get_children().type(FlexiblePricingRequestForm).live().first()
+    )
+
+    data = CoursePageSerializer(
+        instance=course_page, context=course_page.get_context(request)
+    ).data
     assert_drf_json_equal(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": None,
-            "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
+            "page_url": course_page.url,
+            "financial_assistance_form_url": financial_assistance_page.get_url(),
         },
     )
     patched_get_wagtail_src.assert_called_once_with(course_page.feature_image)
 
 
-def test_serialize_course_page_with_flex_price_with_program_fk(mocker, mock_context):
+def test_serialize_course_page_with_flex_price_with_program_fk(
+    mocker, fully_configured_wagtail, staff_user, mock_context
+):
     """
     Tests course page serialization with Financial Assistance form which has a fk relationship to
     a program, but no parent-child relationship with any course or program.
@@ -53,19 +72,25 @@ def test_serialize_course_page_with_flex_price_with_program_fk(mocker, mock_cont
     course = CourseFactory(program=program)
     course_page = CoursePageFactory(course=course)
 
-    data = CoursePageSerializer(instance=course_page).data
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = staff_user
+
+    data = CoursePageSerializer(
+        instance=course_page, context=course_page.get_context(request)
+    ).data
     assert_drf_json_equal(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": None,
-            "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_form.slug}/",
+            "page_url": course_page.url,
+            "financial_assistance_form_url": financial_assistance_form.get_url(),
         },
     )
 
 
 def test_serialize_course_page_with_flex_price_form_as_program_child(
-    mocker, mock_context
+    mocker, fully_configured_wagtail, staff_user, mock_context
 ):
     """
     Tests course page serialization with Financial Assistance form which has no fk relationship
@@ -76,23 +101,31 @@ def test_serialize_course_page_with_flex_price_form_as_program_child(
 
     program = ProgramFactory()
     program_page = ProgramPageFactory(program=program)
-    financial_assistance_form = FlexiblePricingFormFactory(parent=program_page)
+    FlexiblePricingFormFactory(parent=program_page)
     course = CourseFactory(program=program)
     course_page = CoursePageFactory(course=course)
 
-    data = CoursePageSerializer(instance=course_page).data
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = staff_user
+    financial_assistance_page = (
+        program_page.get_children().type(FlexiblePricingRequestForm).live().first()
+    )
+    data = CoursePageSerializer(
+        instance=course_page, context=program_page.get_context(request)
+    ).data
     assert_drf_json_equal(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": None,
-            "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_form.slug}/",
+            "page_url": course_page.url,
+            "financial_assistance_form_url": financial_assistance_page.get_url(),
         },
     )
 
 
 def test_serialize_course_page_with_flex_price_form_as_child_no_program(
-    mocker, mock_context
+    mocker, fully_configured_wagtail, staff_user, mock_context
 ):
     """
     Tests course page serialization with Financial Assistance form with a fk relationship with a course
@@ -107,12 +140,18 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
         selected_course_id=course.id, parent=course_page
     )
 
-    data = CoursePageSerializer(instance=course_page).data
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = staff_user
+
+    data = CoursePageSerializer(
+        instance=course_page, context=course_page.get_context(request)
+    ).data
     assert_drf_json_equal(
         data,
         {
             "feature_image_src": fake_image_src,
-            "page_url": None,
-            "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
+            "page_url": course_page.url,
+            "financial_assistance_form_url": financial_assistance_form.get_url(),
         },
     )
