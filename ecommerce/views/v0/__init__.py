@@ -425,7 +425,7 @@ class CheckoutCallbackView(View):
         """
 
         order = api.get_order_from_cybersource_payment_response(request)
-        if order == None:
+        if order is None:
             return HttpResponse("Order not found")
         # We only want to process responses related to orders which are PENDING
         # otherwise we can conclude that we already received a resonse through
