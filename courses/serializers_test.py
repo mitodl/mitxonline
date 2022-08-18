@@ -163,9 +163,7 @@ def test_serialize_course_with_page_fields(
         financial_assistance_form = FlexiblePricingFormFactory()
         course_page = financial_assistance_form.get_parent()
         course_page.product.program = None
-        expected_financial_assistance_url = (
-            financial_assistance_form.get_url()
-        )
+        expected_financial_assistance_url = financial_assistance_form.get_url()
     else:
         course_page = CoursePageFactory.create()
         course_page.product.program = None
