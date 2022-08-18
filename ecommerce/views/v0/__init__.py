@@ -396,10 +396,7 @@ class CheckoutApiViewSet(ViewSet):
         except ObjectDoesNotExist:
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 
-        # don't auto-apply user discounts if they've added their own code
-        # this may need to be revisited
-        if BasketDiscount.objects.filter(redeemed_basket=basket).count() == 0:
-            api.apply_user_discounts(request)
+        api.apply_user_discounts(request)
 
         return Response(BasketWithProductSerializer(basket).data)
 
@@ -541,6 +538,7 @@ class CheckoutProductView(LoginRequiredMixin, RedirectView):
                 user=self.request.user
             )
             basket.basket_items.all().delete()
+            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
             # Incoming product ids from internal checkout
             all_product_ids = self.request.GET.getlist("product_id")
