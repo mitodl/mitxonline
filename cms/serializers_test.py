@@ -48,7 +48,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk(mocker, mock_cont
     program = ProgramFactory()
     program_page = ProgramPageFactory(program=program)
     financial_assistance_form = FlexiblePricingFormFactory(
-        selected_program_id=program.id, parent=None
+        selected_program_id=program.id, parent=program_page
     )
     course = CourseFactory(program=program)
     course_page = CoursePageFactory(course=course)
@@ -102,10 +102,10 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
     mocker.patch("cms.serializers.get_wagtail_img_src", return_value=fake_image_src)
 
     course = CourseFactory(program=None)
-    financial_assistance_form = FlexiblePricingFormFactory(
-        selected_course_id=course.id, parent=None
-    )
     course_page = CoursePageFactory(course=course)
+    financial_assistance_form = FlexiblePricingFormFactory(
+        selected_course_id=course.id, parent=course_page
+    )
 
     data = CoursePageSerializer(instance=course_page).data
     assert_drf_json_equal(

@@ -26,7 +26,7 @@ from wagtail.admin.edit_handlers import (
 )
 from wagtail.core.blocks import StreamBlock
 from wagtail.core.fields import RichTextField, StreamField
-from wagtail.core.models import Page, Orderable
+from wagtail.core.models import Page, Orderable, Site
 from wagtail.images.models import Image
 from wagtail.images.edit_handlers import ImageChooserPanel
 from wagtail.embeds.embeds import get_embed
@@ -897,6 +897,8 @@ class FlexiblePricingRequestForm(AbstractForm):
             return super().get_url_parts(request=request)
 
         url_parts = self.get_parent_product_page().get_url_parts(request=request)
+        print("CP ", self.get_parent_product_page().url_path)
+        print("CP ", Site.get_site_root_paths())
         if not url_parts:
             return None
 
