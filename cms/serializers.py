@@ -2,9 +2,11 @@
 from django.templatetags.static import static
 from rest_framework import serializers
 
+from django.contrib.contenttypes.models import ContentType
+
 from cms import models
 from cms.api import get_wagtail_img_src
-from cms.models import FlexiblePricingRequestForm
+from cms.models import FlexiblePricingRequestForm, ProgramPage
 from courses.constants import DEFAULT_COURSE_IMG_PATH
 
 
@@ -30,14 +32,34 @@ class CoursePageSerializer(serializers.ModelSerializer):
         """
         Returns URL of the Financial Assistance Form.
         """
-        financial_assistance_page = (
-            instance.get_children().type(FlexiblePricingRequestForm).live().first()
-        )
-        return (
-            f"{instance.get_url()}{financial_assistance_page.slug}/"
-            if financial_assistance_page
-            else ""
-        )
+        financial_assistance_page = None
+        if instance.product.program:
+            program_page = ProgramPage.objects.filter(
+                program_id=instance.product.program
+            ).first()
+
+            financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
+                selected_program=instance.product.program
+            ).first()
+            if financial_assistance_page is None:
+                financial_assistance_page = (
+                    program_page.get_children()
+                    .type(FlexiblePricingRequestForm)
+                    .live()
+                    .first()
+                )
+
+        if financial_assistance_page is None:
+            financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
+                selected_course=instance.product
+            ).first()
+
+        if financial_assistance_page is None:
+            financial_assistance_page = (
+                instance.get_children().type(FlexiblePricingRequestForm).live().first()
+            )
+
+        return financial_assistance_page.get_url() if financial_assistance_page else ""
 
     class Meta:
         model = models.CoursePage
