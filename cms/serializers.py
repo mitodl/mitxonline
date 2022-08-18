@@ -59,9 +59,7 @@ class CoursePageSerializer(serializers.ModelSerializer):
                 instance.get_children().type(FlexiblePricingRequestForm).live().first()
             )
 
-        return (
-            financial_assistance_page.get_url() if financial_assistance_page else ""
-        )
+        return financial_assistance_page.get_url() if financial_assistance_page else ""
 
     class Meta:
         model = models.CoursePage
