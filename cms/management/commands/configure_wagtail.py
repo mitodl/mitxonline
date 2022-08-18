@@ -5,6 +5,7 @@ from cms.api import (
     ensure_home_page_and_site,
     ensure_resource_pages,
     ensure_product_index,
+    ensure_program_product_index,
 )
 
 
@@ -17,3 +18,4 @@ class Command(BaseCommand):
         ensure_home_page_and_site()
         ensure_product_index()
         ensure_resource_pages()
+        ensure_program_product_index()

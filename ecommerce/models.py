@@ -81,9 +81,9 @@ class Product(TimestampedModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["object_id", "is_active"],
+                fields=["object_id", "is_active", "content_type"],
                 condition=models.Q(is_active=True),
-                name="unique_object_id_validated",
+                name="unique_purchasable_object",
             )
         ]
 
@@ -126,6 +126,21 @@ class Basket(TimestampedModel):
                     order__state__in=[Order.STATE.FULFILLED, Order.STATE.REVIEW],
                 ).exists():
                     return True
+
+        return False
+
+    def has_user_purchased_non_upgradable_courserun(self):
+        """
+        Return true if any of the courses in the basket can not be Upgraded/Purchased because of past upgrade_deadline
+        """
+        basket_items = self.basket_items.prefetch_related("product")
+        for item in basket_items:
+            purchased_object = item.product.purchasable_object
+            # If the upgrade_deadline has passed for a course it should not be purchased if it was in basket
+            return (
+                isinstance(purchased_object, CourseRun)
+                and not purchased_object.is_upgradable
+            )
 
         return False
 

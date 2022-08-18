@@ -6,3 +6,23 @@
 // https://github.com/ant-design/ant-design/blob/master/components/style/themes/default.less
 
 @primary-color: #A31F34;
+
+.income-usd {
+  max-width: 150px;
+  overflow-y: auto;
+  max-height: 100px;
+}
+
+.email-subject {
+  display: block;
+  padding: 4px 11px;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  width: 100%;
+
+  &:focus {
+    outline: none !important;
+    border-color: @primary-color;
+    box-shadow: 0 0 4px @primary-color;
+  }
+}

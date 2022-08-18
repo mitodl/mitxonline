@@ -1,19 +1,21 @@
 """CMS model definitions"""
 import logging
 import re
-import datetime
+from datetime import datetime, timedelta
 import json
-from urllib.parse import quote_plus
-
+from urllib.parse import quote_plus, urljoin
 from json import dumps
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.http import Http404
 from django.urls import reverse
+from django.utils.text import slugify
 from django.forms import ChoiceField, DecimalField
 from django.template.response import TemplateResponse
 from django.contrib.contenttypes.models import ContentType
+from django.templatetags.static import static
 
 from mitol.common.utils.datetime import now_in_utc
 from modelcluster.fields import ParentalKey
@@ -23,7 +25,7 @@ from wagtail.admin.edit_handlers import (
     PageChooserPanel,
     InlinePanel,
 )
-from wagtail.core.blocks import StreamBlock
+from wagtail.core.blocks import PageChooserBlock, StreamBlock
 from wagtail.core.fields import RichTextField, StreamField
 from wagtail.core.models import Page, Orderable
 from wagtail.images.models import Image
@@ -38,12 +40,26 @@ from wagtail.contrib.forms.models import (
     AbstractFormSubmission,
     FORM_FIELD_CHOICES,
 )
+from wagtail.contrib.routable_page.models import RoutablePageMixin, route
+from wagtail.core.utils import WAGTAIL_APPEND_SLASH
 from django.core.serializers.json import DjangoJSONEncoder
 
-from cms.blocks import ResourceBlock, PriceBlock, FacultyBlock
-from cms.constants import COURSE_INDEX_SLUG
+from cms.blocks import (
+    ResourceBlock,
+    PriceBlock,
+    FacultyBlock,
+    CourseRunCertificateOverrides,
+    validate_unique_readable_ids,
+)
+from cms.constants import (
+    COURSE_INDEX_SLUG,
+    PROGRAM_INDEX_SLUG,
+    CERTIFICATE_INDEX_SLUG,
+    SIGNATORY_INDEX_SLUG,
+)
+from cms.forms import CertificatePageForm
 from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset
-from courses.models import Course, Program
+from courses.models import Course, CourseRunCertificate, Program
 from main.views import get_base_context
 from flexiblepricing.api import (
     determine_tier_courseware,
@@ -59,6 +75,314 @@ from flexiblepricing.models import (
 )
 
 log = logging.getLogger()
+
+
+class SignatoryObjectIndexPage(Page):
+    """
+    A placeholder class to group signatory object pages as children.
+    This class logically acts as no more than a "folder" to organize
+    pages and add parent slug segment to the page url.
+    """
+
+    class Meta:
+        abstract = True
+
+    parent_page_types = ["HomePage"]
+    subpage_types = ["SignatoryPage"]
+
+    @classmethod
+    def can_create_at(cls, parent):
+        """
+        You can only create one of these pages under the home page.
+        The parent is limited via the `parent_page_type` list.
+        """
+        return (
+            super().can_create_at(parent)
+            and not parent.get_children().type(cls).exists()
+        )
+
+    def serve(self, request, *args, **kwargs):
+        """
+        For index pages we raise a 404 because these pages do not have a template
+        of their own and we do not expect a page to available at their slug.
+        """
+        raise Http404
+
+
+class SignatoryIndexPage(SignatoryObjectIndexPage):
+    """
+    A placeholder page to group all the signatories under it as well
+    as consequently add /signatories/ to the signatory page urls
+    """
+
+    slug = SIGNATORY_INDEX_SLUG
+
+
+class CertificateIndexPage(RoutablePageMixin, Page):
+    """
+    Certificate index page placeholder that handles routes for serving
+    certificates given by UUID
+    """
+
+    parent_page_types = ["HomePage"]
+    subpage_types = []
+
+    slug = CERTIFICATE_INDEX_SLUG
+
+    @classmethod
+    def can_create_at(cls, parent):
+        """
+        You can only create one of these pages under the home page.
+        The parent is limited via the `parent_page_type` list.
+        """
+        return (
+            super().can_create_at(parent)
+            and not parent.get_children().type(cls).exists()
+        )
+
+    @route(r"^([A-Fa-f0-9-]+)/?$")
+    def course_certificate(
+        self, request, uuid, *args, **kwargs
+    ):  # pylint: disable=unused-argument
+        """
+        Serve a course certificate by uuid
+        """
+        # Try to fetch a certificate by the uuid passed in the URL
+        try:
+            certificate = CourseRunCertificate.objects.get(uuid=uuid)
+        except CourseRunCertificate.DoesNotExist:
+            raise Http404()
+
+        # Get a CertificatePage to serve this request
+        certificate_page = (
+            certificate.course_run.course.page.certificate_page
+            if certificate.course_run.course.page
+            else None
+        )
+        if not certificate_page:
+            raise Http404()
+
+        certificate_page.certificate = certificate
+        return certificate_page.serve(request)
+
+    @route(r"^$")
+    def index_route(self, request, *args, **kwargs):
+        """
+        The index page is not meant to be served/viewed directly
+        """
+        raise Http404()
+
+
+class CourseProgramChildPage(Page):
+    """
+    Abstract page representing a child of Course/Program Page
+    """
+
+    class Meta:
+        abstract = True
+
+    parent_page_types = [
+        "CoursePage",
+        "HomePage",
+    ]
+
+    # disable promote panels, no need for slug entry, it will be autogenerated
+    promote_panels = []
+
+    @classmethod
+    def can_create_at(cls, parent):
+        # You can only create one of these page under course / program.
+        return (
+            super(CourseProgramChildPage, cls).can_create_at(parent)
+            and parent.get_children().type(cls).count() == 0
+        )
+
+    def save(self, clean=True, user=None, log_action=False, **kwargs):
+        # autogenerate a unique slug so we don't hit a ValidationError
+        if not self.title:
+            self.title = self.__class__._meta.verbose_name.title()
+        self.slug = slugify("{}-{}".format(self.get_parent().id, self.title))
+        super().save(clean=clean, user=user, log_action=log_action, **kwargs)
+
+    def get_url_parts(self, request=None):
+        """
+        Override how the url is generated for course/program child pages
+        """
+        # Verify the page is routable
+        url_parts = super().get_url_parts(request=request)
+
+        if not url_parts:
+            return None
+
+        site_id, site_root, parent_path = self.get_parent().specific.get_url_parts(
+            request=request
+        )
+        page_path = ""
+
+        # Depending on whether we have trailing slashes or not, build the correct path
+        if WAGTAIL_APPEND_SLASH:
+            page_path = "{}{}/".format(parent_path, self.slug)
+        else:
+            page_path = "{}/{}".format(parent_path, self.slug)
+        return (site_id, site_root, page_path)
+
+    def serve(self, request, *args, **kwargs):
+        """
+        As the name suggests these pages are going to be children of some other page. They are not
+        designed to be viewed on their own so we raise a 404 if someone tries to access their slug.
+        """
+        raise Http404
+
+
+class CertificatePage(CourseProgramChildPage):
+    """
+    CMS page representing a Certificate.
+    """
+
+    template = "certificate_page.html"
+    parent_page_types = [
+        "CoursePage",
+    ]
+
+    product_name = models.CharField(
+        max_length=250,
+        null=False,
+        blank=False,
+        help_text="Specify the course/program name.",
+    )
+
+    CEUs = models.CharField(
+        max_length=250,
+        null=True,
+        blank=True,
+        help_text="Optional text field for CEU (continuing education unit).",
+    )
+
+    signatories = StreamField(
+        StreamBlock(
+            [
+                (
+                    "signatory",
+                    PageChooserBlock(required=True, target_model=["cms.SignatoryPage"]),
+                )
+            ],
+            min_num=1,
+            max_num=5,
+        ),
+        help_text="You can choose upto 5 signatories.",
+    )
+
+    overrides = StreamField(
+        [("course_run", CourseRunCertificateOverrides())],
+        blank=True,
+        help_text="Overrides for specific runs of this Course/Program",
+        validators=[validate_unique_readable_ids],
+    )
+
+    content_panels = [
+        FieldPanel("product_name"),
+        FieldPanel("CEUs"),
+        StreamFieldPanel("overrides"),
+        StreamFieldPanel("signatories"),
+    ]
+
+    base_form_class = CertificatePageForm
+
+    class Meta:
+        verbose_name = "Certificate"
+
+    def __init__(self, *args, **kwargs):
+        self.certificate = None
+        super().__init__(*args, **kwargs)
+
+    def save(self, clean=True, user=None, log_action=False, **kwargs):
+        # auto generate a unique slug so we don't hit a ValidationError
+        self.title = (
+            self.__class__._meta.verbose_name.title()
+            + " For "
+            + self.get_parent().title
+        )
+
+        self.slug = slugify("certificate-{}".format(self.get_parent().id))
+        Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
+
+    def serve(self, request, *args, **kwargs):
+        """
+        We need to serve the certificate template for preview.
+        """
+        return Page.serve(self, request, *args, **kwargs)
+
+    @property
+    def signatory_pages(self):
+        """
+        Extracts all the pages out of the `signatories` stream into a list
+        """
+        pages = []
+        for block in self.signatories:  # pylint: disable=not-an-iterable
+            if block.value:
+                pages.append(block.value.specific)
+        return pages
+
+    @property
+    def parent(self):
+        """
+        Get the parent of this page.
+        """
+        return self.get_parent().specific
+
+    def get_context(self, request, *args, **kwargs):
+        preview_context = {}
+        context = {}
+
+        if request.is_preview:
+            preview_context = {
+                "learner_name": "Anthony M. Stark",
+                "start_date": self.parent.product.first_unexpired_run.start_date
+                if self.parent.product.first_unexpired_run
+                else datetime.now(),
+                "end_date": self.parent.product.first_unexpired_run.end_date
+                if self.parent.product.first_unexpired_run
+                else datetime.now() + timedelta(days=45),
+                "CEUs": self.CEUs,
+            }
+        elif self.certificate:
+            # Verify that the certificate in fact is for this same course
+            if self.parent.product.id != self.certificate.get_courseware_object_id():
+                raise Http404()
+            start_date, end_date = self.certificate.start_end_dates
+            CEUs = self.CEUs
+
+            for override in self.overrides:  # pylint: disable=not-an-iterable
+                if (
+                    override.value.get("readable_id")
+                    == self.certificate.get_courseware_object_readable_id()
+                ):
+                    CEUs = override.value.get("CEUs")
+                    break
+
+            context = {
+                "uuid": self.certificate.uuid,
+                "certificate_user": self.certificate.user,
+                "learner_name": self.certificate.user.get_full_name(),
+                "start_date": start_date,
+                "end_date": end_date,
+                "CEUs": CEUs,
+            }
+        else:
+            raise Http404()
+
+        # The share image url needs to be absolute
+        return {
+            "site_name": settings.SITE_NAME,
+            "share_image_width": "1665",
+            "share_image_height": "1291",
+            "share_text": "I just earned a certificate in {} from {}".format(
+                self.product_name, settings.SITE_NAME
+            ),
+            **super().get_context(request, *args, **kwargs),
+            **preview_context,
+            **context,
+        }
 
 
 class FormField(AbstractFormField):
@@ -158,6 +482,8 @@ class HomePage(Page):
         "ResourcePage",
         "CourseIndexPage",
         "FlexiblePricingRequestForm",
+        "CertificateIndexPage",
+        "SignatoryIndexPage",
     ]
 
     def _get_child_page_of_type(self, cls):
@@ -294,6 +620,16 @@ class CourseIndexPage(CourseObjectIndexPage):
         return self.get_children().get(coursepage__course__readable_id=readable_id)
 
 
+class ProgramIndexPage(CourseObjectIndexPage):
+    """Index page for ProgramPages."""
+
+    slug = PROGRAM_INDEX_SLUG
+
+    def get_child_by_readable_id(self, readable_id):
+        """Fetch a child page by the related Program's readable_id value"""
+        return self.get_children().get(programpage__program__readable_id=readable_id)
+
+
 class ProductPage(Page):
     """
     Abstract detail page for course runs and any other "product" that a user can enroll in
@@ -397,6 +733,11 @@ class ProductPage(Page):
                 )
             return dumps(config)
 
+    @property
+    def is_course_page(self):
+        """Gets the product page type, this is used for sorting product pages."""
+        return isinstance(self, CoursePage)
+
     content_panels = Page.content_panels + [
         FieldPanel("description"),
         FieldPanel("length"),
@@ -450,7 +791,10 @@ class CoursePage(ProductPage):
     """
 
     parent_page_types = ["CourseIndexPage"]
-    subpage_types = ["cms.FlexiblePricingRequestForm"]
+    subpage_types = [
+        "cms.FlexiblePricingRequestForm",
+        "CertificatePage",
+    ]
 
     course = models.OneToOneField(
         "courses.Course", null=True, on_delete=models.SET_NULL, related_name="page"
@@ -514,6 +858,63 @@ class CoursePage(ProductPage):
 
     content_panels = [
         FieldPanel("course"),
+    ] + ProductPage.content_panels
+
+
+class ProgramPage(ProductPage):
+    """
+    Detail page for programs
+    """
+
+    parent_page_types = ["ProgramIndexPage"]
+    subpage_types = ["FlexiblePricingRequestForm"]
+
+    program = models.OneToOneField(
+        "courses.Program", null=True, on_delete=models.SET_NULL, related_name="page"
+    )
+
+    search_fields = Page.search_fields + [
+        index.RelatedFields(
+            "program",
+            [
+                index.SearchField("readable_id", partial_match=True),
+            ],
+        )
+    ]
+
+    @property
+    def product(self):
+        """Gets the product associated with this page"""
+        return self.program
+
+    template = "product_page.html"
+
+    def get_admin_display_title(self):
+        """Gets the title of the course in the specified format"""
+        return f"{self.program.readable_id} | {self.title}"
+
+    def get_context(self, request, *args, **kwargs):
+        relevant_run = None
+        is_enrolled = False
+        sign_in_url = (
+            None
+            if request.user.is_authenticated
+            else f'{reverse("login")}?next={quote_plus(self.get_url())}'
+        )
+        start_date = None
+        can_access_edx_course = False
+        return {
+            **super().get_context(request, *args, **kwargs),
+            **get_base_context(request),
+            "run": relevant_run,
+            "is_enrolled": is_enrolled,
+            "sign_in_url": sign_in_url,
+            "start_date": start_date,
+            "can_access_edx_course": can_access_edx_course,
+        }
+
+    content_panels = [
+        FieldPanel("program"),
     ] + ProductPage.content_panels
 
 
@@ -631,7 +1032,12 @@ class FlexiblePricingRequestForm(AbstractForm):
         FieldPanel("application_denied_text"),
     ]
 
-    parent_page_types = ["cms.HomePage", "cms.ResourcePage", "cms.CoursePage"]
+    parent_page_types = [
+        "cms.HomePage",
+        "cms.ResourcePage",
+        "cms.CoursePage",
+        "cms.ProgramPage",
+    ]
 
     form_builder = FlexiblePricingFormBuilder
     template = "flexiblepricing/flexible_pricing_request_form.html"
@@ -649,14 +1055,15 @@ class FlexiblePricingRequestForm(AbstractForm):
         course or program in the system. This looks at that and grabs the
         appropriate course page back (since get_parent returns a Page).
 
-        Returns: CoursePage, or None if not found
+        Returns: CoursePage, ProgramPage, or None if not found
         """
-        # When program pages are in place, this should have some logic added to
-        # grab other product types (program runs specifically).
+
         parent_page = self.get_parent()
         if CoursePage.objects.filter(page_ptr=parent_page).exists():
-            coursepage = CoursePage.objects.filter(page_ptr=parent_page).get()
-            return coursepage
+            return CoursePage.objects.filter(page_ptr=parent_page).get()
+
+        if ProgramPage.objects.filter(page_ptr=parent_page).exists():
+            return ProgramPage.objects.filter(page_ptr=parent_page).get()
 
         return None
 
@@ -689,6 +1096,8 @@ class FlexiblePricingRequestForm(AbstractForm):
                 return self.selected_course.program
 
             return self.selected_course
+        elif isinstance(self.get_parent_product_page(), ProgramPage):
+            return self.get_parent_product_page().program
         else:
             parent_page_course = self.get_parent_product_page().course
             return (
@@ -785,7 +1194,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         if flexible_price is None:
             flexible_price = FlexiblePrice(user=form.user, courseware_object=courseware)
         else:
-            if flexible_price.status is not FlexiblePriceStatus.RESET:
+            if flexible_price.status != FlexiblePriceStatus.RESET:
                 raise ValidationError(
                     "A Flexible Price request already exists for this user and course or program."
                 )
@@ -794,9 +1203,10 @@ class FlexiblePricingRequestForm(AbstractForm):
         flexible_price.original_currency = form.cleaned_data["income_currency"]
         flexible_price.country_of_income = form.user.legal_address.country
         flexible_price.income_usd = income_usd
-        flexible_price.date_exchange_rate = datetime.datetime.now()
+        flexible_price.date_exchange_rate = datetime.now()
         flexible_price.cms_submission = form_submission
         flexible_price.tier = tier
+        flexible_price.justification = ""
 
         if determine_auto_approval(flexible_price, tier) is True:
             flexible_price.status = FlexiblePriceStatus.AUTO_APPROVED
@@ -824,3 +1234,68 @@ class FlexiblePricingRequestForm(AbstractForm):
             return None
 
         return (url_parts[0], url_parts[1], r"{}{}/".format(url_parts[2], self.slug))
+
+
+class SignatoryPage(Page):
+    """CMS page representing a Signatory."""
+
+    promote_panels = []
+    parent_page_types = [SignatoryIndexPage]
+    subpage_types = []
+
+    name = models.CharField(
+        max_length=250, null=False, blank=False, help_text="Name of the signatory."
+    )
+    title_1 = models.CharField(
+        max_length=250,
+        null=True,
+        blank=True,
+        help_text="Specify signatory first title in organization.",
+    )
+    title_2 = models.CharField(
+        max_length=250,
+        null=True,
+        blank=True,
+        help_text="Specify signatory second title in organization.",
+    )
+    organization = models.CharField(
+        max_length=250,
+        null=True,
+        blank=True,
+        help_text="Specify the organization of signatory.",
+    )
+
+    signature_image = models.ForeignKey(
+        Image,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Signature image size must be at least 150x50 pixels.",
+    )
+
+    class Meta:
+        verbose_name = "Signatory"
+
+    content_panels = [
+        FieldPanel("name"),
+        FieldPanel("title_1"),
+        FieldPanel("title_2"),
+        FieldPanel("organization"),
+        ImageChooserPanel("signature_image"),
+    ]
+
+    def save(self, clean=True, user=None, log_action=False, **kwargs):
+        # auto generate a unique slug so we don't hit a ValidationError
+        if not self.title:
+            self.title = self.__class__._meta.verbose_name.title() + "-" + self.name
+
+        self.slug = slugify("{}-{}".format(self.title, self.id))
+        super().save(clean=clean, user=user, log_action=log_action, **kwargs)
+
+    def serve(self, request, *args, **kwargs):
+        """
+        As the name suggests these pages are going to be children of some other page. They are not
+        designed to be viewed on their own so we raise a 404 if someone tries to access their slug.
+        """
+        raise Http404

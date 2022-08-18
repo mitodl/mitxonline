@@ -18,9 +18,9 @@ import {
   courseRunsQueryKey
 } from "../lib/queries/courseRuns"
 
-import {isFinancialAssistanceAvailable, isWithinEnrollmentPeriod} from "../lib/courseApi"
 import { formatPrettyDate, emptyOrNil} from "../lib/util"
 import moment from "moment-timezone"
+import {isFinancialAssistanceAvailable, isWithinEnrollmentPeriod } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
@@ -228,7 +228,7 @@ export class ProductDetailEnrollApp extends React.Component<
                 Enroll now
               </a>
             ) : run && isWithinEnrollmentPeriod(run) ? (
-              SETTINGS.features.upgrade_dialog && product ? (
+              SETTINGS.features.upgrade_dialog && product && run.is_upgradable ? (
                 <button
                   className="btn btn-primary btn-gradient-red highlight enroll-now"
                   onClick={() => this.toggleUpgradeDialogVisibility()}

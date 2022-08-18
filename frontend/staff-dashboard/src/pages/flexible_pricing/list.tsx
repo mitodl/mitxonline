@@ -20,6 +20,8 @@ import {
 
 import { IFlexiblePriceRequest, IFlexiblePriceRequestFilters } from "interfaces";
 import { FlexiblePricingStatusModal } from "components/flexiblepricing/statusmodal";
+import { formatDiscount, formatIncome } from "utils";
+import { financialAssistanceRequestStatus } from "../../constants";
 
 const FlexiblePricingStatuses = [
     {
@@ -137,7 +139,7 @@ export const FlexiblePricingList: React.FC = () => {
                             <Table.Column 
                                 dataIndex="user" 
                                 title="Name/Location"
-                                render={(value) => <div><strong>{value.name}</strong> <br /> {value.legal_address.country}</div>}
+                                render={(value) => <div><strong>{value.name}</strong> <br /> {value.email} <br /> {value.legal_address.country}</div>}
                             />
                             <Table.Column
                                 dataIndex="status"
@@ -145,23 +147,32 @@ export const FlexiblePricingList: React.FC = () => {
                                 render={(value) => formatStatus(value)}
                             />
                             <Table.Column
-                                dataIndex="income_usd"
-                                title="Income (USD)"
-                                render={(value) => parseFloat(value).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                                dataIndex="courseware"
+                                title="Courseware"
+                                render={(value) => value.readable_id}
+                            />
+                            <Table.Column
+                                dataIndex="income"
+                                title="Income"
+                                render={
+                                (value) => <div className="income-usd">
+                                    <span>
+                                        { formatIncome(value.income_usd, "USD") }
+                                        <br />
+                                        { formatIncome(value.original_income, value.original_currency) }
+                                    </span>
+                                </div>
+                            }
                             />
                             <Table.Column
                                 dataIndex="date_exchange_rate"
                                 title="Date Calculated"
-                                render={(value) => <DateField format="LLL" value={value} />}
+                                render={(value) => <DateField format="l" value={value.toLocaleString()} />}
                             />
                             <Table.Column
-                                dataIndex="original_currency"
-                                title="Original Currency"
-                            />
-                            <Table.Column
-                                dataIndex="date_documents_sent"
-                                title="Documents Sent"
-                                render={(value) => value ? <DateField format="LLL" value={value} /> : 'No Documents Sent'}
+                                dataIndex="discount"
+                                title="Discount"
+                                render={(value) => <div>{ formatDiscount(value) }</div>}
                             />
                             <Table.Column
                                 dataIndex="justification"
@@ -177,18 +188,18 @@ export const FlexiblePricingList: React.FC = () => {
                                             <Space>
                                                 <Button
                                                     type="primary"
-                                                    onClick={() => showModal(record, "approved")}
+                                                    onClick={() => showModal(record, financialAssistanceRequestStatus.approved)}
                                                 >
                                                     Approve
                                                 </Button>
                                                 <Button
                                                     type="dashed"
-                                                    onClick={() => showModal(record, "reset")}
+                                                    onClick={() => showModal(record, financialAssistanceRequestStatus.reset)}
                                                 >
                                                     Reset
                                                 </Button>
                                                 <Button danger
-                                                    onClick={() => showModal(record, "denied")}
+                                                    onClick={() => showModal(record, financialAssistanceRequestStatus.denied)}
                                                 >
                                                     Deny
                                                 </Button>

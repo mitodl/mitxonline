@@ -172,6 +172,25 @@ def test_course_run_past(end_days, expected):
 
 
 @pytest.mark.parametrize(
+    "upgrade_deadline_days,expected", [[-1, False], [1, True], [None, True]]
+)
+def test_course_run_upgradeable(upgrade_deadline_days, expected):
+    """
+    Test that CourseRun.is_upgradable returns the expected boolean value
+    """
+    now = now_in_utc()
+    upgrade_deadline = (
+        None
+        if upgrade_deadline_days is None
+        else (now + timedelta(days=upgrade_deadline_days))
+    )
+    assert (
+        CourseRunFactory.create(upgrade_deadline=upgrade_deadline).is_upgradable
+        is expected
+    )
+
+
+@pytest.mark.parametrize(
     "start_delta, end_delta, expiration_delta", [[-1, 2, 3], [1, 3, 4], [10, 20, 30]]
 )
 def test_course_run_expiration_date(start_delta, end_delta, expiration_delta):

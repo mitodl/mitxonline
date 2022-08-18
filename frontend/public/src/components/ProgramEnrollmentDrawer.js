@@ -40,7 +40,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     return (
       <>
         <div className={backgroundClass}></div>
-        <div className={drawerClass}>
+        <div className={drawerClass} id="program_enrollment_drawer">
           <div className="row chrome">
             <button type="button" className="close" aria-label="Close" onClick={closeDrawer}>
               <span aria-hidden="true">

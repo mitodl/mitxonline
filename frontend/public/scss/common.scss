@@ -359,6 +359,17 @@ button.btn-secondary.unstyled {
         margin: -27px 0 0 0;
       }
     }
+      /* Chrome, Safari, Edge, Opera */
+    #your_income::-webkit-outer-spin-button,
+    #your_income::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    /* Firefox */
+    #your_income{
+      -moz-appearance: textfield;
+    }
 
     .financial-assist-testify {
       color: grey;

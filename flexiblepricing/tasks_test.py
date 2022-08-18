@@ -1,24 +1,22 @@
 """
 Test for flexible pricing celery tasks
 """
-from flexiblepricing.mail_api import generate_flexible_price_email
-import pytest
 from unittest.mock import patch
 
+import pytest
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from courses.factories import CourseRunFactory
+from ecommerce.factories import ProductFactory
+from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.exceptions import (
     ExceededAPICallsException,
     UnexpectedAPIErrorException,
 )
-from flexiblepricing.models import CurrencyExchangeRate
-from flexiblepricing.constants import FlexiblePriceStatus
-from flexiblepricing.tasks import sync_currency_exchange_rates
 from flexiblepricing.factories import FlexiblePriceFactory
-
-from ecommerce.factories import ProductFactory
-from courses.factories import CourseRunFactory
+from flexiblepricing.models import CurrencyExchangeRate
+from flexiblepricing.tasks import sync_currency_exchange_rates
 
 
 class TaskConfigurationTest(TestCase):
@@ -171,3 +169,32 @@ def test_flexible_price_status_change_email(status, flexprice, admin_drf_client)
 
         assert response.status_code < 300
         mocked_mailer.assert_called()
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        FlexiblePriceStatus.APPROVED,
+        FlexiblePriceStatus.RESET,
+        FlexiblePriceStatus.PENDING_MANUAL_APPROVAL,
+        FlexiblePriceStatus.DENIED,
+    ],
+)
+def test_financial_assistance_denied_email(status, flexprice, admin_drf_client):
+    """
+    Tests `notify_financial_assistance_request_denied_email` is called when financial assistance request is denied.
+    """
+    with patch(
+        "flexiblepricing.tasks.notify_financial_assistance_request_denied_email.delay"
+    ) as mocked_mailer:
+        response = admin_drf_client.patch(
+            reverse("fp_admin_flexiblepricing_api-detail", kwargs={"pk": flexprice.id}),
+            {"status": status},
+        )
+
+        assert response.status_code < 300
+
+        if status == FlexiblePriceStatus.DENIED:
+            mocked_mailer.assert_called()
+        else:
+            mocked_mailer.assert_not_called()
