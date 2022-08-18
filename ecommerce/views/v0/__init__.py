@@ -30,7 +30,7 @@ from main.constants import (
 )
 
 from django.views.generic import TemplateView, RedirectView, View
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, Http404
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -482,19 +482,24 @@ class BackofficeCallbackView(APIView):
         """
         This endpoint is called by Cybersource as a server-to-server call
         in order to respond with the payment details.
+
+        Returns:
+            - HTTP_200_OK if the Order is found.
+
+        Raises:
+            - Http404 if the Order is not found.
         """
         order = api.get_order_from_cybersource_payment_response(request)
 
         # We only want to process responses related to orders which are PENDING
         # otherwise we can conclude that we already received a response through
         # the user's browser.
-        result_status = status.HTTP_200_OK
-        if order is not None and order.state == Order.STATE.PENDING:
+        if order is None:
+            raise Http404
+        elif order.state == Order.STATE.PENDING:
             api.process_cybersource_payment_response(request, order)
-        elif order is None:
-            result_status = status.HTTP_404_NOT_FOUND
 
-        return Response(status=result_status)
+        return Response(status=status.HTTP_200_OK)
 
 
 class CheckoutProductView(LoginRequiredMixin, RedirectView):
