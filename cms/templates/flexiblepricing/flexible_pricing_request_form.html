@@ -83,3 +83,19 @@
 
 </div>
 {% endblock %}
+
+{% block scripts %}
+    <script type="text/javascript">
+          $(document).ready(function() {
+                $("#your_income").on("focus", function() {
+                    $(this).on("keydown", function(e) {
+                        //disable up/down keyboard for increment
+                        if (e.keyCode === 38 || e.keyCode === 40) {
+                            e.preventDefault();
+                        }
+                    });
+                });
+
+            });
+    </script>
+{% endblock %}
