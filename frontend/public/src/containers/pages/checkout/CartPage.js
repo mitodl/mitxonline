@@ -26,8 +26,7 @@ import {
   totalPriceSelector,
   discountedPriceSelector,
   discountSelector,
-  applyDiscountCodeMutation,
-  clearDiscountCodeMutation
+  applyDiscountCodeMutation
 } from "../../../lib/queries/cart"
 
 import type { RouterHistory } from "react-router"
@@ -42,7 +41,6 @@ type Props = {
   discounts: Array<Discount>,
   isLoading: boolean,
   applyDiscountCode: (code: string) => Promise<any>,
-  clearDiscountCode: () => Promise<any>,
   addUserNotification: Function,
   forceRequest: Function
 }
@@ -54,35 +52,6 @@ type CartState = {
 export class CartPage extends React.Component<Props, CartState> {
   state = {
     discountCode: ""
-  }
-
-  async clearDiscount() {
-    const { forceRequest, addUserNotification, clearDiscountCode } = this.props
-
-    let userMessage, messageType
-
-    const resp = await clearDiscountCode()
-
-    if (isSuccessResponse(resp)) {
-      messageType = ALERT_TYPE_SUCCESS
-      userMessage = "Discount code cleared."
-
-      forceRequest()
-      this.setState({ discountCode: "" })
-    } else {
-      // TODO: this should use the banner thingy
-      messageType = ALERT_TYPE_DANGER
-      userMessage = `Something went wrong when trying to clear your discount code. Please contact support at ${SETTINGS.support_email}.`
-    }
-
-    addUserNotification({
-      "clear-discount-notification": {
-        type:  messageType,
-        props: {
-          text: userMessage
-        }
-      }
-    })
   }
 
   async addDiscount(ev: Object, { setErrors }: any) {
@@ -147,7 +116,6 @@ export class CartPage extends React.Component<Props, CartState> {
         discountedPrice={discountedPrice}
         discounts={discounts}
         refunds={refunds}
-        clearDiscount={this.clearDiscount.bind(this)}
         addDiscount={this.addDiscount.bind(this)}
         discountCode={this.state.discountCode}
       />
@@ -216,8 +184,6 @@ export class CartPage extends React.Component<Props, CartState> {
 const applyDiscountCode = (code: string) =>
   mutateAsync(applyDiscountCodeMutation(code))
 
-const clearDiscountCode = () => mutateAsync(clearDiscountCodeMutation())
-
 const mapStateToProps = createStructuredSelector({
   cartItems:       cartSelector,
   totalPrice:      totalPriceSelector,
@@ -228,8 +194,7 @@ const mapStateToProps = createStructuredSelector({
 
 const mapDispatchToProps = {
   addUserNotification,
-  applyDiscountCode,
-  clearDiscountCode
+  applyDiscountCode
 }
 
 const mapPropsToConfig = () => [cartQuery()]

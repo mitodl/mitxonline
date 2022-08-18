@@ -88,16 +88,6 @@ export const applyDiscountCodeMutation = (code: string) => ({
   update: {}
 })
 
-export const clearDiscountCodeMutation = () => ({
-  url:     `/api/checkout/clear_discount/`,
-  body:    {},
-  options: {
-    ...getCsrfOptions(),
-    method: "POST"
-  },
-  update: {}
-})
-
 export const orderReceiptQuery = (orderId: number) => ({
   url:       `/api/orders/receipt/${orderId}/`,
   queryKey:  receiptQueryKey,
