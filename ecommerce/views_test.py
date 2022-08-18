@@ -850,6 +850,7 @@ def test_checkout_api_result_verification_failure(
     # checkout_result_api will always respond with a 403 if validate_processor_response returns False
     assert resp.status_code == 403
 
+
 @pytest.mark.parametrize(
     "upgrade_deadline, status_code",
     [
