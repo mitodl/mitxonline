@@ -2,15 +2,6 @@
 MITxOnline ecommerce views
 """
 import logging
-from main.constants import (
-    USER_MSG_TYPE_PAYMENT_ACCEPTED,
-    USER_MSG_TYPE_PAYMENT_CANCELLED,
-    USER_MSG_TYPE_PAYMENT_DECLINED,
-    USER_MSG_TYPE_PAYMENT_ERROR,
-    USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
-    USER_MSG_TYPE_PAYMENT_REVIEW,
-    USER_MSG_TYPE_ENROLL_BLOCKED,
-)
 from main.utils import redirect_with_user_message
 from rest_framework import mixins, status
 from rest_framework.response import Response
@@ -21,13 +12,25 @@ from rest_framework.viewsets import (
     ViewSet,
     ModelViewSet,
 )
+from rest_framework.status import HTTP_200_OK
+from rest_framework.views import APIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.decorators import action
 
+from main.constants import (
+    USER_MSG_TYPE_PAYMENT_ACCEPTED,
+    USER_MSG_TYPE_PAYMENT_CANCELLED,
+    USER_MSG_TYPE_PAYMENT_DECLINED,
+    USER_MSG_TYPE_PAYMENT_ERROR,
+    USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
+    USER_MSG_TYPE_PAYMENT_REVIEW,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
+)
+
 from django.views.generic import TemplateView, RedirectView, View
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, Http404
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -36,14 +39,9 @@ from django.db import transaction
 from django.db.models import Q, Count
 from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
-from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
 from mitol.common.utils import now_in_utc
 from rest_framework_extensions.mixins import NestedViewSetMixin
-from mitol.payment_gateway.api import (
-    PaymentGateway,
-    ProcessorResponse,
-)
 
 from courses.models import (
     CourseRun,
@@ -422,77 +420,31 @@ class CheckoutCallbackView(View):
         clear out the stored basket)
         3. Perform any enrollments, account status changes, etc.
         """
-        if not PaymentGateway.validate_processor_response(
-            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
-        ):
-            raise PermissionDenied(
-                "Could not validate response from the payment processor."
-            )
 
-        payment_data = request.POST
-
-        processor_response = PaymentGateway.get_formatted_response(
-            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
-        )
-        converted_order = PaymentGateway.get_gateway_class(
-            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
-        ).convert_to_order(payment_data)
-
-        order_id = Order.decode_reference_number(converted_order.reference)
-
-        try:
-            order = Order.objects.get(pk=order_id)
-        except ObjectDoesNotExist:
+        order = api.get_order_from_cybersource_payment_response(request)
+        if order is None:
             return HttpResponse("Order not found")
+        # We only want to process responses related to orders which are PENDING
+        # otherwise we can conclude that we already received a resonse through
+        # BackofficeCallbackView.
+        order_state = None
+        if order.state == Order.STATE.PENDING:
+            order_state = api.process_cybersource_payment_response(request, order)
 
-        basket = Basket.objects.filter(user=order.purchaser).first()
-
-        if processor_response.state == ProcessorResponse.STATE_DECLINED:
-            # Transaction declined for some reason
-            # This probably means the order needed to go through the process
-            # again so maybe tell the user to do a thing.
-            self.logger.debug(
-                "Transaction declined: {msg}".format(msg=processor_response.message)
-            )
-            order.decline()
-            order.save()
-            return redirect_with_user_message(
-                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
-            )
-        elif processor_response.state == ProcessorResponse.STATE_ERROR:
-            # Error - something went wrong with the request
-            self.logger.debug(
-                "Error happened submitting the transaction: {msg}".format(
-                    msg=processor_response.message
-                )
-            )
-            order.error()
-            order.save()
-            return redirect_with_user_message(
-                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_ERROR}
-            )
-        elif processor_response.state == ProcessorResponse.STATE_CANCELLED:
-            # Transaction cancelled
-            # Transaction could be cancelled for reasons that don't necessarily
-            # mean that the entire order is invalid, so we'll do nothing with
-            # the order here (other than set it to Cancelled)
-            self.logger.debug(
-                "Transaction cancelled: {msg}".format(msg=processor_response.message)
-            )
-            order.cancel()
-            order.save()
+        if order_state == Order.STATE.CANCELED:
             return redirect_with_user_message(
                 reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
             )
-        elif processor_response.state == ProcessorResponse.STATE_REVIEW:
-            # Transaction held for review in the payment processor's system
-            # The transaction is in limbo here - it may be approved or denied
-            # at a later time
-            self.logger.debug(
-                "Transaction flagged for review: {msg}".format(
-                    msg=processor_response.message
-                )
+        elif order_state == Order.STATE.ERRORED:
+            return redirect_with_user_message(
+                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_ERROR}
             )
+        elif order_state == Order.STATE.DECLINED:
+            return redirect_with_user_message(
+                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
+            )
+        elif order_state == Order.STATE.REVIEW:
+            basket = Basket.objects.filter(user=order.purchaser).first()
             if basket:
                 if basket.has_user_blocked_products(order.purchaser):
                     return redirect_with_user_message(
@@ -500,30 +452,51 @@ class CheckoutCallbackView(View):
                         {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
                     )
                 else:
-                    basket.delete()
-
-            order.review(payment_data)
-            order.save()
-
-            if basket and basket.compare_to_order(order):
-                basket.delete()
-
+                    return redirect_with_user_message(
+                        reverse("user-dashboard"),
+                        {"type": USER_MSG_TYPE_PAYMENT_REVIEW},
+                    )
+        elif order_state == Order.STATE.FULFILLED:
             return redirect_with_user_message(
-                reverse("user-dashboard"), {"type": USER_MSG_TYPE_PAYMENT_REVIEW}
+                reverse("user-dashboard"),
+                {
+                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
+                    "run": order.lines.first().purchased_object.course.title,
+                },
             )
-        elif processor_response.state == ProcessorResponse.STATE_ACCEPTED:
-            # It actually worked here
-            self.logger.debug(
-                "Transaction accepted!: {msg}".format(msg=processor_response.message)
-            )
-
-            return api.fulfill_completed_order(order, payment_data, basket)
         else:
-            order.cancel()
-            order.save()
             return redirect_with_user_message(
                 reverse("user-dashboard"), {"type": USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN}
             )
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class BackofficeCallbackView(APIView):
+    authentication_classes = []  # disables authentication
+    permission_classes = []  # disables permission
+
+    def post(self, request, *args, **kwargs):
+        """
+        This endpoint is called by Cybersource as a server-to-server call
+        in order to respond with the payment details.
+
+        Returns:
+            - HTTP_200_OK if the Order is found.
+
+        Raises:
+            - Http404 if the Order is not found.
+        """
+        order = api.get_order_from_cybersource_payment_response(request)
+
+        # We only want to process responses related to orders which are PENDING
+        # otherwise we can conclude that we already received a response through
+        # the user's browser.
+        if order is None:
+            raise Http404
+        elif order.state == Order.STATE.PENDING:
+            api.process_cybersource_payment_response(request, order)
+
+        return Response(status=status.HTTP_200_OK)
 
 
 class CheckoutProductView(LoginRequiredMixin, RedirectView):

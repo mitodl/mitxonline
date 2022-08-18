@@ -29,6 +29,13 @@ def user_client(user):
     return client
 
 
+@pytest.fixture(scope="session")
+def api_client():
+    """Django test client that is authenticated with the user"""
+    client = Client()
+    return client
+
+
 @pytest.fixture
 def staff_client(staff_user):
     """Django test client that is authenticated with the staff user"""

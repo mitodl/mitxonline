@@ -5,6 +5,7 @@ from rest_framework.routers import SimpleRouter
 
 """ TODO: clean this up later (make the views look more like the courses one) """
 from ecommerce.views.v0 import (
+    BackofficeCallbackView,
     ProductViewSet,
     BasketViewSet,
     BasketItemViewSet,
@@ -82,6 +83,11 @@ urlpatterns = [
         r"^api/orders/receipt/(?P<pk>\d+)/$",
         OrderReceiptView.as_view(),
         name="order_receipt_api",
+    ),
+    re_path(
+        r"^api/checkout/result/",
+        BackofficeCallbackView.as_view(),
+        name="checkout_result_api",
     ),
     re_path(
         r"^checkout/result/",

@@ -394,6 +394,7 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
 def test_checkout_result(
     user,
     user_client,
+    api_client,
     mocker,
     products,
     decision,
@@ -435,6 +436,11 @@ def test_checkout_result(
     assert resp.status_code == 302
     assert resp.url == expected_redirect_url
     print(resp.cookies)
+
+    resp = api_client.post(reverse("checkout_result_api"), payload)
+
+    # checkout_result_api will always respond with a 200 unless validate_processor_response returns false
+    assert resp.status_code == 200
 
     order.refresh_from_db()
 
@@ -713,6 +719,136 @@ def test_paid_and_unpaid_courserun_checkout(
     basket = create_basket_with_product(user, unpaid_product)
     resp = user_client.get(reverse("checkout_interstitial_page"))
     assert resp.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "decision, expected_state, basket_exists",
+    [
+        ("CANCEL", Order.STATE.CANCELED, True),
+        ("DECLINE", Order.STATE.DECLINED, True),
+        ("ERROR", Order.STATE.ERRORED, True),
+        ("REVIEW", Order.STATE.PENDING, True),
+        ("ACCEPT", Order.STATE.FULFILLED, False),
+    ],
+)
+def test_checkout_api_result(
+    user,
+    user_client,
+    api_client,
+    mocker,
+    products,
+    decision,
+    expected_state,
+    basket_exists,
+):
+    """
+    Tests the proper handling of an order after receiving a valid Cybersource payment response.
+    """
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    basket = create_basket(user, products)
+
+    resp = user_client.post(reverse("checkout_api-start_checkout"))
+
+    payload = resp.json()["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": decision,
+        "message": "payment processor message",
+    }
+
+    # Load the pending order from the DB(factory) - should match the ref# in
+    # the payload we get back
+
+    order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)
+
+    assert order.reference_number == payload["req_reference_number"]
+
+    # This is kind of cheating - CyberSource will send back a payload that is
+    # signed, but here we're just passing the payload as we got it back from
+    # the start checkout call.
+
+    resp = api_client.post(reverse("checkout_result_api"), payload)
+
+    # checkout_result_api will always respond with a 200 unless validate_processor_response returns false
+    assert resp.status_code == 200
+
+    order.refresh_from_db()
+
+    if decision == "REVIEW":
+        assert order.is_review
+
+        # create a new basket and then resubmit for acceptance
+        # basket should be extant afterwards
+        # also create a new batch of products
+        #  - otherwise it might select one that's being used in the old basket
+        new_products = ProductFactory.create_batch(5)
+        basket = create_basket(user, new_products)
+
+        payload["decision"] = "ACCEPT"
+        resp = api_client.post(reverse("checkout_result_api"), payload)
+        assert resp.status_code == 200
+
+        # test if course run is recorded in PaidCourseRun for fulfilled order
+        course_run = order.purchased_runs[0]
+        paid_courserun_count = PaidCourseRun.objects.filter(
+            order=order, course_run=course_run, user=order.purchaser
+        ).count()
+        assert paid_courserun_count == 1
+
+    elif decision == "ACCEPT":
+
+        # test if course run is recorded in PaidCourseRun for review order
+        course_run = order.purchased_runs[0]
+        paid_courserun_count = PaidCourseRun.objects.filter(
+            order=order, course_run=course_run, user=order.purchaser
+        ).count()
+        assert paid_courserun_count == 1
+
+    else:
+        assert order.state == expected_state
+
+        # there should be no record in PaidCourseRun if order is in other states
+        course_run = order.purchased_runs[0]
+        paid_courserun_count = PaidCourseRun.objects.filter(
+            order=order, course_run=course_run, user=order.purchaser
+        ).count()
+        assert paid_courserun_count == 0
+
+    assert Basket.objects.filter(id=basket.id).exists() is basket_exists
+
+
+def test_checkout_api_result_verification_failure(
+    user_client,
+    api_client,
+    mocker,
+    user,
+    products,
+):
+    """
+    Tests the failure of verifying of messages from expected from Cybersource.
+    """
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=False,
+    )
+
+    create_basket(user, products)
+    resp = user_client.post(reverse("checkout_api-start_checkout"))
+
+    payload = resp.json()["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": Order.STATE.PENDING,
+        "message": "payment processor message",
+    }
+
+    resp = api_client.post(reverse("checkout_result_api"), payload)
+
+    # checkout_result_api will always respond with a 403 if validate_processor_response returns False
+    assert resp.status_code == 403
 
 
 @pytest.mark.parametrize(

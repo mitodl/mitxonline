@@ -1,21 +1,19 @@
 """Ecommerce APIs"""
 
-import json
 import logging
 
 from functools import total_ordering
 from django.urls import reverse
 from django.db import transaction
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
 from ecommerce.constants import TRANSACTION_TYPE_REFUND, REFUND_SUCCESS_STATES
 from ecommerce.tasks import perform_unenrollment_from_order
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
+
 from main.constants import (
-    USER_MSG_TYPE_PAYMENT_ACCEPTED,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
@@ -26,6 +24,7 @@ from mitol.payment_gateway.api import (
     Order as GatewayOrder,
     PaymentGateway,
     Refund as GatewayRefund,
+    ProcessorResponse,
 )
 from mitol.payment_gateway.exceptions import RefundDuplicateException
 
@@ -207,22 +206,113 @@ def apply_user_discounts(request):
     return
 
 
-def fulfill_completed_order(
-    order, payment_data, basket, message_type=USER_MSG_TYPE_PAYMENT_ACCEPTED
-):
+def fulfill_completed_order(order, payment_data, basket):
     order.fulfill(payment_data)
     order.save()
 
     if not order.is_review and (basket and basket.compare_to_order(order)):
         basket.delete()
 
-    return redirect_with_user_message(
-        reverse("user-dashboard"),
-        {
-            "type": message_type,
-            "run": order.lines.first().purchased_object.course.title,
-        },
+
+def get_order_from_cybersource_payment_response(request):
+    payment_data = request.POST
+    converted_order = PaymentGateway.get_gateway_class(
+        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+    ).convert_to_order(payment_data)
+    order_id = Order.decode_reference_number(converted_order.reference)
+
+    try:
+        order = Order.objects.get(pk=order_id)
+    except ObjectDoesNotExist:
+        order = None
+    return order
+
+
+def process_cybersource_payment_response(request, order):
+    """
+    Updates the order and basket based on the payment request from Cybersource.
+    Returns the order state after applying update operations corresponding to the request.
+
+    Args:
+        - request (HttpRequest): The payment request received from Cybersource.
+        - order (Order): The order corresponding to the request payload.
+    Returns:
+        Order.state
+    """
+
+    if not PaymentGateway.validate_processor_response(
+        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+    ):
+        raise PermissionDenied(
+            "Could not validate response from the payment processor."
+        )
+
+    processor_response = PaymentGateway.get_formatted_response(
+        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
     )
+
+    return_message = ""
+
+    if processor_response.state == ProcessorResponse.STATE_DECLINED:
+        # Transaction declined for some reason
+        # This probably means the order needed to go through the process
+        # again so maybe tell the user to do a thing.
+        log.debug("Transaction declined: {msg}".format(msg=processor_response.message))
+        order.decline()
+        order.save()
+        return_message = order.state
+    elif processor_response.state == ProcessorResponse.STATE_ERROR:
+        # Error - something went wrong with the request
+        log.debug(
+            "Error happened submitting the transaction: {msg}".format(
+                msg=processor_response.message
+            )
+        )
+        order.error()
+        order.save()
+        return_message = order.state
+    elif processor_response.state == ProcessorResponse.STATE_CANCELLED:
+        # Transaction cancelled
+        # Transaction could be cancelled for reasons that don't necessarily
+        # mean that the entire order is invalid, so we'll do nothing with
+        # the order here (other than set it to Cancelled)
+        log.debug("Transaction cancelled: {msg}".format(msg=processor_response.message))
+        order.cancel()
+        order.save()
+        return_message = order.state
+    elif processor_response.state == ProcessorResponse.STATE_REVIEW:
+        # Transaction held for review in the payment processor's system
+        # The transaction is in limbo here - it may be approved or denied
+        # at a later time
+        log.debug(
+            "Transaction flagged for review: {msg}".format(
+                msg=processor_response.message
+            )
+        )
+        basket = Basket.objects.filter(user=order.purchaser).first()
+        return_message = order.state
+        if basket:
+            if not basket.has_user_blocked_products(order.purchaser):
+                basket.delete()
+
+        order.review(request.POST)
+        order.save()
+
+        if basket and basket.compare_to_order(order):
+            basket.delete()
+
+    elif processor_response.state == ProcessorResponse.STATE_ACCEPTED:
+        # It actually worked here
+        log.debug("Transaction accepted!: {msg}".format(msg=processor_response.message))
+        basket = Basket.objects.filter(user=order.purchaser).first()
+        fulfill_completed_order(order, request.POST, basket)
+        return_message = order.state
+    else:
+        order.cancel()
+        order.save()
+        return_message = order.state
+
+    return return_message
 
 
 def establish_basket(request):
