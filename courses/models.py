@@ -24,7 +24,7 @@ from courses.constants import (
 )
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
-from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENTS_PAID_MODES
 from openedx.utils import edx_redirect_url
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 
@@ -393,6 +393,7 @@ class CourseRun(TimestampedModel):
     )
 
     live = models.BooleanField(default=False)
+    self_paced_certificates = models.BooleanField(default=False)
     products = GenericRelation("ecommerce.Product", related_query_name="courseruns")
 
     class Meta:
@@ -801,6 +802,21 @@ class CourseRunGrade(TimestampedModel, AuditableModel, ValidateOnSaveMixin):
     def grade_percent(self):
         """Returns the grade field value as a number out of 100 (or None if the value is None)"""
         return self.grade * 100 if self.grade is not None else None
+
+    @property
+    def is_certificate_eligible(self):
+        """For a user to be eligible for a certificate:
+        1. He should have a passing grade (passed=True)
+        2. He should have a paid enrollment (e.g. Verified)
+        """
+        return (
+            self.passed
+            and CourseRunEnrollment.objects.filter(
+                user=self.user,
+                run=self.course_run,
+                enrollment_mode__in=EDX_ENROLLMENTS_PAID_MODES,
+            ).exists()
+        )
 
     def __str__(self):
         return "CourseRunGrade for run '{course_id}', user '{user}' ({grade})".format(

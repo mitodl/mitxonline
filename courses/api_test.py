@@ -20,6 +20,7 @@ from courses.api import (
     defer_enrollment,
     get_user_enrollments,
     sync_course_runs,
+    process_course_run_grade_certificate,
 )
 from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
@@ -29,6 +30,7 @@ from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    CourseRunGradeFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
@@ -61,13 +63,34 @@ def dates():
     )
 
 
+@pytest.fixture()
+def course():
+    """Course object fixture"""
+    return CourseFactory.create()
+
+
+@pytest.fixture()
+def passed_grade_with_enrollment(user):
+    """Fixture to produce a passed CourseRunGrade"""
+    course_run = CourseRunFactory.create()
+    paid_enrollment = CourseRunEnrollmentFactory.create(
+        user=user, run=course_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    return CourseRunGradeFactory.create(
+        course_run=paid_enrollment.run,
+        user=paid_enrollment.user,
+        grade=0.50,
+        passed=True,
+    )
+
+
 @pytest.mark.parametrize("is_enrolled", [True, False])
-def test_get_user_relevant_course_run(user, dates, is_enrolled):
+def test_get_user_relevant_course_run(user, dates, course, is_enrolled):
     """
     get_user_relevant_course_run should return an enrolled run if the end date isn't in the past, or the soonest course
     run that does not have a past enrollment end date.
     """
-    course = CourseFactory.create()
     # One run in the near future, one run in progress with an expired enrollment period, and one run in the far future.
     course_runs = CourseRunFactory.create_batch(
         3,
@@ -92,14 +115,13 @@ def test_get_user_relevant_course_run(user, dates, is_enrolled):
     assert returned_run == (course_runs[1] if is_enrolled else course_runs[0])
 
 
-def test_get_user_relevant_course_run_invalid_dates(user, dates):
+def test_get_user_relevant_course_run_invalid_dates(user, dates, course):
     """
     get_user_relevant_course_run should ignore course runs with any of the following properties:
     1) No start date or enrollment start date
     2) An end date in the past
 
     """
-    course = CourseFactory.create()
     CourseRunFactory.create_batch(
         3,
         course=course,
@@ -116,12 +138,11 @@ def test_get_user_relevant_course_run_invalid_dates(user, dates):
     assert returned_run is None
 
 
-def test_get_user_relevant_course_run_ignore_enrolled(user, dates):
+def test_get_user_relevant_course_run_ignore_enrolled(user, dates, course):
     """
     get_user_relevant_course_run return a future course run if an enrolled run's end date is in the past, or if an
     enrollment for an open course is not flagged as edX-enrolled
     """
-    course = CourseFactory.create()
     course_runs = CourseRunFactory.create_batch(
         3,
         course=course,
@@ -586,12 +607,11 @@ class TestDeactivateEnrollments:
 
 
 @pytest.mark.parametrize("keep_failed_enrollments", [True, False])
-def test_defer_enrollment(mocker, keep_failed_enrollments):
+def test_defer_enrollment(mocker, course, keep_failed_enrollments):
     """
     defer_enrollment should deactivate a user's existing enrollment and create an enrollment in another
     course run
     """
-    course = CourseFactory.create()
     course_runs = CourseRunFactory.create_batch(3, course=course)
     existing_enrollment = CourseRunEnrollmentFactory.create(run=course_runs[0])
     target_run = course_runs[1]
@@ -748,3 +768,86 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
     else:
         assert success_count == 0
         assert failure_count == 1
+
+
+@pytest.mark.parametrize(
+    "grade, passed, paid, exp_certificate, exp_created, exp_deleted",
+    [
+        [0.25, True, True, True, True, False],
+        [0.25, True, False, False, False, False],
+        [0.0, True, True, False, False, False],
+        [1.0, False, True, False, False, False],
+    ],
+)
+def test_course_run_certificate(
+    user,
+    passed_grade_with_enrollment,
+    grade,
+    paid,
+    passed,
+    exp_certificate,
+    exp_created,
+    exp_deleted,
+):
+    """
+    Test that the certificate is generated correctly
+    """
+    passed_grade_with_enrollment.grade = grade
+    passed_grade_with_enrollment.passed = passed
+    if not paid:
+        CourseRunEnrollment.objects.filter(
+            user=passed_grade_with_enrollment.user,
+            run=passed_grade_with_enrollment.course_run,
+        ).update(enrollment_mode=EDX_DEFAULT_ENROLLMENT_MODE)
+
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert bool(certificate) is exp_certificate
+    assert created is exp_created
+    assert deleted is exp_deleted
+
+
+def test_course_run_certificate_idempotent(passed_grade_with_enrollment):
+    """
+    Test that the certificate generation is idempotent
+    """
+
+    # Certificate is created the first time
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate
+    assert created
+    assert not deleted
+
+    # Existing certificate is simply returned without any create/delete
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate
+    assert not created
+    assert not deleted
+
+
+def test_course_run_certificate_not_passing(passed_grade_with_enrollment):
+    """
+    Test that the certificate is not generated if the grade is set to not passed
+    """
+
+    # Initially the certificate is created
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert certificate
+    assert created
+    assert not deleted
+
+    # Now that the grade indicates score 0.0, certificate should be deleted
+    passed_grade_with_enrollment.grade = 0.0
+    certificate, created, deleted = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+    assert not certificate
+    assert not created
+    assert deleted

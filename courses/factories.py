@@ -11,6 +11,7 @@ from courses.models import (
     CourseRun,
     CourseRunEnrollment,
     CourseRunGrade,
+    CourseRunCertificate,
     Program,
     ProgramEnrollment,
     ProgramRun,
@@ -144,6 +145,16 @@ class CourseRunEnrollmentFactory(DjangoModelFactory):
 
     class Meta:
         model = CourseRunEnrollment
+
+
+class CourseRunCertificateFactory(DjangoModelFactory):
+    """Factory for CourseRunCertificate"""
+
+    course_run = factory.SubFactory(CourseRunFactory)
+    user = factory.SubFactory(UserFactory)
+
+    class Meta:
+        model = CourseRunCertificate
 
 
 class ProgramEnrollmentFactory(DjangoModelFactory):
