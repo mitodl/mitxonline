@@ -15,8 +15,10 @@
                 <h1>{{ page.title }}</h1>
                 {# Description field contents are already rendered wrapped in a <p> tag #}
                 {{ page.description | richtext }}
+                {% if page.course %}
                 <input id="courseId" type="hidden" value="{{page.course.readable_id}}" />
                 <div id="productDetailEnrollment"></div>
+                {% endif %}
               </div>
             </div>
             <div class="content-col hero-media">
@@ -44,43 +46,23 @@
               <div class="date-links-text text" id="start_date">
                 <strong>{{ start_date|date:"F j, Y" }}</strong>
               </div>
-              {% if page.product.unexpired_runs|length > 1 %}
-                {% with course_runs=page.product.unexpired_runs %}
-                  <strong class="more-dates">
-                    <a tabindex="0" role="button" class="dates-tooltip" id="datesPopover" data-trigger="focus" href="#" onClick="event.preventDefault();"
-                      data-toggle="popover" data-placement="auto" title="More dates available for this course" data-html="true"
-                      data-content="
-                        <div>
-                          <p>Click below to enroll in one of these dates</p>
-                        </div>
-                        {% for course_run in course_runs %}
-                            <div>
-                              <a class='date-link' id='{{ course_run.courseware_id }}' href='#' onClick='event.preventDefault();'>Start Date {{ course_run.start_date|date:'F j, Y' }}</a>
-                            </div>
-                        {% endfor %}
-                      ">
-                      More Dates
-                    </a>
-                  </strong>
-                {% endwith %}
-              {% elif page.product.first_course_unexpired_runs|length > 1 %}
-                {% with course_runs=page.product.first_course_unexpired_runs product_id=page.product.products.first.id %}
-                  <strong class="more-dates">
-                    <a tabindex="0" role="button" class="dates-tooltip" id="datesPopover" data-trigger="focus" href="#" onClick="event.preventDefault();"
-                      data-toggle="popover" data-html="true" data-placement="auto" title="More dates available for this program"
-                      data-content="
-                        <div>
-                          <p>Click below to enroll in one of these dates</p>
-                        </div>
-                        {% for course_run in course_runs %}
-                            <div>
-                              <a class='date-link' id='{{ course_run.courseware_id }}' href='#' onClick='event.preventDefault();'>Start Date {{ course_run.start_date|date:'F j, Y' }}</a>
-                            </div>
-                        {% endfor %}">
-                      More Dates
-                    </a>
-                  </strong>
-                {% endwith %}
+              {% if course_runs|length > 1 %}
+                <strong class="more-dates">
+                  <a tabindex="0" role="button" class="dates-tooltip" id="datesPopover" data-trigger="focus" href="#" onClick="event.preventDefault();"
+                    data-toggle="popover" data-placement="auto" title="More dates available" data-html="true"
+                    data-content="
+                      <div>
+                        <p>Click below to enroll in one of these dates</p>
+                      </div>
+                      {% for course_run in course_runs %}
+                          <div>
+                            <a class='date-link' id='{{ course_run.courseware_id }}' href='#' onClick='event.preventDefault();'>Start Date {{ course_run.start_date|date:'F j, Y' }}</a>
+                          </div>
+                      {% endfor %}
+                    ">
+                    More Dates
+                  </a>
+                </strong>
               {% endif %}
             </div>
             {% endif %}

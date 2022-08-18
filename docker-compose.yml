@@ -99,8 +99,8 @@ services:
       test: curl -f http://watch:8012/health || exit 1
       interval: 5s
       timeout: 1s
-      retries: 3
-      start_period: 30s
+      retries: 4
+      start_period: 45s
 
   celery:
     build:

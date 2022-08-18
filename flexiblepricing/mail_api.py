@@ -7,18 +7,18 @@ from django.core.exceptions import ValidationError
 from mitol.mail.api import get_message_sender
 
 from courses.models import CourseRun
+from ecommerce.discounts import DiscountType
+from ecommerce.models import Product
 from flexiblepricing.constants import (
     FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE,
     FLEXIBLE_PRICE_EMAIL_APPROVAL_SUBJECT,
+    FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_MESSAGE,
+    FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_SUBJECT,
     FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE,
     FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT,
-    FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_SUBJECT,
-    FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_MESSAGE,
     FlexiblePriceStatus,
 )
 from flexiblepricing.messages import FlexiblePriceStatusChangeMessage
-from ecommerce.discounts import DiscountType
-from ecommerce.models import Product
 
 log = logging.getLogger(__name__)
 
@@ -76,6 +76,27 @@ def generate_flexible_price_email(flexible_price):
                     "first_name": flexible_price.user.legal_address.first_name,
                     "message": message,
                     "program_name": flexible_price.courseware_object.title,
+                },
+            )
+    except:
+        log.exception("Error sending flexible price request status change email")
+
+
+def send_financial_assistance_request_denied_email(
+    financial_assistance_request, email_subject, email_body
+):
+    log.info(
+        f"Sending Financial Assistance request denied email to {financial_assistance_request.user.email}"
+    )
+    try:
+        with get_message_sender(FlexiblePriceStatusChangeMessage) as sender:
+            sender.build_and_send_message(
+                financial_assistance_request.user.email,
+                {
+                    "subject": email_subject,
+                    "first_name": financial_assistance_request.user.legal_address.first_name,
+                    "message": email_body,
+                    "program_name": financial_assistance_request.courseware_object.title,
                 },
             )
     except:

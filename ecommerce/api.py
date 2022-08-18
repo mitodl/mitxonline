@@ -16,6 +16,7 @@ from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from main.constants import (
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
 )
 
 from mitol.payment_gateway.api import (
@@ -49,6 +50,7 @@ log = logging.getLogger(__name__)
 
 def generate_checkout_payload(request):
     basket = Basket.objects.filter(user=request.user).get()
+
     if basket.has_user_blocked_products(request.user):
         return {
             "country_blocked": True,
@@ -64,6 +66,15 @@ def generate_checkout_payload(request):
             "response": redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},
+            ),
+        }
+
+    if basket.has_user_purchased_non_upgradable_courserun():
+        return {
+            "purchased_non_upgradeable_courserun": True,
+            "response": redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_COURSE_NON_UPGRADABLE},
             ),
         }
 
@@ -162,6 +173,9 @@ def apply_user_discounts(request):
     user = request.user
     discount = None
 
+    BasketDiscount.objects.filter(
+        redeemed_basket=basket, redeemed_discount__for_flexible_pricing=True
+    ).delete()
     if BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0:
         return
 

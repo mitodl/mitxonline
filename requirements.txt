@@ -89,7 +89,7 @@ deprecated==1.2.13
     # via jwcrypto
 dj-database-url==0.5.0
     # via -r requirements.in
-django==3.2.14
+django==3.2.15
     # via
     #   -r requirements.in
     #   django-anymail
@@ -200,6 +200,8 @@ factory-boy==3.2.0
     #   mitol-django-google-sheets
 faker==8.8.2
     # via factory-boy
+fastly==0.5.1
+    # via -r requirements.in
 google-api-python-client==1.7.11
     # via
     #   mitol-django-google-sheets
@@ -392,6 +394,7 @@ six==1.16.0
     #   click-repl
     #   cybersource-rest-client-python
     #   django-compat
+    #   fastly
     #   google-api-python-client
     #   google-auth
     #   google-auth-httplib2

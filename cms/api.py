@@ -12,6 +12,8 @@ from wagtail.core.models import Page, Site
 
 from cms import models as cms_models
 from cms.exceptions import WagtailSpecificPageError
+from cms.models import Page
+
 
 log = logging.getLogger(__name__)
 DEFAULT_HOMEPAGE_PROPS = dict(
@@ -28,6 +30,7 @@ RESOURCE_PAGE_TITLES = [
     "Honor Code",
 ]
 RESOURCE_PAGE_SLUGS = [slugify(title) for title in RESOURCE_PAGE_TITLES]
+PROGRAM_INDEX_PAGE_PROPERTIES = dict(title="Programs")
 
 
 def get_home_page(raise_if_missing=True, check_specific=False) -> Page:
@@ -142,6 +145,27 @@ def ensure_product_index() -> cms_models.CourseIndexPage:
         page = Page.objects.get(id=page_id)
         page.move(course_index, "last-child")
     return course_index
+
+
+def ensure_program_product_index() -> cms_models.ProgramIndexPage:
+    """
+    Same as ensure_product_index, but operates on programs instead.
+    """
+    home_page = get_home_page()
+    program_index = Page.objects.filter(
+        content_type=ContentType.objects.get_for_model(cms_models.ProgramIndexPage)
+    ).first()
+    if not program_index:
+        program_index = cms_models.ProgramIndexPage(**PROGRAM_INDEX_PAGE_PROPERTIES)
+        home_page.add_child(instance=program_index)
+        program_index.save_revision().publish()
+    # Move course detail pages to be children of the course index pages
+    for page_id in cms_models.ProgramPage.objects.exclude(
+        path__startswith=program_index.path
+    ).values_list("id", flat=True):
+        page = Page.objects.get(id=page_id)
+        page.move(program_index, "last-child")
+    return program_index
 
 
 def get_wagtail_img_src(image_obj) -> str:

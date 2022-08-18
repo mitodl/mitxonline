@@ -81,9 +81,9 @@ class Product(TimestampedModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["object_id", "is_active"],
+                fields=["object_id", "is_active", "content_type"],
                 condition=models.Q(is_active=True),
-                name="unique_object_id_validated",
+                name="unique_purchasable_object",
             )
         ]
 
@@ -126,6 +126,21 @@ class Basket(TimestampedModel):
                     order__state__in=[Order.STATE.FULFILLED, Order.STATE.REVIEW],
                 ).exists():
                     return True
+
+        return False
+
+    def has_user_purchased_non_upgradable_courserun(self):
+        """
+        Return true if any of the courses in the basket can not be Upgraded/Purchased because of past upgrade_deadline
+        """
+        basket_items = self.basket_items.prefetch_related("product")
+        for item in basket_items:
+            purchased_object = item.product.purchasable_object
+            # If the upgrade_deadline has passed for a course it should not be purchased if it was in basket
+            return (
+                isinstance(purchased_object, CourseRun)
+                and not purchased_object.is_upgradable
+            )
 
         return False
 
@@ -323,6 +338,21 @@ class Order(TimestampedModel):
         decimal_places=5,
         max_digits=20,
     )
+    reference_number = models.CharField(max_length=255, null=True, blank=True)
+
+    # override save method to auto-fill generated_rerefence_number
+    def save(self, *args, **kwargs):
+
+        # initial save in order to get primary key for new order
+        super().save(*args, **kwargs)
+
+        # can't insert twice because it'll try to insert with a PK now
+        kwargs.pop("force_insert", None)
+
+        # if we don't have a generated reference number, we generate one and save again
+        if self.reference_number is None:
+            self.reference_number = self._generate_reference_number()
+            super().save(*args, **kwargs)
 
     # Flag to determine if the order is in review status - if it is, then
     # we need to not step on the basket that may or may not exist when it is
@@ -359,8 +389,7 @@ class Order(TimestampedModel):
         """Issue a refund"""
         raise NotImplementedError()
 
-    @property
-    def reference_number(self):
+    def _generate_reference_number(self):
         return f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{self.id}"
 
     @property

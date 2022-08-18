@@ -1,10 +1,12 @@
 import pytest
 import random
 
+from datetime import timedelta
 from main.test_utils import assert_drf_json_equal
 from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
 )
 from main.utils import encode_json_cookie_value
 from django.urls import reverse
@@ -43,6 +45,7 @@ from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from users.factories import UserFactory
+from mitol.common.utils.datetime import now_in_utc
 
 pytestmark = [pytest.mark.django_db]
 
@@ -846,3 +849,36 @@ def test_checkout_api_result_verification_failure(
 
     # checkout_result_api will always respond with a 403 if validate_processor_response returns False
     assert resp.status_code == 403
+
+@pytest.mark.parametrize(
+    "upgrade_deadline, status_code",
+    [
+        (now_in_utc() - timedelta(days=1), 302),
+        (now_in_utc() + timedelta(days=1), 200),
+        (None, 200),
+    ],
+)
+def test_non_upgradable_courserun_checkout(
+    user, user_client, user_drf_client, products, upgrade_deadline, status_code
+):
+    """
+    Tests that checking out with upgradable and non-upgradable course transitions the checkout with right state
+    """
+    product = products[0]
+    product.purchasable_object = CourseRunFactory.create(
+        upgrade_deadline=upgrade_deadline
+    )
+    product.save()
+
+    create_basket_with_product(user, product)
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+    assert resp.status_code == status_code
+
+    # In case of 302, the the user
+    if status_code == 302:
+        assert resp.url == reverse("cart")
+        assert USER_MSG_COOKIE_NAME in resp.cookies
+        assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+            {"type": USER_MSG_TYPE_COURSE_NON_UPGRADABLE}
+        )

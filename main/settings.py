@@ -29,7 +29,7 @@ from redbeat import RedBeatScheduler
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 
-VERSION = "0.40.1"
+VERSION = "0.41.1"
 
 log = logging.getLogger()
 
@@ -1028,3 +1028,17 @@ GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE = get_string(
 )
 
 MITOL_GOOGLE_SHEETS_REFUNDS_PLUGINS = ["sheets.plugins.RefundPlugin"]
+
+
+# Fastly configuration
+MITX_ONLINE_FASTLY_AUTH_TOKEN = get_string(
+    name="FASTLY_AUTH_TOKEN",
+    default=None,
+    description="Optional token for the Fastly purge API.",
+)
+
+MITX_ONLINE_FASTLY_URL = get_string(
+    name="FASTLY_URL",
+    default="https://api.fastly.com",
+    description="The URL to the Fastly API.",
+)

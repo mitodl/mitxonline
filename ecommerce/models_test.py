@@ -278,13 +278,29 @@ def test_product_delete_protection_inactive():
     )  # Additional 1 from above
 
 
-def test_product_multiple_active_for_single_course_ID_validation():
-    """Test that creating multiple Products with the same Course ID
+def test_product_multiple_active_for_single_purchasable_object():
+    """Test that creating multiple Products with the same course/program
     and are active is not allowed"""
     first_product = ProductFactory.create()
     try:
         with transaction.atomic():
             ProductFactory.create(purchasable_object=first_product.purchasable_object)
-        pytest.fail("Two active Products for the same course were allowed.")
+        pytest.fail("Two active Products for the same purchasable_object were allowed.")
     except IntegrityError:
         pass
+
+
+def test_order_update_reference_number(user):
+    """Test when order is created/updated, reference_number is updated in db"""
+    order = Order(purchaser=user, total_price_paid=10)
+    order.save()
+
+    assert order.reference_number == order._generate_reference_number()
+
+    existing_order = Order.objects.get(pk=order.id)
+    existing_order.reference_number = None
+    existing_order.save()
+
+    assert (
+        existing_order.reference_number == existing_order._generate_reference_number()
+    )

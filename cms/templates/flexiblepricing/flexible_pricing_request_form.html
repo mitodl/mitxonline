@@ -51,12 +51,21 @@
       </div>
     {% else %}
       {% if prior_request.is_approved %}{# request status #}
+        {% if prior_request.tier.discount.amount == 0 %}{# discount amount text #}
+        <div class="flexible-pricing-head">
+          {{ page.application_approved_no_discount_text|richtext }}
+        </div>
+        <a href="/" class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
+          Get certificate
+        </a>
+        {% else %}
         <div class="flexible-pricing-head">
           {{ page.application_approved_text|richtext }}
         </div>
         <a href="/" class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
           Get certificate at reduced rate
         </a>
+        {% endif %}{# end discount amount text #}
       {% elif prior_request.is_denied %}
         <div class="flexible-pricing-head">
           {{ page.application_denied_text|richtext }}
@@ -73,4 +82,20 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+    <script type="text/javascript">
+          $(document).ready(function() {
+                $("#your_income").on("focus", function() {
+                    $(this).on("keydown", function(e) {
+                        //disable up/down keyboard for increment
+                        if (e.keyCode === 38 || e.keyCode === 40) {
+                            e.preventDefault();
+                        }
+                    });
+                });
+
+            });
+    </script>
 {% endblock %}

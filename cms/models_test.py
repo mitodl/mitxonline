@@ -1,5 +1,6 @@
 """Tests for Wagtail models"""
 from urllib.parse import quote_plus
+from courses.models import CourseRun
 
 import pytest
 import factory
@@ -15,8 +16,9 @@ from cms.factories import (
     ResourcePageFactory,
     CoursePageFactory,
     FlexiblePricingFormFactory,
+    ProgramPageFactory,
 )
-from cms.models import FlexiblePricingRequestSubmission
+from cms.models import FlexiblePricingRequestSubmission, CoursePage, ProgramPage
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
@@ -25,6 +27,8 @@ from courses.factories import (
 )
 from flexiblepricing.models import FlexiblePrice
 from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.factories import FlexiblePriceTierFactory
+from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
 
 pytestmark = [pytest.mark.django_db]
 
@@ -87,6 +91,7 @@ def test_course_page_context(
     else:
         run = None
         course_page_kwargs = dict(course__readable_id=FAKE_READABLE_ID)
+    relevant_runs = list(CourseRun.objects.values("courseware_id", "start_date"))
     course_page = CoursePageFactory.create(**course_page_kwargs)
     if enrolled:
         CourseRunEnrollmentFactory.create(user=staff_user, run=run)
@@ -96,6 +101,7 @@ def test_course_page_context(
         "page": course_page,
         "request": request,
         "run": run,
+        "course_runs": relevant_runs,
         "is_enrolled": exp_is_enrolled,
         "sign_in_url": f"/signin/?next={quote_plus(course_page.get_url())}"
         if exp_sign_in_url
@@ -192,7 +198,7 @@ def test_flex_pricing_form_display(mocker, is_authed, has_submission):
     see the form if they don't have an in-progress submission.
     """
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
-    flex_form = FlexiblePricingFormFactory()
+    flex_form = FlexiblePricingFormFactory(selected_course=course_page.course)
 
     if not is_authed:
         request_user = AnonymousUser()
@@ -205,7 +211,7 @@ def test_flex_pricing_form_display(mocker, is_authed, has_submission):
             flexprice = FlexiblePrice.objects.create(
                 user=request_user,
                 cms_submission=submission,
-                courseware_object=course_page.course,
+                courseware_object=course_page.course.program,
             )
 
     response = generate_flexible_pricing_response(request_user, flex_form)
@@ -238,7 +244,7 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
     """
 
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
-    flex_form = FlexiblePricingFormFactory()
+    flex_form = FlexiblePricingFormFactory(selected_course=course_page.course)
 
     request_user = UserFactory.create()
     submission = FlexiblePricingRequestSubmission.objects.create(
@@ -248,7 +254,7 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
         user=request_user,
         cms_submission=submission,
         status=submission_status,
-        courseware_object=course_page.course,
+        courseware_object=course_page.course.program,
     )
 
     response = generate_flexible_pricing_response(request_user, flex_form)
@@ -265,6 +271,31 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
         ), response.rendered_content
 
 
+@pytest.mark.parametrize("course_or_program", [True, False])
+def test_flex_pricing_parent_resources(course_or_program):
+    """
+    Tests the get_parent_product and get_parent_product_page methods in the
+    FlexiblePricingRequestForm to make sure the right things are returned based
+    on whether the form is under a CoursePage or a ProgramPage.
+
+    Args:
+    - course_or_program: boolean, True to test with a CoursePage, False for ProgramPage.
+    """
+
+    if course_or_program:
+        parent_page = CoursePageFactory.create()
+    else:
+        parent_page = ProgramPageFactory.create()
+
+    flex_form = FlexiblePricingFormFactory(parent=parent_page)
+
+    assert (
+        isinstance(flex_form.get_parent_product_page(), CoursePage)
+        if course_or_program
+        else isinstance(flex_form.get_parent_product_page(), ProgramPage)
+    )
+
+
 def test_flex_pricing_form_courseware_object():
     """
     Tests to make sure the correct courseware objects are returned when hitting
@@ -279,17 +310,17 @@ def test_flex_pricing_form_courseware_object():
 
     # no set courseware object, so get it from the parent page
 
-    assert flex_form.get_parent_courseware() == course_page.course
+    assert flex_form.get_parent_courseware() == course_page.course.program
     assert flex_form.selected_course is None
     assert flex_form.selected_program is None
 
-    # setting a specific course (but not a program) - should return the set course
+    # setting a specific course (but not a program) - should return the program
 
     flex_form.selected_course = secondary_course
     flex_form.save()
     flex_form.refresh_from_db()
 
-    assert flex_form.get_parent_courseware() == secondary_course
+    assert flex_form.get_parent_courseware() == program
     assert flex_form.selected_course == secondary_course
     assert flex_form.selected_program is None
 
@@ -302,3 +333,105 @@ def test_flex_pricing_form_courseware_object():
     assert flex_form.get_parent_courseware() == program
     assert flex_form.selected_course == secondary_course
     assert flex_form.selected_program == program
+
+
+@pytest.mark.parametrize("test_course_first", [True, False])
+def test_flex_pricing_single_submission(mocker, test_course_first):
+    """
+    Tests multiple submissions for the same course/program.
+
+    If the FlexiblePricingRequestForm is associated with a course, it should
+    check for a submission for that course or the program the course belongs to.
+    If it's associated with a program, it should check for submissions in the
+    program. A submission for a course in the program should exist for the program.
+    """
+    program = ProgramFactory.create()
+    course = CourseFactory.create(program=program)
+
+    course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
+
+    if test_course_first:
+        first_sub_form = FlexiblePricingFormFactory(
+            parent=course_page, selected_course=course
+        )
+        second_sub_form = FlexiblePricingFormFactory(
+            parent=course_page, selected_program=program
+        )
+    else:
+        second_sub_form = FlexiblePricingFormFactory(
+            parent=course_page, selected_course=course
+        )
+        first_sub_form = FlexiblePricingFormFactory(
+            parent=course_page, selected_program=program
+        )
+
+    request_user = UserFactory.create()
+    submission = FlexiblePricingRequestSubmission.objects.create(
+        form_data=json.dumps([]), page=first_sub_form, user=request_user
+    )
+
+    flexprice = FlexiblePrice.objects.create(
+        user=request_user,
+        cms_submission=submission,
+        courseware_object=program,
+        status=FlexiblePriceStatus.CREATED,
+    )
+
+    # test to make sure we get back a status message from the first form
+
+    response = generate_flexible_pricing_response(request_user, first_sub_form)
+
+    assert "Application Processing" in response.rendered_content
+
+    # then test to make sure we get a status message back from the second form too
+
+    response = generate_flexible_pricing_response(request_user, second_sub_form)
+
+    # should not get a form here - should get Application Processing
+
+    assert "Application Processing" in response.rendered_content
+
+
+def test_flex_pricing_form_state_display_no_discount_tier(mocker):
+    """
+    Tests the status display when the user is assigned to the no-discount tier.
+    """
+
+    course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
+    flex_form = FlexiblePricingFormFactory(
+        selected_course=course_page.course,
+        application_approved_no_discount_text="No Discount Text",
+        application_approved_text="Application Approved",
+    )
+    tier = FlexiblePriceTierFactory(
+        courseware_object=course_page.course.program, discount__amount=0
+    )
+    other_tier = FlexiblePriceTierFactory(
+        courseware_object=course_page.course.program,
+        discount__amount=50,
+        discount__discount_type=DISCOUNT_TYPE_FIXED_PRICE,
+    )
+
+    request_user = UserFactory.create()
+    submission = FlexiblePricingRequestSubmission.objects.create(
+        form_data=json.dumps([]), page=flex_form, user=request_user
+    )
+    flexprice = FlexiblePrice.objects.create(
+        user=request_user,
+        cms_submission=submission,
+        status=FlexiblePriceStatus.APPROVED,
+        courseware_object=course_page.course.program,
+        tier=tier,
+    )
+
+    response = generate_flexible_pricing_response(request_user, flex_form)
+
+    assert "No Discount Text" in response.rendered_content
+
+    flexprice.tier = other_tier
+    flexprice.save()
+    flexprice.refresh_from_db()
+
+    response = generate_flexible_pricing_response(request_user, flex_form)
+
+    assert "Approved" in response.rendered_content

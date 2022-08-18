@@ -1,6 +1,6 @@
 """micromasters_import admin"""
 from django.contrib import admin
-from micromasters_import.models import CourseId, ProgramId
+from micromasters_import.models import CourseId, ProgramId, ProgramTierId
 
 
 class ProgramIdAdmin(admin.ModelAdmin):
@@ -17,5 +17,13 @@ class CourseIdAdmin(admin.ModelAdmin):
     list_display = ("course", "micromasters_id")
 
 
+class ProgramTieIdAdmin(admin.ModelAdmin):
+    """Admin for ProgramTierId"""
+
+    model = ProgramTierId
+    list_display = ("micromasters_tier_program_id", "flexible_price_tier")
+
+
 admin.site.register(CourseId, CourseIdAdmin)
 admin.site.register(ProgramId, ProgramIdAdmin)
+admin.site.register(ProgramTierId, ProgramTieIdAdmin)

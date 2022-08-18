@@ -18,8 +18,9 @@ import {
   courseRunsQueryKey
 } from "../lib/queries/courseRuns"
 
-import {isFinancialAssistanceAvailable, isWithinEnrollmentPeriod} from "../lib/courseApi"
-import { formatPrettyDate, parseDateString } from "../lib/util"
+import { formatPrettyDate, emptyOrNil} from "../lib/util"
+import moment from "moment-timezone"
+import {isFinancialAssistanceAvailable, isWithinEnrollmentPeriod } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
@@ -55,13 +56,16 @@ export class ProductDetailEnrollApp extends React.Component<
   }
 
   setCurrentCourseRun = (courseRun: EnrollmentFlaggedCourseRun) => {
+    sessionStorage.setItem('currentCourseRun', JSON.stringify(courseRun))
     this.setState({
       currentCourseRun: courseRun
     })
   }
 
   getCurrentCourseRun = (): EnrollmentFlaggedCourseRun => {
-    return this.state.currentCourseRun
+    const courseRun = sessionStorage.getItem('currentCourseRun')
+    const sessionCourseRun = courseRun ? JSON.parse(courseRun) : null
+    return sessionCourseRun ? sessionCourseRun : this.state.currentCourseRun
   }
 
   renderUpgradeEnrollmentDialog() {
@@ -149,10 +153,34 @@ export class ProductDetailEnrollApp extends React.Component<
     )
   }
 
+  updateDate(run: EnrollmentFlaggedCourseRun) {
+    let date = emptyOrNil(run.start_date) ? undefined : moment(new Date(run.start_date))
+    date = date ? date.utc() : date
+    const dateElem = document.getElementById('start_date')
+    if (dateElem) dateElem.innerHTML = `<strong>${formatPrettyDate(date)}</strong>`
+  }
+
   render() {
     const { courseRuns, isLoading, status } = this.props
     const csrfToken = getCookie("csrftoken")
-    let run = !this.getCurrentCourseRun() && courseRuns ? courseRuns[0] : this.getCurrentCourseRun()
+    let run = !this.getCurrentCourseRun() && courseRuns ? (
+      courseRuns[0]
+    ) : (
+      this.getCurrentCourseRun() && courseRuns ? (
+        courseRuns[0].page && this.getCurrentCourseRun().page ? (
+          courseRuns[0].page.page_url === this.getCurrentCourseRun().page.page_url ? (
+            this.getCurrentCourseRun()
+          ) : (
+            courseRuns[0]
+          )
+        ) : (
+          courseRuns[0]
+        )
+      ) : (
+        null
+      )
+    )
+    if (run) this.updateDate(run)
     let product = run && run.products ? run.products[0] : null
     if (courseRuns) {
       const thisScope = this
@@ -164,7 +192,7 @@ export class ProductDetailEnrollApp extends React.Component<
             run = thisScope.getCurrentCourseRun()
             product = run && run.products ? run.products[0] : null
             // $FlowFixMe
-            document.getElementById('start_date').innerHTML = `<strong>${formatPrettyDate(parseDateString(courseRun.start_date))}</strong>`
+            thisScope.updateDate(run)
           }
         })
       })
@@ -200,7 +228,7 @@ export class ProductDetailEnrollApp extends React.Component<
                 Enroll now
               </a>
             ) : run && isWithinEnrollmentPeriod(run) ? (
-              SETTINGS.features.upgrade_dialog && product ? (
+              SETTINGS.features.upgrade_dialog && product && run.is_upgradable ? (
                 <button
                   className="btn btn-primary btn-gradient-red highlight enroll-now"
                   onClick={() => this.toggleUpgradeDialogVisibility()}
