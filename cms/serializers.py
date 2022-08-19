@@ -41,7 +41,7 @@ class CoursePageSerializer(serializers.ModelSerializer):
             financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
                 selected_program=instance.product.program
             ).first()
-            if financial_assistance_page is None:
+            if financial_assistance_page is None and program_page:
                 financial_assistance_page = (
                     program_page.get_children()
                     .type(FlexiblePricingRequestForm)
