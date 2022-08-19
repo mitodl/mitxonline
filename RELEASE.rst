@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.41.3
+--------------
+
+- 811: need financial assistance link on the checkout page (#855)
+- 806: ecommerce implement a cybersource notification api endpoint (#817)
+- added css and js to remove incremantal arrow for income field
+- Online-860 Calculate flexible price discount instead of using BasketDiscount (#861)
+- Adds text to display when a flexible pricing request is assigned a $0 tier
+- Purges the Fastly cache for a page once the page has been modified
+
 Version 0.41.2 (Released August 19, 2022)
 --------------
 
