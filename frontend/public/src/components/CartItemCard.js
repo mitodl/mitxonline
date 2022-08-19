@@ -10,7 +10,7 @@ type Props = {
 }
 
 export class CartItemCard extends React.Component<Props> {
-  courseAboutLink(linkText, course) {
+  courseAboutLink(linkText: string, course: Object) {
     return (<a href={course.page !== null ? course.page.page_url : "#"} target="_blank" rel="noopener noreferrer">
       {linkText}
     </a>)
