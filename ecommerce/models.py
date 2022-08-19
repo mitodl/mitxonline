@@ -38,6 +38,8 @@ def valid_purchasable_objects_list():
 
 
 class ProductsQuerySet(models.QuerySet):
+    """Queryset to block delete and instead mark the items in_active"""
+
     def delete(self):
         self.update(is_active=False)
 
@@ -48,7 +50,7 @@ class ActiveUndeleteManager(models.Manager):
     # This can be used generally, for the models that have `is_active` field
     def get_queryset(self):
         """Getting the active queryset for manager"""
-        return ProductsQuerySet(self.model, using=self._db)
+        return ProductsQuerySet(self.model, using=self._db).filter(is_active=True)
 
 
 @reversion.register(exclude=("created_on", "updated_on"))
@@ -706,7 +708,7 @@ class Line(TimestampedModel):
         return (
             DiscountType.get_discounted_price(
                 discounts,
-                Product.objects.get(pk=self.product_version.object_id),
+                Product.all_objects.get(pk=self.product_version.object_id),
                 product_version=self.product_version,
             ).quantize(Decimal("0.01"))
             * self.quantity
@@ -717,7 +719,7 @@ class Line(TimestampedModel):
         from ecommerce.discounts import resolve_product_version
 
         return resolve_product_version(
-            Product.objects.get(pk=self.product_version.field_dict["id"]),
+            Product.all_objects.get(pk=self.product_version.field_dict["id"]),
             self.product_version,
         )
 

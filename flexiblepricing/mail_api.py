@@ -41,7 +41,8 @@ def generate_flexible_price_email(flexible_price):
         courserun = CourseRun.objects.filter(
             course=flexible_price.courseware_object
         ).first()
-        product = Product.objects.get(object_id=courserun.id, is_active=True)
+        # Product queryset returns active Products by default
+        product = Product.objects.get(object_id=courserun.id)
         price = DiscountType.get_discounted_price(
             [flexible_price.tier.discount], product
         )

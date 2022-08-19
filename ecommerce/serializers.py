@@ -119,6 +119,7 @@ class BasketItemSerializer(serializers.ModelSerializer):
 
     def perform_create(self, validated_data):
         basket = Basket.objects.get(user=validated_data["user"])
+        # Product queryset returns active Products by default
         product = Product.objects.get(id=validated_data["product"])
         item, _ = BasketItem.objects.get_or_create(basket=basket, product=product)
         return item
@@ -232,7 +233,7 @@ class LineSerializer(serializers.ModelSerializer):
     product = serializers.SerializerMethodField()
 
     def get_product(self, instance):
-        product = models.Product.objects.get(
+        product = models.Product.all_objects.get(
             pk=instance.product_version.field_dict["id"]
         )
 
@@ -382,7 +383,7 @@ class OrderHistorySerializer(serializers.ModelSerializer):
         titles = []
 
         for line in instance.lines.all():
-            product = models.Product.objects.get(
+            product = models.Product.all_objects.get(
                 pk=line.product_version.field_dict["id"]
             )
             if product.content_type.model == "courserun":
