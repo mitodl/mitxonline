@@ -225,6 +225,8 @@ def determine_courseware_flexible_price_discount(product, user):
     Returns:
         discount: the discount provided in the flexible price tier
     """
+    if not user.is_authenticated:
+        return None
 
     for eligible_courseware in get_ordered_eligible_coursewares(
         product.purchasable_object
