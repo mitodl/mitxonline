@@ -97,31 +97,6 @@ def test_discount_factory_adjustment(discounts, products):
             )
 
 
-def test_user_discount_application(user, user_drf_client, unlimited_discount, products):
-    """
-    Creates a user discount (which should be applied automatically for a
-    particular user), and then creates a basket for that particular user and
-    applies the user discounts (via the clear discount API call).
-    The User Discount should be applied.
-    """
-    product = products[random.randrange(0, len(products), 1)]
-
-    basket = Basket(user=user)
-    basket.save()
-
-    item = BasketItem(product=product, basket=basket, quantity=1)
-    item.save()
-
-    user_discount = UserDiscount(user=user, discount=unlimited_discount)
-    user_discount.save()
-
-    resp = user_drf_client.post(reverse("checkout_api-clear_discount"))
-
-    assert resp.data == "Discounts cleared"
-
-    assert BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0
-
-
 def test_discounted_price(products):
     """
     Tests the get_discounted_price call with some products to make sure the

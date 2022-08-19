@@ -342,28 +342,6 @@ class CheckoutApiViewSet(ViewSet):
         )
 
     @action(
-        detail=False,
-        methods=["post"],
-        name="Clear Discount",
-        url_name="clear_discount",
-    )
-    def clear_discount(self, request):
-        """
-        API call to clear discounts from the current cart. This will reapply
-        UserDiscounts.
-
-        Returns:
-            - Success message on success
-        """
-        basket = api.establish_basket(request)
-
-        BasketDiscount.objects.filter(redeemed_basket=basket).delete()
-
-        api.apply_user_discounts(request)
-
-        return Response("Discounts cleared")
-
-    @action(
         detail=False, methods=["post"], name="Start Checkout", url_name="start_checkout"
     )
     def start_checkout(self, request):
