@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.41.2
+Version 0.41.2 (Released August 19, 2022)
 --------------
 
 - fix: datetime issue in flexible price form (#863)
