@@ -54,7 +54,7 @@ def test_serialize_course_page(
     patched_get_wagtail_src.assert_called_once_with(course_page.feature_image)
 
 
-def test_serialize_course_page_with_flex_price_with_program_fk(
+def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
     mocker, fully_configured_wagtail, staff_user, mock_context
 ):
     """
@@ -68,6 +68,41 @@ def test_serialize_course_page_with_flex_price_with_program_fk(
     program_page = ProgramPageFactory(program=program)
     financial_assistance_form = FlexiblePricingFormFactory(
         selected_program_id=program.id, parent=program_page
+    )
+    course = CourseFactory(program=program)
+    course_page = CoursePageFactory(course=course)
+
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = staff_user
+
+    data = CoursePageSerializer(
+        instance=course_page, context=course_page.get_context(request)
+    ).data
+    assert_drf_json_equal(
+        data,
+        {
+            "feature_image_src": fake_image_src,
+            "page_url": course_page.url,
+            "financial_assistance_form_url": financial_assistance_form.get_url(),
+        },
+    )
+
+
+def test_serialize_course_page_with_flex_price_with_program_fk_no_parent(
+    mocker, fully_configured_wagtail, staff_user, mock_context
+):
+    """
+    Tests course page serialization with Financial Assistance form which has a fk relationship to
+    a program, but no parent-child relationship with any course or program.
+    """
+    fake_image_src = "http://example.com/my.img"
+    mocker.patch("cms.serializers.get_wagtail_img_src", return_value=fake_image_src)
+
+    program = ProgramFactory()
+    program_page = ProgramPageFactory(program=program)
+    financial_assistance_form = FlexiblePricingFormFactory(
+        selected_program_id=program.id
     )
     course = CourseFactory(program=program)
     course_page = CoursePageFactory(course=course)
