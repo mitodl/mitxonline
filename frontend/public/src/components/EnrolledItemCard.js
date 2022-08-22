@@ -17,7 +17,6 @@ import { partial } from "ramda"
 import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../constants"
 import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
-import { EnrollmentRoleTag } from "./EnrollmentRoleTag"
 
 import type { RunEnrollment } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
@@ -321,9 +320,6 @@ export class EnrolledItemCard extends React.Component<
           )}
           <div className="col-12 col-md px-3 py-3 py-md-0">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
-              <EnrollmentRoleTag
-                enrollmentMode={enrollmentMode}
-              ></EnrollmentRoleTag>
               <Dropdown
                 isOpen={menuVisibility}
                 toggle={this.toggleMenuVisibility.bind(this)}
