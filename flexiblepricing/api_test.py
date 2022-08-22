@@ -1,15 +1,16 @@
 """Flexible price api tests"""
 import json
-from datetime import timedelta
-
+from datetime import timedelta, datetime
 import ddt
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
+import pytz
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 from mitol.common.utils.datetime import now_in_utc
 
+from main.settings import TIME_ZONE
 from courses.factories import (
     CourseFactory,
     CourseRunFactory,
@@ -461,6 +462,45 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
         product = ProductFactory.create(purchasable_object=run_obj)
         discount = determine_courseware_flexible_price_discount(product, user)
         assert discount is None
+
+    def test_determine_courseware_flexible_price_discount_expired(self):
+        """
+        Tests the result of determine_courseware_flexible_price_discount when
+        the discount has expired.
+        """
+        self.select_course_or_program()
+
+        user = UserFactory.create()
+        course = CourseFactory.create()
+        product = ProductFactory.create(purchasable_object=course)
+        flexible_price = FlexiblePriceFactory.create(
+            income_usd=12000,
+            user=user,
+            courseware_object=course,
+            status=FlexiblePriceStatus.APPROVED,
+        )
+        discount = flexible_price.tier.discount
+
+        assert discount.activation_date is None and discount.expiration_date is None
+        assert determine_courseware_flexible_price_discount(product, user) == discount
+
+        expired_delta = timedelta(days=30)
+        discount.activation_date = (
+            datetime.now(pytz.timezone(TIME_ZONE)) - expired_delta - expired_delta
+        )
+        discount.expiration_date = (
+            datetime.now(pytz.timezone(TIME_ZONE)) - expired_delta
+        )
+        discount.save()
+        discount.refresh_from_db()
+
+        assert (
+            discount.activation_date is not None
+            and discount.expiration_date is not None
+        )
+        assert (
+            determine_courseware_flexible_price_discount(product, user) is not discount
+        )
 
     @ddt.data(
         [0, "0", True],
