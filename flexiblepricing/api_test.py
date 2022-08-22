@@ -1,31 +1,32 @@
 """Flexible price api tests"""
-from datetime import timedelta
-import ddt
 import json
-import pytest
+from datetime import timedelta
 
+import ddt
+import pytest
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 from mitol.common.utils.datetime import now_in_utc
-from django.contrib.contenttypes.models import ContentType
 
 from courses.factories import (
-    ProgramFactory,
     CourseFactory,
     CourseRunFactory,
+    ProgramFactory,
     ProgramRunFactory,
 )
 from courses.models import Program
 from ecommerce.factories import ProductFactory
 from flexiblepricing.api import (
-    parse_country_income_thresholds,
     IncomeThreshold,
-    import_country_income_thresholds,
-    update_currency_exchange_rate,
-    determine_tier_courseware,
-    determine_income_usd,
     determine_auto_approval,
     determine_courseware_flexible_price_discount,
+    determine_income_usd,
+    determine_tier_courseware,
+    import_country_income_thresholds,
+    parse_country_income_thresholds,
+    update_currency_exchange_rate,
 )
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.exceptions import CountryIncomeThresholdException
@@ -33,8 +34,8 @@ from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFac
 from flexiblepricing.models import (
     CountryIncomeThreshold,
     CurrencyExchangeRate,
-    FlexiblePriceTier,
     FlexiblePrice,
+    FlexiblePriceTier,
 )
 from users.factories import UserFactory
 
@@ -448,6 +449,18 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
             assert discount.amount == courseware_tier.discount.amount
         else:
             assert discount is None
+
+    def test_determine_courseware_flexible_price_discount_anonymous_user(self):
+        """
+        Tests discount is `None` for anonymous user.
+        """
+        self.select_course_or_program(test_program=False)
+
+        user = AnonymousUser()
+        run_obj = CourseRunFactory.create(course=self.courseware_object)
+        product = ProductFactory.create(purchasable_object=run_obj)
+        discount = determine_courseware_flexible_price_discount(product, user)
+        assert discount is None
 
     @ddt.data(
         [0, "0", True],
