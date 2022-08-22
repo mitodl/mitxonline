@@ -153,9 +153,9 @@ $program-badge-bg: #DBF2F3;
 .nav-drawer {
   position: fixed;
   z-index: 1000;
-  width: 55%;
+  width: 100%;
   height: 100%;
-  right: -55%;
+  right: -100%;
   top: 0;
   background-color: $sidenav-bg;
   transition: right 0.2s ease-in-out ;
@@ -163,8 +163,8 @@ $program-badge-bg: #DBF2F3;
   overflow-y: scroll;
 
   &.open {
-    box-shadow: 0 3px 0 10px rgba(0,0,0,.2);
-    right: 0;
+    box-shadow: 0 3px 0 8px rgba(0,0,0,.2);
+    left: 8px;
   }
 
   button {
