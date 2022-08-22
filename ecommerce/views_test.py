@@ -403,18 +403,6 @@ def test_redeem_time_limited_discount(
         assert "not found" in resp_json
 
 
-def test_clear_discounts(user, user_drf_client, products, discounts):
-    """
-    Bootstraps a basket (see create_basket) and then attempts to redeem a
-    discount on it, then clears it. Should get back a success message.
-    """
-    test_redeem_discount(user, user_drf_client, products, discounts, False)
-
-    resp = user_drf_client.post(reverse("checkout_api-clear_discount"))
-
-    assert resp.json() == "Discounts cleared"
-
-
 def test_start_checkout(user, user_drf_client, products):
     """
     Hits the start checkout view, which should create an Order record
