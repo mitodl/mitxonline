@@ -123,6 +123,7 @@ class CourseSerializer(BaseCourseSerializer):
     courseruns = serializers.SerializerMethodField()
     next_run_id = serializers.SerializerMethodField()
     topics = serializers.SerializerMethodField()
+    page = serializers.SerializerMethodField()
 
     def get_next_run_id(self, instance):
         """Get next run id"""
@@ -154,6 +155,15 @@ class CourseSerializer(BaseCourseSerializer):
             key=lambda topic: topic["name"],
         )
 
+    def get_page(self, instance):
+        return (
+            CoursePageSerializer(
+                instance=CoursePage.objects.filter(course=instance).get()
+            ).data
+            if CoursePage.objects.filter(course=instance).exists()
+            else None
+        )
+
     class Meta:
         model = models.Course
         fields = [
@@ -163,6 +173,7 @@ class CourseSerializer(BaseCourseSerializer):
             "courseruns",
             "next_run_id",
             "topics",
+            "page",
         ]
 
 
