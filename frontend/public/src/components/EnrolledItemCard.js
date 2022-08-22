@@ -15,6 +15,7 @@ import {
 import { partial } from "ramda"
 
 import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../constants"
+import GetCertificateButton from './GetCertificateButton'
 import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
@@ -255,7 +256,7 @@ export class EnrolledItemCard extends React.Component<
     )
 
     const financialAssistanceLink = isFinancialAssistanceAvailable(enrollment.run) ? (
-      <a className="financial-assist-link" href={enrollment.run.page.financial_assistance_form_url}>
+      <a href={enrollment.run.page.financial_assistance_form_url}>
         Financial assistance?
       </a>
     ) : null
@@ -264,25 +265,9 @@ export class EnrolledItemCard extends React.Component<
       enrollment.enrollment_mode === "audit" &&
       enrollment.run.is_upgradable
     ) ? (
-        <div className="pricing-links">
+        <div className="enrollment-extra-links d-flex">
           {financialAssistanceLink}
-          <form
-            action="/cart/add/"
-            method="get"
-            className="text-center ml-auto"
-          >
-            <input
-              type="hidden"
-              name="product_id"
-              value={enrollment.run.products[0].id}
-            />
-            <button
-              type="submit"
-              className="btn btn-primary btn-gradient-red"
-            >
-            Get Certificate
-            </button>
-          </form>
+          <GetCertificateButton productId={enrollment.run.products[0].id} />
         </div>
       ) : null
 
@@ -318,8 +303,10 @@ export class EnrolledItemCard extends React.Component<
               </div>
             </div>
           )}
+
           <div className="col-12 col-md px-3 py-3 py-md-0">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
+              <h2 className="my-0 mr-3">{title}</h2>
               <Dropdown
                 isOpen={menuVisibility}
                 toggle={this.toggleMenuVisibility.bind(this)}
@@ -350,10 +337,6 @@ export class EnrolledItemCard extends React.Component<
                 </DropdownMenu>
               </Dropdown>
             </div>
-
-            <div className="d-flex justify-content-between align-content-start flex-nowrap mb-3">
-              <h2 className="my-0 mr-3">{title}</h2>
-            </div>
             <div className="detail">
               {courseId} |{" "}
               {startDateDescription !== null && startDateDescription.active ? (
@@ -378,6 +361,13 @@ export class EnrolledItemCard extends React.Component<
                     rel="noopener noreferrer"
                   >View certificate</a>
                 ) : null}
+              </div>
+              <div>
+                <p>
+                  <br/>
+                  <strong>Upgrade today</strong> and, upon passing, receive your certificate signed by MIT faculty
+                  to highlight the knowledge and skills you've gained from this MITx course.
+                </p>
                 {certificateLinks}
               </div>
             </div>
