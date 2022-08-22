@@ -12,6 +12,8 @@ from main.utils import encode_json_cookie_value
 from django.urls import reverse
 from django.conf import settings
 from django.forms.models import model_to_dict
+from rest_framework import status
+
 import operator as op
 import reversion
 import uuid
@@ -40,6 +42,7 @@ from ecommerce.serializers import (
     BasketSerializer,
     BasketItemSerializer,
     DiscountSerializer,
+    BasketWithProductSerializer,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
@@ -97,6 +100,19 @@ def test_get_products(user_drf_client, products):
     )
 
     assert_drf_json_equal(resp.json(), ProductSerializer(product).data)
+
+
+def test_get_products_inactive(user_drf_client, products):
+    """Test that Product detail API doesn't return data for inactive product"""
+    product = products[random.randrange(0, len(products))]
+    product.is_active = False
+    product.save()
+
+    resp = user_drf_client.get(
+        reverse("products_api-detail", kwargs={"pk": product.id})
+    )
+
+    assert_drf_json_equal(resp.json(), {"detail": "Not found."})
 
 
 def test_get_basket(user_drf_client, user):
@@ -500,7 +516,6 @@ def test_checkout_product(
     and redirect to checkout
     """
     basket = BasketFactory.create() if cart_exists else None
-
     if not cart_empty:
         BasketItemFactory.create(basket=basket)
 
@@ -517,13 +532,43 @@ def test_checkout_product(
         api_payload = {"product_id": product.id}
 
     resp = user_client.get(reverse("checkout-product"), api_payload)
-
     assert resp.status_code == 302
     assert resp.url == reverse("cart")
 
     basket = Basket.objects.get(user=user)
 
     assert [item.product for item in basket.basket_items.all()] == [product]
+
+
+@pytest.mark.parametrize(
+    "cart_exists, cart_empty, expected_status, expected_message",
+    [
+        (False, True, status.HTTP_406_NOT_ACCEPTABLE, "No basket"),
+        (True, True, status.HTTP_406_NOT_ACCEPTABLE, "No product in basket"),
+        (True, False, status.HTTP_200_OK, ""),
+    ],
+)
+def test_checkout_product_cart(
+    user, user_drf_client, cart_exists, cart_empty, expected_status, expected_message
+):
+    """
+    Verifies that cart/ works the way it is expected and generates proper responses/data in the cart page
+    """
+    basket = None
+
+    if cart_exists:
+        basket = BasketFactory.create(user=user)
+
+    if not cart_empty:
+        BasketItemFactory.create(basket=basket)
+
+    resp = user_drf_client.get(reverse("checkout_api-cart"))
+    assert resp.status_code == expected_status
+
+    if cart_empty:
+        assert resp.data == expected_message
+    else:
+        assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
 
 
 def test_discount_rest_api(admin_drf_client, user_drf_client):
