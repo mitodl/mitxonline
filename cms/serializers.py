@@ -1,6 +1,8 @@
 """CMS app serializers"""
 from django.templatetags.static import static
 from rest_framework import serializers
+import bleach
+from django.contrib.contenttypes.models import ContentType
 
 from django.contrib.contenttypes.models import ContentType
 
@@ -8,6 +10,7 @@ from cms import models
 from cms.api import get_wagtail_img_src
 from cms.models import FlexiblePricingRequestForm, ProgramPage
 from courses.constants import DEFAULT_COURSE_IMG_PATH
+from ecommerce.models import Product
 
 
 class CoursePageSerializer(serializers.ModelSerializer):
@@ -16,6 +19,9 @@ class CoursePageSerializer(serializers.ModelSerializer):
     feature_image_src = serializers.SerializerMethodField()
     page_url = serializers.SerializerMethodField()
     financial_assistance_form_url = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
+    current_price = serializers.SerializerMethodField()
+    instructors = serializers.SerializerMethodField()
 
     def get_feature_image_src(self, instance):
         """Serializes the source of the feature_image"""
@@ -61,10 +67,54 @@ class CoursePageSerializer(serializers.ModelSerializer):
 
         return financial_assistance_page.get_url() if financial_assistance_page else ""
 
+    def get_next_run_id(self, instance):
+        """Get next run id"""
+        run = instance.course.first_unexpired_run
+        return run.id if run is not None else None
+
+    def get_description(self, instance):
+        return bleach.clean(instance.description, tags=[], strip=True)
+
+    def get_current_price(self, instance):
+        next_run = self.get_next_run_id(instance)
+
+        if next_run is None:
+            return None
+
+        course_ct = ContentType.objects.get(app_label="courses", model="courserun")
+
+        relevant_product = (
+            Product.objects.filter(
+                content_type=course_ct, object_id=next_run, is_active=True
+            )
+            .order_by("-price")
+            .first()
+        )
+        return relevant_product.price if relevant_product else None
+
+    def get_instructors(self, instance):
+        members = [member.value for member in instance.faculty_members]
+        returnable_members = []
+
+        for member in members:
+            returnable_members.append(
+                {
+                    "name": member["name"],
+                    "description": bleach.clean(
+                        member["description"].source, tags=[], strip=True
+                    ),
+                }
+            )
+
+        return returnable_members
+
     class Meta:
         model = models.CoursePage
         fields = [
             "feature_image_src",
             "page_url",
             "financial_assistance_form_url",
+            "description",
+            "current_price",
+            "instructors",
         ]

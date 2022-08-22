@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 import factory
 import pytest
+import bleach
 import pytz
 from django.contrib.auth.models import AnonymousUser
 
@@ -29,6 +30,7 @@ from courses.serializers import (
     ProgramSerializer,
 )
 from ecommerce.serializers import BaseProductSerializer
+from ecommerce.factories import ProductFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
 
 pytestmark = [pytest.mark.django_db]
@@ -144,6 +146,7 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
             ],
             "next_run_id": course.first_unexpired_run.id,
             "topics": [{"name": topic}],
+            "page": None,
         },
     )
 
@@ -181,6 +184,9 @@ def test_serialize_course_with_page_fields(
             "feature_image_src": fake_image_src,
             "page_url": None,
             "financial_assistance_form_url": expected_financial_assistance_url,
+            "instructors": [],
+            "current_price": None,
+            "description": bleach.clean(course_page.description, tags=[], strip=True),
         },
     )
     patched_get_wagtail_src.assert_called_once_with(course_page.feature_image)

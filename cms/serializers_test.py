@@ -12,6 +12,7 @@ from cms.serializers import CoursePageSerializer
 from courses.factories import CourseFactory, ProgramFactory
 from main.test_utils import assert_drf_json_equal
 from django.test.client import RequestFactory
+import bleach
 
 pytestmark = [pytest.mark.django_db]
 
@@ -49,6 +50,9 @@ def test_serialize_course_page(
             "feature_image_src": fake_image_src,
             "page_url": course_page.url,
             "financial_assistance_form_url": financial_assistance_page.get_url(),
+            "instructors": [],
+            "current_price": None,
+            "description": bleach.clean(course_page.description, tags=[], strip=True),
         },
     )
     patched_get_wagtail_src.assert_called_once_with(course_page.feature_image)
@@ -85,6 +89,9 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
             "feature_image_src": fake_image_src,
             "page_url": course_page.url,
             "financial_assistance_form_url": financial_assistance_form.get_url(),
+            "instructors": [],
+            "current_price": None,
+            "description": bleach.clean(course_page.description, tags=[], strip=True),
         },
     )
 
@@ -120,6 +127,9 @@ def test_serialize_course_page_with_flex_price_with_program_fk_no_parent(
             "feature_image_src": fake_image_src,
             "page_url": course_page.url,
             "financial_assistance_form_url": financial_assistance_form.get_url(),
+            "instructors": [],
+            "current_price": None,
+            "description": bleach.clean(course_page.description, tags=[], strip=True),
         },
     )
 
@@ -155,6 +165,9 @@ def test_serialize_course_page_with_flex_price_form_as_program_child(
             "feature_image_src": fake_image_src,
             "page_url": course_page.url,
             "financial_assistance_form_url": financial_assistance_page.get_url(),
+            "instructors": [],
+            "current_price": None,
+            "description": bleach.clean(course_page.description, tags=[], strip=True),
         },
     )
 
@@ -188,5 +201,8 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
             "feature_image_src": fake_image_src,
             "page_url": course_page.url,
             "financial_assistance_form_url": financial_assistance_form.get_url(),
+            "instructors": [],
+            "current_price": None,
+            "description": bleach.clean(course_page.description, tags=[], strip=True),
         },
     )
