@@ -1,3 +1,5 @@
+from datetime import datetime
+import pytz
 from django.utils.functional import cached_property
 from django.conf import settings
 from django.db import models, transaction
@@ -25,6 +27,7 @@ from users.models import User
 from decimal import Decimal
 from courses.api import create_run_enrollments
 from ecommerce.tasks import send_ecommerce_order_receipt
+from main.settings import TIME_ZONE
 
 from mitol.common.utils.datetime import now_in_utc
 
@@ -236,6 +239,16 @@ class Discount(TimestampedModel):
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
     discount_code = models.CharField(max_length=50)
     for_flexible_pricing = models.BooleanField(null=False, default=True)
+    activation_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="If set, this discount code will not be redeemable before this date.",
+    )
+    expiration_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="If set, this discount code will not be redeemable after this date.",
+    )
 
     def __str__(self):
         return f"{self.amount} {self.discount_type} {self.redemption_type} - {self.discount_code}"
@@ -268,6 +281,16 @@ class Discount(TimestampedModel):
             self.max_redemptions > 0
             and DiscountRedemption.objects.filter(redeemed_discount=self).count()
             >= self.max_redemptions
+        ):
+            return False
+
+        if self.activation_date is not None and self.activation_date > datetime.now(
+            pytz.timezone(TIME_ZONE)
+        ):
+            return False
+
+        if self.expiration_date is not None and self.expiration_date <= datetime.now(
+            pytz.timezone(TIME_ZONE)
         ):
             return False
 

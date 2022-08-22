@@ -1,7 +1,8 @@
 import pytest
 import random
+import pytz
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from main.test_utils import assert_drf_json_equal
 from main.constants import (
     USER_MSG_COOKIE_NAME,
@@ -9,6 +10,7 @@ from main.constants import (
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
 )
 from main.utils import encode_json_cookie_value
+from main.settings import TIME_ZONE
 from django.urls import reverse
 from django.conf import settings
 from django.forms.models import model_to_dict
@@ -351,6 +353,56 @@ def test_redeem_discount_with_higher_discount(
     )
 
 
+@pytest.mark.parametrize(
+    "time, expects", [["valid", True], ["past", False], ["future", False]]
+)
+def test_redeem_time_limited_discount(
+    user, user_drf_client, products, discounts, time, expects
+):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it. The result will depend on whether or not the discount is
+    valid for the current time.
+    """
+    basket = create_basket(user, products)
+
+    assert basket is not None
+    assert len(basket.basket_items.all()) > 0
+
+    discount = discounts[random.randrange(0, len(discounts))]
+
+    check_delta = timedelta(days=30)
+
+    if time == "valid":
+        discount.activation_date = datetime.now(pytz.timezone(TIME_ZONE)) - check_delta
+        discount.expiration_date = datetime.now(pytz.timezone(TIME_ZONE)) + check_delta
+    elif time == "past":
+        discount.activation_date = (
+            datetime.now(pytz.timezone(TIME_ZONE)) - check_delta - check_delta
+        )
+        discount.expiration_date = datetime.now(pytz.timezone(TIME_ZONE)) - check_delta
+    elif time == "future":
+        discount.activation_date = datetime.now(pytz.timezone(TIME_ZONE)) + check_delta
+        discount.expiration_date = (
+            datetime.now(pytz.timezone(TIME_ZONE)) + check_delta + check_delta
+        )
+
+    discount.save()
+    discount.refresh_from_db()
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    resp_json = resp.json()
+
+    if expects:
+        assert "message" in resp_json
+        assert resp_json["message"] == "Discount applied"
+    else:
+        assert "not found" in resp_json
+
+
 def test_clear_discounts(user, user_drf_client, products, discounts):
     """
     Bootstraps a basket (see create_basket) and then attempts to redeem a
@@ -395,6 +447,28 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
     order = Order.objects.filter(purchaser=user).get()
 
     assert order.state == Order.STATE.PENDING
+
+
+def test_start_checkout_with_invalid_discounts(user, user_client, products, discounts):
+    """
+    Applies a discount, invalidates all the discounts, then hits the start
+    checkout view, which should return an error.
+    """
+    check_delta = timedelta(days=30)
+
+    test_redeem_discount(user, user_client, products, discounts, False)
+
+    for discount in discounts:
+        discount.activation_date = (
+            datetime.now(pytz.timezone(TIME_ZONE)) - check_delta - check_delta
+        )
+        discount.expiration_date = datetime.now(pytz.timezone(TIME_ZONE)) - check_delta
+        discount.save()
+        discount.refresh_from_db()
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
 
 
 @pytest.mark.parametrize(

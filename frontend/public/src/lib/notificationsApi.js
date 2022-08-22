@@ -16,7 +16,8 @@ import {
   USER_MSG_TYPE_PAYMENT_ACCEPTED,
   USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE,
   USER_MSG_TYPE_PAYMENT_REVIEW,
-  USER_MSG_TYPE_COURSE_NON_UPGRADABLE
+  USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+  USER_MSG_TYPE_DISCOUNT_INVALID
 } from "../constants"
 
 type UserMessage = {
@@ -98,6 +99,10 @@ export function parseStoredUserMessage(
     msgText = userMsgJson.run
       ? `Success! You are now enrolled for the certificate version of ${userMsgJson.run}.`
       : null
+    break
+  case USER_MSG_TYPE_DISCOUNT_INVALID:
+    alertType = ALERT_TYPE_DANGER
+    msgText = `The discount that was applied to your cart is no longer valid. If this is unexpected, please contact customer support at ${SETTINGS.support_email}.`
     break
   default:
     return null

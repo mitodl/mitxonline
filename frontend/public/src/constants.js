@@ -121,6 +121,7 @@ export const USER_MSG_TYPE_PAYMENT_ACCEPTED = "payment-accepted"
 export const USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE =
   "payment-accepted-no-value"
 export const USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN = "payment-error-unknown"
+export const USER_MSG_TYPE_DISCOUNT_INVALID = "discount-invalid"
 
 export const USERNAME_LENGTH = 30
 

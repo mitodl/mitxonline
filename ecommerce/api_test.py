@@ -22,7 +22,6 @@ from ecommerce.factories import (
     LineFactory,
 )
 from ecommerce.constants import (
-    TRANSACTION_TYPES,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
 )
