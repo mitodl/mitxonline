@@ -29,7 +29,6 @@ from courses.models import (
     CourseRun,
     CourseRunEnrollment,
     CourseRunGrade,
-    Program,
     ProgramEnrollment,
     Course,
 )
@@ -102,11 +101,9 @@ def get_user_relevant_course_run_qset(
             | Q(enrollment_end__gt=now)
         )
     else:
-        runs = (
-            run_qset.filter(start_date__gt=now)
-            .filter(Q(enrollment_end=None) | Q(enrollment_end__gt=now))
-            .order_by("enrollment_start")
-        )
+        runs = run_qset.filter(
+            Q(enrollment_end=None) | Q(enrollment_end__gt=now)
+        ).order_by("enrollment_start")
     return runs
 
 
