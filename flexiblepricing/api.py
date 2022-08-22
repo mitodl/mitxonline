@@ -2,11 +2,15 @@
 import csv
 from collections import namedtuple
 import logging
+from datetime import datetime
+import pytz
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 
+from main.settings import TIME_ZONE
 from flexiblepricing.constants import (
     INCOME_THRESHOLD_FIELDS,
     COUNTRY,
@@ -225,16 +229,39 @@ def determine_courseware_flexible_price_discount(product, user):
     Returns:
         discount: the discount provided in the flexible price tier
     """
+    if not user.is_authenticated:
+        return None
 
     for eligible_courseware in get_ordered_eligible_coursewares(
         product.purchasable_object
     ):
         content_type = ContentType.objects.get_for_model(eligible_courseware)
-        flexible_price = FlexiblePrice.objects.filter(
-            courseware_content_type=content_type,
-            courseware_object_id=eligible_courseware.id,
-            user=user,
-        ).first()
+        flexible_price = (
+            FlexiblePrice.objects.filter(
+                courseware_content_type=content_type,
+                courseware_object_id=eligible_courseware.id,
+                user=user,
+            )
+            .filter(
+                (
+                    Q(tier__discount__activation_date=None)
+                    | Q(
+                        tier__discount__activation_date__lte=datetime.now(
+                            pytz.timezone(TIME_ZONE)
+                        )
+                    )
+                )
+                & (
+                    Q(tier__discount__expiration_date=None)
+                    | Q(
+                        tier__discount__expiration_date__gte=datetime.now(
+                            pytz.timezone(TIME_ZONE)
+                        )
+                    )
+                )
+            )
+            .first()
+        )
 
         if (
             flexible_price

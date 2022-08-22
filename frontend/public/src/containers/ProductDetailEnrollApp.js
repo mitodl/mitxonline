@@ -161,7 +161,7 @@ export class ProductDetailEnrollApp extends React.Component<
   }
 
   render() {
-    const { courseRuns, isLoading, status } = this.props
+    const { courseRuns, isLoading, currentUser } = this.props
     const csrfToken = getCookie("csrftoken")
     let run = !this.getCurrentCourseRun() && courseRuns ? (
       courseRuns[0]
@@ -220,7 +220,7 @@ export class ProductDetailEnrollApp extends React.Component<
           </Fragment>
         ) : (
           <Fragment>
-            {status === 403 ? (
+            {run && isWithinEnrollmentPeriod(run) && currentUser && !currentUser.id ? (
               <a
                 href={routes.login}
                 className="btn btn-primary btn-gradient-red highlight"

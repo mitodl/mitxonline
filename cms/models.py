@@ -27,7 +27,7 @@ from wagtail.admin.edit_handlers import (
 )
 from wagtail.core.blocks import PageChooserBlock, StreamBlock
 from wagtail.core.fields import RichTextField, StreamField
-from wagtail.core.models import Page, Orderable
+from wagtail.core.models import Page, Orderable, Site
 from wagtail.images.models import Image
 from wagtail.images.edit_handlers import ImageChooserPanel
 from wagtail.embeds.embeds import get_embed

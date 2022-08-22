@@ -6,7 +6,6 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from django.http import HttpResponseRedirect, HttpResponse
 from django.urls import reverse
-from django.conf import settings
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, viewsets, status
@@ -46,7 +45,6 @@ from main.constants import (
 from main.utils import encode_json_cookie_value
 from openedx.api import (
     sync_enrollments_with_edx,
-    unenroll_edx_course_run,
     subscribe_to_edx_course_emails,
     unsubscribe_from_edx_course_emails,
 )
@@ -81,6 +79,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for CourseRuns"""
 
     serializer_class = CourseRunSerializer
+    permission_classes = []
 
     def get_queryset(self):
         relevant_to = self.request.query_params.get("relevant_to", None)

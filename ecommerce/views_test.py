@@ -1,7 +1,8 @@
 import pytest
 import random
+import pytz
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from main.test_utils import assert_drf_json_equal
 from main.constants import (
     USER_MSG_COOKIE_NAME,
@@ -9,9 +10,12 @@ from main.constants import (
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
 )
 from main.utils import encode_json_cookie_value
+from main.settings import TIME_ZONE
 from django.urls import reverse
 from django.conf import settings
 from django.forms.models import model_to_dict
+from rest_framework import status
+
 import operator as op
 import reversion
 import uuid
@@ -40,6 +44,7 @@ from ecommerce.serializers import (
     BasketSerializer,
     BasketItemSerializer,
     DiscountSerializer,
+    BasketWithProductSerializer,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
@@ -97,6 +102,19 @@ def test_get_products(user_drf_client, products):
     )
 
     assert_drf_json_equal(resp.json(), ProductSerializer(product).data)
+
+
+def test_get_products_inactive(user_drf_client, products):
+    """Test that Product detail API doesn't return data for inactive product"""
+    product = products[random.randrange(0, len(products))]
+    product.is_active = False
+    product.save()
+
+    resp = user_drf_client.get(
+        reverse("products_api-detail", kwargs={"pk": product.id})
+    )
+
+    assert_drf_json_equal(resp.json(), {"detail": "Not found."})
 
 
 def test_get_basket(user_drf_client, user):
@@ -335,6 +353,68 @@ def test_redeem_discount_with_higher_discount(
     )
 
 
+@pytest.mark.parametrize(
+    "time, expects", [["valid", True], ["past", False], ["future", False]]
+)
+def test_redeem_time_limited_discount(
+    user, user_drf_client, products, discounts, time, expects
+):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it. The result will depend on whether or not the discount is
+    valid for the current time.
+    """
+    basket = create_basket(user, products)
+
+    assert basket is not None
+    assert len(basket.basket_items.all()) > 0
+
+    discount = discounts[random.randrange(0, len(discounts))]
+
+    check_delta = timedelta(days=30)
+
+    if time == "valid":
+        discount.activation_date = datetime.now(pytz.timezone(TIME_ZONE)) - check_delta
+        discount.expiration_date = datetime.now(pytz.timezone(TIME_ZONE)) + check_delta
+    elif time == "past":
+        discount.activation_date = (
+            datetime.now(pytz.timezone(TIME_ZONE)) - check_delta - check_delta
+        )
+        discount.expiration_date = datetime.now(pytz.timezone(TIME_ZONE)) - check_delta
+    elif time == "future":
+        discount.activation_date = datetime.now(pytz.timezone(TIME_ZONE)) + check_delta
+        discount.expiration_date = (
+            datetime.now(pytz.timezone(TIME_ZONE)) + check_delta + check_delta
+        )
+
+    discount.save()
+    discount.refresh_from_db()
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+
+    resp_json = resp.json()
+
+    if expects:
+        assert "message" in resp_json
+        assert resp_json["message"] == "Discount applied"
+    else:
+        assert "not found" in resp_json
+
+
+def test_clear_discounts(user, user_drf_client, products, discounts):
+    """
+    Bootstraps a basket (see create_basket) and then attempts to redeem a
+    discount on it, then clears it. Should get back a success message.
+    """
+    test_redeem_discount(user, user_drf_client, products, discounts, False)
+
+    resp = user_drf_client.post(reverse("checkout_api-clear_discount"))
+
+    assert resp.json() == "Discounts cleared"
+
+
 def test_start_checkout(user, user_drf_client, products):
     """
     Hits the start checkout view, which should create an Order record
@@ -367,6 +447,28 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
     order = Order.objects.filter(purchaser=user).get()
 
     assert order.state == Order.STATE.PENDING
+
+
+def test_start_checkout_with_invalid_discounts(user, user_client, products, discounts):
+    """
+    Applies a discount, invalidates all the discounts, then hits the start
+    checkout view, which should return an error.
+    """
+    check_delta = timedelta(days=30)
+
+    test_redeem_discount(user, user_client, products, discounts, False)
+
+    for discount in discounts:
+        discount.activation_date = (
+            datetime.now(pytz.timezone(TIME_ZONE)) - check_delta - check_delta
+        )
+        discount.expiration_date = datetime.now(pytz.timezone(TIME_ZONE)) - check_delta
+        discount.save()
+        discount.refresh_from_db()
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
 
 
 @pytest.mark.parametrize(
@@ -488,7 +590,6 @@ def test_checkout_product(
     and redirect to checkout
     """
     basket = BasketFactory.create() if cart_exists else None
-
     if not cart_empty:
         BasketItemFactory.create(basket=basket)
 
@@ -505,13 +606,43 @@ def test_checkout_product(
         api_payload = {"product_id": product.id}
 
     resp = user_client.get(reverse("checkout-product"), api_payload)
-
     assert resp.status_code == 302
     assert resp.url == reverse("cart")
 
     basket = Basket.objects.get(user=user)
 
     assert [item.product for item in basket.basket_items.all()] == [product]
+
+
+@pytest.mark.parametrize(
+    "cart_exists, cart_empty, expected_status, expected_message",
+    [
+        (False, True, status.HTTP_406_NOT_ACCEPTABLE, "No basket"),
+        (True, True, status.HTTP_406_NOT_ACCEPTABLE, "No product in basket"),
+        (True, False, status.HTTP_200_OK, ""),
+    ],
+)
+def test_checkout_product_cart(
+    user, user_drf_client, cart_exists, cart_empty, expected_status, expected_message
+):
+    """
+    Verifies that cart/ works the way it is expected and generates proper responses/data in the cart page
+    """
+    basket = None
+
+    if cart_exists:
+        basket = BasketFactory.create(user=user)
+
+    if not cart_empty:
+        BasketItemFactory.create(basket=basket)
+
+    resp = user_drf_client.get(reverse("checkout_api-cart"))
+    assert resp.status_code == expected_status
+
+    if cart_empty:
+        assert resp.data == expected_message
+    else:
+        assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
 
 
 def test_discount_rest_api(admin_drf_client, user_drf_client):

@@ -42,7 +42,8 @@ export type Discount = {
   id: number,
   amount: number,
   discount_code: string,
-  discount_type: string
+  discount_type: string,
+  for_flexible_pricing: boolean
 }
 
 export type Refund = {

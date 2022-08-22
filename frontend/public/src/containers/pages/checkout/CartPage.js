@@ -31,6 +31,7 @@ import {
 
 import type { RouterHistory } from "react-router"
 import { isSuccessResponse } from "../../../lib/util"
+import { isFinancialAssistanceAvailable } from "../../../lib/courseApi"
 import { addUserNotification } from "../../../actions"
 
 type Props = {
@@ -122,6 +123,25 @@ export class CartPage extends React.Component<Props, CartState> {
     )
   }
 
+  renderFinancialAssistanceOffer() {
+    const { cartItems, discounts } = this.props
+    let userFlexiblePriceExists = false
+    // Check if there are any discounts, and if those discounts are for flexible pricing.
+    if ((discounts && discounts.length > 0) && typeof discounts.find(discount => discount.for_flexible_pricing === true) !== "undefined") {
+      userFlexiblePriceExists = true
+    }
+
+    if (cartItems && cartItems.length > 0 && userFlexiblePriceExists === false) {
+      if (isFinancialAssistanceAvailable(cartItems[0].product.purchasable_object.course)) {
+        return (
+          <a href={cartItems[0].product.purchasable_object.course.page.financial_assistance_form_url}>
+            Need financial assistance?
+          </a>
+        )
+      }
+    }
+  }
+
   render() {
     const { cartItems, isLoading } = this.props
 
@@ -146,14 +166,30 @@ export class CartPage extends React.Component<Props, CartState> {
                 </p>
               </div>
             </div>
+            <div className="row">
+              <div className="col-12 d-flex justify-content-end d-md-none">
+                <p className="font-weight-normal">
+                  {
+                    this.renderFinancialAssistanceOffer()
+                  }
+                </p>
+              </div>
+            </div>
 
             <div className="row d-none d-md-flex mb-3">
-              <div className="col-md-8">
+              <div className="col-md-6">
                 <h4 className="font-weight-normal">
                   You are about to purchase the following:
                 </h4>
               </div>
-              <div className="col-md-4 text-right">
+              <div className="col-md-4 justify-content-end text-right">
+                <h4 className="font-weight-normal">
+                  {
+                    this.renderFinancialAssistanceOffer()
+                  }
+                </h4>
+              </div>
+              <div className="col-md-2 text-right">
                 <h4 className="font-weight-normal">
                   <a
                     href="https://mitxonline.zendesk.com/hc/en-us"

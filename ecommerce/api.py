@@ -8,7 +8,7 @@ from django.db import transaction
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
-from ecommerce.constants import TRANSACTION_TYPE_REFUND, REFUND_SUCCESS_STATES
+from ecommerce.constants import REFUND_SUCCESS_STATES
 from ecommerce.tasks import perform_unenrollment_from_order
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
@@ -17,6 +17,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_DISCOUNT_INVALID,
 )
 
 from mitol.payment_gateway.api import (
@@ -49,7 +50,7 @@ log = logging.getLogger(__name__)
 
 
 def generate_checkout_payload(request):
-    basket = Basket.objects.filter(user=request.user).get()
+    basket = establish_basket(request)
 
     if basket.has_user_blocked_products(request.user):
         return {
@@ -78,7 +79,17 @@ def generate_checkout_payload(request):
             ),
         }
 
-    basket = establish_basket(request)
+    if not check_basket_discounts_for_validity(request):
+        # We only allow one discount per basket so clear all of them here.
+        basket.discounts.all().delete()
+        apply_user_discounts(request)
+        return {
+            "invalid_discounts": True,
+            "response": redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_DISCOUNT_INVALID},
+            ),
+        }
 
     order = PendingOrder.create_from_basket(basket)
     total_price = 0
@@ -157,6 +168,18 @@ def check_discount_for_products(discount, basket):
     )
 
 
+def check_basket_discounts_for_validity(request):
+    basket = establish_basket(request)
+
+    for basket_discount in basket.discounts.all():
+        if not basket_discount.redeemed_discount.check_validity(
+            basket.user
+        ) or not check_discount_for_products(basket_discount.redeemed_discount, basket):
+            return False
+
+    return True
+
+
 def apply_user_discounts(request):
     """
     Applies user discounts to the current cart. (If there are more than one for some
@@ -192,7 +215,9 @@ def apply_user_discounts(request):
 
     if discount:
         # check for product specificity in the discount
-        if not check_discount_for_products(discount, basket):
+        if not check_discount_for_products(
+            discount, basket
+        ) or not discount.check_validity(user):
             return
 
         bd = BasketDiscount(

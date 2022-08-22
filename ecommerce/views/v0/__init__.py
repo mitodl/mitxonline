@@ -149,7 +149,6 @@ class ProductViewSet(ReadOnlyModelViewSet):
                     & Q(content_type__model="programrun")
                 )
             )
-            .exclude(is_active__exact=False)
             .select_related("content_type")
             .prefetch_related("purchasable_object")
         )
@@ -372,6 +371,11 @@ class CheckoutApiViewSet(ViewSet):
         except ObjectDoesNotExist:
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 
+        if not basket.get_products():
+            return Response(
+                "No product in basket", status=status.HTTP_406_NOT_ACCEPTABLE
+            )
+
         api.apply_user_discounts(request)
 
         return Response(BasketWithProductSerializer(basket).data)
@@ -403,7 +407,7 @@ class CheckoutCallbackView(View):
         if order is None:
             return HttpResponse("Order not found")
         # We only want to process responses related to orders which are PENDING
-        # otherwise we can conclude that we already received a resonse through
+        # otherwise we can conclude that we already received a response through
         # BackofficeCallbackView.
         order_state = None
         if order.state == Order.STATE.PENDING:
@@ -525,6 +529,8 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
         if "purchased_same_courserun" in checkout_payload:
             return checkout_payload["response"]
         if "purchased_non_upgradeable_courserun" in checkout_payload:
+            return checkout_payload["response"]
+        if "invalid_discounts" in checkout_payload:
             return checkout_payload["response"]
 
         return render(
