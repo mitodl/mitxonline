@@ -144,9 +144,9 @@ export class ProgramEnrollmentCard extends React.Component<
               <h2 className="my-0 mr-3">{title}</h2>
             </div>
             <div className="detail">
-              {enrollment.program.readable_id} |{" "}
+              {enrollment.program.readable_id.split('+')[1] || enrollment.program.readable_id}
               {startDateDescription !== null && startDateDescription.active ? (
-                <span>Starts - {startDateDescription.datestr}</span>
+                <span>|{" "}Starts - {startDateDescription.datestr}</span>
               ) : (
                 <span>
                   {startDateDescription === null ? null : (

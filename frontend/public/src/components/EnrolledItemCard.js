@@ -362,9 +362,9 @@ export class EnrolledItemCard extends React.Component<
                   >View certificate</a>
                 ) : null}
               </div>
-              <div>
+              <br/>
+              <div className="upgrade-item-description">
                 <p>
-                  <br/>
                   <strong>Upgrade today</strong> and, upon passing, receive your certificate signed by MIT faculty
                   to highlight the knowledge and skills you've gained from this MITx course.
                 </p>
