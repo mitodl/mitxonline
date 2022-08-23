@@ -10,6 +10,12 @@ type Props = {
 }
 
 export class CartItemCard extends React.Component<Props> {
+  courseAboutLink(linkText: string, course: Object) {
+    return (<a href={course.page !== null ? course.page.page_url : "#"} target="_blank" rel="noopener noreferrer">
+      {linkText}
+    </a>)
+  }
+
   render() {
     const { product } = this.props
     if (product.purchasable_object === null) {
@@ -21,18 +27,19 @@ export class CartItemCard extends React.Component<Props> {
 
     const title =
       course !== undefined ? (
-        <a href="#" target="_blank" rel="noopener noreferrer">
-          {course.title}
-        </a>
+        this.courseAboutLink(course.title, course)
       ) : (
         <a href="#" target="_blank" rel="noopener noreferrer">
           {product.description}
         </a>
       )
 
+    const courseDetail =
+      this.courseAboutLink("Course details", course)
+
     const readableId =
       course !== undefined
-        ? purchasableObject.readable_id
+        ? purchasableObject.course_number
         : purchasableObject.run_tag
 
     const startDateDescription = generateStartDateText(purchasableObject)
@@ -67,6 +74,9 @@ export class CartItemCard extends React.Component<Props> {
                   )}
                 </span>
               )}
+            </div>
+            <div className="enrollment-extra-links d-flex">
+              {course !== undefined && courseDetail}
             </div>
           </div>
         </div>{" "}

@@ -13,14 +13,13 @@ type Props = {
   discounts: Array<Discount>,
   refunds: Array<Refund>,
   addDiscount?: Function,
-  clearDiscount?: Function,
   discountCode: string,
   cardTitle?: string
 }
 
 export class OrderSummaryCard extends React.Component<Props> {
   renderAppliedCoupons() {
-    const { discounts, clearDiscount, orderFulfilled } = this.props
+    const { discounts, orderFulfilled } = this.props
 
     if (discounts === null || discounts.length === 0) {
       return null
@@ -42,11 +41,6 @@ export class OrderSummaryCard extends React.Component<Props> {
       discountAmountText = `Fixed Price: ${formatLocalePrice(discountAmount)}`
       break
     }
-    const clearDiscountLink = (
-      <a href="#" className="text-primary" onClick={clearDiscount}>
-        Clear Discount
-      </a>
-    )
 
     return (
       <div className="row order-summary-total">
@@ -58,8 +52,6 @@ export class OrderSummaryCard extends React.Component<Props> {
                 {discounts[0].discount_code}
               </em>{" "}
               )
-              <br />
-              {orderFulfilled ? null : clearDiscountLink}
             </div>
             <div className="ml-auto text-primary text-right">
               {discountAmountText}
