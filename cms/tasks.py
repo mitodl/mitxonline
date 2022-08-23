@@ -6,8 +6,44 @@ from main.settings import (
 )
 from cms.models import Page
 from urllib.parse import urljoin, urlparse
-import fastly
 import logging
+import requests
+
+
+def call_fastly_purge_api(relative_url):
+    """
+    Calls the Fastly purge API. (We aren't using the official Fastly SDK here
+    because it doesn't work for this - the version of it that works with the
+    current API only allows you to purge *everything*, not individual pages.)
+
+    Args:
+        - relative_url  The relative URL to purge.
+    Returns:
+        - Dict of the response (resp.json), or False if there was an error.
+    """
+    logger = logging.getLogger("fastly_purge")
+
+    (scheme, netloc, path, params, query, fragment) = urlparse(SITE_BASE_URL)
+
+    headers = {"host": netloc}
+
+    if relative_url != "*":
+        headers["fastly-soft-purge"] = "1"
+
+    if MITX_ONLINE_FASTLY_AUTH_TOKEN:
+        headers["fastly-key"] = MITX_ONLINE_FASTLY_AUTH_TOKEN
+
+    api_url = urljoin(MITX_ONLINE_FASTLY_URL, relative_url)
+
+    resp = requests.request("PURGE", api_url, headers=headers)
+
+    if resp.status_code >= 400:
+        logger.error(f"Fastly API Purge call failed: {resp.status_code} {resp.reason}")
+        logger.error(f"Fastly returned: {resp.text}")
+        return False
+    else:
+        logger.info(f"Fastly returned: {resp.text}")
+        return resp.json()
 
 
 @app.task
@@ -25,28 +61,35 @@ def queue_fastly_purge_url(page_id):
 
     page = Page.objects.get(pk=page_id)
 
+    logger.debug(f"Page URL is {page.get_url()}")
+
     if page is None:
         raise Exception(f"Page {page_id} not found.")
 
-    (scheme, netloc, path, params, query, fragment) = urlparse(SITE_BASE_URL)
+    resp = call_fastly_purge_api(page.get_url())
 
-    api = fastly.API()
+    if resp and resp["status"] == "ok":
+        logger.info("Purge request processed OK.")
+        return True
 
-    if MITX_ONLINE_FASTLY_AUTH_TOKEN is not None:
-        api.authenticate_by_key(MITX_ONLINE_FASTLY_AUTH_TOKEN)
+    logger.error("Purge request failed.")
 
-    target_url = urljoin(MITX_ONLINE_FASTLY_URL, page.get_url())
 
-    try:
-        if not api.purge_url(netloc, target_url, soft=True):
-            logger.error(f"Fastly purge of {page.title} failed.")
-    except fastly.errors.AuthenticationError:
-        logger.error(f"Fastly purge of {page.title} failed: authenticaiton error")
-    except fastly.errors.InternalServerError:
-        logger.error(f"Fastly purge of {page.title} failed: internal server error")
-    except fastly.errors.BadRequestError as e:
-        logger.error(f"Fastly purge of {page.title} failed: bad request. {e}")
-    except fastly.errors.NotFoundError:
-        logger.error(f"Fastly purge of {page.title} failed: not found")
-    except:
-        logger.error(f"Fastly purge of {page.title} failed: threw a generic exception")
+@app.task()
+def queue_fastly_full_purge():
+    """
+    Purges everything from the Fastly cache.
+
+    Passing * to the purge API instructs Fastly to purge everything.
+    """
+    logger = logging.getLogger("fastly_purge")
+
+    logger.info("Purging all pages from the Fastly cache...")
+
+    resp = call_fastly_purge_api("*")
+
+    if resp and resp["status"] == "ok":
+        logger.info("Purge request processed OK.")
+        return True
+
+    logger.error("Purge request failed.")
