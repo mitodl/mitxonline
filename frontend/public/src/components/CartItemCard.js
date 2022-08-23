@@ -39,7 +39,7 @@ export class CartItemCard extends React.Component<Props> {
 
     const readableId =
       course !== undefined
-        ? course.readable_id
+        ? purchasableObject.course_number
         : purchasableObject.run_tag
 
     const startDateDescription = generateStartDateText(purchasableObject)

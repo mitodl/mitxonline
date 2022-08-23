@@ -57,6 +57,7 @@ class CourseRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
             "readable_id",
             "enrollment_start",
             "enrollment_end",
+            "course_number",
         ]
 
 
