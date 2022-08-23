@@ -34,11 +34,17 @@ export type CourseRunDetail = BaseCourseRun & {
   course: CourseDetail
 }
 
+export type CourseRunCertificate = {
+  link: string,
+  uuid: string
+}
+
 export type RunEnrollment = {
   run: CourseRunDetail,
   id: number,
   edx_emails_subscription: ?string,
-  enrollment_mode: string
+  enrollment_mode: string,
+  certificate: ?CourseRunCertificate,
 }
 
 export type CourseDetailWithRuns = CourseDetail & {

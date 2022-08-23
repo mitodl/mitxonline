@@ -13,6 +13,7 @@ from django.contrib.auth.models import AnonymousUser
 from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
 from courses.factories import (
     CourseFactory,
+    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramEnrollmentFactory,
@@ -22,6 +23,7 @@ from courses.models import CourseTopic
 from courses.serializers import (
     BaseCourseSerializer,
     BaseProgramSerializer,
+    CourseRunCertificateSerializer,
     CourseRunDetailSerializer,
     CourseRunEnrollmentSerializer,
     CourseRunSerializer,
@@ -248,12 +250,18 @@ def test_serialize_course_run_enrollments(settings, receipts_enabled):
     """Test that CourseRunEnrollmentSerializer has correct data"""
     settings.ENABLE_ORDER_RECEIPTS = receipts_enabled
     course_run_enrollment = CourseRunEnrollmentFactory.create()
+    course_run_certificate = CourseRunCertificateFactory.create(
+        course_run=course_run_enrollment.run,
+        user=course_run_enrollment.user,
+        is_revoked=False,
+    )
     serialized_data = CourseRunEnrollmentSerializer(course_run_enrollment).data
     assert serialized_data == {
         "run": CourseRunDetailSerializer(course_run_enrollment.run).data,
         "id": course_run_enrollment.id,
         "edx_emails_subscription": True,
         "enrollment_mode": "audit",
+        "certificate": CourseRunCertificateSerializer(course_run_certificate).data,
     }
 
 
