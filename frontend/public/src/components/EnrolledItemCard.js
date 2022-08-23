@@ -340,9 +340,9 @@ export class EnrolledItemCard extends React.Component<
               </Dropdown>
             </div>
             <div className="detail">
-              {courseId} |{" "}
+              {courseId}
               {startDateDescription !== null && startDateDescription.active ? (
-                <span>Starts - {startDateDescription.datestr}</span>
+                <span>|{" "}Starts - {startDateDescription.datestr}</span>
               ) : (
                 <span>
                   {startDateDescription === null ? null : (
