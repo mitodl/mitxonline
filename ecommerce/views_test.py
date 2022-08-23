@@ -644,6 +644,7 @@ def test_checkout_product_cart(
     else:
         assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
 
+
 def test_checkout_product_with_program_id(user, user_client):
     """
     Verifies that /cart/add?program_id=? url adds the program to the cart
