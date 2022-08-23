@@ -1,6 +1,22 @@
 Release Notes
 =============
 
+Version 0.42.0
+--------------
+
+- Fixes some issues with the Fastly API code
+- Ecommerce: adds activation and expiration dates to discount codes
+- Adds additional fields to the course API
+- fix: active products to cart only (#874)
+- Online-868 Hide enrolment button for anonymous users (#875)
+- Check for program page before checking for child pages (#878)
+- 811: need financial assistance link on the checkout page (#855)
+- 806: ecommerce implement a cybersource notification api endpoint (#817)
+- added css and js to remove incremantal arrow for income field
+- Online-860 Calculate flexible price discount instead of using BasketDiscount (#861)
+- Adds text to display when a flexible pricing request is assigned a $0 tier
+- Purges the Fastly cache for a page once the page has been modified
+
 Version 0.41.2 (Released August 19, 2022)
 --------------
 
