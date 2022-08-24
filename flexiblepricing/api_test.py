@@ -115,7 +115,8 @@ class ExchangeRateAPITests(TestCase):
         Tests updated_currency_exchange_rate()
         """
         latest_rates = {"ABC": 12.3, "GHI": 7.89}
-        update_currency_exchange_rate(latest_rates)
+        descriptions = {"ABC": "Test Code 1", "GHI": "Test Code 2"}
+        update_currency_exchange_rate(latest_rates, descriptions)
         assert (
             CurrencyExchangeRate.objects.get(currency_code="ABC").exchange_rate
             == latest_rates["ABC"]
@@ -125,6 +126,14 @@ class ExchangeRateAPITests(TestCase):
         assert (
             CurrencyExchangeRate.objects.get(currency_code="GHI").exchange_rate
             == latest_rates["GHI"]
+        )
+        assert (
+            CurrencyExchangeRate.objects.get(currency_code="ABC").description
+            == descriptions["ABC"]
+        )
+        assert (
+            CurrencyExchangeRate.objects.get(currency_code="GHI").description
+            == descriptions["GHI"]
         )
 
 

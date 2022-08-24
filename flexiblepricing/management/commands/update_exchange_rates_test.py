@@ -6,7 +6,7 @@ from unittest.mock import patch
 from django.test import TestCase
 from django.test.utils import override_settings
 
-from flexiblepricing.constants import get_currency_exchange_rate_api_request_url
+from flexiblepricing.tasks import get_open_exchange_rates_url
 from flexiblepricing.management.commands import update_exchange_rates
 from flexiblepricing.models import CurrencyExchangeRate
 
@@ -41,7 +41,7 @@ class GenerateExchangeRatesTest(TestCase):
         assert CurrencyExchangeRate.objects.count() == 0
         self.command.handle("generate_exchange_rates")
         called_args, _ = mocked_request.call_args
-        assert called_args[0] == get_currency_exchange_rate_api_request_url()
+        assert called_args[0] == get_open_exchange_rates_url("latest.json")
         assert CurrencyExchangeRate.objects.count() == 3
         currency_cba = CurrencyExchangeRate.objects.get(currency_code="CBA")
         assert currency_cba.exchange_rate == 3.5

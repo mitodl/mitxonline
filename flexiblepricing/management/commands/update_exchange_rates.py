@@ -15,4 +15,4 @@ class Command(BaseCommand):
     help = "Updates local database with the latest exchange rate information from Open Exchange Rates API"
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
-        sync_currency_exchange_rates()
+        sync_currency_exchange_rates.delay()
