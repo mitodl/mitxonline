@@ -6,9 +6,7 @@ import logging
 from django.core.exceptions import ValidationError
 from mitol.mail.api import get_message_sender
 
-from courses.models import CourseRun
-from ecommerce.discounts import DiscountType
-from ecommerce.models import Product
+from courses.models import Course
 from flexiblepricing.constants import (
     FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE,
     FLEXIBLE_PRICE_EMAIL_APPROVAL_SUBJECT,
@@ -38,14 +36,7 @@ def generate_flexible_price_email(flexible_price):
         dict: {"subject": (str), "body": (str)}
     """
     if flexible_price.status == FlexiblePriceStatus.APPROVED:
-        courserun = CourseRun.objects.filter(
-            course=flexible_price.courseware_object
-        ).first()
-        # Product queryset returns active Products by default
-        product = Product.objects.get(object_id=courserun.id)
-        price = DiscountType.get_discounted_price(
-            [flexible_price.tier.discount], product
-        )
+        price = flexible_price.tier.discount.friendly_format()
         message = FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE.format(
             program_name=flexible_price.courseware_object.title, price=price
         )

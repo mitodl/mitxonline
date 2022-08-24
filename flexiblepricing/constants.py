@@ -44,8 +44,8 @@ FLEXIBLE_PRICE_EMAIL_APPROVAL_SUBJECT = (
     "Your personalized course price for {program_name} MITxOnline"
 )
 FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE = (
-    "After reviewing your income documentation, the {program_name} MITxOnline team has determined "
-    "that your personalized course price is ${price}.\n\n"
+    "After reviewing your income documentation, the {program_name} team has awarded you financial "
+    "assistance in the amount of {price}.\n\n"
     "You can pay for MITxOnline courses through the MITxOnline portal "
     "(https://MITxOnline.mit.edu/dashboard). All coursework will be conducted on mitxonline.mit.edu"
 )

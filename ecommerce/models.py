@@ -22,6 +22,9 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
+    DISCOUNT_TYPE_DOLLARS_OFF,
+    DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PERCENT_OFF,
 )
 from users.models import User
 from decimal import Decimal
@@ -295,6 +298,18 @@ class Discount(TimestampedModel):
             return False
 
         return True
+
+    def friendly_format(self):
+        amount = "{:.2f}".format(self.amount)
+
+        if self.discount_type == DISCOUNT_TYPE_PERCENT_OFF:
+            return f"{amount}% off"
+        elif self.discount_type == DISCOUNT_TYPE_DOLLARS_OFF:
+            return f"${amount} off"
+        elif self.discount_type == DISCOUNT_TYPE_FIXED_PRICE:
+            return f"a fixed price of ${amount}"
+
+        return "Indeterminate Discount"
 
 
 class DiscountProduct(TimestampedModel):
