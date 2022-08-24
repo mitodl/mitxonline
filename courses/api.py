@@ -3,7 +3,7 @@
 import itertools
 import logging
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from traceback import format_exc
 from typing import Optional
 
@@ -20,6 +20,7 @@ from mitol.common.utils.collections import (
 )
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
+from openedx.api import get_edx_grades_with_users
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 from rest_framework.status import HTTP_404_NOT_FOUND
 
@@ -35,6 +36,7 @@ from courses.models import (
     Course,
 )
 from courses.tasks import subscribe_edx_course_emails
+from courses.utils import exception_logging_generator
 from openedx.api import (
     enroll_in_edx_course_runs,
     get_edx_api_course_detail_client,
@@ -473,7 +475,8 @@ def ensure_course_run_grade(user, course_run, edx_grade, should_update=False):
         should_update (bool): Update the local grade record if it exists
 
     Returns:
-        (courses.models.CourseRunGrade, bool, bool) that depicts the CourseRunGrade, created and updated values
+        Tuple[ CourseRunGrade, bool, bool ]: A Tuple containing None or CourseRunGrade object,
+            A bool representing if the run grade is created, A bool representing if a run grade is updated
     """
     grade_properties = {
         "grade": edx_grade.percent,
@@ -591,7 +594,8 @@ def process_course_run_grade_certificate(course_run_grade):
         course_run_grade (courses.models.CourseRunGrade): The course run grade for which to generate/delete the certificate
 
     Returns:
-        (courses.models.CourseRunCertificate, bool, bool) that depicts the CourseRunCertificate, created, deleted values
+        Tuple[ CourseRunCertificate, bool, bool ]: A Tuple containing None or CourseRunCertificate object,
+            A bool representing if the certificate is created, A bool representing if a certificate is deleted
     """
     user = course_run_grade.user
     course_run = course_run_grade.course_run
@@ -612,3 +616,74 @@ def process_course_run_grade_certificate(course_run_grade):
         )
         return certificate, created, False
     return None, False, False
+
+
+def get_certificate_grade_eligible_runs():
+    """
+    Get the list of course runs that are eligible for Grades update/creation and certificates creation
+    """
+    now = now_in_utc()
+    # Get all the course runs valid course runs for certificates/Grades
+    # For a valid run it would be live,
+    # .. end_date would be in future with addition of delay settings.CERTIFICATE_CREATION_DELAY_IN_HOURS
+
+    course_runs = CourseRun.objects.live().filter(
+        Q(end_date__isnull=True)
+        | Q(
+            end_date__gt=now
+            - timedelta(hours=settings.CERTIFICATE_CREATION_DELAY_IN_HOURS)
+        )
+    )
+    return course_runs
+
+
+def generate_course_run_certificates():
+    """
+    Hits the edX grades API for eligible course runs and generates the certificates and grades for users for course runs
+    """
+    now = now_in_utc()
+    course_runs = get_certificate_grade_eligible_runs()
+
+    if course_runs is None or course_runs.count() == 0:
+        log.info("No course runs matched the certificates generation criteria")
+        return
+
+    for run in course_runs:
+        edx_grade_user_iter = exception_logging_generator(
+            get_edx_grades_with_users(run)
+        )
+        created_grades_count, updated_grades_count, generated_certificates_count = (
+            0,
+            0,
+            0,
+        )
+        for edx_grade, user in edx_grade_user_iter:
+            course_run_grade, created, updated = ensure_course_run_grade(
+                user=user, course_run=run, edx_grade=edx_grade, should_update=True
+            )
+
+            if created:
+                created_grades_count += 1
+            elif updated:
+                updated_grades_count += 1
+
+            # Check certificate generation eligibility
+            #   1. For self_paced course runs we generate certificates right away irrespective of end_date
+            #   2. For others course runs we generate the certificates if the end of course run has passed
+            if run.is_self_paced or (run.end_date <= now):
+                _, created, deleted = process_course_run_grade_certificate(
+                    course_run_grade=course_run_grade
+                )
+
+                if deleted:
+                    log.warning(
+                        "Certificate deleted for user %s and course_run %s", user, run
+                    )
+                elif created:
+                    log.warning(
+                        "Certificate created for user %s and course_run %s", user, run
+                    )
+                    generated_certificates_count += 1
+        log.info(
+            f"Finished processing course run {run}: created grades for {created_grades_count} users, updated grades for {updated_grades_count} users, generated certificates for {generated_certificates_count} users"
+        )

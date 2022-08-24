@@ -21,6 +21,7 @@ from courses.api import (
     get_user_enrollments,
     sync_course_runs,
     process_course_run_grade_certificate,
+    generate_course_run_certificates,
 )
 from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
@@ -83,6 +84,12 @@ def passed_grade_with_enrollment(user):
         grade=0.50,
         passed=True,
     )
+
+
+@pytest.fixture()
+def courses_api_logs(mocker):
+    """Logger fixture for tasks"""
+    return mocker.patch("courses.api.log")
 
 
 @pytest.mark.parametrize("is_enrolled", [True, False])
@@ -851,3 +858,116 @@ def test_course_run_certificate_not_passing(passed_grade_with_enrollment):
     assert not certificate
     assert not created
     assert deleted
+
+
+def test_generate_course_certificates_no_valid_course_run(settings, courses_api_logs):
+    """Test that a proper message is logged when there is no valid course run to generate certificates"""
+    generate_course_run_certificates()
+    assert (
+        "No course runs matched the certificates generation criteria"
+        in courses_api_logs.info.call_args[0][0]
+    )
+
+    # Create a batch of Course Runs that doesn't match certificate generation filter
+    CourseRunFactory.create_batch(
+        5,
+        is_self_paced=False,
+        end_date=now_in_utc()
+        - timedelta(hours=settings.CERTIFICATE_CREATION_DELAY_IN_HOURS + 1),
+    )
+    generate_course_run_certificates()
+    assert (
+        "No course runs matched the certificates generation criteria"
+        in courses_api_logs.info.call_args[0][0]
+    )
+
+
+def test_generate_course_certificates_self_paced_course(
+    mocker, courses_api_logs, passed_grade_with_enrollment
+):
+    """Test that certificates are generated for self paced course runs independent of course run end date"""
+    course_run = passed_grade_with_enrollment.course_run
+    user = passed_grade_with_enrollment.user
+    course_run.is_self_paced = True
+    course_run.save()
+
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        return_value=(passed_grade_with_enrollment, True, False),
+    )
+    mocker.patch(
+        "courses.api.exception_logging_generator",
+        return_value=[(passed_grade_with_enrollment, user)],
+    )
+    generate_course_run_certificates()
+    assert (
+        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users"
+        in courses_api_logs.info.call_args[0][0]
+    )
+
+
+@pytest.mark.parametrize(
+    "self_paced, end_date",
+    [
+        (True, now_in_utc() + timedelta(hours=2)),
+        (False, now_in_utc()),
+    ],
+)
+def test_course_certificates_with_course_end_date_self_paced_combination(
+    mocker,
+    settings,
+    courses_api_logs,
+    passed_grade_with_enrollment,
+    self_paced,
+    end_date,
+):
+    """Test that correct certificates are created when there are course runs with end_date and self_paced combination"""
+    settings.CERTIFICATE_CREATION_DELAY_IN_HOURS = 1
+    course_run = passed_grade_with_enrollment.course_run
+    course_run.is_self_paced = self_paced
+    course_run.end_date = end_date
+    course_run.save()
+
+    user = passed_grade_with_enrollment.user
+
+    mocker.patch(
+        "courses.api.exception_logging_generator",
+        return_value=[(passed_grade_with_enrollment, user)],
+    )
+
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        return_value=(passed_grade_with_enrollment, True, False),
+    )
+
+    generate_course_run_certificates()
+    assert (
+        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users"
+        in courses_api_logs.info.call_args[0][0]
+    )
+
+
+def test_generate_course_certificates_with_course_end_date(
+    mocker, courses_api_logs, passed_grade_with_enrollment, settings
+):
+    """Test that certificates are generated for passed grades when there are valid course runs for certificates"""
+    settings.CERTIFICATE_CREATION_DELAY_IN_HOURS = 1
+    course_run = passed_grade_with_enrollment.course_run
+    course_run.end_date = now_in_utc()
+    course_run.save()
+
+    user = passed_grade_with_enrollment.user
+
+    mocker.patch(
+        "courses.api.ensure_course_run_grade",
+        return_value=(passed_grade_with_enrollment, True, False),
+    )
+    mocker.patch(
+        "courses.api.exception_logging_generator",
+        return_value=[(passed_grade_with_enrollment, user)],
+    )
+    generate_course_run_certificates()
+    assert (
+        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users"
+        in courses_api_logs.info.call_args[0][0]
+    )

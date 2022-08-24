@@ -393,7 +393,7 @@ class CourseRun(TimestampedModel):
     )
 
     live = models.BooleanField(default=False)
-    self_paced_certificates = models.BooleanField(default=False)
+    is_self_paced = models.BooleanField(default=False)
     products = GenericRelation("ecommerce.Product", related_query_name="courseruns")
 
     class Meta:
