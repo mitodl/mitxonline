@@ -73,7 +73,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
     financial_assistance_form = FlexiblePricingFormFactory(
         selected_program_id=program.id, parent=program_page
     )
-    course = CourseFactory(program=program)
+    course = CourseFactory(program=program, page=None)
     course_page = CoursePageFactory(course=course)
 
     rf = RequestFactory()
@@ -111,7 +111,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_no_parent(
     financial_assistance_form = FlexiblePricingFormFactory(
         selected_program_id=program.id
     )
-    course = CourseFactory(program=program)
+    course = CourseFactory(program=program, page=None)
     course_page = CoursePageFactory(course=course)
 
     rf = RequestFactory()
@@ -147,7 +147,7 @@ def test_serialize_course_page_with_flex_price_form_as_program_child(
     program = ProgramFactory()
     program_page = ProgramPageFactory(program=program)
     FlexiblePricingFormFactory(parent=program_page)
-    course = CourseFactory(program=program)
+    course = CourseFactory(program=program, page=None)
     course_page = CoursePageFactory(course=course)
 
     rf = RequestFactory()
@@ -182,7 +182,7 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
     fake_image_src = "http://example.com/my.img"
     mocker.patch("cms.serializers.get_wagtail_img_src", return_value=fake_image_src)
 
-    course = CourseFactory(program=None)
+    course = CourseFactory(program=None, page=None)
     course_page = CoursePageFactory(course=course)
     financial_assistance_form = FlexiblePricingFormFactory(
         selected_course_id=course.id, parent=course_page

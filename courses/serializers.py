@@ -319,7 +319,7 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
 
     run = CourseRunDetailSerializer(read_only=True)
     run_id = serializers.IntegerField(write_only=True)
-    certificate = serializers.SerializerMethodField()
+    certificate = serializers.SerializerMethodField(read_only=True)
     enrollment_mode = serializers.ChoiceField(
         (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
     )
@@ -342,25 +342,30 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
         """
         Resolve a certificate for this enrollment if it exists
         """
-        # No need to include a certificate if there is no corresponding wagtail page
-        # to support the render
-        if (
-            not enrollment.run.course.page
-            or not enrollment.run.course.page.certificate_page
-        ):
-            return None
+        # When create method is called it returns list object of enrollments
+        if isinstance(enrollment, list):
+            for en in enrollment:
+                self.get_certificate(en)
+        else:
+            # No need to include a certificate if there is no corresponding wagtail page
+            # to support the render
+            if (
+                not enrollment.run.course.page
+                or not enrollment.run.course.page.certificate_page
+            ):
+                return None
 
-        # Using IDs because we don't need the actual record and this avoids redundant queries
-        user_id = enrollment.user_id
-        course_run_id = enrollment.run_id
-        try:
-            return CourseRunCertificateSerializer(
-                models.CourseRunCertificate.objects.get(
-                    user_id=user_id, course_run_id=course_run_id
-                )
-            ).data
-        except models.CourseRunCertificate.DoesNotExist:
-            return None
+            # Using IDs because we don't need the actual record and this avoids redundant queries
+            user_id = enrollment.user_id
+            course_run_id = enrollment.run_id
+            try:
+                return CourseRunCertificateSerializer(
+                    models.CourseRunCertificate.objects.get(
+                        user_id=user_id, course_run_id=course_run_id
+                    )
+                ).data
+            except models.CourseRunCertificate.DoesNotExist:
+                return None
 
     class Meta:
         model = models.CourseRunEnrollment

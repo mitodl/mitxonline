@@ -272,7 +272,10 @@ def test_programs_not_live(client, live):
 @pytest.mark.parametrize("live", [True, False])
 def test_courses_not_live_in_programs_api(client, live):
     """Courses should be filtered out of the programs API if not live"""
-    course = CourseFactory.create(live=live, program__live=True)
+    if live:
+        course = CourseFactory.create(live=live, program__live=True, page=None)
+    else:
+        course = CourseFactory.create(live=live, program__live=True)
     resp = client.get(reverse("programs_api-list"))
     assert resp.status_code == status.HTTP_200_OK
     assert_drf_json_equal(
@@ -303,8 +306,9 @@ def test_course_runs_not_live_in_courses_api(client, live):
 def test_user_enrollments_list(user_drf_client, user):
     """The user enrollments view should return serialized enrollments for the logged-in user"""
     assert UserEnrollmentsApiViewSet.serializer_class == CourseRunEnrollmentSerializer
-    user_run_enrollment = CourseRunEnrollmentFactory.create(user=user)
-    CourseRunEnrollmentFactory.create()
+    course = CourseFactory.create()
+    course_run = CourseRunFactory.create(course=course)
+    user_run_enrollment = CourseRunEnrollmentFactory.create(run=course_run, user=user)
     resp = user_drf_client.get(reverse("user-enrollments-api-list"))
     assert resp.status_code == status.HTTP_200_OK
     assert_drf_json_equal(
@@ -359,14 +363,15 @@ def test_user_enrollments_create(
 ):
     """The user enrollments view should succeed when creating a new enrollment"""
     settings.FEATURES[features.IGNORE_EDX_FAILURES] = ignore_failures_flag
-    run = CourseRunFactory.create()
-    fake_enrollment = {"fake": "enrollment"}
+    course = CourseFactory.create()
+    run = CourseRunFactory.create(course=course)
+    fake_enrollment = CourseRunEnrollmentFactory.create(run=run)
     patched_enroll = mocker.patch(
         "courses.serializers.create_run_enrollments",
         return_value=([fake_enrollment], True),
     )
     resp = user_drf_client.post(
-        reverse("user-enrollments-api-list"), data={"run_id": run.id}
+        reverse("user-enrollments-api-list"), data={"run_id": run.id}, many=True
     )
     assert resp.status_code == status.HTTP_201_CREATED
     patched_enroll.assert_called_once_with(

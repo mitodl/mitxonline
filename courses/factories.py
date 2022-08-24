@@ -4,13 +4,11 @@ import faker
 import pytz
 from factory import SubFactory, Trait, fuzzy
 from factory.django import DjangoModelFactory
-import uuid
 
 from courses.constants import PROGRAM_TEXT_ID_PREFIX
 from courses.models import (
     Course,
     CourseRun,
-    CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
     Program,
@@ -55,6 +53,8 @@ class CourseFactory(DjangoModelFactory):
     readable_id = factory.Sequence("course-{0}".format)
     live = True
 
+    page = factory.RelatedFactory("cms.factories.CoursePageFactory", "course")
+
     class Meta:
         model = Course
 
@@ -65,7 +65,7 @@ class CourseFactory(DjangoModelFactory):
 class CourseRunFactory(DjangoModelFactory):
     """Factory for CourseRuns"""
 
-    course = factory.SubFactory(CourseFactory)
+    course = factory.SubFactory(CourseFactory, page=None)
     title = factory.LazyAttribute(lambda x: "CourseRun " + FAKE.sentence())
     courseware_id = factory.Sequence(
         lambda number: "course:/v{}/{}".format(number, FAKE.slug())
@@ -134,18 +134,6 @@ class CourseRunGradeFactory(DjangoModelFactory):
 
     class Meta:
         model = CourseRunGrade
-
-
-class CourseRunCertificateFactory(DjangoModelFactory):
-    """Factory for CourseRunEnrollment"""
-
-    user = SubFactory(UserFactory)
-    uuid = factory.Faker(uuid.uuid4)
-    is_revoked = factory.fuzzy.FuzzyChoice([True, False])
-    course_run = SubFactory(CourseRunFactory)
-
-    class Meta:
-        model = CourseRunCertificate
 
 
 class CourseRunEnrollmentFactory(DjangoModelFactory):

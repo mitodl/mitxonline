@@ -13,7 +13,6 @@ from django.contrib.auth.models import AnonymousUser
 from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
 from courses.factories import (
     CourseFactory,
-    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramEnrollmentFactory,
@@ -23,7 +22,6 @@ from courses.models import CourseTopic
 from courses.serializers import (
     BaseCourseSerializer,
     BaseProgramSerializer,
-    CourseRunCertificateSerializer,
     CourseRunDetailSerializer,
     CourseRunEnrollmentSerializer,
     CourseRunSerializer,
@@ -249,19 +247,16 @@ def test_serialize_course_run_detail():
 def test_serialize_course_run_enrollments(settings, receipts_enabled):
     """Test that CourseRunEnrollmentSerializer has correct data"""
     settings.ENABLE_ORDER_RECEIPTS = receipts_enabled
-    course_run_enrollment = CourseRunEnrollmentFactory.create()
-    course_run_certificate = CourseRunCertificateFactory.create(
-        course_run=course_run_enrollment.run,
-        user=course_run_enrollment.user,
-        is_revoked=False,
-    )
+    course = CourseFactory.create()
+    course_run = CourseRunFactory.create(course=course)
+    course_run_enrollment = CourseRunEnrollmentFactory.create(run=course_run)
     serialized_data = CourseRunEnrollmentSerializer(course_run_enrollment).data
     assert serialized_data == {
         "run": CourseRunDetailSerializer(course_run_enrollment.run).data,
         "id": course_run_enrollment.id,
         "edx_emails_subscription": True,
         "enrollment_mode": "audit",
-        "certificate": CourseRunCertificateSerializer(course_run_certificate).data,
+        "certificate": None,
     }
 
 
@@ -279,8 +274,19 @@ def test_serialize_program_enrollments(settings, receipts_enabled):
     program = ProgramFactory.create()
     course_run_enrollments = CourseRunEnrollmentFactory.create_batch(
         3,
-        run__course__program=factory.Iterator([program, program, None]),
-        run__course__position_in_program=factory.Iterator([2, 1, None]),
+        run=factory.Iterator(
+            [
+                CourseRunFactory.create(
+                    course=CourseFactory.create(program=program, position_in_program=2)
+                ),
+                CourseRunFactory.create(
+                    course=CourseFactory.create(program=program, position_in_program=1)
+                ),
+                CourseRunFactory.create(
+                    course=CourseFactory.create(program=None, position_in_program=None)
+                ),
+            ]
+        ),
     )
     program_enrollment = ProgramEnrollmentFactory.create(
         program=program,
