@@ -13,6 +13,7 @@ from wagtail.core.models import Page, Site
 from cms import models as cms_models
 from cms.exceptions import WagtailSpecificPageError
 from cms.models import Page
+from cms.constants import CERTIFICATE_INDEX_SLUG
 
 
 log = logging.getLogger(__name__)
@@ -166,6 +167,52 @@ def ensure_program_product_index() -> cms_models.ProgramIndexPage:
         page = Page.objects.get(id=page_id)
         page.move(program_index, "last-child")
     return program_index
+
+
+def ensure_signatory_index() -> cms_models.ProgramIndexPage:
+    """
+    Same as ensure_product_index, but operates on programs instead.
+    """
+    home_page = get_home_page()
+    signatory_index = Page.objects.filter(
+        content_type=ContentType.objects.get_for_model(cms_models.SignatoryIndexPage)
+    ).first()
+    if not signatory_index:
+        signatory_index = cms_models.SignatoryIndexPage(title="Signatories")
+        home_page.add_child(instance=signatory_index)
+        signatory_index.save_revision().publish()
+
+    if signatory_index.get_children_count() != cms_models.SignatoryPage.objects.count():
+        for signatory_page in cms_models.SignatoryPage.objects.all():
+            signatory_page.move(signatory_index, "last-child")
+        log.info("Moved signatory pages under signatory index page")
+    return signatory_index
+
+
+def ensure_certificate_index() -> cms_models.ProgramIndexPage:
+    """
+    Same as ensure_product_index, but operates on programs instead.
+    """
+    home_page = get_home_page()
+    certificate_index = Page.objects.filter(
+        content_type=ContentType.objects.get_for_model(cms_models.CertificateIndexPage)
+    ).first()
+
+    if certificate_index and certificate_index.slug != CERTIFICATE_INDEX_SLUG:
+        certificate_index.slug = CERTIFICATE_INDEX_SLUG
+        certificate_index.save()
+
+    if not certificate_index:
+        cert_index_content_type, _ = ContentType.objects.get_or_create(
+            app_label="cms", model="certificateindexpage"
+        )
+        certificate_index = cms_models.CertificateIndexPage(
+            title="Certificate Index Page",
+            content_type_id=cert_index_content_type.id,
+            slug=CERTIFICATE_INDEX_SLUG,
+        )
+        home_page.add_child(instance=certificate_index)
+    return certificate_index
 
 
 def get_wagtail_img_src(image_obj) -> str:
