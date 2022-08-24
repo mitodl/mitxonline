@@ -1,8 +1,3 @@
-from urllib.parse import quote_plus
-
-from django.conf import settings
-
-
 class FlexiblePriceStatus:
     """Statuses for the FlexiblePrice model"""
 
@@ -66,16 +61,3 @@ FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_MESSAGE = (
     "While you are waiting, we encourage you to enroll now and pay later, when a decision has been "
     "reached."
 )
-
-
-def get_currency_exchange_rate_api_request_url():
-    """
-    Helper function to build the CURRENCY_EXCHANGE_RATE_API_REQUEST_URL
-    """
-    if settings.OPEN_EXCHANGE_RATES_URL and settings.OPEN_EXCHANGE_RATES_APP_ID:
-        return "{url}latest.json?app_id={app_id}".format(
-            url=settings.OPEN_EXCHANGE_RATES_URL,
-            app_id=quote_plus(settings.OPEN_EXCHANGE_RATES_APP_ID),
-        )
-    else:
-        return None  # pragma: no cover

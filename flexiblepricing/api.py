@@ -11,6 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 from main.settings import TIME_ZONE
+from main.constants import DISALLOWED_CURRENCY_TYPES
 from flexiblepricing.constants import (
     INCOME_THRESHOLD_FIELDS,
     COUNTRY,
@@ -274,26 +275,37 @@ def determine_courseware_flexible_price_discount(product, user):
     return None
 
 
-@transaction.atomic
-def update_currency_exchange_rate(latest_rates):
+@transaction.atomic()
+def update_currency_exchange_rate(rates, currency_descriptions):
     """
     Updates all CurrencyExchangeRate objects based on the latest rates.
     Args:
-        latest_rates (dict): latest exchange rates from Open Exchange Rates API
+        rates (dict): latest exchange rates from Open Exchange Rates API
+        currency_descriptions (dict): list of currency codes and descriptions
     Returns:
         None
     """
-    rates = latest_rates.copy()  # So we don't modify the passed parameter
-    currency_exchange_rates = CurrencyExchangeRate.objects.all()
-    for currency_exchange_rate in currency_exchange_rates:
-        if currency_exchange_rate.currency_code in rates:
-            currency_exchange_rate.exchange_rate = rates.pop(
-                currency_exchange_rate.currency_code
-            )
-            currency_exchange_rate.save()
-        else:
-            currency_exchange_rate.delete()
+    codes = []
+
+    log.info("Removing existing rates")
+
+    CurrencyExchangeRate.objects.all().delete()
+
     for currency in rates:
-        CurrencyExchangeRate.objects.create(
-            currency_code=currency, exchange_rate=rates[currency]
+        if currency in DISALLOWED_CURRENCY_TYPES:
+            log.info(f"Skipping create on {currency}, in disallow list")
+            continue
+
+        description = (
+            currency_descriptions[currency]
+            if currency in currency_descriptions
+            else None
         )
+
+        CurrencyExchangeRate.objects.create(
+            currency_code=currency,
+            description=description,
+            exchange_rate=rates[currency],
+        )
+
+        codes.append(currency)
