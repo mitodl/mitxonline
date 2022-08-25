@@ -123,12 +123,17 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             return None
 
     def get_approved_flexible_price_exists(self, instance):
+        # Get the User object if it exists.
         user = self.context["request"].user if "request" in self.context else None
+
+        # Check for an approved flexible price record if the
+        # user exists and has an ID (not an Anonymous user).
+        # Otherwise return False.
         flexible_price_exists = (
             is_courseware_flexible_price_approved(
                 instance, self.context["request"].user
             )
-            if user
+            if user and user.id
             else False
         )
         return flexible_price_exists

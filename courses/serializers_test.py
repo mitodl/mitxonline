@@ -5,6 +5,8 @@ Tests for course serializers
 from datetime import datetime, timedelta
 
 import factory
+from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.factories import FlexiblePriceFactory
 import pytest
 import pytz
 from django.contrib.auth.models import AnonymousUser
@@ -209,6 +211,7 @@ def test_serialize_course_run():
             "id": course_run.id,
             "products": [],
             "page": None,
+            "approved_flexible_price_exists": False,
         },
     )
 
@@ -248,6 +251,7 @@ def test_serialize_course_run_enrollments(settings, receipts_enabled):
         "id": course_run_enrollment.id,
         "edx_emails_subscription": True,
         "enrollment_mode": "audit",
+        "approved_flexible_price_exists": False,
     }
 
 
@@ -282,4 +286,28 @@ def test_serialize_program_enrollments(settings, receipts_enabled):
         "course_run_enrollments": CourseRunEnrollmentSerializer(
             [course_run_enrollments[1], course_run_enrollments[0]], many=True
         ).data,
+    }
+
+
+@pytest.mark.parametrize("approved_flexible_price_exists", [True, False])
+def test_serialize_course_run_enrollments(approved_flexible_price_exists):
+    """Test that CourseRunEnrollmentSerializer has correct data"""
+    course_run_enrollment = CourseRunEnrollmentFactory.create()
+    if approved_flexible_price_exists:
+        status = FlexiblePriceStatus.APPROVED
+    else:
+        status = FlexiblePriceStatus.PENDING_MANUAL_APPROVAL
+
+    FlexiblePriceFactory.create(
+        user=course_run_enrollment.user,
+        courseware_object=course_run_enrollment.run.course,
+        status=status,
+    )
+    serialized_data = CourseRunEnrollmentSerializer(course_run_enrollment).data
+    assert serialized_data == {
+        "run": CourseRunDetailSerializer(course_run_enrollment.run).data,
+        "id": course_run_enrollment.id,
+        "edx_emails_subscription": True,
+        "enrollment_mode": "audit",
+        "approved_flexible_price_exists": approved_flexible_price_exists,
     }
