@@ -279,14 +279,14 @@ def is_courseware_flexible_price_approved(course_run, user):
     """
     Determines whether the user has a Flexible Price record that is approved for the course run.
 
-    
+
 
     Args:
         course_run (CourseRun): The CourseRun associated with a potential Flexible Price.
         user (User): the user that potentially has a Flexible Price.
     Returns:
         boolean:True if the user has a Flexible Price record that is
-                APPROVED or AUTO_APPROVED and assocaited with the CourseRun. 
+                APPROVED or AUTO_APPROVED and assocaited with the CourseRun.
                 False if the user does not have a Flexible Price that is APPROVED or AUTO_APPROVED
                 and associated with the CourseRun.
     """
