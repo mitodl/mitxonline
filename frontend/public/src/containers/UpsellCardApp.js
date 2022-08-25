@@ -52,7 +52,8 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
 
   renderUpgradeEnrollmentDialog(run: EnrollmentFlaggedCourseRun) {
     const { courseRuns } = this.props
-    const needFinancialAssistanceLink = isFinancialAssistanceAvailable(run) ?
+    console.log(courseRuns)
+    const needFinancialAssistanceLink = isFinancialAssistanceAvailable(run) && !run.approved_flexible_price_exists ?
       (
         <p className="text-center financial-assistance-link">
           <a href={run.page.financial_assistance_form_url}>
