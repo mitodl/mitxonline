@@ -25,6 +25,7 @@ from flexiblepricing.api import (
     determine_income_usd,
     determine_tier_courseware,
     import_country_income_thresholds,
+    is_courseware_flexible_price_approved,
     parse_country_income_thresholds,
     update_currency_exchange_rate,
 )
@@ -544,3 +545,24 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
         """
         # Note no CurrencyExchangeRate created here
         assert determine_income_usd(5000, "USD") == 5000
+
+    @ddt.data(
+        [True],
+        [False],
+    )
+    @ddt.unpack
+    def test_is_courseware_flexible_price_approved(
+        self,
+        is_approved,
+    ):
+        status = (
+            FlexiblePriceStatus.APPROVED
+            if is_approved
+            else FlexiblePriceStatus.PENDING_MANUAL_APPROVAL
+        )
+        flexible_price_record = FlexiblePriceFactory(status=status)
+        result = is_courseware_flexible_price_approved(
+            user=flexible_price_record.user,
+            course_run=flexible_price_record.courseware_object,
+        )
+        assert is_approved == result
