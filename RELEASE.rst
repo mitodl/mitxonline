@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.42.0
+Version 0.42.0 (Released August 25, 2022)
 --------------
 
 - Fixes some issues with the Fastly API code
