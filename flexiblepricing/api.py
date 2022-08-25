@@ -249,6 +249,41 @@ def determine_courseware_flexible_price_discount(product, user):
     return None
 
 
+def is_courseware_flexible_price_approved(course_run, user):
+    """
+    Determines whether the user has a Flexible Price record that is approved for the course run.
+
+    
+
+    Args:
+        course_run (CourseRun): The CourseRun associated with a potential Flexible Price.
+        user (User): the user that potentially has a Flexible Price.
+    Returns:
+        boolean:True if the user has a Flexible Price record that is
+                APPROVED or AUTO_APPROVED and assocaited with the CourseRun. 
+                False if the user does not have a Flexible Price that is APPROVED or AUTO_APPROVED
+                and associated with the CourseRun.
+    """
+
+    for eligible_courseware in get_ordered_eligible_coursewares(course_run):
+        content_type = ContentType.objects.get_for_model(eligible_courseware)
+        flexible_price = FlexiblePrice.objects.filter(
+            courseware_content_type=content_type,
+            courseware_object_id=eligible_courseware.id,
+            user=user,
+        ).first()
+
+        if (
+            flexible_price
+            and flexible_price.tier.current
+            and flexible_price.status
+            in (FlexiblePriceStatus.APPROVED, FlexiblePriceStatus.AUTO_APPROVED)
+        ):
+            return True
+
+    return False
+
+
 @transaction.atomic
 def update_currency_exchange_rate(latest_rates):
     """

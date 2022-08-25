@@ -254,8 +254,8 @@ export class EnrolledItemCard extends React.Component<
     ) : (
       enrollment.run.course.title
     )
-
-    const financialAssistanceLink = isFinancialAssistanceAvailable(enrollment.run) ? (
+    console.log(enrollment.run)
+    const financialAssistanceLink = isFinancialAssistanceAvailable(enrollment.run) && !enrollment.approved_flexible_price_exists ? (
       <a href={enrollment.run.page.financial_assistance_form_url}>
         Financial assistance?
       </a>
@@ -342,12 +342,12 @@ export class EnrolledItemCard extends React.Component<
             <div className="detail">
               {courseId}
               {startDateDescription !== null && startDateDescription.active ? (
-                <span>|{" "}Starts - {startDateDescription.datestr}</span>
+                <span> | Starts - {startDateDescription.datestr}</span>
               ) : (
                 <span>
                   {startDateDescription === null ? null : (
-                    <span>
-                      <strong>Active</strong> from{" "}
+                    <span> |
+                      <strong> Active</strong> from{" "}
                       {startDateDescription.datestr}
                     </span>
                   )}
@@ -362,13 +362,15 @@ export class EnrolledItemCard extends React.Component<
                 ) : null}
               </div>
               <br/>
-              <div className="upgrade-item-description">
-                <p>
-                  <strong>Upgrade today</strong> and, upon passing, receive your certificate signed by MIT faculty
-                  to highlight the knowledge and skills you've gained from this MITx course.
-                </p>
-                {certificateLinks}
-              </div>
+              {enrollment.enrollment_mode === "audit" ? (
+                <div className="upgrade-item-description">
+                  <p>
+                    <strong>Upgrade today</strong> and, upon passing, receive your certificate signed by MIT faculty
+                    to highlight the knowledge and skills you've gained from this MITx course.
+                  </p>
+                </div>
+              ) : null}
+              {certificateLinks}
             </div>
           </div>
         </div>
