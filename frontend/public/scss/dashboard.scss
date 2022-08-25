@@ -108,7 +108,11 @@ $program-badge-bg: #DBF2F3;
     a {
       text-decoration: underline;
       color: $light-gray;
-      margin: auto 2px;
+      margin: auto 0;
+    }
+
+    a.view-certificate {
+      margin: auto 5px;
     }
 
     form button.btn-primary {

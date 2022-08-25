@@ -169,9 +169,9 @@ def ensure_program_product_index() -> cms_models.ProgramIndexPage:
     return program_index
 
 
-def ensure_signatory_index() -> cms_models.ProgramIndexPage:
+def ensure_signatory_index() -> cms_models.SignatoryIndexPage:
     """
-    Same as ensure_product_index, but operates on programs instead.
+    Ensures that an index page has been created for signatories.
     """
     home_page = get_home_page()
     signatory_index = Page.objects.filter(
@@ -189,14 +189,12 @@ def ensure_signatory_index() -> cms_models.ProgramIndexPage:
     return signatory_index
 
 
-def ensure_certificate_index() -> cms_models.ProgramIndexPage:
+def ensure_certificate_index() -> cms_models.CertificateIndexPage:
     """
-    Same as ensure_product_index, but operates on programs instead.
+    Ensures that an index page has been created for certificates.
     """
     home_page = get_home_page()
-    certificate_index = Page.objects.filter(
-        content_type=ContentType.objects.get_for_model(cms_models.CertificateIndexPage)
-    ).first()
+    certificate_index = cms_models.CertificateIndexPage.objects.first()
 
     if certificate_index and certificate_index.slug != CERTIFICATE_INDEX_SLUG:
         certificate_index.slug = CERTIFICATE_INDEX_SLUG

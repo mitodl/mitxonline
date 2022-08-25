@@ -377,7 +377,7 @@ export class EnrolledItemCard extends React.Component<
                   <a href={pageLocation.page_url}>Course details</a>
                 ) : null}
                 {enrollment.certificate ? (
-                  <a href={enrollment.certificate.link}
+                  <a className="view-certificate" href={enrollment.certificate.link}
                     target="_blank"
                     rel="noopener noreferrer"
                   >View certificate</a>

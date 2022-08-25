@@ -344,28 +344,28 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
         """
         # When create method is called it returns list object of enrollments
         if isinstance(enrollment, list):
-            for en in enrollment:
-                self.get_certificate(en)
-        else:
-            # No need to include a certificate if there is no corresponding wagtail page
-            # to support the render
-            if (
-                not enrollment.run.course.page
-                or not enrollment.run.course.page.certificate_page
-            ):
-                return None
+            enrollment = enrollment[0] if enrollment else None
 
-            # Using IDs because we don't need the actual record and this avoids redundant queries
-            user_id = enrollment.user_id
-            course_run_id = enrollment.run_id
-            try:
-                return CourseRunCertificateSerializer(
-                    models.CourseRunCertificate.objects.get(
-                        user_id=user_id, course_run_id=course_run_id
-                    )
-                ).data
-            except models.CourseRunCertificate.DoesNotExist:
-                return None
+        # No need to include a certificate if there is no corresponding wagtail page
+        # to support the render
+        if (
+            not enrollment
+            or not enrollment.run.course.page
+            or not enrollment.run.course.page.certificate_page
+        ):
+            return None
+
+        # Using IDs because we don't need the actual record and this avoids redundant queries
+        user_id = enrollment.user_id
+        course_run_id = enrollment.run_id
+        try:
+            return CourseRunCertificateSerializer(
+                models.CourseRunCertificate.objects.get(
+                    user_id=user_id, course_run_id=course_run_id
+                )
+            ).data
+        except models.CourseRunCertificate.DoesNotExist:
+            return None
 
     class Meta:
         model = models.CourseRunEnrollment
