@@ -93,9 +93,14 @@ class CourseRunSerializer(BaseCourseRunSerializer):
     products = ProductRelatedField(many=True, queryset=Product.objects.all())
     page = serializers.SerializerMethodField()
     approved_flexible_price_exists = serializers.SerializerMethodField()
+
     class Meta:
         model = models.CourseRun
-        fields = BaseCourseRunSerializer.Meta.fields + ["products", "page", "approved_flexible_price_exists",]
+        fields = BaseCourseRunSerializer.Meta.fields + [
+            "products",
+            "page",
+            "approved_flexible_price_exists",
+        ]
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -119,10 +124,15 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
     def get_approved_flexible_price_exists(self, instance):
         user = self.context["request"].user if "request" in self.context else None
-        flexible_price_exists = is_courseware_flexible_price_approved(
-            instance, self.context["request"].user
-        ) if user else False
+        flexible_price_exists = (
+            is_courseware_flexible_price_approved(
+                instance, self.context["request"].user
+            )
+            if user
+            else False
+        )
         return flexible_price_exists
+
 
 class CourseSerializer(BaseCourseSerializer):
     """Course model serializer - also serializes child course runs"""
@@ -183,7 +193,7 @@ class CourseRunDetailSerializer(serializers.ModelSerializer):
     course = BaseCourseSerializer(read_only=True, context={"include_page_fields": True})
     products = BaseProductSerializer(read_only=True, many=True)
     page = serializers.SerializerMethodField()
-    
+
     def get_page(self, instance):
         try:
             return CoursePageSerializer(
