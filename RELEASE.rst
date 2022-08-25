@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.42.1
+--------------
+
+- Update flexible pricing approval email to eliminate errors when sending
+- Adds currency code descriptions; makes sure invalid codes are removed
+- Get certificate at reduced price (#856)
+- 872: checkout remove clear discount and a few other tweaks (#877)
+
 Version 0.42.0 (Released August 25, 2022)
 --------------
 
