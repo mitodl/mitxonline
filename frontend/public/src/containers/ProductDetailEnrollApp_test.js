@@ -340,6 +340,7 @@ describe("ProductDetailEnrollApp", () => {
     it(`shows the flexible pricing available link if the user does not have approved flexible pricing for the course run`, async () => {
       courseRun["approved_flexible_price_exists"] = flexPriceApproved
       isWithinEnrollmentPeriodStub.returns(true)
+      isFinancialAssistanceAvailableStub.returns(true)
       SETTINGS.features.upgrade_dialog = true
       const { inner } = await renderPage()
 
