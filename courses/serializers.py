@@ -394,7 +394,6 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
         flexible_price_exists = is_courseware_flexible_price_approved(
             instance.run, instance.user
         )
-        print("CP", flexible_price_exists)
         return flexible_price_exists
 
     class Meta:
