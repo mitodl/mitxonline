@@ -287,6 +287,10 @@ class Discount(TimestampedModel):
         ):
             return False
 
+        return self.valid_now()
+
+    def valid_now(self):
+        """Returns True if the discount is valid right now"""
         if self.activation_date is not None and self.activation_date > datetime.now(
             pytz.timezone(TIME_ZONE)
         ):
