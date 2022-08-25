@@ -6,6 +6,8 @@ from cms.api import (
     ensure_resource_pages,
     ensure_product_index,
     ensure_program_product_index,
+    ensure_signatory_index,
+    ensure_certificate_index,
 )
 
 
@@ -19,3 +21,5 @@ class Command(BaseCommand):
         ensure_product_index()
         ensure_resource_pages()
         ensure_program_product_index()
+        ensure_signatory_index()
+        ensure_certificate_index()

@@ -701,6 +701,16 @@ class ProductPage(Page):
         help_text="The faculty members to display on this page",
     )
 
+    def _get_child_page_of_type(self, cls):
+        """Gets the first child page of the given type if it exists"""
+        child = self.get_children().type(cls).live().first()
+        return child.specific if child else None
+
+    @property
+    def certificate_page(self):
+        """Gets the certificate child page"""
+        return self._get_child_page_of_type(CertificatePage)
+
     @property
     def video_player_config(self):
         """Get configuration for video player"""

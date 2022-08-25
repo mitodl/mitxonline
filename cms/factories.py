@@ -13,6 +13,8 @@ from cms.models import (
     FlexiblePricingRequestForm,
     ProgramPage,
     ProgramIndexPage,
+    CertificatePage,
+    SignatoryPage,
 )
 from courses.factories import CourseFactory, ProgramFactory
 
@@ -57,10 +59,13 @@ class CoursePageFactory(wagtail_factories.PageFactory):
     description = fuzzy.FuzzyText(prefix="Description ")
     length = fuzzy.FuzzyText(prefix="Length ")
     feature_image = factory.SubFactory(wagtail_factories.ImageFactory)
-    course = factory.SubFactory(CourseFactory)
+    course = factory.SubFactory(CourseFactory, page=None)
     slug = fuzzy.FuzzyText(prefix="my-page-")
     parent = LazyAttribute(
         lambda _: CourseIndexPage.objects.first() or CourseIndexPageFactory.create()
+    )
+    certificate_page = factory.RelatedFactory(
+        "cms.factories.CertificatePageFactory", "parent"
     )
 
     class Meta:
@@ -105,3 +110,29 @@ class FlexiblePricingFormFactory(wagtail_factories.PageFactory):
 
     class Meta:
         model = FlexiblePricingRequestForm
+
+
+class SignatoryPageFactory(wagtail_factories.PageFactory):
+    """SignatoryPage factory class"""
+
+    name = factory.fuzzy.FuzzyText(prefix="Name")
+    title_1 = factory.fuzzy.FuzzyText(prefix="Title_1")
+    title_2 = factory.fuzzy.FuzzyText(prefix="Title_2")
+    organization = factory.fuzzy.FuzzyText(prefix="Organization")
+    signature_image = factory.SubFactory(wagtail_factories.ImageFactory)
+
+    class Meta:
+        model = SignatoryPage
+
+
+class CertificatePageFactory(wagtail_factories.PageFactory):
+    """CertificatePage factory class"""
+
+    product_name = factory.fuzzy.FuzzyText(prefix="product_name")
+    CEUs = factory.Faker("pystr_format", string_format="#.#")
+    signatories = wagtail_factories.StreamFieldFactory(
+        {"signatory": SignatoryPageFactory}
+    )
+
+    class Meta:
+        model = CertificatePage

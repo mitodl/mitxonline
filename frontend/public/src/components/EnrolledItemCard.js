@@ -292,8 +292,6 @@ export class EnrolledItemCard extends React.Component<
     const courseId = enrollment.run.course_number
     const enrollmentMode = enrollment.enrollment_mode
     const pageLocation = enrollment.run.page
-    // certLocation is not used yet, just here to test layout
-    const certLocation = false
 
     return (
       <div
@@ -378,8 +376,11 @@ export class EnrolledItemCard extends React.Component<
                 {pageLocation ? (
                   <a href={pageLocation.page_url}>Course details</a>
                 ) : null}
-                {certLocation ? (
-                  <a href={certLocation}>View certificate</a>
+                {enrollment.certificate ? (
+                  <a className="view-certificate" href={enrollment.certificate.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >View certificate</a>
                 ) : null}
                 {certificateLinks}
               </div>

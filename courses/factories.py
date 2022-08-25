@@ -53,6 +53,8 @@ class CourseFactory(DjangoModelFactory):
     readable_id = factory.Sequence("course-{0}".format)
     live = True
 
+    page = factory.RelatedFactory("cms.factories.CoursePageFactory", "course")
+
     class Meta:
         model = Course
 
@@ -63,7 +65,7 @@ class CourseFactory(DjangoModelFactory):
 class CourseRunFactory(DjangoModelFactory):
     """Factory for CourseRuns"""
 
-    course = factory.SubFactory(CourseFactory)
+    course = factory.SubFactory(CourseFactory, page=None)
     title = factory.LazyAttribute(lambda x: "CourseRun " + FAKE.sentence())
     courseware_id = factory.Sequence(
         lambda number: "course:/v{}/{}".format(number, FAKE.slug())
