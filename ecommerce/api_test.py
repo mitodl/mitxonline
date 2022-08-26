@@ -50,6 +50,7 @@ def fulfilled_transaction(fulfilled_order):
     }
 
     return TransactionFactory.create(
+        transaction_id="1234",
         transaction_type=TRANSACTION_TYPE_PAYMENT,
         data=fulfilled_sample,
         order=fulfilled_order,
@@ -149,7 +150,8 @@ def test_cybersource_order_no_transaction(fulfilled_order):
 def test_order_refund_success(mocker, order_state, unenroll, fulfilled_transaction):
     """Test that appropriate data is created for a successful refund and it's state changes to REFUNDED"""
     sample_response_data = {
-        "refundAmountDetails": {"refundAmount": float(fulfilled_transaction.amount)}
+        "id": "12345",  # it only has id in refund response, no transaction_id
+        "refundAmountDetails": {"refundAmount": float(fulfilled_transaction.amount)},
     }
     sample_response = ProcessorResponse(
         state=order_state,
@@ -270,6 +272,7 @@ def test_process_cybersource_payment_response(rf, mocker, user_client, user, pro
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": "ACCEPT",
         "message": "payment processor message",
+        "transaction_id": "12345",
     }
 
     order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)

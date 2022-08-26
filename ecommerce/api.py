@@ -5,7 +5,7 @@ import logging
 from functools import total_ordering
 from django.urls import reverse
 from django.db import transaction
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
 from ecommerce.constants import TRANSACTION_TYPE_REFUND, REFUND_SUCCESS_STATES
@@ -303,9 +303,20 @@ def process_cybersource_payment_response(request, order):
 
     elif processor_response.state == ProcessorResponse.STATE_ACCEPTED:
         # It actually worked here
-        log.debug("Transaction accepted!: {msg}".format(msg=processor_response.message))
         basket = Basket.objects.filter(user=order.purchaser).first()
-        fulfill_completed_order(order, request.POST, basket)
+        try:
+            log.debug(
+                "Transaction accepted!: {msg}".format(msg=processor_response.message)
+            )
+            fulfill_completed_order(order, request.POST, basket)
+        except ValidationError:
+            log.debug(
+                "Missing transaction id from transaction response: {msg}".format(
+                    msg=processor_response.message
+                )
+            )
+            raise
+
         return_message = order.state
     else:
         order.cancel()
@@ -369,12 +380,6 @@ def refund_order(*, order_id: int, **kwargs):
         if refund_amount:
             transaction_dict["req_amount"] = refund_amount
 
-        refund_transaction = order.refund(
-            api_response_data={},
-            amount=transaction_dict["req_amount"],
-            reason=refund_reason,
-        )
-
         refund_gateway_request = PaymentGateway.create_refund_request(
             ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, transaction_dict
         )
@@ -384,10 +389,14 @@ def refund_order(*, order_id: int, **kwargs):
                 ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
                 refund_gateway_request,
             )
+
             if response.state in REFUND_SUCCESS_STATES:
-                # Update the above created refund transaction with PaymentGateway's refund response
-                refund_transaction.data = response.response_data
-                refund_transaction.save()
+                # Record refund transaction with PaymentGateway's refund response
+                order.refund(
+                    api_response_data=response.response_data,
+                    amount=transaction_dict["req_amount"],
+                    reason=refund_reason,
+                )
 
             else:
                 log.error(
