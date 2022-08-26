@@ -279,8 +279,6 @@ def is_courseware_flexible_price_approved(course_run, user):
     """
     Determines whether the user has a Flexible Price record that is approved for the course run.
 
-
-
     Args:
         course_run (CourseRun): The CourseRun associated with a potential Flexible Price.
         user (User): the user that potentially has a Flexible Price.
@@ -311,6 +309,7 @@ def is_courseware_flexible_price_approved(course_run, user):
 
 @transaction.atomic()
 def update_currency_exchange_rate(rates, currency_descriptions):
+    
     """
     Updates all CurrencyExchangeRate objects based on the latest rates.
     Args:
