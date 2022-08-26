@@ -391,8 +391,12 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
             return None
 
     def get_approved_flexible_price_exists(self, instance):
+        instance_run = instance[0].run if isinstance(instance, list) else instance.run
+        instance_user = (
+            instance[0].user if isinstance(instance, list) else instance.user
+        )
         flexible_price_exists = is_courseware_flexible_price_approved(
-            instance.run, instance.user
+            instance_run, instance_user
         )
         return flexible_price_exists
 
