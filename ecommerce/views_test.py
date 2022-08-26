@@ -499,6 +499,7 @@ def test_checkout_result(
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": decision,
         "message": "payment processor message",
+        "transaction_id": "12345",
     }
 
     # Load the pending order from the DB(factory) - should match the ref# in
@@ -828,7 +829,7 @@ def test_paid_and_unpaid_courserun_checkout(
     product = products[0]
     basket = create_basket_with_product(user, product)
     order = PendingOrder.create_from_basket(basket)
-    order.fulfill({"result": "Payment succeeded"})
+    order.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
     order.save()
 
     basket.delete()
@@ -888,6 +889,7 @@ def test_checkout_api_result(
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": decision,
         "message": "payment processor message",
+        "transaction_id": "12345",
     }
 
     # Load the pending order from the DB(factory) - should match the ref# in
@@ -974,6 +976,7 @@ def test_checkout_api_result_verification_failure(
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": Order.STATE.PENDING,
         "message": "payment processor message",
+        "transaction_id": "12345",
     }
 
     resp = api_client.post(reverse("checkout_result_api"), payload)

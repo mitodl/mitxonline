@@ -5,6 +5,7 @@ from mitol.common.utils import now_in_utc
 import reversion
 
 from django.db import IntegrityError, transaction
+from django.core.exceptions import ValidationError
 
 from users.factories import UserFactory
 
@@ -31,6 +32,7 @@ from ecommerce.factories import (
     UnlimitedUseDiscountFactory,
     SetLimitDiscountFactory,
     BasketItemFactory,
+    OrderFactory,
 )
 from ecommerce.discounts import (
     DiscountType,
@@ -212,7 +214,7 @@ def test_order_refund():
         basket_item = BasketItemFactory.create()
 
     order = PendingOrder.create_from_basket(basket_item.basket)
-    order.fulfill({"result": "Payment succeeded"})
+    order.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
     order.save()
 
     fulfilled_order = FulfilledOrder.objects.get(pk=order.id)
@@ -220,7 +222,10 @@ def test_order_refund():
     assert fulfilled_order.transactions.count() == 1
 
     fulfilled_order.refund(
-        api_response_data={},
+        # API response for refund doesn't have transaction_id, it has different id
+        api_response_data={
+            "id": "45678",
+        },
         amount=fulfilled_order.total_price_paid,
         reason="Test refund",
         unenroll_learner=True,
@@ -314,4 +319,56 @@ def test_order_update_reference_number(user):
 
     assert (
         existing_order.reference_number == existing_order._generate_reference_number()
+    )
+
+
+def test_duplicated_product_lines_validation(basket):
+    """Test that creating multiple lines for the same product in the same order are deduped automatically"""
+
+    with reversion.create_revision():
+        products = ProductFactory.create_batch(2)
+
+    basket_item = BasketItem(product=products[1], basket=basket, quantity=2)
+    basket_item.save()
+    order = PendingOrder.create_from_basket(basket)
+    order.save()
+    assert order.lines.count() == 1
+
+    basket_item.delete()
+    basket_item = BasketItem(product=products[0], basket=basket, quantity=1)
+    basket_item.save()
+    basket_item = BasketItem(product=products[1], basket=basket, quantity=1)
+    basket_item.save()
+    order = PendingOrder.create_from_basket(basket)
+    order.save()
+    assert order.lines.count() == 2
+
+
+def test_create_transaction_with_no_transaction_id():
+    """test that creating payment or refund transaction without transaction id in payment data will raise exception"""
+
+    with pytest.raises(ValidationError):
+        pending_order = OrderFactory.create(state=Order.STATE.PENDING)
+        pending_order.fulfill({})
+        pending_order.save()
+    assert (
+        Transaction.objects.filter(
+            transaction_type="payment",
+        ).count()
+        == 0
+    )
+
+    fulfilled_order = OrderFactory.create(state=Order.STATE.FULFILLED)
+    with pytest.raises(ValidationError):
+        fulfilled_order.refund(
+            api_response_data={},
+            amount=fulfilled_order.total_price_paid,
+            reason="Test refund",
+            unenroll_learner=True,
+        )
+    assert (
+        Transaction.objects.filter(
+            transaction_type="refund",
+        ).count()
+        == 0
     )

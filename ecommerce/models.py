@@ -3,6 +3,7 @@ import pytz
 from django.utils.functional import cached_property
 from django.conf import settings
 from django.db import models, transaction
+from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -386,7 +387,6 @@ class Order(TimestampedModel):
 
     # override save method to auto-fill generated_rerefence_number
     def save(self, *args, **kwargs):
-
         # initial save in order to get primary key for new order
         super().save(*args, **kwargs)
 
@@ -459,7 +459,21 @@ class FulfillableOrder:
     """class to handle common logics like fulfill, enrollment etc"""
 
     def create_transaction(self, payment_data):
-        self.transactions.create(
+
+        transaction_id = payment_data.get("transaction_id")
+        amount = payment_data.get("amount")
+        # There are two use cases:
+        # No payment required - simply pass as there is no transaction involved
+        # Payment STATE_ACCEPTED - there should always be transaction_id in payment data, if not, throw ValidationError
+        if amount == 0 and transaction_id is None:
+            return
+        elif transaction_id is None:
+            raise ValidationError(
+                "Failed to record transaction: Missing transaction id from payment API response"
+            )
+
+        self.transactions.get_or_create(
+            transaction_id=transaction_id,
             data=payment_data,
             amount=self.total_price_paid,
         )
@@ -531,14 +545,17 @@ class PendingOrder(FulfillableOrder, Order):
         for product in basket.get_products():
             product_version = Version.objects.get_for_object(product).first()
 
-            line = order.lines.create(
+            line, created = order.lines.get_or_create(
                 order=order,
-                product_version=product_version,
-                quantity=1,
-                purchased_object=product.purchasable_object,
+                purchased_object_id=product.object_id,
+                purchased_content_type_id=product.content_type_id,
+                defaults=dict(
+                    product_version=product_version,
+                    quantity=1,
+                ),
             )
-
-            total += line.discounted_price
+            if created:
+                total += line.discounted_price
 
         order.total_price_paid = total
         order.save()
@@ -610,13 +627,19 @@ class FulfilledOrder(Order):
         amount = kwargs.get("amount")
         reason = kwargs.get("reason")
 
-        refund_transaction = self.transactions.create(
+        transaction_id = api_response_data.get("id")
+        if transaction_id is None:
+            raise ValidationError(
+                "Failed to record transaction: Missing transaction id from refund API response"
+            )
+
+        refund_transaction, created = self.transactions.get_or_create(
+            transaction_id=transaction_id,
             data=api_response_data,
             amount=amount,
             transaction_type=TRANSACTION_TYPE_REFUND,
             reason=reason,
         )
-
         self.state = Order.STATE.REFUNDED
         self.save()
         return refund_transaction
@@ -719,6 +742,14 @@ class Line(TimestampedModel):
         "purchased_content_type", "purchased_object_id"
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["order_id", "purchased_content_type", "purchased_object_id"],
+                name="unique_order_purchased_object",
+            )
+        ]
+
     @property
     def item_description(self):
         return self.product_version.field_dict["description"]
@@ -771,6 +802,9 @@ class Line(TimestampedModel):
 
 class Transaction(TimestampedModel):
     """A transaction on an order, generally a payment but can also cover refunds"""
+
+    # Per CyberSourse, Request ID should be 22 digits
+    transaction_id = models.CharField(max_length=255, unique=True)
 
     order = models.ForeignKey(
         "ecommerce.Order", on_delete=models.CASCADE, related_name="transactions"

@@ -225,6 +225,7 @@ def create_order_receipt(mocker, user, products, user_client):
         **{f"req_{key}": value for key, value in payload.items()},
         "decision": "ACCEPT",
         "message": "payment processor message",
+        "transaction_id": "12345",
     }
 
     order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)
