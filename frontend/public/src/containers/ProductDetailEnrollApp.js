@@ -71,7 +71,7 @@ export class ProductDetailEnrollApp extends React.Component<
   renderUpgradeEnrollmentDialog() {
     const { courseRuns } = this.props
     const run = !this.getCurrentCourseRun() && courseRuns ? courseRuns[0] : this.getCurrentCourseRun()
-    const needFinancialAssistanceLink = isFinancialAssistanceAvailable(run) ?
+    const needFinancialAssistanceLink = isFinancialAssistanceAvailable(run) && !run.approved_flexible_price_exists ?
       (
         <p className="text-center financial-assistance-link">
           <a href={run.page.financial_assistance_form_url}>

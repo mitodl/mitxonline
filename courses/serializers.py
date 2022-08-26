@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.templatetags.static import static
+from flexiblepricing.api import is_courseware_flexible_price_approved
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -91,10 +92,15 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
     products = ProductRelatedField(many=True, queryset=Product.objects.all())
     page = serializers.SerializerMethodField()
+    approved_flexible_price_exists = serializers.SerializerMethodField()
 
     class Meta:
         model = models.CourseRun
-        fields = BaseCourseRunSerializer.Meta.fields + ["products", "page"]
+        fields = BaseCourseRunSerializer.Meta.fields + [
+            "products",
+            "page",
+            "approved_flexible_price_exists",
+        ]
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -115,6 +121,22 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             ).data
         except ObjectDoesNotExist:
             return None
+
+    def get_approved_flexible_price_exists(self, instance):
+        # Get the User object if it exists.
+        user = self.context["request"].user if "request" in self.context else None
+
+        # Check for an approved flexible price record if the
+        # user exists and has an ID (not an Anonymous user).
+        # Otherwise return False.
+        flexible_price_exists = (
+            is_courseware_flexible_price_approved(
+                instance, self.context["request"].user
+            )
+            if user and user.id
+            else False
+        )
+        return flexible_price_exists
 
 
 class CourseSerializer(BaseCourseSerializer):
@@ -323,6 +345,7 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
     enrollment_mode = serializers.ChoiceField(
         (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
     )
+    approved_flexible_price_exists = serializers.SerializerMethodField()
 
     def create(self, validated_data):
         user = self.context["user"]
@@ -367,6 +390,16 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
         except models.CourseRunCertificate.DoesNotExist:
             return None
 
+    def get_approved_flexible_price_exists(self, instance):
+        instance_run = instance[0].run if isinstance(instance, list) else instance.run
+        instance_user = (
+            instance[0].user if isinstance(instance, list) else instance.user
+        )
+        flexible_price_exists = is_courseware_flexible_price_approved(
+            instance_run, instance_user
+        )
+        return flexible_price_exists
+
     class Meta:
         model = models.CourseRunEnrollment
         fields = [
@@ -376,6 +409,7 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
             "edx_emails_subscription",
             "certificate",
             "enrollment_mode",
+            "approved_flexible_price_exists",
         ]
 
 

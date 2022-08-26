@@ -55,7 +55,7 @@ export const makeCourseRunWithProduct = (): CourseRun => ({
   // $FlowFixMe
   id:               genCourseRunId.next().value,
   course_number:    casual.word,
-  page:             null,
+  page:             { financial_assistance_form_url: casual.url },
   is_upgradable:    true,
   products:         [
     {

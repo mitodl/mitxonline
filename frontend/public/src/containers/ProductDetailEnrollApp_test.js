@@ -332,4 +332,37 @@ describe("ProductDetailEnrollApp", () => {
     const enrollBtn = inner.find("form > button.enroll-now")
     assert.isTrue(enrollBtn.exists())
   })
+
+  ;[
+    [true],
+    [false]
+  ].forEach(([flexPriceApproved]) => {
+    it(`shows the flexible pricing available link if the user does not have approved flexible pricing for the course run`, async () => {
+      courseRun["approved_flexible_price_exists"] = flexPriceApproved
+      isWithinEnrollmentPeriodStub.returns(true)
+      isFinancialAssistanceAvailableStub.returns(true)
+      SETTINGS.features.upgrade_dialog = true
+      const { inner } = await renderPage()
+
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        "/api/course_runs/?relevant_to=",
+        "GET"
+      )
+      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      await enrollBtn.prop("onClick")()
+
+      const modal = inner.find(".upgrade-enrollment-modal")
+
+      const flexiblePricingLink = modal.find(".financial-assistance-link").at(0)
+      if (flexPriceApproved) {
+        assert.isFalse(flexiblePricingLink.exists())
+      } else {
+        assert.isTrue(flexiblePricingLink.exists())
+      }
+    })
+  })
 })

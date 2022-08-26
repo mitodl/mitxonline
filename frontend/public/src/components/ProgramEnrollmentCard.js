@@ -5,7 +5,6 @@ import { ReactPageClick } from "react-page-click"
 import { Badge } from "reactstrap"
 
 import { generateStartDateText } from "../lib/courseApi"
-import { EnrollmentRoleTag } from "./EnrollmentRoleTag"
 
 import type { ProgramEnrollment, Program, RunEnrollment, CourseDetailWithRuns, BaseCourseRun } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
@@ -49,29 +48,6 @@ export class ProgramEnrollmentCard extends React.Component<
   hndOpenDrawer = () => {
     const { showDrawer, enrollment } = this.props
     showDrawer(enrollment.enrollments)
-  }
-
-  determineEnrollmentTags = (enrollment: Array<RunEnrollment>) => {
-    let foundAudit = false
-    let foundCert = false
-
-    enrollment.forEach(elem => {
-      switch (elem.enrollment_mode) {
-      case 'audit':
-        foundAudit = true
-        break
-      case 'verified':
-        foundCert = true
-        break
-      default:
-        break
-      }
-    })
-
-    const foundAuditCode = foundAudit ? (<EnrollmentRoleTag enrollmentMode="audit"></EnrollmentRoleTag>) : null
-    const foundCertCode = foundCert ? (<EnrollmentRoleTag enrollmentMode="verified"></EnrollmentRoleTag>) : null
-
-    return (<>{foundCertCode} {foundAuditCode}</>)
   }
 
   renderDrawer = (drawerClass: string): React$Element<*> | null => {
@@ -156,7 +132,6 @@ export class ProgramEnrollmentCard extends React.Component<
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
               <span>
                 {enrollment.enrollments.length === 0 ? (<Badge color="red">Not enrolled in any courses</Badge>) : null}
-                {this.determineEnrollmentTags(enrollment.enrollments)}
                 <Badge className="badge-program">Program</Badge>
               </span>
               <div className="dropdown">
@@ -169,9 +144,9 @@ export class ProgramEnrollmentCard extends React.Component<
               <h2 className="my-0 mr-3">{title}</h2>
             </div>
             <div className="detail">
-              {enrollment.program.readable_id} |{" "}
+              {enrollment.program.readable_id.split('+')[1] || enrollment.program.readable_id}
               {startDateDescription !== null && startDateDescription.active ? (
-                <span>Starts - {startDateDescription.datestr}</span>
+                <span>|{" "}Starts - {startDateDescription.datestr}</span>
               ) : (
                 <span>
                   {startDateDescription === null ? null : (

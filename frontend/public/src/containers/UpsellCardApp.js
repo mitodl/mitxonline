@@ -9,6 +9,7 @@ import { connectRequest } from "redux-query"
 import { Badge } from "reactstrap"
 
 import Loader from "../components/Loader"
+import GetCertificateButton from '../components/GetCertificateButton'
 import { routes } from "../lib/urls"
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
@@ -51,7 +52,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
 
   renderUpgradeEnrollmentDialog(run: EnrollmentFlaggedCourseRun) {
     const { courseRuns } = this.props
-    const needFinancialAssistanceLink = isFinancialAssistanceAvailable(run) ?
+    const needFinancialAssistanceLink = isFinancialAssistanceAvailable(run) && !run.approved_flexible_price_exists ?
       (
         <p className="text-center financial-assistance-link">
           <a href={run.page.financial_assistance_form_url}>
@@ -82,16 +83,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
               highlight the knowledge and skills you've gained from this MITx
               course.
             </p>
-
-            <form action="/cart/add/" method="get" className="text-center">
-              <input type="hidden" name="product_id" value={product.id} />
-              <button
-                type="submit"
-                className="btn btn-primary btn-gradient-red"
-              >
-                Get Certificate
-              </button>
-            </form>
+            <GetCertificateButton productId={product.id} />
             {needFinancialAssistanceLink}
           </div>
         </div>
