@@ -307,9 +307,10 @@ def is_courseware_flexible_price_approved(course_run, user):
 
     return False
 
+
 @transaction.atomic()
 def update_currency_exchange_rate(rates, currency_descriptions):
-    
+
     """
     Updates all CurrencyExchangeRate objects based on the latest rates.
     Args:
