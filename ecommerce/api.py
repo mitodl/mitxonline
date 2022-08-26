@@ -18,6 +18,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_DISCOUNT_INVALID,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
 )
 
 from mitol.payment_gateway.api import (
@@ -118,13 +119,17 @@ def generate_checkout_payload(request):
         total_price += line_item.discounted_price
 
     if total_price == 0:
+        fulfill_completed_order(
+            order, {"amount": 0, "data": {"reason": "No payment required"}}, basket
+        )
         return {
             "no_checkout": True,
-            "response": fulfill_completed_order(
-                order,
-                {"amount": 0, "data": {"reason": "No payment required"}},
-                basket,
-                USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+            "response": redirect_with_user_message(
+                reverse("user-dashboard"),
+                {
+                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+                    "run": order.lines.first().purchased_object.course.title,
+                },
             ),
         }
 
