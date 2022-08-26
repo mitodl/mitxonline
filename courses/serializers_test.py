@@ -312,7 +312,9 @@ def test_serialize_program_enrollments(settings, receipts_enabled):
 @pytest.mark.parametrize("approved_flexible_price_exists", [True, False])
 def test_serialize_course_run_enrollments(approved_flexible_price_exists):
     """Test that CourseRunEnrollmentSerializer has correct data"""
-    course_run_enrollment = CourseRunEnrollmentFactory.create()
+    course = CourseFactory.create()
+    course_run = CourseRunFactory.create(course=course)
+    course_run_enrollment = CourseRunEnrollmentFactory.create(run=course_run)
     if approved_flexible_price_exists:
         status = FlexiblePriceStatus.APPROVED
     else:
@@ -330,4 +332,5 @@ def test_serialize_course_run_enrollments(approved_flexible_price_exists):
         "edx_emails_subscription": True,
         "enrollment_mode": "audit",
         "approved_flexible_price_exists": approved_flexible_price_exists,
+        "certificate": None,
     }
