@@ -8,6 +8,7 @@ from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
 )
 from main.utils import encode_json_cookie_value
 from main.settings import TIME_ZONE
@@ -39,6 +40,7 @@ from ecommerce.models import (
     PendingOrder,
 )
 from courses.models import PaidCourseRun
+from ecommerce.constants import DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.serializers import (
     ProductSerializer,
     BasketSerializer,
@@ -1012,3 +1014,26 @@ def test_non_upgradable_courserun_checkout(
         assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
             {"type": USER_MSG_TYPE_COURSE_NON_UPGRADABLE}
         )
+
+
+def test_start_checkout_with_zero_value(user, user_client, products):
+    """
+    Check that the checkout redirects the user to dashboard when basket price is zero
+    """
+    discount = DiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=100
+    )
+    test_redeem_discount(user, user_client, products, [discount], False)
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    assert USER_MSG_COOKIE_NAME in resp.cookies
+    order = Order.objects.filter(purchaser=user).get()
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {
+            "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+            "run": order.lines.first().purchased_object.course.title,
+        }
+    )
