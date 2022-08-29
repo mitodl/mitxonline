@@ -16,7 +16,7 @@ def backfill_transaction_id(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("ecommerce", "0025_transaction_transaction_id"),
+        ("ecommerce", "0026_transaction_transaction_id"),
     ]
 
     operations = [

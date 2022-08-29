@@ -1,5 +1,6 @@
 from datetime import datetime
 import pytz
+import uuid
 from django.utils.functional import cached_property
 from django.conf import settings
 from django.db import models, transaction
@@ -463,10 +464,10 @@ class FulfillableOrder:
         transaction_id = payment_data.get("transaction_id")
         amount = payment_data.get("amount")
         # There are two use cases:
-        # No payment required - simply pass as there is no transaction involved
+        # No payment required - no cybersource involved, so we need to generate UUID as transaction id
         # Payment STATE_ACCEPTED - there should always be transaction_id in payment data, if not, throw ValidationError
         if amount == 0 and transaction_id is None:
-            return
+            transaction_id = uuid.uuid1()
         elif transaction_id is None:
             raise ValidationError(
                 "Failed to record transaction: Missing transaction id from payment API response"
