@@ -281,6 +281,12 @@ def process_cybersource_payment_response(request, order):
         ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
     )
 
+    # Log error message if reason_code is any number other than 100 (successful transaction)
+    reason_code = processor_response.response_code
+    if reason_code and reason_code != "100":
+        log.error(
+            f"Transaction was not successful. Reason Code:  {reason_code}  \t Message: {processor_response.message}"
+        )
     return_message = ""
 
     if processor_response.state == ProcessorResponse.STATE_DECLINED:
