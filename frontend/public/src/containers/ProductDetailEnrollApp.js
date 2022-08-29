@@ -56,16 +56,13 @@ export class ProductDetailEnrollApp extends React.Component<
   }
 
   setCurrentCourseRun = (courseRun: EnrollmentFlaggedCourseRun) => {
-    sessionStorage.setItem('currentCourseRun', JSON.stringify(courseRun))
     this.setState({
       currentCourseRun: courseRun
     })
   }
 
   getCurrentCourseRun = (): EnrollmentFlaggedCourseRun => {
-    const courseRun = sessionStorage.getItem('currentCourseRun')
-    const sessionCourseRun = courseRun ? JSON.parse(courseRun) : null
-    return sessionCourseRun ? sessionCourseRun : this.state.currentCourseRun
+    return this.state.currentCourseRun
   }
 
   renderUpgradeEnrollmentDialog() {

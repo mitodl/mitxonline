@@ -242,6 +242,7 @@
         .dates-tooltip {
           color: $link-blue !important;
           text-decoration: underline;
+          cursor: pointer;
         }
       }
 
@@ -456,4 +457,10 @@
 .popover-header {
   text-align: center;
   background: $white;
+}
+
+.date-link {
+  color: $link-blue !important;
+  text-decoration: underline;
+  cursor: pointer;
 }
