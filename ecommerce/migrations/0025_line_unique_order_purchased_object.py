@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("ecommerce", "0023_alter_index_unique_object_id_validated"),
+        ("ecommerce", "0024_add_discount_action_dates"),
     ]
 
     operations = [

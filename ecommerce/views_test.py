@@ -766,7 +766,8 @@ def test_discount_redemptions_api(
 
     resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
 
-    assert resp.status_code == 200
+    # 100% discount will redirect to user dashboard
+    assert resp.status_code == 200 or resp.status_code == 302
 
     resp = admin_drf_client.get(f"/api/v0/discounts/{discount.id}/redemptions/")
     assert resp.status_code == 200
