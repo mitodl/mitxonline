@@ -28,6 +28,7 @@ from main.utils import serialize_model_object
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENTS_PAID_MODES
 from openedx.utils import edx_redirect_url
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
+from wagtail.core.models import PageRevision
 
 User = get_user_model()
 
@@ -567,6 +568,9 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     """
 
     course_run = models.ForeignKey(CourseRun, null=False, on_delete=models.CASCADE)
+    certificate_page_revision = models.ForeignKey(
+        PageRevision, null=True, on_delete=models.CASCADE
+    )
 
     objects = ActiveCertificates()
     all_objects = models.Manager()
@@ -606,6 +610,17 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
                 uuid=self.uuid,
             )
         )
+
+    def save(self, *args, **kwargs):
+        if not self.certificate_page_revision:
+            certificate_page = (
+                self.course_run.course.page.certificate_page
+                if self.course_run.course.page
+                else None
+            )
+            if certificate_page:
+                self.certificate_page_revision = certificate_page.get_latest_revision()
+        super(BaseCertificate, self).save(*args, **kwargs)
 
 
 class BlockedCountry(TimestampedModel):
