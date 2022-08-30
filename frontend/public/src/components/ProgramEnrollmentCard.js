@@ -134,11 +134,6 @@ export class ProgramEnrollmentCard extends React.Component<
                 {enrollment.enrollments.length === 0 ? (<Badge color="red">Not enrolled in any courses</Badge>) : null}
                 <Badge className="badge-program">Program</Badge>
               </span>
-              <div className="dropdown">
-                <button type="button" className="d-inline-flex unstyled dot-menu" onClick={() => this.hndOpenDrawer()}>
-                  <i className="material-icons">more_vert</i>
-                </button>
-              </div>
             </div>
             <div className="d-flex justify-content-between align-content-start flex-nowrap mb-3">
               <h2 className="my-0 mr-3">{title}</h2>

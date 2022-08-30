@@ -104,7 +104,6 @@ $program-badge-bg: #DBF2F3;
   .upgrade-item-description {
     background-color: #F6F6F6;
     padding: 15px;
-    height: 100%;
     width: 100%;
   }
 
@@ -203,4 +202,13 @@ $program-badge-bg: #DBF2F3;
 
     background-color: rgba(0,0,0,.2);
   }
+}
+
+.box {
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: row;
+}
+.re-order {
+  order: -2;
 }

@@ -16,6 +16,7 @@ import { partial } from "ramda"
 
 import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../constants"
 import GetCertificateButton from './GetCertificateButton'
+import { EnrollmentRoleTag } from "./EnrollmentRoleTag"
 import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
@@ -276,6 +277,7 @@ export class EnrolledItemCard extends React.Component<
     const courseId = enrollment.run.course_number
     const enrollmentMode = enrollment.enrollment_mode
     const pageLocation = enrollment.run.page
+    const menuTitle = `Course options for ${enrollment.run.course.title}`
 
     return (
       <div
@@ -304,38 +306,9 @@ export class EnrolledItemCard extends React.Component<
             </div>
           )}
 
-          <div className="col-12 col-md px-3 py-3 py-md-0">
+          <div className="col-12 col-md px-3 py-3 py-md-0 box">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
               <h2 className="my-0 mr-3">{title}</h2>
-              <Dropdown
-                isOpen={menuVisibility}
-                toggle={this.toggleMenuVisibility.bind(this)}
-                id={`enrollmentDropdown-${enrollment.id}`}
-              >
-                <DropdownToggle className="d-inline-flex unstyled dot-menu">
-                  <i className="material-icons">more_vert</i>
-                </DropdownToggle>
-                <DropdownMenu right>
-                  <span id={`unenrollButtonWrapper-${enrollment.id}`}>
-                    <DropdownItem
-                      className="unstyled d-block"
-                      onClick={onUnenrollClick}
-                    >
-                      Unenroll
-                    </DropdownItem>
-                    {this.renderVerifiedUnenrollmentModal(enrollment)}
-                  </span>
-                  <span id="subscribeButtonWrapper">
-                    <DropdownItem
-                      className="unstyled d-block"
-                      onClick={() => this.toggleEmailSettingsModalVisibility()}
-                    >
-                      Email Settings
-                    </DropdownItem>
-                    {this.renderEmailSettingsDialog(enrollment)}
-                  </span>
-                </DropdownMenu>
-              </Dropdown>
             </div>
             <div className="detail">
               {courseId}
@@ -372,6 +345,38 @@ export class EnrolledItemCard extends React.Component<
                 </div>
               ) : null}
               {certificateLinks}
+            </div>
+            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container re-order">
+              <EnrollmentRoleTag enrollmentMode={enrollmentMode}></EnrollmentRoleTag>
+              <Dropdown
+                isOpen={menuVisibility}
+                toggle={this.toggleMenuVisibility.bind(this)}
+                id={`enrollmentDropdown-${enrollment.id}`}
+              >
+                <DropdownToggle className="d-inline-flex unstyled dot-menu">
+                  <span className="material-icons" aria-label={menuTitle} title={menuTitle}>more_vert</span>
+                </DropdownToggle>
+                <DropdownMenu right>
+                  <span id={`unenrollButtonWrapper-${enrollment.id}`}>
+                    <DropdownItem
+                      className="unstyled d-block"
+                      onClick={onUnenrollClick}
+                    >
+                      Unenroll
+                    </DropdownItem>
+                    {this.renderVerifiedUnenrollmentModal(enrollment)}
+                  </span>
+                  <span id="subscribeButtonWrapper">
+                    <DropdownItem
+                      className="unstyled d-block"
+                      onClick={() => this.toggleEmailSettingsModalVisibility()}
+                    >
+                      Email Settings
+                    </DropdownItem>
+                    {this.renderEmailSettingsDialog(enrollment)}
+                  </span>
+                </DropdownMenu>
+              </Dropdown>
             </div>
           </div>
         </div>
