@@ -361,6 +361,7 @@ class Order(TimestampedModel):
         ERRORED = "errored"
         REFUNDED = "refunded"
         REVIEW = "review"
+        PARTIALLY_REFUNDED = "partially_refunded"
 
         @classmethod
         def choices(cls):
@@ -372,6 +373,11 @@ class Order(TimestampedModel):
                 (cls.DECLINED, "Declined", "DeclinedOrder"),
                 (cls.ERRORED, "Errored", "ErroredOrder"),
                 (cls.REVIEW, "Review", "ReviewOrder"),
+                (
+                    cls.PARTIALLY_REFUNDED,
+                    "Partially Refunded",
+                    "PartiallyRefundedOrder",
+                ),
             )
 
     state = FSMField(default=STATE.PENDING, state_choices=STATE.choices())
@@ -702,6 +708,17 @@ class DeclinedOrder(Order):
 class ErroredOrder(Order):
     """
     An order that is errored.
+
+    The state of this can't be altered further.
+    """
+
+    class Meta:
+        proxy = True
+
+
+class PartiallyRefundedOrder(Order):
+    """
+    An order that is partially refunded.
 
     The state of this can't be altered further.
     """

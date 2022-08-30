@@ -151,6 +151,7 @@ class BaseOrderAdmin(FSMTransitionMixin, TimestampedModelAdmin):
     list_fields = ["state"]
     list_filter = ["state"]
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
+    readonly_fields = ["reference_number"]
 
     @display(description="Purchaser")
     def get_purchaser(self, obj: Order):
@@ -198,6 +199,7 @@ class CanceledOrderAdmin(BaseOrderAdmin):
 class FulfilledOrderAdmin(TimestampedModelAdmin):
     """Admin for FulfilledOrder"""
 
+    readonly_fields = ["reference_number"]
     search_fields = ["id", "purchaser__email", "purchaser__username"]
     list_display = ["id", "state", "get_purchaser", "total_price_paid"]
     list_fields = ["state"]
