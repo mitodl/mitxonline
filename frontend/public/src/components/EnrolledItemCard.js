@@ -305,39 +305,9 @@ export class EnrolledItemCard extends React.Component<
             </div>
           )}
 
-          <div className="col-12 col-md px-3 py-3 py-md-0">
+          <div className="col-12 col-md px-3 py-3 py-md-0 box">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
-              <EnrollmentRoleTag enrollmentMode={enrollmentMode}></EnrollmentRoleTag>
               <h2 className="my-0 mr-3">{title}</h2>
-              <Dropdown
-                isOpen={menuVisibility}
-                toggle={this.toggleMenuVisibility.bind(this)}
-                id={`enrollmentDropdown-${enrollment.id}`}
-              >
-                <DropdownToggle className="d-inline-flex unstyled dot-menu">
-                  <span className="material-icons" title="menu">more_vert</span>
-                </DropdownToggle>
-                <DropdownMenu right>
-                  <span id={`unenrollButtonWrapper-${enrollment.id}`}>
-                    <DropdownItem
-                      className="unstyled d-block"
-                      onClick={onUnenrollClick}
-                    >
-                      Unenroll
-                    </DropdownItem>
-                    {this.renderVerifiedUnenrollmentModal(enrollment)}
-                  </span>
-                  <span id="subscribeButtonWrapper">
-                    <DropdownItem
-                      className="unstyled d-block"
-                      onClick={() => this.toggleEmailSettingsModalVisibility()}
-                    >
-                      Email Settings
-                    </DropdownItem>
-                    {this.renderEmailSettingsDialog(enrollment)}
-                  </span>
-                </DropdownMenu>
-              </Dropdown>
             </div>
             <div className="detail">
               {courseId}
@@ -374,6 +344,38 @@ export class EnrolledItemCard extends React.Component<
                 </div>
               ) : null}
               {certificateLinks}
+            </div>
+            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container active">
+              <EnrollmentRoleTag enrollmentMode={enrollmentMode}></EnrollmentRoleTag>
+              <Dropdown
+                isOpen={menuVisibility}
+                toggle={this.toggleMenuVisibility.bind(this)}
+                id={`enrollmentDropdown-${enrollment.id}`}
+              >
+                <DropdownToggle className="d-inline-flex unstyled dot-menu">
+                  <span className="material-icons" title="menu">more_vert</span>
+                </DropdownToggle>
+                <DropdownMenu right>
+                  <span id={`unenrollButtonWrapper-${enrollment.id}`}>
+                    <DropdownItem
+                      className="unstyled d-block"
+                      onClick={onUnenrollClick}
+                    >
+                      Unenroll
+                    </DropdownItem>
+                    {this.renderVerifiedUnenrollmentModal(enrollment)}
+                  </span>
+                  <span id="subscribeButtonWrapper">
+                    <DropdownItem
+                      className="unstyled d-block"
+                      onClick={() => this.toggleEmailSettingsModalVisibility()}
+                    >
+                      Email Settings
+                    </DropdownItem>
+                    {this.renderEmailSettingsDialog(enrollment)}
+                  </span>
+                </DropdownMenu>
+              </Dropdown>
             </div>
           </div>
         </div>
