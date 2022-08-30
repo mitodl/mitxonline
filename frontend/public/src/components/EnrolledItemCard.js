@@ -16,6 +16,7 @@ import { partial } from "ramda"
 
 import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../constants"
 import GetCertificateButton from './GetCertificateButton'
+import { EnrollmentRoleTag } from "./EnrollmentRoleTag"
 import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
@@ -306,6 +307,7 @@ export class EnrolledItemCard extends React.Component<
 
           <div className="col-12 col-md px-3 py-3 py-md-0">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
+              <EnrollmentRoleTag enrollmentMode={enrollmentMode}></EnrollmentRoleTag>
               <h2 className="my-0 mr-3">{title}</h2>
               <Dropdown
                 isOpen={menuVisibility}
