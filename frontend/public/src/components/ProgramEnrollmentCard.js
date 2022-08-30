@@ -139,7 +139,7 @@ export class ProgramEnrollmentCard extends React.Component<
               </span>
             </div>
             <div className="detail">
-              {enrollment.program.readable_id.split('+')[1] || enrollment.program.readable_id}
+              {enrollment.program.title}
               {startDateDescription !== null && startDateDescription.active ? (
                 <span>|{" "}Starts - {startDateDescription.datestr}</span>
               ) : (
@@ -163,7 +163,7 @@ export class ProgramEnrollmentCard extends React.Component<
           </div>
           <div className="dropdown">
             <button type="button" className="d-inline-flex unstyled dot-menu" onClick={() => this.hndOpenDrawer()}>
-              <span className="material-icons" title="menu">more_vert</span>
+              <span className="material-icons" title={`Course options for ${enrollment.program.title}`}>more_vert</span>
             </button>
           </div>
         </div>

@@ -353,7 +353,7 @@ export class EnrolledItemCard extends React.Component<
                 id={`enrollmentDropdown-${enrollment.id}`}
               >
                 <DropdownToggle className="d-inline-flex unstyled dot-menu">
-                  <span className="material-icons" title="menu">more_vert</span>
+                  <span className="material-icons" title={`Course options for ${enrollment.run.course.title}`}>more_vert</span>
                 </DropdownToggle>
                 <DropdownMenu right>
                   <span id={`unenrollButtonWrapper-${enrollment.id}`}>
