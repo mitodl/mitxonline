@@ -120,7 +120,7 @@ export class ProgramEnrollmentCard extends React.Component<
 
     // certLocation is not used yet, just here to test layout
     const certLocation = false
-
+    const menuTitle = `Program options for ${enrollment.program.title}`
     return (
       <div
         className="enrolled-item container card p-md-3 mb-4 rounded-0"
@@ -131,12 +131,6 @@ export class ProgramEnrollmentCard extends React.Component<
           <div className="col-12 col-md px-3 py-3 py-md-0 box">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 mb-3">
               <h2 className="my-0 mr-3">{title}</h2>
-            </div>
-            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container active">
-              <span>
-                {enrollment.enrollments.length === 0 ? (<Badge color="red">Not enrolled in any courses</Badge>) : null}
-                <Badge className="badge-program">Program</Badge>
-              </span>
             </div>
             <div className="detail">
               {enrollment.program.title}
@@ -160,11 +154,17 @@ export class ProgramEnrollmentCard extends React.Component<
                 ) : null}
               </div>
             </div>
-          </div>
-          <div className="dropdown">
-            <button type="button" className="d-inline-flex unstyled dot-menu" onClick={() => this.hndOpenDrawer()}>
-              <span className="material-icons" title={`Course options for ${enrollment.program.title}`}>more_vert</span>
-            </button>
+            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container re-order">
+              <span>
+                {enrollment.enrollments.length === 0 ? (<Badge color="red">Not enrolled in any courses</Badge>) : null}
+                <Badge className="badge-program">Program</Badge>
+              </span>
+              <div className="dropdown">
+                <button type="button" className="d-inline-flex unstyled dot-menu" onClick={() => this.hndOpenDrawer()}>
+                  <span className="material-icons" aria-label={menuTitle} title={menuTitle}>more_vert</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

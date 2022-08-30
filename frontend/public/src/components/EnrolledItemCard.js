@@ -277,6 +277,7 @@ export class EnrolledItemCard extends React.Component<
     const courseId = enrollment.run.course_number
     const enrollmentMode = enrollment.enrollment_mode
     const pageLocation = enrollment.run.page
+    const menuTitle = `Course options for ${enrollment.run.course.title}`
 
     return (
       <div
@@ -345,7 +346,7 @@ export class EnrolledItemCard extends React.Component<
               ) : null}
               {certificateLinks}
             </div>
-            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container active">
+            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container re-order">
               <EnrollmentRoleTag enrollmentMode={enrollmentMode}></EnrollmentRoleTag>
               <Dropdown
                 isOpen={menuVisibility}
@@ -353,7 +354,7 @@ export class EnrolledItemCard extends React.Component<
                 id={`enrollmentDropdown-${enrollment.id}`}
               >
                 <DropdownToggle className="d-inline-flex unstyled dot-menu">
-                  <span className="material-icons" title={`Course options for ${enrollment.run.course.title}`}>more_vert</span>
+                  <span className="material-icons" aria-label={menuTitle} title={menuTitle}>more_vert</span>
                 </DropdownToggle>
                 <DropdownMenu right>
                   <span id={`unenrollButtonWrapper-${enrollment.id}`}>
