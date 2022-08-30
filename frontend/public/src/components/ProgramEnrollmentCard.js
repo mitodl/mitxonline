@@ -120,7 +120,7 @@ export class ProgramEnrollmentCard extends React.Component<
 
     // certLocation is not used yet, just here to test layout
     const certLocation = false
-    const menuTitle = `Program options for ${enrollment.program.title}`
+
     return (
       <div
         className="enrolled-item container card p-md-3 mb-4 rounded-0"
@@ -128,8 +128,14 @@ export class ProgramEnrollmentCard extends React.Component<
       >
         <div className="row flex-grow-1">
           {featuredImage}
-          <div className="col-12 col-md px-3 py-3 py-md-0 box">
-            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 mb-3">
+          <div className="col-12 col-md px-3 py-3 py-md-0">
+            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
+              <span>
+                {enrollment.enrollments.length === 0 ? (<Badge color="red">Not enrolled in any courses</Badge>) : null}
+                <Badge className="badge-program">Program</Badge>
+              </span>
+            </div>
+            <div className="d-flex justify-content-between align-content-start flex-nowrap mb-3">
               <h2 className="my-0 mr-3">{title}</h2>
             </div>
             <div className="detail">
@@ -152,17 +158,6 @@ export class ProgramEnrollmentCard extends React.Component<
                 {certLocation ? (
                   <a href={certLocation}>View certificate</a>
                 ) : null}
-              </div>
-            </div>
-            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container re-order">
-              <span>
-                {enrollment.enrollments.length === 0 ? (<Badge color="red">Not enrolled in any courses</Badge>) : null}
-                <Badge className="badge-program">Program</Badge>
-              </span>
-              <div className="dropdown">
-                <button type="button" className="d-inline-flex unstyled dot-menu" onClick={() => this.hndOpenDrawer()}>
-                  <span className="material-icons" aria-label={menuTitle} title={menuTitle}>more_vert</span>
-                </button>
               </div>
             </div>
           </div>
