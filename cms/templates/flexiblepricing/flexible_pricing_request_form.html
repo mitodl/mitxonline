@@ -60,19 +60,23 @@
           {{ page.application_approved_text|richtext }}
         </div>
         {% endif %}{# end discount amount text #}
-          <form action="/cart/add/" method="get" className="text-center">
-          {% if page.selected_program %}
-            <input type="hidden" name="program_id" value={{ page.selected_program.id }} />
-          {% elif page.selected_course %}
+
+          {% if page.selected_course %}
+            <form action="/cart/add/" method="get" className="text-center">
              <input type="hidden" name="course_id" value={{ page.selected_course.id }} />
-          {% endif %}
-            <button
+              <button
               type="submit"
-              class="btn btn-primary btn-gradient-red flexible-price-certificate-btn"
-            >
+              class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
               Get Certificate
-            </button>
-          </form>
+              </button>
+              </form>
+          {% elif page.selected_program %}
+            <a href="/dashboard" class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
+            Go to Dashboard
+            </a>
+          {% endif %}
+
+
       {% elif prior_request.is_denied %}
         <div class="flexible-pricing-head">
           {{ page.application_denied_text|richtext }}
