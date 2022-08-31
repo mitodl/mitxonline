@@ -773,7 +773,7 @@ def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success)
     responding with an error.
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
-    mocker.patch.object(CourseMode, "get_detail", side_effect=[mocked_api_response])
+    mocker.patch.object(CourseMode, "get_mode", side_effect=[mocked_api_response])
     course_run = CourseRunFactory.create()
 
     success_count, failure_count = sync_course_mode([course_run])
