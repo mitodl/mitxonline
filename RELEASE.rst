@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.42.1
+Version 0.42.1 (Released August 31, 2022)
 --------------
 
 - Update flexible pricing approval email to eliminate errors when sending
