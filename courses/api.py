@@ -618,11 +618,10 @@ def process_course_run_grade_certificate(course_run_grade):
     return None, False, False
 
 
-def get_certificate_grade_eligible_runs():
+def get_certificate_grade_eligible_runs(now):
     """
     Get the list of course runs that are eligible for Grades update/creation and certificates creation
     """
-    now = now_in_utc()
     # Get all the course runs valid course runs for certificates/Grades
     # For a valid run it would be live,
     # .. end_date would be in future with addition of delay settings.CERTIFICATE_CREATION_DELAY_IN_HOURS
@@ -642,7 +641,7 @@ def generate_course_run_certificates():
     Hits the edX grades API for eligible course runs and generates the certificates and grades for users for course runs
     """
     now = now_in_utc()
-    course_runs = get_certificate_grade_eligible_runs()
+    course_runs = get_certificate_grade_eligible_runs(now)
 
     if course_runs is None or course_runs.count() == 0:
         log.info("No course runs matched the certificates generation criteria")
