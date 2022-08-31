@@ -620,7 +620,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
             )
             if certificate_page:
                 self.certificate_page_revision = certificate_page.get_latest_revision()
-        super(BaseCertificate, self).save(*args, **kwargs)
+        super(CourseRunCertificate, self).save(*args, **kwargs)
 
 
 class BlockedCountry(TimestampedModel):
