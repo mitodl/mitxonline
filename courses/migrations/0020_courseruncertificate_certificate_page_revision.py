@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("wagtailcore", "0066_collection_management_permissions"),
-        ("courses", "0018_courseruncertificate"),
+        ("courses", "0019_add_is_self_paced_course_run"),
     ]
 
     operations = [

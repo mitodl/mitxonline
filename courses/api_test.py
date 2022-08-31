@@ -77,7 +77,8 @@ def course():
 @pytest.fixture()
 def passed_grade_with_enrollment(user):
     """Fixture to produce a passed CourseRunGrade"""
-    course_run = CourseRunFactory.create()
+    course = CourseFactory.create()
+    course_run = CourseRunFactory.create(course=course)
     paid_enrollment = CourseRunEnrollmentFactory.create(
         user=user, run=course_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
