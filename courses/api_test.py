@@ -2,12 +2,11 @@
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
-from edx_api.course_detail.models import CourseMode
 
 import factory
 import pytest
 from django.core.exceptions import ValidationError
-from edx_api.course_detail import CourseDetail, CourseDetails
+from edx_api.course_detail import CourseDetail, CourseDetails, CourseMode
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
