@@ -329,7 +329,7 @@ export class EnrolledItemCard extends React.Component<
             <div className="detail">
               {courseId}
               {startDateDescription !== null && startDateDescription.active ? (
-                <span> | Starts - {startDateDescription.datestr}</span>
+                <span> | <b>Starts</b> - {startDateDescription.datestr}</span>
               ) : (
                 <span>
                   {startDateDescription === null ? null : (
