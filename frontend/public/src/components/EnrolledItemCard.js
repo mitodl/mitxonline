@@ -256,26 +256,34 @@ export class EnrolledItemCard extends React.Component<
       enrollment.run.course.title
     )
 
-    const financialAssistanceLink = isFinancialAssistanceAvailable(enrollment.run) && !enrollment.approved_flexible_price_exists ? (
+    // const financialAssistanceLink = isFinancialAssistanceAvailable(enrollment.run) && !enrollment.approved_flexible_price_exists ? (
+    //   <a href={enrollment.run.page.financial_assistance_form_url}>
+    //     Financial assistance?
+    //   </a>
+    // ) : null
+    const financialAssistanceLink = (
       <a href={enrollment.run.page.financial_assistance_form_url}>
         Financial assistance?
-      </a>
-    ) : null
+      </a>)
     const certificateLinks = (
       enrollment.run.products.length > 0 &&
       enrollment.enrollment_mode === "audit" &&
       enrollment.run.is_upgradable
     ) ? (
-        <div>
-          <div className="upgrade-item-description">
+        <div className="upgrade-item-description detail d-md-flex justify-content-between">
+          <div className="p-2 mr-0">
             <p>
               <strong>Upgrade today</strong> and, upon passing, receive your certificate signed by MIT faculty
               to highlight the knowledge and skills you've gained from this MITx course.
             </p>
           </div>
-          <div className="enrollment-extra-links d-flex">
-            {financialAssistanceLink}
-            <GetCertificateButton productId={enrollment.run.products[0].id} />
+          <div className="enrollment-extra-links d-flex d-md-flex justify-content-end col-auto">
+            <div className="p-2 my-auto">
+              {financialAssistanceLink}
+            </div>
+            <div className="p-2 my-auto">
+              <GetCertificateButton productId={enrollment.run.products[0].id} />
+            </div>
           </div>
         </div>
       ) : null
@@ -289,7 +297,7 @@ export class EnrolledItemCard extends React.Component<
 
     return (
       <div
-        className="enrolled-item container card p-md-3 mb-4 rounded-0"
+        className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3"
         key={enrollment.run.id}
       >
         <div className="row flex-grow-1">
@@ -344,7 +352,6 @@ export class EnrolledItemCard extends React.Component<
                 ) : null}
               </div>
               <br/>
-              {certificateLinks}
             </div>
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container re-order">
               <EnrollmentRoleTag enrollmentMode={enrollmentMode}></EnrollmentRoleTag>
@@ -378,6 +385,11 @@ export class EnrolledItemCard extends React.Component<
                 </DropdownMenu>
               </Dropdown>
             </div>
+          </div>
+        </div>
+        <div className="row flex-grow-1">
+          <div className="col pl-0 pr-0">
+            {certificateLinks}
           </div>
         </div>
       </div>
