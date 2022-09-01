@@ -255,15 +255,11 @@ export class EnrolledItemCard extends React.Component<
       enrollment.run.course.title
     )
 
-    // const financialAssistanceLink = isFinancialAssistanceAvailable(enrollment.run) && !enrollment.approved_flexible_price_exists ? (
-    //   <a href={enrollment.run.page.financial_assistance_form_url}>
-    //     Financial assistance?
-    //   </a>
-    // ) : null
-    const financialAssistanceLink =  (
+    const financialAssistanceLink = isFinancialAssistanceAvailable(enrollment.run) && !enrollment.approved_flexible_price_exists ? (
       <a href={enrollment.run.page.financial_assistance_form_url}>
         Financial assistance?
-      </a>)
+      </a>
+    ) : null
     const certificateLinks = (
       enrollment.run.products.length > 0 &&
       enrollment.enrollment_mode === "audit" &&
