@@ -178,9 +178,13 @@ $program-badge-bg: #DBF2F3;
   padding: 15px 36px;
   overflow-y: scroll;
 
+  @media only screen and (min-width: 768px) {
+    width: 55%;
+    right: 0;
+  }
+
   &.open {
     box-shadow: 0 3px 0 8px rgba(0,0,0,.2);
-    left: 8px;
   }
 
   button {
@@ -191,6 +195,10 @@ $program-badge-bg: #DBF2F3;
   .row.chrome {
     margin-top: 15px !important;
     margin-bottom: 15px !important;
+  }
+
+  &.closed {
+    display: none;
   }
 }
 
