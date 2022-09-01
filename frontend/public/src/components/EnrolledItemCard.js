@@ -255,11 +255,15 @@ export class EnrolledItemCard extends React.Component<
       enrollment.run.course.title
     )
 
-    const financialAssistanceLink = isFinancialAssistanceAvailable(enrollment.run) && !enrollment.approved_flexible_price_exists ? (
+    // const financialAssistanceLink = isFinancialAssistanceAvailable(enrollment.run) && !enrollment.approved_flexible_price_exists ? (
+    //   <a href={enrollment.run.page.financial_assistance_form_url}>
+    //     Financial assistance?
+    //   </a>
+    // ) : null
+    const financialAssistanceLink =  (
       <a href={enrollment.run.page.financial_assistance_form_url}>
         Financial assistance?
-      </a>
-    ) : null
+      </a>)
     const certificateLinks = (
       enrollment.run.products.length > 0 &&
       enrollment.enrollment_mode === "audit" &&
@@ -273,10 +277,10 @@ export class EnrolledItemCard extends React.Component<
             </p>
           </div>
           <div className="enrollment-extra-links d-flex d-md-flex justify-content-end col-auto">
-            <div className="p-2 my-auto">
+            <div className="pr-4 my-auto">
               {financialAssistanceLink}
             </div>
-            <div className="p-2 my-auto">
+            <div className="my-auto">
               <GetCertificateButton productId={enrollment.run.products[0].id} />
             </div>
           </div>
