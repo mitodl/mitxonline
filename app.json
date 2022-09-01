@@ -187,6 +187,10 @@
       "description": "Email domain of the google service account",
       "required": false
     },
+    "MITOL_GOOGLE_SHEETS_PROCESSOR_APP_NAME": {
+      "description": "Name of the app processing the request",
+      "required": false
+    },
     "MITOL_GOOGLE_SHEETS_REFUNDS_COMPLETED_DATE_COL": {
       "description": "The zero-based index of the enrollment change sheet column that contains the row completion date",
       "required": false
@@ -213,10 +217,6 @@
     },
     "MITOL_GOOGLE_SHEETS_REFUNDS_SKIP_ROW_COL": {
       "description": "The zero-based index of the enrollment change sheet column that indicates whether the row should be skipped",
-      "required": false
-    },
-    "MITOL_GOOGLE_SHEET_PROCESSOR_APP_NAME": {
-      "description": "Name of the app processing the request",
       "required": false
     },
     "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY": {
