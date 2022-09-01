@@ -29,7 +29,6 @@ $program-badge-bg: #DBF2F3;
 
     h2 a {
       font-size: 20px;
-      text-decoration: underline;
       color: black;
     }
 
@@ -153,6 +152,7 @@ $program-badge-bg: #DBF2F3;
 
 .dashboard h1 {
   margin-bottom: 38px;
+  font-size: 32px;
 
   @include media-breakpoint-down(md) {
     margin-bottom: 30px;
