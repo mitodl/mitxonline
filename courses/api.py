@@ -669,7 +669,7 @@ def generate_course_run_certificates():
             # Check certificate generation eligibility
             #   1. For self_paced course runs we generate certificates right away irrespective of end_date
             #   2. For others course runs we generate the certificates if the end of course run has passed
-            if run.is_self_paced or (run.end_date <= now):
+            if run.is_self_paced or (run.end_date and run.end_date <= now):
                 _, created, deleted = process_course_run_grade_certificate(
                     course_run_grade=course_run_grade
                 )

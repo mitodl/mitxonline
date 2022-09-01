@@ -911,6 +911,7 @@ def test_generate_course_certificates_self_paced_course(
     [
         (True, now_in_utc() + timedelta(hours=2)),
         (False, now_in_utc()),
+        (False, None),
     ],
 )
 def test_course_certificates_with_course_end_date_self_paced_combination(
@@ -942,7 +943,7 @@ def test_course_certificates_with_course_end_date_self_paced_combination(
 
     generate_course_run_certificates()
     assert (
-        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users"
+        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1 if end_date else 0} users"
         in courses_api_logs.info.call_args[0][0]
     )
 
