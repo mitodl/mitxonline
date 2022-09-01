@@ -177,14 +177,17 @@ $program-badge-bg: #DBF2F3;
   transition: right 0.2s ease-in-out ;
   padding: 15px 36px;
   overflow-y: scroll;
+  left: 8px;
 
   @media only screen and (min-width: 768px) {
     width: 55%;
     right: 0;
+    left: unset;
   }
 
   &.open {
     box-shadow: 0 3px 0 8px rgba(0,0,0,.2);
+    display: block;
   }
 
   button {
