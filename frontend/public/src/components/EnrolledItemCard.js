@@ -266,9 +266,17 @@ export class EnrolledItemCard extends React.Component<
       enrollment.enrollment_mode === "audit" &&
       enrollment.run.is_upgradable
     ) ? (
-        <div className="enrollment-extra-links d-flex">
-          {financialAssistanceLink}
-          <GetCertificateButton productId={enrollment.run.products[0].id} />
+        <div>
+          <div className="upgrade-item-description">
+            <p>
+              <strong>Upgrade today</strong> and, upon passing, receive your certificate signed by MIT faculty
+              to highlight the knowledge and skills you've gained from this MITx course.
+            </p>
+          </div>
+          <div className="enrollment-extra-links d-flex">
+            {financialAssistanceLink}
+            <GetCertificateButton productId={enrollment.run.products[0].id} />
+          </div>
         </div>
       ) : null
 
@@ -336,14 +344,6 @@ export class EnrolledItemCard extends React.Component<
                 ) : null}
               </div>
               <br/>
-              {enrollment.enrollment_mode === "audit" ? (
-                <div className="upgrade-item-description">
-                  <p>
-                    <strong>Upgrade today</strong> and, upon passing, receive your certificate signed by MIT faculty
-                    to highlight the knowledge and skills you've gained from this MITx course.
-                  </p>
-                </div>
-              ) : null}
               {certificateLinks}
             </div>
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container re-order">
