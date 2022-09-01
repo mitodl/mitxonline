@@ -143,7 +143,7 @@ describe("EnrolledItemCard", () => {
       userEnrollment["approved_flexible_price_exists"] = approvedFlexiblePrice
       enrollmentCardProps.enrollment = userEnrollment
       const inner = await renderedCard()
-      const extraLinks = inner.find(".enrollment-extra-links").at(1)
+      const extraLinks = inner.find(".enrollment-extra-links").at(0)
       if (approvedFlexiblePrice) {
         const text = extraLinks.find("a").at(0)
         assert.isFalse(text.exists())
