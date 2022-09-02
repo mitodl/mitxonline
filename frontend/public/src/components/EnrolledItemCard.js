@@ -273,7 +273,7 @@ export class EnrolledItemCard extends React.Component<
             </p>
           </div>
           <div className="enrollment-extra-links d-flex d-md-flex justify-content-end col-auto pr-0">
-            <div className="my-auto">
+            <div className="pr-4 my-auto">
               {financialAssistanceLink}
             </div>
             <div className="my-auto">
