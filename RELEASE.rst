@@ -1,6 +1,25 @@
 Release Notes
 =============
 
+Version 0.43.0
+--------------
+
+- fix: certificate error when end_date is not set (#923)
+- Hide description if certificate is also hidden (#922)
+- Program Flexible Pricing approval page (#917)
+- feat: poll grades and generate certificates (#722)
+- updated color contrast on dashboard
+- 905: dashboard overflow menu ⋮ accessibility (#908)
+- Added queries to migrate order/line/transaction from MicroMaster
+- fixed migration conflicts and discount tests
+- Fixes nav issues with a course date is selected
+- 884: dashboard design update (#888)
+- added unique keys to ecommerce line/transaction
+- add error log for transactions' reason code any number other than 100
+- fix: basket checkout with zero value (#899)
+- Adds setup command to bootstrap financial aid for DEDP
+- Learner and anonymous certificate view- issue #692 #693 (#892)
+
 Version 0.42.1 (Released August 31, 2022)
 --------------
 
