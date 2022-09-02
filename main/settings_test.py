@@ -24,8 +24,8 @@ test_app_json_modified = pytest_utils.test_app_json_modified
 def settings_sandbox(monkeypatch):
     """Cleanup settings after a test"""
 
-    monkeypatch.delenv("MITX_ONLINE_DB_DISABLE_SSL")
-    monkeypatch.delenv("CSRF_TRUSTED_ORIGINS")
+    monkeypatch.delenv("MITX_ONLINE_DB_DISABLE_SSL", raising=False)
+    monkeypatch.delenv("CSRF_TRUSTED_ORIGINS", raising=False)
     monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "main.settings")
     monkeypatch.setenv("MAILGUN_SENDER_DOMAIN", "mailgun.fake.domain")
     monkeypatch.setenv("MAILGUN_KEY", "fake_mailgun_key")
@@ -146,7 +146,7 @@ def test_semantic_version(settings):
 
 def test_server_side_cursors_disabled(settings_sandbox):
     """DISABLE_SERVER_SIDE_CURSORS should be true by default"""
-    settings_vars = settings_sandbox.get()
+    settings_vars = settinGINgs_sandbox.get()
     assert (
         settings_vars["DEFAULT_DATABASE_CONFIG"]["DISABLE_SERVER_SIDE_CURSORS"] is True
     )
