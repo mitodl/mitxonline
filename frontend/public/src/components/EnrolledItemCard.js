@@ -16,7 +16,6 @@ import { partial } from "ramda"
 
 import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../constants"
 import GetCertificateButton from './GetCertificateButton'
-import { EnrollmentRoleTag } from "./EnrollmentRoleTag"
 import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
@@ -266,16 +265,20 @@ export class EnrolledItemCard extends React.Component<
       enrollment.enrollment_mode === "audit" &&
       enrollment.run.is_upgradable
     ) ? (
-        <div>
-          <div className="upgrade-item-description">
+        <div className="upgrade-item-description detail d-md-flex justify-content-between pb-2">
+          <div className="mr-0">
             <p>
               <strong>Upgrade today</strong> and, upon passing, receive your certificate signed by MIT faculty
               to highlight the knowledge and skills you've gained from this MITx course.
             </p>
           </div>
-          <div className="enrollment-extra-links d-flex">
-            {financialAssistanceLink}
-            <GetCertificateButton productId={enrollment.run.products[0].id} />
+          <div className="enrollment-extra-links d-flex d-md-flex justify-content-end col-auto pr-0">
+            <div className="pr-4 my-auto">
+              {financialAssistanceLink}
+            </div>
+            <div className="my-auto">
+              <GetCertificateButton productId={enrollment.run.products[0].id} />
+            </div>
           </div>
         </div>
       ) : null
@@ -289,7 +292,7 @@ export class EnrolledItemCard extends React.Component<
 
     return (
       <div
-        className="enrolled-item container card p-md-3 mb-4 rounded-0"
+        className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3"
         key={enrollment.run.id}
       >
         <div className="row flex-grow-1">
@@ -317,37 +320,6 @@ export class EnrolledItemCard extends React.Component<
           <div className="col-12 col-md px-3 py-3 py-md-0 box">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
               <h2 className="my-0 mr-3">{title}</h2>
-            </div>
-            <div className="detail">
-              {courseId}
-              {startDateDescription !== null && startDateDescription.active ? (
-                <span> | Starts - {startDateDescription.datestr}</span>
-              ) : (
-                <span>
-                  {startDateDescription === null ? null : (
-                    <span> |
-                      <strong> Active</strong> from{" "}
-                      {startDateDescription.datestr}
-                    </span>
-                  )}
-                </span>
-              )}
-              <div className="enrollment-extra-links d-flex">
-                {pageLocation ? (
-                  <a href={pageLocation.page_url}>Course details</a>
-                ) : null}
-                {enrollment.certificate ? (
-                  <a className="view-certificate" href={enrollment.certificate.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >View certificate</a>
-                ) : null}
-              </div>
-              <br/>
-              {certificateLinks}
-            </div>
-            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container re-order">
-              <EnrollmentRoleTag enrollmentMode={enrollmentMode}></EnrollmentRoleTag>
               <Dropdown
                 isOpen={menuVisibility}
                 toggle={this.toggleMenuVisibility.bind(this)}
@@ -378,6 +350,38 @@ export class EnrolledItemCard extends React.Component<
                 </DropdownMenu>
               </Dropdown>
             </div>
+            <div className="detail pt-1">
+              {courseId}
+              {startDateDescription !== null && startDateDescription.active ? (
+                <span> | <b>Starts</b> - {startDateDescription.datestr}</span>
+              ) : (
+                <span>
+                  {startDateDescription === null ? null : (
+                    <span> |
+                      <strong> Active</strong> from{" "}
+                      {startDateDescription.datestr}
+                    </span>
+                  )}
+                </span>
+              )}
+              <div className="enrollment-extra-links d-flex">
+                {pageLocation ? (
+                  <a href={pageLocation.page_url}>Course details</a>
+                ) : null}
+                {enrollment.certificate ? (
+                  <a className="view-certificate" href={enrollment.certificate.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >View certificate</a>
+                ) : null}
+              </div>
+              <br/>
+            </div>
+          </div>
+        </div>
+        <div className="row flex-grow-1 pt-3">
+          <div className="col pl-0 pr-0">
+            {certificateLinks}
           </div>
         </div>
       </div>

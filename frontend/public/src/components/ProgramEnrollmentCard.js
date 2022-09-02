@@ -135,7 +135,7 @@ export class ProgramEnrollmentCard extends React.Component<
                 <Badge className="badge-program">Program</Badge>
               </span>
             </div>
-            <div className="d-flex justify-content-between align-content-start flex-nowrap mb-3">
+            <div className="d-flex justify-content-between align-content-start flex-nowrap mb-1">
               <h2 className="my-0 mr-3">{title}</h2>
             </div>
             <div className="detail">
