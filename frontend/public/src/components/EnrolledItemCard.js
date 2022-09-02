@@ -272,8 +272,8 @@ export class EnrolledItemCard extends React.Component<
               to highlight the knowledge and skills you've gained from this MITx course.
             </p>
           </div>
-          <div className="enrollment-extra-links d-flex d-md-flex justify-content-end col-auto">
-            <div className="pr-4 my-auto">
+          <div className="enrollment-extra-links d-flex d-md-flex justify-content-end col-auto pr-0">
+            <div className="my-auto">
               {financialAssistanceLink}
             </div>
             <div className="my-auto">
