@@ -17,7 +17,38 @@ from mitol.common import envs, pytest_utils
 
 # this is a test, but pylint thinks it ends up being unused
 # hence we import the entire module and assign it here
-test_app_json_modified = pytest_utils.test_app_json_modified
+# test_app_json_modified = pytest_utils.test_app_json_modified
+
+# NOTE: this is temporarily inlined here until I can stabilize the test upstream in the library
+def test_app_json_modified():
+    """
+    Pytest test that verifies app.json is up-to-date
+
+    To use this, you should import this into a test file somewhere in your project:
+
+    from mitol.common.pytest_utils import test_app_json_modified
+    """
+    from mitol.common import envs
+    import json
+    import logging
+
+    # this line was causing errors due to a loading error bug
+    # envs.reload()
+
+    with open("app.json") as app_json_file:
+        app_json = json.load(app_json_file)
+
+    generated_app_json = envs.generate_app_json()
+
+    if app_json != generated_app_json:
+        logging.error(
+            "Generated app.json does not match the app.json file. To fix this, run `./manage.py generate_app_json`"
+        )
+
+    # pytest will print the difference
+    assert json.dumps(app_json, sort_keys=True, indent=2) == json.dumps(
+        generated_app_json, sort_keys=True, indent=2
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -146,7 +177,7 @@ def test_semantic_version(settings):
 
 def test_server_side_cursors_disabled(settings_sandbox):
     """DISABLE_SERVER_SIDE_CURSORS should be true by default"""
-    settings_vars = settinGINgs_sandbox.get()
+    settings_vars = settings_sandbox.get()
     assert (
         settings_vars["DEFAULT_DATABASE_CONFIG"]["DISABLE_SERVER_SIDE_CURSORS"] is True
     )
