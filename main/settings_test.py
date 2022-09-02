@@ -65,9 +65,7 @@ def test_s3_settings(settings_sandbox):
     # Unset, we don't do S3
     settings_vars = settings_sandbox.patch({"MITX_ONLINE_USE_S3": "False"})
 
-    assert (
-        settings_vars.get("DEFAULT_FILE_STORAGE") is None
-    )
+    assert settings_vars.get("DEFAULT_FILE_STORAGE") is None
 
     with pytest.raises(ImproperlyConfigured):
         settings_sandbox.patch({"MITX_ONLINE_USE_S3": "True"})
@@ -149,7 +147,9 @@ def test_semantic_version(settings):
 def test_server_side_cursors_disabled(settings_sandbox):
     """DISABLE_SERVER_SIDE_CURSORS should be true by default"""
     settings_vars = settings_sandbox.get()
-    assert settings_vars["DEFAULT_DATABASE_CONFIG"]["DISABLE_SERVER_SIDE_CURSORS"] is True
+    assert (
+        settings_vars["DEFAULT_DATABASE_CONFIG"]["DISABLE_SERVER_SIDE_CURSORS"] is True
+    )
 
 
 def test_server_side_cursors_enabled(settings_sandbox):
