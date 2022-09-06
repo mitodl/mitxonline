@@ -813,6 +813,9 @@ def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success)
     else:
         assert success_count == 0
         assert failure_count == 1
+
+
+@pytest.mark.parametrize(
     "grade, passed, paid, exp_certificate, exp_created, exp_deleted",
     [
         [0.25, True, True, True, True, False],
