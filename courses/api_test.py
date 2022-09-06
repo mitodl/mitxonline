@@ -23,6 +23,8 @@ from courses.api import (
     sync_course_runs,
     process_course_run_grade_certificate,
     generate_course_run_certificates,
+    manage_course_run_certificate_access,
+    override_user_grade,
 )
 from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
@@ -33,6 +35,7 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
+    CourseRunCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
@@ -1010,3 +1013,51 @@ def test_generate_course_certificates_with_course_end_date(
         f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users"
         in courses_api_logs.info.call_args[0][0]
     )
+
+
+def test_course_run_certificates_access():
+    """Tests that the revoke and unrevoke for a course run certificates sets the states properly"""
+    test_certificate = CourseRunCertificateFactory.create(is_revoked=False)
+
+    # Revoke a certificate
+    manage_course_run_certificate_access(
+        user=test_certificate.user,
+        courseware_id=test_certificate.course_run.courseware_id,
+        revoke_state=True,
+    )
+
+    test_certificate.refresh_from_db()
+    assert test_certificate.is_revoked is True
+
+    # Unrevoke a certificate
+    manage_course_run_certificate_access(
+        user=test_certificate.user,
+        courseware_id=test_certificate.course_run.courseware_id,
+        revoke_state=False,
+    )
+    test_certificate.refresh_from_db()
+    assert test_certificate.is_revoked is False
+
+
+@pytest.mark.parametrize(
+    "grade, should_force_pass, is_passed",
+    [
+        (0.0, True, False),
+        (0.1, True, True),
+        (0.5, False, False),
+        (0.5, True, True),
+    ],
+)
+def test_override_user_grade(grade, should_force_pass, is_passed):
+    """Test the override grade overrides the user grade properly"""
+    test_grade = CourseRunGradeFactory.create()
+    override_user_grade(
+        user=test_grade.user,
+        override_grade=grade,
+        courseware_id=test_grade.course_run.courseware_id,
+        should_force_pass=should_force_pass,
+    )
+    test_grade.refresh_from_db()
+    assert test_grade.grade == grade
+    assert test_grade.passed is is_passed
+    assert test_grade.set_by_admin is True
