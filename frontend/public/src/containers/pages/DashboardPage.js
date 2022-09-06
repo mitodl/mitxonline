@@ -64,7 +64,8 @@ type DashboardPageProps = {
     enrollmentId: number,
     emailsSubscription: string
   ) => Promise<any>,
-  addUserNotification: Function
+  addUserNotification: Function,
+  closeDrawer: Function,
 }
 
 type DashboardPageState = {
@@ -259,6 +260,7 @@ export class DashboardPage extends React.Component<
       deactivateEnrollment,
       courseEmailsSubscription,
       addUserNotification,
+      closeDrawer,
     } = this.props
 
     if (isProgramUIEnabled() && programEnrollments) {
@@ -277,6 +279,7 @@ export class DashboardPage extends React.Component<
         deactivateEnrollment={deactivateEnrollment}
         courseEmailsSubscription={courseEmailsSubscription}
         addUserNotification={addUserNotification}
+        closeDrawer={closeDrawer}
       ></EnrolledItemCard>
     )
   }

@@ -30,7 +30,8 @@ type EnrolledItemCardProps = {
     enrollmentId: number,
     emailsSubscription: string
   ) => Promise<any>,
-  addUserNotification: Function
+  addUserNotification: Function,
+  closeDrawer:Function,
 }
 
 type EnrolledItemCardState = {
@@ -73,7 +74,7 @@ export class EnrolledItemCard extends React.Component<
   }
 
   async onDeactivate(enrollment: RunEnrollment) {
-    const { deactivateEnrollment, addUserNotification } = this.props
+    const { deactivateEnrollment, addUserNotification, closeDrawer } = this.props
 
     if (enrollment.enrollment_mode === "verified") {
       this.toggleVerifiedUnenrollmentModalVisibility()
@@ -91,6 +92,9 @@ export class EnrolledItemCard extends React.Component<
         messageType = ALERT_TYPE_DANGER
         userMessage = `Something went wrong with your request to unenroll. Please contact support at ${SETTINGS.support_email}.`
       }
+      if (typeof closeDrawer === "function") {
+        closeDrawer()
+      }
       addUserNotification({
         "unenroll-status": {
           type:  messageType,
@@ -107,7 +111,7 @@ export class EnrolledItemCard extends React.Component<
   }
 
   async onSubmit(payload: Object) {
-    const { courseEmailsSubscription, addUserNotification } = this.props
+    const { courseEmailsSubscription, addUserNotification, closeDrawer } = this.props
     this.setState({ submittingEnrollmentId: payload.enrollmentId })
     this.toggleEmailSettingsModalVisibility()
     try {
@@ -126,6 +130,9 @@ export class EnrolledItemCard extends React.Component<
       } else {
         messageType = ALERT_TYPE_DANGER
         userMessage = `Something went wrong with your request to course ${payload.courseNumber} emails subscription. Please contact support at ${SETTINGS.support_email}.`
+      }
+      if (typeof closeDrawer === "function") {
+        closeDrawer()
       }
       addUserNotification({
         "subscription-status": {
