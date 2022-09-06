@@ -371,11 +371,14 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
 
         # No need to include a certificate if there is no corresponding wagtail page
         # to support the render
-        if (
-            not enrollment
-            or not enrollment.run.course.page
-            or not enrollment.run.course.page.certificate_page
-        ):
+        try:
+            if (
+                not enrollment
+                or not enrollment.run.course.page
+                or not enrollment.run.course.page.certificate_page
+            ):
+                return None
+        except models.Course.page.RelatedObjectDoesNotExist:
             return None
 
         # Using IDs because we don't need the actual record and this avoids redundant queries
