@@ -90,8 +90,10 @@ export class ProgramEnrollmentCard extends React.Component<
 
     const title = (
       <a
-        href="#"
         rel="noopener noreferrer"
+        href="#program_enrollment_drawer"
+        aria-flowto="program_enrollment_drawer"
+        aria-haspopup="dialog"
         onClick={() => this.hndOpenDrawer()}
       >
         {enrollment.program.title}
@@ -134,13 +136,8 @@ export class ProgramEnrollmentCard extends React.Component<
                 {enrollment.enrollments.length === 0 ? (<Badge color="red">Not enrolled in any courses</Badge>) : null}
                 <Badge className="badge-program">Program</Badge>
               </span>
-              <div className="dropdown">
-                <button type="button" className="d-inline-flex unstyled dot-menu" onClick={() => this.hndOpenDrawer()}>
-                  <i className="material-icons">more_vert</i>
-                </button>
-              </div>
             </div>
-            <div className="d-flex justify-content-between align-content-start flex-nowrap mb-3">
+            <div className="d-flex justify-content-between align-content-start flex-nowrap mb-1">
               <h2 className="my-0 mr-3">{title}</h2>
             </div>
             <div className="detail">
@@ -158,7 +155,7 @@ export class ProgramEnrollmentCard extends React.Component<
                 </span>
               )}
               <div className="enrollment-extra-links d-flex">
-                <a href="#" onClick={() => this.hndOpenDrawer()}>{enrollment.enrollments.length} course
+                <a href="#program_enrollment_drawer" aria-flowto="program_enrollment_drawer" aria-haspopup="dialog" onClick={() => this.hndOpenDrawer()}>{enrollment.enrollments.length} course
                   {enrollment.enrollments.length === 1 ? null : 's'}</a>
                 {certLocation ? (
                   <a href={certLocation}>View certificate</a>

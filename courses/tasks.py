@@ -1,12 +1,17 @@
 """
 Tasks for the courses app
 """
+import logging
 
+from django.conf import settings
 from django.db.models import Q
-from mitol.common.utils.datetime import now_in_utc
 
-from courses.models import CourseRun, CourseRunEnrollment
+from courses.models import CourseRunEnrollment
+
+from mitol.common.utils.datetime import now_in_utc
 from main.celery import app
+
+log = logging.getLogger(__name__)
 
 
 @app.task
@@ -40,3 +45,13 @@ def subscribe_edx_course_emails(enrollment_id):
     if subscribed:
         enrollment.edx_emails_subscription = subscribed
         enrollment.save()
+
+
+@app.task
+def generate_course_certificates():
+    """
+    Task to generate certificates for courses.
+    """
+    from courses.api import generate_course_run_certificates
+
+    generate_course_run_certificates()

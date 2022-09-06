@@ -27,6 +27,7 @@ def test_get_js_settings(settings, rf):
     settings.RECAPTCHA_SITE_KEY = "fake_key"
     settings.ENABLE_UPGRADE_DIALOG = False
     settings.DISABLE_DISCOUNT_UI = False
+    settings.ENABLE_PROGRAM_UI = False
 
     request = rf.get("/")
 
@@ -41,6 +42,7 @@ def test_get_js_settings(settings, rf):
         "features": {
             "upgrade_dialog": settings.ENABLE_UPGRADE_DIALOG,
             "disable_discount_ui": settings.DISABLE_DISCOUNT_UI,
+            "enable_program_ui": settings.ENABLE_PROGRAM_UI,
         },
     }
 

@@ -55,7 +55,14 @@ export const deactivateEnrollmentMutation = (enrollmentId: number) => ({
       return emptyOrNil(prevEnrollments)
         ? []
         : prevEnrollments.filter(enrollment => enrollment.id !== enrollmentId)
-    }
+    },
+    program_enrollments: prevProgramEnrollments => {
+      return emptyOrNil(prevProgramEnrollments)
+        ? []
+        : prevProgramEnrollments.map(programEnrollment => {
+          return {...programEnrollment, enrollments: programEnrollment.enrollments.filter(enrollment => enrollment.id !== enrollmentId)}
+        })
+    },
   }
 })
 
