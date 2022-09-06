@@ -90,8 +90,10 @@ export class ProgramEnrollmentCard extends React.Component<
 
     const title = (
       <a
-        href="#"
         rel="noopener noreferrer"
+        href="#program_enrollment_drawer"
+        aria-flowto="program_enrollment_drawer"
+        aria-haspopup="dialog"
         onClick={() => this.hndOpenDrawer()}
       >
         {enrollment.program.title}
@@ -153,7 +155,7 @@ export class ProgramEnrollmentCard extends React.Component<
                 </span>
               )}
               <div className="enrollment-extra-links d-flex">
-                <a href="#" onClick={() => this.hndOpenDrawer()}>{enrollment.enrollments.length} course
+                <a href="#program_enrollment_drawer" aria-flowto="program_enrollment_drawer" aria-haspopup="dialog" onClick={() => this.hndOpenDrawer()}>{enrollment.enrollments.length} course
                   {enrollment.enrollments.length === 1 ? null : 's'}</a>
                 {certLocation ? (
                   <a href={certLocation}>View certificate</a>
