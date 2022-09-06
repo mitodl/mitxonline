@@ -44,7 +44,7 @@ describe("ProductDetailEnrollApp", () => {
       },
       {}
     )
-    SETTINGS.features = { upgrade_dialog: false, disable_discount_ui: false }
+    SETTINGS.features = { upgrade_dialog: false, disable_discount_ui: false, enable_program_ui: false }
 
     isWithinEnrollmentPeriodStub = helper.sandbox.stub(
       courseApi,

@@ -42,7 +42,8 @@ import { isLinkableCourseRun } from "../../lib/courseApi"
 import {
   formatPrettyDateTimeAmPmTz,
   isSuccessResponse,
-  parseDateString
+  parseDateString,
+  isProgramUIEnabled,
 } from "../../lib/util"
 import { routes } from "../../lib/urls"
 import { addUserNotification } from "../../actions"
@@ -260,7 +261,7 @@ export class DashboardPage extends React.Component<
       addUserNotification,
     } = this.props
 
-    if (programEnrollments) {
+    if (isProgramUIEnabled() && programEnrollments) {
       const enrollmentMatches = programEnrollments.map(programEnrollment => programEnrollment.enrollments.some(elem => elem.id === enrollment.id))
 
       if (enrollmentMatches.includes(true)) {
@@ -297,7 +298,7 @@ export class DashboardPage extends React.Component<
           <Loader isLoading={isLoading}>
             <h1>My Courses</h1>
             <div className="enrolled-items">
-              {programEnrollments && programEnrollments.length > 0 ? (
+              {isProgramUIEnabled() && programEnrollments && programEnrollments.length > 0 ? (
                 programEnrollments.map(programEnrollment => (
                   <ProgramEnrollmentCard
                     key={programEnrollment.program.readable_id}
