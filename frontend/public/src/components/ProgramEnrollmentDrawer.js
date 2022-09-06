@@ -59,6 +59,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
                   currentUser={currentUser}
                   deactivateEnrollment={deactivateEnrollment}
                   courseEmailsSubscription={courseEmailsSubscription}
+                  closeDrawer = {closeDrawer}
                   addUserNotification={addUserNotification}>
                 </EnrolledItemCard>
               ))) : (
