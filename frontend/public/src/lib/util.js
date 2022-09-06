@@ -247,9 +247,3 @@ export const getFlexiblePriceForProduct = (product: Product) => {
     return Number(product.price)
   }
 }
-
-export const isProgramUIEnabled = () => {
-  const params = new URLSearchParams(document.location.search)
-
-  return params.get("enable_programs") !== null || (SETTINGS && SETTINGS.features && SETTINGS.features.enable_program_ui)
-}

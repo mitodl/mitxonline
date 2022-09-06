@@ -21,8 +21,6 @@ from courses.api import (
     get_user_enrollments,
     sync_course_mode,
     sync_course_runs,
-    process_course_run_grade_certificate,
-    generate_course_run_certificates,
 )
 from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
@@ -32,7 +30,6 @@ from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
-    CourseRunGradeFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
@@ -65,40 +62,13 @@ def dates():
     )
 
 
-@pytest.fixture()
-def course():
-    """Course object fixture"""
-    return CourseFactory.create()
-
-
-@pytest.fixture()
-def passed_grade_with_enrollment(user):
-    """Fixture to produce a passed CourseRunGrade"""
-    course_run = CourseRunFactory.create()
-    paid_enrollment = CourseRunEnrollmentFactory.create(
-        user=user, run=course_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
-    )
-
-    return CourseRunGradeFactory.create(
-        course_run=paid_enrollment.run,
-        user=paid_enrollment.user,
-        grade=0.50,
-        passed=True,
-    )
-
-
-@pytest.fixture()
-def courses_api_logs(mocker):
-    """Logger fixture for tasks"""
-    return mocker.patch("courses.api.log")
-
-
 @pytest.mark.parametrize("is_enrolled", [True, False])
-def test_get_user_relevant_course_run(user, dates, course, is_enrolled):
+def test_get_user_relevant_course_run(user, dates, is_enrolled):
     """
     get_user_relevant_course_run should return an enrolled run if the end date isn't in the past, or the soonest course
     run that does not have a past enrollment end date.
     """
+    course = CourseFactory.create()
     # One run in the near future, one run in progress with an expired enrollment period, and one run in the far future.
     course_runs = CourseRunFactory.create_batch(
         3,
@@ -123,13 +93,14 @@ def test_get_user_relevant_course_run(user, dates, course, is_enrolled):
     assert returned_run == (course_runs[1] if is_enrolled else course_runs[0])
 
 
-def test_get_user_relevant_course_run_invalid_dates(user, dates, course):
+def test_get_user_relevant_course_run_invalid_dates(user, dates):
     """
     get_user_relevant_course_run should ignore course runs with any of the following properties:
     1) No start date or enrollment start date
     2) An end date in the past
 
     """
+    course = CourseFactory.create()
     CourseRunFactory.create_batch(
         3,
         course=course,
@@ -146,11 +117,12 @@ def test_get_user_relevant_course_run_invalid_dates(user, dates, course):
     assert returned_run is None
 
 
-def test_get_user_relevant_course_run_ignore_enrolled(user, dates, course):
+def test_get_user_relevant_course_run_ignore_enrolled(user, dates):
     """
     get_user_relevant_course_run return a future course run if an enrolled run's end date is in the past, or if an
     enrollment for an open course is not flagged as edX-enrolled
     """
+    course = CourseFactory.create()
     course_runs = CourseRunFactory.create_batch(
         3,
         course=course,
@@ -615,11 +587,12 @@ class TestDeactivateEnrollments:
 
 
 @pytest.mark.parametrize("keep_failed_enrollments", [True, False])
-def test_defer_enrollment(mocker, course, keep_failed_enrollments):
+def test_defer_enrollment(mocker, keep_failed_enrollments):
     """
     defer_enrollment should deactivate a user's existing enrollment and create an enrollment in another
     course run
     """
+    course = CourseFactory.create()
     course_runs = CourseRunFactory.create_batch(3, course=course)
     existing_enrollment = CourseRunEnrollmentFactory.create(run=course_runs[0])
     target_run = course_runs[1]
@@ -813,197 +786,3 @@ def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success)
     else:
         assert success_count == 0
         assert failure_count == 1
-    "grade, passed, paid, exp_certificate, exp_created, exp_deleted",
-    [
-        [0.25, True, True, True, True, False],
-        [0.25, True, False, False, False, False],
-        [0.0, True, True, False, False, False],
-        [1.0, False, True, False, False, False],
-    ],
-)
-def test_course_run_certificate(
-    user,
-    passed_grade_with_enrollment,
-    grade,
-    paid,
-    passed,
-    exp_certificate,
-    exp_created,
-    exp_deleted,
-):
-    """
-    Test that the certificate is generated correctly
-    """
-    passed_grade_with_enrollment.grade = grade
-    passed_grade_with_enrollment.passed = passed
-    if not paid:
-        CourseRunEnrollment.objects.filter(
-            user=passed_grade_with_enrollment.user,
-            run=passed_grade_with_enrollment.course_run,
-        ).update(enrollment_mode=EDX_DEFAULT_ENROLLMENT_MODE)
-
-    certificate, created, deleted = process_course_run_grade_certificate(
-        passed_grade_with_enrollment
-    )
-    assert bool(certificate) is exp_certificate
-    assert created is exp_created
-    assert deleted is exp_deleted
-
-
-def test_course_run_certificate_idempotent(passed_grade_with_enrollment):
-    """
-    Test that the certificate generation is idempotent
-    """
-
-    # Certificate is created the first time
-    certificate, created, deleted = process_course_run_grade_certificate(
-        passed_grade_with_enrollment
-    )
-    assert certificate
-    assert created
-    assert not deleted
-
-    # Existing certificate is simply returned without any create/delete
-    certificate, created, deleted = process_course_run_grade_certificate(
-        passed_grade_with_enrollment
-    )
-    assert certificate
-    assert not created
-    assert not deleted
-
-
-def test_course_run_certificate_not_passing(passed_grade_with_enrollment):
-    """
-    Test that the certificate is not generated if the grade is set to not passed
-    """
-
-    # Initially the certificate is created
-    certificate, created, deleted = process_course_run_grade_certificate(
-        passed_grade_with_enrollment
-    )
-    assert certificate
-    assert created
-    assert not deleted
-
-    # Now that the grade indicates score 0.0, certificate should be deleted
-    passed_grade_with_enrollment.grade = 0.0
-    certificate, created, deleted = process_course_run_grade_certificate(
-        passed_grade_with_enrollment
-    )
-    assert not certificate
-    assert not created
-    assert deleted
-
-
-def test_generate_course_certificates_no_valid_course_run(settings, courses_api_logs):
-    """Test that a proper message is logged when there is no valid course run to generate certificates"""
-    generate_course_run_certificates()
-    assert (
-        "No course runs matched the certificates generation criteria"
-        in courses_api_logs.info.call_args[0][0]
-    )
-
-    # Create a batch of Course Runs that doesn't match certificate generation filter
-    CourseRunFactory.create_batch(
-        5,
-        is_self_paced=False,
-        end_date=now_in_utc()
-        - timedelta(hours=settings.CERTIFICATE_CREATION_DELAY_IN_HOURS + 1),
-    )
-    generate_course_run_certificates()
-    assert (
-        "No course runs matched the certificates generation criteria"
-        in courses_api_logs.info.call_args[0][0]
-    )
-
-
-def test_generate_course_certificates_self_paced_course(
-    mocker, courses_api_logs, passed_grade_with_enrollment
-):
-    """Test that certificates are generated for self paced course runs independent of course run end date"""
-    course_run = passed_grade_with_enrollment.course_run
-    user = passed_grade_with_enrollment.user
-    course_run.is_self_paced = True
-    course_run.save()
-
-    mocker.patch(
-        "courses.api.ensure_course_run_grade",
-        return_value=(passed_grade_with_enrollment, True, False),
-    )
-    mocker.patch(
-        "courses.api.exception_logging_generator",
-        return_value=[(passed_grade_with_enrollment, user)],
-    )
-    generate_course_run_certificates()
-    assert (
-        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users"
-        in courses_api_logs.info.call_args[0][0]
-    )
-
-
-@pytest.mark.parametrize(
-    "self_paced, end_date",
-    [
-        (True, now_in_utc() + timedelta(hours=2)),
-        (False, now_in_utc()),
-        (False, None),
-    ],
-)
-def test_course_certificates_with_course_end_date_self_paced_combination(
-    mocker,
-    settings,
-    courses_api_logs,
-    passed_grade_with_enrollment,
-    self_paced,
-    end_date,
-):
-    """Test that correct certificates are created when there are course runs with end_date and self_paced combination"""
-    settings.CERTIFICATE_CREATION_DELAY_IN_HOURS = 1
-    course_run = passed_grade_with_enrollment.course_run
-    course_run.is_self_paced = self_paced
-    course_run.end_date = end_date
-    course_run.save()
-
-    user = passed_grade_with_enrollment.user
-
-    mocker.patch(
-        "courses.api.exception_logging_generator",
-        return_value=[(passed_grade_with_enrollment, user)],
-    )
-
-    mocker.patch(
-        "courses.api.ensure_course_run_grade",
-        return_value=(passed_grade_with_enrollment, True, False),
-    )
-
-    generate_course_run_certificates()
-    assert (
-        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1 if end_date else 0} users"
-        in courses_api_logs.info.call_args[0][0]
-    )
-
-
-def test_generate_course_certificates_with_course_end_date(
-    mocker, courses_api_logs, passed_grade_with_enrollment, settings
-):
-    """Test that certificates are generated for passed grades when there are valid course runs for certificates"""
-    settings.CERTIFICATE_CREATION_DELAY_IN_HOURS = 1
-    course_run = passed_grade_with_enrollment.course_run
-    course_run.end_date = now_in_utc()
-    course_run.save()
-
-    user = passed_grade_with_enrollment.user
-
-    mocker.patch(
-        "courses.api.ensure_course_run_grade",
-        return_value=(passed_grade_with_enrollment, True, False),
-    )
-    mocker.patch(
-        "courses.api.exception_logging_generator",
-        return_value=[(passed_grade_with_enrollment, user)],
-    )
-    generate_course_run_certificates()
-    assert (
-        f"Finished processing course run {course_run}: created grades for {1} users, updated grades for {0} users, generated certificates for {1} users"
-        in courses_api_logs.info.call_args[0][0]
-    )

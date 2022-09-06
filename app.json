@@ -59,10 +59,6 @@
       "description": "Early executed tasks propagate exceptions",
       "required": false
     },
-    "CERTIFICATE_CREATION_DELAY_IN_HOURS": {
-      "description": "The number of hours to delay automated certificate creation after a course run ends.",
-      "required": false
-    },
     "CLOUDFRONT_DIST": {
       "description": "The Cloundfront distribution to use for static assets",
       "required": false
@@ -81,14 +77,6 @@
     },
     "CRON_COURSERUN_SYNC_HOURS": {
       "description": "'hours' value for scheduled task to sync course run data (by default, it will run at midnight",
-      "required": false
-    },
-    "CRON_COURSE_CERTIFICATES_DAYS": {
-      "description": "'day_of_week' value for 'generate-course-certificate' scheduled task (default will run once a day).",
-      "required": false
-    },
-    "CRON_COURSE_CERTIFICATES_HOURS": {
-      "description": "'hours' value for the 'generate-course-certificate' scheduled task (defaults to midnight)",
       "required": false
     },
     "CRON_PROCESS_REFUND_REQUESTS_MINUTES": {

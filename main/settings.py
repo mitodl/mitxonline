@@ -29,7 +29,7 @@ from redbeat import RedBeatScheduler
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 
-VERSION = "0.42.1"
+VERSION = "0.42.0"
 
 log = logging.getLogger()
 
@@ -773,22 +773,6 @@ CRON_PROCESS_REFUND_REQUESTS_MINUTES = get_string(
     default="*",
     description="minute value for scheduled task to process refund requests",
 )
-CRON_COURSE_CERTIFICATES_HOURS = get_string(
-    name="CRON_COURSE_CERTIFICATES_HOURS",
-    default=0,
-    description="'hours' value for the 'generate-course-certificate' scheduled task (defaults to midnight)",
-)
-CRON_COURSE_CERTIFICATES_DAYS = get_string(
-    name="CRON_COURSE_CERTIFICATES_DAYS",
-    default="*",
-    description="'day_of_week' value for 'generate-course-certificate' scheduled task (default will run once a day).",
-)
-CERTIFICATE_CREATION_DELAY_IN_HOURS = get_int(
-    name="CERTIFICATE_CREATION_DELAY_IN_HOURS",
-    default=24,
-    description="The number of hours to delay automated certificate creation after a course run ends.",
-)
-
 RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY = get_int(
     name="RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY",
     default=60 * 30,
@@ -830,16 +814,6 @@ CELERY_BEAT_SCHEDULE = {
     "process-refund-requests": {
         "task": "sheets.tasks.process_refund_requests",
         "schedule": crontab(minute=CRON_PROCESS_REFUND_REQUESTS_MINUTES),
-    },
-    "generate-course-certificate": {
-        "task": "courses.tasks.generate_course_certificates",
-        "schedule": crontab(
-            minute=0,
-            hour=CRON_COURSE_CERTIFICATES_HOURS,
-            day_of_week=CRON_COURSE_CERTIFICATES_DAYS,
-            day_of_month="*",
-            month_of_year="*",
-        ),
     },
 }
 

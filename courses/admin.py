@@ -239,13 +239,7 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
     """Admin for CourseRunGrade"""
 
     model = CourseRunGrade
-    list_display = [
-        "id",
-        "get_user_email",
-        "get_user_username",
-        "get_run_courseware_id",
-        "grade",
-    ]
+    list_display = ["id", "get_user_email", "get_run_courseware_id", "grade"]
     list_filter = ["passed", "set_by_admin", "course_run__courseware_id"]
     raw_id_fields = ("user",)
     search_fields = ["user__email", "user__username"]
@@ -257,14 +251,8 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
         """Returns the related User email"""
         return obj.user.email
 
-    def get_user_username(self, obj):
-        """Returns the related User username"""
-        return obj.user.username
-
     get_user_email.short_description = "User Email"
     get_user_email.admin_order_field = "user__email"
-    get_user_username.short_description = "Username"
-    get_user_username.admin_order_field = "user__username"
 
     def get_run_courseware_id(self, obj):
         """Returns the related CourseRun courseware_id"""
