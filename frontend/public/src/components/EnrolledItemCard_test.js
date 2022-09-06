@@ -19,7 +19,8 @@ describe("EnrolledItemCard", () => {
     currentUser,
     isLinkableStub,
     enrollmentCardProps,
-    isFinancialAssistanceAvailableStub
+    isFinancialAssistanceAvailableStub,
+    closeDrawer
 
 
   beforeEach(() => {
@@ -56,6 +57,7 @@ describe("EnrolledItemCard", () => {
             enrollmentCardProps.courseEmailsSubscription
           }
           addUserNotification={enrollmentCardProps.addUserNotification}
+          closeDrawer={closeDrawer}
         />
       )
   })

@@ -30,7 +30,8 @@ type EnrolledItemCardProps = {
     enrollmentId: number,
     emailsSubscription: string
   ) => Promise<any>,
-  addUserNotification: Function
+  addUserNotification: Function,
+  closeDrawer:Function,
 }
 
 type EnrolledItemCardState = {
@@ -73,7 +74,7 @@ export class EnrolledItemCard extends React.Component<
   }
 
   async onDeactivate(enrollment: RunEnrollment) {
-    const { deactivateEnrollment, addUserNotification } = this.props
+    const { deactivateEnrollment, addUserNotification, closeDrawer } = this.props
 
     if (enrollment.enrollment_mode === "verified") {
       this.toggleVerifiedUnenrollmentModalVisibility()
@@ -91,6 +92,9 @@ export class EnrolledItemCard extends React.Component<
         messageType = ALERT_TYPE_DANGER
         userMessage = `Something went wrong with your request to unenroll. Please contact support at ${SETTINGS.support_email}.`
       }
+      if (typeof closeDrawer === "function") {
+        closeDrawer()
+      }
       addUserNotification({
         "unenroll-status": {
           type:  messageType,
@@ -107,7 +111,7 @@ export class EnrolledItemCard extends React.Component<
   }
 
   async onSubmit(payload: Object) {
-    const { courseEmailsSubscription, addUserNotification } = this.props
+    const { courseEmailsSubscription, addUserNotification, closeDrawer } = this.props
     this.setState({ submittingEnrollmentId: payload.enrollmentId })
     this.toggleEmailSettingsModalVisibility()
     try {
@@ -126,6 +130,9 @@ export class EnrolledItemCard extends React.Component<
       } else {
         messageType = ALERT_TYPE_DANGER
         userMessage = `Something went wrong with your request to course ${payload.courseNumber} emails subscription. Please contact support at ${SETTINGS.support_email}.`
+      }
+      if (typeof closeDrawer === "function") {
+        closeDrawer()
       }
       addUserNotification({
         "subscription-status": {
@@ -265,9 +272,21 @@ export class EnrolledItemCard extends React.Component<
       enrollment.enrollment_mode === "audit" &&
       enrollment.run.is_upgradable
     ) ? (
-        <div className="enrollment-extra-links d-flex">
-          {financialAssistanceLink}
-          <GetCertificateButton productId={enrollment.run.products[0].id} />
+        <div className="upgrade-item-description detail d-md-flex justify-content-between pb-2">
+          <div className="mr-0">
+            <p>
+              <strong>Upgrade today</strong> and, upon passing, receive your certificate signed by MIT faculty
+              to highlight the knowledge and skills you've gained from this MITx course.
+            </p>
+          </div>
+          <div className="enrollment-extra-links d-flex d-md-flex justify-content-end col-auto pr-0">
+            <div className="pr-4 my-auto">
+              {financialAssistanceLink}
+            </div>
+            <div className="my-auto">
+              <GetCertificateButton productId={enrollment.run.products[0].id} />
+            </div>
+          </div>
         </div>
       ) : null
 
@@ -276,10 +295,11 @@ export class EnrolledItemCard extends React.Component<
     const courseId = enrollment.run.course_number
     const enrollmentMode = enrollment.enrollment_mode
     const pageLocation = enrollment.run.page
+    const menuTitle = `Course options for ${enrollment.run.course.title}`
 
     return (
       <div
-        className="enrolled-item container card p-md-3 mb-4 rounded-0"
+        className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3"
         key={enrollment.run.id}
       >
         <div className="row flex-grow-1">
@@ -304,7 +324,7 @@ export class EnrolledItemCard extends React.Component<
             </div>
           )}
 
-          <div className="col-12 col-md px-3 py-3 py-md-0">
+          <div className="col-12 col-md px-3 py-3 py-md-0 box">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
               <h2 className="my-0 mr-3">{title}</h2>
               <Dropdown
@@ -313,7 +333,7 @@ export class EnrolledItemCard extends React.Component<
                 id={`enrollmentDropdown-${enrollment.id}`}
               >
                 <DropdownToggle className="d-inline-flex unstyled dot-menu">
-                  <i className="material-icons">more_vert</i>
+                  <span className="material-icons" aria-label={menuTitle} title={menuTitle}>more_vert</span>
                 </DropdownToggle>
                 <DropdownMenu right>
                   <span id={`unenrollButtonWrapper-${enrollment.id}`}>
@@ -337,10 +357,10 @@ export class EnrolledItemCard extends React.Component<
                 </DropdownMenu>
               </Dropdown>
             </div>
-            <div className="detail">
+            <div className="detail pt-1">
               {courseId}
               {startDateDescription !== null && startDateDescription.active ? (
-                <span> | Starts - {startDateDescription.datestr}</span>
+                <span> | <b>Starts</b> - {startDateDescription.datestr}</span>
               ) : (
                 <span>
                   {startDateDescription === null ? null : (
@@ -363,16 +383,12 @@ export class EnrolledItemCard extends React.Component<
                 ) : null}
               </div>
               <br/>
-              {enrollment.enrollment_mode === "audit" ? (
-                <div className="upgrade-item-description">
-                  <p>
-                    <strong>Upgrade today</strong> and, upon passing, receive your certificate signed by MIT faculty
-                    to highlight the knowledge and skills you've gained from this MITx course.
-                  </p>
-                </div>
-              ) : null}
-              {certificateLinks}
             </div>
+          </div>
+        </div>
+        <div className="row flex-grow-1 pt-3">
+          <div className="col pl-0 pr-0">
+            {certificateLinks}
           </div>
         </div>
       </div>

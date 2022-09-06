@@ -42,7 +42,8 @@ import { isLinkableCourseRun } from "../../lib/courseApi"
 import {
   formatPrettyDateTimeAmPmTz,
   isSuccessResponse,
-  parseDateString
+  parseDateString,
+  isProgramUIEnabled,
 } from "../../lib/util"
 import { routes } from "../../lib/urls"
 import { addUserNotification } from "../../actions"
@@ -63,7 +64,8 @@ type DashboardPageProps = {
     enrollmentId: number,
     emailsSubscription: string
   ) => Promise<any>,
-  addUserNotification: Function
+  addUserNotification: Function,
+  closeDrawer: Function,
 }
 
 type DashboardPageState = {
@@ -258,9 +260,10 @@ export class DashboardPage extends React.Component<
       deactivateEnrollment,
       courseEmailsSubscription,
       addUserNotification,
+      closeDrawer,
     } = this.props
 
-    if (programEnrollments) {
+    if (isProgramUIEnabled() && programEnrollments) {
       const enrollmentMatches = programEnrollments.map(programEnrollment => programEnrollment.enrollments.some(elem => elem.id === enrollment.id))
 
       if (enrollmentMatches.includes(true)) {
@@ -276,6 +279,7 @@ export class DashboardPage extends React.Component<
         deactivateEnrollment={deactivateEnrollment}
         courseEmailsSubscription={courseEmailsSubscription}
         addUserNotification={addUserNotification}
+        closeDrawer={closeDrawer}
       ></EnrolledItemCard>
     )
   }
@@ -297,7 +301,7 @@ export class DashboardPage extends React.Component<
           <Loader isLoading={isLoading}>
             <h1>My Courses</h1>
             <div className="enrolled-items">
-              {programEnrollments && programEnrollments.length > 0 ? (
+              {isProgramUIEnabled() && programEnrollments && programEnrollments.length > 0 ? (
                 programEnrollments.map(programEnrollment => (
                   <ProgramEnrollmentCard
                     key={programEnrollment.program.readable_id}
