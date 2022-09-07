@@ -12,7 +12,8 @@ INSERT INTO public.courses_courserun(
     live,
     created_on,
     updated_on,
-    course_id)
+    course_id,
+    is_self_paced)
 SELECT
     mm_courserun.title,
     mm_courserun.edx_course_key,
@@ -26,7 +27,8 @@ SELECT
     true, --live
     coalesce(mm_courserun.enrollment_start, now()),
     coalesce(mm_courserun.enrollment_end, now()),
-    pk_map.course_id
+    pk_map.course_id,
+    false  -- self_paced
 FROM micromasters.courses_courserun AS mm_courserun
 JOIN public.micromasters_import_courseid AS pk_map
   ON mm_courserun.course_id = pk_map.micromasters_id
