@@ -499,6 +499,7 @@ class CheckoutProductView(LoginRequiredMixin, RedirectView):
             all_product_ids = self.request.GET.getlist("product_id")
 
             # If the request is from an external source we would have course_id as query param
+            # Note that course_id passed in param corresponds to course run's courseware_id on mitxonline
             course_run_ids = self.request.GET.getlist("course_run_id")
             course_ids = self.request.GET.getlist("course_id")
             program_ids = self.request.GET.getlist("program_id")
@@ -507,7 +508,7 @@ class CheckoutProductView(LoginRequiredMixin, RedirectView):
                 list(
                     CourseRun.objects.filter(
                         Q(courseware_id__in=course_run_ids)
-                        | Q(course__id__in=course_ids)
+                        | Q(courseware_id__in=course_ids)
                     ).values_list("products__id", flat=True)
                 )
             )
