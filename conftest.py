@@ -6,8 +6,10 @@ from main import features
 
 
 @pytest.fixture(autouse=True)
-def default_settings(settings):
+def default_settings(monkeypatch, settings):
     """Set default settings for all tests"""
+    monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "main.settings")
+
     settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
     settings.FEATURES[features.SYNC_ON_DASHBOARD_LOAD] = False
     settings.FEATURES[features.ENABLE_UPGRADE_DIALOG] = False

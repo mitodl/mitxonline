@@ -917,7 +917,6 @@ PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"
 # ol-django configuration
 
 import_settings_modules(
-    globals(),
     "mitol.authentication.settings.djoser_settings",
     "mitol.payment_gateway.settings.cybersource",
 )
