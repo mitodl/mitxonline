@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.43.0
+Version 0.43.0 (Released September 07, 2022)
 --------------
 
 - fix: certificate error when end_date is not set (#923)
