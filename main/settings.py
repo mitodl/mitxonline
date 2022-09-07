@@ -804,7 +804,7 @@ CELERY_BEAT_SCHEDULE = {
     "sync-courseruns-data": {
         "task": "courses.tasks.sync_courseruns_data",
         "schedule": crontab(
-            minute="*",
+            minute=0,
             hour=CRON_COURSERUN_SYNC_HOURS,
             day_of_week=CRON_COURSERUN_SYNC_DAYS,
             day_of_month="*",
