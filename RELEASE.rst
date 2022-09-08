@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+Version 0.44.0
+--------------
+
+- Fix failing test_order_refund_success_with_ref_num (#948)
+- Refund order based on id or reference number (#847)
+- fix external checkout by passing course_id
+- add is_self_paced to MicroMaster courserun import script
+- fixed dashboard doesn't refresh when user unenrolls from course in program
+- Adds a feature flag (overridable by URL) for the program UI
+- Adds accessibility attributes to make the program drawer work better with screen readers
+- Wraps the check for a course page and certificate page in a try/except so it doesn't fail if there's no course page for the courserun enrollment
+- Dashboard course card UI updates (#926)
+- Adds info text at the bottom of the course about pages for OFAC messaging
+
 Version 0.43.0 (Released September 07, 2022)
 --------------
 
