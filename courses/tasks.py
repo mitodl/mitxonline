@@ -6,7 +6,7 @@ import logging
 from django.conf import settings
 from django.db.models import Q
 
-from courses.models import CourseRunEnrollment
+from courses.models import CourseRun, CourseRunEnrollment
 
 from mitol.common.utils.datetime import now_in_utc
 from main.celery import app
