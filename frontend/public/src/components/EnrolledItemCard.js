@@ -365,8 +365,7 @@ export class EnrolledItemCard extends React.Component<
                 <span>
                   {startDateDescription === null ? null : (
                     <span> |
-                      <strong> Active</strong> from{" "}
-                      {startDateDescription.datestr}
+                      <strong> Active</strong> - {startDateDescription.datestr}
                     </span>
                   )}
                 </span>
