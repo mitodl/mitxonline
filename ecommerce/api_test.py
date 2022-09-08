@@ -223,7 +223,8 @@ def test_order_refund_success(mocker, order_state, unenroll, fulfilled_transacti
 def test_order_refund_success_with_ref_num(mocker, unenroll, fulfilled_transaction):
     """Test a successful refund based only on reference number"""
     sample_response_data = {
-        "refundAmountDetails": {"refundAmount": float(fulfilled_transaction.amount)}
+        "id": "12345",
+        "refundAmountDetails": {"refundAmount": float(fulfilled_transaction.amount)},
     }
     sample_response = ProcessorResponse(
         state=ProcessorResponse.STATE_PENDING,
