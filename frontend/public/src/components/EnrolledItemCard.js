@@ -291,6 +291,7 @@ export class EnrolledItemCard extends React.Component<
       ) : null
 
     const startDateDescription = generateStartDateText(enrollment.run)
+    console.log("StartDateDesc", startDateDescription)
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
     const courseId = enrollment.run.course_number
     const enrollmentMode = enrollment.enrollment_mode
@@ -359,7 +360,7 @@ export class EnrolledItemCard extends React.Component<
             </div>
             <div className="detail pt-1">
               {courseId}
-              {startDateDescription !== null && startDateDescription.active ? (
+              {startDateDescription !== null && !startDateDescription.active ? (
                 <span> | <b>Starts</b> - {startDateDescription.datestr}</span>
               ) : (
                 <span>
