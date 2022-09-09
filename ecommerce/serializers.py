@@ -218,7 +218,7 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
 
     def get_discounts(self, instance):
         """
-        Exclude zero value discounts and return applicable discounts on the basket. .
+        Exclude zero value discounts and return applicable discounts on the basket.
         """
         discounts = []
         for discount_record in instance.discounts.all():
