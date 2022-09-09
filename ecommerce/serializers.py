@@ -2,19 +2,23 @@
 MITxOnline ecommerce serializers
 """
 from audioop import add
-from this import d
-from rest_framework import serializers
 from decimal import Decimal
 
-from ecommerce import models
-from courses.models import CourseRun, ProgramRun, Course
-from ecommerce.models import Basket, Product, BasketItem, Order
-from users.serializers import ExtendedLegalAddressSerializer
-from ecommerce.constants import TRANSACTION_TYPE_REFUND, CYBERSOURCE_CARD_TYPES
+from rest_framework import serializers
+from this import d
 
 from cms.serializers import CoursePageSerializer
-
+from courses.models import Course, CourseRun, ProgramRun
+from ecommerce import models
+from ecommerce.constants import (
+    CYBERSOURCE_CARD_TYPES,
+    DISCOUNT_TYPE_DOLLARS_OFF,
+    DISCOUNT_TYPE_PERCENT_OFF,
+    TRANSACTION_TYPE_REFUND,
+)
+from ecommerce.models import Basket, BasketItem, Order, Product
 from flexiblepricing.api import determine_courseware_flexible_price_discount
+from users.serializers import ExtendedLegalAddressSerializer
 
 
 class ProgramRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
@@ -213,10 +217,23 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         )
 
     def get_discounts(self, instance):
-        return [
-            BasketDiscountSerializer(discount_record, context=self.context).data
-            for discount_record in instance.discounts.all()
-        ]
+        """
+        Exclude zero value discounts and return applicable discounts on the basket. .
+        """
+        discounts = []
+        for discount_record in instance.discounts.all():
+            discount = discount_record.redeemed_discount
+            if discount.amount == 0 and discount.discount_type in [
+                DISCOUNT_TYPE_PERCENT_OFF,
+                DISCOUNT_TYPE_DOLLARS_OFF,
+            ]:
+                continue
+
+            discounts.append(
+                BasketDiscountSerializer(discount_record, context=self.context).data
+            )
+
+        return discounts
 
     class Meta:
         fields = [
