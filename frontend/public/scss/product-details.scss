@@ -31,7 +31,7 @@
 
   .hero-block {
     font-size: 20px;
-    line-height: 30px;
+    line-height: 2rem;
     color: $black;
     padding: 20px 0;
 
@@ -155,7 +155,7 @@
     }
 
     p {
-      margin: 0 0 24px;
+      margin: 0 0 30px 0;
     }
   }
 
@@ -353,6 +353,9 @@
 
         span.badge {
           font-weight: normal;
+          font-size: .85rem;
+          margin-bottom: .25rem !important;
+          padding: 0.35rem !important;
         }
 
         span.badge-danger {
@@ -453,8 +456,17 @@
   text-decoration: underline;
   margin-bottom: 0;
 
+  &:hover{
+    text-decoration: none !important;
+  }
+
   a {
     color: black;
+
+    &:hover{
+      color: $brand-darker-bg;
+      text-decoration: none !important;
+    }
   }
 }
 

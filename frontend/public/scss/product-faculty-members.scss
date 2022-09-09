@@ -23,6 +23,8 @@
     .member-card {
       padding: 24px;
       overflow: hidden;
+      border-radius: 4px !important;
+      box-shadow: 0 1px 0 0 rgb(0 0 0 / 12%);
 
       .member-info {
         overflow: hidden;

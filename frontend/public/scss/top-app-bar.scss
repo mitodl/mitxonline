@@ -50,6 +50,8 @@ header.site-header {
         }
 
         &.button {
+          transition: .25s;
+
           @include media-breakpoint-up(md) {
             background: $primary;
             color: white;
