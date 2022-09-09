@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import factory
 import pytest
 from django.core.exceptions import ValidationError
-from edx_api.course_detail import CourseDetail, CourseDetails, CourseMode
+from edx_api.course_detail import CourseDetail, CourseDetails, CourseModes, CourseMode
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
@@ -800,7 +800,7 @@ def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success)
     responding with an error.
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
-    mocker.patch.object(CourseMode, "get_mode", side_effect=[mocked_api_response])
+    mocker.patch.object(CourseModes, "get_mode", side_effect=[mocked_api_response])
     course_run = CourseRunFactory.create()
 
     success_count, failure_count = sync_course_mode([course_run])
