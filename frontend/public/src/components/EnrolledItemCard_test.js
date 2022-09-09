@@ -1,6 +1,7 @@
 /* global SETTINGS: false */
 // @flow
 import React from "react"
+import moment from "moment"
 
 import { assert } from "chai"
 import { shallow } from "enzyme"
@@ -106,6 +107,24 @@ describe("EnrolledItemCard", () => {
       const pricingLinks = inner.find(".pricing-links")
       assert.isFalse(pricingLinks.exists())
     })
+  })
+
+  it("Course detail shows `Active` when start date in past", async () => {
+    enrollmentCardProps.enrollment.run.start_date = moment("2021-02-08")
+    const inner = await renderedCard()
+    const detail = inner.find(".enrolled-item").find(".detail")
+    assert.isTrue(detail.exists())
+    const detailText = detail.find("span").find("span").at(1).text()
+    assert.isTrue(detailText.startsWith(" | Active"))
+  })
+
+  it("Course detail shows `Starts` when start date in future", async () => {
+    enrollmentCardProps.enrollment.run.start_date = moment().add(7, "d")
+    const inner = await renderedCard()
+    const detail = inner.find(".enrolled-item").find(".detail")
+    assert.isTrue(detail.exists())
+    const detailText = detail.find("span").at(0).text()
+    assert.isTrue(detailText.startsWith(" | Starts"))
   })
 
   it("renders the unenrollment verification modal", async () => {
