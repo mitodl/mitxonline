@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import factory
 import pytest
 from django.core.exceptions import ValidationError
-from edx_api.course_detail import CourseDetail, CourseDetails
+from edx_api.course_detail import CourseDetail, CourseDetails, CourseModes, CourseMode
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
@@ -19,6 +19,7 @@ from courses.api import (
     deactivate_run_enrollment,
     defer_enrollment,
     get_user_enrollments,
+    sync_course_mode,
     sync_course_runs,
     process_course_run_grade_certificate,
     generate_course_run_certificates,
@@ -772,6 +773,43 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
         assert course_run.end_date == mocked_api_response.end
         assert course_run.enrollment_start == mocked_api_response.enrollment_start
         assert course_run.enrollment_end == mocked_api_response.enrollment_end
+    else:
+        assert success_count == 0
+        assert failure_count == 1
+
+
+@pytest.mark.parametrize(
+    "mocked_api_response, expect_success",
+    [
+        [
+            CourseMode(
+                {
+                    "expiration_datetime": "2019-01-01T00:00:00Z",
+                }
+            ),
+            True,
+        ],
+        [HTTPError(response=Mock(status_code=404)), False],
+        [HTTPError(response=Mock(status_code=400)), False],
+        [ConnectionError(), False],
+    ],
+)
+def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success):
+    """
+    Test that sync_course_mode fetches data from edX API. Should fail on API
+    responding with an error.
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    mocker.patch.object(CourseModes, "get_mode", side_effect=[mocked_api_response])
+    course_run = CourseRunFactory.create()
+
+    success_count, failure_count = sync_course_mode([course_run])
+
+    if expect_success:
+        course_run.refresh_from_db()
+        assert success_count == 1
+        assert failure_count == 0
+        assert course_run.upgrade_deadline == mocked_api_response.expiration_datetime
     else:
         assert success_count == 0
         assert failure_count == 1

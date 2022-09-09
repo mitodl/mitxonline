@@ -5,7 +5,7 @@ import logging
 from collections import namedtuple
 from datetime import datetime, timedelta
 from traceback import format_exc
-from typing import Optional
+from typing import Optional, List
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -40,6 +40,7 @@ from courses.utils import exception_logging_generator
 from openedx.api import (
     enroll_in_edx_course_runs,
     get_edx_api_course_detail_client,
+    get_edx_api_course_mode_client,
     unenroll_edx_course_run,
 )
 from openedx.exceptions import (
@@ -569,6 +570,56 @@ def sync_course_runs(runs):
                 # Report any validation or otherwise model errors
                 log.error("%s: %s", str(e), run.courseware_id)
                 failure_count += 1
+
+    return success_count, failure_count
+
+
+def sync_course_mode(runs: List[CourseRun]) -> List[str]:
+    """
+    Updates course run upgrade expiration dates from Open edX
+
+    Args:
+        runs ([CourseRun]): list of CourseRun objects.
+
+    Returns:
+        [str], [str]: Lists of success and error logs respectively
+    """
+    api_client = get_edx_api_course_mode_client()
+
+    success_count = 0
+    failure_count = 0
+
+    # Iterate all eligible runs and sync if possible
+    for run in runs:
+        try:
+            course_mode = api_client.get_mode(
+                course_id=run.courseware_id,
+            )
+        except HTTPError as e:
+            failure_count += 1
+            if e.response.status_code == HTTP_404_NOT_FOUND:
+                log.error(
+                    "Course mode not found on edX for readable id: %s",
+                    run.courseware_id,
+                )
+            else:
+                log.error("%s: %s", str(e), run.courseware_id)
+        except Exception as e:  # pylint: disable=broad-except
+            failure_count += 1
+            log.error("%s: %s", str(e), run.courseware_id)
+        else:
+            if run.upgrade_deadline != course_mode.expiration_datetime:
+                run.upgrade_deadline = course_mode.expiration_datetime
+                try:
+                    run.save()
+                    success_count += 1
+                    log.info(
+                        "Updated upgrade deadline for course run: %s", run.courseware_id
+                    )
+                except Exception as e:  # pylint: disable=broad-except
+                    # Report any validation or otherwise model errors
+                    log.error("%s: %s", str(e), run.courseware_id)
+                    failure_count += 1
 
     return success_count, failure_count
 
