@@ -4,13 +4,13 @@ body {
 }
 
 h1 {
-  font-size: 34px;
+  font-size: 38px;
   line-height: 38px;
   margin: 0 0 13px;
   font-weight: 700;
 
   @include media-breakpoint-up(md) {
-    font-size: 42px;
+    font-size: 38px;
     line-height: 52px;
   }
 
@@ -22,7 +22,7 @@ h1 {
 }
 
 h2 {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 600;
   line-height: 28px;
   margin: 0 0 18px;
@@ -40,7 +40,7 @@ h3 {
 }
 
 h4 {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -93,9 +93,17 @@ a.link-button {
   color: white;
   font-size: 18px;
   padding: 11px 40px;
-  border-radius: 0;
+  border-radius: 4px;
+  transition: .25s !important;
   font-weight: 600;
   background-color: $brand-button-bg;
+
+  &:hover {
+      opacity: 1;
+      border: 2px solid $brand-darker-bg;
+	  color: $brand-darker-bg;
+	  background: linear-gradient(174deg, $tile-background, $tile-background) !important;
+  }
 
   &.large {
     font-size: 20px;
@@ -111,15 +119,15 @@ a.link-button {
     transition: linear 0.4s;
 
     &:hover {
-      opacity: 0.8;
+      opacity: 1;
     }
   }
 
   &.outline {
-    background-image: none;
     background-color: #ffffff;
     color: $brand-lighter-bg;
     border: 2px solid $brand-lighter-bg;
+    background: linear-gradient(174deg, $tile-background, $tile-background) !important;
 
     &:hover {
       opacity: 1;
@@ -128,7 +136,8 @@ a.link-button {
 }
 
 .btn-gradient-red {
-  background: linear-gradient(174deg, $brand-lighter-bg, $brand-darker-bg);
+  background: linear-gradient(174deg, $brand-darker-bg, $brand-darker-bg) !important;
+  border: 2px solid $brand-darker-bg;
 }
 
 .btn-denim-blue {
@@ -193,7 +202,8 @@ button.btn-secondary.unstyled {
 .card {
   background-color: #ffffff;
   border: 0;
-  box-shadow: 0 1px 0 0 rgba(0,0,0,0.23);
+  border-radius: 4px !important;
+  box-shadow: 0 1px 0 0 rgb(0 0 0 / 12%);
 }
 
 .card-shadow {
@@ -220,7 +230,7 @@ button.btn-secondary.unstyled {
   border-bottom: 3px solid transparent;
   box-shadow: 0 1px 0 0 rgba(0, 0, 0, 0.23);
 
-  &:hover {
+  &.clickable:hover {
     border-color: $brand-button-bg;
     box-shadow: 0 2px 15px 4px rgba(0, 0, 0, 0.16);
   }
@@ -241,24 +251,30 @@ button.btn-secondary.unstyled {
   box-shadow: 0 2px 4px 0 rgba(0,0,0,0.5), 0 13px 11px 8px rgba(0,0,0,0.12);
   border-color: $white-smoke;
   border-radius: 0;
-  padding: 10px 15px;
+  padding: 0;
 
   .dropdown-item {
     display: block;
-    padding: 7px 0;
-    font-size: 16px;
+    padding: .75rem 1rem;
+    font-size: 14px;
     line-height: 14px;
 
-    &:active,
-    &:hover {
+    &:active{
       background-color: white;
     }
+
+    &:hover{
+      color: $brand-darker-bg;
+      background-color: white;
+    }
+
 
     a, button.unstyled {
       display: block;
       width: 100%;
       color: $black;
-      font-weight: 600;
+      font-weight: 400;
+      font-size: 14px;
       text-align: left;
       text-decoration: none;
 
@@ -280,7 +296,7 @@ button.btn-secondary.unstyled {
   margin-left: 15px;
 
   h1 {
-    font-size: 32px;
+    font-size: 38px;
     line-height: 38px;
     font-weight: bold;
   }
@@ -327,7 +343,7 @@ button.btn-secondary.unstyled {
   }
 
   .form-group {
-    margin-bottom: 24px;
+    margin-bottom: 1.5rem;
 
     input[type=number], select {
       height: 48px;

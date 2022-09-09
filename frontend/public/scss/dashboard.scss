@@ -28,11 +28,16 @@ $program-badge-bg: #DBF2F3;
     }
 
     h2 {
-      font-size: 20px;
+      font-size: 26px;
     }
 
     h2 a {
       color: black;
+      text-decoration: none;
+
+      &:hover{
+        text-decoration: underline;
+      }
     }
 
     @include media-breakpoint-up(md) {
@@ -84,8 +89,9 @@ $program-badge-bg: #DBF2F3;
   .enrollment-mode-container {
     span.badge {
       font-weight: normal;
-      padding: .20rem;
-      margin-bottom: .5rem;
+      font-size: .85rem;
+      padding: 0.35rem !important;
+      margin-bottom: .25rem !important;
       margin-right: .5rem;
     }
     span.badge.badge-red {
@@ -122,6 +128,11 @@ $program-badge-bg: #DBF2F3;
       margin: auto 0;
     }
 
+    a:hover {
+      color: black;
+      text-decoration: none;
+    }
+
     a.view-certificate {
       margin: auto 5px;
     }
@@ -155,7 +166,7 @@ $program-badge-bg: #DBF2F3;
 
 .dashboard h1 {
   margin-bottom: 38px;
-  font-size: 32px;
+  font-size: 38px;
 
   @include media-breakpoint-down(md) {
     margin-bottom: 30px;

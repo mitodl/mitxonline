@@ -17,6 +17,10 @@
     margin: 0 22px 44px;
 
     .course-card {
+       border-radius: 4px !important;
+       box-shadow: 0 1px 0 0 rgb(0 0 0 / 12%);
+       transition: .25s;
+
       .course-info {
         padding: 15px;
 
@@ -63,9 +67,15 @@
         display: block;
         cursor: pointer;
         text-decoration: none;
+
+        img{
+          border-radius: 4px 4px 0 0;
+        }
       }
 
       &:hover {
+        box-shadow: 0 3px 12px 6px rgb(0 0 0 / 8%);
+
         h2 {
           color: $brand-button-bg;
         }
