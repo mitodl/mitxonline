@@ -1,4 +1,4 @@
-import { CrudFilters, HttpError } from "@pankod/refine-core";
+import { CrudFilters, HttpError, useInvalidate } from "@pankod/refine-core";
 import React from "react"
 const { useState } = React;
 import {
@@ -17,6 +17,8 @@ import {
     Col,
     Card
 } from "@pankod/refine-antd";
+import { ReloadOutlined } from "@ant-design/icons"
+import { Spin } from "antd"
 
 import { IFlexiblePriceRequest, IFlexiblePriceRequestFilters } from "interfaces";
 import { FlexiblePricingStatusModal } from "components/flexiblepricing/statusmodal";
@@ -74,8 +76,32 @@ const FlexiblePricingFilterForm: React.FC<{ formProps: FormProps }> = ({ formPro
     )
 }
 
+interface RefreshTableButtonProps {
+    refreshList: any;
+    isFetching: boolean;
+}
+
+const RefreshTableButton: React.FC<RefreshTableButtonProps> = (props) => {
+    const { isFetching, refreshList } = props
+
+    if (props.isFetching) {
+        return (
+            <Button onClick={props.refreshList}>
+                <ReloadOutlined spin /> Refreshing...
+            </Button>
+        )
+    }
+
+    return (
+        <Button onClick={props.refreshList}>
+           <ReloadOutlined /> Refresh
+        </Button>
+    )
+}
+
 export const FlexiblePricingList: React.FC = () => {
-    const {tableProps, searchFormProps} = useTable<
+    const invalidate = useInvalidate()
+    const {tableQueryResult, tableProps, searchFormProps} = useTable<
         IFlexiblePriceRequest,
         HttpError, 
         IFlexiblePriceRequestFilters
@@ -122,6 +148,10 @@ export const FlexiblePricingList: React.FC = () => {
         return null
     }
 
+    const refreshList = () => {
+        tableQueryResult.refetch()
+    }
+
     return (
         <div>
             <Row gutter={[10, 10]}>
@@ -134,7 +164,15 @@ export const FlexiblePricingList: React.FC = () => {
 
             <Row gutter={[10, 10]}>
                 <Col sm={24}>
-                    <List title="Flexible Pricing Requests">
+                </Col>
+            </Row>
+
+            <Row gutter={[10, 10]}>
+                <Col sm={24}>
+                    <List 
+                        title="Flexible Pricing Requests"
+                        pageHeaderProps={{ subTitle: <RefreshTableButton isFetching={tableQueryResult.isFetching} refreshList={refreshList} /> }}
+                    >
                         <Table {...tableProps} rowKey="id">
                             <Table.Column 
                                 dataIndex="user" 
