@@ -114,8 +114,8 @@ describe("EnrolledItemCard", () => {
     const inner = await renderedCard()
     const detail = inner.find(".enrolled-item").find(".detail")
     assert.isTrue(detail.exists())
-    const detail_text = detail.find("span").find("span").at(1).text()
-    assert.isTrue(detail_text.startsWith(" | Active"))
+    const detailText = detail.find("span").find("span").at(1).text()
+    assert.isTrue(detailText.startsWith(" | Active"))
   })
 
   it("Course detail shows `Starts` when start date in future", async () => {
@@ -123,8 +123,8 @@ describe("EnrolledItemCard", () => {
     const inner = await renderedCard()
     const detail = inner.find(".enrolled-item").find(".detail")
     assert.isTrue(detail.exists())
-    const detail_text = detail.find("span").at(0).text()
-    assert.isTrue(detail_text.startsWith(" | Starts"))
+    const detailText = detail.find("span").at(0).text()
+    assert.isTrue(detailText.startsWith(" | Starts"))
   })
 
   it("renders the unenrollment verification modal", async () => {
