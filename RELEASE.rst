@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.44.0
+Version 0.44.0 (Released September 09, 2022)
 --------------
 
 - Fix failing test_order_refund_success_with_ref_num (#948)
