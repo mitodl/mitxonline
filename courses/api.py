@@ -592,7 +592,7 @@ def sync_course_mode(runs: List[CourseRun]) -> List[str]:
     # Iterate all eligible runs and sync if possible
     for run in runs:
         try:
-            course_detail = api_client.get_mode(
+            course_mode = api_client.get_mode(
                 course_id=run.courseware_id,
             )
         except HTTPError as e:
@@ -608,8 +608,8 @@ def sync_course_mode(runs: List[CourseRun]) -> List[str]:
             failure_count += 1
             log.error("%s: %s", str(e), run.courseware_id)
         else:
-            if run.upgrade_deadline != course_detail.expiration_datetime:
-                run.upgrade_deadline = course_detail.expiration_datetime
+            if run.upgrade_deadline != course_mode.expiration_datetime:
+                run.upgrade_deadline = course_mode.expiration_datetime
                 try:
                     run.save()
                     success_count += 1
