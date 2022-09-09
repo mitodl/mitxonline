@@ -1,20 +1,22 @@
 import json
 from decimal import Decimal
 
-from django.test import RequestFactory
-from flexiblepricing.constants import FlexiblePriceStatus
-from flexiblepricing.models import FlexiblePrice
-
 import pytest
 import reversion
 from dateutil.parser import parse
 from django.contrib.auth.models import AnonymousUser
+from django.test import RequestFactory
 from django.urls import reverse
 from mitol.common.utils import now_in_utc
 
 from courses.factories import CourseRunFactory, ProgramFactory, ProgramRunFactory
 from courses.models import CourseRun, ProgramRun
-from ecommerce.constants import CYBERSOURCE_CARD_TYPES
+from ecommerce.constants import (
+    CYBERSOURCE_CARD_TYPES,
+    DISCOUNT_TYPE_DOLLARS_OFF,
+    DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PERCENT_OFF,
+)
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
     BasketItemFactory,
@@ -38,7 +40,9 @@ from ecommerce.serializers import (
     TransactionPurchaseSerializer,
 )
 from ecommerce.views_test import create_basket, payment_gateway_settings
+from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
+from flexiblepricing.models import FlexiblePrice
 from main.test_utils import assert_drf_json_equal
 from users.factories import UserFactory
 
@@ -206,6 +210,55 @@ def test_basket_with_product_serializer():
     assert serialized_basket["total_price"] == basket_item.product.price
     assert serialized_basket["discounted_price"] == discount_price
     assert len(serialized_basket["discounts"]) == 1
+
+
+@pytest.mark.parametrize(
+    "discount_amount, discount_type",
+    [
+        (0, DISCOUNT_TYPE_PERCENT_OFF),
+        (50, DISCOUNT_TYPE_PERCENT_OFF),
+        (0, DISCOUNT_TYPE_DOLLARS_OFF),
+        (50, DISCOUNT_TYPE_DOLLARS_OFF),
+        (0, DISCOUNT_TYPE_FIXED_PRICE),
+        (50, DISCOUNT_TYPE_FIXED_PRICE),
+    ],
+)
+def test_basket_product_serializer_with_zero_value_discount(
+    discount_amount, discount_type
+):
+    """
+    Tests serialization of a basket with the attached products and different discount values and types.
+    """
+    basket_item = BasketItemFactory.create()
+    discount = UnlimitedUseDiscountFactory.create(
+        amount=discount_amount, discount_type=discount_type
+    )
+    user = UserFactory.create()
+
+    basket_discount = BasketDiscount(
+        redeemed_by=user,
+        redeemed_discount=discount,
+        redeemed_basket=basket_item.basket,
+        redemption_date=now_in_utc(),
+    )
+    basket_discount.save()
+
+    serialized_basket = BasketWithProductSerializer(basket_item.basket).data
+
+    logic = DiscountType.for_discount(discount)
+    discount_price = logic.get_discounted_price([discount], basket_item.product)
+
+    assert serialized_basket["total_price"] == basket_item.product.price
+
+    if discount_amount == 0 and discount_type in [
+        DISCOUNT_TYPE_DOLLARS_OFF,
+        DISCOUNT_TYPE_PERCENT_OFF,
+    ]:
+        assert serialized_basket["discounted_price"] == basket_item.product.price
+        assert len(serialized_basket["discounts"]) == 0
+    else:
+        assert serialized_basket["discounted_price"] == discount_price
+        assert len(serialized_basket["discounts"]) == 1
 
 
 def create_order_receipt(mocker, user, products, user_client):
