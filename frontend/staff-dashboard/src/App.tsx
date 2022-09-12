@@ -2,7 +2,8 @@ import { Refine } from "@pankod/refine-core";
 import { Icons, notificationProvider } from "@pankod/refine-antd";
 import routerProvider from "@pankod/refine-react-router-v6";
 import "@pankod/refine-antd/dist/styles.min.css";
-import { useAuthProvider } from "hooks/useAuthProvider";
+import {useAuthProvider } from "hooks/useAuthProvider";
+import {useAuth} from "react-oidc-context";
 import {
   Title,
   Header,
@@ -43,7 +44,10 @@ export default function App() {
   const dataURI = DATASOURCES_CONFIG?.mitxOnline ?? "";
   const authProvider = useAuthProvider();
   const xonlineProvider = useDrfDataProvider(dataURI);
-
+  const auth = useAuth()
+  if (auth.isLoading) {
+    return <span>loading...</span>;
+  }
   return (
     <Refine
       routerProvider={{

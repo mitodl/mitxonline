@@ -12,12 +12,11 @@ export function useAuthProvider(): AuthProvider {
         if (result.profile.is_staff) {
           return Promise.resolve();
         }
-      } else if (auth && auth.user && auth.user.profile.is_staff === true) {
-        return Promise.resolve();
       }
       return Promise.reject();
     },
     logout: async () => {
+      sessionStorage.removeItem(`oidc.user:${OIDC_CONFIG.authority}:${OIDC_CONFIG.client_id}`);
       await auth.removeUser();
       return Promise.resolve();
     },
@@ -25,12 +24,10 @@ export function useAuthProvider(): AuthProvider {
       return Promise.resolve();
     },
     checkAuth: async () => {
-      let token = sessionStorage.getItem(`oidc.user:${OIDC_CONFIG.authority}:${OIDC_CONFIG.client_id}`);
-      if (!auth.isLoading && !auth.isAuthenticated && token) {
-        console.log("here")
-        let result = await auth.signinSilent();
+      if (auth.isAuthenticated) {
         return Promise.resolve();
       }
+      return Promise.reject();
     },
     getPermissions: () => Promise.resolve(),
     getUserIdentity: async () => {
