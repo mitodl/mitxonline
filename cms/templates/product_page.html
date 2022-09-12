@@ -82,8 +82,20 @@
               </div>
             </div>
             {% endif %}
-            {% if page.price %}
-            <div class="stat-col">
+            {% if finaid_price %}
+            <div class="stat-col small">
+              <div class="title">price</div>
+              <div class="text">
+                <strong>
+                  <a target="_blank" href="{% url 'checkout-product' %}?product_id={{product.id}}">
+                    ${{finaid_price.1}}
+                  </a>
+                </strong>
+              </div>
+            </div>  
+            {% endif %}
+            {% if not finaid_price and page.price %}
+            <div class="stat-col small">
               <div class="title">price</div>
               <div class="text">
                 <strong>

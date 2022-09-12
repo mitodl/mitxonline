@@ -41,6 +41,11 @@ from ecommerce.discounts import (
     DollarsOffDiscount,
 )
 from ecommerce.views_test import user
+from ecommerce.constants import (
+    DISCOUNT_TYPE_DOLLARS_OFF,
+    DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PERCENT_OFF,
+)
 
 pytestmark = [pytest.mark.django_db]
 
@@ -372,3 +377,23 @@ def test_create_transaction_with_no_transaction_id():
         ).count()
         == 0
     )
+
+
+@pytest.mark.parametrize(
+    "discount_type",
+    [DISCOUNT_TYPE_DOLLARS_OFF, DISCOUNT_TYPE_FIXED_PRICE, DISCOUNT_TYPE_PERCENT_OFF],
+)
+def test_discount_product_calculation(user, unlimited_discount, discount_type):
+    product = ProductFactory.create()
+    unlimited_discount.discount_type = discount_type
+
+    discounted_amount = unlimited_discount.discount_product(product)
+
+    if unlimited_discount.discount_type == DISCOUNT_TYPE_DOLLARS_OFF:
+        assert discounted_amount == product.price - unlimited_discount.amount
+    elif unlimited_discount.discount_type == DISCOUNT_TYPE_FIXED_PRICE:
+        assert discounted_amount == unlimited_discount.amount
+    elif unlimited_discount.discount_type == DISCOUNT_TYPE_PERCENT_OFF:
+        assert discounted_amount == Decimal(
+            product.price - (product.price * Decimal(unlimited_discount.amount / 100))
+        ).quantize(Decimal("0.01"))
