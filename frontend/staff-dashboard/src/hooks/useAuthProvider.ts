@@ -8,15 +8,11 @@ export function useAuthProvider(): AuthProvider {
     login: async () => {
       if (!hasAuthParams() &&
         !auth.isAuthenticated && !auth.activeNavigator && !auth.isLoading) {
-        let result = await auth.signinPopup();
-        if (result.profile.is_staff) {
-          return Promise.resolve();
-        }
+        await auth.signinPopup()
+        return Promise.resolve();
       }
-      return Promise.reject();
     },
     logout: async () => {
-      sessionStorage.removeItem(`oidc.user:${OIDC_CONFIG.authority}:${OIDC_CONFIG.client_id}`);
       await auth.removeUser();
       return Promise.resolve();
     },
@@ -24,7 +20,8 @@ export function useAuthProvider(): AuthProvider {
       return Promise.resolve();
     },
     checkAuth: async () => {
-      if (auth.isAuthenticated) {
+      let _ = require("lodash");
+      if (auth.isAuthenticated && auth.user && _.get(auth.user, "profile.is_staff")) {
         return Promise.resolve();
       }
       return Promise.reject();
