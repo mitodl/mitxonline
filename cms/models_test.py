@@ -27,8 +27,10 @@ from courses.factories import (
 )
 from flexiblepricing.models import FlexiblePrice
 from flexiblepricing.constants import FlexiblePriceStatus
-from flexiblepricing.factories import FlexiblePriceTierFactory
+from flexiblepricing.factories import FlexiblePriceTierFactory, FlexiblePriceFactory
+from flexiblepricing.api import determine_courseware_flexible_price_discount
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
+from ecommerce.factories import ProductFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -63,11 +65,12 @@ def test_custom_detail_page_urls_handled(fully_configured_wagtail):
 
 
 @pytest.mark.parametrize(
-    "is_authenticated,has_relevant_run,enrolled,exp_sign_in_url,exp_is_enrolled",
+    "is_authenticated,has_relevant_run,enrolled,exp_sign_in_url,exp_is_enrolled,has_finaid",
     [
-        [True, True, True, False, True],
-        [False, False, False, True, False],
-        [False, True, True, True, False],
+        [True, True, True, False, True, True],
+        [True, True, True, False, True, False],
+        [False, False, False, True, False, False],
+        [False, True, True, True, False, False],
     ],
 )
 def test_course_page_context(
@@ -78,6 +81,7 @@ def test_course_page_context(
     enrolled,
     exp_sign_in_url,
     exp_is_enrolled,
+    has_finaid,
 ):
     """CoursePage.get_context should return expected values"""
     rf = RequestFactory()
@@ -91,6 +95,25 @@ def test_course_page_context(
     else:
         run = None
         course_page_kwargs = dict(course__readable_id=FAKE_READABLE_ID)
+    if has_finaid and is_authenticated and has_relevant_run:
+        sub = FlexiblePriceFactory(
+            courseware_object=run.course,
+            user=staff_user,
+            status=FlexiblePriceStatus.APPROVED,
+        )
+        ProductFactory.create(purchasable_object=run)
+        ecommerce_product = run.products.filter(is_active=True).first()
+        discount = determine_courseware_flexible_price_discount(
+            ecommerce_product, request.user
+        )
+        finaid_price = (
+            ecommerce_product.price,
+            discount.discount_product(ecommerce_product),
+        )
+        product = ecommerce_product
+    else:
+        finaid_price = None
+        product = None
     relevant_runs = list(CourseRun.objects.values("courseware_id", "start_date"))
     course_page = CoursePageFactory.create(**course_page_kwargs)
     if enrolled:
@@ -108,6 +131,8 @@ def test_course_page_context(
         else None,
         "start_date": getattr(run, "start_date", None),
         "can_access_edx_course": is_authenticated and has_relevant_run,
+        "finaid_price": finaid_price,
+        "product": product,
     }
 
 

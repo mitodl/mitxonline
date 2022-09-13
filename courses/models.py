@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 from django.utils.functional import cached_property
+from django.contrib.contenttypes.models import ContentType
 from django_countries.fields import CountryField
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.collections import first_matching_item
@@ -214,6 +215,18 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     def page(self):
         """Gets the associated CoursePage"""
         return getattr(self, "coursepage", None)
+
+    @property
+    def active_products(self):
+        """
+        Gets active products for the first unexpired courserun for this course
+
+        Returns:
+        - ProductsQuerySet
+        """
+        relevant_run = self.first_unexpired_run
+
+        return relevant_run.products.filter(is_active=True).all()
 
     @cached_property
     def next_run_date(self):

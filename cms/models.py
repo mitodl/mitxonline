@@ -65,6 +65,8 @@ from flexiblepricing.api import (
     determine_tier_courseware,
     determine_auto_approval,
     determine_income_usd,
+    is_courseware_flexible_price_approved,
+    determine_courseware_flexible_price_discount,
 )
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.exceptions import NotSupportedException
@@ -795,6 +797,18 @@ class ProductPage(Page):
             ),
         )
 
+    @property
+    def get_current_finaid(self):
+        """
+        Returns information about financial aid for the current learner.
+
+        If the learner has a flexible pricing(financial aid) request that's
+        approved, this should return the learner's adjusted price. If they
+        don't, this should return the Page for the applicable request form.
+        If they're not logged in, this should return None.
+        """
+        raise NotImplementedError
+
 
 class CoursePage(ProductPage):
     """
@@ -824,6 +838,33 @@ class CoursePage(ProductPage):
     def product(self):
         """Gets the product associated with this page"""
         return self.course
+
+    def get_current_finaid(self, request):
+        """
+        Returns information about financial aid for the current learner.
+
+        Args:
+            request: the current request
+        Returns:
+            None, or a tuple of the original price and the discount to apply
+        """
+        if is_courseware_flexible_price_approved(self.product, request.user):
+            ecommerce_product = self.product.active_products.first()
+
+            discount = determine_courseware_flexible_price_discount(
+                ecommerce_product, request.user
+            )
+
+            if discount.check_validity(request.user):
+                log.debug(
+                    f"price is {ecommerce_product.price}, discount is {discount.discount_product(ecommerce_product)}"
+                )
+                return (
+                    ecommerce_product.price,
+                    discount.discount_product(ecommerce_product),
+                )
+
+        return None
 
     template = "product_page.html"
 
@@ -856,6 +897,12 @@ class CoursePage(ProductPage):
             and relevant_run is not None
             and (relevant_run.is_in_progress or request.user.is_editor)
         )
+        finaid_price = self.get_current_finaid(request)
+        product = (
+            relevant_run.products.filter(is_active=True).first()
+            if relevant_run
+            else None
+        )
         return {
             **super().get_context(request, *args, **kwargs),
             **get_base_context(request),
@@ -865,6 +912,8 @@ class CoursePage(ProductPage):
             "sign_in_url": sign_in_url,
             "start_date": start_date,
             "can_access_edx_course": can_access_edx_course,
+            "finaid_price": finaid_price,
+            "product": product,
         }
 
     content_panels = [

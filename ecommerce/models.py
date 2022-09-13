@@ -317,6 +317,23 @@ class Discount(TimestampedModel):
 
         return "Indeterminate Discount"
 
+    def discount_product(self, product, user=None):
+        """
+        Returns the calculated discount amount for a given product.
+
+        Args:
+            product (Product): the product to discount
+            user (User or None): the current user
+        Returns:
+            Number; the calculated amount of the discounts
+        """
+        from ecommerce.discounts import DiscountType
+
+        if (user is None and self.valid_now()) or self.check_validity(user):
+            return DiscountType.get_discounted_price([self], product).quantize(
+                Decimal("0.01")
+            )
+
 
 class DiscountProduct(TimestampedModel):
     discount = models.ForeignKey(

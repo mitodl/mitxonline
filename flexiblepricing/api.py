@@ -9,6 +9,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
+from django.contrib.auth.models import AnonymousUser
 
 from main.settings import TIME_ZONE
 from main.constants import DISALLOWED_CURRENCY_TYPES
@@ -288,6 +289,9 @@ def is_courseware_flexible_price_approved(course_run, user):
                 False if the user does not have a Flexible Price that is APPROVED or AUTO_APPROVED
                 and associated with the CourseRun.
     """
+
+    if isinstance(user, AnonymousUser):
+        return False
 
     for eligible_courseware in get_ordered_eligible_coursewares(course_run):
         content_type = ContentType.objects.get_for_model(eligible_courseware)
