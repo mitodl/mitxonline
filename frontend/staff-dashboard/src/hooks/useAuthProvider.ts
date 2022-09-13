@@ -1,6 +1,5 @@
 import { AuthProvider } from "@pankod/refine-core";
 import { useAuth } from "react-oidc-context";
-import { User } from "oidc-client-ts";
 
 export function useAuthProvider(): AuthProvider {
   const auth = useAuth()
