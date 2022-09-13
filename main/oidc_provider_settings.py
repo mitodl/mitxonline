@@ -1,4 +1,3 @@
-from django.utils.translation import ugettext as _
 from oauth2_provider.oauth2_validators import OAuth2Validator
 
 
