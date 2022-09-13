@@ -45,6 +45,7 @@ export interface ICourseware {
     id: number;
     title: string;
     readable_id: string;
+    type:string;
 }
 
 
@@ -79,6 +80,7 @@ export interface IFlexiblePriceStatus {
 export interface IFlexiblePriceRequestFilters {
     q: string;
     status: string;
+    courseware: string;
 }
 
 export interface IFlexiblePriceStatusModalProps {

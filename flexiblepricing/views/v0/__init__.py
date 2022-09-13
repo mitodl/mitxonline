@@ -3,6 +3,7 @@ MITxOnline Flexible Pricing/Financial Aid views
 """
 from django.db import transaction
 from django.db.models import Q
+from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
@@ -48,7 +49,6 @@ class FlexiblePriceAdminViewSet(ModelViewSet):
 
     def get_queryset(self):
         queryset = models.FlexiblePrice.objects.all()
-
         name_search = self.request.query_params.get("q")
 
         if name_search is not None:
@@ -62,6 +62,19 @@ class FlexiblePriceAdminViewSet(ModelViewSet):
 
         if status_search is not None:
             queryset = queryset.filter(status=status_search)
+
+        courseware_search = self.request.query_params.get("courseware")
+        if courseware_search is not None:
+            courseware_content_type, courseware_object_id = courseware_search.split(":")
+            content_type = ContentType.objects.get(
+                app_label="courses", model=courseware_content_type
+            )
+            queryset = queryset.filter(
+                Q(
+                    courseware_object_id=courseware_object_id,
+                    courseware_content_type=content_type,
+                )
+            )
 
         return queryset.order_by("-created_on")
 
