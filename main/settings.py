@@ -873,10 +873,6 @@ OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = "oauth2_provider.AccessToken"
 OAUTH2_PROVIDER_APPLICATION_MODEL = "oauth2_provider.Application"
 OAUTH2_PROVIDER_REFRESH_TOKEN_MODEL = "oauth2_provider.RefreshToken"
 
-OIDC_USERINFO = 'myproject.oidc_provider_settings.userinfo'
-OIDC_IDTOKEN_INCLUDE_CLAIMS = True
-OIDC_IDTOKEN_PROCESSING_HOOK = OIDC_USERINFO = 'myproject.oidc_provider_settings.idtoken_processing_hook'
-
 OAUTH2_PROVIDER = {
     "OIDC_ENABLED": True,
     "OIDC_RSA_PRIVATE_KEY": get_string(
