@@ -873,6 +873,10 @@ OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = "oauth2_provider.AccessToken"
 OAUTH2_PROVIDER_APPLICATION_MODEL = "oauth2_provider.Application"
 OAUTH2_PROVIDER_REFRESH_TOKEN_MODEL = "oauth2_provider.RefreshToken"
 
+OIDC_USERINFO = 'myproject.oidc_provider_settings.userinfo'
+OIDC_IDTOKEN_INCLUDE_CLAIMS = True
+OIDC_IDTOKEN_PROCESSING_HOOK = OIDC_USERINFO = 'myproject.oidc_provider_settings.idtoken_processing_hook'
+
 OAUTH2_PROVIDER = {
     "OIDC_ENABLED": True,
     "OIDC_RSA_PRIVATE_KEY": get_string(
@@ -889,6 +893,7 @@ OAUTH2_PROVIDER = {
         # "digitalcredentials": "Can read and write Digital Credentials data",
     },
     "DEFAULT_SCOPES": ["user:read"],
+    "OAUTH2_VALIDATOR_CLASS": "main.oidc_provider_settings.CustomOAuth2Validator",
     # "SCOPES_BACKEND_CLASS": "mitol.oauth_toolkit_extensions.backends.ApplicationAccessOrSettingsScopes",
     "ERROR_RESPONSE_WITH_SCOPES": DEBUG,
     "ALLOWED_REDIRECT_URI_SCHEMES": get_delimited_list(
