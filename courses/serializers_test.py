@@ -46,6 +46,7 @@ def test_base_program_serializer():
         "title": program.title,
         "readable_id": program.readable_id,
         "id": program.id,
+        "type": "program",
     }
 
 
@@ -99,6 +100,7 @@ def test_base_course_serializer():
         "title": course.title,
         "readable_id": course.readable_id,
         "id": course.id,
+        "type": "course",
     }
 
 
@@ -183,6 +185,7 @@ def test_serialize_course_with_page_fields(
             "title": course.title,
             "readable_id": course.readable_id,
             "id": course.id,
+            "type": "course",
             "feature_image_src": fake_image_src,
             "page_url": None,
             "financial_assistance_form_url": expected_financial_assistance_url,

@@ -6,7 +6,6 @@ from urllib.parse import urljoin
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.templatetags.static import static
-from flexiblepricing.api import is_courseware_flexible_price_approved
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -14,8 +13,10 @@ from cms.models import CoursePage
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
+from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
 from ecommerce.models import Product
 from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSerializer
+from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
@@ -45,15 +46,26 @@ def _get_thumbnail_url(page):
 class BaseCourseSerializer(serializers.ModelSerializer):
     """Basic course model serializer"""
 
+    type = serializers.SerializerMethodField(read_only=True)
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         if not self.context.get("include_page_fields") or not hasattr(instance, "page"):
             return data
         return {**data, **CoursePageSerializer(instance=instance.page).data}
 
+    @staticmethod
+    def get_type(obj):
+        return CONTENT_TYPE_MODEL_COURSE
+
     class Meta:
         model = models.Course
-        fields = ["id", "title", "readable_id"]
+        fields = [
+            "id",
+            "title",
+            "readable_id",
+            "type",
+        ]
 
 
 class ProductRelatedField(serializers.RelatedField):
@@ -242,9 +254,15 @@ class CourseRunDetailSerializer(serializers.ModelSerializer):
 class BaseProgramSerializer(serializers.ModelSerializer):
     """Basic program model serializer"""
 
+    type = serializers.SerializerMethodField(read_only=True)
+
+    @staticmethod
+    def get_type(obj):
+        return CONTENT_TYPE_MODEL_PROGRAM
+
     class Meta:
         model = models.Program
-        fields = ["title", "readable_id", "id"]
+        fields = ["title", "readable_id", "id", "type"]
 
 
 class ProgramSerializer(serializers.ModelSerializer):

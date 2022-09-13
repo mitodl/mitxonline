@@ -1,4 +1,4 @@
-import { CrudFilters, HttpError, useInvalidate } from "@pankod/refine-core";
+import { CrudFilters, HttpError, useInvalidate, useList } from "@pankod/refine-core";
 import React from "react"
 const { useState } = React;
 import {
@@ -54,7 +54,26 @@ const FlexiblePricingStatuses = [
 
 const FlexiblePricingStatusText = "Select Status";
 
+const FlexiblePricingSelectCoursewareText = "Select Course/Program";
+
 const FlexiblePricingFilterForm: React.FC<{ formProps: FormProps }> = ({ formProps }) => {
+
+    const FlexiblePricingCoursewareList: any[] | undefined = [];
+    const CoursewareList = useList({
+        resource: "flexible_pricing/applications_admin",
+    });
+    if (CoursewareList.data) {
+        CoursewareList.data.data.map(item => {
+            const index = FlexiblePricingCoursewareList.findIndex(object => object.label === item.courseware.readable_id);
+            if (index === -1) {
+                FlexiblePricingCoursewareList.push({
+                    'label': item.courseware.readable_id,
+                    'value': item.courseware.type + ':' + item.courseware.id
+                })
+            }
+        })
+    }
+
     return (
         <Form layout="inline" {...formProps}>
             <Form.Item label="Search by Name" name="q">
@@ -65,6 +84,13 @@ const FlexiblePricingFilterForm: React.FC<{ formProps: FormProps }> = ({ formPro
                     style={{ minWidth: 200 }}
                     placeholder={FlexiblePricingStatusText}
                     options={FlexiblePricingStatuses}
+                    allowClear={true} />
+            </Form.Item>
+            <Form.Item label="Search by Course/Program" name="courseware">
+                <Select
+                    style={{ minWidth: 250 }}
+                    placeholder={FlexiblePricingSelectCoursewareText}
+                    options={FlexiblePricingCoursewareList}
                     allowClear={true} />
             </Form.Item>
             <Form.Item>
@@ -109,7 +135,7 @@ export const FlexiblePricingList: React.FC = () => {
         resource: 'flexible_pricing/applications_admin',
         onSearch: (params) => {
             const filters: CrudFilters = [];
-            const { q, status } = params;
+            const { q, status, courseware } = params;
 
             filters.push({
                 field: 'q',
@@ -121,6 +147,12 @@ export const FlexiblePricingList: React.FC = () => {
                 field: 'status',
                 operator: 'eq',
                 value: status
+            });
+
+            filters.push({
+                field: 'courseware',
+                operator: 'eq',
+                value: courseware
             });
 
             return filters;
@@ -169,7 +201,7 @@ export const FlexiblePricingList: React.FC = () => {
 
             <Row gutter={[10, 10]}>
                 <Col sm={24}>
-                    <List 
+                    <List
                         title="Flexible Pricing Requests"
                         pageHeaderProps={{ subTitle: <RefreshTableButton isFetching={tableQueryResult.isFetching} refreshList={refreshList} /> }}
                     >
