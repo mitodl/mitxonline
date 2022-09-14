@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.45.0 (Released September 14, 2022)
+--------------
+
+- design tweaks on order/product/dashboard pages
+- 842: sync-coursrun-upgrade-deadline-with-edx (#919)
+- Adds a check to make sure flexible pricing forms have the right fields in them
+- Online-941 Filter zero value discounts on checkout (#958)
+- Online-943 Update course start string (#946)
+
 Version 0.44.0 (Released September 09, 2022)
 --------------
 
