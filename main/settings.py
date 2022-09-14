@@ -889,6 +889,7 @@ OAUTH2_PROVIDER = {
         # "digitalcredentials": "Can read and write Digital Credentials data",
     },
     "DEFAULT_SCOPES": ["user:read"],
+    "OAUTH2_VALIDATOR_CLASS": "main.oidc_provider_settings.CustomOAuth2Validator",
     # "SCOPES_BACKEND_CLASS": "mitol.oauth_toolkit_extensions.backends.ApplicationAccessOrSettingsScopes",
     "ERROR_RESPONSE_WITH_SCOPES": DEBUG,
     "ALLOWED_REDIRECT_URI_SCHEMES": get_delimited_list(

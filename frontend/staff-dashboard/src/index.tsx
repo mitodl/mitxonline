@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom";
 import {AuthProvider} from "react-oidc-context";
+import { User } from "oidc-client-ts";
 
 import reportWebVitals from "./reportWebVitals";
 import App from "./App";

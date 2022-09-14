@@ -1,23 +1,32 @@
 import { AuthProvider } from "@pankod/refine-core";
-import {useAuth} from "react-oidc-context";
+import { useAuth } from "react-oidc-context";
 
 export function useAuthProvider(): AuthProvider {
   const auth = useAuth()
   return {
     login: async () => {
-      let result = await auth.signinPopup();
-      return Promise.resolve();
+      if (!auth.isAuthenticated && !auth.activeNavigator && !auth.isLoading) {
+        let result = await auth.signinPopup()
+        if (result && result.profile["is_staff"] === true) {
+          return Promise.resolve();
+        }
+      }
+      return Promise.reject();
+
     },
     logout: async () => {
       await auth.removeUser();
       return Promise.resolve();
     },
-    checkError: async () => Promise.resolve(),
+    checkError: async () => {
+      return Promise.resolve();
+    },
     checkAuth: async () => {
-      if (auth.isAuthenticated) {
+      let _ = require("lodash");
+      if (auth.isAuthenticated && auth.user && _.get(auth.user, "profile.is_staff") === true) {
         return Promise.resolve();
       }
-      return Promise.reject()
+      return Promise.reject();
     },
     getPermissions: () => Promise.resolve(),
     getUserIdentity: async () => {
