@@ -55,6 +55,7 @@ class FlexiblePricingRequestSubmissionAdmin(admin.ModelAdmin):
 
 class FlexiblePriceTierAdmin(admin.ModelAdmin):
     """Admin for FlexiblePriceTier"""
+
     model = FlexiblePriceTier
     list_display = (
         "id",
@@ -62,7 +63,7 @@ class FlexiblePriceTierAdmin(admin.ModelAdmin):
         "courseware_content_type",
         "discount",
         "income_threshold_usd",
-        "current"
+        "current",
     )
 
 
