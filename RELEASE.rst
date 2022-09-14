@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.45.0
+Version 0.45.0 (Released September 14, 2022)
 --------------
 
 - design tweaks on order/product/dashboard pages
