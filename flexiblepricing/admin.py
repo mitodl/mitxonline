@@ -32,6 +32,13 @@ class FlexiblePriceAdmin(VersionAdmin):
     """Admin for FlexiblePrice"""
 
     model = FlexiblePrice
+    list_display = (
+        "id",
+        "user",
+        "courseware_object_id",
+        "courseware_content_type",
+        "tier",
+    )
     raw_id_fields = ("user",)
 
     def has_delete_permission(
@@ -47,7 +54,16 @@ class FlexiblePricingRequestSubmissionAdmin(admin.ModelAdmin):
 
 
 class FlexiblePriceTierAdmin(admin.ModelAdmin):
+    """Admin for FlexiblePriceTier"""
     model = FlexiblePriceTier
+    list_display = (
+        "id",
+        "courseware_object_id",
+        "courseware_content_type",
+        "discount",
+        "income_threshold_usd",
+        "current"
+    )
 
 
 admin.site.register(CountryIncomeThreshold, CountryIncomeThresholdAdmin)
