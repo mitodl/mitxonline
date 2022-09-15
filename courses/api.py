@@ -36,7 +36,7 @@ from courses.models import (
     Course,
 )
 from courses.tasks import subscribe_edx_course_emails
-from courses.utils import exception_logging_generator
+from courses.utils import exception_logging_generator, is_grade_valid
 from openedx.api import (
     enroll_in_edx_course_runs,
     get_edx_api_course_detail_client,
@@ -784,7 +784,7 @@ def override_user_grade(user, override_grade, courseware_id, should_force_pass=F
         (CourseRunGrade): The updates grade of the user
     """
 
-    if override_grade and (override_grade < 0.0 or override_grade > 1.0):
+    if not is_grade_valid(override_grade):
         raise ValidationError("Invalid value for grade. Allowed range: 0.0 - 1.0")
 
     with transaction.atomic():

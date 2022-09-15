@@ -1,6 +1,30 @@
 """
-Management command to revoke and un revoke a certificate for a course run or program for the given user.
+Management command to revoke, un revoke or create a certificate for a course run for the given User
+or Users when no user is provided.
+
+Check the usages of this command below:
+
+**Certificate Creation**
+
+1. Sync grades with edX and generate certificates. (For all users)
+./manage.py manage_certificates -—create -—run=<course_run_courseware_id>
+
+2. Sync grades with edX and generate certificate. (For single user)
+./manage.py manage_certificates —-create -—run=<course_run_courseware_id> -—user=<username or email>
+
+3. Override grade for a user and generate certificate. (For single user, will force create the certificate for the user)
+./manage.py manage_certificates -—create  -—run=<course_run_courseware_id> —-user=<username or email> -—grade=<a float value between 0.0-1.0>
+
+**Revoke/Un-revoke Certificates**
+
+4. Revoke a certificate (Only available for single user)
+./mange.py manage_certificates -—revoke -—user=<username or email> -—run=<course_run_courseware_id>
+
+5. Un-Revoke a certificate (Only available for single user)
+./mange.py manage_certificates -—unrevoke —-run=<course_run_courseware_id> -—user=<username or email>
+
 """
+
 from django.core.management.base import BaseCommand, CommandError
 from users.api import fetch_user
 from courses.api import (
@@ -9,7 +33,8 @@ from courses.api import (
     process_course_run_grade_certificate,
     override_user_grade,
 )
-from courses.models import CourseRun
+from courses.utils import is_grade_valid
+from courses.models import CourseRun, CourseRunGrade
 from openedx.api import get_edx_grades_with_users
 from django.contrib.auth import get_user_model
 
@@ -18,10 +43,15 @@ User = get_user_model()
 
 class Command(BaseCommand):
     """
-    Command to revoke/un-revoke a course run or program certificate for a specified user.
+    Invoke with:
+
+        python manage.py manage_certificates
     """
 
-    help = "Revoke and un revoke a certificate for a specified user against a program or course run."
+    help = (
+        "Revoke, un revoke or create a certificate for a course run for the given User "
+        "or Users when no user is provided"
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -60,10 +90,11 @@ class Command(BaseCommand):
         unrevoke = options.get("unrevoke")
         create = options.get("create")
         run = options.get("run")
+        override_grade = options.get("grade")
 
         if not (revoke or unrevoke) and not create:
             raise CommandError(
-                "The command needs a valid action e.g. --revoke, --unrevoke, --create"
+                "The command needs a valid action e.g. --revoke, --unrevoke, --create."
             )
         try:
             user = fetch_user(options["user"]) if options["user"] else None
@@ -72,20 +103,18 @@ class Command(BaseCommand):
 
         # A run is needed for revoke/un-revoke and certificate creation
         if not run:
-            raise CommandError("The command needs a valid course run")
+            raise CommandError("The command needs a valid course run.")
 
         # Unable to obtain a run object based on the provided courseware id
         try:
-            course_run = CourseRun.objects.get(courseware_id=options["run"])
+            course_run = CourseRun.objects.get(courseware_id=run)
         except CourseRun.DoesNotExist:
-            raise CommandError(
-                "Could not find run with courseware_id={}".format(options["run"])
-            )
+            raise CommandError("Could not find run with courseware_id={}.".format(run))
 
         # Handle revoke/un-revoke of a certificate
         if revoke or unrevoke:
             if not user:
-                raise CommandError("Revoke/Un-revoke operation needs a valid user")
+                raise CommandError("Revoke/Un-revoke operation needs a valid user.")
 
             revoke_status = manage_course_run_certificate_access(
                 user=user,
@@ -97,26 +126,28 @@ class Command(BaseCommand):
                 self.stdout.write(
                     self.style.SUCCESS(
                         "Certificate for {} has been {}".format(
-                            "run: {}".format(run), "revoked" if revoke else "un-revoked"
+                            "run: {}".format(run),
+                            "revoked." if revoke else "un-revoked.",
                         )
                     )
                 )
             else:
                 self.stdout.write(self.style.WARNING("No changes made."))
 
-        # Handle the creation of the certificates
+        # Handle the creation of the certificates.
+        # Also check if the certificate creation was requested with grade override. (Generally useful when we want to
+        # create a certificate for a user while overriding the grade value)
         elif create:
-            override_grade = options.get("grade")
 
-            if override_grade and (override_grade < 0.0 or override_grade > 1.0):
-                raise CommandError("Invalid value for grade. Allowed range: 0.0 - 1.0")
+            if override_grade and not is_grade_valid(override_grade):
+                raise CommandError("Invalid value for grade. Allowed range: 0.0 - 1.0.")
 
             if override_grade and not user:
                 raise CommandError(
-                    "Override grade needs a user (The grade override operation is not supported for multiple users)"
+                    "Override grade needs a user (The grade override operation is not supported for multiple users)."
                 )
 
-            # If user=None, Grades for all users in this runs will be fetched
+            # If user=None, Grades for all users in the run will be fetched
             edx_grade_user_iter = get_edx_grades_with_users(course_run, user=user)
 
             results = []

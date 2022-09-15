@@ -10,6 +10,7 @@ from courses.factories import (
     CourseRunFactory,
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
+    CourseRunGradeFactory,
 )
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from edx_api.grades.models import CurrentGrade
@@ -34,7 +35,7 @@ def test_certificate_management_no_argument():
         manage_certificates.Command().handle()
     assert (
         str(command_error.value)
-        == "The command needs a valid action e.g. --revoke, --unrevoke, --create"
+        == "The command needs a valid action e.g. --revoke, --unrevoke, --create."
     )
 
 
@@ -44,13 +45,13 @@ def test_certificate_management_invalid_run():
     test_user = UserFactory.create()
     with pytest.raises(CommandError) as command_error:
         manage_certificates.Command().handle(user=test_user.username, create=True)
-    assert str(command_error.value) == "The command needs a valid course run"
+    assert str(command_error.value) == "The command needs a valid course run."
 
     with pytest.raises(CommandError) as command_error:
         manage_certificates.Command().handle(
             user=test_user.username, create=True, run="test"
         )
-    assert str(command_error.value) == "Could not find run with courseware_id=test"
+    assert str(command_error.value) == "Could not find run with courseware_id=test."
 
 
 def test_certificate_override_grade_no_user():
@@ -63,7 +64,7 @@ def test_certificate_override_grade_no_user():
         )
     assert (
         str(command_error.value)
-        == "Override grade needs a user (The grade override operation is not supported for multiple users)"
+        == "Override grade needs a user (The grade override operation is not supported for multiple users)."
     )
 
 
@@ -89,7 +90,7 @@ def test_certificate_management_revoke_unrevoke_invalid_args(
             unrevoke=unrevoke,
             run=course_run.courseware_id,
         )
-    assert str(command_error.value) == "Revoke/Un-revoke operation needs a valid user"
+    assert str(command_error.value) == "Revoke/Un-revoke operation needs a valid user."
 
 
 @pytest.mark.parametrize(
