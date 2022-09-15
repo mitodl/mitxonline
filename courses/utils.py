@@ -18,3 +18,7 @@ def exception_logging_generator(generator):
             log.exception("EdX API error for fetching user grades %s:", exc)
         except Exception as exp:  # pylint: disable=broad-except
             log.exception("Error fetching user grades from edX %s:", exp)
+
+
+def is_grade_valid(override_grade: float):
+    return 0.0 <= override_grade <= 1.0

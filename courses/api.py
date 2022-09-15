@@ -36,7 +36,7 @@ from courses.models import (
     Course,
 )
 from courses.tasks import subscribe_edx_course_emails
-from courses.utils import exception_logging_generator
+from courses.utils import exception_logging_generator, is_grade_valid
 from openedx.api import (
     enroll_in_edx_course_runs,
     get_edx_api_course_detail_client,
@@ -637,13 +637,13 @@ def is_program_text_id(item_text_id):
     return item_text_id.startswith(PROGRAM_TEXT_ID_PREFIX)
 
 
-def process_course_run_grade_certificate(course_run_grade):
+def process_course_run_grade_certificate(course_run_grade, should_force_create=False):
     """
     Ensure that the course run certificate is in line with the values in the course run grade
 
     Args:
         course_run_grade (courses.models.CourseRunGrade): The course run grade for which to generate/delete the certificate
-
+        should_force_create (bool): If True, it will force the certificate creation without matching criteria
     Returns:
         Tuple[ CourseRunCertificate, bool, bool ]: A Tuple containing None or CourseRunCertificate object,
             A bool representing if the certificate is created, A bool representing if a certificate is deleted
@@ -653,7 +653,7 @@ def process_course_run_grade_certificate(course_run_grade):
 
     # A grade of 0.0 indicates that the certificate should be deleted
     should_delete = not bool(course_run_grade.grade)
-    should_create = course_run_grade.is_certificate_eligible
+    should_create = course_run_grade.is_certificate_eligible or should_force_create
 
     if should_delete:
         delete_count, _ = CourseRunCertificate.objects.filter(
@@ -737,3 +737,64 @@ def generate_course_run_certificates():
         log.info(
             f"Finished processing course run {run}: created grades for {created_grades_count} users, updated grades for {updated_grades_count} users, generated certificates for {generated_certificates_count} users"
         )
+
+
+def manage_course_run_certificate_access(user, courseware_id, revoke_state):
+    """
+    Revokes/Un-Revokes a course run certificate.
+
+    Args:
+        user (User): a Django user.
+        courseware_id (str): A string representing the course run's courseware_id.
+        revoke_state (bool): A flag representing True(Revoke), False(Un-Revoke)
+
+    Returns:
+        bool: A boolean representing the revoke/unrevoke success
+    """
+    course_run = CourseRun.objects.get(courseware_id=courseware_id)
+
+    try:
+        course_run_certificate = CourseRunCertificate.all_objects.get(
+            user=user, course_run=course_run
+        )
+    except CourseRunCertificate.DoesNotExist:
+        log.warning(
+            "Course run certificate for user: %s and course_run: %s does not exist.",
+            user.username,
+            course_run,
+        )
+        return False
+
+    course_run_certificate.is_revoked = revoke_state
+    course_run_certificate.save()
+
+    return True
+
+
+def override_user_grade(user, override_grade, courseware_id, should_force_pass=False):
+    """Override grade for a user
+
+    Args:
+        user (User): a Django user.
+        courseware_id (str): A string representing the course run's courseware_id.
+        override_grade (float): A float value for the grade override between (0.0 and 1.0) - 0.0 would mean passed=False
+        should_force_pass (bool): A flag representing if user should mark as passed forcefully (In this case we don't know
+        the grading policy based in edX so we manually take a value for forcing the passed status)
+    Returns:
+        (CourseRunGrade): The updates grade of the user
+    """
+
+    if not is_grade_valid(override_grade):
+        raise ValidationError("Invalid value for grade. Allowed range: 0.0 - 1.0")
+
+    with transaction.atomic():
+        course_run_grade = CourseRunGrade.objects.select_for_update().get(
+            user=user, course_run__courseware_id=courseware_id
+        )
+        course_run_grade.grade = override_grade
+        course_run_grade.passed = bool(override_grade) if should_force_pass else False
+        course_run_grade.letter_grade = None
+        course_run_grade.set_by_admin = True
+        course_run_grade.save_and_log(None)
+
+    return course_run_grade
