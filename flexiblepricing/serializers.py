@@ -161,3 +161,58 @@ class FlexiblePriceAdminSerializer(serializers.ModelSerializer):
         Returns income information associated with a flexible price request.
         """
         return FlexiblePriceIncomeSerializer(instance=instance).data
+
+
+class FlexiblePriceCoursewareAdminSerializer(serializers.ModelSerializer):
+    """
+    Serializer for coursewares in flexible price requests
+    """
+
+    id = serializers.SerializerMethodField()
+    title = serializers.SerializerMethodField()
+    readable_id = serializers.SerializerMethodField()
+    type = serializers.SerializerMethodField()
+
+    def get_courseware_object(self, instance):
+        course_content_type = ContentType.objects.get(
+            app_label="courses", model="course"
+        ).id
+        program_content_type = ContentType.objects.get(
+            app_label="courses", model="program"
+        ).id
+        if instance["courseware_content_type"] == course_content_type:
+            return BaseCourseSerializer(
+                Course.objects.filter(id=instance["courseware_object_id"]).first()
+            ).data
+        elif instance["courseware_content_type"] == program_content_type:
+            return BaseProgramSerializer(
+                Program.objects.filter(id=instance["courseware_object_id"]).first()
+            ).data
+
+    def get_id(self, instance):
+        """
+        Returns serialized courseware id.
+        """
+        return self.get_courseware_object(instance)["id"]
+
+    def get_type(self, instance):
+        """
+        Returns serialized courseware type.
+        """
+        return self.get_courseware_object(instance)["type"]
+
+    def get_readable_id(self, instance):
+        """
+        Returns serialized courseware readable id.
+        """
+        return self.get_courseware_object(instance)["readable_id"]
+
+    def get_title(self, instance):
+        """
+        Returns serialized courseware title.
+        """
+        return self.get_courseware_object(instance)["title"]
+
+    class Meta:
+        model = models.FlexiblePrice
+        fields = ["id", "title", "readable_id", "type"]
