@@ -7,8 +7,6 @@
     ":separateMajorReleases",
     "config:base",
     "docker:disable",
-  ],
-  "group": [
     "group:allNonMajor",
     "group:nodeJs",
   ],
