@@ -7,6 +7,7 @@ from flexiblepricing.views.v0 import (
     CountryIncomeThresholdViewSet,
     FlexiblePriceViewSet,
     FlexiblePriceAdminViewSet,
+    FlexiblePriceCoursewareViewSet,
 )
 
 
@@ -30,6 +31,12 @@ router.register(
     r"applications_admin",
     FlexiblePriceAdminViewSet,
     basename="fp_admin_flexiblepricing_api",
+)
+
+router.register(
+    r"coursewares",
+    FlexiblePriceCoursewareViewSet,
+    basename="fp_flexiblepricing_coursewares_api",
 )
 
 urlpatterns = [

@@ -60,17 +60,14 @@ const FlexiblePricingFilterForm: React.FC<{ formProps: FormProps }> = ({ formPro
 
     const FlexiblePricingCoursewareList: any[] | undefined = [];
     const CoursewareList = useList({
-        resource: "flexible_pricing/applications_admin",
+        resource: "flexible_pricing/coursewares",
     });
     if (CoursewareList.data) {
         CoursewareList.data.data.map(item => {
-            const index = FlexiblePricingCoursewareList.findIndex(object => object.label === item.courseware.readable_id);
-            if (index === -1) {
-                FlexiblePricingCoursewareList.push({
-                    'label': item.courseware.readable_id,
-                    'value': item.courseware.type + ':' + item.courseware.id
-                })
-            }
+            FlexiblePricingCoursewareList.push({
+                'label': item.readable_id,
+                'value': item.type + ':' + item.id
+            })
         })
     }
 

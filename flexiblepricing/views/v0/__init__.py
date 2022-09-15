@@ -41,6 +41,20 @@ class FlexiblePriceViewSet(ModelViewSet):
         return models.FlexiblePrice.objects.filter(user=self.request.user).all()
 
 
+class FlexiblePriceCoursewareViewSet(ModelViewSet):
+    serializer_class = serializers.FlexiblePriceCoursewareAdminSerializer
+    authentication_classes = (SessionAuthentication, TokenAuthentication)
+    permission_classes = (IsAdminUser,)
+
+    def get_queryset(self):
+        return (
+            models.FlexiblePrice.objects.all()
+            .values("courseware_content_type", "courseware_object_id")
+            .distinct()
+            .order_by("courseware_content_type", "courseware_object_id")
+        )
+
+
 class FlexiblePriceAdminViewSet(ModelViewSet):
     serializer_class = serializers.FlexiblePriceAdminSerializer
     authentication_classes = (SessionAuthentication, TokenAuthentication)
