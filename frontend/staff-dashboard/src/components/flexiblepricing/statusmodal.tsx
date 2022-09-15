@@ -9,34 +9,14 @@ import {
 
 import { IDiscount, IFlexiblePriceRequest, IFlexiblePriceStatusModalProps } from "interfaces";
 import { formatDiscount } from "utils";
-import { financialAssistanceRequestStatus } from "../../constants";
+import {
+    All_Justifications,
+    Approved_Justifications,
+    Denied_Justifications,
+    DOCUMENTS_IN_ORDER,
+    financialAssistanceRequestStatus
+} from "../../constants";
 
-const All_Justifications = [
-    {
-        label: '',
-        value: '',
-    },
-    {
-        label: 'Documents in order',
-        value: 'Documents in order'
-    },
-    {
-        label: 'Docs not notarized',
-        value: 'Docs not notarized'
-    },
-    {
-        label: 'Insufficient docs',
-        value: 'Insufficient docs'
-    },
-    {
-        label: 'Inaccurate income reported',
-        value: 'Inaccurate income reported'
-    },
-    { 
-        label: 'Inaccurate country reported',
-        value: 'Inaccurate country reported'
-    },
-];
 
 
 export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps> = (props) => {
@@ -47,8 +27,18 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
     let [ emailSubject, setEmailSubject ] = useState("");
     let [ emailBody, setEmailBody ] = useState("");
 
-    let [ justification, setJustification ] = useState(modaldata.justification);
-    !justification && status === financialAssistanceRequestStatus.approved ? setJustification("Documents in order") : null
+    const [ justification, setJustification ] = useState(modaldata.justification);
+
+    // set justification here to overwrite the prior state
+    if (justification != DOCUMENTS_IN_ORDER && status === financialAssistanceRequestStatus.approved) {
+        setJustification(DOCUMENTS_IN_ORDER);
+    }
+    else if (justification == DOCUMENTS_IN_ORDER && status === financialAssistanceRequestStatus.denied){
+       setJustification("");
+    }
+    else if (justification !== "" && status === financialAssistanceRequestStatus.reset){
+       setJustification("");
+    }
 
     const [ discount, setDiscount ] = useState(modaldata.discount);
     let discount_choices = [];
@@ -66,7 +56,7 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
     }
 
     const handleOk = () => {
-        if (justification.length === 0) {
+        if (justification.length === 0 && status !== financialAssistanceRequestStatus.reset) {
             displayToast({
                 message: "Please choose a justification.",
                 description: "Error",
@@ -162,7 +152,7 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
                 <Select 
                     onChange={(e) => handleChangeJustification(e)} 
                     style={{ marginLeft: "20px", 'width': '20rem' }}
-                    options={All_Justifications}
+                    options={ status === financialAssistanceRequestStatus.approved ? Approved_Justifications: status === financialAssistanceRequestStatus.denied?  Denied_Justifications : All_Justifications}
                     defaultValue={justification}
                 >
                 </Select>
