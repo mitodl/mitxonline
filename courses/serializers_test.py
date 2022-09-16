@@ -53,9 +53,9 @@ def test_base_program_serializer():
 def test_serialize_program(mock_context):
     """Test Program serialization"""
     program = ProgramFactory.create()
-    run1 = CourseRunFactory.create(course__program=program)
+    run1 = CourseRunFactory.create(course__program=program, course__page=None)
     course1 = run1.course
-    run2 = CourseRunFactory.create(course__program=program)
+    run2 = CourseRunFactory.create(course__program=program, course__page=None)
     course2 = run2.course
     runs = (
         [run1, run2]
@@ -114,7 +114,9 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
     if all_runs:
         mock_context["all_runs"] = True
     user = mock_context["request"].user
-    course_run = CourseRunFactory.create(course__no_program=True, live=True)
+    course_run = CourseRunFactory.create(
+        course__no_program=True, course__page=None, live=True
+    )
     course = course_run.course
     topic = "a course topic"
     course.topics.set([CourseTopic.objects.create(name=topic)])
@@ -199,7 +201,7 @@ def test_serialize_course_with_page_fields(
 
 def test_serialize_course_run():
     """Test CourseRun serialization"""
-    course_run = CourseRunFactory.create()
+    course_run = CourseRunFactory.create(course__page=None)
     course_run.refresh_from_db()
 
     data = CourseRunSerializer(course_run).data
@@ -227,7 +229,7 @@ def test_serialize_course_run():
 
 def test_serialize_course_run_detail():
     """Test CourseRunDetailSerializer serialization"""
-    course_run = CourseRunFactory.create()
+    course_run = CourseRunFactory.create(course__page=None)
     data = CourseRunDetailSerializer(course_run).data
 
     assert data == {
@@ -253,9 +255,7 @@ def test_serialize_course_run_detail():
 def test_serialize_course_run_enrollments(settings, receipts_enabled):
     """Test that CourseRunEnrollmentSerializer has correct data"""
     settings.ENABLE_ORDER_RECEIPTS = receipts_enabled
-    course = CourseFactory.create()
-    course_run = CourseRunFactory.create(course=course)
-    course_run_enrollment = CourseRunEnrollmentFactory.create(run=course_run)
+    course_run_enrollment = CourseRunEnrollmentFactory.create()
     serialized_data = CourseRunEnrollmentSerializer(course_run_enrollment).data
     assert serialized_data == {
         "run": CourseRunDetailSerializer(course_run_enrollment.run).data,
@@ -315,9 +315,7 @@ def test_serialize_program_enrollments(settings, receipts_enabled):
 @pytest.mark.parametrize("approved_flexible_price_exists", [True, False])
 def test_serialize_course_run_enrollments(approved_flexible_price_exists):
     """Test that CourseRunEnrollmentSerializer has correct data"""
-    course = CourseFactory.create()
-    course_run = CourseRunFactory.create(course=course)
-    course_run_enrollment = CourseRunEnrollmentFactory.create(run=course_run)
+    course_run_enrollment = CourseRunEnrollmentFactory.create()
     if approved_flexible_price_exists:
         status = FlexiblePriceStatus.APPROVED
     else:

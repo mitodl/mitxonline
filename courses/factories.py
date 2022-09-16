@@ -66,7 +66,7 @@ class CourseFactory(DjangoModelFactory):
 class CourseRunFactory(DjangoModelFactory):
     """Factory for CourseRuns"""
 
-    course = factory.SubFactory(CourseFactory, page=None)
+    course = factory.SubFactory(CourseFactory)
     title = factory.LazyAttribute(lambda x: "CourseRun " + FAKE.sentence())
     courseware_id = factory.Sequence(
         lambda number: "course:/v{}/{}".format(number, FAKE.slug())
