@@ -3,7 +3,7 @@ bpython
 codecov
 ddt
 django-debug-toolbar
-factory_boy~=3.2
+factory-boy==3.2.0
 faker
 flaky
 freezegun==0.3.14
