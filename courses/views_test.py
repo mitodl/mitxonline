@@ -306,9 +306,7 @@ def test_course_runs_not_live_in_courses_api(client, live):
 def test_user_enrollments_list(user_drf_client, user):
     """The user enrollments view should return serialized enrollments for the logged-in user"""
     assert UserEnrollmentsApiViewSet.serializer_class == CourseRunEnrollmentSerializer
-    course = CourseFactory.create()
-    course_run = CourseRunFactory.create(course=course)
-    user_run_enrollment = CourseRunEnrollmentFactory.create(run=course_run, user=user)
+    user_run_enrollment = CourseRunEnrollmentFactory.create(user=user)
     resp = user_drf_client.get(reverse("user-enrollments-api-list"))
     assert resp.status_code == status.HTTP_200_OK
     assert_drf_json_equal(

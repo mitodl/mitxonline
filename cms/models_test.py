@@ -89,7 +89,7 @@ def test_course_page_context(
     request.user = staff_user if is_authenticated else AnonymousUser()
     if has_relevant_run:
         run = CourseRunFactory.create(
-            course__readable_id=FAKE_READABLE_ID, in_future=True
+            course__page=None, course__readable_id=FAKE_READABLE_ID, in_future=True
         )
         course_page_kwargs = dict(course=run.course)
     else:
