@@ -380,17 +380,29 @@ def test_create_transaction_with_no_transaction_id():
 
 
 @pytest.mark.parametrize(
-    "discount_type",
-    [DISCOUNT_TYPE_DOLLARS_OFF, DISCOUNT_TYPE_FIXED_PRICE, DISCOUNT_TYPE_PERCENT_OFF],
+    "discount_type, less_than_zero",
+    [
+        [DISCOUNT_TYPE_DOLLARS_OFF, False],
+        [DISCOUNT_TYPE_DOLLARS_OFF, True],
+        [DISCOUNT_TYPE_FIXED_PRICE, False],
+        [DISCOUNT_TYPE_PERCENT_OFF, False],
+    ],
 )
-def test_discount_product_calculation(user, unlimited_discount, discount_type):
+def test_discount_product_calculation(
+    user, unlimited_discount, discount_type, less_than_zero
+):
     product = ProductFactory.create()
     unlimited_discount.discount_type = discount_type
+
+    if less_than_zero and discount_type == DISCOUNT_TYPE_DOLLARS_OFF:
+        unlimited_discount.amount += product.price
 
     discounted_amount = unlimited_discount.discount_product(product)
 
     if unlimited_discount.discount_type == DISCOUNT_TYPE_DOLLARS_OFF:
-        assert discounted_amount == product.price - unlimited_discount.amount
+        calculated_amount = product.price - Decimal(unlimited_discount.amount)
+        calculated_amount = 0 if calculated_amount < 0 else calculated_amount
+        assert discounted_amount == calculated_amount
     elif unlimited_discount.discount_type == DISCOUNT_TYPE_FIXED_PRICE:
         assert discounted_amount == unlimited_discount.amount
     elif unlimited_discount.discount_type == DISCOUNT_TYPE_PERCENT_OFF:
