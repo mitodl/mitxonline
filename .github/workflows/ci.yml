@@ -129,7 +129,7 @@ jobs:
           SECRET_KEY: local_unsafe_key
 
       - name: Upload coverage to CodeCov
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
 
@@ -183,6 +183,6 @@ jobs:
           NODE_ENV: production
 
       - name: Upload test coverage to CodeCov
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v3
         with:
           file: coverage/lcov.info
