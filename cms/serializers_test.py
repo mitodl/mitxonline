@@ -49,7 +49,7 @@ def test_serialize_course_page(
         {
             "feature_image_src": fake_image_src,
             "page_url": course_page.url,
-            "financial_assistance_form_url": financial_assistance_page.get_url(),
+            "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_page.slug}/",
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
@@ -63,7 +63,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
 ):
     """
     Tests course page serialization with Financial Assistance form which has a fk relationship to
-    a program, but no parent-child relationship with any course or program.
+    a program, it also has parent-child relationship with program.
     """
     fake_image_src = "http://example.com/my.img"
     mocker.patch("cms.serializers.get_wagtail_img_src", return_value=fake_image_src)
@@ -88,7 +88,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
         {
             "feature_image_src": fake_image_src,
             "page_url": course_page.url,
-            "financial_assistance_form_url": financial_assistance_form.get_url(),
+            "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_form.slug}/",
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
@@ -126,7 +126,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_no_parent(
         {
             "feature_image_src": fake_image_src,
             "page_url": course_page.url,
-            "financial_assistance_form_url": financial_assistance_form.get_url(),
+            "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
@@ -164,7 +164,7 @@ def test_serialize_course_page_with_flex_price_form_as_program_child(
         {
             "feature_image_src": fake_image_src,
             "page_url": course_page.url,
-            "financial_assistance_form_url": financial_assistance_page.get_url(),
+            "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_page.slug}/",
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
@@ -200,7 +200,7 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
         {
             "feature_image_src": fake_image_src,
             "page_url": course_page.url,
-            "financial_assistance_form_url": financial_assistance_form.get_url(),
+            "financial_assistance_form_url": f"{course_page.get_url()}{financial_assistance_form.slug}/",
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
