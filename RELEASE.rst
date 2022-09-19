@@ -1,6 +1,21 @@
 Release Notes
 =============
 
+Version 0.45.1 (Released September 19, 2022)
+--------------
+
+- fixed course/program filter for flexible pricing request
+- Fix renovate config
+- Add renovate.json5
+- updated justifications based on action for flexible pricing requests in refine admin
+- feat: Add command for certificate management (#897)
+- Adding list_display for FlexiblePriceAdmin (#971)
+- 942: unauthorized user can access staff dashboard (#969)
+- added course/program filter to flexible pricing request on dashboard
+- added legacy grades migration, updated enrollment
+- Updates product pages to allow for price widget display based on flexible pricing submission and status; added some helper stuff for calculating discounted amounts for arbitrary products
+- Adds a refresh button to the Flexible Pricing Request list page in staff dashboard
+
 Version 0.45.0 (Released September 14, 2022)
 --------------
 
