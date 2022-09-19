@@ -3,31 +3,31 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@craco/craco": "^6.4.3",
+    "@craco/craco": "6.4.3",
     "@pankod/refine-antd": "3.22.1",
     "@pankod/refine-core": "3.22.1",
     "@pankod/refine-react-router-v6": "3.22.1",
     "@pankod/refine-simple-rest": "3.22.1",
-    "@testing-library/jest-dom": "^5.16.4",
-    "@testing-library/react": "^13.0.1",
-    "@testing-library/user-event": "^14.1.0",
-    "@types/jest": "^27.4.1",
-    "@types/node": "^17.0.24",
-    "@types/react": "^17.0.2",
-    "@types/react-dom": "^17.0.2",
-    "craco-less": "^2.0.0",
-    "eslint-config-react": "^1.1.7",
-    "oidc-client-ts": "^2.0.3",
-    "react": "^17.0.2",
-    "react-dom": "^17.0.2",
-    "react-markdown": "^8.0.2",
-    "react-mde": "^11.5.0",
-    "react-oidc-context": "^2.1.0",
-    "react-scripts": "^5.0.1",
-    "typescript": "^4.6.3",
-    "web-vitals": "^2.1.4",
-    "webpack-bundle-tracker": "^1.6.0",
-    "webpack-merge": "^5.8.0"
+    "@testing-library/jest-dom": "5.16.4",
+    "@testing-library/react": "13.0.1",
+    "@testing-library/user-event": "14.1.0",
+    "@types/jest": "27.4.1",
+    "@types/node": "17.0.24",
+    "@types/react": "17.0.44",
+    "@types/react-dom": "17.0.15",
+    "craco-less": "2.0.0",
+    "eslint-config-react": "1.1.7",
+    "oidc-client-ts": "2.0.3",
+    "react": "17.0.2",
+    "react-dom": "17.0.2",
+    "react-markdown": "8.0.2",
+    "react-mde": "11.5.0",
+    "react-oidc-context": "2.1.0",
+    "react-scripts": "5.0.1",
+    "typescript": "4.6.3",
+    "web-vitals": "2.1.4",
+    "webpack-bundle-tracker": "1.6.0",
+    "webpack-merge": "5.8.0"
   },
   "scripts": {
     "dev": "craco start",
@@ -51,6 +51,6 @@
     ]
   },
   "devDependencies": {
-    "yarn-upgrade-all": "^0.7.1"
+    "yarn-upgrade-all": "0.7.1"
   }
 }
