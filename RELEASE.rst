@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.45.1
+Version 0.45.1 (Released September 19, 2022)
 --------------
 
 - fixed course/program filter for flexible pricing request
