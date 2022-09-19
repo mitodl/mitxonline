@@ -44,16 +44,20 @@ class CoursePageSerializer(serializers.ModelSerializer):
                 program_id=instance.product.program
             ).first()
 
-            financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
-                selected_program=instance.product.program
-            ).first()
-            if financial_assistance_page is None and program_page:
+            # for courses in program, financial assistance form from program should take precedence if exist
+            if program_page:
                 financial_assistance_page = (
                     program_page.get_children()
                     .type(FlexiblePricingRequestForm)
                     .live()
                     .first()
                 )
+                if financial_assistance_page:
+                    return f"{program_page.get_url()}{financial_assistance_page.slug}/"
+
+            financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
+                selected_program=instance.product.program
+            ).first()
 
         if financial_assistance_page is None:
             financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
@@ -65,7 +69,11 @@ class CoursePageSerializer(serializers.ModelSerializer):
                 instance.get_children().type(FlexiblePricingRequestForm).live().first()
             )
 
-        return financial_assistance_page.get_url() if financial_assistance_page else ""
+        return (
+            f"{instance.get_url()}{financial_assistance_page.slug}/"
+            if financial_assistance_page
+            else ""
+        )
 
     def get_next_run_id(self, instance):
         """Get next run id"""
