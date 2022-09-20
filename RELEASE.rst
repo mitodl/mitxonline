@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.45.2
+Version 0.45.2 (Released September 20, 2022)
 --------------
 
 - fixed the link to the flexible pricing form on the course detail popup
