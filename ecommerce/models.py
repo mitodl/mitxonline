@@ -31,7 +31,7 @@ from ecommerce.constants import (
 from users.models import User
 from decimal import Decimal
 from courses.api import create_run_enrollments
-from ecommerce.tasks import send_ecommerce_order_receipt
+from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
 from main.settings import TIME_ZONE
 
 from mitol.common.utils.datetime import now_in_utc
@@ -666,6 +666,9 @@ class FulfilledOrder(Order):
         )
         self.state = Order.STATE.REFUNDED
         self.save()
+
+        send_order_refund_email.delay(self.id)
+
         return refund_transaction
 
     class Meta:
