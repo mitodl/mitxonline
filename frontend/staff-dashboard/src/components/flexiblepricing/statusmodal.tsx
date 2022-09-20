@@ -92,7 +92,7 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
         mutate({
             resource: "flexible_pricing/applications_admin",
             id: sendableData.id,
-            mutationMode: "undoable",
+            mutationMode: "optimistic",
             values: sendableData
         });
         handleCancel();
