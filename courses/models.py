@@ -499,6 +499,11 @@ class CourseRun(TimestampedModel):
         """
         return get_course_number(self.courseware_id)
 
+    @property
+    def readable_id(self):
+        """Alias for the courseware_id so this is consistent with Course and Program"""
+        return self.courseware_id
+
     def __str__(self):
         title = f"{self.courseware_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."

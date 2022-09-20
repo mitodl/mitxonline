@@ -22,3 +22,13 @@ def perform_unenrollment_from_order(order_id):
     from ecommerce.api import unenroll_learner_from_order
 
     unenroll_learner_from_order(order_id)
+
+
+@app.task
+def send_order_refund_email(order_id):
+    from ecommerce.mail_api import send_ecommerce_refund_message
+    from ecommerce.models import Order
+
+    order = Order.objects.get(pk=order_id)
+
+    send_ecommerce_refund_message(order)
