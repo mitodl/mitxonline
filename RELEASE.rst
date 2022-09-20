@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.45.3
+--------------
+
+- data migration for certificate index page (#974)
+- fix(deps): pin dependencies
+
 Version 0.45.2 (Released September 20, 2022)
 --------------
 
