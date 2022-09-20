@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.45.3
+Version 0.45.3 (Released September 20, 2022)
 --------------
 
 - data migration for certificate index page (#974)
