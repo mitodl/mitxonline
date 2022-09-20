@@ -32,8 +32,8 @@ mitol-django-mail~=3.2.0
 mitol-django-authentication~=1.5.0
 mitol-django-openedx~=1.0.0
 mitol-django-payment-gateway~=1.6.0
-mitol-django-google-sheets~=2.4.0
-mitol-django-google-sheets-refunds~=0.5.2
+mitol-django-google-sheets~=2.5.0
+mitol-django-google-sheets-refunds~=0.6.0
 newrelic
 pyOpenSSL
 psycopg2
