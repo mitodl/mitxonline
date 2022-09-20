@@ -24,12 +24,12 @@ def fix_certificate_index_page(apps, schema_editor):
             home_page.get_specific()
             ensure_certificate_index()
         except cms_models.HomePage.DoesNotExist as exc:
-            log.info(
+            log.error(
                 "Migration Error: cms.0026_certificate_index_page_slug, HomePage not found!: %s",
                 exc,
             )
         except Exception as exc:
-            log.info(
+            log.error(
                 "Migration Error: cms.0026_certificate_index_page_slug, Exception: %s",
                 exc,
             )
