@@ -14,7 +14,7 @@ def fix_certificate_index_page(apps, schema_editor):
     Get HomePage and Create or update Certificate Index Page. Fix slug name if already created
     """
     from cms import models as cms_models
-    from cms.constants import CERTIFICATE_INDEX_SLUG
+    from cms.api import ensure_certificate_index
 
     home_page = Page.objects.filter(
         content_type=ContentType.objects.get_for_model(cms_models.HomePage), live=True
@@ -22,22 +22,7 @@ def fix_certificate_index_page(apps, schema_editor):
     if home_page:
         try:
             home_page.get_specific()
-            certificate_index = cms_models.CertificateIndexPage.objects.first()
-
-            if certificate_index and certificate_index.slug != CERTIFICATE_INDEX_SLUG:
-                certificate_index.slug = CERTIFICATE_INDEX_SLUG
-                certificate_index.save()
-
-            if not certificate_index:
-                cert_index_content_type, _ = ContentType.objects.get_or_create(
-                    app_label="cms", model="certificateindexpage"
-                )
-                certificate_index = cms_models.CertificateIndexPage(
-                    title="Certificate Index Page",
-                    content_type_id=cert_index_content_type.id,
-                    slug=CERTIFICATE_INDEX_SLUG,
-                )
-                home_page.add_child(instance=certificate_index)
+            ensure_certificate_index()
         except cms_models.HomePage.DoesNotExist as exc:
             log.info(
                 "Migration Error: cms.0026_certificate_index_page_slug, HomePage not found!: %s",
