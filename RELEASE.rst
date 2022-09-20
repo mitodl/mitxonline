@@ -1,6 +1,20 @@
 Release Notes
 =============
 
+Version 0.45.2 (Released September 20, 2022)
+--------------
+
+- fixed the link to the flexible pricing form on the course detail popup
+- Fix factory-boy package name and pin
+- Fixing test - forcing Decimal type and limiting calced amount to 0
+- chore(deps): update actions/checkout action to v3
+- chore(deps): update dependency attrs to v22
+- chore(deps): update codecov/codecov-action action to v3
+- chore(deps): update actions/cache action to v3
+- chore(deps): update actions/setup-python action to v4
+- display certificate start and end date on template (#973)
+- Versioning of certificate template (#903)
+
 Version 0.45.1 (Released September 19, 2022)
 --------------
 
