@@ -29,7 +29,9 @@ def before_send(event, hint):
     return event
 
 
-def init_sentry(*, dsn, environment, version, log_level, heroku_app_name):
+def init_sentry(
+    *, dsn, environment, version, send_default_pii, log_level, heroku_app_name
+):
     """
     Initializes sentry
 
@@ -37,6 +39,7 @@ def init_sentry(*, dsn, environment, version, log_level, heroku_app_name):
         dsn (str): the sentry DSN key
         environment (str): the application environment
         version (str): the version of the application
+        send_default_pii (bool): enable sending PII data to associate users to errors
         log_level (str): the sentry log level
         heroku_app_name (str or None): the name of the heroku review app
     """
@@ -45,6 +48,7 @@ def init_sentry(*, dsn, environment, version, log_level, heroku_app_name):
         environment=environment,
         release=version,
         before_send=before_send,
+        send_default_pii=send_default_pii,
         integrations=[
             DjangoIntegration(),
             CeleryIntegration(),

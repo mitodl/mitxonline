@@ -55,6 +55,7 @@ init_sentry(
     dsn=SENTRY_DSN,
     environment=ENVIRONMENT,
     version=VERSION,
+    send_default_pii=True,
     log_level=SENTRY_LOG_LEVEL,
     heroku_app_name=HEROKU_APP_NAME,
 )

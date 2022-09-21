@@ -669,7 +669,8 @@ def sync_enrollments_with_edx(
     # Log an error if any enrollments exist locally but not in edX
     if local_only_ids:
         log.error(
-            "Found local enrollments with no equivalent enrollment in edX (CourseRunEnrollment ids: %s)",
+            "Found local enrollments with no equivalent enrollment in edX for User - %s (CourseRunEnrollment ids: %s)",
+            user.username,
             str(local_only_ids),
         )
     return results
