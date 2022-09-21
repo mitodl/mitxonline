@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.45.4
+Version 0.45.4 (Released September 21, 2022)
 --------------
 
 - fix: text change to OFAC disclaimer (#992)
