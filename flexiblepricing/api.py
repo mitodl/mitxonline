@@ -4,6 +4,7 @@ from collections import namedtuple
 import logging
 from datetime import datetime
 import pytz
+from typing import Union
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
@@ -19,6 +20,7 @@ from flexiblepricing.constants import (
     INCOME,
     DEFAULT_INCOME_THRESHOLD,
     FlexiblePriceStatus,
+    FINAID_FORM_TEXTS,
 )
 from flexiblepricing.exceptions import (
     CountryIncomeThresholdException,
@@ -31,7 +33,10 @@ from flexiblepricing.models import (
     FlexiblePrice,
 )
 
-from courses.models import CourseRun, Course, ProgramRun
+from courses.models import CourseRun, Course, ProgramRun, Program
+
+from django.utils.text import slugify
+
 
 IncomeThreshold = namedtuple("IncomeThreshold", ["country", "income"])
 log = logging.getLogger(__name__)
@@ -347,3 +352,79 @@ def update_currency_exchange_rate(rates, currency_descriptions):
         )
 
         codes.append(currency)
+
+
+def create_default_flexible_pricing_page(
+    object: Union[Course, Program], forceCourse: bool = False, *args, **kwargs
+):
+    """
+    Creates a default flexible pricing page for the given courseware object.
+    There must be an extant page for the object. If a course is provided, this
+    will create the flexible pricing page for its program unless forceCourse is
+    True.
+
+    The title and slug are programmatically generated from the courseware object
+    title. You can override this with the title and slug kwargs.
+
+    This won't check for an existing form, and it won't publish the form so
+    it initially won't have any form fields in it.
+
+    Args:
+    - object (Course or Program): The courseware object to work with
+    - forceCourse (boolean): Force the creation of a flexible price form for a course (ignored if a Program is specified)
+    Keyword Args:
+    - title (str): Force a specific title.
+    - slug (str): Force a specific slug.
+    Returns:
+    - FlexiblePricingRequestForm; the form page
+    Raises:
+    - Exception if there's no page for the courseware object specified
+    """
+    from cms.models import FlexiblePricingRequestForm
+
+    if (
+        isinstance(object, Program)
+        or (isinstance(object, Course) and forceCourse)
+        or (isinstance(object, Course) and object.program is None)
+    ):
+        courseware = object
+    else:
+        courseware = object.program
+
+    if courseware.page is None:
+        raise Exception(f"No page for courseware object {courseware}, can't continue.")
+
+    parent_page = courseware.page
+
+    if "title" in kwargs and kwargs["title"] is not None:
+        title = kwargs["title"]
+    else:
+        title = f"{courseware.title} Financial Assistance Form"
+
+    if "slug" in kwargs and kwargs["slug"] is not None:
+        slug = slugify(kwargs["slug"])
+    else:
+        slug = slugify(title)
+
+    form_page = FlexiblePricingRequestForm(
+        intro=FINAID_FORM_TEXTS["intro"],
+        title=title,
+        slug=slug,
+        guest_text=FINAID_FORM_TEXTS["guest"],
+        application_processing_text=FINAID_FORM_TEXTS["processing"],
+        application_approved_text=FINAID_FORM_TEXTS["approved"],
+        application_approved_no_discount_text=FINAID_FORM_TEXTS["approved_no_discount"],
+        application_denied_text=FINAID_FORM_TEXTS["denied"],
+        live=False,
+    )
+    parent_page.add_child(instance=form_page)
+
+    if isinstance(courseware, Program):
+        form_page.selected_program = courseware
+    else:
+        form_page.selected_course = courseware
+
+    form_page.save()
+    form_page.refresh_from_db()
+
+    return form_page

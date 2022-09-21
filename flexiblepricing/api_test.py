@@ -9,6 +9,8 @@ import pytz
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 from mitol.common.utils.datetime import now_in_utc
+from django.utils.text import slugify
+from factory import fuzzy
 
 from main.settings import TIME_ZONE
 from courses.factories import (
@@ -18,6 +20,8 @@ from courses.factories import (
     ProgramRunFactory,
 )
 from courses.models import Program
+from cms.factories import ProgramPageFactory
+from cms.models import FlexiblePricingRequestForm
 from ecommerce.factories import ProductFactory
 from flexiblepricing.api import (
     IncomeThreshold,
@@ -29,6 +33,7 @@ from flexiblepricing.api import (
     is_courseware_flexible_price_approved,
     parse_country_income_thresholds,
     update_currency_exchange_rate,
+    create_default_flexible_pricing_page,
 )
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.exceptions import CountryIncomeThresholdException
@@ -40,6 +45,8 @@ from flexiblepricing.models import (
     FlexiblePriceTier,
 )
 from users.factories import UserFactory
+
+pytestmark = [pytest.mark.django_db]
 
 
 def test_parse_country_income_thresholds_no_header(tmp_path):
@@ -615,3 +622,63 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
             course_run=flexible_price_record.courseware_object,
         )
         assert is_approved == result
+
+
+@pytest.mark.parametrize(
+    "courseware_type,force_course,gen_slug,gen_title",
+    [
+        ("course", False, False, False),
+        ("program", False, False, False),
+        ("courseprogram", False, False, False),
+        ("course", False, True, True),
+        ("program", False, True, True),
+        ("courseprogram", False, True, True),
+        ("courseprogram", True, False, False),
+    ],
+)
+def test_create_finaid_form(courseware_type, force_course, gen_slug, gen_title):
+    """
+    Tests the automated financial assistance form code.
+    """
+
+    if courseware_type == "course":
+        courseware = CourseFactory.create(program=None)
+        page = courseware.page
+    elif courseware_type == "program":
+        page = ProgramPageFactory.create()
+        courseware = page.program
+    else:
+        program_page = ProgramPageFactory.create()
+        courseware = CourseFactory.create(program=program_page.program)
+        if force_course:
+            page = courseware.page
+        else:
+            page = program_page
+
+    test_kwargs = {
+        "slug": str(fuzzy.FuzzyText()) if gen_slug else None,
+        "title": str(fuzzy.FuzzyText()) if gen_title else None,
+    }
+
+    generated_page = create_default_flexible_pricing_page(
+        courseware, force_course, **test_kwargs
+    )
+
+    assert isinstance(generated_page, FlexiblePricingRequestForm)
+    assert generated_page.live is False
+
+    if test_kwargs["slug"] is not None:
+        assert generated_page.slug == slugify(test_kwargs["slug"])
+    if test_kwargs["title"] is not None:
+        assert generated_page.title == test_kwargs["title"]
+
+    assert generated_page.get_parent() == page
+
+    if courseware_type == "course" or (
+        courseware_type == "courseprogram" and force_course
+    ):
+        assert generated_page.selected_course == courseware
+    elif courseware_type == "courseprogram" and not force_course:
+        assert generated_page.selected_program == courseware.program
+    else:
+        assert generated_page.selected_program == courseware
