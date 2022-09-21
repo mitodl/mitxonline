@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.45.4 (Released September 21, 2022)
+--------------
+
+- fix: text change to OFAC disclaimer (#992)
+- Adds an email message that is sent when an order is refunded
+
 Version 0.45.3 (Released September 20, 2022)
 --------------
 
