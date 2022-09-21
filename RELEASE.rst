@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.45.5
+Version 0.45.5 (Released September 21, 2022)
 --------------
 
 - Bump google sheets versions
