@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.45.5
+--------------
+
+- Bump google sheets versions
+- Adds a management command to create a basic financial assistance form for a courseware object
+- Fix (#1018)
+
 Version 0.45.4 (Released September 21, 2022)
 --------------
 
