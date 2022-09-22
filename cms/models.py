@@ -862,7 +862,7 @@ class CoursePage(ProductPage):
                 ecommerce_product, request.user
             )
 
-            if discount.check_validity(request.user):
+            if discount and discount.check_validity(request.user):
                 log.debug(
                     f"price is {ecommerce_product.price}, discount is {discount.discount_product(ecommerce_product)}"
                 )
