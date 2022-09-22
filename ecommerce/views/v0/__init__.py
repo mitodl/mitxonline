@@ -12,7 +12,6 @@ from rest_framework.viewsets import (
     ViewSet,
     ModelViewSet,
 )
-from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
@@ -75,8 +74,6 @@ from ecommerce.models import (
     DiscountProduct,
     BasketDiscount,
     UserDiscount,
-    PendingOrder,
-    FulfilledOrder,
     Order,
 )
 
@@ -403,53 +400,55 @@ class CheckoutCallbackView(View):
         3. Perform any enrollments, account status changes, etc.
         """
 
-        order = api.get_order_from_cybersource_payment_response(request)
-        if order is None:
-            return HttpResponse("Order not found")
-        # We only want to process responses related to orders which are PENDING
-        # otherwise we can conclude that we already received a response through
-        # BackofficeCallbackView.
-        order_state = None
-        if order.state == Order.STATE.PENDING:
-            order_state = api.process_cybersource_payment_response(request, order)
+        with transaction.atomic():
+            order = api.get_order_from_cybersource_payment_response(request)
+            if order is None:
+                return HttpResponse("Order not found")
+            # We only want to process responses related to orders which are PENDING
+            # otherwise we can conclude that we already received a response through
+            # BackofficeCallbackView.
+            order_state = None
+            if order.state == Order.STATE.PENDING:
+                order_state = api.process_cybersource_payment_response(request, order)
 
-        if order_state == Order.STATE.CANCELED:
-            return redirect_with_user_message(
-                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
-            )
-        elif order_state == Order.STATE.ERRORED:
-            return redirect_with_user_message(
-                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_ERROR}
-            )
-        elif order_state == Order.STATE.DECLINED:
-            return redirect_with_user_message(
-                reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
-            )
-        elif order_state == Order.STATE.REVIEW:
-            basket = Basket.objects.filter(user=order.purchaser).first()
-            if basket:
-                if basket.has_user_blocked_products(order.purchaser):
-                    return redirect_with_user_message(
-                        reverse("user-dashboard"),
-                        {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
-                    )
-                else:
-                    return redirect_with_user_message(
-                        reverse("user-dashboard"),
-                        {"type": USER_MSG_TYPE_PAYMENT_REVIEW},
-                    )
-        elif order_state == Order.STATE.FULFILLED:
-            return redirect_with_user_message(
-                reverse("user-dashboard"),
-                {
-                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
-                    "run": order.lines.first().purchased_object.course.title,
-                },
-            )
-        else:
-            return redirect_with_user_message(
-                reverse("user-dashboard"), {"type": USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN}
-            )
+            if order_state == Order.STATE.CANCELED:
+                return redirect_with_user_message(
+                    reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
+                )
+            elif order_state == Order.STATE.ERRORED:
+                return redirect_with_user_message(
+                    reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_ERROR}
+                )
+            elif order_state == Order.STATE.DECLINED:
+                return redirect_with_user_message(
+                    reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
+                )
+            elif order_state == Order.STATE.REVIEW:
+                basket = Basket.objects.filter(user=order.purchaser).first()
+                if basket:
+                    if basket.has_user_blocked_products(order.purchaser):
+                        return redirect_with_user_message(
+                            reverse("user-dashboard"),
+                            {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+                        )
+                    else:
+                        return redirect_with_user_message(
+                            reverse("user-dashboard"),
+                            {"type": USER_MSG_TYPE_PAYMENT_REVIEW},
+                        )
+            elif order_state == Order.STATE.FULFILLED:
+                return redirect_with_user_message(
+                    reverse("user-dashboard"),
+                    {
+                        "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
+                        "run": order.lines.first().purchased_object.course.title,
+                    },
+                )
+            else:
+                return redirect_with_user_message(
+                    reverse("user-dashboard"),
+                    {"type": USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN},
+                )
 
 
 @method_decorator(csrf_exempt, name="dispatch")
