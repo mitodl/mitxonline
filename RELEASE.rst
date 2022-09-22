@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.45.6
+--------------
+
+- fix: product discount calculation for inactive product on course detail page (#1026)
+- added user info to sync_enrollment and updated sentry config to pass send_default_pii
+
 Version 0.45.5 (Released September 21, 2022)
 --------------
 
