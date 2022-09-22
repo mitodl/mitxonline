@@ -2,7 +2,6 @@
 
 import logging
 
-from functools import total_ordering
 from django.urls import reverse
 from django.db import transaction
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
@@ -25,7 +24,6 @@ from mitol.payment_gateway.api import (
     CartItem as GatewayCartItem,
     Order as GatewayOrder,
     PaymentGateway,
-    Refund as GatewayRefund,
     ProcessorResponse,
 )
 from mitol.payment_gateway.exceptions import RefundDuplicateException
@@ -40,7 +38,6 @@ from ecommerce.models import (
     UserDiscount,
     BasketDiscount,
     FulfilledOrder,
-    Transaction,
     Order,
     Discount,
     DiscountProduct,
@@ -119,19 +116,20 @@ def generate_checkout_payload(request):
         total_price += line_item.discounted_price
 
     if total_price == 0:
-        fulfill_completed_order(
-            order, {"amount": 0, "data": {"reason": "No payment required"}}, basket
-        )
-        return {
-            "no_checkout": True,
-            "response": redirect_with_user_message(
-                reverse("user-dashboard"),
-                {
-                    "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
-                    "run": order.lines.first().purchased_object.course.title,
-                },
-            ),
-        }
+        with transaction.atomic():
+            fulfill_completed_order(
+                order, {"amount": 0, "data": {"reason": "No payment required"}}, basket
+            )
+            return {
+                "no_checkout": True,
+                "response": redirect_with_user_message(
+                    reverse("user-dashboard"),
+                    {
+                        "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+                        "run": order.lines.first().purchased_object.course.title,
+                    },
+                ),
+            }
 
     callback_uri = request.build_absolute_uri(reverse("checkout-result-callback"))
 
@@ -252,7 +250,7 @@ def get_order_from_cybersource_payment_response(request):
     order_id = Order.decode_reference_number(converted_order.reference)
 
     try:
-        order = Order.objects.get(pk=order_id)
+        order = Order.objects.select_for_update().get(pk=order_id)
     except ObjectDoesNotExist:
         order = None
     return order
