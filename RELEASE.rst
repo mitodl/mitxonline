@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.45.6
+Version 0.45.6 (Released September 22, 2022)
 --------------
 
 - fix: product discount calculation for inactive product on course detail page (#1026)
