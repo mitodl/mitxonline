@@ -195,6 +195,11 @@ export class ProductDetailEnrollApp extends React.Component<
       })
     }
 
+
+    const startDate = run && !emptyOrNil(run.start_date) ? moment(new Date(run.start_date)) : null
+    const disableEnrolledBtn = moment().isBefore(startDate) ? "" : "disabled"
+
+
     return (
       // $FlowFixMe: isLoading null or undefined
       <Loader isLoading={isLoading}>
@@ -203,14 +208,14 @@ export class ProductDetailEnrollApp extends React.Component<
             {run.courseware_url ? (
               <a
                 href={run.courseware_url}
-                className="btn btn-primary btn-gradient-red highlight outline"
+                className={`btn btn-primary btn-gradient-red highlight outline ${disableEnrolledBtn}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 Enrolled &#10003;
               </a>
             ) : (
-              <div className="btn btn-primary btn-gradient-red highlight outline">
+              <div className={`btn btn-primary btn-gradient-red highlight outline ${disableEnrolledBtn}`}>
                 Enrolled &#10003;
               </div>
             )}
