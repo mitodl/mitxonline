@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.45.7
+Version 0.45.7 (Released September 23, 2022)
 --------------
 
 - Fixes duplicate key error when returning to cart using back button
