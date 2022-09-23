@@ -467,17 +467,18 @@ class BackofficeCallbackView(APIView):
         Raises:
             - Http404 if the Order is not found.
         """
-        order = api.get_order_from_cybersource_payment_response(request)
+        with transaction.atomic():
+            order = api.get_order_from_cybersource_payment_response(request)
 
-        # We only want to process responses related to orders which are PENDING
-        # otherwise we can conclude that we already received a response through
-        # the user's browser.
-        if order is None:
-            raise Http404
-        elif order.state == Order.STATE.PENDING:
-            api.process_cybersource_payment_response(request, order)
+            # We only want to process responses related to orders which are PENDING
+            # otherwise we can conclude that we already received a response through
+            # the user's browser.
+            if order is None:
+                raise Http404
+            elif order.state == Order.STATE.PENDING:
+                api.process_cybersource_payment_response(request, order)
 
-        return Response(status=status.HTTP_200_OK)
+            return Response(status=status.HTTP_200_OK)
 
 
 class CheckoutProductView(LoginRequiredMixin, RedirectView):
