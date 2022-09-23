@@ -241,7 +241,7 @@ jmespath==0.10.0
     # via
     #   boto3
     #   botocore
-jwcrypto==1.0
+jwcrypto==1.4
     # via django-oauth-toolkit
 kombu==5.2.3
     # via celery
