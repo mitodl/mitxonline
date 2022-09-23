@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.45.8
+--------------
+
+- Missed a spot where get_order_from_cybersource_payment_response needed to be wrapped in a transaction
+- Bump oauthlib from 3.1.1 to 3.2.1 (#1008)
+
 Version 0.45.7 (Released September 23, 2022)
 --------------
 
