@@ -12,7 +12,9 @@ def products():
         return ProductFactory.create_batch(5)
 
 
-def test_delayed_order_receipt_sends_email(mocker, user, products, user_client):
+def test_delayed_order_receipt_sends_email(
+    mocker, user, products, user_client, django_capture_on_commit_callbacks
+):
     """
     Tests that the Order model is properly calling the send email receipt task
     rather than calling the mail_api version directly. The create_order_receipt
@@ -24,7 +26,8 @@ def test_delayed_order_receipt_sends_email(mocker, user, products, user_client):
         "ecommerce.mail_api.send_ecommerce_order_receipt"
     )
 
-    create_order_receipt(mocker, user, products, user_client)
+    with django_capture_on_commit_callbacks(execute=True):
+        create_order_receipt(mocker, user, products, user_client)
 
     mock_send_ecommerce_order_receipt.assert_called()
 

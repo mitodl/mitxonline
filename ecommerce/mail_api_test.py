@@ -17,7 +17,9 @@ def products():
         return ProductFactory.create_batch(5)
 
 
-def test_mail_api_task_called(mocker, user, products, user_client):
+def test_mail_api_task_called(
+    mocker, user, products, user_client, django_capture_on_commit_callbacks
+):
     """
     Tests that the Order model is properly calling the send email receipt task
     rather than calling the mail_api version directly. The create_order_receipt
@@ -28,13 +30,16 @@ def test_mail_api_task_called(mocker, user, products, user_client):
         "ecommerce.tasks.send_ecommerce_order_receipt.delay"
     )
 
-    order = create_order_receipt(mocker, user, products, user_client)
+    with django_capture_on_commit_callbacks(execute=True):
+        order = create_order_receipt(mocker, user, products, user_client)
 
     mock_delayed_send_ecommerce_order_receipt.assert_called()
     assert mock_delayed_send_ecommerce_order_receipt.call_args[0][0] == order.id
 
 
-def test_mail_api_receipt_generation(mocker, user, products, user_client):
+def test_mail_api_receipt_generation(
+    mocker, user, products, user_client, django_capture_on_commit_callbacks
+):
     """
     Tests email generation. Mocks actual message sending and then looks for some
     key data in the rendered template body (name from legal address, order ID,
@@ -42,7 +47,8 @@ def test_mail_api_receipt_generation(mocker, user, products, user_client):
     """
     mock_send_message = mocker.patch("mitol.mail.api.send_message")
 
-    order = create_order_receipt(mocker, user, products, user_client)
+    with django_capture_on_commit_callbacks(execute=True):
+        order = create_order_receipt(mocker, user, products, user_client)
 
     mock_send_message.assert_called()
 
