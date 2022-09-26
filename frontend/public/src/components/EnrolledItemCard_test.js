@@ -111,10 +111,11 @@ describe("EnrolledItemCard", () => {
 
   it("Course detail shows `Active` when start date in past", async () => {
     enrollmentCardProps.enrollment.run.start_date = moment("2021-02-08")
+    enrollmentCardProps.enrollment.run.end_date = moment().add(7, "d")
     const inner = await renderedCard()
     const detail = inner.find(".enrolled-item").find(".detail")
     assert.isTrue(detail.exists())
-    const detailText = detail.find("span").find("span").at(1).text()
+    const detailText = detail.find("span").find("span").at(0).text()
     assert.isTrue(detailText.startsWith(" | Active"))
   })
 
@@ -125,6 +126,15 @@ describe("EnrolledItemCard", () => {
     assert.isTrue(detail.exists())
     const detailText = detail.find("span").at(0).text()
     assert.isTrue(detailText.startsWith(" | Starts"))
+  })
+
+  it("Course detail shows `Ended` when end date in past", async () => {
+    enrollmentCardProps.enrollment.run.end_date = moment().add(-7, "d")
+    const inner = await renderedCard()
+    const detail = inner.find(".enrolled-item").find(".detail")
+    assert.isTrue(detail.exists())
+    const detailText = detail.find("span").at(0).text()
+    assert.isTrue(detailText.startsWith(" | Ended"))
   })
 
   it("renders the unenrollment verification modal", async () => {

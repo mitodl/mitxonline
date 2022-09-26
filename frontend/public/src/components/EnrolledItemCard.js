@@ -2,6 +2,7 @@
 /* global SETTINGS:false */
 import React from "react"
 import { Formik, Form, Field } from "formik"
+import moment from "moment"
 import {
   Dropdown,
   DropdownToggle,
@@ -297,6 +298,23 @@ export class EnrolledItemCard extends React.Component<
     const pageLocation = enrollment.run.page
     const menuTitle = `Course options for ${enrollment.run.course.title}`
 
+    let courseRunStatusMessage = null
+
+    if (startDateDescription !== null) {
+      if (startDateDescription.active) {
+        console.log("here")
+        if (moment(enrollment.run.end_date).isBefore(moment())) {
+          courseRunStatusMessage = <span> | <b>Ended</b> - {enrollment.run.end_date}</span>
+        } else {
+          courseRunStatusMessage = <span> |
+            <strong> Active</strong> - {startDateDescription.datestr}
+          </span>
+        }
+      } else {
+        courseRunStatusMessage = <span> | <b>Starts</b> - {startDateDescription.datestr}</span>
+      }
+    }
+
     return (
       <div
         className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3"
@@ -359,17 +377,8 @@ export class EnrolledItemCard extends React.Component<
             </div>
             <div className="detail pt-1">
               {courseId}
-              {startDateDescription !== null && !startDateDescription.active ? (
-                <span> | <b>Starts</b> - {startDateDescription.datestr}</span>
-              ) : (
-                <span>
-                  {startDateDescription === null ? null : (
-                    <span> |
-                      <strong> Active</strong> - {startDateDescription.datestr}
-                    </span>
-                  )}
-                </span>
-              )}
+              {startDateDescription === null}
+              {courseRunStatusMessage}
               <div className="enrollment-extra-links d-flex">
                 {pageLocation ? (
                   <a href={pageLocation.page_url}>Course details</a>
