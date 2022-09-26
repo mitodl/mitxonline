@@ -302,7 +302,6 @@ export class EnrolledItemCard extends React.Component<
 
     if (startDateDescription !== null) {
       if (startDateDescription.active) {
-        console.log("here")
         if (moment(enrollment.run.end_date).isBefore(moment())) {
           courseRunStatusMessage = <span> | <b>Ended</b> - {enrollment.run.end_date}</span>
         } else {
