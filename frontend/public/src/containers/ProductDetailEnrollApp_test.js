@@ -2,7 +2,6 @@
 // @flow
 import { assert } from "chai"
 import moment from "moment-timezone"
-import React from "react"
 
 import IntegrationTestHelper from "../util/integration_test_helper"
 import ProductDetailEnrollApp, {
