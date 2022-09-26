@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.46.0
+--------------
+
+- Updates the order fulfillment code to wait for the transaction to complete before sending message
+- Missed a spot where get_order_from_cybersource_payment_response needed to be wrapped in a transaction
+- Bump oauthlib from 3.1.1 to 3.2.1 (#1008)
+
 Version 0.45.7 (Released September 23, 2022)
 --------------
 
