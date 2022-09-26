@@ -5,6 +5,7 @@
   background: $footer-bg;
   color: white;
   padding: 0 0 42px;
+  margin-top: 10%;
 
   @include media-breakpoint-down(sm) {
     padding: 0 0 10px;
