@@ -517,6 +517,9 @@ class FulfillableOrder:
             keep_failed_enrollments=True,
         )
 
+    def send_ecommerce_order_receipt(self):
+        send_ecommerce_order_receipt.delay(self.id)
+
     @transition(
         field="state",
         source=(Order.STATE.PENDING, Order.STATE.REVIEW),
@@ -533,7 +536,7 @@ class FulfillableOrder:
         self.create_paid_courseruns()
 
         # send the receipt emails
-        send_ecommerce_order_receipt.delay(self.id)
+        transaction.on_commit(self.send_ecommerce_order_receipt)
 
 
 class PendingOrder(FulfillableOrder, Order):
