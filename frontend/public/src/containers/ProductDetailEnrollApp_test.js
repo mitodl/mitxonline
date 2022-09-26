@@ -1,6 +1,8 @@
 /* global SETTINGS: false */
 // @flow
 import { assert } from "chai"
+import moment from "moment-timezone"
+import React from "react"
 
 import IntegrationTestHelper from "../util/integration_test_helper"
 import ProductDetailEnrollApp, {
@@ -181,11 +183,12 @@ describe("ProductDetailEnrollApp", () => {
     )
   })
 
-  it("checks for enrolled button", async () => {
+  it("checks for disabled enrolled button", async () => {
     const userEnrollment = makeCourseRunEnrollment()
+    userEnrollment.run['start_date'] = moment().add(2, "M")
     const expectedResponse = {
       ...userEnrollment.run,
-      is_enrolled: true
+      is_enrolled: true,
     }
 
     const { inner, store } = await renderPage(
@@ -196,22 +199,61 @@ describe("ProductDetailEnrollApp", () => {
         queries: {
           courseRuns: {
             isPending: false,
-            status:    200
+            status:    200,
           }
         }
       },
       {}
     )
 
+    const item = inner.find("a").first()
+    assert.isTrue(item.hasClass('disabled'))
+    assert.isTrue(inner.containsMatchingElement(<p>Enrolled and waiting for the course to begin.</p>))
+
     assert.equal(
-      inner
-        .find("a")
-        .at(0)
-        .text(),
+      item.text(),
       "Enrolled ✓"
     )
     assert.equal(courseRunsSelector(store.getState())[0], expectedResponse)
   })
+
+
+  it("checks for enrolled button", async () => {
+    const userEnrollment = makeCourseRunEnrollment()
+    userEnrollment.run['start_date'] = moment().add(-2, "M")
+    const expectedResponse = {
+      ...userEnrollment.run,
+      is_enrolled: true,
+    }
+
+    const { inner, store } = await renderPage(
+      {
+        entities: {
+          courseRuns: [expectedResponse]
+        },
+        queries: {
+          courseRuns: {
+            isPending: false,
+            status:    200,
+          }
+        }
+      },
+      {}
+    )
+
+    const item = inner.find("a").first()
+
+    assert.isFalse(item.hasClass('disabled'))
+    assert.isFalse(inner.containsMatchingElement(<p>Enrolled and waiting for the course to begin.</p>))
+
+
+    assert.equal(
+      item.text(),
+      "Enrolled ✓"
+    )
+    assert.equal(courseRunsSelector(store.getState())[0], expectedResponse)
+  })
+
   ;[
     [true, 201],
     [false, 400]

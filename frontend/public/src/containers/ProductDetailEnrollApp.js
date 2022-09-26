@@ -197,8 +197,8 @@ export class ProductDetailEnrollApp extends React.Component<
 
 
     const startDate = run && !emptyOrNil(run.start_date) ? moment(new Date(run.start_date)) : null
-    const disableEnrolledBtn = moment().isBefore(startDate) ? "" : "disabled"
-    const waitingForCourseToBeginMessage = moment().isBefore(startDate) ? null : <p style={{ fontSize: "16px" }}>Enrolled and waiting for the course to begin.</p>
+    const disableEnrolledBtn = moment().isBefore(startDate) ? "disabled" : ""
+    const waitingForCourseToBeginMessage = moment().isBefore(startDate) ? <p style={{ fontSize: "16px" }}>Enrolled and waiting for the course to begin.</p> : null
 
 
     return (
