@@ -7,6 +7,7 @@ import os
 import platform
 from datetime import timedelta
 from urllib.parse import urljoin, urlparse
+import cssutils
 
 import dj_database_url
 from celery.schedules import crontab
@@ -32,6 +33,9 @@ from main.sentry import init_sentry
 VERSION = "0.45.7"
 
 log = logging.getLogger()
+
+# set log level on cssutils - should be fairly high or it will log messages for Outlook-specific styling
+cssutils.log.setLevel(logging.CRITICAL)
 
 ENVIRONMENT = get_string(
     name="MITX_ONLINE_ENVIRONMENT",

@@ -5,7 +5,6 @@ from audioop import add
 from decimal import Decimal
 
 from rest_framework import serializers
-from this import d
 
 from cms.serializers import CoursePageSerializer
 from courses.models import Course, CourseRun, ProgramRun
