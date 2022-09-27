@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.46.0
+Version 0.46.0 (Released September 27, 2022)
 --------------
 
 - Updates the order fulfillment code to wait for the transaction to complete before sending message
