@@ -35,25 +35,26 @@ def generate_flexible_price_email(flexible_price):
     Returns:
         dict: {"subject": (str), "body": (str)}
     """
+    program_name_with_course_number = flexible_price.courseware_object.readable_id.split('+')[1] + " " + flexible_price.courseware_object.title
     if flexible_price.status == FlexiblePriceStatus.APPROVED:
         price = flexible_price.tier.discount.friendly_format()
         message = FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE.format(
-            program_name=flexible_price.courseware_object.title, price=price
+            program_name=program_name_with_course_number, price=price
         )
         subject = FLEXIBLE_PRICE_EMAIL_APPROVAL_SUBJECT.format(
-            program_name=flexible_price.courseware_object.title
+            program_name=program_name_with_course_number
         )
     elif flexible_price.status == FlexiblePriceStatus.PENDING_MANUAL_APPROVAL:
         message = FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_MESSAGE
         subject = FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_SUBJECT.format(
-            program_name=flexible_price.courseware_object.title
+            program_name=program_name_with_course_number
         )
     elif flexible_price.status == FlexiblePriceStatus.RESET:
         message = FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE.format(
-            program_name=flexible_price.courseware_object.title
+            program_name=program_name_with_course_number
         )
         subject = FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT.format(
-            program_name=flexible_price.courseware_object.title
+            program_name=program_name_with_course_number
         )
     else:
         raise ValidationError(
@@ -67,7 +68,7 @@ def generate_flexible_price_email(flexible_price):
                     "subject": subject,
                     "first_name": flexible_price.user.legal_address.first_name,
                     "message": message,
-                    "program_name": flexible_price.courseware_object.title,
+                    "program_name": program_name_with_course_number,
                 },
             )
     except:
