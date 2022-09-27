@@ -1,5 +1,4 @@
 // @flow
-/* global SETTINGS:false */
 import qs from "query-string"
 import { isEmpty, includes, has } from "ramda"
 

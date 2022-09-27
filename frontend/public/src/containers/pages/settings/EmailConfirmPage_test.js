@@ -5,7 +5,6 @@ import IntegrationTestHelper from "../../../util/integration_test_helper"
 import EmailConfirmPage, {
   EmailConfirmPage as InnerEmailConfirmPage
 } from "./EmailConfirmPage"
-import { STATE_REGISTER_DETAILS } from "../../../lib/auth"
 
 describe("EmailConfirmPage", () => {
   let helper, renderPage
@@ -30,7 +29,6 @@ describe("EmailConfirmPage", () => {
 
   it("shows a message when the confirmation page is displayed", async () => {
     helper.handleRequestStub.returns({})
-    const token = "asdf"
     const { inner, store } = await renderPage({
       entities: {
         updateEmail: {
@@ -53,7 +51,6 @@ describe("EmailConfirmPage", () => {
 
   it("shows a message when the error page is displayed", async () => {
     helper.handleRequestStub.returns({})
-    const token = "asdf"
     const { inner, store } = await renderPage({
       entities: {
         updateEmail: {

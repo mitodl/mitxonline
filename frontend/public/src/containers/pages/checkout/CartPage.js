@@ -3,8 +3,6 @@
 import React from "react"
 import DocumentTitle from "react-document-title"
 import {
-  ALERT_TYPE_DANGER,
-  ALERT_TYPE_SUCCESS,
   CART_DISPLAY_PAGE_TITLE
 } from "../../../constants"
 import { compose } from "redux"
@@ -13,7 +11,7 @@ import { connectRequest, mutateAsync } from "redux-query"
 import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
 
-import type { BasketItem, Discount, Refund } from "../../../flow/cartTypes"
+import type { BasketItem, Discount } from "../../../flow/cartTypes"
 
 import Loader from "../../../components/Loader"
 import { CartItemCard } from "../../../components/CartItemCard"
@@ -57,7 +55,7 @@ export class CartPage extends React.Component<Props, CartState> {
 
   async addDiscount(ev: Object, { setErrors }: any) {
     const subbedCode = ev.couponCode
-    const { applyDiscountCode, forceRequest, addUserNotification } = this.props
+    const { applyDiscountCode, forceRequest } = this.props
 
     this.setState({ discountCode: subbedCode })
 
@@ -65,16 +63,14 @@ export class CartPage extends React.Component<Props, CartState> {
       return
     }
 
-    let userMessage, messageType
+    let userMessage
 
     const resp = await applyDiscountCode(this.state.discountCode)
     if (isSuccessResponse(resp)) {
-      messageType = ALERT_TYPE_SUCCESS
       userMessage = "Discount code added."
 
       forceRequest()
     } else {
-      messageType = ALERT_TYPE_DANGER
       userMessage = `Discount code ${this.state.discountCode} is invalid.`
 
       setErrors({

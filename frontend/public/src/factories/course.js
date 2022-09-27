@@ -1,29 +1,19 @@
 // @flow
-import { range } from "ramda"
 import casual from "casual-browserify"
 
 import { incrementer } from "./util"
 
 import type {
   CourseRun,
-  BaseCourse,
-  Course,
   CourseRunDetail,
   CourseRunEnrollment,
-  Program,
-  ProgramEnrollment,
-  UserEnrollments,
-  CourseRunCertificate,
-  ProgramCertificate,
   CourseDetail
 } from "../flow/courseTypes"
-import type { Product } from "../flow/ecommerceTypes"
 
 const genCourseRunId = incrementer()
 const genEnrollmentId = incrementer()
 const genCoursewareId = incrementer()
 const genRunTagNumber = incrementer()
-const genReadableId = incrementer()
 const genProductId = incrementer()
 
 export const makeCourseRun = (): CourseRun => ({

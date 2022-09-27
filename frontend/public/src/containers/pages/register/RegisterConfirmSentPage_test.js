@@ -6,7 +6,6 @@ import RegisterConfirmSentPage, {
   RegisterConfirmSentPage as InnerRegisterConfirmSentPage
 } from "./RegisterConfirmSentPage"
 import IntegrationTestHelper from "../../../util/integration_test_helper"
-import { isIf, shouldIf } from "../../../lib/test_utils"
 
 import { routes } from "../../../lib/urls"
 

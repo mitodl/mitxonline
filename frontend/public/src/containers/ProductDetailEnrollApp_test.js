@@ -257,7 +257,7 @@ describe("ProductDetailEnrollApp", () => {
   ;[
     [true, 201],
     [false, 400]
-  ].forEach(([success, returnedStatusCode]) => {
+  ].forEach(([__success, returnedStatusCode]) => {
     it(`shows dialog to upgrade user enrollment with flexible dollars-off discount and handles ${returnedStatusCode} response`, async () => {
       courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 1, discount_type: DISCOUNT_TYPE_DOLLARS_OFF}}]
       isWithinEnrollmentPeriodStub.returns(true)

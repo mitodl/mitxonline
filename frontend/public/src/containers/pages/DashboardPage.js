@@ -5,11 +5,6 @@ import DocumentTitle from "react-document-title"
 import { connect } from "react-redux"
 import { Formik, Form, Field } from "formik"
 import {
-  Tooltip,
-  Dropdown,
-  DropdownToggle,
-  DropdownMenu,
-  DropdownItem,
   Button,
   Modal,
   ModalHeader,
@@ -18,8 +13,7 @@ import {
 import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
 import { connectRequest, mutateAsync } from "redux-query"
-import { partial, pathOr, without } from "ramda"
-import moment from "moment"
+import { pathOr, without } from "ramda"
 
 import Loader from "../../components/Loader"
 import {
@@ -32,17 +26,13 @@ import {
   enrollmentsQuery,
   enrollmentsQueryKey,
   programEnrollmentsQuery,
-  programEnrollmentsQueryKey,
   programEnrollmentsSelector,
   deactivateEnrollmentMutation,
   courseEmailsSubscriptionMutation
 } from "../../lib/queries/enrollment"
 import { currentUserSelector } from "../../lib/queries/users"
-import { isLinkableCourseRun } from "../../lib/courseApi"
 import {
-  formatPrettyDateTimeAmPmTz,
   isSuccessResponse,
-  parseDateString,
   isProgramUIEnabled,
 } from "../../lib/util"
 import { routes } from "../../lib/urls"

@@ -1,5 +1,4 @@
 // @flow
-/* global SETTINGS:false */
 import "isomorphic-fetch"
 import * as R from "ramda"
 

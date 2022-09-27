@@ -25,8 +25,6 @@ import {
 
 import { authSelector } from "../../../lib/queries/auth"
 import {
-  qsVerificationCodeSelector,
-  qsPartialTokenSelector,
   qsSelector
 } from "../../../lib/selectors"
 

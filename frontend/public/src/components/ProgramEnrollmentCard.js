@@ -1,12 +1,11 @@
 // @flow
-/* global SETTINGS:false */
-import React, { useState } from "react"
-import { ReactPageClick } from "react-page-click"
+import React from "react"
+
 import { Badge } from "reactstrap"
 
 import { generateStartDateText } from "../lib/courseApi"
 
-import type { ProgramEnrollment, Program, RunEnrollment, CourseDetailWithRuns, BaseCourseRun } from "../flow/courseTypes"
+import type { ProgramEnrollment } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
 
 type ProgramEnrollmentCardProps = {
@@ -81,12 +80,6 @@ export class ProgramEnrollmentCard extends React.Component<
     const {
       enrollment,
     } = this.props
-
-    const {
-      drawerVisibility
-    } = this.state
-
-    const drawerClass = `nav-drawer ${drawerVisibility ? "open" : "closed"}`
 
     const title = (
       <a

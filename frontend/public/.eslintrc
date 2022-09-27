@@ -6,7 +6,11 @@
     }
   },
   "rules": {
-    "no-unused-vars": 0,
+    "no-unused-vars": [
+      "error", {
+        "argsIgnorePattern": "^__"
+        }
+      ],
     // module importing pattern have huge impact over performance, especially when it comes to lodash
     // the below rule will restrict developers to do lodash global imports
     // (i.e: "import { map } from 'lodash'" will be insisted to get replaced with "import map from 'lodash/map'")

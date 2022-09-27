@@ -1,6 +1,5 @@
 // @flow
 import React from "react"
-import { Button } from "reactstrap"
 
 type Props = {
   title: string,

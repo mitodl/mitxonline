@@ -18,15 +18,8 @@ import {
   usernameFieldValidation
 } from "../../lib/validation"
 
-const US_ALPHA_2 = "US"
-const CA_ALPHA_2 = "CA"
-
-const US_POSTAL_CODE_REGEX = /[0-9]{5}(-[0-9]{4}){0,1}/
-const CA_POSTAL_CODE_REGEX = /[A-Z][0-9][A-Z] [0-9][A-Z][0-9]/
-const COUNTRIES_REQUIRING_POSTAL_CODE = [US_ALPHA_2, CA_ALPHA_2]
-const COUNTRIES_REQUIRING_STATE = [US_ALPHA_2, CA_ALPHA_2]
 export const NAME_REGEX = /^(?![~!@&)(+:'.?/,`-]+)([^/^$#*=[\]`%_;<>{}"|]+)$/
-const ADDRESS_LINES_MAX = 4
+
 const seedYear = moment().year()
 
 // Field Error messages

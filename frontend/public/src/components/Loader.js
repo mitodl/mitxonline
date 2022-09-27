@@ -1,5 +1,4 @@
 // @flow
-/* global SETTINGS:false */
 import React, { useEffect, useState } from "react"
 
 import { notNil } from "../lib/util"

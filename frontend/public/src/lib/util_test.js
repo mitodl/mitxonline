@@ -1,5 +1,4 @@
 // @flow
-/* global SETTINGS:false */
 import sinon from "sinon"
 import { assert } from "chai"
 import moment from "moment"

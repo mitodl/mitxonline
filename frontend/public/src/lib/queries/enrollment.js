@@ -33,7 +33,7 @@ export const programEnrollmentsQuery = () => ({
   }
 })
 
-export const enrollmentQuery = (enrollmentId: number) => ({
+export const enrollmentQuery = () => ({
   queryKey:  enrollmentQuery,
   url:       "/api/enrollments/${enrollmentId}",
   transform: json => ({

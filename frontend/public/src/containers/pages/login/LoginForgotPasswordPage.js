@@ -69,7 +69,7 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
     try {
       const resp = await forgotPassword(email)
 
-      this.setState((state, props) => {
+      this.setState(() => {
         return {
           isError:         !isSuccessResponse(resp),
           forgotEmailSent: isSuccessResponse(resp),

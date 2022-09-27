@@ -158,7 +158,7 @@ describe("RegisterEmailPage", () => {
   })
 
   it("handles onSubmit for a confirmation email", async () => {
-    const { inner, store } = await renderPage()
+    const { inner } = await renderPage()
 
     helper.handleRequestStub.returns({
       body: makeRegisterAuthResponse({

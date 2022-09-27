@@ -18,7 +18,7 @@ const ApplyCouponForm = ({ onSubmit, couponCode, discounts }: Props) => (
   <Formik
     onSubmit={onSubmit}
     initialValues={getInitialValues(couponCode, discounts)}
-    render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
+    render={() => (
       <Form>
         <div className="row">
           <div className="col-12 mt-4 px-3 py-3 py-md-0">

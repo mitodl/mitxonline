@@ -4,7 +4,6 @@ import { assert } from "chai"
 import { shallow } from "enzyme"
 
 import { TextNotification } from "."
-import { routes } from "../../lib/urls"
 import IntegrationTestHelper from "../../util/integration_test_helper"
 
 describe("Notification component", () => {
