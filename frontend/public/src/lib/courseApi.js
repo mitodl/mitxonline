@@ -36,6 +36,26 @@ export const isWithinEnrollmentPeriod = (run: CourseRunDetail): boolean => {
   )
 }
 
+export const courseRunStatusMessage = (run: CourseRun) => {
+  const startDateDescription = generateStartDateText(run)
+  if (startDateDescription !== null) {
+    if (startDateDescription.active) {
+      if (moment(run.end_date).isBefore(moment())) {
+        const dateString = parseDateString(run.start_date)
+        return (<span> | <b>Ended</b> - {formatPrettyDateTimeAmPmTz(dateString)}</span>)
+      } else {
+        return (<span> |
+          <strong> Active</strong> - {startDateDescription.datestr}
+        </span>)
+      }
+    } else {
+      return (<span> | <b>Starts</b> - {startDateDescription.datestr}</span>)
+    }
+  } else {
+    return null
+  }
+}
+
 export const generateStartDateText = (run: CourseRunDetail) => {
   if (run.start_date) {
     const now = moment()

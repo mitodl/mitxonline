@@ -17,7 +17,7 @@ import { partial } from "ramda"
 
 import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../constants"
 import GetCertificateButton from './GetCertificateButton'
-import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText } from "../lib/courseApi"
+import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText, courseRunStatusMessage } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
 import type { RunEnrollment } from "../flow/courseTypes"
@@ -298,21 +298,7 @@ export class EnrolledItemCard extends React.Component<
     const pageLocation = enrollment.run.page
     const menuTitle = `Course options for ${enrollment.run.course.title}`
 
-    let courseRunStatusMessage = null
-
-    if (startDateDescription !== null) {
-      if (startDateDescription.active) {
-        if (moment(enrollment.run.end_date).isBefore(moment())) {
-          courseRunStatusMessage = <span> | <b>Ended</b> - {enrollment.run.end_date}</span>
-        } else {
-          courseRunStatusMessage = <span> |
-            <strong> Active</strong> - {startDateDescription.datestr}
-          </span>
-        }
-      } else {
-        courseRunStatusMessage = <span> | <b>Starts</b> - {startDateDescription.datestr}</span>
-      }
-    }
+    const courseRunStatusMessageText = courseRunStatusMessage(enrollment.run)
 
     return (
       <div
@@ -377,7 +363,7 @@ export class EnrolledItemCard extends React.Component<
             <div className="detail pt-1">
               {courseId}
               {startDateDescription === null}
-              {courseRunStatusMessage}
+              {courseRunStatusMessageText}
               <div className="enrollment-extra-links d-flex">
                 {pageLocation ? (
                   <a href={pageLocation.page_url}>Course details</a>
