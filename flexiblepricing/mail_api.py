@@ -35,7 +35,11 @@ def generate_flexible_price_email(flexible_price):
     Returns:
         dict: {"subject": (str), "body": (str)}
     """
-    program_name_with_course_number = flexible_price.courseware_object.readable_id.split('+')[1] + " " + flexible_price.courseware_object.title
+    program_name_with_course_number = (
+        flexible_price.courseware_object.readable_id.split("+")[1]
+        + " "
+        + flexible_price.courseware_object.title
+    )
     if flexible_price.status == FlexiblePriceStatus.APPROVED:
         price = flexible_price.tier.discount.friendly_format()
         message = FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE.format(
