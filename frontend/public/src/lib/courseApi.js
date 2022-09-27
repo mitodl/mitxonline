@@ -7,7 +7,7 @@ import { isNil } from "ramda"
 import { notNil, parseDateString, formatPrettyDateTimeAmPmTz } from "./util"
 
 import type Moment from "moment"
-import type { CourseRunDetail } from "../flow/courseTypes"
+import type { CourseRunDetail, CourseRun } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
 
 export const isLinkableCourseRun = (
