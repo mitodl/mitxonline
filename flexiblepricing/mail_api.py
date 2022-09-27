@@ -35,10 +35,13 @@ def generate_flexible_price_email(flexible_price):
     Returns:
         dict: {"subject": (str), "body": (str)}
     """
+    courseware_readable_id_formatted = (
+        flexible_price.courseware_object.readable_id
+        if len(flexible_price.courseware_object.readable_id.split("+")) < 2
+        else flexible_price.courseware_object.readable_id.split("+")[1]
+    )
     program_name_with_course_number = (
-        flexible_price.courseware_object.readable_id.split("+")[1]
-        + " "
-        + flexible_price.courseware_object.title
+        courseware_readable_id_formatted + " " + flexible_price.courseware_object.title
     )
     if flexible_price.status == FlexiblePriceStatus.APPROVED:
         price = flexible_price.tier.discount.friendly_format()

@@ -87,9 +87,9 @@ def send_ecommerce_refund_message(order_record):
                 recipient,
                 {
                     "order": order_record,
-                    "readable_id": line.purchased_object.readable_id.split("+")[1]
-                    if line
-                    else None,
+                    "readable_id": line.purchased_object.readable_id
+                    if line and len(line.purchased_object.readable_id.split("+")) < 2
+                    else line.purchased_object.readable_id.split("+")[1],
                     "title": line.purchased_object.title if line else None,
                     "transaction_amount": transaction.amount.quantize(Decimal("0.01")),
                 },
