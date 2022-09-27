@@ -7,7 +7,7 @@ import { isNil } from "ramda"
 import { notNil, parseDateString, formatPrettyDateTimeAmPmTz } from "./util"
 
 import type Moment from "moment"
-import type { CourseRunDetail } from "../flow/courseTypes"
+import type { CourseRunDetail, CourseRun } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
 
 export const isLinkableCourseRun = (
@@ -34,6 +34,26 @@ export const isWithinEnrollmentPeriod = (run: CourseRunDetail): boolean => {
     now.isAfter(enrollStart) &&
     (isNil(enrollEnd) || now.isBefore(enrollEnd))
   )
+}
+
+export const courseRunStatusMessage = (run: CourseRun) => {
+  const startDateDescription = generateStartDateText(run)
+  if (startDateDescription !== null) {
+    if (startDateDescription.active) {
+      if (moment(run.end_date).isBefore(moment())) {
+        const dateString = parseDateString(run.start_date)
+        return (<span> | <b>Ended</b> - {formatPrettyDateTimeAmPmTz(dateString)}</span>)
+      } else {
+        return (<span> |
+          <strong> Active</strong> - {startDateDescription.datestr}
+        </span>)
+      }
+    } else {
+      return (<span> | <b>Starts</b> - {startDateDescription.datestr}</span>)
+    }
+  } else {
+    return null
+  }
 }
 
 export const generateStartDateText = (run: CourseRunDetail) => {
