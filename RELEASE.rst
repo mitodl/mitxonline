@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.46.1 (Released September 28, 2022)
+--------------
+
+- 1051: Don't display "active" on the dashboard when it is past the course run's course_end date (#1057)
+- added management command to create products for DEDP
+- 1036 enrolled button on about page links to course before it has started (#1056)
+- updated payment response reason code to log error for 1xx
+- Bump jwcrypto from 1.0 to 1.4 (#1022)
+- Online-1048 Add top margin for footer (#1052)
+- Removed an "import this" and updated settings to make cssutils log less verbosely
+
 Version 0.46.0 (Released September 27, 2022)
 --------------
 
