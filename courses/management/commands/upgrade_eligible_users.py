@@ -82,6 +82,13 @@ class Command(BaseCommand):
                     ) = create_run_enrollments(
                         user, [course_run], mode=EDX_ENROLLMENT_VERIFIED_MODE
                     )
+                    if edx_request_success is False:
+                        self.stdout.write(
+                            self.style.ERROR(
+                                f"Enrollment for user {user} has failed."
+                            )
+                        )
+                        continue
                     upgrade_count += 1
                     self.stdout.write(
                         self.style.SUCCESS(
