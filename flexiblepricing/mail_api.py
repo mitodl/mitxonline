@@ -35,7 +35,11 @@ def generate_flexible_price_email(flexible_price):
     Returns:
         dict: {"subject": (str), "body": (str)}
     """
-    courseware_readable_id_formatted = flexible_price.courseware_object.course_number if isinstance(flexible_price.courseware_object, Course) else flexible_price.courseware_object.readable_id
+    courseware_readable_id_formatted = (
+        flexible_price.courseware_object.course_number
+        if isinstance(flexible_price.courseware_object, Course)
+        else flexible_price.courseware_object.readable_id
+    )
     program_name_with_course_number = (
         courseware_readable_id_formatted + " " + flexible_price.courseware_object.title
     )
