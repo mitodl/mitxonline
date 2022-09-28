@@ -61,7 +61,14 @@ class Command(BaseCommand):
                 upgrade_count = 0
                 enrollment = CourseRunEnrollment.objects.filter(
                     user=user, run=course_run
-                )
+                ).first()
+                if enrollment is None:
+                    self.stderr.write(
+                        self.style.ERROR(
+                            f"Can't find enrollment for user {row[0]}, course run {row[1]} skipping row"
+                        )
+                    )
+                    continue
                 if enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE:
                     self.stdout.write(
                         self.style.ERROR(
