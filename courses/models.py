@@ -211,6 +211,14 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     topics = models.ManyToManyField(CourseTopic, blank=True)
     flexible_prices = GenericRelation("flexiblepricing.FlexiblePrice")
     tiers = GenericRelation("flexiblepricing.FlexiblePriceTier")
+    
+    @property
+    def course_number(self):
+        """
+        Returns:
+            str: Course number (last part of readable_id, after the final +)
+        """
+        return get_course_number(self.courseware_id)
 
     @property
     def page(self):
