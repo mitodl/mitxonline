@@ -211,7 +211,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     topics = models.ManyToManyField(CourseTopic, blank=True)
     flexible_prices = GenericRelation("flexiblepricing.FlexiblePrice")
     tiers = GenericRelation("flexiblepricing.FlexiblePriceTier")
-    
+
     @property
     def course_number(self):
         """
