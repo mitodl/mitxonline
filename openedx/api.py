@@ -666,12 +666,19 @@ def sync_enrollments_with_edx(
                 ].is_active,
             )
             results.created.append(local_enrollment)
+
+    # Confirm if local_only_ids are actually active enrollments before logging these as error
+    local_only_active_ids = (
+        user.courserunenrollment_set(manager="all_objects")
+        .filter(user=user, run__courseware_id__in=local_only_ids, active=True)
+        .values_list("run__courseware_id", flat=True)
+    )
     # Log an error if any enrollments exist locally but not in edX
-    if local_only_ids:
+    if local_only_active_ids:
         log.error(
             "Found local enrollments with no equivalent enrollment in edX for User - %s (CourseRunEnrollment ids: %s)",
             user.username,
-            str(local_only_ids),
+            str(local_only_active_ids),
         )
     return results
 
