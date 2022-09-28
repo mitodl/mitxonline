@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.46.1
+Version 0.46.1 (Released September 28, 2022)
 --------------
 
 - 1051: Don't display "active" on the dashboard when it is past the course run's course_end date (#1057)
