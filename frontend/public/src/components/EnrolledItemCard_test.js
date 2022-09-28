@@ -29,6 +29,7 @@ describe("EnrolledItemCard", () => {
     userEnrollment = makeCourseRunEnrollment()
     currentUser = makeUser()
     isLinkableStub = helper.sandbox.stub(courseApi, "isLinkableCourseRun")
+    SETTINGS.features = { upgrade_dialog: true, disable_discount_ui: false, enable_program_ui: false }
     enrollmentCardProps = {
       enrollment:           userEnrollment,
       currentUser:          currentUser,
@@ -84,6 +85,33 @@ describe("EnrolledItemCard", () => {
         userEnrollment.run.course.title
       )
       if (mode === "verified") {
+        const pricingLinks = inner.find(".pricing-links")
+        assert.isFalse(pricingLinks.exists())
+      }
+    })
+  })
+
+  ;[
+    "audit",
+    "verified"
+  ].forEach(([mode]) => {
+    it("renders the card without upsell message when ecommerce disabled", async () => {
+      const testEnrollment = makeCourseRunEnrollmentWithProduct()
+      userEnrollment = testEnrollment
+      enrollmentCardProps.enrollment = testEnrollment
+      const inner = await renderedCard()
+      const enrolledItems = inner.find(".enrolled-item")
+      assert.lengthOf(enrolledItems, 1)
+      const enrolledItem = enrolledItems.at(0)
+      assert.equal(
+        enrolledItem.find("h2").text(),
+        userEnrollment.run.course.title
+      )
+      if (mode === "verified") {
+        const pricingLinks = inner.find(".pricing-links")
+        assert.isFalse(pricingLinks.exists())
+      } else {
+        SETTINGS.features = { upgrade_dialog: false, disable_discount_ui: false, enable_program_ui: false }
         const pricingLinks = inner.find(".pricing-links")
         assert.isFalse(pricingLinks.exists())
       }
