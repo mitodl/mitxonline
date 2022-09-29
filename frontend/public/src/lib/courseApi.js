@@ -1,5 +1,4 @@
 // @flow
-/* global SETTINGS:false */
 import React from "react"
 import moment from "moment"
 import { isNil } from "ramda"

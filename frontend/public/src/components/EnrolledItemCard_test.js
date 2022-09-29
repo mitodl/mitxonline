@@ -1,5 +1,5 @@
-/* global SETTINGS: false */
 // @flow
+/* global SETTINGS:false */
 import React from "react"
 import moment from "moment"
 
@@ -18,7 +18,6 @@ describe("EnrolledItemCard", () => {
     renderedCard,
     userEnrollment,
     currentUser,
-    isLinkableStub,
     enrollmentCardProps,
     isFinancialAssistanceAvailableStub,
     closeDrawer
@@ -28,7 +27,6 @@ describe("EnrolledItemCard", () => {
     helper = new IntegrationTestHelper()
     userEnrollment = makeCourseRunEnrollment()
     currentUser = makeUser()
-    isLinkableStub = helper.sandbox.stub(courseApi, "isLinkableCourseRun")
     SETTINGS.features = { upgrade_dialog: true, disable_discount_ui: false, enable_program_ui: false }
     enrollmentCardProps = {
       enrollment:           userEnrollment,

@@ -9,7 +9,7 @@ import {
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { connectRequest, mutateAsync } from "redux-query"
-import { partial, pathOr, without } from "ramda"
+import { pathOr } from "ramda"
 
 import Loader from "../../../components/Loader"
 
@@ -21,13 +21,11 @@ import {
 } from "../../../lib/queries/cart"
 
 import type { RouterHistory } from "react-router"
-import moment from "moment"
 import {
   formatLocalePrice,
   formatPrettyDateTimeAmPmTz,
   parseDateString
 } from "../../../lib/util"
-import { Button } from "reactstrap"
 import type { PaginatedOrderHistory } from "../../../flow/cartTypes"
 
 type Props = {

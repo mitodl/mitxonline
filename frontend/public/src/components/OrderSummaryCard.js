@@ -2,7 +2,7 @@
 /* global SETTINGS: false */
 import React from "react"
 import { Button, Badge } from "reactstrap"
-import { formatLocalePrice, isSuccessResponse } from "../lib/util"
+import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
 import type { Discount, Refund } from "../flow/cartTypes"
 
@@ -19,7 +19,7 @@ type Props = {
 
 export class OrderSummaryCard extends React.Component<Props> {
   renderAppliedCoupons() {
-    const { discounts, orderFulfilled } = this.props
+    const { discounts } = this.props
 
     if (discounts === null || discounts.length === 0) {
       return null

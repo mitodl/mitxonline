@@ -1,5 +1,4 @@
 // @flow
-/* global SETTINGS: false */
 import React from "react"
 
 import { routes } from "../lib/urls"
@@ -16,7 +15,7 @@ type Props = {
   location: ?Location
 }
 
-const TopAppBar = ({ currentUser, location }: Props) => (
+const TopAppBar = ({ currentUser }: Props) => (
   <header className="site-header d-flex d-flex flex-column">
     <NotificationContainer />
     <nav

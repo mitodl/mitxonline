@@ -23,7 +23,6 @@ import { currentUserSelector } from "../../../lib/queries/users"
 import type { RouterHistory } from "react-router"
 import type { ChangePasswordFormValues } from "../../../components/forms/ChangePasswordForm"
 import type { ChangeEmailFormValues } from "../../../components/forms/ChangeEmailForm"
-import type { Response } from "redux-query"
 
 type Props = {
   history: RouterHistory,

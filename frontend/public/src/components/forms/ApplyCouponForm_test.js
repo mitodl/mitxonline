@@ -3,7 +3,6 @@ import React from "react"
 import sinon from "sinon"
 import { assert } from "chai"
 import { shallow } from "enzyme"
-import { Formik } from "formik"
 
 import ApplyCouponForm from "./ApplyCouponForm"
 

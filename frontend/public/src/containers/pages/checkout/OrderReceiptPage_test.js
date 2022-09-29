@@ -4,17 +4,14 @@ import { assert } from "chai"
 import OrderReceiptPage, {
   OrderReceiptPage as InnerOrderReceiptPage
 } from "./OrderReceiptPage"
-import { makeUser } from "../../../factories/user"
 import IntegrationTestHelper from "../../../util/integration_test_helper"
-import * as courseApi from "../../../lib/courseApi"
 import { ORDER_RECEIPT_OBJECT } from "../../../lib/test_constants"
 
 describe("OrderReceiptPage", () => {
-  let helper, renderPage, currentUser, isLinkableStub
+  let helper, renderPage, currentUser
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
-    isLinkableStub = helper.sandbox.stub(courseApi, "isLinkableCourseRun")
 
     renderPage = helper.configureHOCRenderer(
       OrderReceiptPage,

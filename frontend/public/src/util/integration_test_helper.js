@@ -1,4 +1,3 @@
-/* global SETTINGS: false */
 import React from "react"
 import R from "ramda"
 import { shallow } from "enzyme"

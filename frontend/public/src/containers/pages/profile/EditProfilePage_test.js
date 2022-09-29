@@ -6,7 +6,6 @@ import EditProfilePage, {
   EditProfilePage as InnerEditProfilePage
 } from "./EditProfilePage"
 import {
-  makeAnonymousUser,
   makeCountries,
   makeUser
 } from "../../../factories/user"

@@ -1,6 +1,6 @@
 // @flow
-/* global SETTINGS:false */
-import React, { Fragment } from "react"
+
+import React from "react"
 
 import MixedLink from "./MixedLink"
 import { routes } from "../lib/urls"

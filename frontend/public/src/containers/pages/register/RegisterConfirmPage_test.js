@@ -11,7 +11,6 @@ import {
   STATE_EXISTING_ACCOUNT,
   STATE_INVALID_EMAIL
 } from "../../../lib/auth"
-import { routes } from "../../../lib/urls"
 
 describe("RegisterConfirmPage", () => {
   let helper, renderPage
@@ -66,7 +65,7 @@ describe("RegisterConfirmPage", () => {
   it("Shows a register link with invalid/expired confirmation code", async () => {
     helper.handleRequestStub.returns({})
     const token = "asdf"
-    const { inner, store } = await renderPage({
+    const { inner } = await renderPage({
       entities: {
         auth: {
           state:         STATE_INVALID_LINK,
@@ -86,7 +85,7 @@ describe("RegisterConfirmPage", () => {
   it("Shows a login link with existing account message", async () => {
     helper.handleRequestStub.returns({})
     const token = "asdf"
-    const { inner, store } = await renderPage({
+    const { inner } = await renderPage({
       entities: {
         auth: {
           state:         STATE_EXISTING_ACCOUNT,
@@ -106,7 +105,7 @@ describe("RegisterConfirmPage", () => {
   it("Shows a register link with invalid or no confirmation code", async () => {
     helper.handleRequestStub.returns({})
     const token = "asdf"
-    const { inner, store } = await renderPage({
+    const { inner } = await renderPage({
       entities: {
         auth: {
           state:         STATE_INVALID_EMAIL,

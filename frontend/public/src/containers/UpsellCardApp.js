@@ -1,6 +1,6 @@
 // @flow
 /* global SETTINGS:false */
-import React, { Fragment } from "react"
+import React from "react"
 import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
 import { compose } from "redux"
@@ -10,7 +10,7 @@ import { Badge } from "reactstrap"
 
 import Loader from "../components/Loader"
 import GetCertificateButton from '../components/GetCertificateButton'
-import { routes } from "../lib/urls"
+
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
   courseRunsSelector,
@@ -19,7 +19,7 @@ import {
 } from "../lib/queries/courseRuns"
 import { getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
 
-import { isFinancialAssistanceAvailable, isWithinEnrollmentPeriod} from "../lib/courseApi"
+import { isFinancialAssistanceAvailable } from "../lib/courseApi"
 
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
@@ -51,7 +51,6 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
   }
 
   renderUpgradeEnrollmentDialog(run: EnrollmentFlaggedCourseRun) {
-    const { courseRuns } = this.props
     const needFinancialAssistanceLink = isFinancialAssistanceAvailable(run) && !run.approved_flexible_price_exists ?
       (
         <p className="text-center financial-assistance-link">
@@ -107,8 +106,8 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
 
 
   render() {
-    const { courseRuns, isLoading, status } = this.props
-    const csrfToken = getCookie("csrftoken")
+    const { courseRuns, isLoading } = this.props
+
     const run = courseRuns ? courseRuns[0] : null
 
     return SETTINGS.features.upgrade_dialog ? (

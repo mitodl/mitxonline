@@ -2,7 +2,6 @@
 /* global SETTINGS:false */
 import React from "react"
 import { Formik, Form, Field } from "formik"
-import moment from "moment"
 import {
   Dropdown,
   DropdownToggle,
@@ -245,8 +244,6 @@ export class EnrolledItemCard extends React.Component<
     const {
       enrollment,
       currentUser,
-      deactivateEnrollment,
-      addUserNotification
     } = this.props
 
     const { menuVisibility } = this.state
@@ -295,7 +292,6 @@ export class EnrolledItemCard extends React.Component<
     const startDateDescription = generateStartDateText(enrollment.run)
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
     const courseId = enrollment.run.course_number
-    const enrollmentMode = enrollment.enrollment_mode
     const pageLocation = enrollment.run.page
     const menuTitle = `Course options for ${enrollment.run.course.title}`
 

@@ -8,7 +8,6 @@ import LoginForgotPasswordPage, {
 } from "./LoginForgotPasswordPage"
 import IntegrationTestHelper from "../../../util/integration_test_helper"
 import { routes } from "../../../lib/urls"
-import { ALERT_TYPE_TEXT } from "../../../constants"
 
 describe("LoginForgotPasswordPage", () => {
   const email = "email@example.com"
@@ -40,7 +39,7 @@ describe("LoginForgotPasswordPage", () => {
   })
 
   it("handles onSubmit", async () => {
-    const { inner, store } = await renderPage()
+    const { inner } = await renderPage()
 
     helper.handleRequestStub.returns({
       status: 200

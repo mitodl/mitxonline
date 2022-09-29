@@ -1,8 +1,6 @@
 // @flow
 import React from "react"
-import type { BasketItem, Product } from "../flow/cartTypes"
-import moment from "moment"
-import { formatPrettyDateTimeAmPmTz, parseDateString } from "../lib/util"
+import type { Product } from "../flow/cartTypes"
 import { generateStartDateText } from "../lib/courseApi"
 
 type Props = {

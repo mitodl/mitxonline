@@ -1,4 +1,3 @@
-/* global SETTINGS: false */
 // @flow
 import {
   isLinkableCourseRun,

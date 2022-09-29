@@ -4,10 +4,6 @@ import { assert } from "chai"
 import { shallow } from "enzyme"
 
 import TopAppBar from "./TopAppBar"
-import AnonymousMenu from "./AnonymousMenu"
-import UserMenu from "./UserMenu"
-
-import { routes } from "../lib/urls"
 import { makeUser, makeAnonymousUser } from "../factories/user"
 
 describe("TopAppBar component", () => {
