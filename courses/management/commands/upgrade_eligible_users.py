@@ -84,9 +84,7 @@ class Command(BaseCommand):
                     )
                     if edx_request_success is False:
                         self.stdout.write(
-                            self.style.ERROR(
-                                f"Enrollment for user {user} has failed."
-                            )
+                            self.style.ERROR(f"Enrollment for user {user} has failed.")
                         )
                         continue
                     upgrade_count += 1
