@@ -2,6 +2,7 @@ const path = require("path")
 const webpack = require("webpack")
 const BundleTracker = require("webpack-bundle-tracker")
 const MiniCssExtractPlugin = require("mini-css-extract-plugin")
+const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer")
 
 module.exports = function(env, argv) {
   const mode = argv.mode || process.env.NODE_ENV || "production"
@@ -10,7 +11,7 @@ module.exports = function(env, argv) {
     mode,
     context: __dirname,
     devtool: "source-map",
-    entry: {
+    entry:   {
       root:         "./src/entry/root",
       header:       "./src/entry/header",
       style:        "./src/entry/style",
@@ -22,11 +23,11 @@ module.exports = function(env, argv) {
         filename:           "[name]-[chunkhash].js",
         chunkFilename:      "[id]-[chunkhash].js",
         crossOriginLoading: "anonymous",
-        hashFunction: "xxhash64"
+        hashFunction:       "xxhash64"
       } : {
         filename: "[name].js",
       }),
-      publicPath: isProduction ? "/static/mitx-online/" : process.env.PUBLIC_PATH 
+      publicPath: isProduction ? "/static/mitx-online/" : process.env.PUBLIC_PATH
     },
     module: {
       rules: [
@@ -35,8 +36,8 @@ module.exports = function(env, argv) {
           type: "asset/inline"
         },
         {
-          test: require.resolve('jquery'),
-          loader: "expose-loader",
+          test:    require.resolve('jquery'),
+          loader:  "expose-loader",
           options: {
             exposes: ["jQuery", "$"]
           }
@@ -48,12 +49,12 @@ module.exports = function(env, argv) {
             path.resolve(__dirname, "../../node_modules/query-string"),
             path.resolve(__dirname, "../../node_modules/strict-uri-encode"),
           ],
-          loader:  "babel-loader",
+          loader: "babel-loader",
         },
         {
           test: /\.css$|\.scss$/,
           use:  [
-            { loader: isProduction ? MiniCssExtractPlugin.loader :"style-loader" },
+            { loader: isProduction ? MiniCssExtractPlugin.loader : "style-loader" },
             "css-loader",
             "postcss-loader",
             "sass-loader"
@@ -72,6 +73,9 @@ module.exports = function(env, argv) {
       new webpack.optimize.AggressiveMergingPlugin(),
       new MiniCssExtractPlugin({
         filename: "[name]-[contenthash].css"
+      }),
+      new BundleAnalyzerPlugin({
+        analyzerMode: "static",
       })
     ] : []),
     resolve: {
@@ -86,39 +90,39 @@ module.exports = function(env, argv) {
       hints: false
     },
     optimization: {
-      moduleIds: "named",
+      moduleIds:   "named",
       splitChunks:  {
         name:      "common",
         minChunks: 2,
         ...(isProduction ? {
-            cacheGroups: {
+          cacheGroups: {
             common: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'common',
+              test:   /[\\/]node_modules[\\/]/,
+              name:   'common',
               chunks: 'all',
             }
           }
         } : {})
       },
-      minimize: isProduction,
+      minimize:     isProduction,
       emitOnErrors: false
     },
     devServer: {
       allowedHosts: "all",
-      headers: {
+      headers:      {
         'Access-Control-Allow-Origin': '*'
       },
-      host: "::",
-      setupMiddlewares: function (middlewares, devServer) {
+      host:             "::",
+      setupMiddlewares: function(middlewares, devServer) {
         if (!devServer) {
-          throw new Error('webpack-dev-server is not defined');
+          throw new Error('webpack-dev-server is not defined')
         }
-    
-        devServer.app.get('/health', function (req, res) {
-          res.json({ success: true, server: "webpack" });
-        });
 
-        return middlewares;
+        devServer.app.get('/health', function(req, res) {
+          res.json({ success: true, server: "webpack" })
+        })
+
+        return middlewares
       },
     }
   }
