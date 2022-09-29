@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.46.2
+Version 0.46.2 (Released September 29, 2022)
 --------------
 
 - Online-1035 Display upgrade dialog when Ecommerce enabled (#1065)
