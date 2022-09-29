@@ -213,14 +213,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     tiers = GenericRelation("flexiblepricing.FlexiblePriceTier")
 
     @property
-    def course_number(self):
-        """
-        Returns:
-            str: Course number (last part of readable_id, after the final +)
-        """
-        return get_course_number(self.readable_id)
-
-    @property
     def page(self):
         """Gets the associated CoursePage"""
         return getattr(self, "coursepage", None)
