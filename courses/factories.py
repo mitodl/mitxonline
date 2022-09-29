@@ -12,6 +12,7 @@ from courses.models import (
     CourseRunEnrollment,
     CourseRunGrade,
     CourseRunCertificate,
+    ProgramCertificate,
     Program,
     ProgramEnrollment,
     ProgramRun,
@@ -30,6 +31,8 @@ class ProgramFactory(DjangoModelFactory):
         lambda number: "{}{}".format(PROGRAM_TEXT_ID_PREFIX, number)
     )
     live = True
+
+    page = factory.RelatedFactory("cms.factories.ProgramPageFactory", "program")
 
     class Meta:
         model = Program
@@ -137,6 +140,16 @@ class CourseRunGradeFactory(DjangoModelFactory):
         model = CourseRunGrade
 
 
+class ProgramCertificateFactory(DjangoModelFactory):
+    """Factory for ProgramCertificate"""
+
+    program = factory.SubFactory(ProgramFactory)
+    user = factory.SubFactory(UserFactory)
+
+    class Meta:
+        model = ProgramCertificate
+
+
 class CourseRunEnrollmentFactory(DjangoModelFactory):
     """Factory for CourseRunEnrollment"""
 
@@ -151,6 +164,7 @@ class CourseRunCertificateFactory(DjangoModelFactory):
     """Factory for CourseRunCertificate"""
 
     course_run = factory.SubFactory(CourseRunFactory)
+    certificate_page_revision = None
     user = factory.SubFactory(UserFactory)
 
     class Meta:

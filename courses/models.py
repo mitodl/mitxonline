@@ -638,6 +638,71 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         super(CourseRunCertificate, self).save(*args, **kwargs)
 
 
+class ProgramCertificate(TimestampedModel, BaseCertificate):
+    """
+    Model for storing program certificates
+    """
+
+    program = models.ForeignKey(Program, null=False, on_delete=models.CASCADE)
+    certificate_page_revision = models.ForeignKey(
+        PageRevision, null=True, on_delete=models.CASCADE
+    )
+
+    objects = ActiveCertificates()
+    all_objects = models.Manager()
+
+    class Meta:
+        unique_together = ("user", "program")
+
+    def get_certified_object_id(self):
+        return self.program_id
+
+    def get_courseware_object_id(self):
+        """Gets the program id"""
+        return self.program_id
+
+    def get_courseware_object_readable_id(self):
+        return self.program.readable_id
+
+    @property
+    def link(self):
+        """
+        Get the link at which this certificate will be served
+        Format: /certificate/program/<uuid>/
+        Example: /certificate/program/93ebd74e-5f88-4b47-bb09-30a6d575328f/
+        """
+        return "/certificate/program/{}/".format(str(self.uuid))
+
+    @property
+    def start_end_dates(self):
+        """
+        Start date: earliest course run start date
+        End date: latest course run end date
+        """
+        course_ids = self.program.courses.all().values_list("id", flat=True)
+        dates = CourseRunCertificate.objects.filter(
+            user_id=self.user_id, course_run__course_id__in=course_ids
+        ).aggregate(
+            start_date=models.Min("course_run__start_date"),
+            end_date=models.Max("course_run__end_date"),
+        )
+        return dates["start_date"], dates["end_date"]
+
+    def __str__(self):
+        return 'ProgramCertificate for user={user}, program={program} ({uuid})"'.format(
+            user=self.user.username, program=self.program.text_id, uuid=self.uuid
+        )
+
+    def save(self, *args, **kwargs):  # pylint: disable=signature-differs
+        if not self.certificate_page_revision:
+            certificate_page = (
+                self.program.page.certificate_page if self.program.page else None
+            )
+            if certificate_page:
+                self.certificate_page_revision = certificate_page.get_latest_revision()
+        super().save(*args, **kwargs)
+
+
 class BlockedCountry(TimestampedModel):
     """Represents a country that is blocked from enrollment for a course"""
 

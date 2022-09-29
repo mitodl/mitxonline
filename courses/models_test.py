@@ -12,6 +12,7 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunCertificateFactory,
+    ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
@@ -589,19 +590,52 @@ def test_enrollment_is_ended():
     assert course_enrollment.is_ended
 
 
-def test_course_run_certificate_start_end_dates():
-    """
-    Test that the CourseRunCertificate start_end_dates property works properly
-    """
-    certificate = CourseRunCertificateFactory.create()
-    start_date, end_date = certificate.start_end_dates
-    assert start_date == certificate.course_run.start_date
-    assert end_date == certificate.course_run.end_date
-
-
 def test_course_course_number():
     """
     Test that the Course course_number property works correctly with the readable_id.
     """
     course = CourseFactory.build(readable_id="course-v1:TestX+Test101")
     assert "Test101" == course.course_number
+
+
+def test_course_run_certificate_start_end_dates():
+    """
+    Test that the CourseRunCertificate start_end_dates property works properly
+    """
+    certificate = CourseRunCertificateFactory.create(
+        course_run__course__page__certificate_page__product_name="product_name"
+    )
+    start_date, end_date = certificate.start_end_dates
+    assert start_date == certificate.course_run.start_date
+    assert end_date == certificate.course_run.end_date
+    print(certificate.certificate_page_revision)
+    # assert certificate.course_run.course.page.certificate_page.product_name == certificate.certificate_page_revision.content.get('product_name')
+
+
+def test_program_certificate_start_end_dates(user):
+    """
+    Test that the ProgramCertificate start_end_dates property works properly
+    """
+    now = now_in_utc()
+    start_date = now + timedelta(days=1)
+    end_date = now + timedelta(days=100)
+    program = ProgramFactory.create()
+
+    early_course_run = CourseRunFactory.create(
+        course__program=program, start_date=start_date, end_date=end_date
+    )
+    later_course_run = CourseRunFactory.create(
+        course__program=program,
+        start_date=start_date + timedelta(days=1),
+        end_date=end_date + timedelta(days=1),
+    )
+
+    # Need the course run certificates to be there in order for the start_end_dates
+    # to return valid values
+    CourseRunCertificateFactory.create(course_run=early_course_run, user=user)
+    CourseRunCertificateFactory.create(course_run=later_course_run, user=user)
+
+    certificate = ProgramCertificateFactory.create(program=program, user=user)
+    program_start_date, program_end_date = certificate.start_end_dates
+    assert program_start_date == early_course_run.start_date
+    assert program_end_date == later_course_run.end_date

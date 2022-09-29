@@ -58,7 +58,7 @@ from cms.constants import (
 )
 from cms.forms import CertificatePageForm
 from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset
-from courses.models import Course, CourseRunCertificate, Program
+from courses.models import Course, CourseRunCertificate, ProgramCertificate, Program
 from flexiblepricing.api import (
     determine_auto_approval,
     determine_courseware_flexible_price_discount,
@@ -141,6 +141,40 @@ class CertificateIndexPage(RoutablePageMixin, Page):
             super().can_create_at(parent)
             and not parent.get_children().type(cls).exists()
         )
+
+    @route(r"^program/([A-Fa-f0-9-]+)/?$")
+    def program_certificate(
+        self, request, uuid, *args, **kwargs
+    ):  # pylint: disable=unused-argument
+        """
+        Serve a program certificate by uuid
+        """
+        # Try to fetch a certificate by the uuid passed in the URL
+        try:
+            certificate = ProgramCertificate.objects.get(uuid=uuid)
+        except ProgramCertificate.DoesNotExist:
+            raise Http404()
+
+        # Get a CertificatePage to serve this request
+        certificate_page = (
+            certificate.certificate_page_revision.as_page_object()
+            if certificate.certificate_page_revision
+            else (
+                certificate.program.page.certificate_page
+                if certificate.program.page
+                else None
+            )
+        )
+        if not certificate_page:
+            raise Http404()
+
+        if not certificate.certificate_page_revision:
+            # It'll save the certificate page revision
+            # If certificate page is available and revision is not saved
+            certificate.save()
+
+        certificate_page.certificate = certificate
+        return certificate_page.serve(request)
 
     @route(r"^([A-Fa-f0-9-]+)/?$")
     def course_certificate(
@@ -369,6 +403,10 @@ class CertificatePage(CourseProgramChildPage):
                     CEUs = override.value.get("CEUs")
                     break
 
+            is_program_certificate = False
+            if isinstance(self.certificate, ProgramCertificate):
+                is_program_certificate = True
+
             context = {
                 "uuid": self.certificate.uuid,
                 "certificate_user": self.certificate.user,
@@ -376,6 +414,7 @@ class CertificatePage(CourseProgramChildPage):
                 "start_date": start_date,
                 "end_date": end_date,
                 "CEUs": CEUs,
+                "is_program_certificate": is_program_certificate,
             }
         else:
             raise Http404()

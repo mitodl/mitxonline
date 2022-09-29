@@ -83,6 +83,9 @@ class ProgramPageFactory(wagtail_factories.PageFactory):
     parent = LazyAttribute(
         lambda _: ProgramIndexPage.objects.first() or ProgramIndexPageFactory.create()
     )
+    certificate_page = factory.RelatedFactory(
+        "cms.factories.CertificatePageFactory", "parent"
+    )
 
     class Meta:
         model = ProgramPage
