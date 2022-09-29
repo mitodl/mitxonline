@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.46.3
+--------------
+
+- Upgrade legacy learners that paid and are enrolled, have exam attempt (#1059)
+- Revert "1044: when referring to a course in email don't include the full course (#1060)" (#1071)
+- 1044: when referring to a course in email don't include the full course (#1060)
+- remove unused variables + update eslint config
+- Adds management command to generate enrollment codes for legacy learners
+- add webpack-bundle-analyzer
+- Changes the receipt email subject
+
 Version 0.46.2 (Released September 29, 2022)
 --------------
 
