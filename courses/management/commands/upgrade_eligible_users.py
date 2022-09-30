@@ -34,7 +34,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
-
+        upgrade_count = 0
         with open(kwargs["input_file"], newline="") as csvfile:
             reader = csv.reader(csvfile, delimiter=",", quotechar="\\")
 
@@ -58,7 +58,6 @@ class Command(BaseCommand):
                         )
                     )
                     continue
-                upgrade_count = 0
                 enrollment = CourseRunEnrollment.objects.filter(
                     user=user, run=course_run
                 ).first()
