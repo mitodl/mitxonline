@@ -337,5 +337,9 @@ describe("utility functions", () => {
     it("formatLocalePrice returns a US-formatted price string equalling zero when the input is null", () => {
       assert.equal(formatLocalePrice(null), "$0.00")
     })
+
+    it("formatLocalePrice returns a US-formatted price string equalling zero when the input is negative", () => {
+      assert.equal(formatLocalePrice(null), "$0.00")
+    })
   })
 })
