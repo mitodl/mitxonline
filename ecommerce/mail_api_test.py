@@ -91,6 +91,7 @@ def test_mail_api_refund_email_generation(mocker, user, products, user_client):
         "{} {}".format(
             order.purchaser.legal_address.first_name,
             order.purchaser.legal_address.last_name,
+            order.purchased_runs[0].course_number,
         )
         in rendered_template.body
     )
