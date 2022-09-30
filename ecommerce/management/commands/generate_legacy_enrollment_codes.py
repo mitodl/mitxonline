@@ -14,15 +14,19 @@ and course combination (if a product exists for it). The course must be
 available for enrollment and must also have a product associated with it. 
 """
 from django.core.management import BaseCommand
+from django.db import transaction
+
 import csv
 import uuid
-from django.db import transaction
+import dateutil
+import pytz
 
 from courses.models import CourseRun, Course
 from ecommerce.models import Discount, DiscountProduct, UserDiscount
 from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, DISCOUNT_TYPE_PERCENT_OFF
 from users.models import User
 from micromasters_import.models import CourseId
+from main.settings import TIME_ZONE
 
 
 class Command(BaseCommand):
@@ -42,9 +46,24 @@ class Command(BaseCommand):
         parser.add_argument(
             "output_file", type=str, help="File to write the results to."
         )
+        parser.add_argument(
+            "--expires",
+            type=str,
+            help="Optional expiration date for the code, in ISO-8601 (YYYY-MM-DD) format.",
+        )
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
         output_codes = []
+
+        if "expires" in kwargs and kwargs["expires"] is not None:
+            self.stdout.write(f"Setting expiration date to {kwargs['expires']}")
+            expiration_date = dateutil.parser.parse(kwargs["expires"])
+            if expiration_date.utcoffset() is not None:
+                expiration_date = expiration_date - expiration_date.utcoffset()
+
+            expiration_date = expiration_date.replace(tzinfo=pytz.timezone(TIME_ZONE))
+        else:
+            expiration_date = None
 
         with open(kwargs["input_file"], newline="") as csvfile:
             reader = csv.reader(csvfile, delimiter=",", quotechar="\\")
@@ -93,6 +112,30 @@ class Command(BaseCommand):
                             continue
 
                 try:
+                    discount_product = courserun.products.filter(is_active=True).first()
+                    user_discounts = (
+                        UserDiscount.objects.filter(
+                            user=user,
+                        )
+                        .filter(
+                            discount__amount=100,
+                        )
+                        .filter(discount__discount_type=DISCOUNT_TYPE_PERCENT_OFF)
+                        .filter(
+                            discount__redemption_type=REDEMPTION_TYPE_ONE_TIME,
+                        )
+                        .filter(discount__products__product=discount_product)
+                        .first()
+                    )
+
+                    if user_discounts is not None:
+                        self.stderr.write(
+                            self.style.ERROR(
+                                f"Discount already exists for {row[0]} in course {row[1]}, skipping"
+                            )
+                        )
+                        continue
+
                     with transaction.atomic():
                         generated_uuid = uuid.uuid4()
                         code = f"{self.CODE_PREFIX}{generated_uuid}"
@@ -103,11 +146,12 @@ class Command(BaseCommand):
                             redemption_type=REDEMPTION_TYPE_ONE_TIME,
                             discount_code=code,
                             for_flexible_pricing=False,
+                            expiration_date=expiration_date,
                         )
 
                         DiscountProduct.objects.create(
                             discount=discount,
-                            product=courserun.products.filter(is_active=True).first(),
+                            product=discount_product,
                         )
 
                         UserDiscount.objects.create(discount=discount, user=user)
