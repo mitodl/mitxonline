@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.46.3
+Version 0.46.3 (Released October 03, 2022)
 --------------
 
 - Upgrade legacy learners that paid and are enrolled, have exam attempt (#1059)
