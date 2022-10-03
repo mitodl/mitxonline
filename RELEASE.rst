@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.47.0
+--------------
+
+- Fix a small bug in upgrade_eligible_users (#1081)
+- Adds dupe checking for generated codes; adds --expires flag to set the expiration date on generated codes
+- 1044: when referring to a course in email dont include the full course (#1076)
+- fix: show zero for negative prices (#1079)
+- update local only enrollments error to filter out unenrolled
+
 Version 0.46.3 (Released October 03, 2022)
 --------------
 
