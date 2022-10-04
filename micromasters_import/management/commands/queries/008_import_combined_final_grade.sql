@@ -44,7 +44,7 @@ combined_final_grades AS (
     SELECT
         best_grade.user_id,
         best_grade.course_run_id,
-        ROUND(CAST(best_grade.max_grade * 100 * 0.4 + best_exam.max_score * 0.6 AS numeric), 1) AS calculated_grade,
+        CAST(best_grade.max_grade * 100 * 0.4 + best_exam.max_score * 0.6 AS numeric) AS calculated_grade,
         mm_courserun.course_id,
         mm_courserun.edx_course_key,
         mm_grade.created_on,
@@ -81,13 +81,10 @@ SELECT
   combined_grades.created_on,
   combined_grades.updated_on,
   combined_grades.passed,
-  combined_grades.calculated_grade,
+  ROUND(CAST(combined_grades.calculated_grade/100 AS decimal), 3),
   CASE
-      WHEN combined_grades.calculated_grade >= 82.5 THEN 'A'
-      WHEN combined_grades.calculated_grade >= 65 THEN 'B'
-      WHEN combined_grades.calculated_grade >= 55 THEN 'C'
-      WHEN combined_grades.calculated_grade >= 50 THEN 'D'
-      ELSE 'F'
+      WHEN combined_grades.passed = true THEN 'Pass'
+      ELSE NULL
   END AS letter_grade,
   False AS set_by_admin,
   mo_courserun.id,
