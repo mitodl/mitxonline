@@ -153,6 +153,9 @@ class BaseOrderAdmin(FSMTransitionMixin, TimestampedModelAdmin):
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     readonly_fields = ["reference_number"]
 
+    def has_change_permission(self, request, obj=None):
+        return False
+
     @display(description="Purchaser")
     def get_purchaser(self, obj: Order):
         return f"{obj.purchaser.name} ({obj.purchaser.email})"
@@ -206,6 +209,9 @@ class FulfilledOrderAdmin(TimestampedModelAdmin):
     list_filter = ["state"]
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     model = FulfilledOrder
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
     @display(description="Purchaser")
     def get_purchaser(self, obj: Order):
