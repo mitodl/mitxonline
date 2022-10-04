@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.47.2
+--------------
+
+- made order admin page view-only
+
 Version 0.47.1 (Released October 04, 2022)
 --------------
 
