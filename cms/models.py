@@ -283,9 +283,7 @@ class CertificatePage(CourseProgramChildPage):
     """
 
     template = "certificate_page.html"
-    parent_page_types = [
-        "CoursePage",
-    ]
+    parent_page_types = ["CoursePage", "ProgramPage"]
 
     product_name = models.CharField(
         max_length=250,
@@ -863,7 +861,7 @@ class CoursePage(ProductPage):
 
     parent_page_types = ["CourseIndexPage"]
     subpage_types = [
-        "cms.FlexiblePricingRequestForm",
+        "FlexiblePricingRequestForm",
         "CertificatePage",
     ]
 
@@ -973,7 +971,7 @@ class ProgramPage(ProductPage):
     """
 
     parent_page_types = ["ProgramIndexPage"]
-    subpage_types = ["FlexiblePricingRequestForm"]
+    subpage_types = ["FlexiblePricingRequestForm", "CertificatePage"]
 
     program = models.OneToOneField(
         "courses.Program", null=True, on_delete=models.SET_NULL, related_name="page"

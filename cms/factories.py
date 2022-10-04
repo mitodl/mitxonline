@@ -78,7 +78,7 @@ class ProgramPageFactory(wagtail_factories.PageFactory):
     description = fuzzy.FuzzyText(prefix="Description ")
     length = fuzzy.FuzzyText(prefix="Length ")
     feature_image = factory.SubFactory(wagtail_factories.ImageFactory)
-    program = factory.SubFactory(ProgramFactory)
+    program = factory.SubFactory(ProgramFactory, page=None)
     slug = fuzzy.FuzzyText(prefix="my-page-")
     parent = LazyAttribute(
         lambda _: ProgramIndexPage.objects.first() or ProgramIndexPageFactory.create()
