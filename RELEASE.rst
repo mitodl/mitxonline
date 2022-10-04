@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.47.0
+Version 0.47.0 (Released October 04, 2022)
 --------------
 
 - Fix a small bug in upgrade_eligible_users (#1081)
