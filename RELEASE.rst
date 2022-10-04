@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.47.1
+--------------
+
+- fixed letter_grade and grade in MM migration query to match with production
+
 Version 0.47.0 (Released October 04, 2022)
 --------------
 
