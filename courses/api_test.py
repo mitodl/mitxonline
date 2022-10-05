@@ -278,7 +278,9 @@ def test_get_user_enrollments(user):
 @pytest.mark.parametrize(
     "enrollment_mode", [EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE]
 )
-def test_create_run_enrollments(mocker, user, enrollment_mode):
+def test_create_run_enrollments(
+    mocker, user, enrollment_mode, django_capture_on_commit_callbacks
+):
     """
     create_run_enrollments should call the edX API to create enrollments, create or reactivate local
     enrollment records, and notify enrolled users via email
@@ -306,22 +308,23 @@ def test_create_run_enrollments(mocker, user, enrollment_mode):
     )
     patched_edx_enroll.assert_called_once_with(user, runs, mode=enrollment_mode)
 
-    assert patched_send_enrollment_email.call_count == num_runs
-    assert edx_request_success is True
-    assert len(successful_enrollments) == num_runs
-    enrollments = CourseRunEnrollment.objects.order_by("run__id").all()
-    for (run, enrollment) in zip(runs, enrollments):
-        assert enrollment.change_status is None
-        assert enrollment.active is True
-        assert enrollment.edx_enrolled is True
-        assert enrollment.edx_emails_subscription is True
-        assert enrollment.run == run
-        assert enrollment.enrollment_mode == enrollment_mode
-        patched_send_enrollment_email.assert_any_call(enrollment)
+    with django_capture_on_commit_callbacks(execute=True):
+        assert patched_send_enrollment_email.call_count == num_runs
+        assert edx_request_success is True
+        assert len(successful_enrollments) == num_runs
+        enrollments = CourseRunEnrollment.objects.order_by("run__id").all()
+        for (run, enrollment) in zip(runs, enrollments):
+            assert enrollment.change_status is None
+            assert enrollment.active is True
+            assert enrollment.edx_enrolled is True
+            assert enrollment.edx_emails_subscription is True
+            assert enrollment.run == run
+            assert enrollment.enrollment_mode == enrollment_mode
+            patched_send_enrollment_email.assert_any_call(enrollment)
 
-        assert ProgramEnrollment.objects.filter(
-            user=user, program=runs[0].course.program
-        ).exists()
+            assert ProgramEnrollment.objects.filter(
+                user=user, program=runs[0].course.program
+            ).exists()
 
 
 @pytest.mark.parametrize("is_active", [True, False])
