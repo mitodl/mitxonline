@@ -94,15 +94,15 @@ class Command(BaseCommand):
                         )
                     )
         if users_no_enrollment:
-            file_name = 'users_eligible_for_coupon.csv'
-            path = '{}/{}'.format(settings.BASE_DIR, file_name)
-            with open(path, 'w') as f:
+            file_name = "users_eligible_for_coupon.csv"
+            path = "{}/{}".format(settings.BASE_DIR, file_name)
+            with open(path, "w") as f:
                 for email, course_id in users_no_enrollment:
-                    f.write(f'{email},{course_id}\n')
+                    f.write(f"{email},{course_id}\n")
 
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'{len(users_no_enrollment)} are missing enrollments. Successfully created {file_name}.'
+                    f"{len(users_no_enrollment)} are missing enrollments. Successfully created {file_name}."
                 )
             )
 
