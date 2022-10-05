@@ -9,12 +9,11 @@ learner email,courserun readable id
 ```
 """
 from django.core.management import BaseCommand
+from django.conf import settings
 import csv
 
 from courses.api import create_run_enrollments
 from courses.models import CourseRun, CourseRunEnrollment
-from ecommerce.models import Discount, DiscountProduct, UserDiscount
-from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, DISCOUNT_TYPE_PERCENT_OFF
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE
 from users.models import User
 
@@ -35,6 +34,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
         upgrade_count = 0
+        users_no_enrollment = []
         with open(kwargs["input_file"], newline="") as csvfile:
             reader = csv.reader(csvfile, delimiter=",", quotechar="\\")
 
@@ -62,6 +62,7 @@ class Command(BaseCommand):
                     user=user, run=course_run
                 ).first()
                 if enrollment is None:
+                    users_no_enrollment.append((row[0], course_run.course_id))
                     self.stderr.write(
                         self.style.ERROR(
                             f"Can't find enrollment for user {row[0]}, course run {row[1]} skipping row"
@@ -92,5 +93,17 @@ class Command(BaseCommand):
                             f"User {user} was upgraded for {course_run.courseware_id}, edx request {edx_request_success}"
                         )
                     )
+        if users_no_enrollment:
+            file_name = 'users_eligible_for_coupon.csv'
+            path = '{}/{}'.format(settings.BASE_DIR, file_name)
+            with open(path, 'w') as f:
+                for email, course_id in users_no_enrollment:
+                    f.write(f'{email},{course_id}\n')
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f'{len(users_no_enrollment)} are missing enrollments. Successfully created {file_name}.'
+                )
+            )
 
         self.stdout.write(self.style.SUCCESS(f"Upgraded {upgrade_count} learners."))
