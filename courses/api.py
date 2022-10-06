@@ -613,13 +613,17 @@ def sync_course_mode(runs: List[CourseRun]) -> List[str]:
             log.error("%s: %s", str(e), run.courseware_id)
         else:
             for course_mode in course_modes:
-                if course_mode.mode_slug == "verified" and run.upgrade_deadline != course_mode.expiration_datetime:
+                if (
+                    course_mode.mode_slug == "verified"
+                    and run.upgrade_deadline != course_mode.expiration_datetime
+                ):
                     run.upgrade_deadline = course_mode.expiration_datetime
                     try:
                         run.save()
                         success_count += 1
                         log.info(
-                            "Updated upgrade deadline for course run: %s", run.courseware_id
+                            "Updated upgrade deadline for course run: %s",
+                            run.courseware_id,
                         )
                     except Exception as e:  # pylint: disable=broad-except
                         # Report any validation or otherwise model errors
