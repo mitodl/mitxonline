@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.47.3
+--------------
+
+- Updates the call to subscribe to edX emails to be in a post-commit hook
+
 Version 0.47.2 (Released October 04, 2022)
 --------------
 
