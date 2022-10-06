@@ -233,6 +233,10 @@ def create_run_enrollments(
             for all of the given course runs
     """
     successful_enrollments = []
+
+    def send_enrollment_emails():
+        subscribe_edx_course_emails.delay(enrollment.id)
+
     try:
         enroll_in_edx_course_runs(user, runs, mode=mode)
     except (
@@ -278,7 +282,7 @@ def create_run_enrollments(
                     if enrollment_mode_changed:
                         enrollment.enrollment_mode = mode
                     enrollment.reactivate_and_save()
-                    subscribe_edx_course_emails.delay(enrollment_id=enrollment.id)
+                    transaction.on_commit(send_enrollment_emails)
         except:  # pylint: disable=bare-except
             mail_api.send_enrollment_failure_message(user, run, details=format_exc())
             log.exception(
