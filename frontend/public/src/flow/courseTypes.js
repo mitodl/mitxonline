@@ -34,7 +34,7 @@ export type CourseRunDetail = BaseCourseRun & {
   course: CourseDetail
 }
 
-export type CourseRunCertificate = {
+export type Certificate = {
   link: string,
   uuid: string
 }
@@ -44,7 +44,7 @@ export type RunEnrollment = {
   id: number,
   edx_emails_subscription: ?string,
   enrollment_mode: string,
-  certificate: ?CourseRunCertificate,
+  certificate: ?Certificate,
 }
 
 export type CourseDetailWithRuns = CourseDetail & {
@@ -60,5 +60,6 @@ export type Program = {
 
 export type ProgramEnrollment = {
   program: Program,
-  enrollments: Array<RunEnrollment>
+  enrollments: Array<RunEnrollment>,
+  certificate: ?Certificate
 }

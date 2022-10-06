@@ -14,6 +14,7 @@ from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
+from courses.utils import get_program_certificate
 from ecommerce.models import Product
 from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
@@ -434,17 +435,35 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
         ]
 
 
+class ProgramCertificateSerializer(serializers.ModelSerializer):
+    """CourseRunCertificate model serializer"""
+
+    class Meta:
+        model = models.ProgramCertificate
+        fields = ["uuid", "link"]
+
+
 class ProgramEnrollmentSerializer(serializers.ModelSerializer):
     """ProgramEnrollmentSerializer model serializer"""
 
     program = BaseProgramSerializer(read_only=True)
     course_run_enrollments = serializers.SerializerMethodField()
+    certificate = serializers.SerializerMethodField(read_only=True)
 
     def __init__(self, *args, **kwargs):
         assert (
             "context" in kwargs and "course_run_enrollments" in kwargs["context"]
         ), "An iterable of course run enrollments must be passed in the context (key: course_run_enrollments)"
         super().__init__(*args, **kwargs)
+
+    def get_certificate(self, enrollment):
+        """
+        Resolve a certificate for this enrollment if it exists
+        """
+        certificate = get_program_certificate(enrollment)
+        if certificate:
+            return ProgramCertificateSerializer(certificate).data
+        return None
 
     def get_course_run_enrollments(self, instance):
         """Returns a serialized list of course run enrollments that belong to this program (in position order)"""
@@ -466,9 +485,18 @@ class ProgramEnrollmentSerializer(serializers.ModelSerializer):
             "id",
             "program",
             "course_run_enrollments",
+            "certificate",
         ]
 
 
 class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
     program = ProgramSerializer()
     enrollments = CourseRunEnrollmentSerializer(many=True)
+    certificate = serializers.SerializerMethodField(read_only=True)
+
+    def get_certificate(self, user_program_enrollment):
+        """
+        Resolve a certificate for this enrollment if it exists
+        """
+        certificate = user_program_enrollment.get("certificate")
+        return ProgramCertificateSerializer(certificate).data if certificate else None

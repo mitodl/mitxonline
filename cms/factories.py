@@ -128,13 +128,19 @@ class SignatoryPageFactory(wagtail_factories.PageFactory):
         model = SignatoryPage
 
 
+class SignatoryPageChooserBlockFactory(wagtail_factories.PageChooserBlockFactory):
+    """SignatoryPageChooser factory class"""
+
+    page = factory.SubFactory(SignatoryPageFactory)
+
+
 class CertificatePageFactory(wagtail_factories.PageFactory):
     """CertificatePage factory class"""
 
     product_name = factory.fuzzy.FuzzyText(prefix="product_name")
     CEUs = factory.Faker("pystr_format", string_format="#.#")
     signatories = wagtail_factories.StreamFieldFactory(
-        {"signatory": SignatoryPageFactory}
+        {"signatory": factory.SubFactory(SignatoryPageChooserBlockFactory)}
     )
 
     class Meta:

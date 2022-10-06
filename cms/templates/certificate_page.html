@@ -74,11 +74,7 @@
                     <span class="award-text">
                         {% if page.CEUs %} Awarded {{ CEUs }} Continuing Education Units (CEUs) <br> {% endif %}
                         
-                        {% if is_program_certificate %}
-                            {{ end_date|date }}
-                        {% else %}
-                            {{ start_date|date }} - {{ end_date|date }}
-                        {% endif %}
+                        {{ start_date|date }} - {{ end_date|date }}
                     </span>
                     <div class="row justify-content-center certify-by-row">
                         {% for signatory in page.signatory_pages %}

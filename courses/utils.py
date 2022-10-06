@@ -4,6 +4,7 @@ import logging
 from requests.exceptions import HTTPError
 from courses.models import (
     CourseRunCertificate,
+    CourseRunEnrollment,
     ProgramCertificate,
     ProgramEnrollment,
 )
@@ -84,3 +85,30 @@ def generate_program_certificate(user, program):
             )
 
     return program_cert, True
+
+
+def get_program_certificate(enrollment):
+    """
+    Resolve a certificate for this enrollment if it exists
+    """
+    user_id = enrollment.user_id
+    if isinstance(enrollment, CourseRunEnrollment):
+        # No need to include a certificate if there is no corresponding wagtail page
+        # to support the render
+        if (
+            not enrollment.run.course.program.page
+            or not enrollment.run.course.program.page.certificate_page
+        ):
+            return None
+        program_id = enrollment.run.course.program.id
+    else:
+        # No need to include a certificate if there is no corresponding wagtail page
+        # to support the render
+        if not enrollment.program.page or not enrollment.program.page.certificate_page:
+            return None
+        program_id = enrollment.program_id
+    # Using IDs because we don't need the actual record and this avoids redundant queries
+    try:
+        return ProgramCertificate.objects.get(user_id=user_id, program_id=program_id)
+    except ProgramCertificate.DoesNotExist:
+        return None

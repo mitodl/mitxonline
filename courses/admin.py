@@ -23,6 +23,7 @@ from courses.models import (
     ProgramEnrollmentAudit,
     ProgramRun,
     PaidCourseRun,
+    ProgramCertificate,
 )
 from main.admin import AuditableModelAdmin
 from main.utils import get_field_names
@@ -404,6 +405,37 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         )
 
 
+class ProgramCertificateAdmin(TimestampedModelAdmin):
+    """Admin for ProgramCertificate"""
+
+    model = ProgramCertificate
+    include_timestamps_in_list = True
+    list_display = [
+        "uuid",
+        "user",
+        "program",
+        "get_revoked_state",
+        "certificate_page_revision",
+    ]
+    search_fields = [
+        "program__readable_id",
+        "program__title",
+        "user__username",
+        "user__email",
+    ]
+    raw_id_fields = ("user",)
+
+    def get_revoked_state(self, obj):
+        """return the revoked state"""
+        return obj.is_revoked is not True
+
+    get_revoked_state.short_description = "Active"
+    get_revoked_state.boolean = True
+
+    def get_queryset(self, request):
+        return self.model.all_objects.get_queryset().select_related("user", "program")
+
+
 admin.site.register(Program, ProgramAdmin)
 admin.site.register(ProgramRun, ProgramRunAdmin)
 admin.site.register(Course, CourseAdmin)
@@ -418,3 +450,4 @@ admin.site.register(CourseTopic, CourseTopicAdmin)
 admin.site.register(BlockedCountry, BlockedCountryAdmin)
 admin.site.register(PaidCourseRun, PaidCourseRunAdmin)
 admin.site.register(CourseRunCertificate, CourseRunCertificateAdmin)
+admin.site.register(ProgramCertificate, ProgramCertificateAdmin)

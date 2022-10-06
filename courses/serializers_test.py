@@ -311,6 +311,7 @@ def test_serialize_program_enrollments(settings, receipts_enabled):
         "course_run_enrollments": CourseRunEnrollmentSerializer(
             [course_run_enrollments[1], course_run_enrollments[0]], many=True
         ).data,
+        "certificate": None,
     }
 
 

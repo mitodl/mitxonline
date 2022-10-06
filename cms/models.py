@@ -795,6 +795,11 @@ class ProductPage(Page):
         """Gets the product page type, this is used for sorting product pages."""
         return isinstance(self, CoursePage)
 
+    @property
+    def is_program_page(self):
+        """Gets the product page type, this is used for sorting product pages."""
+        return isinstance(self, ProgramPage)
+
     content_panels = Page.content_panels + [
         FieldPanel("description"),
         FieldPanel("length"),
@@ -809,7 +814,7 @@ class ProductPage(Page):
         FieldPanel("video_url"),
     ]
 
-    subpage_types = []
+    subpage_types = ["FlexiblePricingRequestForm", "CertificatePage"]
 
     # Matches the standard page path that Wagtail returns for this page type.
     slugged_page_path_pattern = re.compile(r"(^.*/)([^/]+)(/?$)")
@@ -860,10 +865,6 @@ class CoursePage(ProductPage):
     """
 
     parent_page_types = ["CourseIndexPage"]
-    subpage_types = [
-        "FlexiblePricingRequestForm",
-        "CertificatePage",
-    ]
 
     course = models.OneToOneField(
         "courses.Course", null=True, on_delete=models.SET_NULL, related_name="page"
@@ -971,7 +972,6 @@ class ProgramPage(ProductPage):
     """
 
     parent_page_types = ["ProgramIndexPage"]
-    subpage_types = ["FlexiblePricingRequestForm", "CertificatePage"]
 
     program = models.OneToOneField(
         "courses.Program", null=True, on_delete=models.SET_NULL, related_name="page"

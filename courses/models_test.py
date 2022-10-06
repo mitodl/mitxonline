@@ -598,7 +598,7 @@ def test_course_course_number():
     assert "Test101" == course.course_number
 
 
-def test_course_run_certificate_start_end_dates():
+def test_course_run_certificate_start_end_dates_and_page_revision():
     """
     Test that the CourseRunCertificate start_end_dates property works properly
     """
@@ -608,11 +608,13 @@ def test_course_run_certificate_start_end_dates():
     start_date, end_date = certificate.start_end_dates
     assert start_date == certificate.course_run.start_date
     assert end_date == certificate.course_run.end_date
-    print(certificate.certificate_page_revision)
-    # assert certificate.course_run.course.page.certificate_page.product_name == certificate.certificate_page_revision.content.get('product_name')
+    certificate_page = certificate.course_run.course.page.certificate_page
+    assert (
+        certificate_page.get_latest_revision() == certificate.certificate_page_revision
+    )
 
 
-def test_program_certificate_start_end_dates(user):
+def test_program_certificate_start_end_dates_and_page_revision(user):
     """
     Test that the ProgramCertificate start_end_dates property works properly
     """
@@ -639,3 +641,7 @@ def test_program_certificate_start_end_dates(user):
     program_start_date, program_end_date = certificate.start_end_dates
     assert program_start_date == early_course_run.start_date
     assert program_end_date == later_course_run.end_date
+    certificate_page = certificate.program.page.certificate_page
+    assert (
+        certificate_page.get_latest_revision() == certificate.certificate_page_revision
+    )

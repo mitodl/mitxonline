@@ -494,11 +494,11 @@ def test_certificate_for_course_page():
         parent=course_page,
         product_name="product_name",
         CEUs="1.8",
-        signatories__0__signatory__name="Name",
-        signatories__0__signatory__title_1="Title_1",
-        signatories__0__signatory__title_2="Title_2",
-        signatories__0__signatory__organization="Organization",
-        signatories__0__signatory__signature_image__title="Image",
+        signatories__0__signatory__page__name="Name",
+        signatories__0__signatory__page__title_1="Title_1",
+        signatories__0__signatory__page__title_2="Title_2",
+        signatories__0__signatory__page__organization="Organization",
+        signatories__0__signatory__page__signature_image__title="Image",
     )
     assert certificate_page.get_parent() == course_page
     assert certificate_page.CEUs == "1.8"
@@ -523,11 +523,11 @@ def test_certificate_for_program_page():
         parent=program_page,
         product_name="product_name",
         CEUs="2.8",
-        signatories__0__signatory__name="Name",
-        signatories__0__signatory__title_1="Title_1",
-        signatories__0__signatory__title_2="Title_2",
-        signatories__0__signatory__organization="Organization",
-        signatories__0__signatory__signature_image__title="Image",
+        signatories__0__signatory__page__name="Name",
+        signatories__0__signatory__page__title_1="Title_1",
+        signatories__0__signatory__page__title_2="Title_2",
+        signatories__0__signatory__page__organization="Organization",
+        signatories__0__signatory__page__signature_image__title="Image",
     )
 
     assert certificate_page.get_parent() == program_page
