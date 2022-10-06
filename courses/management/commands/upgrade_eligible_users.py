@@ -62,7 +62,7 @@ class Command(BaseCommand):
                     user=user, run=course_run
                 ).first()
                 if enrollment is None:
-                    users_no_enrollment.append((row[0], course_run.course_id))
+                    users_no_enrollment.append((row[0], row[1]))
                     self.stderr.write(
                         self.style.ERROR(
                             f"Can't find enrollment for user {row[0]}, course run {row[1]} skipping row"
