@@ -450,13 +450,11 @@ class CheckoutCallbackView(View):
                 if not PaymentGateway.validate_processor_response(
                     ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
                 ):
-                    raise PermissionDenied(
-                        "Could not validate response from the payment processor."
+                    log.info("Could not validate payment response for order")
+                else:
+                    processor_response = PaymentGateway.get_formatted_response(
+                        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
                     )
-
-                processor_response = PaymentGateway.get_formatted_response(
-                    ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
-                )
                 log.info(
                     "Checkout callback unknown error for transaction_id %s, state %s, reason_code %s, message %s, and ProcessorResponse %s",
                     processor_response.transaction_id,
