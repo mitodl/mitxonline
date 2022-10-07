@@ -15,6 +15,7 @@ available for enrollment and must also have a product associated with it.
 """
 from django.core.management import BaseCommand
 from django.db import transaction
+from django.db.models import Q
 
 import csv
 import uuid
@@ -69,15 +70,28 @@ class Command(BaseCommand):
             reader = csv.reader(csvfile, delimiter=",", quotechar="\\")
 
             for row in reader:
-                user = User.objects.filter(email=row[0]).first()
+                user = None
 
-                if user is None:
-                    self.stderr.write(
-                        self.style.ERROR(
-                            f"Can't find account for user {row[0]}, skipping row"
+                try:
+                    user = User.objects.filter(
+                        Q(email__exact=row[0]) | Q(username__exact=row[0])
+                    ).get()
+                except User.DoesNotExist:
+                    if user is None:
+                        self.stderr.write(
+                            self.style.ERROR(
+                                f"Can't find account for user {row[0]}, skipping row"
+                            )
                         )
-                    )
-                    continue
+                        continue
+                except User.MultipleObjectsReturned:
+                    if user is None:
+                        self.stderr.write(
+                            self.style.ERROR(
+                                f"More than one matching user for {row[0]}, skipping row"
+                            )
+                        )
+                        continue
 
                 try:
                     mmid = int(row[1])
@@ -131,7 +145,7 @@ class Command(BaseCommand):
                     if user_discounts is not None:
                         self.stderr.write(
                             self.style.ERROR(
-                                f"Discount already exists for {row[0]} in course {row[1]}, skipping"
+                                f"Discount already exists for {user.username} in course {row[1]}, skipping"
                             )
                         )
                         continue
