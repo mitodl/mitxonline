@@ -7,6 +7,6 @@ class CachelessAPIMiddleware(MiddlewareMixin):
 
     def process_response(self, request, response):
         """Add a Cache-Control header to an API response"""
-        if request.path.startswith("/api/"):
+        if request.path.startswith("/api/") or request.path.startswith("/courses/"):
             response["Cache-Control"] = "private, no-store"
         return response
