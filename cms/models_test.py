@@ -1,36 +1,38 @@
 """Tests for Wagtail models"""
-from urllib.parse import quote_plus
-from courses.models import CourseRun
-
-import pytest
-import factory
 import json
+from urllib.parse import quote_plus
+
+import factory
+import pytest
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, Group
-from django.urls import resolve
-from django.test.client import RequestFactory
-from mitol.common.factories import UserFactory
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.test.client import RequestFactory
+from django.urls import resolve
+from mitol.common.factories import UserFactory
 
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from cms.factories import (
-    ResourcePageFactory,
     CoursePageFactory,
     FlexiblePricingFormFactory,
     ProgramPageFactory,
+    ResourcePageFactory,
 )
-from cms.models import FlexiblePricingRequestSubmission, CoursePage, ProgramPage
+from cms.models import CoursePage, FlexiblePricingRequestSubmission, ProgramPage
 from courses.factories import (
+    CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
-    CourseFactory,
 )
-from flexiblepricing.models import FlexiblePrice
-from flexiblepricing.constants import FlexiblePriceStatus
-from flexiblepricing.factories import FlexiblePriceTierFactory, FlexiblePriceFactory
-from flexiblepricing.api import determine_courseware_flexible_price_discount
+from courses.models import CourseRun
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
 from ecommerce.factories import ProductFactory
+from flexiblepricing.api import determine_courseware_flexible_price_discount
+from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
+from flexiblepricing.models import FlexiblePrice
+from main import features
 
 pytestmark = [pytest.mark.django_db]
 
@@ -118,6 +120,8 @@ def test_course_page_context(
     course_page = CoursePageFactory.create(**course_page_kwargs)
     if enrolled:
         CourseRunEnrollmentFactory.create(user=staff_user, run=run)
+
+    settings.FEATURES[features.ENABLE_UPGRADE_DIALOG] = True
     context = course_page.get_context(request=request)
     assert context == {
         "self": course_page,
@@ -134,6 +138,10 @@ def test_course_page_context(
         "finaid_price": finaid_price,
         "product": product,
     }
+
+    settings.FEATURES[features.ENABLE_UPGRADE_DIALOG] = False
+    context = course_page.get_context(request=request)
+    assert context["finaid_price"] is None
 
 
 @pytest.mark.parametrize(
