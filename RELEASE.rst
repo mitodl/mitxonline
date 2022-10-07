@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.47.3
+Version 0.47.3 (Released October 07, 2022)
 --------------
 
 - 1094: log information when an order callback request results in an unknown error (#1099)
