@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.47.4
+--------------
+
+- 1094: log information when an order callback request results in an unknown error (#1099)
+- Online-1100 Disable price on course page (#1101)
+- Save users with no enrollment into file (#1096)
+- Updates the call to subscribe to edX emails to be in a post-commit hook
+
 Version 0.47.2 (Released October 04, 2022)
 --------------
 
