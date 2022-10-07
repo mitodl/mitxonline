@@ -597,3 +597,10 @@ def test_course_run_certificate_start_end_dates():
     start_date, end_date = certificate.start_end_dates
     assert start_date == certificate.course_run.start_date
     assert end_date == certificate.course_run.end_date
+    
+def test_course_course_number():
+    """
+    Test that the Course course_number property works correctly with the readable_id.
+    """
+    course = CourseFactory.build(readable_id='course-v1:TestX+Test101')
+    assert "Test101" == course.course_number
