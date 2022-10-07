@@ -787,11 +787,30 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
     "mocked_api_response, expect_success",
     [
         [
-            CourseMode(
-                {
-                    "expiration_datetime": "2019-01-01T00:00:00Z",
-                }
-            ),
+            [
+                CourseMode(
+                    {
+                        "expiration_datetime": "2019-01-01T00:00:00Z",
+                        "mode_slug": "verified",
+                    }
+                )
+            ],
+            True,
+        ],
+        [
+            [CourseMode({"expiration_datetime": "", "mode_slug": "audit"})],
+            True,
+        ],
+        [
+            [
+                CourseMode({"expiration_datetime": "", "mode_slug": "audit"}),
+                CourseMode(
+                    {
+                        "expiration_datetime": "2019-01-01T00:00:00Z",
+                        "mode_slug": "verified",
+                    }
+                ),
+            ],
             True,
         ],
         [HTTPError(response=Mock(status_code=404)), False],
@@ -811,10 +830,19 @@ def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success)
     success_count, failure_count = sync_course_mode([course_run])
 
     if expect_success:
-        course_run.refresh_from_db()
-        assert success_count == 1
-        assert failure_count == 0
-        assert course_run.upgrade_deadline == mocked_api_response.expiration_datetime
+        if all(course_mode.mode_slug == "audit" for course_mode in mocked_api_response):
+            course_run.refresh_from_db()
+            assert success_count == 0
+            assert failure_count == 0
+        else:
+            course_run.refresh_from_db()
+            assert success_count == 1
+            assert failure_count == 0
+            assert course_run.upgrade_deadline == next(
+                course_mode.expiration_datetime
+                for course_mode in mocked_api_response
+                if course_mode.mode_slug == "verified"
+            )
     else:
         assert success_count == 0
         assert failure_count == 1
