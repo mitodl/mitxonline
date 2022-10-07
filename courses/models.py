@@ -218,7 +218,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             str: Course number (last part of readable_id, after the final +)
         """
-        return get_course_number(self.readable_id)
+        return self.readable_id.split("+")[-1]
 
     @property
     def page(self):
