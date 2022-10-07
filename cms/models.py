@@ -1,72 +1,70 @@
 """CMS model definitions"""
+import json
 import logging
 import re
 from datetime import datetime, timedelta
-import json
-from urllib.parse import quote_plus, urljoin
 from json import dumps
+from urllib.parse import quote_plus, urljoin
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
+from django.forms import ChoiceField, DecimalField
 from django.http import Http404
+from django.template.response import TemplateResponse
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils.text import slugify
-from django.forms import ChoiceField, DecimalField
-from django.template.response import TemplateResponse
-from django.contrib.contenttypes.models import ContentType
-from django.templatetags.static import static
-
 from mitol.common.utils.datetime import now_in_utc
 from modelcluster.fields import ParentalKey
 from wagtail.admin.edit_handlers import (
     FieldPanel,
-    StreamFieldPanel,
-    PageChooserPanel,
     InlinePanel,
+    PageChooserPanel,
+    StreamFieldPanel,
 )
-from wagtail.core.blocks import PageChooserBlock, StreamBlock
-from wagtail.core.fields import RichTextField, StreamField
-from wagtail.core.models import Page, Orderable, Site
-from wagtail.images.models import Image
-from wagtail.images.edit_handlers import ImageChooserPanel
-from wagtail.embeds.embeds import get_embed
-from wagtail.embeds.exceptions import EmbedException
-from wagtail.search import index
 from wagtail.contrib.forms.forms import FormBuilder
 from wagtail.contrib.forms.models import (
+    FORM_FIELD_CHOICES,
     AbstractForm,
     AbstractFormField,
     AbstractFormSubmission,
-    FORM_FIELD_CHOICES,
 )
 from wagtail.contrib.routable_page.models import RoutablePageMixin, route
+from wagtail.core.blocks import PageChooserBlock, StreamBlock
+from wagtail.core.fields import RichTextField, StreamField
+from wagtail.core.models import Orderable, Page, Site
 from wagtail.core.utils import WAGTAIL_APPEND_SLASH
-from django.core.serializers.json import DjangoJSONEncoder
+from wagtail.embeds.embeds import get_embed
+from wagtail.embeds.exceptions import EmbedException
+from wagtail.images.edit_handlers import ImageChooserPanel
+from wagtail.images.models import Image
+from wagtail.search import index
 
 from cms.blocks import (
-    ResourceBlock,
-    PriceBlock,
-    FacultyBlock,
     CourseRunCertificateOverrides,
+    FacultyBlock,
+    PriceBlock,
+    ResourceBlock,
     validate_unique_readable_ids,
 )
 from cms.constants import (
+    CERTIFICATE_INDEX_SLUG,
     COURSE_INDEX_SLUG,
     PROGRAM_INDEX_SLUG,
-    CERTIFICATE_INDEX_SLUG,
     SIGNATORY_INDEX_SLUG,
 )
 from cms.forms import CertificatePageForm
 from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset
 from courses.models import Course, CourseRunCertificate, Program
-from main.views import get_base_context
 from flexiblepricing.api import (
-    determine_tier_courseware,
     determine_auto_approval,
-    determine_income_usd,
-    is_courseware_flexible_price_approved,
     determine_courseware_flexible_price_discount,
+    determine_income_usd,
+    determine_tier_courseware,
+    is_courseware_flexible_price_approved,
 )
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.exceptions import NotSupportedException
@@ -75,6 +73,8 @@ from flexiblepricing.models import (
     FlexiblePrice,
     FlexiblePricingRequestSubmission,
 )
+from main import features
+from main.views import get_base_context
 
 log = logging.getLogger()
 
@@ -855,6 +855,9 @@ class CoursePage(ProductPage):
         Returns:
             None, or a tuple of the original price and the discount to apply
         """
+        if not features.is_enabled(features.ENABLE_UPGRADE_DIALOG):
+            return None
+
         if is_courseware_flexible_price_approved(self.product, request.user):
             ecommerce_product = self.product.active_products.first()
 

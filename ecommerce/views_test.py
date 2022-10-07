@@ -1,58 +1,58 @@
-import pytest
+import operator as op
 import random
-import pytz
-
+import uuid
 from datetime import datetime, timedelta
-from main.test_utils import assert_drf_json_equal
-from main.constants import (
-    USER_MSG_COOKIE_NAME,
-    USER_MSG_TYPE_ENROLL_DUPLICATED,
-    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
-)
-from main.utils import encode_json_cookie_value
-from main.settings import TIME_ZONE
-from django.urls import reverse
+
+import pytest
+import pytz
+import reversion
 from django.conf import settings
 from django.forms.models import model_to_dict
+from django.urls import reverse
+from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status
 
-import operator as op
-import reversion
-import uuid
-
 from courses.factories import CourseRunFactory, ProgramRunFactory
+from courses.models import PaidCourseRun
 from ecommerce.api import generate_checkout_payload
+from ecommerce.constants import DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
-    ProductFactory,
-    DiscountFactory,
-    BasketItemFactory,
     BasketFactory,
+    BasketItemFactory,
+    DiscountFactory,
+    ProductFactory,
 )
 from ecommerce.models import (
     Basket,
     BasketItem,
-    Order,
     Discount,
-    UserDiscount,
     DiscountProduct,
+    Order,
     PendingOrder,
+    UserDiscount,
 )
-from courses.models import PaidCourseRun
-from ecommerce.constants import DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.serializers import (
-    ProductSerializer,
-    BasketSerializer,
     BasketItemSerializer,
-    DiscountSerializer,
+    BasketSerializer,
     BasketWithProductSerializer,
+    DiscountSerializer,
+    ProductSerializer,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
+from main import features
+from main.constants import (
+    USER_MSG_COOKIE_NAME,
+    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+)
+from main.settings import TIME_ZONE
+from main.test_utils import assert_drf_json_equal
+from main.utils import encode_json_cookie_value
 from users.factories import UserFactory
-from mitol.common.utils.datetime import now_in_utc
 
 pytestmark = [pytest.mark.django_db]
 
@@ -297,6 +297,7 @@ def test_redeem_discount_with_higher_discount(
     discount on it. Should get back a success message. (The API call returns an
     ID so this doesn't just do json_equal.)
     """
+    settings.FEATURES[features.ENABLE_UPGRADE_DIALOG] = True
     product = products[random.randrange(0, len(products), 1)]
     course = product.purchasable_object.course
     tier = FlexiblePriceTierFactory.create(
@@ -606,19 +607,27 @@ def test_checkout_product(
 
 
 @pytest.mark.parametrize(
-    "cart_exists, cart_empty, expected_status, expected_message",
+    "cart_exists, cart_empty, ecommerce_enabled, expected_status, expected_message",
     [
-        (False, True, status.HTTP_406_NOT_ACCEPTABLE, "No basket"),
-        (True, True, status.HTTP_406_NOT_ACCEPTABLE, "No product in basket"),
-        (True, False, status.HTTP_200_OK, ""),
+        (False, True, True, status.HTTP_406_NOT_ACCEPTABLE, "No basket"),
+        (True, True, True, status.HTTP_406_NOT_ACCEPTABLE, "No product in basket"),
+        (True, False, True, status.HTTP_200_OK, ""),
+        (True, False, False, status.HTTP_404_NOT_FOUND, ""),
     ],
 )
 def test_checkout_product_cart(
-    user, user_drf_client, cart_exists, cart_empty, expected_status, expected_message
+    user,
+    user_drf_client,
+    cart_exists,
+    cart_empty,
+    ecommerce_enabled,
+    expected_status,
+    expected_message,
 ):
     """
     Verifies that cart/ works the way it is expected and generates proper responses/data in the cart page
     """
+    settings.FEATURES[features.ENABLE_UPGRADE_DIALOG] = ecommerce_enabled
     basket = None
 
     if cart_exists:
@@ -632,7 +641,7 @@ def test_checkout_product_cart(
 
     if cart_empty:
         assert resp.data == expected_message
-    else:
+    elif ecommerce_enabled:
         assert_drf_json_equal(resp.json(), BasketWithProductSerializer(basket).data)
 
 

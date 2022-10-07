@@ -2,82 +2,74 @@
 MITxOnline ecommerce views
 """
 import logging
-from main.utils import redirect_with_user_message
-from rest_framework import mixins, status
-from rest_framework.response import Response
-from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
-from rest_framework.viewsets import (
-    ReadOnlyModelViewSet,
-    GenericViewSet,
-    ViewSet,
-    ModelViewSet,
-)
-from rest_framework.views import APIView
-from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from rest_framework.decorators import action
 
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
+from django.db.models import Count, Q
+from django.http import Http404, HttpResponse
+from django.shortcuts import render
+from django.urls import reverse
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import RedirectView, TemplateView, View
+from mitol.common.utils import now_in_utc
+from rest_framework import mixins, status
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework.decorators import action
+from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
+from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.viewsets import (
+    GenericViewSet,
+    ModelViewSet,
+    ReadOnlyModelViewSet,
+    ViewSet,
+)
+from rest_framework_extensions.mixins import NestedViewSetMixin
+
+from courses.models import Course, CourseRun, Program, ProgramRun
+from ecommerce import api
+from ecommerce.discounts import DiscountType
+from ecommerce.models import (
+    Basket,
+    BasketDiscount,
+    BasketItem,
+    Discount,
+    DiscountProduct,
+    DiscountRedemption,
+    Order,
+    Product,
+    UserDiscount,
+)
+from ecommerce.serializers import (
+    BasketDiscountSerializer,
+    BasketItemSerializer,
+    BasketSerializer,
+    BasketWithProductSerializer,
+    DiscountProductSerializer,
+    DiscountRedemptionSerializer,
+    DiscountSerializer,
+    OrderHistorySerializer,
+    OrderSerializer,
+    ProductSerializer,
+    UserDiscountMetaSerializer,
+    UserDiscountSerializer,
+)
+from flexiblepricing.api import determine_courseware_flexible_price_discount
+from main import features
 from main.constants import (
+    USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
     USER_MSG_TYPE_PAYMENT_DECLINED,
     USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
     USER_MSG_TYPE_PAYMENT_REVIEW,
-    USER_MSG_TYPE_ENROLL_BLOCKED,
 )
-
-from django.views.generic import TemplateView, RedirectView, View
-from django.http import HttpResponse, Http404
-from django.shortcuts import render
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db import transaction
-from django.db.models import Q, Count
-from django.core.exceptions import ObjectDoesNotExist
-from django.urls import reverse
-
-from mitol.common.utils import now_in_utc
-from rest_framework_extensions.mixins import NestedViewSetMixin
-
-from courses.models import (
-    CourseRun,
-    Course,
-    Program,
-    ProgramRun,
-)
-
-from ecommerce import api
-from ecommerce.discounts import DiscountType
-from ecommerce.serializers import (
-    OrderHistorySerializer,
-    ProductSerializer,
-    BasketSerializer,
-    BasketItemSerializer,
-    BasketDiscountSerializer,
-    BasketWithProductSerializer,
-    OrderSerializer,
-    DiscountSerializer,
-    DiscountRedemptionSerializer,
-    DiscountProductSerializer,
-    UserDiscountSerializer,
-    UserDiscountMetaSerializer,
-)
-from ecommerce.models import (
-    Product,
-    Basket,
-    BasketItem,
-    Discount,
-    DiscountRedemption,
-    DiscountProduct,
-    BasketDiscount,
-    UserDiscount,
-    Order,
-)
-
-from flexiblepricing.api import determine_courseware_flexible_price_discount
+from main.utils import redirect_with_user_message
 
 log = logging.getLogger(__name__)
 
@@ -363,6 +355,9 @@ class CheckoutApiViewSet(ViewSet):
         """
         Returns the current cart, with the product info embedded.
         """
+        if not features.is_enabled(features.ENABLE_UPGRADE_DIALOG):
+            return Response("", status=status.HTTP_404_NOT_FOUND)
+
         try:
             basket = Basket.objects.filter(user=request.user).get()
         except ObjectDoesNotExist:
