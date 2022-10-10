@@ -89,7 +89,7 @@ class DiscountProductAdmin(admin.ModelAdmin):
     model = DiscountProduct
     search_fields = ["discount", "product"]
     list_display = ["id", "discount", "product"]
-    raw_id_fields = ('discount',)
+    raw_id_fields = ("discount",)
 
 
 @admin.register(UserDiscount)
@@ -97,7 +97,7 @@ class UserDiscountAdmin(admin.ModelAdmin):
     model = UserDiscount
     search_fields = ["discount", "user"]
     list_display = ["id", "discount", "user"]
-    raw_id_fields = ('discount',)
+    raw_id_fields = ("discount",)
 
 
 @admin.register(DiscountRedemption)
