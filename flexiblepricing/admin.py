@@ -65,6 +65,7 @@ class FlexiblePriceTierAdmin(admin.ModelAdmin):
         "income_threshold_usd",
         "current",
     )
+    raw_id_fields = ("discount",)
 
 
 admin.site.register(CountryIncomeThreshold, CountryIncomeThresholdAdmin)
