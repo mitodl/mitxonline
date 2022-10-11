@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.48.1
+Version 0.48.1 (Released October 11, 2022)
 --------------
 
 - DRYed up the redirect code
