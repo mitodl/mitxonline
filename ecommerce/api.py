@@ -341,7 +341,10 @@ def process_cybersource_payment_response(request, order):
         if basket and basket.compare_to_order(order):
             basket.delete()
 
-    elif processor_response.state == ProcessorResponse.STATE_ACCEPTED:
+    elif (
+        processor_response.state == ProcessorResponse.STATE_ACCEPTED
+        or reason_code == 100
+    ):
         # It actually worked here
         basket = Basket.objects.filter(user=order.purchaser).first()
         try:
@@ -359,6 +362,9 @@ def process_cybersource_payment_response(request, order):
 
         return_message = order.state
     else:
+        log.error(
+            f"Unknown state {processor_response.state} found: transaction ID {transaction_id}, reason code {reason_code}, response message {processor_response.message}"
+        )
         order.cancel()
         order.save()
         return_message = order.state
