@@ -38,6 +38,7 @@ class TransactionAdmin(VersionAdmin):
     """Admin for Product"""
 
     model = Transaction
+    raw_id_fields = ("order",)
 
 
 @admin.register(Product)
