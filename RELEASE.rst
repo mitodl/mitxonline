@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.48.0
+--------------
+
+- 1119 Fix basket search for Django admin (#1120)
+- Adds additional error reporting; accepts transactions with status code 100
+- 1102 Use raw id field for discount in admin (#1112)
+- 1115 Use raw id field for order in transactions admin (#1118)
+- Fix course model course number property (#1103)
+- Updating the enrollment code query to match on email or username now
+- 842: sync coursrun upgrade deadline with edx (#1098)
+- Added /courses/ to the cache-control list (there's dynamic stuff on course pages; this should keep it out of the Fastly cache)
+
 Version 0.47.3 (Released October 07, 2022)
 --------------
 
