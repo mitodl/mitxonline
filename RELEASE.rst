@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.48.0
+Version 0.48.0 (Released October 11, 2022)
 --------------
 
 - 1119 Fix basket search for Django admin (#1120)
