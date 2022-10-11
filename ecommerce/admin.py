@@ -64,7 +64,7 @@ class BasketAdmin(VersionAdmin):
     """Admin for Basket"""
 
     model = Basket
-    search_fields = ["user"]
+    search_fields = ["user__email", "user__username"]
     list_display = ["id", "user"]
 
 
