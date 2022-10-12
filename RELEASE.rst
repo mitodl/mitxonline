@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.48.2
+Version 0.48.2 (Released October 12, 2022)
 --------------
 
 - Updates `configure_for_dedp` command to make it more generic
