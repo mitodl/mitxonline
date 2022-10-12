@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.48.2
+--------------
+
+- Updates `configure_for_dedp` command to make it more generic
+- Added reference number to list display (#1128)
+
 Version 0.48.1 (Released October 11, 2022)
 --------------
 
