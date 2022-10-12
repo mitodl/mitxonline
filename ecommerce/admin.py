@@ -176,6 +176,7 @@ class BaseOrderAdmin(FSMTransitionMixin, TimestampedModelAdmin):
 class OrderAdmin(BaseOrderAdmin):
     """Admin for Order"""
 
+    list_display = ["id", "state", "purchaser", "total_price_paid", "reference_number"]
     model = Order
 
 
