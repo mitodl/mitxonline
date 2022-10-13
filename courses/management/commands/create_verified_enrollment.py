@@ -31,10 +31,7 @@ class Command(BaseCommand):
             required=True,
         )
         parser.add_argument(
-            "--code",
-            type=str,
-            help="The enrollment code for the course",
-            required=True
+            "--code", type=str, help="The enrollment code for the course", required=True
         )
         parser.add_argument(
             "-k",
@@ -62,9 +59,7 @@ class Command(BaseCommand):
                 "Could not find course run with courseware_id={}".format(options["run"])
             )
 
-        product = Product.objects.filter(
-            object_id=run.id
-        ).first()
+        product = Product.objects.filter(object_id=run.id).first()
         if product is None:
             raise CommandError(
                 "No product found for that course with courseware_id={}".format(
@@ -79,7 +74,9 @@ class Command(BaseCommand):
             )
         if not discount.check_validity(user):
             raise CommandError(
-                "That enrollment code {} is not valid for user {}".format(options["code"], options["user"])
+                "That enrollment code {} is not valid for user {}".format(
+                    options["code"], options["user"]
+                )
             )
 
         with transaction.atomic():
