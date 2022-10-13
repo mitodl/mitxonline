@@ -1,5 +1,4 @@
 // @flow
-/* global SETTINGS: false */
 import React from "react"
 import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
@@ -155,9 +154,7 @@ export class OrderSummaryCard extends React.Component<Props> {
           </div>
         </div>
 
-        {!SETTINGS.features.disable_discount_ui
-          ? this.renderAppliedCoupons()
-          : null}
+        {this.renderAppliedCoupons()}
 
         {refunds === null || refunds.length === 0
           ? this.renderFulfilledTag()
@@ -180,7 +177,7 @@ export class OrderSummaryCard extends React.Component<Props> {
           </div>
         </div>
 
-        {!SETTINGS.features.disable_discount_ui && !orderFulfilled ? (
+        {!orderFulfilled ? (
           <ApplyCouponForm
             onSubmit={addDiscount}
             couponCode={discountCode}

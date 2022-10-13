@@ -855,9 +855,6 @@ class CoursePage(ProductPage):
         Returns:
             None, or a tuple of the original price and the discount to apply
         """
-        if not features.is_enabled(features.ENABLE_UPGRADE_DIALOG):
-            return None
-
         if is_courseware_flexible_price_approved(self.product, request.user):
             ecommerce_product = self.product.active_products.first()
 

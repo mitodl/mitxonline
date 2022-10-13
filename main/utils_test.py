@@ -25,8 +25,6 @@ def test_get_js_settings(settings, rf):
     settings.VERSION = "4.5.6"
     settings.EMAIL_SUPPORT = "support@text.com"
     settings.RECAPTCHA_SITE_KEY = "fake_key"
-    settings.ENABLE_UPGRADE_DIALOG = False
-    settings.DISABLE_DISCOUNT_UI = False
     settings.ENABLE_PROGRAM_UI = False
 
     request = rf.get("/")
@@ -40,8 +38,6 @@ def test_get_js_settings(settings, rf):
         "support_email": settings.EMAIL_SUPPORT,
         "site_name": settings.SITE_NAME,
         "features": {
-            "upgrade_dialog": settings.ENABLE_UPGRADE_DIALOG,
-            "disable_discount_ui": settings.DISABLE_DISCOUNT_UI,
             "enable_program_ui": settings.ENABLE_PROGRAM_UI,
         },
     }

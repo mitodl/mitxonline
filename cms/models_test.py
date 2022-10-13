@@ -121,7 +121,6 @@ def test_course_page_context(
     if enrolled:
         CourseRunEnrollmentFactory.create(user=staff_user, run=run)
 
-    settings.FEATURES[features.ENABLE_UPGRADE_DIALOG] = True
     context = course_page.get_context(request=request)
     assert context == {
         "self": course_page,
@@ -139,9 +138,15 @@ def test_course_page_context(
         "product": product,
     }
 
-    settings.FEATURES[features.ENABLE_UPGRADE_DIALOG] = False
     context = course_page.get_context(request=request)
-    assert context["finaid_price"] is None
+
+    if has_finaid:
+        assert context["finaid_price"] == (
+            ecommerce_product.price,
+            discount.discount_product(ecommerce_product),
+        )
+    else:
+        assert context["finaid_price"] is None
 
 
 @pytest.mark.parametrize(
