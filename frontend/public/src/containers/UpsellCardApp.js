@@ -1,5 +1,4 @@
 // @flow
-/* global SETTINGS:false */
 import React from "react"
 import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
@@ -110,12 +109,12 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
 
     const run = courseRuns ? courseRuns[0] : null
 
-    return SETTINGS.features.upgrade_dialog ? (
+    return (
       // $FlowFixMe: isLoading null or undefined
       <Loader isLoading={isLoading}>
         {run ? this.renderUpgradeEnrollmentDialog(run) : null}
       </Loader>
-    ) : null
+    )
   }
 }
 

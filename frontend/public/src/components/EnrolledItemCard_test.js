@@ -27,7 +27,7 @@ describe("EnrolledItemCard", () => {
     helper = new IntegrationTestHelper()
     userEnrollment = makeCourseRunEnrollment()
     currentUser = makeUser()
-    SETTINGS.features = { upgrade_dialog: true, disable_discount_ui: false, enable_program_ui: false }
+    SETTINGS.features = { enable_program_ui: false }
     enrollmentCardProps = {
       enrollment:           userEnrollment,
       currentUser:          currentUser,
@@ -109,7 +109,7 @@ describe("EnrolledItemCard", () => {
         const pricingLinks = inner.find(".pricing-links")
         assert.isFalse(pricingLinks.exists())
       } else {
-        SETTINGS.features = { upgrade_dialog: false, disable_discount_ui: false, enable_program_ui: false }
+        SETTINGS.features = { enable_program_ui: false }
         const pricingLinks = inner.find(".pricing-links")
         assert.isFalse(pricingLinks.exists())
       }

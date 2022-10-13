@@ -1,5 +1,4 @@
 // @flow
-/* global SETTINGS:false */
 import React, { Fragment } from "react"
 import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
@@ -232,7 +231,7 @@ export class ProductDetailEnrollApp extends React.Component<
                 Enroll now
               </a>
             ) : run && isWithinEnrollmentPeriod(run) ? (
-              SETTINGS.features.upgrade_dialog && product && run.is_upgradable ? (
+              product && run.is_upgradable ? (
                 <button
                   className="btn btn-primary btn-gradient-red highlight enroll-now"
                   onClick={() => this.toggleUpgradeDialogVisibility()}
@@ -258,9 +257,7 @@ export class ProductDetailEnrollApp extends React.Component<
                 </Fragment>
               )
             ) : null}
-            {SETTINGS.features.upgrade_dialog && run
-              ? this.renderUpgradeEnrollmentDialog()
-              : null}
+            {run ? this.renderUpgradeEnrollmentDialog() : null}
           </Fragment>
         )}
       </Loader>

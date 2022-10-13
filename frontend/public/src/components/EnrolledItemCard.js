@@ -268,8 +268,7 @@ export class EnrolledItemCard extends React.Component<
     const certificateLinks = (
       enrollment.run.products.length > 0 &&
       enrollment.enrollment_mode === "audit" &&
-      enrollment.run.is_upgradable &&
-      SETTINGS.features.upgrade_dialog
+      enrollment.run.is_upgradable
     ) ? (
         <div className="upgrade-item-description detail d-md-flex justify-content-between pb-2">
           <div className="mr-0">
