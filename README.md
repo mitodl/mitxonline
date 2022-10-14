@@ -34,3 +34,11 @@ Running, testing, and administering this app follows the same patterns as our ot
 *Note: for js tests, run the commands in `frontend/public`, or run via `yarn workspaces foreach run <command>` from the root.
 
 [See the common OL web app guide](http://mitodl.github.io/handbook/common-web-app-guide.html#running-and-accessing-the-app).
+
+
+# Certificates
+
+In order to manage the certificates, follow these steps:
+
+* Create a template (In CMS, go to a course page and add a certificate child page). Note that this is course based which means you need to create separate templates for each course
+* User certificates are automatically created through a regular task, but you can test these by adding manual entries in CourseRunCertificate model (This is only recommended for local testing because it will make the data inconsistent with payment and grades)
