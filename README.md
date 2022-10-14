@@ -40,5 +40,6 @@ Running, testing, and administering this app follows the same patterns as our ot
 
 In order to manage the certificates, follow these steps:
 
-* Create a template (In CMS, go to a course page and add a certificate child page). Note that this is course based which means you need to create separate templates for each course
+* Create Signatories (In CMS, go to Pages-> HomePage -> Signatories and then add child pages). Signatories are independent of courses and a signatory can be used with any number of certificates
+* Create Certificate Template (In CMS, go to Pages -> Courses -> (Your Course Page) and add a certificate child page). Note that this is course based which means you need to create separate templates for each course
 * User certificates are automatically created through a regular task, but you can test these by adding manual entries in CourseRunCertificate model (This is only recommended for local testing because it will make the data inconsistent with payment and grades)
