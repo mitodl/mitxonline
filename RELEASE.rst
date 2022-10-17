@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.49.0
+Version 0.49.0 (Released October 17, 2022)
 --------------
 
 - Adds a management command to create discount code(s) from the command line
