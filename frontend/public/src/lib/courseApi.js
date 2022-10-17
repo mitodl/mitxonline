@@ -40,7 +40,7 @@ export const courseRunStatusMessage = (run: CourseRun) => {
   if (startDateDescription !== null) {
     if (startDateDescription.active) {
       if (moment(run.end_date).isBefore(moment())) {
-        const dateString = parseDateString(run.start_date)
+        const dateString = parseDateString(run.end_date)
         return (<span> | <b>Ended</b> - {formatPrettyDateTimeAmPmTz(dateString)}</span>)
       } else {
         return (<span> |
