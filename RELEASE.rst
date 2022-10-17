@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.48.3
+Version 0.48.3 (Released October 17, 2022)
 --------------
 
 - 1114 Add /checkout/ to no cache urls (#1132)
