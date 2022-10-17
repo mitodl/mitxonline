@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.49.0
+--------------
+
+- Adds a management command to create discount code(s) from the command line
+- 1141 Display end date when course ends on dashboard (#1146)
+- update course run as raw field on CourseRunGrade admin
+
 Version 0.48.3 (Released October 17, 2022)
 --------------
 
