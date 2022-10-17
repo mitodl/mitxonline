@@ -74,7 +74,7 @@ class BasketItemAdmin(VersionAdmin):
     """Admin for BasketItem"""
 
     model = BasketItem
-    search_fields = ["product"]
+    search_fields = ["product__description", "product__price"]
     list_display = ["id", "product", "quantity"]
 
 
@@ -88,7 +88,7 @@ class DiscountAdmin(admin.ModelAdmin):
 @admin.register(DiscountProduct)
 class DiscountProductAdmin(admin.ModelAdmin):
     model = DiscountProduct
-    search_fields = ["discount", "product"]
+    search_fields = ["discount__discount_type", "discount__redemption_type", "product__description", "product__price"]
     list_display = ["id", "discount", "product"]
     raw_id_fields = ("discount",)
 
@@ -96,7 +96,7 @@ class DiscountProductAdmin(admin.ModelAdmin):
 @admin.register(UserDiscount)
 class UserDiscountAdmin(admin.ModelAdmin):
     model = UserDiscount
-    search_fields = ["discount", "user"]
+    search_fields = ["discount__discount_type", "discount__redemption_type", "user__name", "user__email", "user__username"]
     list_display = ["id", "discount", "user"]
     raw_id_fields = ("discount",)
 
