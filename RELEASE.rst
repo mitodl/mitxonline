@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.48.3 (Released October 17, 2022)
+--------------
+
+- 1114 Add /checkout/ to no cache urls (#1132)
+- Removes unused ecommerce feature flags
+
 Version 0.48.2 (Released October 12, 2022)
 --------------
 
