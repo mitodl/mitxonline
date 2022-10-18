@@ -1,6 +1,26 @@
 Release Notes
 =============
 
+Version 0.49.0
+--------------
+
+- Revert "Fix"
+- Revert "Add test and extra documentation"
+- Revert "Merge branch 'main' of https://github.com/mitodl/mitxonline"
+- Add test and extra documentation
+- docs: add information about certificates management (#1136)
+- 1143&1144 Fix search and improve loading for e-commerce admin (#1145)
+- Fix
+- Release date for 0.49.0
+- Release 0.49.0
+- Adds a management command to create discount code(s) from the command line
+- Release date for 0.48.3
+- 1141 Display end date when course ends on dashboard (#1146)
+- Release 0.48.3
+- update course run as raw field on CourseRunGrade admin
+- 1114 Add /checkout/ to no cache urls (#1132)
+- Removes unused ecommerce feature flags
+
 Version 0.48.2 (Released October 12, 2022)
 --------------
 
