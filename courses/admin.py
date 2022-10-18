@@ -247,10 +247,7 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
         "grade",
     ]
     list_filter = ["passed", "set_by_admin", "course_run__courseware_id"]
-    raw_id_fields = (
-        "user",
-        "course_run",
-    )
+    raw_id_fields = ("user",)
     search_fields = ["user__email", "user__username"]
 
     def get_queryset(self, request):

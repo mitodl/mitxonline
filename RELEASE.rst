@@ -1,19 +1,6 @@
 Release Notes
 =============
 
-Version 0.49.0 (Released October 17, 2022)
---------------
-
-- Adds a management command to create discount code(s) from the command line
-- 1141 Display end date when course ends on dashboard (#1146)
-- update course run as raw field on CourseRunGrade admin
-
-Version 0.48.3 (Released October 17, 2022)
---------------
-
-- 1114 Add /checkout/ to no cache urls (#1132)
-- Removes unused ecommerce feature flags
-
 Version 0.48.2 (Released October 12, 2022)
 --------------
 
