@@ -275,6 +275,7 @@ def create_run_enrollments(
                 # Case (Upgrade): When user was enrolled in free mode and now enrolls in paid mode (e.g. Verified)
                 # So, User has an active enrollment and the only changing thing is going to be enrollment mode
                 if enrollment.active and enrollment_mode_changed:
+                    enrollment.edx_enrolled = edx_request_success
                     enrollment.update_mode_and_save(mode=mode)
 
                 elif not enrollment.active:
