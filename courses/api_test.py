@@ -30,11 +30,7 @@ from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_REFUNDED,
 )
-from openedx.constants import (
-    EDX_DEFAULT_ENROLLMENT_MODE,
-    EDX_ENROLLMENT_AUDIT_MODE,
-    EDX_ENROLLMENT_VERIFIED_MODE,
-)
+
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -48,7 +44,7 @@ from courses.factories import (
 # pylint: disable=redefined-outer-name
 from courses.models import CourseRunEnrollment, ProgramEnrollment
 from main.test_utils import MockHttpError
-from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE,
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
     NoEdxApiAuthError,
