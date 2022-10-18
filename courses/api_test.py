@@ -26,6 +26,10 @@ from courses.api import (
     manage_course_run_certificate_access,
     override_user_grade,
 )
+from courses.constants import (
+    ENROLL_CHANGE_STATUS_DEFERRED,
+    ENROLL_CHANGE_STATUS_REFUNDED,
+)
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
     EDX_ENROLLMENT_AUDIT_MODE,
