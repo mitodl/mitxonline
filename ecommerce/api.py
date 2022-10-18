@@ -234,8 +234,8 @@ def apply_user_discounts(request):
     return
 
 
-def fulfill_completed_order(order, payment_data, basket):
-    order.fulfill(payment_data)
+def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=False):
+    order.fulfill(payment_data, already_enrolled=already_enrolled)
     order.save()
 
     if not order.is_review and (basket and basket.compare_to_order(order)):
