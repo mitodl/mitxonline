@@ -229,7 +229,7 @@ def create_run_enrollments(
 
     Returns:
         (list of CourseRunEnrollment, bool): A list of enrollment objects that were successfully
-            created in mitxonline, paired with a boolean indicating whether or not edX enrollment API call was successful
+            created, paired with a boolean indicating whether or not edX enrollment was successful
             for all of the given course runs
     """
     successful_enrollments = []
