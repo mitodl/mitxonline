@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.49.1
+--------------
+
+- docs: add information about certificates management (#1136)
+- 1143&1144 Fix search and improve loading for e-commerce admin (#1145)
+
 Version 0.49.0 (Released October 17, 2022)
 --------------
 
