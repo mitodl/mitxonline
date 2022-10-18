@@ -67,6 +67,7 @@ class BasketAdmin(VersionAdmin):
     model = Basket
     search_fields = ["user__email", "user__username"]
     list_display = ["id", "user"]
+    raw_id_fields = ("user",)
 
 
 @admin.register(BasketItem)
@@ -74,8 +75,9 @@ class BasketItemAdmin(VersionAdmin):
     """Admin for BasketItem"""
 
     model = BasketItem
-    search_fields = ["product"]
+    search_fields = ["product__description", "product__price"]
     list_display = ["id", "product", "quantity"]
+    raw_id_fields = ("basket", "product")
 
 
 @admin.register(Discount)
@@ -88,17 +90,28 @@ class DiscountAdmin(admin.ModelAdmin):
 @admin.register(DiscountProduct)
 class DiscountProductAdmin(admin.ModelAdmin):
     model = DiscountProduct
-    search_fields = ["discount", "product"]
+    search_fields = [
+        "discount__discount_type",
+        "discount__redemption_type",
+        "product__description",
+        "product__price",
+    ]
     list_display = ["id", "discount", "product"]
-    raw_id_fields = ("discount",)
+    raw_id_fields = ("discount", "product")
 
 
 @admin.register(UserDiscount)
 class UserDiscountAdmin(admin.ModelAdmin):
     model = UserDiscount
-    search_fields = ["discount", "user"]
+    search_fields = [
+        "discount__discount_type",
+        "discount__redemption_type",
+        "user__name",
+        "user__email",
+        "user__username",
+    ]
     list_display = ["id", "discount", "user"]
-    raw_id_fields = ("discount",)
+    raw_id_fields = ("discount", "user")
 
 
 @admin.register(DiscountRedemption)
@@ -106,12 +119,19 @@ class DiscountRedemptionAdmin(admin.ModelAdmin):
     model = DiscountRedemption
     search_fields = ["redemption_date", "redeemed_discount", "redeemed_by"]
     list_display = ["id", "redemption_date", "redeemed_discount", "redeemed_by"]
+    readonly_fields = (
+        "redemption_date",
+        "redeemed_discount",
+        "redeemed_by",
+        "redeemed_order",
+    )
 
 
 @admin.register(BasketDiscount)
 class BasketDiscountAdmin(admin.ModelAdmin):
     model = BasketDiscount
     list_display = ["id", "redeemed_basket", "redeemed_discount"]
+    raw_id_fields = ("redeemed_basket", "redeemed_discount", "redeemed_by")
 
 
 class OrderLineInline(admin.TabularInline):
