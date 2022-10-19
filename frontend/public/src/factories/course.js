@@ -7,7 +7,10 @@ import type {
   CourseRun,
   CourseRunDetail,
   CourseRunEnrollment,
-  CourseDetail
+  CourseDetail,
+  CourseDetailWithRuns,
+  ProgramEnrollment,
+  Program,
 } from "../flow/courseTypes"
 
 const genCourseRunId = incrementer()
@@ -15,6 +18,7 @@ const genEnrollmentId = incrementer()
 const genCoursewareId = incrementer()
 const genRunTagNumber = incrementer()
 const genProductId = incrementer()
+const genProgramId = incrementer()
 
 export const makeCourseRun = (): CourseRun => ({
   title:            casual.text,
@@ -76,6 +80,13 @@ const makeCourseDetail = (): CourseDetail => ({
   feature_image_src: casual.url
 })
 
+export const makeCourseDetailWithRuns = (): CourseDetailWithRuns => {
+  return {
+    ...makeCourseRun(),
+    courseruns: [makeCourseRun()]
+  }
+}
+
 export const makeCourseRunDetail = (): CourseRunDetail => {
   return {
     ...makeCourseRun(),
@@ -110,4 +121,16 @@ export const makeCourseRunEnrollmentWithProduct = (): CourseRunEnrollment => ({
   run:                     makeCourseRunDetailWithProduct(),
   edx_emails_subscription: true,
   enrollment_mode:         genEnrollmentMode()
+})
+
+export const makeProgram = (): Program => ({
+  id:          genProgramId.next().value,
+  title:       casual.text,
+  readable_id: casual.word,
+  courses:     [makeCourseDetailWithRuns()],
+})
+
+export const makeProgramEnrollment = (): ProgramEnrollment => ({
+  program:     makeProgram(),
+  enrollments: makeCourseRunEnrollment()
 })

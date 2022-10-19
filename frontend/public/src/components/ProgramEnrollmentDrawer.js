@@ -1,31 +1,39 @@
 import React from "react"
 
 import EnrolledItemCard from "./EnrolledItemCard"
-import { routes } from "../lib/urls"
+import ProgramCourseInfoCard from "./ProgramCourseInfoCard"
+
+import type { ProgramEnrollment, CourseDetailWithRuns } from "../flow/courseTypes"
 
 interface ProgramEnrollmentDrawerProps {
-  enrollments:  Array<any>,
+  enrollment:  ProgramEnrollment|null,
   showDrawer:   Function,
   isHidden:     boolean,
-  currentUser: CurrentUser,
-  deactivateEnrollment: (enrollmentId: number) => Promise<any>,
-  courseEmailsSubscription: (
-    enrollmentId: number,
-    emailsSubscription: string
-  ) => Promise<any>,
-  addUserNotification: Function
 }
 
 export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDrawerProps> {
+  renderCourseInfoCard(course: CourseDetailWithRuns) {
+    const { enrollment } = this.props
+    let found = undefined
+
+    console.log(`course is ${course.title} - ${course.readable_id}`)
+
+    for (let i = 0; i < course.courseruns.length; i++) {
+      found = enrollment.enrollments.find(elem => elem.run.id === course.courseruns[i].id)
+    }
+
+    if (found === undefined) {
+      return (<ProgramCourseInfoCard course={course}></ProgramCourseInfoCard>)
+    }
+
+    return null
+  }
+
   render() {
     const {
       isHidden,
-      enrollments,
+      enrollment,
       showDrawer,
-      currentUser,
-      deactivateEnrollment,
-      addUserNotification,
-      courseEmailsSubscription,
     } = this.props
 
     const closeDrawer = () => {
@@ -37,41 +45,36 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     const backgroundClass = isHidden ? 'drawer-background open' : 'drawer-background'
     const drawerClass = `nav-drawer ${isHidden ? "open" : "closed"}`
 
-    return (
+    return enrollment === null ? null : (
       <>
         <div className={backgroundClass}>
-          <div className={drawerClass} id="program_enrollment_drawer" tabIndex="-1" role="dialog" aria-modal="true" aria-label="program courses" aria-describedby="program_enrolled_items">
-            <div className="row chrome">
+          <div className={drawerClass} id="program_enrollment_drawer" tabIndex="-1" role="dialog" aria-modal="true" aria-label="program courses" aria-describedby="program_enrolled_items" aria-hidden={!isHidden ? true : false}>
+            <div className="row chrome d-flex flex-row" id="program_enrollment_title">
+              <h3 className="flex-grow-1">{enrollment.program.title}</h3>
               <button type="button" className="close" aria-label="Close" onClick={closeDrawer}>
-                <span aria-hidden="true">
+                <span>
                   &times;
                 </span>
               </button>
             </div>
-            <div className="row chrome" id="program_enrollment_title">
-              <h3>Program courses</h3>
+            <div className="row chrome" id="program_enrollment_subtite">
+              <h5>{enrollment.program.courses.length} courses | {enrollment.enrollments.length} enrolled</h5>
             </div>
             <div className="row enrolled-items" id="program_enrolled_items">
-              {enrollments && enrollments.length > 0 ? (enrollments.map(enrollment => (
+              <h5>ENROLLED ({enrollment.enrollments.length})</h5>
+              {enrollment.enrollments.length > 0 ? (enrollment.enrollments.map(enrollment => (
                 <EnrolledItemCard
                   key={enrollment.id}
-                  enrollment={enrollment}
-                  currentUser={currentUser}
-                  deactivateEnrollment={deactivateEnrollment}
-                  courseEmailsSubscription={courseEmailsSubscription}
-                  closeDrawer = {closeDrawer}
-                  addUserNotification={addUserNotification}>
+                  enrollment={enrollment}>
                 </EnrolledItemCard>
-              ))) : (
-                <div className="card no-enrollments p-3 p-md-5 rounded-0 flex-grow-1">
-                  <h2>Enroll Now</h2>
-                  <p>
-                    You are not enrolled in any courses yet. Please{" "}
-                    <a href={routes.root}>browse our courses</a>.
-                  </p>
-                </div>
-              )}
+              ))) : null}
             </div>
+            {enrollment.program.courses.length - enrollment.enrollments.length > 0 ? (
+              <div className="row enrolled-items" id="program_unenrolled_items">
+                <h5>AVAILABLE ({enrollment.program.courses.length - enrollment.enrollments.length})</h5>
+
+                {enrollment.program.courses.map(course => this.renderCourseInfoCard(course))}
+              </div>) : null}
           </div>
         </div>
       </>

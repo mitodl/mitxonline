@@ -39,21 +39,4 @@ describe("DashboardPage", () => {
     const { inner } = await renderPage()
     assert.isTrue(inner.find(".dashboard").exists())
   })
-
-  it("shows a message if the user has no enrollments", async () => {
-    const { inner } = await renderPage({
-      entities: {
-        enrollments: []
-      }
-    })
-    assert.isTrue(inner.find(".dashboard").exists())
-    const enrolledItems = inner.find(".no-enrollments")
-    assert.lengthOf(enrolledItems, 1)
-    assert.isTrue(
-      enrolledItems
-        .at(0)
-        .text()
-        .includes("You are not enrolled in any courses yet")
-    )
-  })
 })

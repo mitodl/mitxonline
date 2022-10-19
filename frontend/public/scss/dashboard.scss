@@ -173,6 +173,24 @@ $program-badge-bg: #DBF2F3;
   }
 }
 
+.dashboard button.dash-tab {
+  border: 0;
+  font-weight: bold;
+  font-size: 75%;
+  margin-right: 3em;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+
+  @include media-breakpoint-down(sm) {
+    margin-right: 1em;
+  }
+}
+
+.dashboard button.dash-tab.active {
+  border-bottom: 3px solid $primary !important;
+}
+
 .modal-title {
   width: 500px;
 }
@@ -190,7 +208,7 @@ $program-badge-bg: #DBF2F3;
   overflow-y: scroll;
   left: 8px;
 
-  @media only screen and (min-width: 768px) {
+  @media only screen and (min-width: 1025px) {
     width: 55%;
     right: 0;
     left: unset;
@@ -201,14 +219,16 @@ $program-badge-bg: #DBF2F3;
     display: block;
   }
 
-  button {
-    float: right;
-    margin-left: auto;
-  }
-
   .row.chrome {
     margin-top: 15px !important;
     margin-bottom: 15px !important;
+    
+    button.close {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      float: none !important;
+    }
   }
 
   &.closed {
