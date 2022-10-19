@@ -30,6 +30,7 @@ from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_REFUNDED,
 )
+
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -43,7 +44,11 @@ from courses.factories import (
 # pylint: disable=redefined-outer-name
 from courses.models import CourseRunEnrollment, ProgramEnrollment
 from main.test_utils import MockHttpError
-from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import (
+    EDX_DEFAULT_ENROLLMENT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+    EDX_ENROLLMENT_AUDIT_MODE,
+)
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
     NoEdxApiAuthError,
@@ -1091,3 +1096,52 @@ def test_override_user_grade(grade, should_force_pass, is_passed):
     assert test_grade.grade == grade
     assert test_grade.passed is is_passed
     assert test_grade.set_by_admin is True
+
+
+def test_create_run_enrollments_upgrade(mocker, user):
+    """
+    create_run_enrollments should call the edX API to create/update enrollments, and set the enrollment mode properly
+    on mitxonline.  If the edx API call to update the course_mode from audit -> verified fails, then edx_request_success
+    should return as False and the course_run_enrollment's edx_enrolled value should be set to False.
+    In addition, tests to make sure there's a ProgramEnrollment for the course.
+    """
+    test_course_run = CourseRunFactory.create()
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    patched_send_enrollment_email = mocker.patch(
+        "courses.api.mail_api.send_course_run_enrollment_email"
+    )
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    successful_enrollments, edx_request_success = create_run_enrollments(
+        user,
+        runs=[test_course_run],
+        keep_failed_enrollments=True,
+        mode=EDX_ENROLLMENT_AUDIT_MODE,
+    )
+    patched_edx_enroll.assert_called_once_with(
+        user, [test_course_run], mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+
+    patched_send_enrollment_email.assert_called_once()
+    assert edx_request_success is True
+    assert successful_enrollments[0].enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+
+    patched_edx_enroll = mocker.patch(
+        "courses.api.enroll_in_edx_course_runs",
+        side_effect=UnknownEdxApiEnrollException(user, test_course_run, Exception()),
+    )
+    patched_log_exception = mocker.patch("courses.api.log.exception")
+    successful_enrollments, edx_request_success = create_run_enrollments(
+        user,
+        runs=[test_course_run],
+        keep_failed_enrollments=True,
+        mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
+
+    patched_edx_enroll.assert_called_once_with(
+        user, [test_course_run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    assert edx_request_success is False
+    assert successful_enrollments[0].enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert successful_enrollments[0].edx_enrolled == False

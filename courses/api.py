@@ -229,7 +229,7 @@ def create_run_enrollments(
 
     Returns:
         (list of CourseRunEnrollment, bool): A list of enrollment objects that were successfully
-            created, paired with a boolean indicating whether or not edX enrollment was successful
+            created in mitxonline, paired with a boolean indicating whether or not the edX enrollment API call was successful
             for all of the given course runs
     """
     successful_enrollments = []
@@ -272,13 +272,13 @@ def create_run_enrollments(
 
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
+                enrollment.edx_enrolled = edx_request_success
                 # Case (Upgrade): When user was enrolled in free mode and now enrolls in paid mode (e.g. Verified)
                 # So, User has an active enrollment and the only changing thing is going to be enrollment mode
                 if enrollment.active and enrollment_mode_changed:
                     enrollment.update_mode_and_save(mode=mode)
 
                 elif not enrollment.active:
-                    enrollment.edx_enrolled = edx_request_success
                     if enrollment_mode_changed:
                         enrollment.enrollment_mode = mode
                     enrollment.reactivate_and_save()
