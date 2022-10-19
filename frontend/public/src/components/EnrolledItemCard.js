@@ -10,20 +10,33 @@ import {
   Button,
   Modal,
   ModalHeader,
-  ModalBody
+  ModalBody,
 } from "reactstrap"
-import { partial } from "ramda"
+import { partial, pathOr } from "ramda"
+import { createStructuredSelector } from "reselect"
+import { compose } from "redux"
+import { connectRequest, mutateAsync } from "redux-query"
+import { connect } from "react-redux"
+
+import {
+  enrollmentsQuery,
+  enrollmentsQueryKey,
+  deactivateEnrollmentMutation,
+  courseEmailsSubscriptionMutation
+} from "../lib/queries/enrollment"
+import { currentUserSelector } from "../lib/queries/users"
+import { addUserNotification } from "../actions"
 
 import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../constants"
 import GetCertificateButton from './GetCertificateButton'
 import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText, courseRunStatusMessage } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
-import type { RunEnrollment } from "../flow/courseTypes"
+import type { RunEnrollment, Program } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
 
 type EnrolledItemCardProps = {
-  enrollment: RunEnrollment,
+  enrollment: RunEnrollment|Program,
   currentUser: CurrentUser,
   deactivateEnrollment: (enrollmentId: number) => Promise<any>,
   courseEmailsSubscription: (
@@ -31,7 +44,8 @@ type EnrolledItemCardProps = {
     emailsSubscription: string
   ) => Promise<any>,
   addUserNotification: Function,
-  closeDrawer:Function,
+  isLoading: boolean,
+  toggleProgramDrawer: Function|null,
 }
 
 type EnrolledItemCardState = {
@@ -73,8 +87,16 @@ export class EnrolledItemCard extends React.Component<
     })
   }
 
+  toggleProgramInfo = () => {
+    const { toggleProgramDrawer, enrollment } = this.props
+
+    if (toggleProgramDrawer !== null) {
+      toggleProgramDrawer(enrollment)
+    }
+  }
+
   async onDeactivate(enrollment: RunEnrollment) {
-    const { deactivateEnrollment, addUserNotification, closeDrawer } = this.props
+    const { deactivateEnrollment, addUserNotification } = this.props
 
     if (enrollment.enrollment_mode === "verified") {
       this.toggleVerifiedUnenrollmentModalVisibility()
@@ -92,9 +114,6 @@ export class EnrolledItemCard extends React.Component<
         messageType = ALERT_TYPE_DANGER
         userMessage = `Something went wrong with your request to unenroll. Please contact support at ${SETTINGS.support_email}.`
       }
-      if (typeof closeDrawer === "function") {
-        closeDrawer()
-      }
       addUserNotification({
         "unenroll-status": {
           type:  messageType,
@@ -110,8 +129,8 @@ export class EnrolledItemCard extends React.Component<
     }
   }
 
-  async onSubmit(payload: Object) {
-    const { courseEmailsSubscription, addUserNotification, closeDrawer } = this.props
+  async onSubmitEmailSettings(payload: Object) {
+    const { courseEmailsSubscription, addUserNotification } = this.props
     this.setState({ submittingEnrollmentId: payload.enrollmentId })
     this.toggleEmailSettingsModalVisibility()
     try {
@@ -130,9 +149,6 @@ export class EnrolledItemCard extends React.Component<
       } else {
         messageType = ALERT_TYPE_DANGER
         userMessage = `Something went wrong with your request to course ${payload.courseNumber} emails subscription. Please contact support at ${SETTINGS.support_email}.`
-      }
-      if (typeof closeDrawer === "function") {
-        closeDrawer()
       }
       addUserNotification({
         "subscription-status": {
@@ -164,7 +180,7 @@ export class EnrolledItemCard extends React.Component<
         </ModalHeader>
         <ModalBody>
           <Formik
-            onSubmit={this.onSubmit.bind(this)}
+            onSubmit={this.onSubmitEmailSettings.bind(this)}
             initialValues={{
               subscribeEmails: enrollment.edx_emails_subscription,
               enrollmentId:    enrollment.id,
@@ -240,7 +256,7 @@ export class EnrolledItemCard extends React.Component<
     )
   }
 
-  render() {
+  renderCourseEnrollment() {
     const {
       enrollment,
       currentUser,
@@ -383,6 +399,124 @@ export class EnrolledItemCard extends React.Component<
       </div>
     )
   }
+
+  renderProgramEnrollment() {
+    const {
+      enrollment
+    } = this.props
+
+    const title = enrollment.program.title
+    const startDateDescription = null
+    const certificateLinks = null
+    const pageLocation = null
+    const courseRunStatusMessageText = null
+    const menuTitle = `Program information for ${enrollment.program.title}`
+
+    const courseId = enrollment.program.readable_id
+
+    return (
+      <div
+        className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3"
+        key={enrollment.program.id}
+      >
+        <div className="row flex-grow-1">
+          <div className="col-12 col-md-auto px-0 px-md-3">
+            <div className="img-container">
+              <img
+                src="/static/images/mit-dome.png"
+                alt="Preview image"
+              />
+            </div>
+          </div>
+
+          <div className="col-12 col-md px-3 py-3 py-md-0 box">
+            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
+              <h2 className="my-0 mr-3">
+                <a
+                  rel="noopener noreferrer"
+                  href="#program_enrollment_drawer"
+                  aria-flowto="program_enrollment_drawer"
+                  aria-haspopup="dialog"
+                  onClick={() => this.toggleProgramInfo()}
+                >
+                  {title}</a>
+              </h2>
+              <a
+                rel="noopener noreferrer"
+                href="#program_enrollment_drawer"
+                aria-flowto="program_enrollment_drawer"
+                aria-haspopup="dialog"
+                className="text-body material-icons"
+                aria-label={menuTitle}
+                title={menuTitle}
+                onClick={this.toggleProgramInfo.bind(this)}
+              >more_vert</a>
+            </div>
+            <div className="detail pt-1">
+              {courseId}
+              {startDateDescription === null}
+              {courseRunStatusMessageText}
+              <div className="enrollment-extra-links d-flex">
+                <span className="program-course-count">
+                  {enrollment.program.courses.length} course{enrollment.program.courses.length > 1 ? 's' : null}
+                </span>
+                {pageLocation ? (
+                  <a href={pageLocation.page_url}>Course details</a>
+                ) : null}
+                {enrollment.certificate ? (
+                  <a className="view-certificate" href={enrollment.certificate.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >View certificate</a>
+                ) : null}
+              </div>
+              <br/>
+            </div>
+          </div>
+        </div>
+        <div className="row flex-grow-1 pt-3">
+          <div className="col pl-0 pr-0">
+            {certificateLinks}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  render() {
+    const {
+      enrollment,
+    } = this.props
+
+    return enrollment.run ? this.renderCourseEnrollment() : this.renderProgramEnrollment()
+  }
 }
 
-export default EnrolledItemCard
+const mapStateToProps = createStructuredSelector({
+  currentUser:        currentUserSelector,
+  isLoading:          pathOr(true, ["queries", enrollmentsQueryKey, "isPending"])
+})
+
+const mapPropsToConfig = () => [enrollmentsQuery()]
+
+const deactivateEnrollment = (enrollmentId: number) =>
+  mutateAsync(deactivateEnrollmentMutation(enrollmentId))
+
+const courseEmailsSubscription = (
+  enrollmentId: number,
+  emailsSubscription: string
+) =>
+  mutateAsync(
+    courseEmailsSubscriptionMutation(enrollmentId, emailsSubscription)
+  )
+
+const mapDispatchToProps = {
+  deactivateEnrollment,
+  courseEmailsSubscription,
+  addUserNotification,
+}
+
+export default compose(
+  connect(mapStateToProps, mapDispatchToProps),
+  connectRequest(mapPropsToConfig)
+)(EnrolledItemCard)

@@ -73,6 +73,7 @@ class CourseRunAdmin(TimestampedModelAdmin):
     list_display = (
         "id",
         "title",
+        "get_course_program_title",
         "courseware_id",
         "run_tag",
         "start_date",
@@ -87,6 +88,11 @@ class CourseRunAdmin(TimestampedModelAdmin):
         models.CharField: {"widget": TextInput(attrs={"size": "80"})},
         models.TextField: {"widget": TextInput(attrs={"size": "100"})},
     }
+
+    @display(description="Program Title")
+    def get_course_program_title(self, obj):
+        """Returns the course run's program"""
+        return obj.course.program.title if obj.course.program else None
 
 
 class ProgramEnrollmentAdmin(AuditableModelAdmin):
@@ -172,8 +178,14 @@ class CourseRunEnrollmentAdmin(AuditableModelAdmin):
         "run__courseware_id",
         "run__title",
     ]
-    list_filter = ["active", "change_status", "edx_enrolled"]
-    list_display = ("id", "get_user_email", "get_run_courseware_id", "change_status")
+    list_filter = ["active", "change_status", "edx_enrolled", "enrollment_mode"]
+    list_display = (
+        "id",
+        "get_user_email",
+        "get_run_courseware_id",
+        "enrollment_mode",
+        "change_status",
+    )
     raw_id_fields = (
         "user",
         "run",

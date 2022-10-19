@@ -6,7 +6,7 @@ import moment from "moment"
 import { assert } from "chai"
 import { shallow } from "enzyme"
 
-import EnrolledItemCard from "./EnrolledItemCard"
+import { EnrolledItemCard } from "./EnrolledItemCard"
 import { shouldIf } from "../lib/test_utils"
 import IntegrationTestHelper from "../util/integration_test_helper"
 import { makeCourseRunEnrollment, makeCourseRunEnrollmentWithProduct } from "../factories/course"
@@ -20,7 +20,7 @@ describe("EnrolledItemCard", () => {
     currentUser,
     enrollmentCardProps,
     isFinancialAssistanceAvailableStub,
-    closeDrawer
+    toggleProgramDrawer
 
 
   beforeEach(() => {
@@ -40,11 +40,12 @@ describe("EnrolledItemCard", () => {
         .withArgs(userEnrollment.id, "test")
         .returns(Promise),
       addUserNotification: helper.sandbox.stub().returns(Function),
-    },
+    }
     isFinancialAssistanceAvailableStub = helper.sandbox.stub(
       courseApi,
       "isFinancialAssistanceAvailable"
     )
+    toggleProgramDrawer = helper.sandbox.stub().returns(Function)
 
     renderedCard = () =>
       shallow(
@@ -57,7 +58,8 @@ describe("EnrolledItemCard", () => {
             enrollmentCardProps.courseEmailsSubscription
           }
           addUserNotification={enrollmentCardProps.addUserNotification}
-          closeDrawer={closeDrawer}
+          toggleProgramDrawer={toggleProgramDrawer}
+          isLoading={false}
         />
       )
   })
