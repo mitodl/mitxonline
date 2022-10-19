@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.49.1
+Version 0.49.1 (Released October 19, 2022)
 --------------
 
 - docs: add information about certificates management (#1136)
