@@ -68,6 +68,9 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
             "legal_address": None,
             "is_anonymous": True,
             "is_authenticated": False,
+            "is_staff": False,
+            "is_superuser": False,
+            "grants": [],
         }
         # patched_unused_coupon_api.assert_not_called()
     elif not is_anonymous and show_enrollment_codes:
@@ -86,6 +89,9 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
             "is_editor": False,
             "created_on": drf_datetime(user.created_on),
             "updated_on": drf_datetime(user.updated_on),
+            "is_staff": user.is_staff,
+            "is_superuser": user.is_superuser,
+            "grants": list(user.get_all_permissions()),
         }
 
 

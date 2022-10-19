@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { useLogout, useTitle, useNavigation } from "@pankod/refine-core";
+import { CanAccess, useLogout, useTitle, useNavigation } from "@pankod/refine-core";
 import { AntdLayout, Menu, Grid, Icons, useMenu, Typography, Space, Divider } from "@pankod/refine-antd";
 import { antLayoutSider, antLayoutSiderMobile } from "./styles";
 
@@ -33,7 +33,10 @@ export const Sider: React.FC = () => {
         mode="inline"
         onClick={({ key }) => {
           if (key === "logout") {
-            logout();
+            localStorage.removeItem("mitx-online-staff-profile");
+            const logoutPath = (new URL(DATASOURCES_CONFIG.mitxOnline)).origin + "/logout/";
+            window.location.href = logoutPath;
+      
             return;
           }
 
@@ -44,27 +47,33 @@ export const Sider: React.FC = () => {
           push(key as string);
         }}
       >
-        {menuItems.map(({ icon, label, route }) => {
+        {menuItems.map(({ icon, label, route, name }) => {
           const isSelected = route === selectedKey;
           return (
-            <Menu.Item
-              style={{
-                fontWeight: isSelected ? "bold" : "normal",
-              }}
+            <CanAccess
               key={route}
-              icon={icon}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
+              resource={name.toLowerCase()}
+              action="list"
               >
-                {label}
-                {!collapsed && isSelected && <RightOutlined />}
-              </div>
-            </Menu.Item>
+              <Menu.Item
+                style={{
+                  fontWeight: isSelected ? "bold" : "normal",
+                }}
+                key={route}
+                icon={icon}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  {label}
+                  {!collapsed && isSelected && <RightOutlined />}
+                </div>
+              </Menu.Item>
+            </CanAccess>
           );
         })}
 

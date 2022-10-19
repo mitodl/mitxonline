@@ -110,6 +110,7 @@ class UserSerializer(serializers.ModelSerializer):
         required=False,
     )
     legal_address = LegalAddressSerializer(allow_null=True)
+    grants = serializers.SerializerMethodField(read_only=True, required=False)
 
     def validate_email(self, value):
         """Empty validation function, but this is required for WriteableSerializerMethodField"""
@@ -144,6 +145,9 @@ class UserSerializer(serializers.ModelSerializer):
     def get_username(self, instance):
         """Returns the username or None in the case of AnonymousUser"""
         return getattr(instance, "username", None)
+
+    def get_grants(self, instance):
+        return instance.get_all_permissions()
 
     def validate(self, data):
         request = self.context.get("request", None)
@@ -220,16 +224,22 @@ class UserSerializer(serializers.ModelSerializer):
             "is_anonymous",
             "is_authenticated",
             "is_editor",
+            "is_staff",
+            "is_superuser",
             "created_on",
             "updated_on",
+            "grants",
         )
         read_only_fields = (
             "username",
             "is_anonymous",
             "is_authenticated",
             "is_editor",
+            "is_staff",
+            "is_superuser",
             "created_on",
             "updated_on",
+            "grants",
         )
 
 

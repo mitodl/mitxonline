@@ -1,20 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import {AuthProvider} from "react-oidc-context";
-import { User } from "oidc-client-ts";
-
 import reportWebVitals from "./reportWebVitals";
 import App from "./App";
 
 ReactDOM.render(
   <React.StrictMode>
-    <AuthProvider
-      {...OIDC_CONFIG}
-      monitorAnonymousSession={false}
-      prompt="login"
-    >
-      <App />
-    </AuthProvider>
+    <App />
   </React.StrictMode>,
   document.getElementById("root")
 );
