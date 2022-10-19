@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.49.2
+--------------
+
+- 1148: course-enrollment-upgrading-is-not-ever-synchronized-with-edx-if-the-original-update-request-fails (#1151)
+
 Version 0.49.1 (Released October 19, 2022)
 --------------
 
