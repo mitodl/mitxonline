@@ -1,5 +1,20 @@
-"""Management command to change enrollment status"""
+"""
+Management command to create verified enrollment for a course run for the given User
+
+Check the usages of this command below:
+
+**Create verified enrollment**
+
+1. Create verified enrollment for user
+./manage.py create_verified_enrollment -—user=<username or email> -—run=<course_run_courseware_id> -code=<enrollment_code or discount_code>
+
+**Keep failed enrollments**
+
+4. Keep failed enrollments
+./manage.py create_verified_enrollment -—user=<username or email> -—run=<course_run_courseware_id> -code=<enrollment_code or discount_code> -k or --keep-failed-enrollments
+"""
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
@@ -7,7 +22,7 @@ from courses.api import create_run_enrollments
 from courses.models import CourseRun, PaidCourseRun
 from ecommerce.api import fulfill_completed_order
 from ecommerce.discounts import DiscountType
-from ecommerce.models import Order, PendingOrder, Product, Discount, DiscountProduct
+from ecommerce.models import Order, PendingOrder, Product, Discount
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.api import fetch_user
 
@@ -42,13 +57,6 @@ class Command(BaseCommand):
             dest="keep_failed_enrollments",
             help="If provided, enrollment records will be kept even if edX enrollment fails",
         )
-        parser.add_argument(
-            "-f",
-            "--force",
-            action="store_true",
-            dest="force",
-            help="If provided, Enroll user in expired courses",
-        )
         super().add_arguments(parser)
 
     def handle(self, *args, **options):
@@ -61,7 +69,9 @@ class Command(BaseCommand):
                 "Could not find course run with courseware_id={}".format(options["run"])
             )
 
-        product = Product.objects.filter(object_id=run.id).first()
+        product = Product.objects.filter(
+            object_id=run.id, content_type=ContentType.objects.get_for_model(CourseRun)
+        ).first()
         if product is None:
             raise CommandError(
                 "No product found for that course with courseware_id={}".format(
@@ -69,34 +79,27 @@ class Command(BaseCommand):
                 )
             )
 
-        purchased_object = product.purchasable_object
-
-        if purchased_object.course.is_country_blocked(user):
+        if run.course.is_country_blocked(user):
             raise CommandError(
                 "Enrollment is blocked of this course with courseware_id={} for user {}".format(
                     options["run"], options["user"]
                 )
             )
 
-        if isinstance(purchased_object, CourseRun):
-            # PaidCourseRun should only contain fulfilled or review orders
-            # but in order to avoid false positive passing in order__state__in here
-            if PaidCourseRun.objects.filter(
-                user=user,
-                course_run=purchased_object,
-                order__state__in=[Order.STATE.FULFILLED, Order.STATE.REVIEW],
-            ).exists():
-                raise CommandError(
-                    "User {} already enrolled in this course with courseware_id={}".format(
-                        options["user"], options["run"]
-                    )
+        # PaidCourseRun should only contain fulfilled or review orders
+        # but in order to avoid false positive passing in order__state__in here
+        if PaidCourseRun.objects.filter(
+            user=user,
+            course_run=run,
+            order__state__in=[Order.STATE.FULFILLED, Order.STATE.REVIEW],
+        ).exists():
+            raise CommandError(
+                "User {} already enrolled in this course with courseware_id={}".format(
+                    options["user"], options["run"]
                 )
+            )
 
-        if (
-            not options["force"]
-            and isinstance(purchased_object, CourseRun)
-            and not purchased_object.is_upgradable
-        ):
+        if not run.is_upgradable:
             raise CommandError(
                 "The course with courseware_id={} is not upgradeable or the upgrade deadline has been passed".format(
                     options["run"]
@@ -112,17 +115,17 @@ class Command(BaseCommand):
             )
 
         if discount.products.exists() and not (
-            DiscountProduct.objects.filter(product=product, discount=discount).exists()
+            discount.products.filter(product=product).exists()
         ):
             raise CommandError(
-                "That enrollment code {} is not valid for course with courseware_id={}".format(
+                "That enrollment code {} is invalid for course with courseware_id={}".format(
                     options["code"], options["run"]
                 )
             )
 
         if not discount.check_validity(user):
             raise CommandError(
-                "That enrollment code {} for course with courseware_id={} is not valid for user {}".format(
+                "That enrollment code {} for course with courseware_id={} is invalid for user {}".format(
                     options["code"], options["run"], options["user"]
                 )
             )
