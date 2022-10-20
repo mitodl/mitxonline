@@ -37,8 +37,6 @@ services:
   nginx:
     build:
       context: ./nginx
-    ports:
-      - "8013:8013"
     links:
       - web
     volumes:
@@ -97,10 +95,10 @@ services:
       - yarn-cache:/home/mitodl/.cache/yarn
     healthcheck:
       test: curl -f http://watch:8012/health || exit 1
-      interval: 5s
+      interval: 30s
       timeout: 1s
       retries: 4
-      start_period: 45s
+      start_period: 180s
 
   celery:
     build:
@@ -140,10 +138,10 @@ services:
         condition: service_healthy
     healthcheck:
       test: curl -f http://refine:8016/health || exit 1
-      interval: 5s
+      interval: 30s
       timeout: 1s
-      retries: 3
-      start_period: 30s
+      retries: 4
+      start_period: 180s
 
   notebook:
     build:
@@ -162,6 +160,17 @@ services:
       jupyter notebook --no-browser --ip=0.0.0.0 --port=8080'
     ports:
       - "8080:8080"
+
+  varnish:
+    image: varnish:fresh
+    links: 
+      - nginx
+    ports: 
+      - "8013:80"
+    volumes:
+      - ./config/default.vcl:/etc/varnish/default.vcl:ro
+    depends_on:
+      - nginx
 
 volumes:
   npm-cache: {}
