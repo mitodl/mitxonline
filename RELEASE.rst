@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.49.3
+Version 0.49.3 (Released October 20, 2022)
 --------------
 
 - Adds updated dashboard UI for programs
