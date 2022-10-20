@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.49.3
+--------------
+
+- Adds updated dashboard UI for programs
+- Changes staff dashboard to use Django sessions rather than OAuth2
+
 Version 0.49.2 (Released October 19, 2022)
 --------------
 
