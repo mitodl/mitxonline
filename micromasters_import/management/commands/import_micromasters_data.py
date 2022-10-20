@@ -24,15 +24,25 @@ class Command(BaseCommand):
         file_name: str
         raw_sql: str
 
-    help = "Imports Micromasters data"
+    help = "Imports Micromasters data. Specify --num to run a paticular file. e.g. --num 002"
+
+    def add_arguments(self, parser) -> None:
+        parser.add_argument(
+            "--num",
+            type=str,
+            help="specify a file num to run. eg. 002 refers to 002_import_courserun.sql",
+        )
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+        file_num = kwargs["num"].zfill(3)
         sqls = []
 
         self.stdout.write(f"Gathering SQL queries:")
 
         for root, _, files in os.walk(SQL_FILES_DIR):
             for file_name in sorted(files):
+                if file_num and not file_name.startswith(file_num):
+                    continue
                 with open(os.path.join(root, file_name), "r") as sql_file:
                     self.stdout.write(file_name)
                     sqls.append(self.Sql(file_name, sql_file.read()))
