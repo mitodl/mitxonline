@@ -741,7 +741,7 @@ def test_defer_enrollment_validation(mocker, user):
                     "enrollment_start": "2019-01-01T00:00:00Z",
                     "enrollment_end": "2020-02-01T00:00:00Z",
                     "name": "Demonstration Course",
-                    "pacing": "self"
+                    "pacing": "self",
                 }
             ),
             True,
@@ -755,7 +755,7 @@ def test_defer_enrollment_validation(mocker, user):
                     "enrollment_start": "2019-01-01T00:00:00Z",
                     "enrollment_end": "2020-02-01T00:00:00Z",
                     "name": "Demonstration Course",
-                    "pacing": "instructor"
+                    "pacing": "instructor",
                 }
             ),
             True,
