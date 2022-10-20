@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.49.4
+Version 0.49.4 (Released October 20, 2022)
 --------------
 
 - add course certificate migration from MM
