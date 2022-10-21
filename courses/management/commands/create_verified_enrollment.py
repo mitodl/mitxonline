@@ -88,14 +88,15 @@ class Command(BaseCommand):
 
         # PaidCourseRun should only contain fulfilled or review orders
         # but in order to avoid false positive passing in order__state__in here
-        if PaidCourseRun.objects.filter(
+        paid_course_run = PaidCourseRun.objects.filter(
             user=user,
             course_run=run,
             order__state__in=[Order.STATE.FULFILLED, Order.STATE.REVIEW],
-        ).exists():
+        ).first()
+        if paid_course_run:
             raise CommandError(
-                "User {} already enrolled in this course with courseware_id={}".format(
-                    options["user"], options["run"]
+                "User {} already enrolled in this course with courseware_id={}\nEnrollment order:{}".format(
+                    options["user"], options["run"], paid_course_run.order
                 )
             )
 
