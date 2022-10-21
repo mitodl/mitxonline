@@ -16,7 +16,7 @@ sub vcl_init {
 sub vcl_recv {
 	# force the host header to match the backend (not all backends need it,
 	# but example.com does)
-	set req.http.host = "nginx";
+	set req.http.host = "mitxonline.odl.local:8013";
 	# set the backend
 	set req.backend_hint = d.backend("mitxonline.odl.local");
 }
