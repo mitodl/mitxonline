@@ -290,12 +290,13 @@ class Discount(TimestampedModel):
 
     def check_validity_with_products(self, products: list):
         """
-        Enforces the redemption rules for a given discount.
-
+        Checks if the discount is valid for product
+        Returns True if there is no product attached to the discount or if all the products
+        are attached with the discount else False.
         Args:
-            - products (list): List of products.
+            products (list): List of products.
         Returns:
-            - boolean
+            Boolean
         """
         if self.products.exists() and not (
             self.products.filter(product__in=products).exists()

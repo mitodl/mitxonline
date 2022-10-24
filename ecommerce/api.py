@@ -7,7 +7,7 @@ from django.db import transaction
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
-from ecommerce.constants import REFUND_SUCCESS_STATES
+from ecommerce.constants import REFUND_SUCCESS_STATES, ZERO_PAYMENT_DATA
 from ecommerce.tasks import perform_unenrollment_from_order
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
@@ -40,7 +40,6 @@ from ecommerce.models import (
     FulfilledOrder,
     Order,
     Discount,
-    DiscountProduct,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 
@@ -117,8 +116,9 @@ def generate_checkout_payload(request):
 
     if total_price == 0:
         with transaction.atomic():
-            payment_data = zero_payment_data()
-            fulfill_completed_order(order, payment_data, basket)
+            fulfill_completed_order(
+                order, payment_data=ZERO_PAYMENT_DATA, basket=basket
+            )
             return {
                 "no_checkout": True,
                 "response": redirect_with_user_message(
@@ -234,16 +234,6 @@ def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=F
 
     if not order.is_review and (basket and basket.compare_to_order(order)):
         basket.delete()
-
-
-def zero_payment_data():
-    """
-    returns payment data for 100% discounted order or zero amount order
-
-    Returns:
-        dict
-    """
-    return {"amount": 0, "data": {"reason": "No payment required"}}
 
 
 def get_order_from_cybersource_payment_response(request):

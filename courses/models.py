@@ -905,13 +905,11 @@ class PaidCourseRun(TimestampedModel):
     def fulfilled_paid_course_run_exists(cls, user: User, run: CourseRun):
         """
         Checks if user has paid course run
-
+        Returns True if PaidCourseRun exists else False.
         Args:
-            user (User): the user
-            run (CourseRun): the course run
-
+            products (list): List of products.
         Returns:
-            bool
+            Boolean
         """
 
         # Due to circular dependancy importing locally

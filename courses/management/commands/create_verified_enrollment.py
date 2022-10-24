@@ -20,9 +20,10 @@ from django.db import transaction
 
 from courses.api import create_run_enrollments
 from courses.models import CourseRun, PaidCourseRun
-from ecommerce.api import fulfill_completed_order, zero_payment_data
+from ecommerce.api import fulfill_completed_order
+from ecommerce.constants import ZERO_PAYMENT_DATA
 from ecommerce.discounts import DiscountType
-from ecommerce.models import Order, PendingOrder, Product, Discount
+from ecommerce.models import PendingOrder, Product, Discount
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.api import fetch_user
 
@@ -32,7 +33,7 @@ User = get_user_model()
 class Command(BaseCommand):
     """creates an enrollment for a course run"""
 
-    help = "Creates an enrollment for a course run"
+    help = "Creates a verified enrollment for a course run"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -136,8 +137,9 @@ class Command(BaseCommand):
             if not successful_enrollments:
                 raise CommandError("Failed to create the enrollment record")
             order = PendingOrder.create_from_product(product, user, discount)
-            payment_data = zero_payment_data()
-            fulfill_completed_order(order, payment_data, already_enrolled=True)
+            fulfill_completed_order(
+                order, payment_data=ZERO_PAYMENT_DATA, already_enrolled=True
+            )
 
         self.stdout.write(
             self.style.SUCCESS(
