@@ -161,7 +161,7 @@ class CertificateIndexPage(RoutablePageMixin, Page):
             if certificate.certificate_page_revision
             else (
                 certificate.program.page.certificate_page
-                if certificate.program.page
+                if hasattr(certificate.program, "page") and certificate.program.page
                 else None
             )
         )

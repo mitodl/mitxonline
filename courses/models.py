@@ -696,7 +696,9 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
     def save(self, *args, **kwargs):  # pylint: disable=signature-differs
         if not self.certificate_page_revision:
             certificate_page = (
-                self.program.page.certificate_page if self.program.page else None
+                self.program.page.certificate_page
+                if hasattr(self.program, "page") and self.program.page
+                else None
             )
             if certificate_page:
                 self.certificate_page_revision = certificate_page.get_latest_revision()

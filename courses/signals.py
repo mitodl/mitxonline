@@ -1,5 +1,5 @@
 """
-Signals for micromasters course certificates
+Signals for mitxonline course certificates
 """
 from django.db import transaction
 from django.db.models.signals import post_save

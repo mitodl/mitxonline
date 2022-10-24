@@ -26,7 +26,6 @@ from courses.models import (
     Program,
     CourseRunEnrollment,
     ProgramEnrollment,
-    ProgramCertificate,
 )
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
@@ -34,9 +33,8 @@ from courses.serializers import (
     CourseSerializer,
     ProgramSerializer,
     UserProgramEnrollmentDetailSerializer,
-    ProgramCertificateSerializer,
 )
-from courses.utils import get_program_certificate
+from courses.utils import get_program_certificate_by_enrollment
 from main import features
 from main.constants import (
     USER_MSG_COOKIE_NAME,
@@ -279,7 +277,7 @@ def get_user_program_enrollments(request):
                 program_list[enrollment.run.course.program.id] = {
                     "enrollments": [enrollment],
                     "program": enrollment.run.course.program,
-                    "certificate": get_program_certificate(enrollment),
+                    "certificate": get_program_certificate_by_enrollment(enrollment),
                 }
 
     non_course_programs = (
@@ -296,7 +294,7 @@ def get_user_program_enrollments(request):
             {
                 "enrollments": [],
                 "program": enrollment.program,
-                "certificate": get_program_certificate(enrollment),
+                "certificate": get_program_certificate_by_enrollment(enrollment),
             }
         )
 

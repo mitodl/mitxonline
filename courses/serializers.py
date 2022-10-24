@@ -14,7 +14,7 @@ from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
-from courses.utils import get_program_certificate
+from courses.utils import get_program_certificate_by_enrollment
 from ecommerce.models import Product
 from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
@@ -460,7 +460,7 @@ class ProgramEnrollmentSerializer(serializers.ModelSerializer):
         """
         Resolve a certificate for this enrollment if it exists
         """
-        certificate = get_program_certificate(enrollment)
+        certificate = get_program_certificate_by_enrollment(enrollment)
         if certificate:
             return ProgramCertificateSerializer(certificate).data
         return None
