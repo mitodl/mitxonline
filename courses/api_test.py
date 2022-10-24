@@ -741,6 +741,21 @@ def test_defer_enrollment_validation(mocker, user):
                     "enrollment_start": "2019-01-01T00:00:00Z",
                     "enrollment_end": "2020-02-01T00:00:00Z",
                     "name": "Demonstration Course",
+                    "pacing": "self",
+                }
+            ),
+            True,
+        ],
+        [
+            CourseDetail(
+                {
+                    "id": "course-v1:edX+DemoX+2020_T1",
+                    "start": "2019-01-01T00:00:00Z",
+                    "end": "2020-02-01T00:00:00Z",
+                    "enrollment_start": "2019-01-01T00:00:00Z",
+                    "enrollment_end": "2020-02-01T00:00:00Z",
+                    "name": "Demonstration Course",
+                    "pacing": "instructor",
                 }
             ),
             True,
@@ -783,6 +798,7 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
         assert course_run.end_date == mocked_api_response.end
         assert course_run.enrollment_start == mocked_api_response.enrollment_start
         assert course_run.enrollment_end == mocked_api_response.enrollment_end
+        assert course_run.is_self_paced == mocked_api_response.is_self_paced()
     else:
         assert success_count == 0
         assert failure_count == 1

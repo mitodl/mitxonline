@@ -566,6 +566,7 @@ def sync_course_runs(runs):
             run.end_date = course_detail.end
             run.enrollment_start = course_detail.enrollment_start
             run.enrollment_end = course_detail.enrollment_end
+            run.is_self_paced = course_detail.is_self_paced()
             try:
                 run.save()
                 success_count += 1
