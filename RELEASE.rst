@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.50.0
+--------------
+
+- Updating version of mitol-django-payment-gateway to 1.7.1.
+- feat: sync is_self_paced from edX (#1158)
+- Some changes to the Varnish config; the host was getting set wrong so there were some issues with generated URLs
+- Adding simple Varnish config file and service block; should be caching now on port 8013
+
 Version 0.49.4 (Released October 20, 2022)
 --------------
 
