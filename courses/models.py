@@ -900,3 +900,25 @@ class PaidCourseRun(TimestampedModel):
 
     def __str__(self):
         return f"Paid Course Run - {self.course_run.courseware_id} by {self.user.name}"
+
+    @classmethod
+    def fulfilled_paid_course_run_exists(cls, user: User, run: CourseRun):
+        """
+        Checks if user has paid course run
+        Returns True if PaidCourseRun exists else False.
+        Args:
+            products (list): List of products.
+        Returns:
+            Boolean
+        """
+
+        # Due to circular dependancy importing locally
+        from ecommerce.models import Order
+
+        # PaidCourseRun should only contain fulfilled or review orders
+        # but in order to avoid false positive passing in order__state__in here
+        return cls.objects.filter(
+            user=user,
+            course_run=run,
+            order__state__in=[Order.STATE.FULFILLED, Order.STATE.REVIEW],
+        ).exists()

@@ -129,12 +129,9 @@ class Basket(TimestampedModel):
             purchased_object = item.product.purchasable_object
             if isinstance(purchased_object, CourseRun):
                 # PaidCourseRun should only contain fulfilled or review orders
-                # but in order to avoid false positive passing in order__state__in here
-                if PaidCourseRun.objects.filter(
-                    user=user,
-                    course_run=purchased_object,
-                    order__state__in=[Order.STATE.FULFILLED, Order.STATE.REVIEW],
-                ).exists():
+                if PaidCourseRun.fulfilled_paid_course_run_exists(
+                    user, purchased_object
+                ):
                     return True
 
         return False
@@ -286,6 +283,23 @@ class Discount(TimestampedModel):
             self.max_redemptions > 0
             and DiscountRedemption.objects.filter(redeemed_discount=self).count()
             >= self.max_redemptions
+        ):
+            return False
+
+        return self.valid_now()
+
+    def check_validity_with_products(self, products: list):
+        """
+        Checks if the discount is valid for product
+        Returns True if there is no product attached to the discount or if all the products
+        are attached with the discount else False.
+        Args:
+            products (list): List of products.
+        Returns:
+            Boolean
+        """
+        if self.products.exists() and not (
+            self.products.filter(product__in=products).exists()
         ):
             return False
 
@@ -525,18 +539,22 @@ class FulfillableOrder:
         source=(Order.STATE.PENDING, Order.STATE.REVIEW),
         target=Order.STATE.FULFILLED,
     )
-    def fulfill(self, payment_data):
+    def fulfill(self, payment_data, already_enrolled=False):
         # record the transaction
         self.create_transaction(payment_data)
 
-        # create enrollments for what the learner has paid for
-        self.create_enrollments()
+        # if user already enrolled from management command it'll not recreate
+        if not already_enrolled:
+            # create enrollments for what the learner has paid for
+            self.create_enrollments()
 
         # record all the courseruns in the order
         self.create_paid_courseruns()
 
-        # send the receipt emails
-        transaction.on_commit(self.send_ecommerce_order_receipt)
+        # No email is required as this order is generated from management command
+        if not already_enrolled:
+            # send the receipt emails
+            transaction.on_commit(self.send_ecommerce_order_receipt)
 
 
 class PendingOrder(FulfillableOrder, Order):
@@ -583,6 +601,53 @@ class PendingOrder(FulfillableOrder, Order):
             )
             if created:
                 total += line.discounted_price
+
+        order.total_price_paid = total
+        order.save()
+
+        return order
+
+    @classmethod
+    @transaction.atomic()
+    def create_from_product(cls, product: Product, user: User, discount: Discount):
+        """
+        Creates a new pending order from a product
+
+        Args:
+            product (Product):  the product to create an order for
+            user (User):  the user to create an order for
+            discount (Discount):  the discount code to create an order discount redemption
+
+        Returns:
+            PendingOrder: the created pending order
+        """
+        order = cls.objects.select_for_update().create(
+            total_price_paid=0, purchaser=user
+        )
+        total = 0
+        now = now_in_utc()
+
+        # apply all the discounts to the order first
+        # this is needed to compute the discounted prices of each line
+        order.discounts.create(
+            redemption_date=now,
+            redeemed_by=user,
+            redeemed_discount=discount,
+        )
+
+        product_version = Version.objects.get_for_object(product).first()
+
+        line, created = order.lines.get_or_create(
+            order=order,
+            purchased_object_id=product.object_id,
+            purchased_content_type_id=product.content_type_id,
+            defaults=dict(
+                product_version=product_version,
+                quantity=1,
+            ),
+        )
+        if created:
+            total += line.discounted_price
 
         order.total_price_paid = total
         order.save()

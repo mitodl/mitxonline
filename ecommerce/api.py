@@ -7,7 +7,7 @@ from django.db import transaction
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
-from ecommerce.constants import REFUND_SUCCESS_STATES
+from ecommerce.constants import REFUND_SUCCESS_STATES, ZERO_PAYMENT_DATA
 from ecommerce.tasks import perform_unenrollment_from_order
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
@@ -40,7 +40,6 @@ from ecommerce.models import (
     FulfilledOrder,
     Order,
     Discount,
-    DiscountProduct,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 
@@ -118,7 +117,7 @@ def generate_checkout_payload(request):
     if total_price == 0:
         with transaction.atomic():
             fulfill_completed_order(
-                order, {"amount": 0, "data": {"reason": "No payment required"}}, basket
+                order, payment_data=ZERO_PAYMENT_DATA, basket=basket
             )
             return {
                 "no_checkout": True,
@@ -163,12 +162,7 @@ def check_discount_for_products(discount, basket):
 
     basket_products = basket.get_products()
 
-    return (
-        not discount.products.exists()
-        or DiscountProduct.objects.filter(product__in=basket_products)
-        .filter(discount=discount)
-        .exists()
-    )
+    return discount.check_validity_with_products(basket_products)
 
 
 def check_basket_discounts_for_validity(request):
@@ -234,8 +228,8 @@ def apply_user_discounts(request):
     return
 
 
-def fulfill_completed_order(order, payment_data, basket):
-    order.fulfill(payment_data)
+def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=False):
+    order.fulfill(payment_data, already_enrolled=already_enrolled)
     order.save()
 
     if not order.is_review and (basket and basket.compare_to_order(order)):

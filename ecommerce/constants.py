@@ -64,3 +64,5 @@ REFUND_SUCCESS_STATES = [
     ProcessorResponse.STATE_DUPLICATE,
     ProcessorResponse.STATE_PENDING,
 ]
+
+ZERO_PAYMENT_DATA = {"amount": 0, "data": {"reason": "No payment required"}}
