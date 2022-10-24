@@ -129,12 +129,9 @@ class Basket(TimestampedModel):
             purchased_object = item.product.purchasable_object
             if isinstance(purchased_object, CourseRun):
                 # PaidCourseRun should only contain fulfilled or review orders
-                # but in order to avoid false positive passing in order__state__in here
-                if PaidCourseRun.objects.filter(
-                    user=user,
-                    course_run=purchased_object,
-                    order__state__in=[Order.STATE.FULFILLED, Order.STATE.REVIEW],
-                ).exists():
+                if PaidCourseRun.fulfilled_paid_course_run_exists(
+                    user, purchased_object
+                ):
                     return True
 
         return False
@@ -286,6 +283,22 @@ class Discount(TimestampedModel):
             self.max_redemptions > 0
             and DiscountRedemption.objects.filter(redeemed_discount=self).count()
             >= self.max_redemptions
+        ):
+            return False
+
+        return self.valid_now()
+
+    def check_validity_with_products(self, products: list):
+        """
+        Enforces the redemption rules for a given discount.
+
+        Args:
+            - products (list): List of products.
+        Returns:
+            - boolean
+        """
+        if self.products.exists() and not (
+            self.products.filter(product__in=products).exists()
         ):
             return False
 

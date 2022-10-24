@@ -117,9 +117,8 @@ def generate_checkout_payload(request):
 
     if total_price == 0:
         with transaction.atomic():
-            fulfill_completed_order(
-                order, {"amount": 0, "data": {"reason": "No payment required"}}, basket
-            )
+            payment_data = zero_payment_data()
+            fulfill_completed_order(order, payment_data, basket)
             return {
                 "no_checkout": True,
                 "response": redirect_with_user_message(
@@ -163,12 +162,7 @@ def check_discount_for_products(discount, basket):
 
     basket_products = basket.get_products()
 
-    return (
-        not discount.products.exists()
-        or DiscountProduct.objects.filter(product__in=basket_products)
-        .filter(discount=discount)
-        .exists()
-    )
+    return discount.check_validity_with_products(basket_products)
 
 
 def check_basket_discounts_for_validity(request):
@@ -240,6 +234,16 @@ def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=F
 
     if not order.is_review and (basket and basket.compare_to_order(order)):
         basket.delete()
+
+
+def zero_payment_data():
+    """
+    returns payment data for 100% discounted order or zero amount order
+
+    Returns:
+        dict
+    """
+    return {"amount": 0, "data": {"reason": "No payment required"}}
 
 
 def get_order_from_cybersource_payment_response(request):

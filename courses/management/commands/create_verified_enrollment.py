@@ -20,7 +20,7 @@ from django.db import transaction
 
 from courses.api import create_run_enrollments
 from courses.models import CourseRun, PaidCourseRun
-from ecommerce.api import fulfill_completed_order
+from ecommerce.api import fulfill_completed_order, zero_payment_data
 from ecommerce.discounts import DiscountType
 from ecommerce.models import Order, PendingOrder, Product, Discount
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
@@ -78,25 +78,10 @@ class Command(BaseCommand):
                     options["run"]
                 )
             )
-
-        if run.course.is_country_blocked(user):
+        if PaidCourseRun.fulfilled_paid_course_run_exists(user, run):
             raise CommandError(
-                "Enrollment is blocked of this course with courseware_id={} for user {}".format(
-                    options["run"], options["user"]
-                )
-            )
-
-        # PaidCourseRun should only contain fulfilled or review orders
-        # but in order to avoid false positive passing in order__state__in here
-        paid_course_run = PaidCourseRun.objects.filter(
-            user=user,
-            course_run=run,
-            order__state__in=[Order.STATE.FULFILLED, Order.STATE.REVIEW],
-        ).first()
-        if paid_course_run:
-            raise CommandError(
-                "User {} already enrolled in this course with courseware_id={}\nEnrollment order:{}".format(
-                    options["user"], options["run"], paid_course_run.order
+                "User {} already enrolled in this course with courseware_id={}".format(
+                    options["user"], options["run"]
                 )
             )
 
@@ -115,9 +100,7 @@ class Command(BaseCommand):
                 "That enrollment code {} does not exist".format(options["code"])
             )
 
-        if discount.products.exists() and not (
-            discount.products.filter(product=product).exists()
-        ):
+        if not discount.check_validity_with_products([product]):
             raise CommandError(
                 "That enrollment code {} is invalid for course with courseware_id={}".format(
                     options["code"], options["run"]
@@ -134,7 +117,14 @@ class Command(BaseCommand):
         discounted_price = DiscountType.get_discounted_price([discount], product)
 
         if discounted_price > 0:
-            raise CommandError("Discount code is not 100% off")
+            raise CommandError("Enrollment code is not 100% off")
+
+        if run.course.is_country_blocked(user):
+            raise CommandError(
+                "Enrollment is blocked of this course with courseware_id={} for user {}".format(
+                    options["run"], options["user"]
+                )
+            )
 
         with transaction.atomic():
             successful_enrollments, edx_request_success = create_run_enrollments(
@@ -146,11 +136,8 @@ class Command(BaseCommand):
             if not successful_enrollments:
                 raise CommandError("Failed to create the enrollment record")
             order = PendingOrder.create_from_product(product, user, discount)
-            fulfill_completed_order(
-                order,
-                {"amount": 0, "data": {"reason": "No payment required"}},
-                already_enrolled=True,
-            )
+            payment_data = zero_payment_data()
+            fulfill_completed_order(order, payment_data, already_enrolled=True)
 
         self.stdout.write(
             self.style.SUCCESS(
