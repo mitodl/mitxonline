@@ -76,7 +76,7 @@ def mock_context(mocker, user):
 
 @pytest.fixture()
 def program():
-    """User object fixture"""
+    """Program object fixture"""
     return ProgramFactory.create()
 
 
