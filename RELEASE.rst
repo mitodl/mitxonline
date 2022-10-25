@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.50.1
+--------------
+
+- feat: program certificates (#1072)
+- feat: User verified course enrollment (#1129)
+
 Version 0.50.0 (Released October 25, 2022)
 --------------
 
