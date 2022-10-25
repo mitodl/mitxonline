@@ -23,5 +23,5 @@ pytest-mock
 pytest-lazy-fixture==0.6.3
 responses
 semantic-version
-wagtail-factories
+wagtail-factories==3.1
 mitol-django-openedx==1.0.0

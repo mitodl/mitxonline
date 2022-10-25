@@ -78,10 +78,13 @@ class ProgramPageFactory(wagtail_factories.PageFactory):
     description = fuzzy.FuzzyText(prefix="Description ")
     length = fuzzy.FuzzyText(prefix="Length ")
     feature_image = factory.SubFactory(wagtail_factories.ImageFactory)
-    program = factory.SubFactory(ProgramFactory)
+    program = factory.SubFactory(ProgramFactory, page=None)
     slug = fuzzy.FuzzyText(prefix="my-page-")
     parent = LazyAttribute(
         lambda _: ProgramIndexPage.objects.first() or ProgramIndexPageFactory.create()
+    )
+    certificate_page = factory.RelatedFactory(
+        "cms.factories.CertificatePageFactory", "parent"
     )
 
     class Meta:
@@ -125,13 +128,19 @@ class SignatoryPageFactory(wagtail_factories.PageFactory):
         model = SignatoryPage
 
 
+class SignatoryPageChooserBlockFactory(wagtail_factories.PageChooserBlockFactory):
+    """SignatoryPageChooser factory class"""
+
+    page = factory.SubFactory(SignatoryPageFactory)
+
+
 class CertificatePageFactory(wagtail_factories.PageFactory):
     """CertificatePage factory class"""
 
     product_name = factory.fuzzy.FuzzyText(prefix="product_name")
     CEUs = factory.Faker("pystr_format", string_format="#.#")
     signatories = wagtail_factories.StreamFieldFactory(
-        {"signatory": SignatoryPageFactory}
+        {"signatory": factory.SubFactory(SignatoryPageChooserBlockFactory)}
     )
 
     class Meta:

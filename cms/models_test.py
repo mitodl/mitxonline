@@ -17,8 +17,15 @@ from cms.factories import (
     FlexiblePricingFormFactory,
     ProgramPageFactory,
     ResourcePageFactory,
+    CertificatePageFactory,
 )
-from cms.models import CoursePage, FlexiblePricingRequestSubmission, ProgramPage
+from cms.models import (
+    FlexiblePricingRequestSubmission,
+    CoursePage,
+    ProgramPage,
+    CertificatePage,
+    SignatoryPage,
+)
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -473,3 +480,62 @@ def test_flex_pricing_form_state_display_no_discount_tier(mocker):
     response = generate_flexible_pricing_response(request_user, flex_form)
 
     assert "Approved" in response.rendered_content
+
+
+def test_certificate_for_course_page():
+    """
+    The Certificate property should return expected values if associated with a CertificatePage
+    """
+    course_page = CoursePageFactory.create(certificate_page=None)
+    assert CertificatePage.can_create_at(course_page)
+    assert not SignatoryPage.can_create_at(course_page)
+
+    certificate_page = CertificatePageFactory.create(
+        parent=course_page,
+        product_name="product_name",
+        CEUs="1.8",
+        signatories__0__signatory__page__name="Name",
+        signatories__0__signatory__page__title_1="Title_1",
+        signatories__0__signatory__page__title_2="Title_2",
+        signatories__0__signatory__page__organization="Organization",
+        signatories__0__signatory__page__signature_image__title="Image",
+    )
+    assert certificate_page.get_parent() == course_page
+    assert certificate_page.CEUs == "1.8"
+    assert certificate_page.product_name == "product_name"
+    for signatory in certificate_page.signatories:  # pylint: disable=not-an-iterable
+        assert signatory.value.name == "Name"
+        assert signatory.value.title_1 == "Title_1"
+        assert signatory.value.title_2 == "Title_2"
+        assert signatory.value.organization == "Organization"
+        assert signatory.value.signature_image.title == "Image"
+
+
+def test_certificate_for_program_page():
+    """
+    The Certificate property should return expected values if associated with a CertificatePage
+    """
+    program_page = ProgramPageFactory.create(certificate_page=None)
+    assert CertificatePage.can_create_at(program_page)
+    assert not SignatoryPage.can_create_at(program_page)
+
+    certificate_page = CertificatePageFactory.create(
+        parent=program_page,
+        product_name="product_name",
+        CEUs="2.8",
+        signatories__0__signatory__page__name="Name",
+        signatories__0__signatory__page__title_1="Title_1",
+        signatories__0__signatory__page__title_2="Title_2",
+        signatories__0__signatory__page__organization="Organization",
+        signatories__0__signatory__page__signature_image__title="Image",
+    )
+
+    assert certificate_page.get_parent() == program_page
+    assert certificate_page.CEUs == "2.8"
+    assert certificate_page.product_name == "product_name"
+    for signatory in certificate_page.signatories:  # pylint: disable=not-an-iterable
+        assert signatory.value.name == "Name"
+        assert signatory.value.title_1 == "Title_1"
+        assert signatory.value.title_2 == "Title_2"
+        assert signatory.value.organization == "Organization"
+        assert signatory.value.signature_image.title == "Image"

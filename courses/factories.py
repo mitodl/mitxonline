@@ -12,6 +12,7 @@ from courses.models import (
     CourseRunEnrollment,
     CourseRunGrade,
     CourseRunCertificate,
+    ProgramCertificate,
     Program,
     ProgramEnrollment,
     ProgramRun,
@@ -31,6 +32,8 @@ class ProgramFactory(DjangoModelFactory):
     )
     live = True
 
+    page = factory.RelatedFactory("cms.factories.ProgramPageFactory", "program")
+
     class Meta:
         model = Program
 
@@ -48,7 +51,7 @@ class ProgramRunFactory(DjangoModelFactory):
 class CourseFactory(DjangoModelFactory):
     """Factory for Courses"""
 
-    program = factory.SubFactory(ProgramFactory)
+    program = factory.SubFactory(ProgramFactory, page=None)
     position_in_program = None  # will get populated in save()
     title = fuzzy.FuzzyText(prefix="Course ")
     readable_id = factory.Sequence("course-{0}".format)
@@ -137,6 +140,17 @@ class CourseRunGradeFactory(DjangoModelFactory):
         model = CourseRunGrade
 
 
+class ProgramCertificateFactory(DjangoModelFactory):
+    """Factory for ProgramCertificate"""
+
+    program = factory.SubFactory(ProgramFactory)
+    user = factory.SubFactory(UserFactory)
+    certificate_page_revision = None
+
+    class Meta:
+        model = ProgramCertificate
+
+
 class CourseRunEnrollmentFactory(DjangoModelFactory):
     """Factory for CourseRunEnrollment"""
 
@@ -152,6 +166,7 @@ class CourseRunCertificateFactory(DjangoModelFactory):
 
     course_run = factory.SubFactory(CourseRunFactory)
     user = factory.SubFactory(UserFactory)
+    certificate_page_revision = None
 
     class Meta:
         model = CourseRunCertificate

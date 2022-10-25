@@ -7,6 +7,7 @@ from django.test.client import Client
 from rest_framework.test import APIClient
 
 from users.factories import UserFactory
+from courses.factories import ProgramFactory
 
 
 @pytest.fixture
@@ -71,6 +72,12 @@ def mocked_responses():
 def mock_context(mocker, user):
     """Mocked context for serializers"""
     return {"request": mocker.Mock(user=user)}
+
+
+@pytest.fixture()
+def program():
+    """Program object fixture"""
+    return ProgramFactory.create()
 
 
 @pytest.fixture
