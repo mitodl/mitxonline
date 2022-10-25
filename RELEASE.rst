@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.50.0
+Version 0.50.0 (Released October 25, 2022)
 --------------
 
 - Updating version of mitol-django-payment-gateway to 1.7.1.
