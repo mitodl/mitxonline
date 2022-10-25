@@ -169,8 +169,8 @@ class CertificateIndexPage(RoutablePageMixin, Page):
             raise Http404()
 
         if not certificate.certificate_page_revision:
-            # It'll save the certificate page revision
-            # If certificate page is available and revision is not saved
+            # The certificate.save() is overridden,it associates the certificate
+            # page revision with the user's program certificate object
             certificate.save()
 
         certificate_page.certificate = certificate

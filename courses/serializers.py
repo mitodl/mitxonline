@@ -436,7 +436,7 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
 
 
 class ProgramCertificateSerializer(serializers.ModelSerializer):
-    """CourseRunCertificate model serializer"""
+    """ProgramCertificate model serializer"""
 
     class Meta:
         model = models.ProgramCertificate
