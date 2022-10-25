@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.50.1
+Version 0.50.1 (Released October 25, 2022)
 --------------
 
 - feat: program certificates (#1072)
