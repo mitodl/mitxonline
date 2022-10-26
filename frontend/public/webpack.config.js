@@ -4,26 +4,27 @@ const BundleTracker = require("webpack-bundle-tracker")
 const MiniCssExtractPlugin = require("mini-css-extract-plugin")
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer")
 
-module.exports = function(env, argv) {
+module.exports = function (env, argv) {
   const mode = argv.mode || process.env.NODE_ENV || "production"
   const isProduction = mode === "production"
   return {
     mode,
     context: __dirname,
     devtool: "source-map",
-    entry:   {
-      root:         "./src/entry/root",
-      header:       "./src/entry/header",
-      style:        "./src/entry/style",
-      django:       "./src/entry/django",
+    entry: {
+      root: "./src/entry/root",
+      header: "./src/entry/header",
+      style: "./src/entry/style",
+      django: "./src/entry/django",
+      requirementsAdmin: "./src/entry/requirements-admin"
     },
-    output:  {
+    output: {
       path: path.resolve(__dirname, "build"),
       ...(isProduction ? {
-        filename:           "[name]-[chunkhash].js",
-        chunkFilename:      "[id]-[chunkhash].js",
+        filename: "[name]-[chunkhash].js",
+        chunkFilename: "[id]-[chunkhash].js",
         crossOriginLoading: "anonymous",
-        hashFunction:       "xxhash64"
+        hashFunction: "xxhash64"
       } : {
         filename: "[name].js",
       }),
@@ -36,14 +37,14 @@ module.exports = function(env, argv) {
           type: "asset/inline"
         },
         {
-          test:    require.resolve('jquery'),
-          loader:  "expose-loader",
+          test: require.resolve('jquery'),
+          loader: "expose-loader",
           options: {
             exposes: ["jQuery", "$"]
           }
         },
         {
-          test:    /\.jsx?$/,
+          test: /\.jsx?$/,
           include: [
             path.resolve(__dirname, "src"),
             path.resolve(__dirname, "../../node_modules/query-string"),
@@ -53,7 +54,7 @@ module.exports = function(env, argv) {
         },
         {
           test: /\.css$|\.scss$/,
-          use:  [
+          use: [
             { loader: isProduction ? MiniCssExtractPlugin.loader : "style-loader" },
             "css-loader",
             "postcss-loader",
@@ -79,7 +80,7 @@ module.exports = function(env, argv) {
       })
     ] : []),
     resolve: {
-      modules:    [
+      modules: [
         path.resolve(__dirname, "src"),
         path.resolve(__dirname, "node_modules"),
         path.resolve(__dirname, "../../node_modules")
@@ -90,35 +91,35 @@ module.exports = function(env, argv) {
       hints: false
     },
     optimization: {
-      moduleIds:   "named",
-      splitChunks:  {
-        name:      "common",
+      moduleIds: "named",
+      splitChunks: {
+        name: "common",
         minChunks: 2,
         ...(isProduction ? {
           cacheGroups: {
             common: {
-              test:   /[\\/]node_modules[\\/]/,
-              name:   'common',
+              test: /[\\/]node_modules[\\/]/,
+              name: 'common',
               chunks: 'all',
             }
           }
         } : {})
       },
-      minimize:     isProduction,
+      minimize: isProduction,
       emitOnErrors: false
     },
     devServer: {
       allowedHosts: "all",
-      headers:      {
+      headers: {
         'Access-Control-Allow-Origin': '*'
       },
-      host:             "::",
-      setupMiddlewares: function(middlewares, devServer) {
+      host: "::",
+      setupMiddlewares: function (middlewares, devServer) {
         if (!devServer) {
           throw new Error('webpack-dev-server is not defined')
         }
 
-        devServer.app.get('/health', function(req, res) {
+        devServer.app.get('/health', function (req, res) {
           res.json({ success: true, server: "webpack" })
         })
 

@@ -187,6 +187,8 @@ INSTALLED_APPS = (
     "robots",
     # django-reversion
     "reversion",
+    # django-treebeard
+    "treebeard",
     # Put our apps after this point
     "main",
     "authentication",

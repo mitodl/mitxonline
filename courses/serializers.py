@@ -19,6 +19,7 @@ from ecommerce.models import Product
 from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
+from main.serializers import StrictFieldsSerializer
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
@@ -500,3 +501,133 @@ class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
         """
         certificate = user_program_enrollment.get("certificate")
         return ProgramCertificateSerializer(certificate).data if certificate else None
+
+
+class ProgramRequirementDataSerializer(StrictFieldsSerializer):
+    """Serializer for ProgramRequirement data"""
+
+    node_type = serializers.ChoiceField(
+        choices=(
+            models.ProgramRequirementNodeType.OPERATOR,
+            models.ProgramRequirementNodeType.COURSE,
+        )
+    )
+    course = serializers.CharField(source="course_id", allow_null=True, default=None)
+    program = serializers.CharField(source="program_id", required=False)
+    title = serializers.CharField(allow_null=True, default=None)
+    operator = serializers.CharField(allow_null=True, default=None)
+    operator_value = serializers.CharField(allow_null=True, default=None)
+
+
+class ProgramRequirementSerializer(StrictFieldsSerializer):
+    """Serializer for a ProgramRequirement"""
+
+    id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    data = ProgramRequirementDataSerializer()
+
+    def get_fields(self):
+        """Override because 'children' is a recursive structure"""
+        fields = super().get_fields()
+        fields["children"] = ProgramRequirementSerializer(many=True, default=[])
+        return fields
+
+
+class ProgramRequirementTreeSerializer(serializers.ListSerializer):
+    """
+    Serializer for root nodes of a program requirement tree
+
+    The instance is considered immutable and the data passed in
+    is expected to be a list of objects in the structure that ProgramRequirement.load_bulk()
+    can consume.
+    """
+
+    child = ProgramRequirementSerializer()
+
+    def update(self, instance, validated_data):
+        """
+        Update the program requirement tree
+
+        This is inspired by the load_bulk method, but that method is an append-only operation and doesn't update existing records
+        """
+        keep_node_ids = [instance.id]
+
+        def _get_existing(data):
+            node_id = data.get("id", None)
+            return (
+                models.ProgramRequirement.objects.filter(id=node_id).first()
+                if node_id
+                else None
+            )
+
+        # we'll recursively walk the tree, in practice this is at most 3 deep under instance (OPERATOR -> OPERATOR -> COURSE)
+        def _update(parent, children_data):
+            last_updated_child = None
+
+            for node_data in children_data:
+                parent.refresh_from_db()
+                first_child = parent.get_first_child()
+                existing_child = _get_existing(node_data)
+
+                data = {
+                    **node_data["data"],
+                    "program_id": instance.program_id,
+                }
+                children = node_data.get("children", [])
+
+                if existing_child is None:
+                    # we're inserting a new node
+                    if last_updated_child is not None:
+                        # insert after the last node we updated or inserted
+                        last_updated_child = last_updated_child.add_sibling(
+                            "right", **data
+                        )
+                    elif first_child is not None:
+                        # otherwise insert as the first sibling
+                        last_updated_child = first_child.add_sibling(
+                            "first-sibling", **data
+                        )
+                    else:
+                        # insert as a regular child node as there's no children yet
+                        last_updated_child = parent.add_child(**data)
+                else:
+                    # we have an existing node and need to move it and update it
+                    if last_updated_child is not None:
+                        # place it after the last node we updated
+                        existing_child.move(last_updated_child, pos="right")
+                    elif first_child is not None:
+                        # move it to the first sibling
+                        existing_child.move(first_child, "first-sibling")
+                    elif parent is not None:
+                        # this would only happen if the child is moving form another part of the tree, which
+                        # we don't support at the moment but it's here for completeness and future-proofing
+                        existing_child.move(parent, "first-child")
+
+                    # since this is an existing node we need to update the props and save
+                    for key, value in data.items():
+                        setattr(existing_child, key, value)
+
+                    existing_child.save(update_fields=data.keys())
+
+                    last_updated_child = existing_child
+
+                keep_node_ids.append(last_updated_child.id)
+
+                # if the input has children, process those
+                if children:
+                    _update(last_updated_child, children)
+
+        _update(instance, validated_data)
+
+        # delete everything that didn't show up in the input
+        models.ProgramRequirement.objects.exclude(id__in=keep_node_ids).delete()
+
+        instance.refresh_from_db()
+
+        return instance
+
+    @property
+    def data(self):
+        """Serializes the root node to a bulk dump of the tree"""
+        # here we're bypassing Serializer.data implementation because it coerces
+        # the to_representation return value into a dict of its keys
+        return models.ProgramRequirement.dump_bulk(parent=self.instance, keep_ids=True)

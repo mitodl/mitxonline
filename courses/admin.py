@@ -1,12 +1,11 @@
 """
 Admin site bindings for profiles
 """
-
 from django.contrib import admin
 from django.db import models
 from django.forms import TextInput
-from mitol.common.admin import TimestampedModelAdmin
 from django.contrib.admin.decorators import display
+from mitol.common.admin import TimestampedModelAdmin
 
 from courses.models import (
     Course,
@@ -25,6 +24,7 @@ from courses.models import (
     PaidCourseRun,
     ProgramCertificate,
 )
+from courses.forms import ProgramAdminForm
 from main.admin import AuditableModelAdmin
 from main.utils import get_field_names
 
@@ -33,6 +33,7 @@ class ProgramAdmin(admin.ModelAdmin):
     """Admin for Program"""
 
     model = Program
+    form = ProgramAdminForm
     search_fields = ["title", "readable_id"]
     list_display = ("id", "title", "readable_id")
     list_filter = ["live"]
