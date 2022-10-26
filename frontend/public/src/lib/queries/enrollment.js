@@ -5,7 +5,10 @@ import { emptyOrNil } from "../util"
 
 export const enrollmentsSelector = pathOr(null, ["entities", "enrollments"])
 export const enrollmentSelector = pathOr(null, ["entities", "enrollment"])
-export const programEnrollmentsSelector = pathOr(null, ["entities", "program_enrollments"])
+export const programEnrollmentsSelector = pathOr(null, [
+  "entities",
+  "program_enrollments"
+])
 
 export const enrollmentsQueryKey = "enrollments"
 export const enrollmentQueryKey = "enrollment"
@@ -23,9 +26,9 @@ export const enrollmentsQuery = () => ({
 })
 
 export const programEnrollmentsQuery = () => ({
-  queryKey:   programEnrollmentsQueryKey,
-  url:        "/api/program_enrollments/",
-  transform:  json => ({
+  queryKey:  programEnrollmentsQueryKey,
+  url:       "/api/program_enrollments/",
+  transform: json => ({
     program_enrollments: json
   }),
   update: {
@@ -60,9 +63,14 @@ export const deactivateEnrollmentMutation = (enrollmentId: number) => ({
       return emptyOrNil(prevProgramEnrollments)
         ? []
         : prevProgramEnrollments.map(programEnrollment => {
-          return {...programEnrollment, enrollments: programEnrollment.enrollments.filter(enrollment => enrollment.id !== enrollmentId)}
+          return {
+            ...programEnrollment,
+            enrollments: programEnrollment.enrollments.filter(
+              enrollment => enrollment.id !== enrollmentId
+            )
+          }
         })
-    },
+    }
   }
 })
 

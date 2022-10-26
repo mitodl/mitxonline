@@ -1,7 +1,6 @@
 // @flow
 import { assert } from "chai"
 
-
 import DashboardPage, {
   DashboardPage as InnerDashboardPage
 } from "./DashboardPage"

@@ -10,7 +10,7 @@ import type {
   CourseDetail,
   CourseDetailWithRuns,
   ProgramEnrollment,
-  Program,
+  Program
 } from "../flow/courseTypes"
 
 const genCourseRunId = incrementer()
@@ -127,7 +127,7 @@ export const makeProgram = (): Program => ({
   id:          genProgramId.next().value,
   title:       casual.text,
   readable_id: casual.word,
-  courses:     [makeCourseDetailWithRuns()],
+  courses:     [makeCourseDetailWithRuns()]
 })
 
 export const makeProgramEnrollment = (): ProgramEnrollment => ({

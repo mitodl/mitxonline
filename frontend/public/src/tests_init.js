@@ -48,7 +48,6 @@ Object.defineProperty(window, "location", {
   }
 })
 
-
 configure({ adapter: new Adapter() })
 
 const _createSettings = () => ({})

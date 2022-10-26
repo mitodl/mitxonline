@@ -9,9 +9,15 @@ type Props = {
 
 export class CartItemCard extends React.Component<Props> {
   courseAboutLink(linkText: string, course: Object) {
-    return (<a href={course.page !== null ? course.page.page_url : "#"} target="_blank" rel="noopener noreferrer">
-      {linkText}
-    </a>)
+    return (
+      <a
+        href={course.page !== null ? course.page.page_url : "#"}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        {linkText}
+      </a>
+    )
   }
 
   render() {
@@ -32,8 +38,7 @@ export class CartItemCard extends React.Component<Props> {
         </a>
       )
 
-    const courseDetail =
-      this.courseAboutLink("Course details", course)
+    const courseDetail = this.courseAboutLink("Course details", course)
 
     const readableId =
       course !== undefined

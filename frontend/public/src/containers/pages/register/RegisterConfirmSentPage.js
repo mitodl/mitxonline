@@ -62,8 +62,10 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
                 <b>Check your spam folder.</b> It might be there.
               </li>
               <li>
-                <b>Is your email correct?</b> If you made a typo, no problem, just try {" "}
-                <Link to={routes.register.begin}>creating an account</Link> again.
+                <b>Is your email correct?</b> If you made a typo, no problem,
+                just try{" "}
+                <Link to={routes.register.begin}>creating an account</Link>{" "}
+                again.
               </li>
             </ul>
             <div className="contact-support">

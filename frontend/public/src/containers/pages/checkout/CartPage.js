@@ -2,9 +2,7 @@
 /* global SETTINGS: false */
 import React from "react"
 import DocumentTitle from "react-document-title"
-import {
-  CART_DISPLAY_PAGE_TITLE
-} from "../../../constants"
+import { CART_DISPLAY_PAGE_TITLE } from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { connectRequest, mutateAsync } from "redux-query"
@@ -123,14 +121,33 @@ export class CartPage extends React.Component<Props, CartState> {
     const { cartItems, discounts } = this.props
     let userFlexiblePriceExists = false
     // Check if there are any discounts, and if those discounts are for flexible pricing.
-    if ((discounts && discounts.length > 0) && typeof discounts.find(discount => discount.for_flexible_pricing === true) !== "undefined") {
+    if (
+      discounts &&
+      discounts.length > 0 &&
+      typeof discounts.find(
+        discount => discount.for_flexible_pricing === true
+      ) !== "undefined"
+    ) {
       userFlexiblePriceExists = true
     }
 
-    if (cartItems && cartItems.length > 0 && userFlexiblePriceExists === false) {
-      if (isFinancialAssistanceAvailable(cartItems[0].product.purchasable_object.course)) {
+    if (
+      cartItems &&
+      cartItems.length > 0 &&
+      userFlexiblePriceExists === false
+    ) {
+      if (
+        isFinancialAssistanceAvailable(
+          cartItems[0].product.purchasable_object.course
+        )
+      ) {
         return (
-          <a href={cartItems[0].product.purchasable_object.course.page.financial_assistance_form_url}>
+          <a
+            href={
+              cartItems[0].product.purchasable_object.course.page
+                .financial_assistance_form_url
+            }
+          >
             Need financial assistance?
           </a>
         )
@@ -165,9 +182,7 @@ export class CartPage extends React.Component<Props, CartState> {
             <div className="row">
               <div className="col-12 d-flex justify-content-end d-md-none">
                 <p className="font-weight-normal">
-                  {
-                    this.renderFinancialAssistanceOffer()
-                  }
+                  {this.renderFinancialAssistanceOffer()}
                 </p>
               </div>
             </div>
@@ -180,9 +195,7 @@ export class CartPage extends React.Component<Props, CartState> {
               </div>
               <div className="col-md-4 justify-content-end text-right">
                 <h4 className="font-weight-normal">
-                  {
-                    this.renderFinancialAssistanceOffer()
-                  }
+                  {this.renderFinancialAssistanceOffer()}
                 </h4>
               </div>
               <div className="col-md-2 text-right">

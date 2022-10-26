@@ -8,7 +8,7 @@ import { connectRequest } from "redux-query"
 import { Badge } from "reactstrap"
 
 import Loader from "../components/Loader"
-import GetCertificateButton from '../components/GetCertificateButton'
+import GetCertificateButton from "../components/GetCertificateButton"
 
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
@@ -50,14 +50,15 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
   }
 
   renderUpgradeEnrollmentDialog(run: EnrollmentFlaggedCourseRun) {
-    const needFinancialAssistanceLink = isFinancialAssistanceAvailable(run) && !run.approved_flexible_price_exists ?
-      (
-        <p className="text-center financial-assistance-link">
-          <a href={run.page.financial_assistance_form_url}>
+    const needFinancialAssistanceLink =
+      isFinancialAssistanceAvailable(run) &&
+      !run.approved_flexible_price_exists ? (
+          <p className="text-center financial-assistance-link">
+            <a href={run.page.financial_assistance_form_url}>
             Need financial assistance?
-          </a>
-        </p>
-      ) : null
+            </a>
+          </p>
+        ) : null
     const product =
       run.products && !run.is_verified && run.is_enrolled && run.is_upgradable
         ? run.products[0]
@@ -102,7 +103,6 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
       </form>
     )
   }
-
 
   render() {
     const { courseRuns, isLoading } = this.props

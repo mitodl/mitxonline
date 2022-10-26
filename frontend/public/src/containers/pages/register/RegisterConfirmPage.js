@@ -24,9 +24,7 @@ import {
 } from "../../../lib/auth"
 
 import { authSelector } from "../../../lib/queries/auth"
-import {
-  qsSelector
-} from "../../../lib/selectors"
+import { qsSelector } from "../../../lib/selectors"
 
 import type { RouterHistory, Location } from "react-router"
 import type { AuthResponse } from "../../../flow/authTypes"
