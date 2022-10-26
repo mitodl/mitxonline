@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.50.2
+Version 0.50.2 (Released October 26, 2022)
 --------------
 
 - Fix fmt and fmt:check commands
