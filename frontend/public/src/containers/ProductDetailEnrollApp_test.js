@@ -28,7 +28,12 @@ import sinon from "sinon"
 import { makeUser } from "../factories/user"
 
 describe("ProductDetailEnrollApp", () => {
-  let helper, renderPage, isWithinEnrollmentPeriodStub, isFinancialAssistanceAvailableStub, courseRun, currentUser
+  let helper,
+    renderPage,
+    isWithinEnrollmentPeriodStub,
+    isFinancialAssistanceAvailableStub,
+    courseRun,
+    currentUser
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
@@ -185,10 +190,10 @@ describe("ProductDetailEnrollApp", () => {
 
   it("checks for disabled enrolled button", async () => {
     const userEnrollment = makeCourseRunEnrollment()
-    userEnrollment.run['start_date'] = moment().add(2, "M")
+    userEnrollment.run["start_date"] = moment().add(2, "M")
     const expectedResponse = {
       ...userEnrollment.run,
-      is_enrolled: true,
+      is_enrolled: true
     }
 
     const { inner, store } = await renderPage(
@@ -199,7 +204,7 @@ describe("ProductDetailEnrollApp", () => {
         queries: {
           courseRuns: {
             isPending: false,
-            status:    200,
+            status:    200
           }
         }
       },
@@ -207,23 +212,23 @@ describe("ProductDetailEnrollApp", () => {
     )
 
     const item = inner.find("a").first()
-    assert.isTrue(item.hasClass('disabled'))
-    assert.isTrue(inner.containsMatchingElement(<p>Enrolled and waiting for the course to begin.</p>))
-
-    assert.equal(
-      item.text(),
-      "Enrolled ✓"
+    assert.isTrue(item.hasClass("disabled"))
+    assert.isTrue(
+      inner.containsMatchingElement(
+        <p>Enrolled and waiting for the course to begin.</p>
+      )
     )
+
+    assert.equal(item.text(), "Enrolled ✓")
     assert.equal(courseRunsSelector(store.getState())[0], expectedResponse)
   })
-
 
   it("checks for enrolled button", async () => {
     const userEnrollment = makeCourseRunEnrollment()
-    userEnrollment.run['start_date'] = moment().add(-2, "M")
+    userEnrollment.run["start_date"] = moment().add(-2, "M")
     const expectedResponse = {
       ...userEnrollment.run,
-      is_enrolled: true,
+      is_enrolled: true
     }
 
     const { inner, store } = await renderPage(
@@ -234,7 +239,7 @@ describe("ProductDetailEnrollApp", () => {
         queries: {
           courseRuns: {
             isPending: false,
-            status:    200,
+            status:    200
           }
         }
       },
@@ -243,23 +248,31 @@ describe("ProductDetailEnrollApp", () => {
 
     const item = inner.find("a").first()
 
-    assert.isFalse(item.hasClass('disabled'))
-    assert.isFalse(inner.containsMatchingElement(<p>Enrolled and waiting for the course to begin.</p>))
-
-
-    assert.equal(
-      item.text(),
-      "Enrolled ✓"
+    assert.isFalse(item.hasClass("disabled"))
+    assert.isFalse(
+      inner.containsMatchingElement(
+        <p>Enrolled and waiting for the course to begin.</p>
+      )
     )
+
+    assert.equal(item.text(), "Enrolled ✓")
     assert.equal(courseRunsSelector(store.getState())[0], expectedResponse)
   })
-
   ;[
     [true, 201],
     [false, 400]
   ].forEach(([__success, returnedStatusCode]) => {
     it(`shows dialog to upgrade user enrollment with flexible dollars-off discount and handles ${returnedStatusCode} response`, async () => {
-      courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 1, discount_type: DISCOUNT_TYPE_DOLLARS_OFF}}]
+      courseRun["products"] = [
+        {
+          id:                     1,
+          price:                  10,
+          product_flexible_price: {
+            amount:        1,
+            discount_type: DISCOUNT_TYPE_DOLLARS_OFF
+          }
+        }
+      ]
       isWithinEnrollmentPeriodStub.returns(true)
       const { inner } = await renderPage()
 
@@ -290,7 +303,16 @@ describe("ProductDetailEnrollApp", () => {
     })
 
     it(`shows dialog to upgrade user enrollment with flexible percent-off discount and handles ${returnedStatusCode} response`, async () => {
-      courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 10, discount_type: DISCOUNT_TYPE_PERCENT_OFF}}]
+      courseRun["products"] = [
+        {
+          id:                     1,
+          price:                  10,
+          product_flexible_price: {
+            amount:        10,
+            discount_type: DISCOUNT_TYPE_PERCENT_OFF
+          }
+        }
+      ]
       isWithinEnrollmentPeriodStub.returns(true)
       const { inner } = await renderPage()
 
@@ -322,7 +344,16 @@ describe("ProductDetailEnrollApp", () => {
     })
 
     it(`shows dialog to upgrade user enrollment with flexible fixed-price discount and handles ${returnedStatusCode} response`, async () => {
-      courseRun["products"] = [{ id: 1, price: 10, product_flexible_price: { amount: 9, discount_type: DISCOUNT_TYPE_FIXED_PRICE}}]
+      courseRun["products"] = [
+        {
+          id:                     1,
+          price:                  10,
+          product_flexible_price: {
+            amount:        9,
+            discount_type: DISCOUNT_TYPE_FIXED_PRICE
+          }
+        }
+      ]
       isWithinEnrollmentPeriodStub.returns(true)
       isFinancialAssistanceAvailableStub.returns(false)
       const { inner } = await renderPage()
@@ -370,11 +401,7 @@ describe("ProductDetailEnrollApp", () => {
     const enrollBtn = inner.find("form > button.enroll-now")
     assert.isTrue(enrollBtn.exists())
   })
-
-  ;[
-    [true],
-    [false]
-  ].forEach(([flexPriceApproved]) => {
+  ;[[true], [false]].forEach(([flexPriceApproved]) => {
     it(`shows the flexible pricing available link if the user does not have approved flexible pricing for the course run`, async () => {
       courseRun["approved_flexible_price_exists"] = flexPriceApproved
       isWithinEnrollmentPeriodStub.returns(true)

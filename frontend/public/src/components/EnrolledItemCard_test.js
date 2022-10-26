@@ -9,7 +9,10 @@ import { shallow } from "enzyme"
 import { EnrolledItemCard } from "./EnrolledItemCard"
 import { shouldIf } from "../lib/test_utils"
 import IntegrationTestHelper from "../util/integration_test_helper"
-import { makeCourseRunEnrollment, makeCourseRunEnrollmentWithProduct } from "../factories/course"
+import {
+  makeCourseRunEnrollment,
+  makeCourseRunEnrollmentWithProduct
+} from "../factories/course"
 import { makeUser } from "../factories/user"
 import * as courseApi from "../lib/courseApi"
 
@@ -21,7 +24,6 @@ describe("EnrolledItemCard", () => {
     enrollmentCardProps,
     isFinancialAssistanceAvailableStub,
     toggleProgramDrawer
-
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
@@ -39,7 +41,7 @@ describe("EnrolledItemCard", () => {
         .stub()
         .withArgs(userEnrollment.id, "test")
         .returns(Promise),
-      addUserNotification: helper.sandbox.stub().returns(Function),
+      addUserNotification: helper.sandbox.stub().returns(Function)
     }
     isFinancialAssistanceAvailableStub = helper.sandbox.stub(
       courseApi,
@@ -67,11 +69,7 @@ describe("EnrolledItemCard", () => {
   afterEach(() => {
     helper.cleanup()
   })
-
-  ;[
-    "audit",
-    "verified"
-  ].forEach(([mode]) => {
+  ;["audit", "verified"].forEach(([mode]) => {
     it("renders the card", async () => {
       const testEnrollment = makeCourseRunEnrollmentWithProduct()
       userEnrollment = testEnrollment
@@ -90,11 +88,7 @@ describe("EnrolledItemCard", () => {
       }
     })
   })
-
-  ;[
-    "audit",
-    "verified"
-  ].forEach(([mode]) => {
+  ;["audit", "verified"].forEach(([mode]) => {
     it("renders the card without upsell message when ecommerce disabled", async () => {
       const testEnrollment = makeCourseRunEnrollmentWithProduct()
       userEnrollment = testEnrollment
@@ -117,11 +111,7 @@ describe("EnrolledItemCard", () => {
       }
     })
   })
-
-  ;[
-    "audit",
-    "verified"
-  ].forEach(([mode]) => {
+  ;["audit", "verified"].forEach(([mode]) => {
     it("does not render the pricing links when upgrade deadline has passed", async () => {
       enrollmentCardProps.enrollment.enrollment_mode = mode
       const inner = await renderedCard()
@@ -143,7 +133,11 @@ describe("EnrolledItemCard", () => {
     const inner = await renderedCard()
     const detail = inner.find(".enrolled-item").find(".detail")
     assert.isTrue(detail.exists())
-    const detailText = detail.find("span").find("span").at(0).text()
+    const detailText = detail
+      .find("span")
+      .find("span")
+      .at(0)
+      .text()
     assert.isTrue(detailText.startsWith(" | Active"))
   })
 
@@ -152,7 +146,10 @@ describe("EnrolledItemCard", () => {
     const inner = await renderedCard()
     const detail = inner.find(".enrolled-item").find(".detail")
     assert.isTrue(detail.exists())
-    const detailText = detail.find("span").at(0).text()
+    const detailText = detail
+      .find("span")
+      .at(0)
+      .text()
     assert.isTrue(detailText.startsWith(" | Starts"))
   })
 
@@ -161,7 +158,10 @@ describe("EnrolledItemCard", () => {
     const inner = await renderedCard()
     const detail = inner.find(".enrolled-item").find(".detail")
     assert.isTrue(detail.exists())
-    const detailText = detail.find("span").at(0).text()
+    const detailText = detail
+      .find("span")
+      .at(0)
+      .text()
     assert.isTrue(detailText.startsWith(" | Ended"))
   })
 
@@ -190,11 +190,7 @@ describe("EnrolledItemCard", () => {
       assert.isTrue(modal.prop("isOpen") === activationStatus)
     })
   })
-
-  ;[
-    [true],
-    [false]
-  ].forEach(([approvedFlexiblePrice]) => {
+  ;[[true], [false]].forEach(([approvedFlexiblePrice]) => {
     it("renders the financial assistance link", async () => {
       isFinancialAssistanceAvailableStub.returns(true)
       userEnrollment = makeCourseRunEnrollmentWithProduct()
@@ -207,7 +203,10 @@ describe("EnrolledItemCard", () => {
         const text = extraLinks.find("a").at(0)
         assert.isFalse(text.exists())
       } else {
-        const text = extraLinks.find("a").at(0).text()
+        const text = extraLinks
+          .find("a")
+          .at(0)
+          .text()
         assert.equal(text, "Financial assistance?")
       }
     })

@@ -10,7 +10,7 @@ import {
   Button,
   Modal,
   ModalHeader,
-  ModalBody,
+  ModalBody
 } from "reactstrap"
 import { partial, pathOr } from "ramda"
 import { createStructuredSelector } from "reselect"
@@ -28,15 +28,20 @@ import { currentUserSelector } from "../lib/queries/users"
 import { addUserNotification } from "../actions"
 
 import { ALERT_TYPE_DANGER, ALERT_TYPE_SUCCESS } from "../constants"
-import GetCertificateButton from './GetCertificateButton'
-import { isFinancialAssistanceAvailable, isLinkableCourseRun, generateStartDateText, courseRunStatusMessage } from "../lib/courseApi"
+import GetCertificateButton from "./GetCertificateButton"
+import {
+  isFinancialAssistanceAvailable,
+  isLinkableCourseRun,
+  generateStartDateText,
+  courseRunStatusMessage
+} from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
 import type { RunEnrollment, Program } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
 
 type EnrolledItemCardProps = {
-  enrollment: RunEnrollment|Program,
+  enrollment: RunEnrollment | Program,
   currentUser: CurrentUser,
   deactivateEnrollment: (enrollmentId: number) => Promise<any>,
   courseEmailsSubscription: (
@@ -45,7 +50,7 @@ type EnrolledItemCardProps = {
   ) => Promise<any>,
   addUserNotification: Function,
   isLoading: boolean,
-  toggleProgramDrawer: Function|null,
+  toggleProgramDrawer: Function | null
 }
 
 type EnrolledItemCardState = {
@@ -257,10 +262,7 @@ export class EnrolledItemCard extends React.Component<
   }
 
   renderCourseEnrollment() {
-    const {
-      enrollment,
-      currentUser,
-    } = this.props
+    const { enrollment, currentUser } = this.props
 
     const { menuVisibility } = this.state
 
@@ -276,33 +278,33 @@ export class EnrolledItemCard extends React.Component<
       enrollment.run.course.title
     )
 
-    const financialAssistanceLink = isFinancialAssistanceAvailable(enrollment.run) && !enrollment.approved_flexible_price_exists ? (
-      <a href={enrollment.run.page.financial_assistance_form_url}>
-        Financial assistance?
-      </a>
-    ) : null
-    const certificateLinks = (
+    const financialAssistanceLink =
+      isFinancialAssistanceAvailable(enrollment.run) &&
+      !enrollment.approved_flexible_price_exists ? (
+          <a href={enrollment.run.page.financial_assistance_form_url}>
+          Financial assistance?
+          </a>
+        ) : null
+    const certificateLinks =
       enrollment.run.products.length > 0 &&
       enrollment.enrollment_mode === "audit" &&
-      enrollment.run.is_upgradable
-    ) ? (
-        <div className="upgrade-item-description detail d-md-flex justify-content-between pb-2">
-          <div className="mr-0">
-            <p>
-              <strong>Upgrade today</strong> and, upon passing, receive your certificate signed by MIT faculty
-              to highlight the knowledge and skills you've gained from this MITx course.
-            </p>
-          </div>
-          <div className="enrollment-extra-links d-flex d-md-flex justify-content-end col-auto pr-0">
-            <div className="pr-4 my-auto">
-              {financialAssistanceLink}
+      enrollment.run.is_upgradable ? (
+          <div className="upgrade-item-description detail d-md-flex justify-content-between pb-2">
+            <div className="mr-0">
+              <p>
+                <strong>Upgrade today</strong> and, upon passing, receive your
+              certificate signed by MIT faculty to highlight the knowledge and
+              skills you've gained from this MITx course.
+              </p>
             </div>
-            <div className="my-auto">
-              <GetCertificateButton productId={enrollment.run.products[0].id} />
+            <div className="enrollment-extra-links d-flex d-md-flex justify-content-end col-auto pr-0">
+              <div className="pr-4 my-auto">{financialAssistanceLink}</div>
+              <div className="my-auto">
+                <GetCertificateButton productId={enrollment.run.products[0].id} />
+              </div>
             </div>
           </div>
-        </div>
-      ) : null
+        ) : null
 
     const startDateDescription = generateStartDateText(enrollment.run)
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
@@ -328,7 +330,9 @@ export class EnrolledItemCard extends React.Component<
               </div>
             </div>
           )}
-          {!enrollment.run.course.feature_image_src && (enrollment.run.page && enrollment.run.page.feature_image_src) && (
+          {!enrollment.run.course.feature_image_src &&
+            enrollment.run.page &&
+            enrollment.run.page.feature_image_src && (
             <div className="col-12 col-md-auto px-0 px-md-3">
               <div className="img-container">
                 <img
@@ -348,7 +352,13 @@ export class EnrolledItemCard extends React.Component<
                 id={`enrollmentDropdown-${enrollment.id}`}
               >
                 <DropdownToggle className="d-inline-flex unstyled dot-menu">
-                  <span className="material-icons" aria-label={menuTitle} title={menuTitle}>more_vert</span>
+                  <span
+                    className="material-icons"
+                    aria-label={menuTitle}
+                    title={menuTitle}
+                  >
+                    more_vert
+                  </span>
                 </DropdownToggle>
                 <DropdownMenu right>
                   <span id={`unenrollButtonWrapper-${enrollment.id}`}>
@@ -381,29 +391,29 @@ export class EnrolledItemCard extends React.Component<
                   <a href={pageLocation.page_url}>Course details</a>
                 ) : null}
                 {enrollment.certificate ? (
-                  <a className="view-certificate" href={enrollment.certificate.link}
+                  <a
+                    className="view-certificate"
+                    href={enrollment.certificate.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                  >View certificate</a>
+                  >
+                    View certificate
+                  </a>
                 ) : null}
               </div>
-              <br/>
+              <br />
             </div>
           </div>
         </div>
         <div className="row flex-grow-1 pt-3">
-          <div className="col pl-0 pr-0">
-            {certificateLinks}
-          </div>
+          <div className="col pl-0 pr-0">{certificateLinks}</div>
         </div>
       </div>
     )
   }
 
   renderProgramEnrollment() {
-    const {
-      enrollment
-    } = this.props
+    const { enrollment } = this.props
 
     const title = enrollment.program.title
     const startDateDescription = null
@@ -422,10 +432,7 @@ export class EnrolledItemCard extends React.Component<
         <div className="row flex-grow-1">
           <div className="col-12 col-md-auto px-0 px-md-3">
             <div className="img-container">
-              <img
-                src="/static/images/mit-dome.png"
-                alt="Preview image"
-              />
+              <img src="/static/images/mit-dome.png" alt="Preview image" />
             </div>
           </div>
 
@@ -439,7 +446,8 @@ export class EnrolledItemCard extends React.Component<
                   aria-haspopup="dialog"
                   onClick={() => this.toggleProgramInfo()}
                 >
-                  {title}</a>
+                  {title}
+                </a>
               </h2>
               <a
                 rel="noopener noreferrer"
@@ -450,7 +458,9 @@ export class EnrolledItemCard extends React.Component<
                 aria-label={menuTitle}
                 title={menuTitle}
                 onClick={this.toggleProgramInfo.bind(this)}
-              >more_vert</a>
+              >
+                more_vert
+              </a>
             </div>
             <div className="detail pt-1">
               {courseId}
@@ -458,43 +468,46 @@ export class EnrolledItemCard extends React.Component<
               {courseRunStatusMessageText}
               <div className="enrollment-extra-links d-flex">
                 <span className="program-course-count">
-                  {enrollment.program.courses.length} course{enrollment.program.courses.length > 1 ? 's' : null}
+                  {enrollment.program.courses.length} course
+                  {enrollment.program.courses.length > 1 ? "s" : null}
                 </span>
                 {pageLocation ? (
                   <a href={pageLocation.page_url}>Course details</a>
                 ) : null}
                 {enrollment.certificate ? (
-                  <a className="view-certificate" href={enrollment.certificate.link}
+                  <a
+                    className="view-certificate"
+                    href={enrollment.certificate.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                  >View certificate</a>
+                  >
+                    View certificate
+                  </a>
                 ) : null}
               </div>
-              <br/>
+              <br />
             </div>
           </div>
         </div>
         <div className="row flex-grow-1 pt-3">
-          <div className="col pl-0 pr-0">
-            {certificateLinks}
-          </div>
+          <div className="col pl-0 pr-0">{certificateLinks}</div>
         </div>
       </div>
     )
   }
 
   render() {
-    const {
-      enrollment,
-    } = this.props
+    const { enrollment } = this.props
 
-    return enrollment.run ? this.renderCourseEnrollment() : this.renderProgramEnrollment()
+    return enrollment.run
+      ? this.renderCourseEnrollment()
+      : this.renderProgramEnrollment()
   }
 }
 
 const mapStateToProps = createStructuredSelector({
-  currentUser:        currentUserSelector,
-  isLoading:          pathOr(true, ["queries", enrollmentsQueryKey, "isPending"])
+  currentUser: currentUserSelector,
+  isLoading:   pathOr(true, ["queries", enrollmentsQueryKey, "isPending"])
 })
 
 const mapPropsToConfig = () => [enrollmentsQuery()]
@@ -513,7 +526,7 @@ const courseEmailsSubscription = (
 const mapDispatchToProps = {
   deactivateEnrollment,
   courseEmailsSubscription,
-  addUserNotification,
+  addUserNotification
 }
 
 export default compose(

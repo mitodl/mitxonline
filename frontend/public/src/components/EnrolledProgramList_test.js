@@ -4,7 +4,6 @@ import React from "react"
 import { assert } from "chai"
 import { shallow } from "enzyme"
 
-
 import EnrolledProgramList from "./EnrolledProgramList"
 import IntegrationTestHelper from "../util/integration_test_helper"
 import { makeProgramEnrollment } from "../factories/course"
@@ -17,9 +16,13 @@ describe("EnrolledProgramList", () => {
     userEnrollments = [makeProgramEnrollment(), makeProgramEnrollment()]
     toggleProgramDrawer = helper.sandbox.stub().returns(Function)
 
-    renderedCard = () => shallow(
-      <EnrolledProgramList enrollments={userEnrollments} toggleDrawer={toggleProgramDrawer}></EnrolledProgramList>
-    )
+    renderedCard = () =>
+      shallow(
+        <EnrolledProgramList
+          enrollments={userEnrollments}
+          toggleDrawer={toggleProgramDrawer}
+        ></EnrolledProgramList>
+      )
   })
 
   afterEach(() => {

@@ -5,10 +5,7 @@ import sinon from "sinon"
 import EditProfilePage, {
   EditProfilePage as InnerEditProfilePage
 } from "./EditProfilePage"
-import {
-  makeCountries,
-  makeUser
-} from "../../../factories/user"
+import { makeCountries, makeUser } from "../../../factories/user"
 import IntegrationTestHelper from "../../../util/integration_test_helper"
 
 describe("EditProfilePage", () => {

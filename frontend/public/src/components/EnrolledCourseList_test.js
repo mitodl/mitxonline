@@ -4,7 +4,6 @@ import React from "react"
 import { assert } from "chai"
 import { shallow } from "enzyme"
 
-
 import EnrolledCourseList from "./EnrolledCourseList"
 import IntegrationTestHelper from "../util/integration_test_helper"
 import { makeCourseRunEnrollment } from "../factories/course"
@@ -16,9 +15,10 @@ describe("EnrolledCourseList", () => {
     helper = new IntegrationTestHelper()
     userEnrollments = [makeCourseRunEnrollment(), makeCourseRunEnrollment()]
 
-    renderedCard = () => shallow(
-      <EnrolledCourseList enrollments={userEnrollments}></EnrolledCourseList>
-    )
+    renderedCard = () =>
+      shallow(
+        <EnrolledCourseList enrollments={userEnrollments}></EnrolledCourseList>
+      )
   })
 
   afterEach(() => {

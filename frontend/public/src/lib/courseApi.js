@@ -41,14 +41,27 @@ export const courseRunStatusMessage = (run: CourseRun) => {
     if (startDateDescription.active) {
       if (moment(run.end_date).isBefore(moment())) {
         const dateString = parseDateString(run.end_date)
-        return (<span> | <b>Ended</b> - {formatPrettyDateTimeAmPmTz(dateString)}</span>)
+        return (
+          <span>
+            {" "}
+            | <b>Ended</b> - {formatPrettyDateTimeAmPmTz(dateString)}
+          </span>
+        )
       } else {
-        return (<span> |
-          <strong> Active</strong> - {startDateDescription.datestr}
-        </span>)
+        return (
+          <span>
+            {" "}
+            |<strong> Active</strong> - {startDateDescription.datestr}
+          </span>
+        )
       }
     } else {
-      return (<span> | <b>Starts</b> - {startDateDescription.datestr}</span>)
+      return (
+        <span>
+          {" "}
+          | <b>Starts</b> - {startDateDescription.datestr}
+        </span>
+      )
     }
   } else {
     return null

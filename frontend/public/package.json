@@ -140,8 +140,8 @@
     "watch": "WATCH=1 ./../../scripts/test/js_test.sh",
     "dev-server": "node ../../node_modules/.bin/webpack serve",
     "flow": "flow check",
-    "fmt": "LOG_LEVEL= prettier-eslint --write --no-semi --ignore 'src/flow/**/*.js' $PWD/'src/**/*.js'",
-    "fmt:check": "LOG_LEVEL= prettier-eslint --list-different --no-semi --ignore 'src/flow/**/*.js' $PWD/'src/**/*.js'"
+    "fmt": "LOG_LEVEL= prettier-eslint --write --no-semi --ignore 'src/flow/**/*.js' 'src/**/*.js'",
+    "fmt:check": "LOG_LEVEL= prettier-eslint --list-different --no-semi --ignore 'src/flow/**/*.js' 'src/**/*.js'"
   },
   "packageManager": "yarn@3.2.0",
   "browserslist": [

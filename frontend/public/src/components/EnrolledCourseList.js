@@ -7,7 +7,7 @@ import EnrolledItemCard from "./EnrolledItemCard"
 import type { RunEnrollment } from "../flow/courseTypes"
 
 type EnrolledCourseListProps = {
-    enrollments: RunEnrollment[],
+  enrollments: RunEnrollment[]
 }
 
 export class EnrolledCourseList extends React.Component<EnrolledCourseListProps> {
@@ -22,21 +22,21 @@ export class EnrolledCourseList extends React.Component<EnrolledCourseListProps>
   }
 
   render() {
-    const {
-      enrollments,
-    } = this.props
+    const { enrollments } = this.props
 
-    return enrollments && enrollments.length > 0 ?
-      enrollments.map<RunEnrollment>(enrollment => this.renderEnrolledItemCard(enrollment))
-      : (
-        <div className="card no-enrollments p-3 p-md-5 rounded-0">
-          <h2>Enroll Now</h2>
-          <p>
-                You are not enrolled in any courses yet. Please{" "}
-            <a href={routes.root}>browse our courses</a>.
-          </p>
-        </div>
+    return enrollments && enrollments.length > 0 ? (
+      enrollments.map<RunEnrollment>(enrollment =>
+        this.renderEnrolledItemCard(enrollment)
       )
+    ) : (
+      <div className="card no-enrollments p-3 p-md-5 rounded-0">
+        <h2>Enroll Now</h2>
+        <p>
+          You are not enrolled in any courses yet. Please{" "}
+          <a href={routes.root}>browse our courses</a>.
+        </p>
+      </div>
+    )
   }
 }
 

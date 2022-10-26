@@ -17,9 +17,12 @@ import {
   courseRunsQueryKey
 } from "../lib/queries/courseRuns"
 
-import { formatPrettyDate, emptyOrNil} from "../lib/util"
+import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
-import {isFinancialAssistanceAvailable, isWithinEnrollmentPeriod } from "../lib/courseApi"
+import {
+  isFinancialAssistanceAvailable,
+  isWithinEnrollmentPeriod
+} from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
@@ -35,7 +38,7 @@ type Props = {
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
-  currentCourseRun:                  ?EnrollmentFlaggedCourseRun
+  currentCourseRun: ?EnrollmentFlaggedCourseRun
 }
 
 export class ProductDetailEnrollApp extends React.Component<
@@ -44,7 +47,7 @@ export class ProductDetailEnrollApp extends React.Component<
 > {
   state = {
     upgradeEnrollmentDialogVisibility: false,
-    currentCourseRun:                  null,
+    currentCourseRun:                  null
   }
 
   toggleUpgradeDialogVisibility = () => {
@@ -66,15 +69,19 @@ export class ProductDetailEnrollApp extends React.Component<
 
   renderUpgradeEnrollmentDialog() {
     const { courseRuns } = this.props
-    const run = !this.getCurrentCourseRun() && courseRuns ? courseRuns[0] : this.getCurrentCourseRun()
-    const needFinancialAssistanceLink = isFinancialAssistanceAvailable(run) && !run.approved_flexible_price_exists ?
-      (
-        <p className="text-center financial-assistance-link">
-          <a href={run.page.financial_assistance_form_url}>
+    const run =
+      !this.getCurrentCourseRun() && courseRuns
+        ? courseRuns[0]
+        : this.getCurrentCourseRun()
+    const needFinancialAssistanceLink =
+      isFinancialAssistanceAvailable(run) &&
+      !run.approved_flexible_price_exists ? (
+          <p className="text-center financial-assistance-link">
+            <a href={run.page.financial_assistance_form_url}>
             Need financial assistance?
-          </a>
-        </p>
-      ) : null
+            </a>
+          </p>
+        ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run.products ? run.products[0] : null
     return product ? (
@@ -92,7 +99,9 @@ export class ProductDetailEnrollApp extends React.Component<
             <div className="flex-grow-1 align-self-end">
               Learn online and get a certificate
             </div>
-            <div className="text-right align-self-end">{formatLocalePrice(getFlexiblePriceForProduct(product))}</div>
+            <div className="text-right align-self-end">
+              {formatLocalePrice(getFlexiblePriceForProduct(product))}
+            </div>
           </div>
           <div className="row">
             <div className="col-12">
@@ -150,39 +159,37 @@ export class ProductDetailEnrollApp extends React.Component<
   }
 
   updateDate(run: EnrollmentFlaggedCourseRun) {
-    let date = emptyOrNil(run.start_date) ? undefined : moment(new Date(run.start_date))
+    let date = emptyOrNil(run.start_date)
+      ? undefined
+      : moment(new Date(run.start_date))
     date = date ? date.utc() : date
-    const dateElem = document.getElementById('start_date')
-    if (dateElem) dateElem.innerHTML = `<strong>${formatPrettyDate(date)}</strong>`
+    const dateElem = document.getElementById("start_date")
+    if (dateElem) {
+      dateElem.innerHTML = `<strong>${formatPrettyDate(date)}</strong>`
+    }
   }
 
   render() {
     const { courseRuns, isLoading, currentUser } = this.props
     const csrfToken = getCookie("csrftoken")
-    let run = !this.getCurrentCourseRun() && courseRuns ? (
-      courseRuns[0]
-    ) : (
-      this.getCurrentCourseRun() && courseRuns ? (
-        courseRuns[0].page && this.getCurrentCourseRun().page ? (
-          courseRuns[0].page.page_url === this.getCurrentCourseRun().page.page_url ? (
-            this.getCurrentCourseRun()
-          ) : (
-            courseRuns[0]
-          )
-        ) : (
-          courseRuns[0]
-        )
-      ) : (
-        null
-      )
-    )
+    let run =
+      !this.getCurrentCourseRun() && courseRuns
+        ? courseRuns[0]
+        : this.getCurrentCourseRun() && courseRuns
+          ? courseRuns[0].page && this.getCurrentCourseRun().page
+            ? courseRuns[0].page.page_url ===
+            this.getCurrentCourseRun().page.page_url
+              ? this.getCurrentCourseRun()
+              : courseRuns[0]
+            : courseRuns[0]
+          : null
     if (run) this.updateDate(run)
     let product = run && run.products ? run.products[0] : null
     if (courseRuns) {
       const thisScope = this
       courseRuns.map(courseRun => {
         // $FlowFixMe
-        document.addEventListener('click', function(e) {
+        document.addEventListener("click", function(e) {
           if (e.target && e.target.id === courseRun.courseware_id) {
             thisScope.setCurrentCourseRun(courseRun)
             run = thisScope.getCurrentCourseRun()
@@ -194,11 +201,16 @@ export class ProductDetailEnrollApp extends React.Component<
       })
     }
 
-
-    const startDate = run && !emptyOrNil(run.start_date) ? moment(new Date(run.start_date)) : null
+    const startDate =
+      run && !emptyOrNil(run.start_date)
+        ? moment(new Date(run.start_date))
+        : null
     const disableEnrolledBtn = moment().isBefore(startDate) ? "disabled" : ""
-    const waitingForCourseToBeginMessage = moment().isBefore(startDate) ? <p style={{ fontSize: "16px" }}>Enrolled and waiting for the course to begin.</p> : null
-
+    const waitingForCourseToBeginMessage = moment().isBefore(startDate) ? (
+      <p style={{ fontSize: "16px" }}>
+        Enrolled and waiting for the course to begin.
+      </p>
+    ) : null
 
     return (
       // $FlowFixMe: isLoading null or undefined
@@ -215,7 +227,9 @@ export class ProductDetailEnrollApp extends React.Component<
                 Enrolled &#10003;
               </a>
             ) : (
-              <div className={`btn btn-primary btn-gradient-red highlight outline ${disableEnrolledBtn}`}>
+              <div
+                className={`btn btn-primary btn-gradient-red highlight outline ${disableEnrolledBtn}`}
+              >
                 Enrolled &#10003;
               </div>
             )}
@@ -223,40 +237,43 @@ export class ProductDetailEnrollApp extends React.Component<
           </Fragment>
         ) : (
           <Fragment>
-            {run && isWithinEnrollmentPeriod(run) && currentUser && !currentUser.id ? (
-              <a
-                href={routes.login}
-                className="btn btn-primary btn-gradient-red highlight"
-              >
-                Enroll now
-              </a>
-            ) : run && isWithinEnrollmentPeriod(run) ? (
-              product && run.is_upgradable ? (
-                <button
-                  className="btn btn-primary btn-gradient-red highlight enroll-now"
-                  onClick={() => this.toggleUpgradeDialogVisibility()}
+            {run &&
+            isWithinEnrollmentPeriod(run) &&
+            currentUser &&
+            !currentUser.id ? (
+                <a
+                  href={routes.login}
+                  className="btn btn-primary btn-gradient-red highlight"
                 >
+                Enroll now
+                </a>
+              ) : run && isWithinEnrollmentPeriod(run) ? (
+                product && run.is_upgradable ? (
+                  <button
+                    className="btn btn-primary btn-gradient-red highlight enroll-now"
+                    onClick={() => this.toggleUpgradeDialogVisibility()}
+                  >
                   Enroll now
-                </button>
-              ) : (
-                <Fragment>
-                  <form action="/enrollments/" method="post">
-                    <input
-                      type="hidden"
-                      name="csrfmiddlewaretoken"
-                      value={csrfToken}
-                    />
-                    <input type="hidden" name="run" value={run ? run.id : ""} />
-                    <button
-                      type="submit"
-                      className="btn btn-primary btn-gradient-red highlight enroll-now"
-                    >
+                  </button>
+                ) : (
+                  <Fragment>
+                    <form action="/enrollments/" method="post">
+                      <input
+                        type="hidden"
+                        name="csrfmiddlewaretoken"
+                        value={csrfToken}
+                      />
+                      <input type="hidden" name="run" value={run ? run.id : ""} />
+                      <button
+                        type="submit"
+                        className="btn btn-primary btn-gradient-red highlight enroll-now"
+                      >
                       Enroll now
-                    </button>
-                  </form>
-                </Fragment>
-              )
-            ) : null}
+                      </button>
+                    </form>
+                  </Fragment>
+                )
+              ) : null}
             {run ? this.renderUpgradeEnrollmentDialog() : null}
           </Fragment>
         )}

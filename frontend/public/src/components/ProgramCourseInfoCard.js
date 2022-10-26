@@ -6,7 +6,7 @@ import { generateStartDateText } from "../lib/courseApi"
 import type { CourseDetailWithRuns } from "../flow/courseTypes"
 
 type ProgramCourseInfoCardProps = {
-    course: CourseDetailWithRuns,
+  course: CourseDetailWithRuns
 }
 
 export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCardProps> {
@@ -29,10 +29,7 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
       featuredImage = (
         <div className="col-12 col-md-auto px-0 px-md-3">
           <div className="img-container">
-            <img
-              src={course.feature_image_src}
-              alt="Preview image"
-            />
+            <img src={course.feature_image_src} alt="Preview image" />
           </div>
         </div>
       )
@@ -50,9 +47,9 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
               <h2 className="my-0 mr-3">{course.title}</h2>
             </div>
             <div className="detail pt-1">
-              {course.readable_id.split('+')[1] || course.readable_id}
+              {course.readable_id.split("+")[1] || course.readable_id}
               {startDateDescription !== null && startDateDescription.active ? (
-                <span> |{" "}Starts - {startDateDescription.datestr}</span>
+                <span> | Starts - {startDateDescription.datestr}</span>
               ) : (
                 <span>
                   {startDateDescription === null ? null : (
@@ -64,16 +61,16 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
                 </span>
               )}
               <div className="enrollment-extra-links d-flex">
-                {courseDetailsPage ? (<a href={courseDetailsPage}>Course details</a>) : null}
+                {courseDetailsPage ? (
+                  <a href={courseDetailsPage}>Course details</a>
+                ) : null}
               </div>
               <br />
             </div>
           </div>
         </div>
         <div className="row flex-grow-1 pt-3">
-          <div className="col pl-0 pr-0">
-            {null}
-          </div>
+          <div className="col pl-0 pr-0">{null}</div>
         </div>
       </div>
     )

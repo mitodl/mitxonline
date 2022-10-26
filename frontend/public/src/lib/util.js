@@ -233,14 +233,20 @@ export const formatLocalePrice = (amount: number | null) => {
 }
 
 export const getFlexiblePriceForProduct = (product: Product) => {
-  const flexDiscountAmount = product && product.product_flexible_price ? product.product_flexible_price.amount : 0
-  const flexDiscountType = product && product.product_flexible_price ? product.product_flexible_price.discount_type : null
+  const flexDiscountAmount =
+    product && product.product_flexible_price
+      ? product.product_flexible_price.amount
+      : 0
+  const flexDiscountType =
+    product && product.product_flexible_price
+      ? product.product_flexible_price.discount_type
+      : null
 
   switch (flexDiscountType) {
   case DISCOUNT_TYPE_DOLLARS_OFF:
     return Number(product.price - flexDiscountAmount)
   case DISCOUNT_TYPE_PERCENT_OFF:
-    return Number(product.price - ((flexDiscountAmount / 100) * product.price))
+    return Number(product.price - (flexDiscountAmount / 100) * product.price)
   case DISCOUNT_TYPE_FIXED_PRICE:
     return Number(flexDiscountAmount)
   default:
@@ -251,5 +257,8 @@ export const getFlexiblePriceForProduct = (product: Product) => {
 export const isProgramUIEnabled = () => {
   const params = new URLSearchParams(document.location.search)
 
-  return params.get("enable_programs") !== null || (SETTINGS && SETTINGS.features && SETTINGS.features.enable_program_ui)
+  return (
+    params.get("enable_programs") !== null ||
+    (SETTINGS && SETTINGS.features && SETTINGS.features.enable_program_ui)
+  )
 }

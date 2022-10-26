@@ -80,7 +80,11 @@ export class NotificationContainer extends React.Component<Props, State> {
               toggle={dismiss}
               fade={true}
             >
-              <AlertBodyComponent aria-live="assertive" dismiss={dismiss} {...notification.props} />
+              <AlertBodyComponent
+                aria-live="assertive"
+                dismiss={dismiss}
+                {...notification.props}
+              />
             </Alert>
           )
         })}
