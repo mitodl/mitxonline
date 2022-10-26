@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.50.2
+--------------
+
+- Fix fmt and fmt:check commands
+- Adds a management command to create and optionally enroll a user
+
 Version 0.50.1 (Released October 25, 2022)
 --------------
 
