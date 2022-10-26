@@ -1,0 +1,7 @@
+<div id="{{ widget.name }}-field" class="program-requirements-field">
+    <input type="hidden" name="{{ widget.name }}" value="{{ widget.value|stringformat:'s' }}"/>
+    {% with widget.name|add:'-schema' as script_name %}
+    {{ widget.schema|json_script:script_name }}
+    {% endwith %}
+    <div class="editor-container"></div>
+</div>

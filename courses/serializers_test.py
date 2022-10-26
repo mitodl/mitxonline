@@ -20,7 +20,7 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
-from courses.models import CourseTopic
+from courses.models import CourseTopic, ProgramRequirementNodeType
 from courses.serializers import (
     BaseCourseSerializer,
     BaseProgramSerializer,
@@ -30,6 +30,8 @@ from courses.serializers import (
     CourseSerializer,
     ProgramEnrollmentSerializer,
     ProgramSerializer,
+    ProgramRequirementSerializer,
+    ProgramRequirementTreeSerializer,
 )
 from ecommerce.serializers import BaseProductSerializer
 from ecommerce.factories import ProductFactory
@@ -338,3 +340,75 @@ def test_serialize_course_run_enrollments(approved_flexible_price_exists):
         "approved_flexible_price_exists": approved_flexible_price_exists,
         "certificate": None,
     }
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {
+            "id": None,
+            "data": {
+                "node_type": ProgramRequirementNodeType.COURSE,
+            },
+            "children": [],
+        },
+        {
+            "id": 1,
+            "data": {
+                "node_type": ProgramRequirementNodeType.COURSE,
+            },
+            "children": [],
+        },
+        {
+            "id": 1,
+            "data": {
+                "node_type": ProgramRequirementNodeType.COURSE,
+            },
+        },
+        {
+            "data": {
+                "node_type": ProgramRequirementNodeType.COURSE,
+            },
+            "children": [],
+        },
+    ],
+)
+def test_program_requirement_serializer_valid(data):
+    """Verify that the ProgramRequirementSerializer validates data"""
+    serializer = ProgramRequirementSerializer(data=data)
+    serializer.is_valid(raise_exception=True)
+
+
+def test_program_requirement_tree_serializer_valid():
+    """Verify that the ProgramRequirementTreeSerializer validates data"""
+    program = ProgramFactory.create()
+    course1, course2, course3 = CourseFactory.create_batch(3)
+    root = program.requirements_root
+
+    serializer = ProgramRequirementTreeSerializer(
+        instance=root,
+        data=[
+            {
+                "data": {
+                    "node_type": "operator",
+                    "title": "Required Courses",
+                    "operator": "all_of",
+                },
+                "children": [
+                    {"id": None, "data": {"node_type": "course", "course": course1.id}}
+                ],
+            },
+            {
+                "data": {
+                    "node_type": "operator",
+                    "title": "Elective Courses",
+                    "operator": "min_number_of",
+                    "operator_value": "1",
+                },
+                "children": [],
+            },
+        ],
+        context={"program": program},
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()

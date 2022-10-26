@@ -2297,6 +2297,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@json-editor/json-editor@npm:2.8.0":
+  version: 2.8.0
+  resolution: "@json-editor/json-editor@npm:2.8.0"
+  dependencies:
+    core-js: ^3.12.1
+  checksum: 3368ed4a3e8c777f24ac6a9adef6381803614b8485f89401d0819af17c5da66d7644736d0ad3eafdc795d6e5415e45cb9f5be01cbd68a5e5059f82f25e435240
+  languageName: node
+  linkType: hard
+
 "@leichtgewicht/ip-codec@npm:^2.0.1":
   version: 2.0.3
   resolution: "@leichtgewicht/ip-codec@npm:2.0.3"
@@ -6464,6 +6473,13 @@ __metadata:
   version: 3.21.1
   resolution: "core-js@npm:3.21.1"
   checksum: d68eddd831340ad5b24ac29c72fda022a43b17f194c4278b6b875a843283d316502cb4abd07f28631d6ebc4387f66aa06e2b1b3c8fd7e08096a751b5c63f6889
+  languageName: node
+  linkType: hard
+
+"core-js@npm:^3.12.1":
+  version: 3.26.0
+  resolution: "core-js@npm:3.26.0"
+  checksum: 0149eb9d3909fde9c17626af3a6e625c326e8598d0bb5e6c5b48a18e5fcd4eaf48d4964d873667d8148542ff590fb98eb3f93618da114ca54999d6bc0349734b
   languageName: node
   linkType: hard
 
@@ -13438,6 +13454,7 @@ __metadata:
     "@babel/preset-react": 7.16.7
     "@babel/register": 7.17.7
     "@fancyapps/fancybox": 3.5.7
+    "@json-editor/json-editor": 2.8.0
     "@material/layout-grid": 0.41.0
     "@material/top-app-bar": 1.1.1
     "@sentry/browser": 6.19.3

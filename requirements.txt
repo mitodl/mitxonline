@@ -166,7 +166,9 @@ django-taggit==1.5.1
 django-templated-mail==1.1.1
     # via djoser
 django-treebeard==4.5.1
-    # via wagtail
+    # via
+    #   -r requirements.in
+    #   wagtail
 django-user-agents==0.4.0
     # via -r requirements.in
 django-webpack-loader==1.4.1

@@ -10,9 +10,13 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
+from django.db.models import Q
+from django.db.models.constraints import CheckConstraint, UniqueConstraint
 from django.utils.functional import cached_property
 from django.contrib.contenttypes.models import ContentType
 from django_countries.fields import CountryField
+from treebeard.mp_tree import MP_Node
+
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
@@ -62,6 +66,10 @@ class CourseQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
     def live(self):
         """Applies a filter for Courses with live=True"""
         return self.filter(live=True)
+
+    def courses_in_program(self, program):
+        """Return a list of courses that are required by a given program"""
+        return self.filter(in_programs__program=program)
 
 
 class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
@@ -148,6 +156,26 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def text_id(self):
         """Gets the readable_id"""
         return self.readable_id
+
+    @cached_property
+    def requirements_root(self):
+        return self.get_requirements_root()
+
+    def get_requirements_root(self, *, for_update=False):
+        """The root of the requirements tree"""
+        query = ProgramRequirement.get_root_nodes().filter(program=self)
+        if for_update:
+            query = query.select_for_update()
+
+        return query.first()
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        if not ProgramRequirement.get_root_nodes().filter(program=self).exists():
+            ProgramRequirement.add_root(
+                program=self, node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value
+            )
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
@@ -989,3 +1017,168 @@ class PaidCourseRun(TimestampedModel):
             course_run=run,
             order__state__in=[Order.STATE.FULFILLED, Order.STATE.REVIEW],
         ).exists()
+
+
+class ProgramRequirementNodeType(models.TextChoices):
+    PROGRAM_ROOT = "program_root", "Program Root"
+    OPERATOR = "operator", "Operator"
+    COURSE = "course", "Course"
+
+
+class ProgramRequirement(MP_Node):
+    """
+    A representation of program requirements.
+
+    There are 3 types of nodes that exist in a requirement tree:
+
+    Root nodes - these represent a program
+    Operator nodes - these represent a logical operation over a set of courses
+    Course nodes - these represent a reference to a course
+
+    Usage:
+
+    root = ProgramRequirement.add_root(program=program)
+
+    required_courses = root.add_child(operator=ProgramRequirement.Operator.all_of, title="Required Courses")
+    required_courses.add_child(course=course1)
+    required_courses.add_child(course=course2)
+
+    # at least two must be taken
+    elective_courses = root.add_child(
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=2,
+        title="Elective Courses"
+    )
+    elective_courses.add_child(course=course3)
+    elective_courses.add_child(course=course4)
+
+    # 3rd elective option is at least one of these courses
+    mut_exclusive_courses = elective_courses.add_child(
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1
+    )
+    mut_exclusive_courses.add_child(course=course5)
+    mut_exclusive_courses.add_child(course=course6)
+
+    """
+
+    # extended alphabet from the default to the recommended one for postgres
+    alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+    node_type = models.CharField(
+        choices=ProgramRequirementNodeType.choices,
+        max_length=len(max(ProgramRequirementNodeType.values, key=len)),
+        null=True,
+    )
+
+    class Operator(models.TextChoices):
+        ALL_OF = "all_of", "All of"
+        MIN_NUMBER_OF = "min_number_of", "Minimum # of"
+
+    operator = models.CharField(
+        choices=Operator.choices,
+        max_length=len(max(Operator.values, key=len)),
+        null=True,
+    )
+    operator_value = models.CharField(max_length=100, null=True)
+
+    program = models.ForeignKey(
+        "courses.Program", on_delete=models.CASCADE, related_name="all_requirements"
+    )
+    course = models.ForeignKey(
+        "courses.Course",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="in_programs",
+    )
+
+    title = models.TextField(null=True, blank=True, default="")
+
+    @property
+    def is_all_of_operator(self):
+        """True if the node is an ALL_OF operator"""
+        return self.operator == self.Operator.ALL_OF
+
+    @property
+    def is_min_number_of_operator(self):
+        """True if the node is a MIN_NUMBER_OF operator"""
+        return self.operator == self.Operator.MIN_NUMBER_OF
+
+    @property
+    def is_operator(self):
+        """True if the node is an operator"""
+        return self.node_type == ProgramRequirementNodeType.OPERATOR
+
+    @property
+    def is_course(self):
+        """True if the node references a course"""
+        return self.node_type == ProgramRequirementNodeType.COURSE
+
+    @property
+    def is_root(self):
+        """True if the node is the root"""
+        return self.node_type == ProgramRequirementNodeType.PROGRAM_ROOT
+
+    def add_child(self, **kwargs):
+        """Children must always have the same program"""
+        kwargs["program"] = self.program
+        return super().add_child(**kwargs)
+
+    def __str__(self):
+        attrs = {
+            "id": self.id,
+            "program": self.program.readable_id,
+            "node_type": self.node_type,
+        }
+
+        if self.is_operator:
+            attrs["operator"] = self.operator
+            attrs["operator_value"] = self.operator_value
+        elif self.is_course:
+            attrs["course"] = self.course
+
+        return " ".join(f"{key}={value}" for key, value in attrs.items())
+
+    class Meta:
+        constraints = (
+            # validate the fields based on the node 'type'
+            CheckConstraint(
+                name="courses_programrequirement_node_check",
+                check=(
+                    # root nodes
+                    Q(
+                        node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value,
+                        operator__isnull=True,
+                        operator_value__isnull=True,
+                        course__isnull=True,
+                        depth=1,
+                    )
+                    # operator nodes
+                    | Q(
+                        node_type=ProgramRequirementNodeType.OPERATOR.value,
+                        operator__isnull=False,
+                        course__isnull=True,
+                        depth__gt=1,
+                    )
+                    # course nodes
+                    | Q(
+                        node_type=ProgramRequirementNodeType.COURSE.value,
+                        operator__isnull=True,
+                        operator_value__isnull=True,
+                        course__isnull=False,
+                        depth__gt=1,
+                    )
+                ),
+            ),
+            # only all 1 root node per program
+            UniqueConstraint(
+                name="courses_programrequirement_root_uniq",
+                fields=("program", "depth"),
+                condition=Q(depth=1),
+            ),
+        )
+        index_together = (
+            ("program", "course"),
+            ("course", "program"),
+        )

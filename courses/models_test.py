@@ -1,5 +1,6 @@
 """Tests for course models"""
 from datetime import timedelta
+from types import SimpleNamespace
 
 import factory
 import pytest
@@ -16,11 +17,70 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
-from courses.models import CourseRunEnrollment
+from courses.models import (
+    Course,
+    CourseRunEnrollment,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
+)
 from main.test_utils import format_as_iso8601
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
+
+
+@pytest.fixture
+def program_with_requirements():
+    program = ProgramFactory.create()
+    required_courses = CourseFactory.create_batch(3, program=program)
+    elective_courses = CourseFactory.create_batch(3, program=program)
+    mut_exclusive_courses = CourseFactory.create_batch(3, program=program)
+
+    root_node = program.requirements_root
+
+    required_courses_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    for course in required_courses:
+        required_courses_node.add_child(
+            node_type=ProgramRequirementNodeType.COURSE, course=course
+        )
+
+    # at least two must be taken
+    elective_courses_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=2,
+        title="Elective Courses",
+    )
+    for course in elective_courses:
+        elective_courses_node.add_child(
+            node_type=ProgramRequirementNodeType.COURSE, course=course
+        )
+
+    # 3rd elective option is at least one of these courses
+    mut_exclusive_courses_node = elective_courses_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+    )
+    for course in mut_exclusive_courses:
+        mut_exclusive_courses_node.add_child(
+            node_type=ProgramRequirementNodeType.COURSE, course=course
+        )
+
+    return SimpleNamespace(
+        program=program,
+        root_node=root_node,
+        required_courses=required_courses,
+        required_courses_node=required_courses_node,
+        elective_courses=elective_courses,
+        elective_courses_node=elective_courses_node,
+        mut_exclusive_courses=mut_exclusive_courses,
+        mut_exclusive_courses_node=mut_exclusive_courses_node,
+    )
 
 
 def test_program_course_auto_position():
@@ -644,4 +704,198 @@ def test_program_certificate_start_end_dates_and_page_revision(user):
     certificate_page = certificate.program.page.certificate_page
     assert (
         certificate_page.get_latest_revision() == certificate.certificate_page_revision
+    )
+
+
+def test_program_requirements(program_with_requirements):
+    """Test for program requirements"""
+    node_defaults = {
+        "course": None,
+        "operator": None,
+        "operator_value": None,
+        "title": "",
+        "program": program_with_requirements.program.id,
+    }
+
+    assert program_with_requirements.root_node.dump_bulk() == [
+        {
+            "data": {
+                **node_defaults,
+                "node_type": ProgramRequirementNodeType.PROGRAM_ROOT.value,
+            },
+            "id": program_with_requirements.root_node.id,
+            "children": [
+                {
+                    "data": {
+                        **node_defaults,
+                        "operator": ProgramRequirement.Operator.ALL_OF.value,
+                        "title": "Required Courses",
+                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
+                    },
+                    "id": program_with_requirements.required_courses_node.id,
+                    "children": [
+                        {
+                            "data": {
+                                **node_defaults,
+                                "course": course.id,
+                                "node_type": ProgramRequirementNodeType.COURSE.value,
+                            },
+                            "id": node.id,
+                        }
+                        for course, node in zip(
+                            program_with_requirements.required_courses,
+                            program_with_requirements.required_courses_node.get_children(),
+                        )
+                    ],
+                },
+                {
+                    "data": {
+                        **node_defaults,
+                        "operator": ProgramRequirement.Operator.MIN_NUMBER_OF.value,
+                        "operator_value": "2",
+                        "title": "Elective Courses",
+                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
+                    },
+                    "id": program_with_requirements.elective_courses_node.id,
+                    "children": [
+                        *[
+                            {
+                                "data": {
+                                    **node_defaults,
+                                    "course": course.id,
+                                    "node_type": ProgramRequirementNodeType.COURSE.value,
+                                },
+                                "id": node.id,
+                            }
+                            for course, node in zip(
+                                program_with_requirements.elective_courses,
+                                program_with_requirements.elective_courses_node.get_children(),
+                            )
+                        ],
+                        {
+                            "data": {
+                                **node_defaults,
+                                "operator": ProgramRequirement.Operator.MIN_NUMBER_OF.value,
+                                "operator_value": "1",
+                                "node_type": ProgramRequirementNodeType.OPERATOR.value,
+                            },
+                            "id": program_with_requirements.mut_exclusive_courses_node.id,
+                            "children": [
+                                {
+                                    "data": {
+                                        **node_defaults,
+                                        "course": course.id,
+                                        "node_type": ProgramRequirementNodeType.COURSE.value,
+                                    },
+                                    "id": node.id,
+                                }
+                                for course, node in zip(
+                                    program_with_requirements.mut_exclusive_courses,
+                                    program_with_requirements.mut_exclusive_courses_node.get_children(),
+                                )
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    "operator, expected",
+    [
+        (ProgramRequirement.Operator.ALL_OF.value, True),
+        (ProgramRequirement.Operator.MIN_NUMBER_OF.value, False),
+    ],
+)
+def test_program_requirements_is_all_of_operator(operator, expected):
+    """Test is_all_of_operator"""
+    assert ProgramRequirement(operator=operator).is_all_of_operator is expected
+
+
+@pytest.mark.parametrize(
+    "operator, expected",
+    [
+        (ProgramRequirement.Operator.ALL_OF.value, False),
+        (ProgramRequirement.Operator.MIN_NUMBER_OF.value, True),
+    ],
+)
+def test_program_requirements_is_min_number_of_operator(operator, expected):
+    """Test is_min_number_of_operator"""
+    assert ProgramRequirement(operator=operator).is_min_number_of_operator is expected
+
+
+def test_courses_in_program(program_with_requirements):
+    """Test CourseQuerySet.courses_in_program"""
+    CourseFactory.create_batch(4)
+
+    courses = Course.objects.courses_in_program(program_with_requirements.program)
+
+    assert set(courses) == set(
+        program_with_requirements.required_courses
+        + program_with_requirements.elective_courses
+        + program_with_requirements.mut_exclusive_courses
+    )
+
+
+def test_program_requirements_is_operator():
+    """Test is_operator"""
+    assert (
+        ProgramRequirement(node_type=ProgramRequirementNodeType.OPERATOR).is_operator
+        is True
+    )
+    assert (
+        ProgramRequirement(
+            node_type=ProgramRequirementNodeType.PROGRAM_ROOT
+        ).is_operator
+        is False
+    )
+    assert (
+        ProgramRequirement(node_type=ProgramRequirementNodeType.COURSE).is_operator
+        is False
+    )
+
+
+def test_program_requirements_is_course():
+    """Test is_course"""
+    assert (
+        ProgramRequirement(node_type=ProgramRequirementNodeType.OPERATOR).is_course
+        is False
+    )
+    assert (
+        ProgramRequirement(node_type=ProgramRequirementNodeType.PROGRAM_ROOT).is_course
+        is False
+    )
+    assert (
+        ProgramRequirement(node_type=ProgramRequirementNodeType.COURSE).is_course
+        is True
+    )
+
+
+def test_program_requirements_is_root():
+    """Test is_root"""
+    assert (
+        ProgramRequirement(node_type=ProgramRequirementNodeType.OPERATOR).is_root
+        is False
+    )
+    assert (
+        ProgramRequirement(node_type=ProgramRequirementNodeType.PROGRAM_ROOT).is_root
+        is True
+    )
+    assert (
+        ProgramRequirement(node_type=ProgramRequirementNodeType.COURSE).is_root is False
+    )
+
+
+def test_courses_in_program(program_with_requirements):
+    """Test CourseQuerySet.courses_in_program"""
+    CourseFactory.create_batch(4)
+
+    courses = Course.objects.courses_in_program(program_with_requirements.program)
+
+    assert set(courses) == set(
+        program_with_requirements.required_courses
+        + program_with_requirements.elective_courses
+        + program_with_requirements.mut_exclusive_courses
     )
