@@ -1,10 +1,11 @@
 """API functionality for the CMS app"""
 import logging
-from typing import Tuple
+from typing import Tuple, Union
 from urllib.parse import urljoin, urlencode
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 
 from django.utils.text import slugify
 from wagtail.core.blocks import StreamValue
@@ -14,6 +15,7 @@ from cms import models as cms_models
 from cms.exceptions import WagtailSpecificPageError
 from cms.models import Page
 from cms.constants import CERTIFICATE_INDEX_SLUG
+from courses.models import Course, Program
 
 
 log = logging.getLogger(__name__)
@@ -223,3 +225,60 @@ def get_wagtail_img_src(image_obj) -> str:
         if image_obj
         else ""
     )
+
+
+def create_default_courseware_page(
+    courseware: Union[Course, Program], live: bool = False, *args, **kwargs
+):
+    """
+    Creates a default about page for the given courseware object. Created pages
+    won't be in a published state (as this will put just the bare minimum in to
+    make it work). The created page will exist in the proper part of the
+    hierarchy, so this will fail if there's not an index page for the courseware
+    object type. You cannot have duplicate pages for a courseware object, so
+    trying to create one will result in an exception being raised.
+
+    Args:
+    - object (Course or Program): The courseware object to work with
+    - live (boolean): Make the page live or not (default False)
+    Keyword Args:
+    - title (str): Force a specific title.
+    - slug (str): Force a specific slug.
+    Returns:
+    - CoursePage or ProgramPage; the page
+    Raises:
+    - Exception
+    """
+    from cms.models import CoursePage, ProgramPage, CourseIndexPage, ProgramIndexPage
+
+    page_framework = {
+        "title": courseware.title,
+        "description": courseware.title,
+        "live": live,
+        "length": "No Data",
+        "slug": slugify(courseware.readable_id),
+    }
+
+    try:
+        if isinstance(courseware, Course):
+            parent_page = CourseIndexPage.objects.filter(live=True).get()
+            page = CoursePage(course=courseware, **page_framework)
+        else:
+            parent_page = ProgramIndexPage.objects.filter(live=True).get()
+            page = ProgramPage(program=courseware, **page_framework)
+    except:
+        raise ValidationError(f"No valid index page found for {courseware}.")
+
+    parent_page.add_child(instance=page)
+
+    page.save()
+    page.refresh_from_db()
+
+    if isinstance(courseware, Course):
+        homepage = cms_models.HomePage.objects.first()
+
+        cms_models.HomeProductLink.objects.create(
+            page=homepage, course_product_page=page
+        )
+
+    return page

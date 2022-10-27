@@ -3,6 +3,7 @@ import pytest
 from django.contrib.contenttypes.models import ContentType
 from wagtail.core.models import Page
 from wagtail_factories import PageFactory
+from django.core.exceptions import ValidationError
 
 from cms.api import (
     ensure_home_page_and_site,
@@ -12,6 +13,7 @@ from cms.api import (
     get_home_page,
     RESOURCE_PAGE_TITLES,
     ensure_program_product_index,
+    create_default_courseware_page,
 )
 from cms.exceptions import WagtailSpecificPageError
 from cms.factories import HomePageFactory, CoursePageFactory, ProgramPageFactory
@@ -21,7 +23,11 @@ from cms.models import (
     CourseIndexPage,
     HomeProductLink,
     ProgramIndexPage,
+    CoursePage,
+    ProgramPage,
 )
+
+from courses.factories import CourseFactory
 
 
 @pytest.mark.django_db
@@ -221,3 +227,28 @@ def test_home_page_featured_products_sorting(mocker):
     featured_products = home_page.products
     assert len(featured_products) == 2
     assert featured_products == page_data
+
+
+@pytest.mark.django_db
+def test_create_courseware_page():
+    ensure_home_page_and_site()
+    ensure_product_index()
+    ensure_program_product_index()
+
+    course = CourseFactory.create(page=None)
+
+    resulting_page = create_default_courseware_page(course)
+
+    assert isinstance(resulting_page, CoursePage)
+    assert resulting_page.title == course.title
+
+    with pytest.raises(ValidationError):
+        resulting_page = create_default_courseware_page(course)
+
+    resulting_page = create_default_courseware_page(course.program)
+
+    assert isinstance(resulting_page, ProgramPage)
+    assert resulting_page.title == course.program.title
+
+    with pytest.raises(ValidationError):
+        resulting_page = create_default_courseware_page(course.program)
