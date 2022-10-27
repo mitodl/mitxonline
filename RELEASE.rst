@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.50.3
+Version 0.50.3 (Released October 27, 2022)
 --------------
 
 - Adds management command to create a really basic courseware about page.
