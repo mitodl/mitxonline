@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.51.0
+Version 0.51.0 (Released November 01, 2022)
 --------------
 
 - Add missing import
