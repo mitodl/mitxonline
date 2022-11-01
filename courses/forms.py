@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.forms import ModelForm
 from django.forms.fields import JSONField
 from webpack_loader import utils as webpack_loader_utils
