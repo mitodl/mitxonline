@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.51.0
+--------------
+
+- Add missing import
+- Added program requirements data model and admin
+
 Version 0.50.3 (Released October 27, 2022)
 --------------
 
