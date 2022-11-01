@@ -252,9 +252,12 @@ class ProgramAdminForm(ModelForm):
 
     class Media:
         css = {
-            "all": (
-                "css/vendor/spectre-icons.min.css",
-                "css/admin/requirements.css",
-            )
+            "all": [
+                chunk["url"]
+                for chunk in webpack_loader_utils.get_files("requirementsAdmin", "css")
+            ],
         }
-        js = (webpack_loader_utils.get_static("requirementsAdmin.js"),)
+        js = [
+            chunk["url"]
+            for chunk in webpack_loader_utils.get_files("requirementsAdmin", "js")
+        ]

@@ -1,5 +1,6 @@
 """Common fixtures"""
 # pylint: disable=unused-argument, redefined-outer-name
+import os
 
 import pytest
 import responses
@@ -94,3 +95,17 @@ def valid_address_dict():
 def nplusone_fail(settings):
     """Configures the nplusone app to raise errors"""
     settings.NPLUSONE_RAISE = True
+
+
+@pytest.fixture(autouse=True)
+def webpack_stats(settings):
+    """mocks out webpack stats"""
+
+    directory = "scripts/test/data/webpack-stats/"
+
+    for loader_config in settings.WEBPACK_LOADER.values():
+        filename = os.path.basename(loader_config["STATS_FILE"])
+
+        loader_config["STATS_FILE"] = os.path.join(
+            settings.BASE_DIR, directory, "default.json"
+        )
