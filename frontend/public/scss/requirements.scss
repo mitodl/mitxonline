@@ -1,0 +1,106 @@
+.program-requirements-field {
+    button {
+        background: var(--hairline-color);
+        color: var(--body-fg);
+        border-radius: 15px;
+        border: 0;
+        font-weight: 400;
+        font-size: 11px;
+        letter-spacing: 0.5px;
+        padding: 3px 12px;
+        margin: 2px 2px 10px;
+    }
+
+    div[data-schemaid="root"] {
+        & > .je-indented-panel {
+            border: 0;
+            margin: 0;
+        }
+        & > h3 {
+            display: none;
+        }
+    }
+
+    div[data-schemapath$=".data"],
+    div[data-schemapath$=".children"] {
+        & > .je-header label {
+            color: var(--body-quiet-color);
+        }
+    }
+    div[data-schemapath$=".children"] .je-indented-panel {
+        padding: 0;
+        border: 0;
+    }
+
+    &, .editor-container .row  {
+        clear: both;
+    }
+
+    .je-object__controls {
+        display: none;
+    }
+
+    .je-child-editor-holder {
+        border: 1px solid rgb(221, 221, 221);
+        clear: both;
+
+        & > span {
+            display: block;
+            padding: 5px;
+            border-top: 1px solid var(--hairline-color);
+        }
+
+        & > span > button{
+            margin: 0;
+        }
+    }
+
+    .je-table {
+        width: 100%;
+    }
+
+    .row {
+        div[data-schematype="array"] > div {
+            margin: 15px;
+        }
+
+        & > div > .je-header {
+            border-bottom: 2px solid var(--border-color);
+            background: #fff;
+        }
+    }
+    
+    .je-indented-panel {
+        border: 0;
+        margin: 0;
+
+        select.je-switcher {
+            margin: 5px;
+        }
+    }
+
+    .je-header {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        
+        label {
+            color: var(--primary-fg);
+            margin: 5px;
+        }
+        
+        button {
+            float: right;
+            margin: 10px;
+        }
+        
+    }
+
+    .je-object__container > h3.je-object__title {
+        background: var(--primary);
+
+        label {
+            color: var(--primary-fg);
+        }
+    }
+}

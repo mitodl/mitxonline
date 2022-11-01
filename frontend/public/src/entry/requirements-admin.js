@@ -1,5 +1,7 @@
 import { JSONEditor } from "@json-editor/json-editor"
 
+import "../../scss/requirements.scss"
+
 document.addEventListener("DOMContentLoaded", function() {
   // just in case, we iterate on all of the potential editors
   const elements = document.querySelectorAll(".program-requirements-field")
