@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.51.1
+--------------
+
+- added a import script to backfill PaidCourseRun for the legacy orders
+- Adds wrapper command to bootstrap a fresh MITxOnline instance
+
 Version 0.51.0 (Released November 01, 2022)
 --------------
 
