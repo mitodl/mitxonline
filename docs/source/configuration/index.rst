@@ -7,3 +7,4 @@ Configuration
    open_edx
    ecommerce
    refine_admin
+   quickstart

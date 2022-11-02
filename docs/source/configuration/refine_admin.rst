@@ -1,7 +1,7 @@
 Refine Admin
 ############
 
-Some administrative functionality is built out using `Refine <https://refine.dev>`_. The Refine admin is a separate application that uses OAuth2/OIDC for authentication and communicates with MITxOnline via the standard REST API. It compliments the Django Admin interface, providing an interface for operations that would otherwise be hard to implement in Django Admin, and for users that don't necessarily need the level of access that Django Admin provides.
+Some administrative functionality is built out using `Refine <https://refine.dev>`_. The Refine admin is a separate application that uses OAuth2/OIDC for authentication and communicates with MITx Online via the standard REST API. It compliments the Django Admin interface, providing an interface for operations that would otherwise be hard to implement in Django Admin, and for users that don't necessarily need the level of access that Django Admin provides.
 
 Accessing
 *********
@@ -16,7 +16,7 @@ Development
 -----------
 
 
-You will need to make some adjustments to the MITxOnline configuration to allow the Refine admin to work.  
+You will need to make some adjustments to the MITx Online configuration to allow the Refine admin to work.  
 
   Currently, the application expects to be accessible at ``mitxonline.odl.local``. 
 
@@ -31,8 +31,8 @@ This will generate the key and then output it to the terminal in a format that c
 
 The key generation process is from the `Django OAuth Toolkit <https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#creating-rsa-private-key>`_ docs.
 
-Step 2: Configuring MITxOnline
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Step 2: Configuring MITx Online
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You will need to add a new Application in the Django Oauth Toolkit section in Django Admin (``/admin/oauth2_provider/application/``). Navigate there and create a new Application. Use these values (overwriting the defaults where necessary):
 
@@ -63,7 +63,7 @@ This will generate the key and then output it to the terminal. Copy everything i
 
 The key generation process is from the `Django OAuth Toolkit <https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#creating-rsa-private-key>`_ docs.
 
-**Step 2: Configuring MITxOnline OAuth Provider** 
+**Step 2: Configuring MITx Online OAuth Provider** 
 
 You will need to add a new Application in the Django OAuth Toolkit section in Django Admin (``/admin/oauth2_provider/application/``). Navigate there and create a new Application. Use these values (overwriting the defaults where necessary):
 

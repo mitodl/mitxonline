@@ -14,6 +14,9 @@ from django.db.models import Q
 
 from mail.api import validate_email_addresses
 from users.models import User, LegalAddress, validate_iso_3166_1_code
+from openedx.api import create_user as openedx_create_user
+from openedx.tasks import create_user_from_id as openedx_create_user_from_id
+from authentication.pipeline.user import CREATE_OPENEDX_USER_RETRY_DELAY
 
 
 class Command(BaseCommand):
@@ -73,7 +76,6 @@ class Command(BaseCommand):
         parser.add_argument(
             "--enroll",
             action="append",
-            nargs="?",
             type=str,
             help="Optionally enroll the new user in the specified courseware.",
         )
@@ -110,11 +112,22 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"Created user {new_account.username}."))
 
-        if kwargs["enroll"] is not None and len(kwargs["enroll"]) > 0:
-            for courseware in kwargs["enroll"]:
-                call_command(
-                    "create_enrollment",
-                    user=new_account.username,
-                    run=courseware,
-                    keep_failed_enrollments=True,
+        try:
+            openedx_create_user(new_account)
+        except:
+            self.stdout.write(
+                self.style.ERROR(
+                    f"An error occurred creating the Open edX user for {new_account.username}; will queue it for later."
                 )
+            )
+            openedx_create_user_from_id.apply_async(
+                (new_account.id,), countdown=CREATE_OPENEDX_USER_RETRY_DELAY
+            )
+
+        if kwargs["enroll"] is not None and len(kwargs["enroll"]) > 0:
+            call_command(
+                "create_enrollment",
+                user=new_account.username,
+                run=kwargs["enroll"],
+                keep_failed_enrollments=True,
+            )

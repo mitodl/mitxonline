@@ -1,7 +1,7 @@
 Flexible Pricing
 ================
 
-The Flexible Pricing system allows learners to request alternative pricing for MITxOnline courses based on their location and annual income. These requests can be made through a customizable form in the Wagtail CMS system.
+The Flexible Pricing system allows learners to request alternative pricing for MITx Online courses based on their location and annual income. These requests can be made through a customizable form in the Wagtail CMS system.
 
 When the learner accesses the Flexible Pricing request form, they will see one of the following:
 

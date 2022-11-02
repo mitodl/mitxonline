@@ -1,12 +1,12 @@
 Configure eCommerce
 ===================
 
-To use the eCommerce subsystem, some configuration is required. These instructions will also set up a course in your MITxOnline environment that you can use for enrollment.
+To use the eCommerce subsystem, some configuration is required. These instructions will also set up a course in your MITx Online environment that you can use for enrollment.
 
-You'll need a working MITxOnline setup and a working devstack setup to begin, and superuser accounts for each.
+You'll need a working MITx Online setup and a working devstack setup to begin, and superuser accounts for each.
 
-Set Up MITxOnline eCommerce Config
-##################################
+Set Up MITx Online eCommerce Config
+###################################
 
 The CyberSource configuration for the app can be lifted out of Heroku. **Make sure you use values from RC - otherwise, you will actually be charged for purchases (and test credit card numbers will fail).** For best results, you should also have an account for the test Enterprise Business Center (``https://ebc2test.cybersource.com/ebc2/``). 
 
@@ -33,8 +33,8 @@ In Open edX
 2. Find a course from the `Course Overviews <http://edx.odl.local:18000/admin/course_overviews/courseoverview/>`_ page.
 3. Note the *Display name* and *Id* fields. 
 
-In MITxOnline
--------------
+In MITx Online
+--------------
 
 1. Log into the Django Admin interface.
 2. Under Courses, open Programs and add a Program. (The specifics here aren't important - there just needs to be a Program.)
@@ -48,12 +48,12 @@ In MITxOnline
 10. Under the Featured Products section, select Add. You will be given a button to choose a page, and the page chooser there should list the page you created. 
 11. Publish the Home Page when ready. 
 
-You should now be able to see the course under the hero image on the MITxOnline homepage, and navigating into the course should give you the option to Enroll. (At this point, you won't have a Product set up, so enrolling now should just enroll you in the course.)
+You should now be able to see the course under the hero image on the MITx Online homepage, and navigating into the course should give you the option to Enroll. (At this point, you won't have a Product set up, so enrolling now should just enroll you in the course.)
 
 Setting Up a Product
 ####################
 
-1. Log into MITxOnline Django Admin.
+1. Log into MITx Online Django Admin.
 2. Under Ecommerce, open Products and create a new Product. Set *Content type* to Course Run and *Object Id* to the ID of the course run you created earlier (it's probably 1 if you're working from a new install). Price should ideally be set to a non-zero value, that is less than $999, in RC/Sandbox environments. Description needs to be filled in but can be anything - for clarity, it's recommended to use the course name. Make sure Is active is checked.
 
 You should now be able to enroll in the upgraded course. 
