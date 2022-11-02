@@ -13,6 +13,7 @@ Welcome to MITx Online Documentation's documentation!
    authentication
    configuration/index
    ecommerce/index
+   commands/index
 
 Indices and tables
 ==================
