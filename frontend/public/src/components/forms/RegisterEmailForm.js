@@ -51,6 +51,14 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
           <p className="py-2">
             By creating an account I agree to the{" "}
             <a
+              href={routes.informationLinks.honorCode}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Honor Code
+            </a>
+            {", "}
+            <a
               href={routes.informationLinks.termsOfService}
               target="_blank"
               rel="noopener noreferrer"

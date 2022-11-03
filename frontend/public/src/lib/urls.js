@@ -43,6 +43,7 @@ export const routes = {
 
   informationLinks: include("", {
     termsOfService: "terms-of-service",
-    privacyPolicy:  "privacy-policy"
+    privacyPolicy:  "privacy-policy",
+    honorCode:      "honor-code"
   })
 }
