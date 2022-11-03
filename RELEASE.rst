@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.51.2
+--------------
+
+- Add honor code link to account creation dialog (#1187)
+
 Version 0.51.1 (Released November 02, 2022)
 --------------
 
