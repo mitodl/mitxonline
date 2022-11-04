@@ -3,7 +3,6 @@
 from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
@@ -13,7 +12,6 @@ from fsm_admin.mixins import FSMTransitionMixin
 from mitol.common.admin import TimestampedModelAdmin
 from reversion.admin import VersionAdmin
 
-from courses.models import CourseRun, ProgramRun
 from ecommerce.api import refund_order
 from ecommerce.forms import AdminRefundOrderForm
 from ecommerce.models import (
@@ -67,12 +65,7 @@ class ProductAdmin(VersionAdmin):
 
     def content_object(self, obj):
         """Return the content object details"""
-        if obj.content_type == ContentType.objects.get_for_model(CourseRun):
-            course_run = obj.purchasable_object
-            return f"{course_run.courseware_id} | {course_run.title}"
-        elif obj.content_type == ContentType.objects.get_for_model(ProgramRun):
-            program = obj.purchasable_object.program
-            return f"{program.readable_id} | {program.title}"
+        return str(obj.purchasable_object)
 
     def has_delete_permission(self, request, obj=None):
         """Disable the delete permission for Product models"""
