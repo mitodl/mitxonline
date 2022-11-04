@@ -1,35 +1,35 @@
 """Admin management for Ecommerce module"""
 
 from django.contrib import admin, messages
-from django.core.exceptions import ObjectDoesNotExist
-from django.shortcuts import render
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.views.generic import TemplateView
-from ecommerce.forms import AdminRefundOrderForm
-from ecommerce.models import BasketDiscount, Product, Basket, BasketItem, Transaction
 from django.contrib.admin.decorators import display
-from fsm_admin.mixins import FSMTransitionMixin
-from reversion.admin import VersionAdmin
-from mitol.common.admin import TimestampedModelAdmin
-from django.http import HttpResponse, HttpResponseRedirect
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.exceptions import ObjectDoesNotExist
+from django.http import HttpResponseRedirect
+from django.shortcuts import render
 from django.urls import reverse
+from django.views.generic import TemplateView
+from fsm_admin.mixins import FSMTransitionMixin
+from mitol.common.admin import TimestampedModelAdmin
+from reversion.admin import VersionAdmin
+
 from ecommerce.api import refund_order
-
-
+from ecommerce.forms import AdminRefundOrderForm
 from ecommerce.models import (
-    Product,
+    Basket,
+    BasketDiscount,
+    BasketItem,
+    CanceledOrder,
     Discount,
-    UserDiscount,
     DiscountProduct,
     DiscountRedemption,
+    FulfilledOrder,
+    Line,
     Order,
     PendingOrder,
-    CanceledOrder,
-    FulfilledOrder,
+    Product,
     RefundedOrder,
-    Line,
-    BasketDiscount,
     Transaction,
+    UserDiscount,
 )
 
 
@@ -46,8 +46,26 @@ class ProductAdmin(VersionAdmin):
     """Admin for Product"""
 
     model = Product
-    search_fields = ["description", "price"]
-    list_display = ["id", "description", "price", "is_active"]
+    search_fields = (
+        "description",
+        "courseruns__title",
+        "programruns__program__title",
+        "courseruns__courseware_id",
+        "programruns__program__readable_id",
+    )
+    list_display = ("id", "content_object", "description", "price", "is_active")
+    list_filter = ("content_type", "is_active")
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        product = Product.objects.get(id=object_id)
+        extra_context = {"subtitle": self.content_object(product)}
+        return super(ProductAdmin, self).change_view(
+            request, object_id, form_url, extra_context
+        )
+
+    def content_object(self, obj):
+        """Return the content object details"""
+        return str(obj.purchasable_object)
 
     def has_delete_permission(self, request, obj=None):
         """Disable the delete permission for Product models"""

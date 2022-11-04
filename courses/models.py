@@ -7,20 +7,20 @@ import uuid
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 from django.db.models import Q
 from django.db.models.constraints import CheckConstraint, UniqueConstraint
 from django.utils.functional import cached_property
-from django.contrib.contenttypes.models import ContentType
 from django_countries.fields import CountryField
-from treebeard.mp_tree import MP_Node
-
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
+from treebeard.mp_tree import MP_Node
+from wagtail.core.models import PageRevision
 
 from courses.constants import (
     ENROLL_CHANGE_STATUS_CHOICES,
@@ -31,8 +31,6 @@ from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENTS_PAID_MODES
 from openedx.utils import edx_redirect_url
-from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
-from wagtail.core.models import PageRevision
 
 User = get_user_model()
 
@@ -209,7 +207,7 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
         )
 
     def __str__(self):
-        return f"{self.program.readable_id} | {self.run_tag}"
+        return f"{self.program.readable_id} | {self.program.title}"
 
 
 class CourseTopic(TimestampedModel):
