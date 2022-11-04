@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.51.3
+Version 0.51.3 (Released November 04, 2022)
 --------------
 
 - Enhance Product admin search and List display (#1194)
