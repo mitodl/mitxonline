@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.52.0
+Version 0.52.0 (Released November 14, 2022)
 --------------
 
 - Fix issues with requirements admin assets
