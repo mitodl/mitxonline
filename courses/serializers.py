@@ -275,6 +275,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     end_date = serializers.SerializerMethodField()
     enrollment_start = serializers.SerializerMethodField()
     topics = serializers.SerializerMethodField()
+    requirements = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         """Serializer for courses"""
@@ -334,6 +335,23 @@ class ProgramSerializer(serializers.ModelSerializer):
         )
         return list(topics)
 
+    def get_requirements(self, instance):
+        formatted_reqs = {"required": [], "electives": []}
+
+        req_root = instance.get_requirements_root()
+
+        for node in req_root.get_children():
+            if node.operator == models.ProgramRequirement.Operator.ALL_OF:
+                formatted_reqs["required"] = [
+                    req.course.id for req in node.get_children()
+                ]
+            else:
+                formatted_reqs["electives"] = [
+                    req.course.id for req in node.get_children()
+                ]
+
+        return formatted_reqs
+
     class Meta:
         model = models.Program
         fields = [
@@ -345,6 +363,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "end_date",
             "enrollment_start",
             "topics",
+            "requirements",
         ]
 
 
@@ -354,6 +373,14 @@ class CourseRunCertificateSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.CourseRunCertificate
         fields = ["uuid", "link"]
+
+
+class CourseRunGradeSerializer(serializers.ModelSerializer):
+    """CourseRunGrade serializer"""
+
+    class Meta:
+        model = models.CourseRunGrade
+        fields = ["grade", "letter_grade", "passed", "set_by_admin", "grade_percent"]
 
 
 class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
@@ -366,6 +393,7 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
         (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
     )
     approved_flexible_price_exists = serializers.SerializerMethodField()
+    grades = serializers.SerializerMethodField(read_only=True)
 
     def create(self, validated_data):
         user = self.context["user"]
@@ -423,6 +451,19 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
         )
         return flexible_price_exists
 
+    def get_grades(self, instance):
+        instance_run = instance[0].run if isinstance(instance, list) else instance.run
+        instance_user = (
+            instance[0].user if isinstance(instance, list) else instance.user
+        )
+
+        return CourseRunGradeSerializer(
+            instance=models.CourseRunGrade.objects.filter(
+                user=instance_user, course_run=instance_run
+            ).all(),
+            many=True,
+        ).data
+
     class Meta:
         model = models.CourseRunEnrollment
         fields = [
@@ -433,6 +474,7 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
             "certificate",
             "enrollment_mode",
             "approved_flexible_price_exists",
+            "grades",
         ]
 
 

@@ -899,3 +899,117 @@ def test_courses_in_program(program_with_requirements):
         + program_with_requirements.elective_courses
         + program_with_requirements.mut_exclusive_courses
     )
+
+
+def test_program_add_requirement():
+    """
+    Tests the add_requirement convenience function.
+
+    It should only add the course to the ALL_OF operator node, and not create
+    duplicate nodes. It should create the root node if there isn't one already.
+    """
+    program = ProgramFactory.create()
+    course = CourseFactory.create(program=program)
+
+    def add_and_check():
+        program.add_requirement(course)
+        program.refresh_from_db()
+
+        assert (
+            program.get_requirements_root()
+            .get_descendants()
+            .filter(course=course)
+            .count()
+            > 0
+        )
+
+        required_root = (
+            program.get_requirements_root()
+            .get_children()
+            .filter(operator=ProgramRequirement.Operator.ALL_OF)
+            .first()
+        )
+
+        assert required_root is not None
+
+        required_course_ids = (
+            required_root.get_children().values_list("course", flat=True)
+            if required_root
+            else []
+        )
+
+        elective_root = (
+            program.get_requirements_root()
+            .get_children()
+            .filter(operator=ProgramRequirement.Operator.MIN_NUMBER_OF)
+            .first()
+        )
+
+        elective_course_ids = (
+            elective_root.get_children().values_list("course", flat=True)
+            if elective_root
+            else []
+        )
+
+        assert course.id in required_course_ids
+        assert course.id not in elective_course_ids
+
+    add_and_check()
+    add_and_check()
+
+
+def test_program_add_elective():
+    """
+    Tests the add_elective convenience function.
+
+    It should only add the course to the MIN_NUMBER_OF operator node, and not
+    create duplicate nodes. It should create the root node if there isn't one already.
+    """
+    program = ProgramFactory.create()
+    course = CourseFactory.create(program=program)
+
+    def add_and_check():
+        program.add_elective(course)
+        program.refresh_from_db()
+
+        assert (
+            program.get_requirements_root()
+            .get_descendants()
+            .filter(course=course)
+            .count()
+            > 0
+        )
+
+        elective_root = (
+            program.get_requirements_root()
+            .get_children()
+            .filter(operator=ProgramRequirement.Operator.MIN_NUMBER_OF)
+            .first()
+        )
+
+        assert elective_root is not None
+
+        elective_course_ids = (
+            elective_root.get_children().values_list("course", flat=True)
+            if elective_root
+            else []
+        )
+
+        required_root = (
+            program.get_requirements_root()
+            .get_children()
+            .filter(operator=ProgramRequirement.Operator.ALL_OF)
+            .first()
+        )
+
+        required_course_ids = (
+            required_root.get_children().values_list("course", flat=True)
+            if required_root
+            else []
+        )
+
+        assert course.id not in required_course_ids
+        assert course.id in elective_course_ids
+
+    add_and_check()
+    add_and_check()
