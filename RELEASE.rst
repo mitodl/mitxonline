@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.53.0
+--------------
+
+- added migration to import program enrollments from MicroMaster
+
 Version 0.52.0 (Released November 14, 2022)
 --------------
 
