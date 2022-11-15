@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.53.1
+--------------
+
+- Fix accidental deletion of requirements
+
 Version 0.53.0 (Released November 14, 2022)
 --------------
 
