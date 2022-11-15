@@ -33,7 +33,8 @@ import {
   isFinancialAssistanceAvailable,
   isLinkableCourseRun,
   generateStartDateText,
-  courseRunStatusMessage
+  courseRunStatusMessage,
+  enrollmentHasPassingGrade
 } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
@@ -50,7 +51,8 @@ type EnrolledItemCardProps = {
   ) => Promise<any>,
   addUserNotification: Function,
   isLoading: boolean,
-  toggleProgramDrawer: Function | null
+  toggleProgramDrawer: Function | null,
+  isProgramCard: boolean
 }
 
 type EnrolledItemCardState = {
@@ -262,7 +264,7 @@ export class EnrolledItemCard extends React.Component<
   }
 
   renderCourseEnrollment() {
-    const { enrollment, currentUser } = this.props
+    const { enrollment, currentUser, isProgramCard } = this.props
 
     const { menuVisibility } = this.state
 
@@ -285,11 +287,19 @@ export class EnrolledItemCard extends React.Component<
           Financial assistance?
           </a>
         ) : null
+
+    const certificateLinksStyles = isProgramCard
+      ? "upgrade-item-description detail d-md-flex justify-content-between pb-2 flex-column px-4"
+      : "upgrade-item-description detail d-md-flex justify-content-between pb-2"
+    const certificateLinksIntStyles = isProgramCard
+      ? "enrollment-extra-links d-flex d-md-flex w-100 justify-content-center"
+      : "enrollment-extra-links d-flex d-md-flex col-auto pr-0 justify-content-end"
+
     const certificateLinks =
       enrollment.run.products.length > 0 &&
       enrollment.enrollment_mode === "audit" &&
       enrollment.run.is_upgradable ? (
-          <div className="upgrade-item-description detail d-md-flex justify-content-between pb-2">
+          <div className={certificateLinksStyles}>
             <div className="mr-0">
               <p>
                 <strong>Upgrade today</strong> and, upon passing, receive your
@@ -297,7 +307,7 @@ export class EnrolledItemCard extends React.Component<
               skills you've gained from this MITx course.
               </p>
             </div>
-            <div className="enrollment-extra-links d-flex d-md-flex justify-content-end col-auto pr-0">
+            <div className={certificateLinksIntStyles}>
               <div className="pr-4 my-auto">{financialAssistanceLink}</div>
               <div className="my-auto">
                 <GetCertificateButton productId={enrollment.run.products[0].id} />
@@ -313,6 +323,8 @@ export class EnrolledItemCard extends React.Component<
     const menuTitle = `Course options for ${enrollment.run.course.title}`
 
     const courseRunStatusMessageText = courseRunStatusMessage(enrollment.run)
+
+    const hasPassed = enrollmentHasPassingGrade(enrollment)
 
     return (
       <div
@@ -344,8 +356,30 @@ export class EnrolledItemCard extends React.Component<
           )}
 
           <div className="col-12 col-md px-3 py-3 py-md-0 box">
-            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
-              <h2 className="my-0 mr-3">{title}</h2>
+            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100">
+              <div className="d-flex flex-column">
+                <div className="align-content-start d-flex enrollment-mode-container flex-wrap pb-1">
+                  {hasPassed ? (
+                    <span className="badge badge-enrolled-passed mr-2">
+                      <img src="/static/images/done.svg" alt="Check" /> Course
+                      passed
+                    </span>
+                  ) : null}
+                  {enrollment.enrollment_mode === "verified" ? (
+                    <span className="badge badge-enrolled-verified mr-2">
+                      Enrolled in certificate track
+                    </span>
+                  ) : null}
+                  {startDateDescription !== null &&
+                  startDateDescription.active ? (
+                      <span className="badge badge-in-progress mr-2">
+                      In Progress
+                      </span>
+                    ) : null}
+                </div>
+
+                <h2 className="my-0 mr-3">{title}</h2>
+              </div>
               <Dropdown
                 isOpen={menuVisibility}
                 toggle={this.toggleMenuVisibility.bind(this)}

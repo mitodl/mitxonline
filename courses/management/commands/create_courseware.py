@@ -4,7 +4,11 @@ a course run).
 """
 from django.core.management import BaseCommand
 
-from courses.models import Program, Course, CourseRun
+from courses.models import (
+    Program,
+    Course,
+    CourseRun,
+)
 
 
 class Command(BaseCommand):
@@ -98,7 +102,39 @@ class Command(BaseCommand):
             help="(Course only) The position the course should be in the program.",
         )
 
+        parser.add_argument(
+            "--required",
+            help="(Course only) Make the course a requirement of the program.",
+            action="store_true",
+        )
+
+        parser.add_argument(
+            "--elective",
+            help="(Course only) Make the course an elective of the program.",
+            action="store_true",
+        )
+
+        parser.add_argument(
+            "--force",
+            "-f",
+            help="Ignore some checks (swapped ID and title, requirements without live flag)",
+            action="store_true",
+            dest="force",
+        )
+
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+        if not (
+            kwargs["force"]
+            or kwargs["courseware_id"].startswith("course")
+            or kwargs["courseware_id"].startswith("program")
+        ):
+            self.stderr.write(
+                self.style.ERROR(
+                    f"Object ID \"{kwargs['courseware_id']}\" would be named \"{kwargs['title']}\" - you might have your ID and title options swapped. Use --force to force creation anyway."
+                )
+            )
+            exit(-1)
+
         if kwargs["type"] == "program":
             if Program.objects.filter(readable_id=kwargs["courseware_id"]).exists():
                 self.stderr.write(
@@ -156,6 +192,32 @@ class Command(BaseCommand):
                 run_id = f"{new_course.readable_id}+{kwargs['create_run']}"
 
                 self.create_course_run(new_course, **kwargs)
+
+            if kwargs["live"] or kwargs["force"]:
+                if kwargs["force"]:
+                    self.stderr.write(
+                        self.style.ERROR(
+                            f"WARNING: creating a requirement for {new_course.readable_id} anyway since you specified --force. This will probably break the Django Admin until you set the course to Live."
+                        )
+                    )
+
+                new_req = None
+
+                if program is not None and kwargs["required"]:
+                    new_req = program.add_requirement(new_course)
+                elif program is not None and kwargs["elective"]:
+                    new_req = program.add_elective(new_course)
+
+                if new_req is not None:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Added {new_course.readable_id} to {program.readable_id}'s {new_req.get_parent().title} requirements."
+                        )
+                    )
+            else:
+                self.stdout.write(
+                    f"Live flag not specified for {new_course.readable_id}, ignoring any requirements flags"
+                )
         elif kwargs["type"] == "courserun":
             if not Course.objects.filter(readable_id=kwargs["courseware_id"]).exists():
                 self.stderr.write(

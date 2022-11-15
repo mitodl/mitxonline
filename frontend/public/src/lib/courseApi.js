@@ -6,7 +6,11 @@ import { isNil } from "ramda"
 import { notNil, parseDateString, formatPrettyDateTimeAmPmTz } from "./util"
 
 import type Moment from "moment"
-import type { CourseRunDetail, CourseRun } from "../flow/courseTypes"
+import type {
+  CourseRunDetail,
+  CourseRun,
+  RunEnrollment
+} from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
 
 export const isLinkableCourseRun = (
@@ -44,14 +48,17 @@ export const courseRunStatusMessage = (run: CourseRun) => {
         return (
           <span>
             {" "}
-            | <b>Ended</b> - {formatPrettyDateTimeAmPmTz(dateString)}
+            | <strong>Ended</strong> - {formatPrettyDateTimeAmPmTz(dateString)}
           </span>
         )
       } else {
         return (
           <span>
             {" "}
-            |<strong> Active</strong> - {startDateDescription.datestr}
+            |<strong className="active-enrollment-text">
+              {" "}
+              Active
+            </strong> from {startDateDescription.datestr}
           </span>
         )
       }
@@ -59,7 +66,8 @@ export const courseRunStatusMessage = (run: CourseRun) => {
       return (
         <span>
           {" "}
-          | <b>Starts</b> - {startDateDescription.datestr}
+          | <strong className="text-dark">Starts</strong>{" "}
+          {startDateDescription.datestr}
         </span>
       )
     }
@@ -83,4 +91,16 @@ export const generateStartDateText = (run: CourseRunDetail) => {
 
 export const isFinancialAssistanceAvailable = (run: CourseRunDetail) => {
   return run.page ? !!run.page.financial_assistance_form_url : false
+}
+
+export const enrollmentHasPassingGrade = (enrollment: RunEnrollment) => {
+  if (enrollment.grades && enrollment.grades.length > 0) {
+    for (let i = 0; i < enrollment.grades.length; i++) {
+      if (enrollment.grades[i].passed) {
+        return true
+      }
+    }
+  }
+
+  return false
 }

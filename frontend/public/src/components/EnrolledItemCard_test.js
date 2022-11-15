@@ -62,6 +62,7 @@ describe("EnrolledItemCard", () => {
           addUserNotification={enrollmentCardProps.addUserNotification}
           toggleProgramDrawer={toggleProgramDrawer}
           isLoading={false}
+          isProgramCard={false}
         />
       )
   })

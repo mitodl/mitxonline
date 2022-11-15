@@ -1,7 +1,7 @@
 // @flow
 import React from "react"
 
-import { generateStartDateText } from "../lib/courseApi"
+import { generateStartDateText, courseRunStatusMessage } from "../lib/courseApi"
 
 import type { CourseDetailWithRuns } from "../flow/courseTypes"
 
@@ -13,16 +13,28 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
   render() {
     const { course } = this.props
 
-    let startDateDescription = null
     let featuredImage = null
     let courseDetailsPage = null
+    let financialAssistanceForm = null
+    let courseRunStatusMessageText = null
+    let courseRunStatusDetail = null
 
     if (course.courseruns.length > 0) {
-      startDateDescription = generateStartDateText(course.courseruns[0])
+      courseRunStatusDetail = generateStartDateText(course.courseruns[0])
+
+      if (courseRunStatusDetail) {
+        courseRunStatusMessageText = courseRunStatusMessage(
+          course.courseruns[0]
+        )
+      }
 
       if (course.courseruns[0].page) {
         courseDetailsPage = course.courseruns[0].page.page_url
       }
+    }
+
+    if (course.financial_assistance_form_url) {
+      financialAssistanceForm = course.financial_assistance_form_url
     }
 
     if (course.feature_image_src) {
@@ -43,23 +55,22 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
         <div className="row flex-grow-1">
           {featuredImage}
           <div className="col-12 col-md px-3 py-3 py-md-0 box">
-            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
+            <div className="align-content-start d-flex enrollment-mode-container w-100">
+              {courseRunStatusDetail !== null &&
+              courseRunStatusDetail.active ? (
+                  <span className="badge badge-in-progress mr-2">
+                  In Progress
+                  </span>
+                ) : null}
+            </div>
+            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container flex-wrap pb-1">
               <h2 className="my-0 mr-3">{course.title}</h2>
             </div>
             <div className="detail pt-1">
               {course.readable_id.split("+")[1] || course.readable_id}
-              {startDateDescription !== null && startDateDescription.active ? (
-                <span> | Starts - {startDateDescription.datestr}</span>
-              ) : (
-                <span>
-                  {startDateDescription === null ? null : (
-                    <span>
-                      <strong>Active</strong> from{" "}
-                      {startDateDescription.datestr}
-                    </span>
-                  )}
-                </span>
-              )}
+              {courseRunStatusDetail !== null
+                ? courseRunStatusMessageText
+                : null}
               <div className="enrollment-extra-links d-flex">
                 {courseDetailsPage ? (
                   <a href={courseDetailsPage}>Course details</a>
@@ -70,7 +81,32 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
           </div>
         </div>
         <div className="row flex-grow-1 pt-3">
-          <div className="col pl-0 pr-0">{null}</div>
+          <div className="col pl-0 pr-0">
+            <div className="upgrade-item-description detail d-md-flex flex-column px-4 justify-content-between pb-3">
+              <div className=" w-100 ">
+                <strong>Enroll today</strong> for free, and start learning from
+                MIT faculty. Courses are always free until you want to get a
+                certificate.
+              </div>
+              <div className="enrollment-extra-links d-flex d-md-flex justify-content-center w-100">
+                <div className="pr-4 my-auto">
+                  {financialAssistanceForm ? (
+                    <a href={financialAssistanceForm}>Financial assistance?</a>
+                  ) : null}
+                </div>
+                <div className="my-auto">
+                  <form method="get" action={courseDetailsPage}>
+                    <button
+                      type="submit"
+                      className="btn btn-primary btn-gradient-red"
+                    >
+                      Enroll
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )

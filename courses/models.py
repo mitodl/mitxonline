@@ -7,7 +7,6 @@ import uuid
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
@@ -166,6 +165,65 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             query = query.select_for_update()
 
         return query.first()
+
+    def _add_course_node(self, node_type, min_courses=1):
+        """
+        Adds the given course node type to the root of the requirements tree, or
+        returns the existing node if there is one.
+
+        Arguments:
+        - node_type (str): one of the ProgramRequirement.Operator constants
+        - min_courses (int): number of courses to require (for electives)
+        Returns:
+        - ProgramRequirement: the node you requested
+        """
+        node = (
+            self.get_requirements_root()
+            .get_children()
+            .filter(operator=node_type)
+            .first()
+        )
+
+        if node is None:
+            if node_type == ProgramRequirement.Operator.MIN_NUMBER_OF:
+                node = self.get_requirements_root().add_child(
+                    node_type=ProgramRequirementNodeType.OPERATOR,
+                    operator=node_type,
+                    title="Elective Courses",
+                    operator_value=min_courses,
+                )
+            else:
+                node = self.get_requirements_root().add_child(
+                    node_type=ProgramRequirementNodeType.OPERATOR,
+                    operator=node_type,
+                    title="Required Courses",
+                )
+
+            node.save()
+            node.refresh_from_db()
+
+        return node
+
+    def add_requirement(self, course):
+        """Makes the specified course a required course"""
+
+        self.get_requirements_root().get_children().filter(course=course).delete()
+
+        new_req = self._add_course_node(ProgramRequirement.Operator.ALL_OF).add_child(
+            course=course, node_type=ProgramRequirementNodeType.COURSE
+        )
+
+        return new_req
+
+    def add_elective(self, course):
+        """Makes the specified course an elective course"""
+        self.get_requirements_root().get_children().filter(course=course).delete()
+
+        new_req = self._add_course_node(
+            ProgramRequirement.Operator.MIN_NUMBER_OF
+        ).add_child(course=course, node_type=ProgramRequirementNodeType.COURSE)
+
+        return new_req
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

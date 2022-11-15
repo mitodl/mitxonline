@@ -2,6 +2,7 @@ import React from "react"
 
 import EnrolledItemCard from "./EnrolledItemCard"
 import ProgramCourseInfoCard from "./ProgramCourseInfoCard"
+import { enrollmentHasPassingGrade } from "../lib/courseApi"
 
 import type {
   ProgramEnrollment,
@@ -19,8 +20,6 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     const { enrollment } = this.props
     let found = undefined
 
-    console.log(`course is ${course.title} - ${course.readable_id}`)
-
     for (let i = 0; i < course.courseruns.length; i++) {
       found = enrollment.enrollments.find(
         elem => elem.run.id === course.courseruns[i].id
@@ -28,10 +27,48 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     }
 
     if (found === undefined) {
-      return <ProgramCourseInfoCard course={course}></ProgramCourseInfoCard>
+      return (
+        <ProgramCourseInfoCard
+          key={course.readable_id}
+          course={course}
+        ></ProgramCourseInfoCard>
+      )
     }
 
-    return null
+    return (
+      <EnrolledItemCard
+        key={found.readable_id}
+        enrollment={found}
+        isProgramCard={true}
+      ></EnrolledItemCard>
+    )
+  }
+
+  isRequired(course) {
+    const { enrollment } = this.props
+
+    return enrollment.program.requirements.required.indexOf(course.id) >= 0
+  }
+
+  isElective(course) {
+    const { enrollment } = this.props
+
+    return enrollment.program.requirements.electives.indexOf(course.id) >= 0
+  }
+
+  passedCount() {
+    const { enrollment } = this.props
+
+    let i = 0
+    let passedFlags = 0
+
+    for (i = 0; i < enrollment.enrollments.length; i++) {
+      if (enrollmentHasPassingGrade(enrollment.enrollments[i])) {
+        passedFlags++
+      }
+    }
+
+    return passedFlags
   }
 
   render() {
@@ -47,6 +84,8 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
       ? "drawer-background open"
       : "drawer-background"
     const drawerClass = `nav-drawer ${isHidden ? "open" : "closed"}`
+
+    const passedCourses = enrollment === null ? null : this.passedCount()
 
     return enrollment === null ? null : (
       <>
@@ -76,37 +115,36 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
               </button>
             </div>
             <div className="row chrome" id="program_enrollment_subtite">
-              <h5>
-                {enrollment.program.courses.length} courses |{" "}
-                {enrollment.enrollments.length} enrolled
-              </h5>
+              <p>
+                Program overview: {enrollment.program.courses.length} courses |{" "}
+                {passedCourses} passed |{" "}
+                {enrollment.program.courses.length -
+                  enrollment.enrollments.length}{" "}
+                not enrolled
+              </p>
             </div>
             <div className="row enrolled-items" id="program_enrolled_items">
-              <h5>ENROLLED ({enrollment.enrollments.length})</h5>
-              {enrollment.enrollments.length > 0
-                ? enrollment.enrollments.map(enrollment => (
-                  <EnrolledItemCard
-                    key={enrollment.id}
-                    enrollment={enrollment}
-                  ></EnrolledItemCard>
-                ))
-                : null}
-            </div>
-            {enrollment.program.courses.length - enrollment.enrollments.length >
-            0 ? (
-                <div className="row enrolled-items" id="program_unenrolled_items">
-                  <h5>
-                  AVAILABLE (
-                    {enrollment.program.courses.length -
-                    enrollment.enrollments.length}
-                  )
-                  </h5>
+              <h6>
+                REQUIRED ({enrollment.program.requirements.required.length})
+              </h6>
 
-                  {enrollment.program.courses.map(course =>
-                    this.renderCourseInfoCard(course)
-                  )}
-                </div>
-              ) : null}
+              {enrollment.program.courses.map(courseEnrollment =>
+                this.isRequired(courseEnrollment)
+                  ? this.renderCourseInfoCard(courseEnrollment)
+                  : null
+              )}
+            </div>
+            <div className="row enrolled-items" id="program_unenrolled_items">
+              <h6>
+                OPTIONAL ({enrollment.program.requirements.electives.length})
+              </h6>
+
+              {enrollment.program.courses.map(courseEnrollment => {
+                return this.isElective(courseEnrollment)
+                  ? this.renderCourseInfoCard(courseEnrollment)
+                  : null
+              })}
+            </div>
           </div>
         </div>
       </>

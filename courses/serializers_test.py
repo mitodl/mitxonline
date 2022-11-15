@@ -19,6 +19,7 @@ from courses.factories import (
     CourseRunFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
+    CourseRunGradeFactory,
 )
 from courses.models import CourseTopic, ProgramRequirement, ProgramRequirementNodeType
 from courses.serializers import (
@@ -32,6 +33,7 @@ from courses.serializers import (
     ProgramSerializer,
     ProgramRequirementSerializer,
     ProgramRequirementTreeSerializer,
+    CourseRunGradeSerializer,
 )
 from ecommerce.serializers import BaseProductSerializer
 from ecommerce.factories import ProductFactory
@@ -70,6 +72,16 @@ def test_serialize_program(mock_context):
 
     data = ProgramSerializer(instance=program, context=mock_context).data
 
+    formatted_reqs = {"required": [], "electives": []}
+
+    req_root = program.get_requirements_root()
+
+    for node in req_root.get_children():
+        if node.operator == ProgramRequirement.Operator.ALL_OF:
+            formatted_reqs["required"] = [req.course.id for req in node.get_children()]
+        else:
+            formatted_reqs["electives"] = [req.course.id for req in node.get_children()]
+
     assert_drf_json_equal(
         data,
         {
@@ -90,6 +102,7 @@ def test_serialize_program(mock_context):
                 sorted(runs, key=lambda run: run.enrollment_start)[0].enrollment_start
             ),
             "topics": [{"name": topic.name} for topic in topics],
+            "requirements": formatted_reqs,
         },
     )
 
@@ -268,6 +281,7 @@ def test_serialize_course_run_enrollments(settings, receipts_enabled):
         "enrollment_mode": "audit",
         "certificate": None,
         "approved_flexible_price_exists": False,
+        "grades": [],
     }
 
 
@@ -318,7 +332,9 @@ def test_serialize_program_enrollments(settings, receipts_enabled):
 
 
 @pytest.mark.parametrize("approved_flexible_price_exists", [True, False])
-def test_serialize_course_run_enrollments(approved_flexible_price_exists):
+def test_serialize_course_run_enrollments_with_flexible_pricing(
+    approved_flexible_price_exists,
+):
     """Test that CourseRunEnrollmentSerializer has correct data"""
     course_run_enrollment = CourseRunEnrollmentFactory.create()
     if approved_flexible_price_exists:
@@ -339,6 +355,27 @@ def test_serialize_course_run_enrollments(approved_flexible_price_exists):
         "enrollment_mode": "audit",
         "approved_flexible_price_exists": approved_flexible_price_exists,
         "certificate": None,
+        "grades": [],
+    }
+
+
+def test_serialize_course_run_enrollments_with_grades():
+    """Test that CourseRunEnrollmentSerializer has correct data"""
+    course_run_enrollment = CourseRunEnrollmentFactory.create()
+
+    grade = CourseRunGradeFactory.create(
+        course_run=course_run_enrollment.run, user=course_run_enrollment.user
+    )
+
+    serialized_data = CourseRunEnrollmentSerializer(course_run_enrollment).data
+    assert serialized_data == {
+        "run": CourseRunDetailSerializer(course_run_enrollment.run).data,
+        "id": course_run_enrollment.id,
+        "edx_emails_subscription": True,
+        "enrollment_mode": "audit",
+        "approved_flexible_price_exists": False,
+        "certificate": None,
+        "grades": CourseRunGradeSerializer([grade], many=True).data,
     }
 
 
