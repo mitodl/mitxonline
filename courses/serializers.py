@@ -591,7 +591,7 @@ class ProgramRequirementTreeSerializer(serializers.ListSerializer):
 
         This is inspired by the load_bulk method, but that method is an append-only operation and doesn't update existing records
         """
-        keep_node_ids = [instance.id]
+        keep_node_ids = []
 
         def _get_existing(data):
             node_id = data.get("id", None)
@@ -660,8 +660,8 @@ class ProgramRequirementTreeSerializer(serializers.ListSerializer):
 
         _update(instance, validated_data)
 
-        # delete everything that didn't show up in the input
-        models.ProgramRequirement.objects.exclude(id__in=keep_node_ids).delete()
+        # delete all descendants that didn't show up in the input
+        instance.get_descendants().exclude(id__in=keep_node_ids).delete()
 
         instance.refresh_from_db()
 

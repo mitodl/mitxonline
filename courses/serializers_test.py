@@ -21,7 +21,7 @@ from courses.factories import (
     ProgramFactory,
     CourseRunGradeFactory,
 )
-from courses.models import CourseTopic, ProgramRequirementNodeType, ProgramRequirement
+from courses.models import CourseTopic, ProgramRequirement, ProgramRequirementNodeType
 from courses.serializers import (
     BaseCourseSerializer,
     BaseProgramSerializer,
@@ -449,3 +449,42 @@ def test_program_requirement_tree_serializer_valid():
     )
     serializer.is_valid(raise_exception=True)
     serializer.save()
+
+
+def test_program_requirement_deletion():
+    """Verify that saving the requirements for one program doesn't affect other programs"""
+
+    courses = CourseFactory.create_batch(3)
+
+    program1 = ProgramFactory.create()
+    program2 = ProgramFactory.create()
+    root1 = program1.requirements_root
+    root2 = program2.requirements_root
+
+    for root in [root1, root2]:
+        program = root.program
+        # build the same basic tree structure for both
+        required = root.add_child(
+            program=program,
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            title="Required",
+            operator=ProgramRequirement.Operator.ALL_OF,
+        )
+        for course in courses:
+            required.add_child(
+                program=program,
+                node_type=ProgramRequirementNodeType.COURSE,
+                course=course,
+            )
+
+    expected = list(ProgramRequirement.get_tree(parent=root2))
+
+    # this will delete everything under this tree
+    serializer = ProgramRequirementTreeSerializer(instance=root1, data=[])
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+
+    assert list(ProgramRequirement.get_tree(parent=root1)) == [
+        root1
+    ]  # just the one root node
+    assert list(ProgramRequirement.get_tree(parent=root2)) == expected
