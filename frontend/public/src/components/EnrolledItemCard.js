@@ -298,7 +298,7 @@ export class EnrolledItemCard extends React.Component<
               </p>
             </div>
             <div className="enrollment-extra-links d-flex d-md-flex justify-content-end col-auto pr-0">
-              <div className="pr-4 my-auto">{financialAssistanceLink}</div>
+              <div className="pr-2 my-auto">{financialAssistanceLink}</div>
               <div className="my-auto">
                 <GetCertificateButton productId={enrollment.run.products[0].id} />
               </div>
@@ -388,7 +388,7 @@ export class EnrolledItemCard extends React.Component<
               {courseRunStatusMessageText}
               <div className="enrollment-extra-links d-flex">
                 {pageLocation ? (
-                  <a className="pr-4" href={pageLocation.page_url}>
+                  <a className="pr-2" href={pageLocation.page_url}>
                     Course details
                   </a>
                 ) : null}
