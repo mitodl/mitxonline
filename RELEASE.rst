@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.53.2
+--------------
+
+- Re-groups enrollments in the program drawer and adds tags back to enrollments
+
 Version 0.53.1 (Released November 15, 2022)
 --------------
 
