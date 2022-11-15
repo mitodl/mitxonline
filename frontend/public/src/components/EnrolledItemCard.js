@@ -388,7 +388,9 @@ export class EnrolledItemCard extends React.Component<
               {courseRunStatusMessageText}
               <div className="enrollment-extra-links d-flex">
                 {pageLocation ? (
-                  <a className="pr-4" href={pageLocation.page_url}>Course details</a>
+                  <a className="pr-4" href={pageLocation.page_url}>
+                    Course details
+                  </a>
                 ) : null}
                 {enrollment.certificate ? (
                   <a
@@ -479,7 +481,9 @@ export class EnrolledItemCard extends React.Component<
                   {enrollment.program.courses.length > 1 ? "s" : null}
                 </a>
                 {pageLocation ? (
-                  <a className="pr-2" href={pageLocation.page_url}>Course details</a>
+                  <a className="pr-2" href={pageLocation.page_url}>
+                    Course details
+                  </a>
                 ) : null}
                 {enrollment.certificate ? (
                   <a
