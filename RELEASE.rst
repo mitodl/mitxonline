@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.53.2
+Version 0.53.2 (Released November 16, 2022)
 --------------
 
 - Adds some code to walk the requirements tree if there are nested operators
