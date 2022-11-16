@@ -422,7 +422,9 @@ export class EnrolledItemCard extends React.Component<
               {courseRunStatusMessageText}
               <div className="enrollment-extra-links d-flex">
                 {pageLocation ? (
-                  <a href={pageLocation.page_url}>Course details</a>
+                  <a className="pr-2" href={pageLocation.page_url}>
+                    Course details
+                  </a>
                 ) : null}
                 {enrollment.certificate ? (
                   <a
@@ -500,13 +502,22 @@ export class EnrolledItemCard extends React.Component<
               {courseId}
               {startDateDescription === null}
               {courseRunStatusMessageText}
-              <div className="enrollment-extra-links d-flex">
-                <span className="program-course-count">
+              <div className="enrollment-extra-links d-flex pr-2">
+                <a
+                  className="program-course-count pr-2"
+                  rel="noopener noreferrer"
+                  href="#program_enrollment_drawer"
+                  aria-flowto="program_enrollment_drawer"
+                  aria-haspopup="dialog"
+                  onClick={() => this.toggleProgramInfo()}
+                >
                   {enrollment.program.courses.length} course
                   {enrollment.program.courses.length > 1 ? "s" : null}
-                </span>
+                </a>
                 {pageLocation ? (
-                  <a href={pageLocation.page_url}>Course details</a>
+                  <a className="pr-2" href={pageLocation.page_url}>
+                    Course details
+                  </a>
                 ) : null}
                 {enrollment.certificate ? (
                   <a
