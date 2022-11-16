@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.53.2
+--------------
+
+- Adds some code to walk the requirements tree if there are nested operators
+- removes ol-django openedx from test_requirements, updates other requirements to get google-sheets-refunds 0.7.0
+- Re-groups enrollments in the program drawer and adds tags back to enrollments
+
 Version 0.53.1 (Released November 15, 2022)
 --------------
 
