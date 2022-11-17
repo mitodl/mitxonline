@@ -219,15 +219,15 @@ class ProgramAdminForm(ModelForm):
 
     def save(self, commit=True):
         """Save requirements"""
+        # django-admin calls this commit=False, so it doesn't commit, but django-admin needs to call commit=False
+        # because that adds the save_m2m method which django-admin expects
         program = super().save(commit=commit)
-        with transaction.atomic():
-            root = program.get_requirements_root(for_update=True)
 
-            if root is None:
-                root = ProgramRequirement.add_root(
-                    program=program,
-                    node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value,
-                )
+        with transaction.atomic():
+            # subsequently perform an actual save so that we have a pk for new programs
+            program.save()
+
+            root = program.get_requirements_root(for_update=True)
 
             serializer = ProgramRequirementTreeSerializer(
                 root,

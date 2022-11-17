@@ -225,14 +225,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
         return new_req
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-
-        if not ProgramRequirement.get_root_nodes().filter(program=self).exists():
-            ProgramRequirement.add_root(
-                program=self, node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value
-            )
-
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."
