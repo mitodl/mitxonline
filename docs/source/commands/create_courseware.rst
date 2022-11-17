@@ -12,7 +12,7 @@ This will not run ``sync_course_run`` for you, so for best results, ensure the c
 Syntax
 ------
 
-``create_courseware <object> <readable id> <title> [--live] [--self-paced] [--create-run [create_run]] [--run-url [RUN_URL]] [--program [PROGRAM]] [--program-position [PROGRAM_POSITION]] [--run-tag [run-tag]] [--required] [--elective] [--force]``
+``create_courseware <object> <readable id> <title> [--live] [--self-paced] [--create-run [create_run]] [--run-url [RUN_URL]] [--program [PROGRAM]] [--program-position [PROGRAM_POSITION]] [--run-tag [run-tag]] [--required] [--elective] [--force] [--start <date>] [--end <date>] [--enrollment-start <date>] [--enrollment-end <date>] [--upgrade <date>]``
 
 Checks
 ------
@@ -51,4 +51,8 @@ Course runs can take the following options:
 * ``--program-position <PROGRAM_POSITION>`` - The program position to set (default none).
 * ``--run-url <url>`` - The courseware URL for the course run.
 * ``--self-paced`` - The course run is self-paced.
-
+* ``--start <date>`` - The date the course run should start.
+* ``--end <date>`` - The date the course run should end.
+* ``--enrollment-start <date>`` - The date the course run enrollment should start.
+* ``--enrollment-end <date>`` - The date the course run enrollment should end.
+* ``--upgrade <date>`` - The date after which course run enrollments should not be possible.

@@ -4,11 +4,8 @@ a course run).
 """
 from django.core.management import BaseCommand
 
-from courses.models import (
-    Program,
-    Course,
-    CourseRun,
-)
+from courses.models import Course, CourseRun, Program
+from main.utils import parse_supplied_date
 
 
 class Command(BaseCommand):
@@ -39,6 +36,19 @@ class Command(BaseCommand):
             courseware_url_path=kwargs["run_url"],
             live=kwargs["live"],
             is_self_paced=kwargs["self_paced"],
+            start_date=parse_supplied_date(kwargs["start"])
+            if kwargs["start"]
+            else None,
+            end_date=parse_supplied_date(kwargs["end"]) if kwargs["end"] else None,
+            enrollment_start=parse_supplied_date(kwargs["enrollment_start"])
+            if kwargs["enrollment_start"]
+            else None,
+            enrollment_end=parse_supplied_date(kwargs["enrollment_end"])
+            if kwargs["enrollment_end"]
+            else None,
+            upgrade_deadline=parse_supplied_date(kwargs["upgrade"])
+            if kwargs["upgrade"]
+            else None,
         )
 
         self.stdout.write(
@@ -86,6 +96,41 @@ class Command(BaseCommand):
             type=str,
             nargs="?",
             help="(Course and course run only) Create a run with the specified URL path.",
+        )
+
+        parser.add_argument(
+            "--start",
+            nargs="?",
+            type=str,
+            help="Start date for the course run.",
+        )
+
+        parser.add_argument(
+            "--enrollment-start",
+            nargs="?",
+            type=str,
+            help="Enrollment start date for the course run.",
+        )
+
+        parser.add_argument(
+            "--end",
+            nargs="?",
+            type=str,
+            help="End date for the course run.",
+        )
+
+        parser.add_argument(
+            "--enrollment-end",
+            nargs="?",
+            type=str,
+            help="Enrollment end date for the course run.",
+        )
+
+        parser.add_argument(
+            "--upgrade",
+            nargs="?",
+            type=str,
+            help="Upgrade deadline for the course run.",
         )
 
         parser.add_argument(
