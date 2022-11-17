@@ -504,7 +504,9 @@ def get_edx_grades_with_users(course_run, user=None):
                 yield edx_grade, user
 
 
-def enroll_in_edx_course_runs(user, course_runs, *, mode=EDX_DEFAULT_ENROLLMENT_MODE, force_enrollment=False):
+def enroll_in_edx_course_runs(
+    user, course_runs, *, mode=EDX_DEFAULT_ENROLLMENT_MODE, force_enrollment=False
+):
     """
     Enrolls a user in edx course runs
 
@@ -532,7 +534,10 @@ def enroll_in_edx_course_runs(user, course_runs, *, mode=EDX_DEFAULT_ENROLLMENT_
     for course_run in course_runs:
         try:
             result = edx_client.enrollments.create_student_enrollment(
-                course_run.courseware_id, mode=mode, username=username, force_enrollment=force_enrollment
+                course_run.courseware_id,
+                mode=mode,
+                username=username,
+                force_enrollment=force_enrollment,
             )
             results.append(result)
         except HTTPError as exc:
