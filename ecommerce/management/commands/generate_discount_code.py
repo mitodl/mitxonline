@@ -30,18 +30,17 @@ import csv
 import uuid
 from decimal import Decimal
 
-import dateutil
-import pytz
 from django.core.management import BaseCommand
 
 from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
     DISCOUNT_TYPE_PERCENT_OFF,
     REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
 )
 from ecommerce.models import Discount
-from main.settings import TIME_ZONE
+from main.utils import parse_supplied_date
 
 
 class Command(BaseCommand):
@@ -62,6 +61,12 @@ class Command(BaseCommand):
             "--expires",
             type=str,
             help="Optional expiration date for the code, in ISO-8601 (YYYY-MM-DD) format.",
+        )
+
+        parser.add_argument(
+            "--activates",
+            type=str,
+            help="Optional activation date for the code, in ISO-8601 (YYYY-MM-DD) format.",
         )
 
         parser.add_argument(
@@ -90,9 +95,13 @@ class Command(BaseCommand):
         parser.add_argument(
             "--one-time",
             help="Make the resulting code(s) one-time redemptions (otherwise, default to unlimited)",
-            nargs="?",
-            const=True,
-            default=False,
+            action="store_true",
+        )
+
+        parser.add_argument(
+            "--once-per-user",
+            help="Make the resulting code(s) one-time per user redemptions (otherwise, default to unlimited)",
+            action="store_true",
         )
 
         parser.add_argument(
@@ -154,14 +163,18 @@ class Command(BaseCommand):
         if "one_time" in kwargs and kwargs["one_time"]:
             redemption_type = REDEMPTION_TYPE_ONE_TIME
 
-        if "expires" in kwargs and kwargs["expires"] is not None:
-            expiration_date = dateutil.parser.parse(kwargs["expires"])
-            if expiration_date.utcoffset() is not None:
-                expiration_date = expiration_date - expiration_date.utcoffset()
+        if "once_per_user" in kwargs and kwargs["once_per_user"]:
+            redemption_type = REDEMPTION_TYPE_ONE_TIME_PER_USER
 
-            expiration_date = expiration_date.replace(tzinfo=pytz.timezone(TIME_ZONE))
+        if "expires" in kwargs and kwargs["expires"] is not None:
+            expiration_date = parse_supplied_date(kwargs["expires"])
         else:
             expiration_date = None
+
+        if "activates" in kwargs and kwargs["activates"] is not None:
+            activation_date = parse_supplied_date(kwargs["activates"])
+        else:
+            activation_date = None
 
         generated_codes = []
 
@@ -171,6 +184,7 @@ class Command(BaseCommand):
                     discount_type=discount_type,
                     redemption_type=redemption_type,
                     expiration_date=expiration_date,
+                    activation_date=activation_date,
                     discount_code=code_to_generate,
                     amount=amount,
                     for_flexible_pricing=False,

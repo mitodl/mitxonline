@@ -1,17 +1,21 @@
 """mitx_online utilities"""
 import json
 from enum import Flag, auto
+from typing import Set, Tuple, TypeVar, Union
 from urllib.parse import quote_plus
-from typing import Union, Tuple, TypeVar, Set
 
+import dateutil
+import pytz
 from django.conf import settings
 from django.core.serializers import serialize
 from django.http import HttpRequest, HttpResponseRedirect
-from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME
 from mitol.common.utils.urls import remove_password_from_url
 from rest_framework import status
 from rest_framework.response import Response
+
 from main import features
+from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME
+from main.settings import TIME_ZONE
 
 
 class FeatureFlag(Flag):
@@ -161,3 +165,21 @@ def get_partitioned_set_difference(
     """
     common_item_set = set1.intersection(set2)
     return set1 - common_item_set, common_item_set, set2 - common_item_set
+
+
+def parse_supplied_date(datearg):
+    """
+    Creates a datetime with timezone from a user-supplied date. For use in
+    management commands.
+
+    Args:
+    - datearg (string): the date supplied by the user.
+    Returns:
+    - datetime
+    """
+    retDate = dateutil.parser.parse(datearg)
+    if retDate.utcoffset() is not None:
+        retDate = retDate - retDate.utcoffset()
+
+    retDate = retDate.replace(tzinfo=pytz.timezone(TIME_ZONE))
+    return retDate
