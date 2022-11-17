@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.53.3
+Version 0.53.3 (Released November 17, 2022)
 --------------
 
 - 1206 dashboard course detail and view certificate links are too close together (#1209)
