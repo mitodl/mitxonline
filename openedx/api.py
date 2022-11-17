@@ -28,6 +28,7 @@ from main.utils import get_partitioned_set_difference
 from openedx.constants import (
     EDX_ENROLLMENT_AUDIT_MODE,
     EDX_DEFAULT_ENROLLMENT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     PLATFORM_EDX,
     PRO_ENROLL_MODE_ERROR_TEXTS,
@@ -46,6 +47,7 @@ from openedx.exceptions import (
 )
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
 from openedx.utils import edx_url, SyncResult
+from users.api import fetch_user
 
 log = logging.getLogger(__name__)
 User = get_user_model()
@@ -502,7 +504,7 @@ def get_edx_grades_with_users(course_run, user=None):
                 yield edx_grade, user
 
 
-def enroll_in_edx_course_runs(user, course_runs, *, mode=EDX_DEFAULT_ENROLLMENT_MODE):
+def enroll_in_edx_course_runs(user, course_runs, *, mode=EDX_DEFAULT_ENROLLMENT_MODE, force_enrollment=False):
     """
     Enrolls a user in edx course runs
 
@@ -510,6 +512,8 @@ def enroll_in_edx_course_runs(user, course_runs, *, mode=EDX_DEFAULT_ENROLLMENT_
         user (users.models.User): The user to enroll
         course_runs (iterable of CourseRun): The course runs to enroll in
         mode (str): The course mode to enroll the user with
+        force_enrollment (bool): If True, Enforces Enrollment after the enrollment end date
+                                    has been passed or upgrade_deadline is ended
 
     Returns:
         list of edx_api.enrollments.models.Enrollment:
@@ -520,11 +524,15 @@ def enroll_in_edx_course_runs(user, course_runs, *, mode=EDX_DEFAULT_ENROLLMENT_
         UnknownEdxApiEnrollException: Raised if an unknown error was encountered during the edX API request
     """
     edx_client = get_edx_api_client(user)
+    username = None
+    if force_enrollment:
+        edx_client = get_edx_api_service_client()
+        username = user.username
     results = []
     for course_run in course_runs:
         try:
             result = edx_client.enrollments.create_student_enrollment(
-                course_run.courseware_id, mode=mode
+                course_run.courseware_id, mode=mode, username=username, force_enrollment=force_enrollment
             )
             results.append(result)
         except HTTPError as exc:
