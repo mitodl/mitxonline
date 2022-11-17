@@ -30,7 +30,7 @@ from redbeat import RedBeatScheduler
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 
-VERSION = "0.53.2"
+VERSION = "0.53.3"
 
 log = logging.getLogger()
 
