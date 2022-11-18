@@ -10,5 +10,5 @@ $(".dates-tooltip").popover({
     '<div class="arrow"></div>' +
     '<div class="popover-header py-2 px-0 mx-5"></div>' +
     '<div class="popover-body"></div>' +
-    "</div>"
+    '</div>'
 })
