@@ -12,3 +12,7 @@ $(".dates-tooltip").popover({
     '<div class="popover-body"></div>' +
     '</div>'
 })
+$(".dates-tooltip").on("shown.bs.popover", () => {
+  $(".date-link").attr("tabindex", 0)
+  $(".date-link").first().focus()
+})
