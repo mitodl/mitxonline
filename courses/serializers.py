@@ -338,11 +338,12 @@ class ProgramSerializer(serializers.ModelSerializer):
     def _get_nested_requirements(self, node):
         ids = []
 
-        for child in node.get_children():
-            if child.node_type == models.ProgramRequirementNodeType.OPERATOR:
-                ids += self._get_nested_requirements(child)
-            else:
-                ids.append(child.course.id)
+        if node.get_children():
+            for child in node.get_children():
+                if child.node_type == models.ProgramRequirementNodeType.OPERATOR:
+                    ids += self._get_nested_requirements(child)
+                elif child.course.id is not None:
+                    ids.append(child.course.id)
 
         return ids
 
@@ -351,40 +352,14 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         req_root = instance.get_requirements_root()
 
+        if req_root is None:
+            return []
+
         for node in req_root.get_children():
             if node.operator == models.ProgramRequirement.Operator.ALL_OF:
-                formatted_reqs["required"] = [
-                    req.course.id
-                    for req in node.get_children()
-                    .filter(node_type=models.ProgramRequirementNodeType.COURSE)
-                    .all()
-                ]
-
-                for nested_operator in (
-                    node.get_children()
-                    .filter(node_type=models.ProgramRequirementNodeType.OPERATOR)
-                    .all()
-                ):
-                    formatted_reqs["required"] += self._get_nested_requirements(
-                        nested_operator
-                    )
-
+                formatted_reqs["required"] = self._get_nested_requirements(node)
             else:
-                formatted_reqs["electives"] = [
-                    req.course.id
-                    for req in node.get_children()
-                    .filter(node_type=models.ProgramRequirementNodeType.COURSE)
-                    .all()
-                ]
-
-                for nested_operator in (
-                    node.get_children()
-                    .filter(node_type=models.ProgramRequirementNodeType.OPERATOR)
-                    .all()
-                ):
-                    formatted_reqs["electives"] += self._get_nested_requirements(
-                        nested_operator
-                    )
+                formatted_reqs["electives"] = self._get_nested_requirements(node)
 
         return formatted_reqs
 
