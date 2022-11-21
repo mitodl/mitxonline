@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.54.0
+--------------
+
+- fixing list formatting in generate_discount_code.rst
+- Adds some checks to ensure there is a requirements tree before walking it
+- Adds some additional options and docs for some management commands
+
 Version 0.53.3 (Released November 17, 2022)
 --------------
 
