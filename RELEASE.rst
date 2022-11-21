@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.54.0
+Version 0.54.0 (Released November 21, 2022)
 --------------
 
 - fixing list formatting in generate_discount_code.rst
