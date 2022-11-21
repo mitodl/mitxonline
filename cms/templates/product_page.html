@@ -48,20 +48,19 @@
               </div>
               {% if course_runs|length > 1 %}
                 <strong class="more-dates">
-                  <span tabindex="0" role="button" class="dates-tooltip" id="datesPopover" data-trigger="click" onkeydown="{ $('span.dates-tooltip').popover('show'); event.preventDefault(); }" onClick="{ $('span.dates-tooltip').popover('show'); event.preventDefault(); }" 
-                  data-toggle="popover" data-placement="auto" title="More dates available" data-html="true"
+                  <button class="dates-tooltip" id="datesPopover" data-trigger="click" data-toggle="popover" data-placement="auto" title="More dates available" data-html="true"
                     data-content="
                       <div>
                         <p>Click below to enroll in one of these dates</p>
                       </div>
                       {% for course_run in course_runs %}
                           <div>
-                            <span role='button' taborder='0' class='date-link' id='{{ course_run.courseware_id }}' onClick='event.preventDefault();'>Start Date {{ course_run.start_date|date:'F j, Y' }}</span>
+                            <button class='date-link' id='{{ course_run.courseware_id }}' >Start Date {{ course_run.start_date|date:'F j, Y' }}</button>
                           </div>
                       {% endfor %}
                     ">
                     More Dates
-                  </a>
+                  </button>
                 </strong>
               {% endif %}
             </div>
