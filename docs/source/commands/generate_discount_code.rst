@@ -21,6 +21,7 @@ Output
 ------
 
 Generated codes will be written to a ``generated-codes.csv`` file, with the following information:
+
 * Discount code
 * Code type
 * Amount
@@ -32,6 +33,7 @@ Options
 -------
 
 General options:
+
 * ``--amount <amount>`` - The discount's amount. For percent off discounts, this should be on a scale of 0-100. This is required.
 * ``--discount-type <discount type>`` - One of ``percent-off``, ``dollars-off``, or ``fixed-price``; the type of discount code to make. Defaults to ``percent-off``.
 * ``--activates <date>`` - The date the code should become active (in ISO-8601 format).
@@ -40,8 +42,10 @@ General options:
 * ``--once-per-user`` - Set the discount to be redeemable only once per learner. 
 
 For explicitly named codes:
+
 * ``code`` - The code to generate. (You can specify any number of these.) Max length 50 characters.
 
 For automatically generated codes:
+
 * ``--count <count>`` - The number of codes to create.
 * ``--prefix <prefix>`` - The prefix to append to the code. Max length 13 characters.
