@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.54.1
+--------------
+
+- 1207 accessibility more dates popup on course pages lacks keyboard controls (#1230)
+
 Version 0.54.0 (Released November 21, 2022)
 --------------
 
