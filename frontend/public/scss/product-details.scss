@@ -240,9 +240,11 @@
         font-size: 12px;
 
         .dates-tooltip {
+          font-weight: bolder;
           color: $link-blue !important;
           text-decoration: underline;
-          cursor: pointer;
+          background-color: transparent;
+          border: none;
         }
       }
 
@@ -478,5 +480,6 @@
 .date-link {
   color: $link-blue !important;
   text-decoration: underline;
-  cursor: pointer;
+  background-color: transparent;
+  border: none;
 }
