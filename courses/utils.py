@@ -7,6 +7,8 @@ from courses.models import (
     CourseRunEnrollment,
     ProgramCertificate,
     ProgramEnrollment,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
 )
 
 
@@ -54,7 +56,16 @@ def generate_program_certificate(user, program):
         )
         return existing_cert_queryset.first(), False
 
-    courses_in_program_ids = set(program.courses.values_list("id", flat=True))
+    courses_in_program_ids = set(
+        program.get_requirements_root()
+        .get_children()
+        .filter(operator=ProgramRequirement.Operator.ALL_OF)
+        .first()
+        .get_children()
+        .filter(node_type=ProgramRequirementNodeType.COURSE)
+        .values_list("course_id", flat=True)
+    )
+    # courses_in_program_ids = set(program.courses.values_list("id", flat=True))
     num_courses_with_cert = (
         CourseRunCertificate.objects.filter(
             user=user, course_run__course_id__in=courses_in_program_ids
@@ -85,6 +96,31 @@ def generate_program_certificate(user, program):
             )
 
     return program_cert, True
+
+
+def generate_multiple_programs_certificate(user, programs):
+    """
+    Create a program certificate if the user has a course certificate
+    for each course in the program. Also, It will create the
+    program enrollment if it does not exist for the user.
+
+    Args:
+        user (User): a Django user.
+        programs (list of objects of programs.models.Program): programs where the user is enrolled.
+
+    Returns:
+        list of [(ProgramCertificate or None, bool), (ProgramCertificate or None, bool)]: the return
+        result is ordered as the order of programs list
+
+    (ProgramCertificate or None, bool): A tuple containing a
+    ProgramCertificate (or None if one was not found or created) paired
+    with a boolean indicating whether the certificate was newly created.
+    """
+    results = []
+    for program in programs:
+        result = generate_program_certificate(user, program)
+        results.append(result)
+    return results
 
 
 def get_program_certificate_by_enrollment(enrollment):

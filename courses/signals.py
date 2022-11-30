@@ -5,8 +5,12 @@ from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from courses.models import CourseRunCertificate
-from courses.utils import generate_program_certificate
+from courses.models import (
+    CourseRunCertificate,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
+)
+from courses.utils import generate_multiple_programs_certificate
 
 
 @receiver(
@@ -22,6 +26,18 @@ def handle_create_course_run_certificate(
     """
     if created:
         user = instance.user
-        program = instance.course_run.course.program
-        if program:
-            transaction.on_commit(lambda: generate_program_certificate(user, program))
+        program_requirements = (
+            ProgramRequirement.objects.filter(
+                node_type=ProgramRequirementNodeType.COURSE,
+                course=instance.course_run.course,
+            )
+            .order_by("program_id")
+            .distinct("program_id")
+        )
+        programs = [
+            program_requirement.program for program_requirement in program_requirements
+        ]
+        if programs:
+            transaction.on_commit(
+                lambda: generate_multiple_programs_certificate(user, programs)
+            )
