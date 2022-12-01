@@ -7,8 +7,7 @@ from django.dispatch import receiver
 
 from courses.models import (
     CourseRunCertificate,
-    ProgramRequirement,
-    ProgramRequirementNodeType,
+    Program,
 )
 from courses.utils import generate_multiple_programs_certificate
 
@@ -26,17 +25,10 @@ def handle_create_course_run_certificate(
     """
     if created:
         user = instance.user
-        program_requirements = (
-            ProgramRequirement.objects.filter(
-                node_type=ProgramRequirementNodeType.COURSE,
-                course=instance.course_run.course,
-            )
-            .order_by("program_id")
-            .distinct("program_id")
+        course = instance.course_run.course
+        programs = list(
+            Program.objects.filter(all_requirements__course=course).distinct()
         )
-        programs = [
-            program_requirement.program for program_requirement in program_requirements
-        ]
         if programs:
             transaction.on_commit(
                 lambda: generate_multiple_programs_certificate(user, programs)

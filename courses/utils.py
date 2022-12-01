@@ -3,8 +3,9 @@
 import logging
 from requests.exceptions import HTTPError
 from courses.models import (
-    CourseRunCertificate,
+    Course,
     CourseRunEnrollment,
+    CourseRunCertificate,
     ProgramCertificate,
     ProgramEnrollment,
     ProgramRequirement,
@@ -32,6 +33,31 @@ def is_grade_valid(override_grade: float):
     return 0.0 <= override_grade <= 1.0
 
 
+# has a learner passed all the requirements for a certificate?
+def has_earned_program_cert(user, program):
+    passed_courses = Course.objects.filter(
+        in_programs__program=program,
+        courseruns__courserungrade__user=user,
+        courseruns__courserungrade__passed=True,
+    )
+    root = ProgramRequirement.get_root_nodes().get(program=program)
+
+    def _has_earned(node):
+        if node.is_root or node.is_all_of_operator:
+            # has passed all of the child requirements
+            return all(_has_earned(child) for child in node.get_children())
+        elif node.is_min_number_of_operator:
+            # has passed a minimum of the child requirements
+            return len(list(filter(_has_earned, node.get_children()))) >= int(
+                node.operator_value
+            )
+        elif node.is_course:
+            # has passed the reference course
+            return node.course in passed_courses
+
+    return _has_earned(root)
+
+
 def generate_program_certificate(user, program):
     """
     Create a program certificate if the user has a course certificate
@@ -56,16 +82,24 @@ def generate_program_certificate(user, program):
         )
         return existing_cert_queryset.first(), False
 
-    courses_in_program_ids = set(
-        program.get_requirements_root()
-        .get_children()
-        .filter(operator=ProgramRequirement.Operator.ALL_OF)
-        .first()
-        .get_children()
-        .filter(node_type=ProgramRequirementNodeType.COURSE)
-        .values_list("course_id", flat=True)
+    # which courses are in a program?
+    courses_in_program_ids = (
+        Course.objects.filter(in_programs__program=program)
+        .distinct()
+        .values_list("id", flat=True)
     )
-    # courses_in_program_ids = set(program.courses.values_list("id", flat=True))
+
+    # TODO handle MIN_NUMBER_OF
+    # courses_in_program_ids = set(
+    #     program.get_requirements_root()
+    #     .get_descendants()
+    #     .filter(node_type=ProgramRequirementNodeType.COURSE)
+    #     .values_list("course_id", flat=True)
+    # )
+
+    if not courses_in_program_ids:
+        return None, False
+
     num_courses_with_cert = (
         CourseRunCertificate.objects.filter(
             user=user, course_run__course_id__in=courses_in_program_ids
@@ -74,7 +108,9 @@ def generate_program_certificate(user, program):
         .count()
     )
 
-    if len(courses_in_program_ids) > num_courses_with_cert:
+    if len(
+        courses_in_program_ids
+    ) > num_courses_with_cert or not has_earned_program_cert(user, program):
         return None, False
 
     program_cert = ProgramCertificate.objects.create(user=user, program=program)
