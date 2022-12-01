@@ -9,24 +9,57 @@ from courses.factories import (
     CourseRunFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
+    ProgramRequirementFactory,
     ProgramFactory,
 )
-from courses.models import ProgramCertificate
+from courses.models import (
+    ProgramCertificate,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
+)
 from courses.utils import (
     generate_program_certificate,
     get_program_certificate_by_enrollment,
 )
 
 
-def test_generate_program_certificate_already_exist(user, program):
-    """
-    Test that generate_program_certificate return (None, False) and not create program certificate
-    if program certificate already exist.
-    """
-    program_certificate = ProgramCertificateFactory.create(program=program, user=user)
-    result = generate_program_certificate(user=user, program=program)
-    assert result == (program_certificate, False)
-    assert len(ProgramCertificate.objects.all()) == 1
+# Temporarily defined here, will move it to ProgramRequirementFactory
+def create_program_requirement(program, course):
+    if not program.requirements_root:
+        ProgramRequirementFactory.create(
+            path="ZZZZ",
+            depth=1,
+            numchild=1,
+            program=program,
+            node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value,
+            title=None,
+            operator=None,
+            operator_value=None,
+            course=None,
+        )
+    path = program.get_requirements_root().path
+    ProgramRequirementFactory.create(
+        path="{}0001".format(path),
+        depth=2,
+        numchild=1,
+        program=program,
+        node_type=ProgramRequirementNodeType.OPERATOR.value,
+        operator=ProgramRequirement.Operator.ALL_OF.value,
+        title="Required Courses",
+        operator_value=None,
+        course=None,
+    )
+    ProgramRequirementFactory.create(
+        path="{}00010001".format(path),
+        depth=3,
+        numchild=0,
+        course=course,
+        program=program,
+        node_type=ProgramRequirementNodeType.COURSE.value,
+        title=None,
+        operator=None,
+        operator_value=None,
+    )
 
 
 def test_generate_program_certificate_failure(user, program):
@@ -47,6 +80,7 @@ def test_generate_program_certificate_success(user, program):
     Test that generate_program_certificate generate a program certificate
     """
     course = CourseFactory.create(program=program)
+    create_program_requirement(program, course)
     course_run = CourseRunFactory.create(course=course)
 
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
@@ -54,6 +88,17 @@ def test_generate_program_certificate_success(user, program):
     certificate, created = generate_program_certificate(user=user, program=program)
     assert created is True
     assert isinstance(certificate, ProgramCertificate)
+    assert len(ProgramCertificate.objects.all()) == 1
+
+
+def test_generate_program_certificate_already_exist(user, program):
+    """
+    Test that generate_program_certificate return (None, False) and not create program certificate
+    if program certificate already exist.
+    """
+    program_certificate = ProgramCertificateFactory.create(program=program, user=user)
+    result = generate_program_certificate(user=user, program=program)
+    assert result == (program_certificate, False)
     assert len(ProgramCertificate.objects.all()) == 1
 
 
