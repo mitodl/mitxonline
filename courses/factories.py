@@ -2,9 +2,8 @@
 import factory
 import faker
 import pytz
-from factory import SubFactory, Trait, fuzzy
+from factory import SubFactory, fuzzy
 from factory.django import DjangoModelFactory
-from treebeard.mp_tree import MP_AddRootHandler
 
 from courses.constants import PROGRAM_TEXT_ID_PREFIX
 from courses.models import (
