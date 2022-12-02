@@ -141,6 +141,14 @@ class ProgramRequirementFactory(DjangoModelFactory):
     class Meta:
         model = ProgramRequirement
 
+    @classmethod
+    def add_root(cls, program):
+        if not ProgramRequirement.get_root_nodes().filter(program=program).exists():
+            return ProgramRequirement.add_root(
+                program=program, node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value
+            )
+        return program.get_requirements_root()
+
 
 class BlockedCountryFactory(DjangoModelFactory):
     """Factory for BlockedCountry"""

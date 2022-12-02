@@ -3,12 +3,12 @@ Tests for signals
 """
 from unittest.mock import patch
 import pytest
-from courses.utils_test import create_program_requirement
 from courses.factories import (
     CourseRunFactory,
     CourseRunCertificateFactory,
     UserFactory,
     CourseFactory,
+    ProgramRequirementFactory,
 )
 
 
@@ -25,7 +25,8 @@ def test_create_course_certificate(generate_program_cert_mock, mock_on_commit):
     """
     user = UserFactory.create()
     course_run = CourseRunFactory.create()
-    create_program_requirement(course_run.course.program, course_run.course)
+    ProgramRequirementFactory.add_root(course_run.course.program)
+    course_run.course.program.add_requirement(course_run.course)
     cert = CourseRunCertificateFactory.create(user=user, course_run=course_run)
     generate_program_cert_mock.assert_called_once_with(
         user, [cert.course_run.course.program]

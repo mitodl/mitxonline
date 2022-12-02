@@ -2,11 +2,14 @@
 """
 Tests for utils
 """
+import factory
+
 from courses.factories import (
     CourseFactory,
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    CourseRunGradeFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramRequirementFactory,
@@ -14,8 +17,6 @@ from courses.factories import (
 )
 from courses.models import (
     ProgramCertificate,
-    ProgramRequirement,
-    ProgramRequirementNodeType,
 )
 from courses.utils import (
     generate_program_certificate,
@@ -23,52 +24,41 @@ from courses.utils import (
 )
 
 
-# Temporarily defined here, will move it to ProgramRequirementFactory
-def create_program_requirement(program, course):
-    if not program.requirements_root:
-        ProgramRequirementFactory.create(
-            path="ZZZZ",
-            depth=1,
-            numchild=1,
-            program=program,
-            node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value,
-            title=None,
-            operator=None,
-            operator_value=None,
-            course=None,
-        )
-    path = program.get_requirements_root().path
-    ProgramRequirementFactory.create(
-        path="{}0001".format(path),
-        depth=2,
-        numchild=1,
-        program=program,
-        node_type=ProgramRequirementNodeType.OPERATOR.value,
-        operator=ProgramRequirement.Operator.ALL_OF.value,
-        title="Required Courses",
-        operator_value=None,
-        course=None,
-    )
-    ProgramRequirementFactory.create(
-        path="{}00010001".format(path),
-        depth=3,
-        numchild=0,
-        course=course,
-        program=program,
-        node_type=ProgramRequirementNodeType.COURSE.value,
-        title=None,
-        operator=None,
-        operator_value=None,
-    )
-
-
-def test_generate_program_certificate_failure(user, program):
+def test_generate_program_certificate_failure_missing_certificates(user, program):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
     if there is not any course_run certificate for the given course.
     """
     course = CourseFactory.create(program=program)
     CourseRunFactory.create_batch(3, course=course)
+    ProgramRequirementFactory.add_root(program)
+    program.add_requirement(course)
+
+    result = generate_program_certificate(user=user, program=program)
+    assert result == (None, False)
+    assert len(ProgramCertificate.objects.all()) == 0
+
+
+def test_generate_program_certificate_failure_not_all_passed(user, program):
+    """
+    Test that generate_program_certificate return (None, False) and not create program certificate
+    if there is not any course_run certificate for the given course.
+    """
+    courses = CourseFactory.create_batch(2, program=program)
+    course_runs = CourseRunFactory.create_batch(2, course=factory.Iterator(courses))
+    CourseRunCertificateFactory.create_batch(
+        2, user=user, course_run=factory.Iterator(course_runs)
+    )
+    CourseRunGradeFactory.create_batch(
+        2,
+        course_run=factory.Iterator(course_runs),
+        user=user,
+        passed=factory.Iterator([True, False]),
+        grade=factory.Iterator([1, 0]),
+    )
+    ProgramRequirementFactory.add_root(program)
+    program.add_requirement(courses[0])
+    program.add_requirement(courses[1])
 
     result = generate_program_certificate(user=user, program=program)
     assert result == (None, False)
@@ -80,8 +70,10 @@ def test_generate_program_certificate_success(user, program):
     Test that generate_program_certificate generate a program certificate
     """
     course = CourseFactory.create(program=program)
-    create_program_requirement(program, course)
+    ProgramRequirementFactory.add_root(program)
+    program.add_requirement(course)
     course_run = CourseRunFactory.create(course=course)
+    CourseRunGradeFactory.create(course_run=course_run, user=user, passed=True, grade=1)
 
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
 
