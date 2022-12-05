@@ -170,3 +170,13 @@ export const ORDER_HISTORY_COLUMN_TITLES = [
 export const DISCOUNT_TYPE_FIXED_PRICE = "fixed-price"
 export const DISCOUNT_TYPE_DOLLARS_OFF = "dollars-off"
 export const DISCOUNT_TYPE_PERCENT_OFF = "percent-off"
+
+export const RECORDS_PAGE_TITLE = "MITx Online Program Record"
+
+/* Program Requirements constants */
+export const NODETYPE_ROOT = "program_root"
+export const NODETYPE_OPERATOR = "operator"
+export const NODETYPE_COURSE = "course"
+
+export const NODEOPER_ALL = "all_of"
+export const NODEOPER_MIN = "min_number_of"

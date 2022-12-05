@@ -29,6 +29,8 @@ import CartPage from "./pages/checkout/CartPage"
 import OrderHistory from "./pages/checkout/OrderHistory"
 import OrderReceiptPage from "./pages/checkout/OrderReceiptPage"
 
+import LearnerRecordsPage from "./pages/records/LearnerRecordsPage"
+
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
 
@@ -99,6 +101,10 @@ export class App extends React.Component<Props, void> {
               path={urljoin(match.url, String(routes.cart))}
               component={CartPage}
             />
+            <Route
+              path={urljoin(match.url, String(routes.sharedLearnerRecord))}
+              component={LearnerRecordsPage}
+            />
             <PrivateRoute
               path={urljoin(match.url, String(routes.orderHistory))}
               component={OrderHistory}
@@ -106,6 +112,10 @@ export class App extends React.Component<Props, void> {
             <PrivateRoute
               path={urljoin(match.url, String(routes.orderReceipt))}
               component={OrderReceiptPage}
+            />
+            <PrivateRoute
+              path={urljoin(match.url, String(routes.learnerRecords))}
+              component={LearnerRecordsPage}
             />
           </Switch>
         </div>

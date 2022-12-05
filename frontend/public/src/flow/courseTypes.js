@@ -1,5 +1,6 @@
 import type { Product } from "./ecommerceTypes"
 import type { Page } from "./cmsTypes"
+import type { LearnerRecordUser } from "./authTypes"
 
 export type CourseDetail = {
   id: number,
@@ -77,4 +78,71 @@ export type ProgramEnrollment = {
   program: Program,
   enrollments: Array<RunEnrollment>,
   certificate: ?Certificate
+}
+
+export type PartnerSchool = {
+  id: number,
+  name: string,
+  email: string
+}
+
+export type RequirementNode = {
+  node_type: string,
+  operator: ?string,
+  operator_value: ?number,
+  program: number,
+  course: ?number,
+  title: ?string,
+}
+
+export type ProgramRequirement = {
+  id: number,
+  data: RequirementNode,
+  children: Array<ProgramRequirement>,
+}
+
+export type LearnerRecordGrade = {
+  grade: number,
+  letter_grade: string,
+  passed: boolean,
+  set_by_admin: boolean,
+  grade_percent: number
+}
+
+export type LearnerRecordCertificate = {
+  uuid: string,
+  link: string
+}
+
+export type LearnerRecordCourse = {
+  title: string,
+  id: number,
+  readable_id: string,
+  reqtype: ?string,
+  grade: ?LearnerRecordGrade,
+  certificate: ?LearnerRecordCertificate
+}
+
+export type LearnerRecordProgram = {
+  title: string,
+  readable_id: string,
+  courses: Array<LearnerRecordCourse>,
+  requirements: Array<ProgramRequirement>,
+}
+
+export type LearnerRecordShare = {
+  share_uuid: string,
+  created_on: string,
+  updated_on: string,
+  is_active: boolean,
+  user: number,
+  program: number,
+  partner_school: ?number
+}
+
+export type LearnerRecord = {
+  user: LearnerRecordUser,
+  program: LearnerRecordProgram,
+  sharing: Array<LearnerRecordShare>,
+  partner_schools: Array<PartnerSchool>,
 }

@@ -262,3 +262,12 @@ export const isProgramUIEnabled = () => {
     (SETTINGS && SETTINGS.features && SETTINGS.features.enable_program_ui)
   )
 }
+
+export const areLearnerRecordsEnabled = () => {
+  const params = new URLSearchParams(document.location.search)
+
+  return (
+    params.get("enable_lr") !== null ||
+    (SETTINGS && SETTINGS.features && SETTINGS.features.enable_learner_records)
+  )
+}

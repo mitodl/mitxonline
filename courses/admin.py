@@ -2,12 +2,14 @@
 Admin site bindings for profiles
 """
 from django.contrib import admin
+from django.contrib.admin.decorators import display
 from django.db import models
 from django.forms import TextInput
-from django.contrib.admin.decorators import display
 from mitol.common.admin import TimestampedModelAdmin
 
+from courses.forms import ProgramAdminForm
 from courses.models import (
+    BlockedCountry,
     Course,
     CourseRun,
     CourseRunCertificate,
@@ -16,15 +18,15 @@ from courses.models import (
     CourseRunGrade,
     CourseRunGradeAudit,
     CourseTopic,
-    BlockedCountry,
+    LearnerProgramRecordShare,
+    PaidCourseRun,
+    PartnerSchool,
     Program,
+    ProgramCertificate,
     ProgramEnrollment,
     ProgramEnrollmentAudit,
     ProgramRun,
-    PaidCourseRun,
-    ProgramCertificate,
 )
-from courses.forms import ProgramAdminForm
 from main.admin import AuditableModelAdmin
 from main.utils import get_field_names
 
@@ -437,6 +439,22 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
         return self.model.all_objects.get_queryset().select_related("user", "program")
 
 
+class PartnerSchoolAdmin(TimestampedModelAdmin):
+    """Admin for PartnerSchool"""
+
+    model = PartnerSchool
+    list_display = ["name", "email"]
+    search_fields = ["name", "email"]
+
+
+class LearnerProgramRecordShareAdmin(TimestampedModelAdmin):
+    """Admin for LearnerProgramRecordShare"""
+
+    model = LearnerProgramRecordShare
+    list_display = ["share_uuid", "user", "partner_school", "is_active"]
+    search_fields = ["share_uuid"]
+
+
 admin.site.register(Program, ProgramAdmin)
 admin.site.register(ProgramRun, ProgramRunAdmin)
 admin.site.register(Course, CourseAdmin)
@@ -452,3 +470,5 @@ admin.site.register(BlockedCountry, BlockedCountryAdmin)
 admin.site.register(PaidCourseRun, PaidCourseRunAdmin)
 admin.site.register(CourseRunCertificate, CourseRunCertificateAdmin)
 admin.site.register(ProgramCertificate, ProgramCertificateAdmin)
+admin.site.register(PartnerSchool, PartnerSchoolAdmin)
+admin.site.register(LearnerProgramRecordShare, LearnerProgramRecordShareAdmin)

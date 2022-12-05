@@ -21,3 +21,10 @@ class EnrollmentFailureMessage(TemplatedMessage):
 
     name = "Enrollment Failure"
     template_name = "mail/enrollment_failure"
+
+
+class PartnerSchoolSharingMessage(TemplatedMessage):
+    """Email message for sharing learner records to partner schools"""
+
+    name = "Shared Learner Record"
+    template_name = "mail/partner_school_sharing"

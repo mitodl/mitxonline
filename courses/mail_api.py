@@ -1,16 +1,17 @@
 """Ecommerce mail API"""
 import logging
 
-from django.conf import settings
-from django.core import mail
 from django.urls import reverse
 from mitol.mail.api import get_message_sender
+
 from courses.messages import (
     CourseRunEnrollmentMessage,
     CourseRunUnenrollmentMessage,
     EnrollmentFailureMessage,
+    PartnerSchoolSharingMessage,
 )
 from courses.models import CourseRun
+from main.settings import SITE_BASE_URL
 
 log = logging.getLogger()
 
@@ -68,3 +69,25 @@ def send_enrollment_failure_message(user, enrollment_obj, details):
             )
     except Exception:  # pylint: disable=broad-except
         log.exception("Error sending unenrollment success email")
+
+
+def send_partner_school_sharing_message(learner_record):
+    """
+    Args:
+        learner_record (LearnerProgramRecordShare): the learner record to send
+    """
+    try:
+        with get_message_sender(PartnerSchoolSharingMessage) as sender:
+            sender.build_and_send_message(
+                learner_record.partner_school.email,
+                {
+                    "learner_record": learner_record,
+                    "record_link": SITE_BASE_URL
+                    + reverse(
+                        "shared_learner_record_from_uuid",
+                        kwargs={"uuid": learner_record.share_uuid},
+                    ),
+                },
+            )
+    except Exception:  # pylint: disable=broad-except
+        log.exception("Error sending partner school sharing email")

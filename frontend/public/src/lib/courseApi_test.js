@@ -3,12 +3,13 @@ import {
   isLinkableCourseRun,
   isWithinEnrollmentPeriod,
   generateStartDateText,
-  isFinancialAssistanceAvailable
+  isFinancialAssistanceAvailable,
+  learnerProgramIsCompleted
 } from "./courseApi"
 import { assert } from "chai"
 import moment from "moment"
 
-import { makeCourseRunDetail } from "../factories/course"
+import { makeCourseRunDetail, makeLearnerRecord } from "../factories/course"
 import { makeUser } from "../factories/user"
 
 import type { CourseRunDetail } from "../flow/courseTypes"
@@ -131,6 +132,27 @@ describe("Course API", () => {
       it(`returns ${String(expResult)}`, () => {
         courseRun["page"] = { financial_assistance_form_url: url }
         assert.equal(isFinancialAssistanceAvailable(courseRun), expResult)
+      })
+    })
+  })
+
+  describe("learnerProgramIsCompleted", () => {
+    [
+      [true, "returns true", "all courses are complete"],
+      [false, "returns false", "not enough courses are complete"]
+    ].forEach(([shouldBeCompleted, returnResult, courseConditions]) => {
+      it(`${returnResult} when ${courseConditions}`, () => {
+        const learnerRecord = makeLearnerRecord(shouldBeCompleted)
+
+        if (shouldBeCompleted) {
+          assert.isOk(learnerProgramIsCompleted(learnerRecord))
+        } else {
+          // force one of the required courses to be incomplete
+          learnerRecord.program.courses[0].certificate = null
+          learnerRecord.program.courses[0].grade = null
+
+          assert.isNotOk(learnerProgramIsCompleted(learnerRecord))
+        }
       })
     })
   })

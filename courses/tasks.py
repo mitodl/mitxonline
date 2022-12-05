@@ -5,10 +5,9 @@ import logging
 
 from django.conf import settings
 from django.db.models import Q
-
-from courses.models import CourseRun, CourseRunEnrollment
-
 from mitol.common.utils.datetime import now_in_utc
+
+from courses.models import CourseRun, CourseRunEnrollment, LearnerProgramRecordShare
 from main.celery import app
 
 log = logging.getLogger(__name__)
@@ -55,3 +54,15 @@ def generate_course_certificates():
     from courses.api import generate_course_run_certificates
 
     generate_course_run_certificates()
+
+
+@app.task
+def send_partner_school_email(record_uuid):
+    """
+    Task to send the partner school emails.
+    """
+    from courses.mail_api import send_partner_school_sharing_message
+
+    record = LearnerProgramRecordShare.objects.get(share_uuid=record_uuid)
+
+    send_partner_school_sharing_message(record)
