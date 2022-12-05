@@ -1,16 +1,21 @@
 """Tests for Course related tasks"""
 
+from datetime import timedelta
+
 import pytest
+from mitol.common.utils.datetime import now_in_utc
 
 from courses.factories import (
+    CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
-    CourseRunEnrollmentFactory,
+    LearnerProgramRecordShareFactory,
 )
-from courses.tasks import subscribe_edx_course_emails, generate_course_certificates
-
-from mitol.common.utils.datetime import now_in_utc
-from datetime import timedelta
+from courses.tasks import (
+    generate_course_certificates,
+    send_partner_school_email,
+    subscribe_edx_course_emails,
+)
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = pytest.mark.django_db
@@ -40,3 +45,14 @@ def test_generate_course_certificates_task(mocker):
     )
     generate_course_certificates.delay()
     generate_course_run_certificates.assert_called_once()
+
+
+def test_send_partner_school_email(mocker):
+    """Test generate_course_certificates calls the right api functionality from courses"""
+    record = LearnerProgramRecordShareFactory()
+
+    send_partner_school_sharing_message = mocker.patch(
+        "courses.mail_api.send_partner_school_sharing_message"
+    )
+    send_partner_school_email.delay(record.share_uuid)
+    send_partner_school_sharing_message.assert_called_once()

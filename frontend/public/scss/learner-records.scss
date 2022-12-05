@@ -1,0 +1,65 @@
+div.std-page-body.learner-record.container {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+#learner-record-school-name img {
+  width: 245px;
+}
+
+.badge.badge-partially-completed {
+  color: white;
+  background-color: #f0ad4e;
+}
+
+.badge.badge-completed {
+  color: white;
+  background-color: #556b2f;
+}
+
+span.badge-learner-completion {
+  color: white;
+  background-color: #f0ad4e;
+  font-size: 125%;
+  font-weight: normal;
+}
+
+div.learner-record-user-profile {
+  margin-top: 1em;
+
+  span.learner-record-user-name {
+    font-size: 150%;
+  }
+}
+
+table.learner-record-table {
+  margin-top: .5em;
+  width: 100vw;
+
+  tr:first-child {
+    width: 45%;
+  }
+
+  td, th {
+    padding: 10px;
+  }
+
+  thead {
+    border-bottom: 1px solid grey;
+  }
+}
+
+div.learner-record-sharing-controls {
+  button.btn {
+    padding: 8px 10px !important;
+  }
+
+  button:not(:first-child) {
+    margin-left: .25em;
+  }
+}
+
+#sharing-link-modal button.btn, #partner-school-modal button.btn {
+  padding: 0.375rem 0.75rem !important;
+  font-size: 1rem;
+}

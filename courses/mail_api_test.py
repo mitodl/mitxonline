@@ -7,14 +7,20 @@ from pytz import UTC
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    LearnerProgramRecordShareFactory,
     ProgramFactory,
 )
 from courses.mail_api import (
     send_course_run_enrollment_email,
-    send_course_run_unenrollment_email,
     send_enrollment_failure_message,
+    send_partner_school_sharing_message,
 )
-from courses.messages import CourseRunEnrollmentMessage, EnrollmentFailureMessage
+from courses.messages import (
+    CourseRunEnrollmentMessage,
+    EnrollmentFailureMessage,
+    PartnerSchoolSharingMessage,
+)
+from main.settings import SITE_BASE_URL
 
 pytestmark = pytest.mark.django_db
 
@@ -67,4 +73,22 @@ def test_send_enrollment_failure_message(user, mocker, is_program):
             "enrollment_obj": enrollment_obj,
             "details": details,
         },
+    )
+
+
+def test_send_partner_school_sharing_message(mocker):
+    """Test that the partner school message goes to the right spot"""
+    record = LearnerProgramRecordShareFactory()
+    record_link = SITE_BASE_URL + reverse(
+        "shared_learner_record_from_uuid", kwargs={"uuid": record.share_uuid}
+    )
+
+    patched_get_message_sender = mocker.patch("courses.mail_api.get_message_sender")
+    mock_sender = patched_get_message_sender.return_value.__enter__.return_value
+
+    send_partner_school_sharing_message(record)
+    patched_get_message_sender.assert_called_once_with(PartnerSchoolSharingMessage)
+    mock_sender.build_and_send_message.assert_called_once_with(
+        record.partner_school.email,
+        {"learner_record": record, "record_link": record_link},
     )

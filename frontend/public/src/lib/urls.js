@@ -15,7 +15,7 @@ export const routes = {
   // authentication related routes
   login: include("/signin/", {
     begin:    "",
-    password: "password/",
+    password: "password/", // pragma: allowlist secret
     forgot:   include("forgot-password/", {
       begin:   "",
       confirm: "confirm/:uid/:token/"
@@ -45,5 +45,8 @@ export const routes = {
     termsOfService: "terms-of-service",
     privacyPolicy:  "privacy-policy",
     honorCode:      "honor-code"
-  })
+  }),
+
+  learnerRecords:      "/records/:program/",
+  sharedLearnerRecord: "/records/shared/:program/"
 }

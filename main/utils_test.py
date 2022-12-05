@@ -36,6 +36,7 @@ def test_get_js_settings(settings, rf):
     settings.EMAIL_SUPPORT = "support@text.com"
     settings.RECAPTCHA_SITE_KEY = "fake_key"
     settings.ENABLE_PROGRAM_UI = False
+    settings.ENABLE_LEARNER_RECORDS = False
 
     request = rf.get("/")
 
@@ -49,6 +50,7 @@ def test_get_js_settings(settings, rf):
         "site_name": settings.SITE_NAME,
         "features": {
             "enable_program_ui": settings.ENABLE_PROGRAM_UI,
+            "enable_learner_records": settings.ENABLE_LEARNER_RECORDS,
         },
     }
 

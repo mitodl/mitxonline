@@ -296,6 +296,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     flexible_prices = GenericRelation("flexiblepricing.FlexiblePrice")
     tiers = GenericRelation("flexiblepricing.FlexiblePriceTier")
 
+    class Meta:
+        ordering = ("program", "title")
+
     @property
     def course_number(self):
         """
@@ -419,8 +422,29 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         ).values_list("run__id", flat=True)
         return [run for run in self.unexpired_runs if run.id not in enrolled_runs]
 
-    class Meta:
-        ordering = ("program", "title")
+    @property
+    def requirement_type(self):
+        """
+        Returns which branch of the requirements tree this course falls under.
+        This looks only at the requirements tree of the program that the course
+        is in - if the course has been added to another program's requirements
+        tree, this won't consider that.
+
+        Returns:
+            None, "Elective Courses", or "Required Courses".
+        """
+        if not self.program or not self.in_programs.count():
+            return None
+
+        # This will cause an error if the course has been added to its program's
+        # requirement tree more than once - but in this case it probably should
+        # cause an error, so it can be fixed.
+
+        mpnode = self.in_programs.filter(program=self.program).get()
+
+        for branch_root in mpnode.get_root().get_children().all():
+            if mpnode.is_descendant_of(branch_root):
+                return branch_root.title
 
     def save(self, *args, **kwargs):  # pylint: disable=signature-differs
         """Overridden save method"""
@@ -886,6 +910,15 @@ class CourseRunEnrollment(EnrollmentModel):
     def get_audit_class(cls):
         return CourseRunEnrollmentAudit
 
+    @property
+    def highest_grade(self):
+        """Returns the highest grade achieved for the course run."""
+        return (
+            self.grades.filter(course_run=self, user=self.user)
+            .order_by("-grade")
+            .first()
+        )
+
     @classmethod
     def get_program_run_enrollments(cls, user, program):
         """
@@ -1238,3 +1271,51 @@ class ProgramRequirement(MP_Node):
             ("program", "course"),
             ("course", "program"),
         )
+
+
+class PartnerSchool(TimestampedModel):
+    """
+    Model for partner school to send records to (copied from MicroMasters)
+    """
+
+    name = models.CharField(max_length=255)
+    email = models.TextField(null=False)
+
+    def __str__(self):
+        return self.name
+
+
+class LearnerProgramRecordShare(TimestampedModel):
+    """
+    Tracks the sharing status of an individual learner's program record.
+
+    partner_school is null if the record is for the learner's public sharing link.
+    """
+
+    share_uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
+    program = models.ForeignKey(
+        "courses.Program", on_delete=models.CASCADE, related_name="+"
+    )
+    partner_school = models.ForeignKey(
+        "courses.PartnerSchool",
+        on_delete=models.CASCADE,
+        related_name="shares",
+        null=True,
+        blank=True,
+    )
+    is_active = models.BooleanField(default=True, blank=True)
+
+    def __str__(self):
+        if self.partner_school:
+            return f"Learner Program Record for {self.user.username} shared with partner school {self.partner_school.name} on {self.created_on} - {self.share_uuid}"
+        else:
+            return f"Learner Program record for {self.user.username} shared with the public on {self.created_on} - {self.share_uuid}"
+
+    class Meta:
+        constraints = [
+            UniqueConstraint(
+                name="record_share_partner_school_unique",
+                fields=("program", "user", "partner_school"),
+            )
+        ]

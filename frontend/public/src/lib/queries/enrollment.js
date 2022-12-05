@@ -9,10 +9,15 @@ export const programEnrollmentsSelector = pathOr(null, [
   "entities",
   "program_enrollments"
 ])
+export const learnerRecordSelector = pathOr(null, [
+  "entities",
+  "learner_record"
+])
 
 export const enrollmentsQueryKey = "enrollments"
 export const enrollmentQueryKey = "enrollment"
 export const programEnrollmentsQueryKey = "program_enrollments"
+export const learnerRecordQueryKey = "learner_record"
 
 export const enrollmentsQuery = () => ({
   queryKey:  enrollmentsQueryKey,
@@ -44,6 +49,28 @@ export const enrollmentQuery = () => ({
   }),
   update: {
     enrollment: nextState
+  }
+})
+
+export const learnerRecordQuery = (programId: number) => ({
+  queryKey:  learnerRecordQueryKey,
+  url:       `/api/records/program/${programId}`,
+  transform: json => ({
+    learnerRecord: json
+  }),
+  update: {
+    learnerRecord: nextState
+  }
+})
+
+export const sharedLearnerRecordQuery = (uuid: string) => ({
+  queryKey:  learnerRecordQueryKey,
+  url:       `/api/records/shared/${uuid}`,
+  transform: json => ({
+    learnerRecord: json
+  }),
+  update: {
+    learnerRecord: nextState
   }
 })
 
@@ -97,5 +124,39 @@ export const courseEmailsSubscriptionMutation = (
       }
       return prevEnrollments
     }
+  }
+})
+
+export const getLearnerRecordSharingLinkMutation = (
+  programId: number,
+  partnerSchoolId: number | null
+) => ({
+  url:  `/api/records/program/${programId}/share/`,
+  body: {
+    partnerSchool: partnerSchoolId
+  },
+  options: {
+    ...getCsrfOptions(),
+    method: "POST"
+  },
+  transform: json => ({
+    learnerRecord: json
+  }),
+  update: {
+    learnerRecord: nextState
+  }
+})
+
+export const revokeLearnerRecordSharingLinkMutation = (programId: number) => ({
+  url:     `/api/records/program/${programId}/revoke/`,
+  options: {
+    ...getCsrfOptions(),
+    method: "POST"
+  },
+  transform: json => ({
+    learnerRecord: json
+  }),
+  update: {
+    learnerRecord: nextState
   }
 })

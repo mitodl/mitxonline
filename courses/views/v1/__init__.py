@@ -1,14 +1,14 @@
 """Course views verson 1"""
 import logging
-from typing import Tuple, Optional, Union
+from typing import Optional, Tuple, Union
 
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
-from rest_framework import mixins, viewsets, status
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -23,36 +23,41 @@ from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
     Course,
     CourseRun,
-    Program,
     CourseRunEnrollment,
+    LearnerProgramRecordShare,
+    PartnerSchool,
+    Program,
     ProgramEnrollment,
 )
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
     CourseRunSerializer,
     CourseSerializer,
+    LearnerRecordSerializer,
+    PartnerSchoolSerializer,
     ProgramSerializer,
     UserProgramEnrollmentDetailSerializer,
 )
+from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
 from main import features
 from main.constants import (
-    USER_MSG_COOKIE_NAME,
-    USER_MSG_TYPE_ENROLLED,
     USER_MSG_COOKIE_MAX_AGE,
-    USER_MSG_TYPE_ENROLL_FAILED,
+    USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_FAILED,
+    USER_MSG_TYPE_ENROLLED,
 )
 from main.utils import encode_json_cookie_value
 from openedx.api import (
-    sync_enrollments_with_edx,
     subscribe_to_edx_course_emails,
+    sync_enrollments_with_edx,
     unsubscribe_from_edx_course_emails,
 )
 from openedx.exceptions import (
-    UnknownEdxApiEmailSettingsException,
     EdxApiEmailSettingsErrorException,
     NoEdxApiAuthError,
+    UnknownEdxApiEmailSettingsException,
 )
 
 log = logging.getLogger(__name__)
@@ -299,3 +304,103 @@ def get_user_program_enrollments(request):
         )
 
     return Response(UserProgramEnrollmentDetailSerializer(program_list, many=True).data)
+
+
+class PartnerSchoolViewSet(viewsets.ReadOnlyModelViewSet):
+    """API view set for PartnerSchools"""
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    serializer_class = PartnerSchoolSerializer
+    queryset = PartnerSchool.objects.all()
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_learner_record(request, pk):
+    program = Program.objects.get(pk=pk)
+
+    return Response(LearnerRecordSerializer(program, context={"request": request}).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def get_learner_record_share(request, pk):
+    """
+    Sets up a sharing link for the learner's record. Returns back the entire
+    learner record.
+    """
+    program = Program.objects.get(pk=pk)
+
+    school = None
+
+    if "partnerSchool" in request.data and request.data["partnerSchool"] is not None:
+        # OK here to just turn on the existing partner school share if there's
+        # already one - these technically don't get revoked.
+        try:
+            school = PartnerSchool.objects.get(pk=request.data["partnerSchool"])
+        except:
+            return Response("Partner school not found.", status.HTTP_404_NOT_FOUND)
+
+        (ps_share, created) = LearnerProgramRecordShare.objects.filter(
+            user=request.user, program=program, partner_school=school
+        ).get_or_create(user=request.user, program=program, partner_school=school)
+        ps_share.is_active = True
+        ps_share.save()
+
+        # Send email
+        send_partner_school_email.delay(ps_share.share_uuid)
+    else:
+        # If we're creating an anonymous one, we need to check to make sure the
+        # existing link hasn't been deactivated (if there is one). We don't
+        # want to re-activate an existing one so people can revoke the links
+        # that are out there and get new ones. But, if there's a still active
+        # record out there, we don't want to make another new one either.
+
+        (ps_share, created) = LearnerProgramRecordShare.objects.filter(
+            user=request.user, program=program, partner_school=None, is_active=True
+        ).get_or_create(
+            user=request.user, program=program, partner_school=None, is_active=True
+        )
+
+    return Response(LearnerRecordSerializer(program, context={"request": request}).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def revoke_learner_record_share(request, pk):
+    """
+    Disables sharing links for the learner's record. This only applies to the
+    anonymous ones; shares sent to partner schools are always allowed once they
+    are sent.
+    """
+    program = Program.objects.get(pk=pk)
+
+    LearnerProgramRecordShare.objects.filter(
+        user=request.user, partner_school=None, program=program
+    ).update(is_active=False)
+
+    return Response(LearnerRecordSerializer(program, context={"request": request}).data)
+
+
+@api_view(["GET"])
+@permission_classes([])
+def get_learner_record_from_uuid(request, uuid):
+    """
+    Does mostly the same thing as get_learner_record, but sets context to skip
+    the partner school and sharing information.
+    """
+    record = LearnerProgramRecordShare.objects.filter(
+        is_active=True, share_uuid=uuid
+    ).first()
+
+    if record is None:
+        return Response([], status=status.HTTP_404_NOT_FOUND)
+
+    return Response(
+        LearnerRecordSerializer(
+            record.program, context={"user": record.user, "anonymous_pull": True}
+        ).data
+    )

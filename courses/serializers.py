@@ -1,9 +1,11 @@
 """
 Course model serializers
 """
+import logging
 from urllib.parse import urljoin
 
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ObjectDoesNotExist
 from django.templatetags.static import static
 from rest_framework import serializers
@@ -20,7 +22,12 @@ from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSe
 from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
 from main.serializers import StrictFieldsSerializer
+from main.settings import AUTH_USER_MODEL
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from users.models import User
+from users.serializers import UserSerializer
+
+logger = logging.getLogger(__name__)
 
 
 def _get_thumbnail_url(page):
@@ -684,3 +691,110 @@ class ProgramRequirementTreeSerializer(serializers.ListSerializer):
         # here we're bypassing Serializer.data implementation because it coerces
         # the to_representation return value into a dict of its keys
         return models.ProgramRequirement.dump_bulk(parent=self.instance, keep_ids=True)
+
+
+class PartnerSchoolSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.PartnerSchool
+        fields = "__all__"
+
+
+class LearnerProgramRecordShareSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.LearnerProgramRecordShare
+        fields = "__all__"
+
+
+class LearnerRecordSerializer(serializers.BaseSerializer):
+    """
+    Gathers the various data needed to display the learner's program record.
+    Pass the program you want the record for and attach the learner via context
+    object.
+    """
+
+    def to_representation(self, instance):
+        """
+        Returns formatted data.
+
+        Args:
+        - instance (Program): The program to retrieve data for.
+        """
+        user = None
+
+        if "request" in self.context:
+            if not isinstance(self.context["request"].user, AnonymousUser):
+                user = self.context["request"].user
+
+        if "user" in self.context and isinstance(self.context["user"], User):
+            user = self.context["user"]
+
+        if user is None:
+            raise ValidationError("Valid user object not found")
+
+        courses = []
+
+        for course in instance.courses.all():
+            fmt_course = {
+                "title": course.title,
+                "id": course.id,
+                "readable_id": course.readable_id,
+                "reqtype": course.requirement_type,
+                "grade": None,
+                "certificate": None,
+            }
+
+            grade = (
+                models.CourseRunGrade.objects.filter(
+                    user=user, course_run__course=course
+                )
+                .order_by("-grade")
+                .first()
+            )
+
+            if grade is not None:
+                fmt_course["grade"] = CourseRunGradeSerializer(grade).data
+
+            certificate = (
+                models.CourseRunCertificate.objects.filter(
+                    user=user, course_run__course=course, is_revoked=False
+                )
+                .order_by("-created_on")
+                .first()
+            )
+
+            if certificate is not None:
+                fmt_course["certificate"] = CourseRunCertificateSerializer(
+                    certificate
+                ).data
+
+            courses.append(fmt_course)
+
+        shares = models.LearnerProgramRecordShare.objects.filter(
+            user=user, program=instance, is_active=True
+        ).all()
+
+        output = {
+            "user": {
+                "name": user.name,
+                "email": user.email,
+                "username": user.username,
+            },
+            "program": {
+                "title": instance.title,
+                "readable_id": instance.readable_id,
+                "courses": courses,
+                "requirements": ProgramRequirementTreeSerializer(
+                    instance.requirements_root
+                ).data,
+            },
+            "sharing": LearnerProgramRecordShareSerializer(shares, many=True).data
+            if "anonymous_pull" not in self.context
+            else [],
+            "partner_schools": PartnerSchoolSerializer(
+                models.PartnerSchool.objects.all(), many=True
+            ).data
+            if "anonymous_pull" not in self.context
+            else [],
+        }
+
+        return output

@@ -3,7 +3,7 @@ import React from "react"
 import EnrolledItemCard from "./EnrolledItemCard"
 import ProgramCourseInfoCard from "./ProgramCourseInfoCard"
 import { enrollmentHasPassingGrade } from "../lib/courseApi"
-
+import { areLearnerRecordsEnabled } from "../lib/util"
 import type {
   ProgramEnrollment,
   CourseDetailWithRuns
@@ -121,6 +121,18 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
                 {enrollment.program.courses.length -
                   enrollment.enrollments.length}{" "}
                 not enrolled
+                {areLearnerRecordsEnabled() ? (
+                  <>
+                    <br />
+                    <a
+                      href={`/records/${enrollment.program.id}/`}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      View program record
+                    </a>
+                  </>
+                ) : null}
               </p>
             </div>
             <div className="row enrolled-items" id="program_enrolled_items">

@@ -3,6 +3,8 @@ import casual from "casual-browserify"
 
 import { incrementer } from "./util"
 
+import type { LearnerRecordUser } from "../flow/authTypes"
+
 import type {
   CourseRun,
   CourseRunDetail,
@@ -10,7 +12,15 @@ import type {
   CourseDetail,
   CourseDetailWithRuns,
   ProgramEnrollment,
-  Program
+  Program,
+  PartnerSchool,
+  LearnerRecord,
+  LearnerRecordCertificate,
+  ProgramRequirement,
+  LearnerRecordGrade,
+  LearnerRecordCourse,
+  LearnerRecordProgram,
+  LearnerRecordShare
 } from "../flow/courseTypes"
 
 const genCourseRunId = incrementer()
@@ -19,6 +29,8 @@ const genCoursewareId = incrementer()
 const genRunTagNumber = incrementer()
 const genProductId = incrementer()
 const genProgramId = incrementer()
+const genPartnerSchoolId = incrementer()
+const genProgramRequirementId = incrementer()
 
 export const makeCourseRun = (): CourseRun => ({
   title:            casual.text,
@@ -134,3 +146,183 @@ export const makeProgramEnrollment = (): ProgramEnrollment => ({
   program:     makeProgram(),
   enrollments: makeCourseRunEnrollment()
 })
+
+export const makeLearnerRecordCertificate = (): LearnerRecordCertificate => ({
+  uuid: casual.uuid,
+  link: casual.array_of_words(3).join("/")
+})
+
+export const makeLearnerRecordGrade = (): LearnerRecordGrade => ({
+  grade:         Math.ceil(Math.random() * 100) / 100,
+  letter_grade:  String.fromCharCode(casual.integer(0, 3) + 65),
+  passed:        casual.coin_flip,
+  set_by_admin:  casual.coin_flip,
+  grade_percent: Math.ceil(Math.random() * 100)
+})
+
+export const makeLearnerRecordCourse = (): LearnerRecordCourse => ({
+  title:       casual.short_description,
+  id:          genCourseId.next().value,
+  readable_id: casual.word.concat(genCoursewareId.next().value),
+  reqtype:     null,
+  grade:       casual.coin_flip ? makeLearnerRecordGrade() : null,
+  certificate: casual.coin_flip ? makeLearnerRecordCertificate() : null
+})
+
+export const makeLearnerRecordProgram = (): LearnerRecordProgram => ({
+  title:        casual.short_description,
+  readable_id:  casual.word.concat(genCoursewareId.next().value),
+  courses:      [],
+  requirements: []
+})
+
+export const makePartnerSchool = (): PartnerSchool => ({
+  id:    genPartnerSchoolId.next().value,
+  name:  casual.company_name,
+  email: casual.email
+})
+
+export const makeLearnerRecordShare = (
+  forPartnerSchool: boolean
+): LearnerRecordShare => ({
+  share_uuid:     casual.uuid,
+  created_on:     casual.date(),
+  updated_on:     casual.date(),
+  is_active:      casual.coin_flip,
+  user:           casual.integer(0, 1000),
+  program:        casual.integer(0, 1000),
+  partner_school: forPartnerSchool ? casual.integer(0, 1000) : null
+})
+
+export const makeLearnerRecordUser = (): LearnerRecordUser => ({
+  name:     casual.name,
+  email:    casual.email,
+  username: casual.username
+})
+
+export const makeRequirementCourseNode = (
+  course: LearnerRecordCourse,
+  parentNode: ProgramRequirement,
+  shouldBeCompleted: boolean
+): ProgramRequirement => {
+  const courseNode = {
+    id:   genProgramRequirementId.next().value,
+    data: {
+      node_type: "course",
+      program:   parentNode.data.program,
+      course:    course.id
+    },
+    children: []
+  }
+
+  if (shouldBeCompleted || casual.coin_flip) {
+    course.grade = makeLearnerRecordGrade()
+    course.certificate = makeLearnerRecordCertificate()
+  }
+
+  course.reqtype = parentNode.data.title
+
+  return courseNode
+}
+
+export const makeLearnerRecord = (
+  shouldBeCompleted: boolean
+): LearnerRecord => {
+  // This does a lot of things. It will generate a program with a handful of
+  // courses, some of which are required and some are electives, with the
+  // requisite requirements tree, and will generate grades for your fake learner
+  // depending on the flag.
+
+  const partnerSchools = []
+  const courses = []
+
+  for (let i = 0; i < 5; i++) {
+    partnerSchools.push(makePartnerSchool())
+  }
+
+  // mirroring RC DEDP as of 12/1 - 3 required, two electives and then a nested
+  // elective with two more courses in it
+  for (let i = 0; i < 7; i++) {
+    courses.push(makeLearnerRecordCourse())
+  }
+
+  const learnerRecord = {
+    user:            makeLearnerRecordUser(),
+    program:         makeLearnerRecordProgram(),
+    sharing:         [],
+    partner_schools: partnerSchools
+  }
+
+  // make root node
+  // root nodes have two children - both operators, one for reqs and one for electives
+  const rn = {
+    id:   genProgramRequirementId.next().value,
+    data: {
+      node_type: "program_root",
+      program:   learnerRecord.program.id
+    },
+    children: [
+      {
+        id:   genProgramRequirementId.next().value,
+        data: {
+          node_type: "operator",
+          program:   learnerRecord.program.id,
+          operator:  "all_of",
+          title:     "Required Courses"
+        },
+        children: []
+      },
+      {
+        id:   genProgramRequirementId.next().value,
+        data: {
+          node_type:      "operator",
+          program:        learnerRecord.program.id,
+          operator:       "min_number_of",
+          operator_value: 1,
+          title:          "Elective Courses"
+        },
+        children: []
+      }
+    ]
+  }
+
+  // add courses to the Required Courses node
+  for (let i = 0; i < 3; i++) {
+    rn.children[0].children.push(
+      makeRequirementCourseNode(courses[i], rn.children[0], shouldBeCompleted)
+    )
+  }
+
+  // add base-level electives
+  for (let i = 3; i < 5; i++) {
+    rn.children[1].children.push(
+      makeRequirementCourseNode(courses[i], rn.children[1], shouldBeCompleted)
+    )
+  }
+
+  // add nested operator and electives
+  const nestedElectiveOp = {
+    id:   genProgramRequirementId.next().value,
+    data: {
+      node_type:      "operator",
+      program:        learnerRecord.program.id,
+      operator:       "min_number_of",
+      operator_value: 1,
+      title:          "One of"
+    },
+    children: []
+  }
+
+  for (let i = 5; i < courses.length; i++) {
+    nestedElectiveOp.children.push(
+      makeRequirementCourseNode(courses[i], nestedElectiveOp, shouldBeCompleted)
+    )
+  }
+
+  rn.children[1].children.push(nestedElectiveOp)
+
+  learnerRecord.program.requirements = [rn]
+  learnerRecord.program.courses = courses
+
+  return learnerRecord
+}

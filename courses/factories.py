@@ -7,16 +7,18 @@ from factory.django import DjangoModelFactory
 
 from courses.constants import PROGRAM_TEXT_ID_PREFIX
 from courses.models import (
+    BlockedCountry,
     Course,
     CourseRun,
+    CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
-    CourseRunCertificate,
-    ProgramCertificate,
+    LearnerProgramRecordShare,
+    PartnerSchool,
     Program,
+    ProgramCertificate,
     ProgramEnrollment,
     ProgramRun,
-    BlockedCountry,
 )
 from users.factories import UserFactory
 
@@ -180,3 +182,21 @@ class ProgramEnrollmentFactory(DjangoModelFactory):
 
     class Meta:
         model = ProgramEnrollment
+
+
+class PartnerSchoolFactory(DjangoModelFactory):
+    name = fuzzy.FuzzyText(prefix="Program ")
+    email = fuzzy.FuzzyText(suffix="@example.com")
+
+    class Meta:
+        model = PartnerSchool
+
+
+class LearnerProgramRecordShareFactory(DjangoModelFactory):
+    user = SubFactory(UserFactory)
+    program = SubFactory(ProgramFactory)
+    partner_school = SubFactory(PartnerSchoolFactory)
+    is_active = fuzzy.FuzzyInteger(0, 1, 1)
+
+    class Meta:
+        model = LearnerProgramRecordShare

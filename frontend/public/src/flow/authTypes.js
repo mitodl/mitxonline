@@ -129,3 +129,9 @@ export type updateEmailResponse = {
   confirmed: boolean,
   detail: ?string
 }
+
+export type LearnerRecordUser = {
+  name: string,
+  email: string,
+  username: string,
+}
