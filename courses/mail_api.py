@@ -82,11 +82,7 @@ def send_partner_school_sharing_message(learner_record):
                 learner_record.partner_school.email,
                 {
                     "learner_record": learner_record,
-                    "record_link": SITE_BASE_URL
-                    + reverse(
-                        "shared_learner_record_from_uuid",
-                        kwargs={"uuid": learner_record.share_uuid},
-                    ),
+                    "record_link": f"{SITE_BASE_URL}/records/shared/{learner_record.share_uuid}",
                 },
             )
     except Exception:  # pylint: disable=broad-except
