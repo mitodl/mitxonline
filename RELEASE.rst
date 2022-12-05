@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.54.2
+Version 0.54.2 (Released December 05, 2022)
 --------------
 
 - Adds program record functionality
