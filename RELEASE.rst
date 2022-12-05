@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.54.2
+--------------
+
+- Change ubuntu-latest to ubuntu-20.04 on all hithub actions yml files
+
 Version 0.54.1 (Released November 22, 2022)
 --------------
 
