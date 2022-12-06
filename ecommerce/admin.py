@@ -187,7 +187,12 @@ class OrderTransactionInline(admin.TabularInline):
 class BaseOrderAdmin(FSMTransitionMixin, TimestampedModelAdmin):
     """Base admin for Order"""
 
-    search_fields = ["id", "purchaser__email", "purchaser__username"]
+    search_fields = [
+        "id",
+        "purchaser__email",
+        "purchaser__username",
+        "reference_number",
+    ]
     list_display = ["id", "state", "get_purchaser", "total_price_paid"]
     list_fields = ["state"]
     list_filter = ["state"]
@@ -245,7 +250,12 @@ class FulfilledOrderAdmin(TimestampedModelAdmin):
     """Admin for FulfilledOrder"""
 
     readonly_fields = ["reference_number"]
-    search_fields = ["id", "purchaser__email", "purchaser__username"]
+    search_fields = [
+        "id",
+        "purchaser__email",
+        "purchaser__username",
+        "reference_number",
+    ]
     list_display = ["id", "state", "get_purchaser", "total_price_paid"]
     list_fields = ["state"]
     list_filter = ["state"]
