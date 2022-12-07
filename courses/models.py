@@ -688,7 +688,12 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     Model for storing course run certificates
     """
 
-    course_run = models.ForeignKey(CourseRun, null=False, on_delete=models.CASCADE)
+    course_run = models.ForeignKey(
+        CourseRun,
+        null=False,
+        on_delete=models.CASCADE,
+        related_name="courseruncertificates",
+    )
     certificate_page_revision = models.ForeignKey(
         PageRevision, null=True, on_delete=models.CASCADE
     )

@@ -123,7 +123,7 @@ class CourseRunFactory(DjangoModelFactory):
 NODE_TYPES = [x[0] for x in ProgramRequirementNodeType.choices]
 OPERATORS = [x[0] for x in ProgramRequirement.Operator.choices]
 OPERATOR_VALUES = [str(x) for x in range(1, 11)]
-TITILES = ["Required Courses", "Elective Courses"]
+TITLES = ["Required Courses", "Elective Courses"]
 
 
 class ProgramRequirementFactory(DjangoModelFactory):
@@ -135,7 +135,7 @@ class ProgramRequirementFactory(DjangoModelFactory):
 
     program = factory.SubFactory(ProgramFactory)
     course = factory.SubFactory(CourseFactory)
-    title = fuzzy.FuzzyChoice(TITILES)
+    title = fuzzy.FuzzyChoice(TITLES)
 
     class Meta:
         model = ProgramRequirement

@@ -44,21 +44,15 @@ def test_generate_program_certificate_failure_not_all_passed(user, program):
     Test that generate_program_certificate return (None, False) and not create program certificate
     if there is not any course_run certificate for the given course.
     """
-    courses = CourseFactory.create_batch(2, program=program)
-    course_runs = CourseRunFactory.create_batch(2, course=factory.Iterator(courses))
+    courses = CourseFactory.create_batch(3, program=program)
+    course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     CourseRunCertificateFactory.create_batch(
         2, user=user, course_run=factory.Iterator(course_runs)
-    )
-    CourseRunGradeFactory.create_batch(
-        2,
-        course_run=factory.Iterator(course_runs),
-        user=user,
-        passed=factory.Iterator([True, False]),
-        grade=factory.Iterator([1, 0]),
     )
     ProgramRequirementFactory.add_root(program)
     program.add_requirement(courses[0])
     program.add_requirement(courses[1])
+    program.add_requirement(courses[2])
 
     result = generate_program_certificate(user=user, program=program)
     assert result == (None, False)

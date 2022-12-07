@@ -33,12 +33,23 @@ def is_grade_valid(override_grade: float):
     return 0.0 <= override_grade <= 1.0
 
 
-# has a learner passed all the requirements for a certificate?
 def has_earned_program_cert(user, program):
+    """
+    Checks if a user has earned all the course certificates required
+    for a given program.
+
+    Args:
+        user (User): a Django user.
+        program (programs.models.Program): program where the user is enrolled.
+
+    Returns:
+        bool: True if a user has earned all the course certificates required
+              for a given program else False
+    """
     passed_courses = Course.objects.filter(
         in_programs__program=program,
-        courseruns__courserungrade__user=user,
-        courseruns__courserungrade__passed=True,
+        courseruns__courseruncertificates__user=user,
+        courseruns__courseruncertificates__is_revoked=False,
     )
     root = ProgramRequirement.get_root_nodes().get(program=program)
 
@@ -82,53 +93,7 @@ def generate_program_certificate(user, program):
         )
         return existing_cert_queryset.first(), False
 
-    min_number_of_nodes = (
-        program.get_requirements_root()
-        .get_descendants()
-        .filter(
-            node_type=ProgramRequirementNodeType.OPERATOR,
-            operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-        )
-        .distinct()
-    )
-
-    # required elective courses count
-    min_required_courses_sum = 0
-
-    # total elective courses list
-    total_elective_courses = []
-
-    for node in min_number_of_nodes:
-        min_required_courses_sum += int(node.operator_value)
-        total_elective_courses += list(
-            node.get_children()
-            .filter(node_type=ProgramRequirementNodeType.COURSE)
-            .order_by("course_id")
-            .distinct("course_id")
-            .values_list("course_id", flat=True)
-        )
-    not_required_courses_count = (
-        len(set(total_elective_courses)) - min_required_courses_sum
-    )
-
-    # which courses are in a program?
-    courses_in_program_ids = (
-        Course.objects.filter(in_programs__program=program)
-        .distinct()
-        .values_list("id", flat=True)
-    )
-
-    num_courses_with_cert = (
-        CourseRunCertificate.objects.filter(
-            user=user, course_run__course_id__in=courses_in_program_ids
-        )
-        .distinct()
-        .count()
-    )
-
-    if (
-        len(courses_in_program_ids) - not_required_courses_count
-    ) > num_courses_with_cert or not has_earned_program_cert(user, program):
+    if not has_earned_program_cert(user, program):
         return None, False
 
     program_cert = ProgramCertificate.objects.create(user=user, program=program)
