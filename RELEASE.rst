@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.54.3
+--------------
+
+- Adds "reference_number" to the searchable fields in the BaseOrderAdmin and FulfilledOrderAdmin classes
+
 Version 0.54.2 (Released December 05, 2022)
 --------------
 
