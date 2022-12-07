@@ -7,8 +7,8 @@ import os
 import platform
 from datetime import timedelta
 from urllib.parse import urljoin, urlparse
-import cssutils
 
+import cssutils
 import dj_database_url
 from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
@@ -20,11 +20,9 @@ from mitol.common.envs import (
     get_string,
     import_settings_modules,
 )
-
-from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from mitol.google_sheets.settings.google_sheets import *
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *
-
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
@@ -790,6 +788,17 @@ CRON_COURSE_CERTIFICATES_DAYS = get_string(
     default="*",
     description="'day_of_week' value for 'generate-course-certificate' scheduled task (default will run once a day).",
 )
+CRON_ORPHAN_CHECK_HOURS = get_string(
+    name="CRON_ORPHAN_CHECK_HOURS",
+    default="3",
+    description="'hours' value for 'check-for-program-orphans' scheduled task (default will run at 3 AM).",
+)
+CRON_ORPHAN_CHECK_DAYS = get_string(
+    name="CRON_ORPHAN_CHECK_DAYS",
+    default="*",
+    description="'day_of_week' value for 'check-for-program-orphans' scheduled task (default will run once a day).",
+)
+
 CERTIFICATE_CREATION_DELAY_IN_HOURS = get_int(
     name="CERTIFICATE_CREATION_DELAY_IN_HOURS",
     default=24,
@@ -844,6 +853,16 @@ CELERY_BEAT_SCHEDULE = {
             minute=0,
             hour=CRON_COURSE_CERTIFICATES_HOURS,
             day_of_week=CRON_COURSE_CERTIFICATES_DAYS,
+            day_of_month="*",
+            month_of_year="*",
+        ),
+    },
+    "check-for-program-orphans": {
+        "task": "courses.tasks.check_for_program_orphans",
+        "schedule": crontab(
+            minute=0,
+            hour=CRON_ORPHAN_CHECK_HOURS,
+            day_of_week=CRON_ORPHAN_CHECK_DAYS,
             day_of_month="*",
             month_of_year="*",
         ),

@@ -463,7 +463,7 @@ export class EnrolledItemCard extends React.Component<
     return (
       <div
         className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3"
-        key={enrollment.program.id}
+        key={`enrolled-program-card-id-${enrollment.program.id}`}
       >
         <div className="row flex-grow-1">
           <div className="col-12 col-md-auto px-0 px-md-3">

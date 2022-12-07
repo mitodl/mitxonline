@@ -7,7 +7,12 @@ from django.conf import settings
 from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 
-from courses.models import CourseRun, CourseRunEnrollment, LearnerProgramRecordShare
+from courses.models import (
+    CourseRun,
+    CourseRunEnrollment,
+    LearnerProgramRecordShare,
+    Program,
+)
 from main.celery import app
 
 log = logging.getLogger(__name__)
@@ -66,3 +71,20 @@ def send_partner_school_email(record_uuid):
     record = LearnerProgramRecordShare.objects.get(share_uuid=record_uuid)
 
     send_partner_school_sharing_message(record)
+
+
+@app.task
+def check_for_program_orphans():
+    """
+    Check the programs for orphaned courses. You can do something similar to
+    this by using the check_program_requirements management command. This just
+    lets the API call run; it'll throw errors if it finds things.
+
+    This only checks Live programs; if they're not Live then they're unlikely to
+    cause issues in the front-end.
+    """
+    from courses.api import check_program_for_orphans
+
+    for program in Program.objects.filter(live=True).all():
+        log.info(f"check_for_program_orphans: checking program {program.readable_id}")
+        check_program_for_orphans(program)

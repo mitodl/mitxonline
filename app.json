@@ -91,6 +91,14 @@
       "description": "'hours' value for the 'generate-course-certificate' scheduled task (defaults to midnight)",
       "required": false
     },
+    "CRON_ORPHAN_CHECK_DAYS": {
+      "description": "'day_of_week' value for 'check-for-program-orphans' scheduled task (default will run once a day).",
+      "required": false
+    },
+    "CRON_ORPHAN_CHECK_HOURS": {
+      "description": "'hours' value for 'check-for-program-orphans' scheduled task (default will run at 3 AM).",
+      "required": false
+    },
     "CRON_PROCESS_REFUND_REQUESTS_MINUTES": {
       "description": "minute value for scheduled task to process refund requests",
       "required": false

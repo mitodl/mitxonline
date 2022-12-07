@@ -71,6 +71,49 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     return passedFlags
   }
 
+  renderCourseCards() {
+    const { enrollment } = this.props
+
+    return (
+      <React.Fragment
+        key={`drawer-course-list-${enrollment.program.readable_id}`}
+      >
+        <div className="row enrolled-items" id="program_enrolled_items">
+          <h6>REQUIRED ({enrollment.program.requirements.required.length})</h6>
+
+          {enrollment.program.courses.map(courseEnrollment =>
+            this.isRequired(courseEnrollment)
+              ? this.renderCourseInfoCard(courseEnrollment)
+              : null
+          )}
+        </div>
+        <div className="row enrolled-items" id="program_unenrolled_items">
+          <h6>OPTIONAL ({enrollment.program.requirements.electives.length})</h6>
+
+          {enrollment.program.courses.map(courseEnrollment => {
+            return this.isElective(courseEnrollment)
+              ? this.renderCourseInfoCard(courseEnrollment)
+              : null
+          })}
+        </div>
+      </React.Fragment>
+    )
+  }
+
+  renderFlatCourseCards() {
+    const { enrollment } = this.props
+
+    return (
+      <div className="row enrolled-items" id="program_enrolled_items">
+        <h6>COURSES ({enrollment.program.courses.length})</h6>
+
+        {enrollment.program.courses.map(courseEnrollment =>
+          this.renderCourseInfoCard(courseEnrollment)
+        )}
+      </div>
+    )
+  }
+
   render() {
     const { isHidden, enrollment, showDrawer } = this.props
 
@@ -135,28 +178,9 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
                 ) : null}
               </p>
             </div>
-            <div className="row enrolled-items" id="program_enrolled_items">
-              <h6>
-                REQUIRED ({enrollment.program.requirements.required.length})
-              </h6>
-
-              {enrollment.program.courses.map(courseEnrollment =>
-                this.isRequired(courseEnrollment)
-                  ? this.renderCourseInfoCard(courseEnrollment)
-                  : null
-              )}
-            </div>
-            <div className="row enrolled-items" id="program_unenrolled_items">
-              <h6>
-                OPTIONAL ({enrollment.program.requirements.electives.length})
-              </h6>
-
-              {enrollment.program.courses.map(courseEnrollment => {
-                return this.isElective(courseEnrollment)
-                  ? this.renderCourseInfoCard(courseEnrollment)
-                  : null
-              })}
-            </div>
+            {enrollment.program.requirements.length === 0
+              ? this.renderFlatCourseCards()
+              : this.renderCourseCards()}
           </div>
         </div>
       </>

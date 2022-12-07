@@ -1,4 +1,5 @@
 """Courses API tests"""
+import logging
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -6,48 +7,48 @@ from unittest.mock import Mock
 import factory
 import pytest
 from django.core.exceptions import ValidationError
-from edx_api.course_detail import CourseDetail, CourseDetails, CourseModes, CourseMode
+from edx_api.course_detail import CourseDetail, CourseDetails, CourseMode, CourseModes
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 
 from courses.api import (
-    get_user_relevant_course_run,
+    check_program_for_orphans,
     create_program_enrollments,
     create_run_enrollments,
     deactivate_program_enrollment,
     deactivate_run_enrollment,
     defer_enrollment,
-    get_user_enrollments,
-    sync_course_mode,
-    sync_course_runs,
-    process_course_run_grade_certificate,
     generate_course_run_certificates,
+    get_user_enrollments,
+    get_user_relevant_course_run,
     manage_course_run_certificate_access,
     override_user_grade,
+    process_course_run_grade_certificate,
+    sync_course_mode,
+    sync_course_runs,
 )
 from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_REFUNDED,
 )
-
 from courses.factories import (
     CourseFactory,
+    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
-    CourseRunCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
 
 # pylint: disable=redefined-outer-name
-from courses.models import CourseRunEnrollment, ProgramEnrollment
+from courses.models import CourseRunEnrollment, ProgramEnrollment, ProgramRequirement
 from main.test_utils import MockHttpError
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
-    EDX_ENROLLMENT_VERIFIED_MODE,
     EDX_ENROLLMENT_AUDIT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
 )
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
@@ -1161,3 +1162,52 @@ def test_create_run_enrollments_upgrade(mocker, user):
     assert edx_request_success is False
     assert successful_enrollments[0].enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     assert successful_enrollments[0].edx_enrolled == False
+
+
+@pytest.mark.parametrize(
+    "has_empty_tree, has_orphans",
+    [
+        (True, False),
+        (True, True),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_check_program_for_orphans(caplog, has_empty_tree, has_orphans):
+    program = ProgramFactory.create()
+
+    caplog.set_level(logging.ERROR, logger="courses.api")
+
+    for i in range(4):
+        course = CourseFactory.create(program=program)
+        if not has_empty_tree:
+            if i % 2:
+                program.add_requirement(course)
+            else:
+                program.add_elective(course)
+
+    program.save()
+
+    if has_orphans:
+        orphaned_course = CourseFactory.create(program=program)
+
+    program.refresh_from_db()
+
+    if has_empty_tree:
+        assert len(check_program_for_orphans(program)) == program.courses.count()
+        assert (
+            "no requirements tree" in caplog.text or "empty requirements" in caplog.text
+        )
+
+        # just to make sure, forcefully clear *any* ProgramRequirements and check again
+        ProgramRequirement.objects.filter(program_id=program.id).delete()
+        assert len(check_program_for_orphans(program)) == program.courses.count()
+        assert "no requirements tree" in caplog.text
+
+    if has_orphans and not has_empty_tree:
+        assert orphaned_course in program.courses.all()
+        assert orphaned_course in check_program_for_orphans(program)
+        assert "orphaned courses" in caplog.text
+
+    if not has_orphans and not has_empty_tree:
+        assert len(check_program_for_orphans(program)) == 0
