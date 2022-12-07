@@ -17,6 +17,9 @@ take care of it). If the creation is successful, this will optionally run the
 create_courseware_page command for the course run.
 """
 
+from urllib import parse
+
+from django.conf import settings
 from django.core.management import BaseCommand
 from django.db.models import Q
 
@@ -72,7 +75,10 @@ class Command(BaseCommand):
 
         if kwargs["courserun"] is not None:
             try:
-                course = edx_course_detail.get_detail(kwargs["courserun"])
+                course = edx_course_detail.get_detail(
+                    course_id=kwargs["courserun"],
+                    username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
+                )
 
                 if course is not None:
                     edx_courses.append(course)
@@ -103,11 +109,12 @@ class Command(BaseCommand):
                 if course.courseruns.filter(run_tag=kwargs["run_tag"]).count() == 0:
                     try:
                         edx_course = edx_course_detail.get_detail(
-                            f"{course.readable_id}+{kwargs['run_tag']}"
+                            course_id=f"{course.readable_id}+{kwargs['run_tag']}",
+                            username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
                         )
 
-                        if course is not None:
-                            edx_courses.append(course)
+                        if edx_course is not None:
+                            edx_courses.append(edx_course)
                     except Exception as e:
                         self.stdout.write(
                             self.style.ERROR(
@@ -125,7 +132,7 @@ class Command(BaseCommand):
 
         for edx_course in edx_courses:
             courserun_tag = edx_course.course_id.split("+")[-1]
-            course_readable_id = edx_course.removesuffix(f"+{courserun_tag}")
+            course_readable_id = edx_course.course_id.removesuffix(f"+{courserun_tag}")
 
             try:
                 course = Course.objects.filter(readable_id=course_readable_id).get()
@@ -140,6 +147,10 @@ class Command(BaseCommand):
                     title=edx_course.name,
                     live=kwargs["live"],
                     is_self_paced=edx_course.is_self_paced(),
+                    courseware_url_path=parse.urljoin(
+                        settings.OPENEDX_API_BASE_URL,
+                        f"/courses/{edx_course.course_id}",
+                    ),
                 )
 
                 self.stdout.write(
