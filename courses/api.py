@@ -5,12 +5,12 @@ import logging
 from collections import namedtuple
 from datetime import datetime, timedelta
 from traceback import format_exc
-from typing import Optional, List
+from typing import List, Optional
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q, Count
+from django.db.models import Count, Q
 from django.db.models.query import QuerySet
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
@@ -20,20 +20,19 @@ from mitol.common.utils.collections import (
 )
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
-from openedx.api import get_edx_grades_with_users
-from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 from rest_framework.status import HTTP_404_NOT_FOUND
 
 from courses import mail_api
 from courses.constants import ENROLL_CHANGE_STATUS_DEFERRED, PROGRAM_TEXT_ID_PREFIX
 from courses.models import (
+    Course,
     CourseRun,
+    CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
-    CourseRunCertificate,
     Program,
     ProgramEnrollment,
-    Course,
+    ProgramRequirementNodeType,
 )
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import exception_logging_generator, is_grade_valid
@@ -41,14 +40,15 @@ from openedx.api import (
     enroll_in_edx_course_runs,
     get_edx_api_course_detail_client,
     get_edx_api_course_mode_client,
+    get_edx_grades_with_users,
     unenroll_edx_course_run,
 )
+from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
 log = logging.getLogger(__name__)
@@ -808,3 +808,63 @@ def override_user_grade(user, override_grade, courseware_id, should_force_pass=F
         course_run_grade.save_and_log(None)
 
     return course_run_grade
+
+
+def check_program_for_orphans(program: Program, report_error: bool = True) -> List:
+    """
+    Checks a program for orphans.
+
+    Orphans in a program include courses that don't appear in the requirements
+    tree. Additionally, there's a short-circuit here that will trigger if the
+    requirements tree is empty/nonexistant (which is also an error case).
+
+    If the triggers are pulled, this will log an error message if the
+    report_error flag is set to True (which is the default; the intent is to
+    allow you to quiet the reporting if you're looking for orphans to adopt them
+    into the tree).
+
+    Args:
+        program (Program): the program to search through
+        report_error (bool): flag; should the check log an error if there are orphans (default True)
+    Returns:
+        List of Course: the courses that aren't in the requirements tree
+    """
+
+    # program.requirements_root is a @cached_property; for this use case, then,
+    # we always want to pull the root from the database directly.
+    reqroot = program.get_requirements_root()
+
+    if reqroot is None:
+        if report_error:
+            log.error(
+                f"Program {program.title} ({program.readable_id}) has no requirements tree at all"
+            )
+        return program.courses.all()
+
+    if (
+        reqroot.get_descendants()
+        .filter(node_type=ProgramRequirementNodeType.COURSE.value)
+        .count()
+        == 0
+    ):
+        if report_error:
+            log.error(
+                f"Program {program.title} ({program.readable_id}) has an empty requirements tree (no courses)"
+            )
+        return program.courses.all()
+
+    course_ids = [
+        node.course.id
+        for node in reqroot.get_descendants()
+        .filter(node_type=ProgramRequirementNodeType.COURSE.value)
+        .all()
+    ]
+
+    all_orphans = program.courses.exclude(id__in=course_ids).all()
+
+    if len(all_orphans) > 0 and report_error:
+        log.error(
+            f"Program {program.title} ({program.readable_id}) has {len(all_orphans)} orphaned courses"
+        )
+
+    return all_orphans
