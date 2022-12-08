@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.54.4
+Version 0.54.4 (Released December 08, 2022)
 --------------
 
 - fix: program certificate creation should use ProgramRequirement tree (#1239)
