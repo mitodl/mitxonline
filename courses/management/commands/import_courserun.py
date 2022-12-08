@@ -24,7 +24,6 @@ import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
-from django.db.models import Q
 
 from cms.api import create_default_courseware_page
 from courses.models import Course, CourseRun, Program
@@ -106,20 +105,18 @@ class Command(BaseCommand):
                 )
                 return False
         elif kwargs["program"] is not None and kwargs["run_tag"] is not None:
-            if kwargs["program"].isnumeric():
-                program = Program.objects.filter(pk=kwargs["program"]).all()
-            else:
-                program = Program.objects.filter(readable_id=kwargs["program"]).all()
-
-            if len(program) > 1:
+            try:
+                if kwargs["program"].isnumeric():
+                    program = Program.objects.filter(pk=kwargs["program"]).get()
+                else:
+                    program = Program.objects.filter(
+                        readable_id=kwargs["program"]
+                    ).get()
+            except:
                 self.stdout.write(
-                    self.style.ERROR(
-                        f"Program ID {kwargs['program']} is ambiguous - {len(program)} results found."
-                    )
+                    self.style.ERROR(f"Program {kwargs['program']} not found.")
                 )
                 return False
-
-            program = program.first()
 
             for course in program.courses.all():
                 if course.courseruns.filter(run_tag=kwargs["run_tag"]).count() == 0:
