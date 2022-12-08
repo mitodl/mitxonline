@@ -2,7 +2,7 @@
 import factory
 import faker
 import pytz
-from factory import SubFactory, Trait, fuzzy
+from factory import SubFactory, fuzzy
 from factory.django import DjangoModelFactory
 
 from courses.constants import PROGRAM_TEXT_ID_PREFIX
@@ -18,6 +18,8 @@ from courses.models import (
     Program,
     ProgramCertificate,
     ProgramEnrollment,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
     ProgramRun,
 )
 from users.factories import UserFactory
@@ -116,6 +118,35 @@ class CourseRunFactory(DjangoModelFactory):
         in_future = factory.Trait(
             start_date=factory.Faker("future_datetime", tzinfo=pytz.utc), end_date=None
         )
+
+
+NODE_TYPES = [x[0] for x in ProgramRequirementNodeType.choices]
+OPERATORS = [x[0] for x in ProgramRequirement.Operator.choices]
+OPERATOR_VALUES = [str(x) for x in range(1, 11)]
+TITLES = ["Required Courses", "Elective Courses"]
+
+
+class ProgramRequirementFactory(DjangoModelFactory):
+    """Factory for Program Requirement"""
+
+    node_type = fuzzy.FuzzyChoice(NODE_TYPES)
+    operator = fuzzy.FuzzyChoice(OPERATORS)
+    operator_value = fuzzy.FuzzyChoice(OPERATOR_VALUES)
+
+    program = factory.SubFactory(ProgramFactory)
+    course = factory.SubFactory(CourseFactory)
+    title = fuzzy.FuzzyChoice(TITLES)
+
+    class Meta:
+        model = ProgramRequirement
+
+    @classmethod
+    def add_root(cls, program):
+        if not ProgramRequirement.get_root_nodes().filter(program=program).exists():
+            return ProgramRequirement.add_root(
+                program=program, node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value
+            )
+        return program.get_requirements_root()
 
 
 class BlockedCountryFactory(DjangoModelFactory):

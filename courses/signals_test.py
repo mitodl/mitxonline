@@ -8,6 +8,7 @@ from courses.factories import (
     CourseRunCertificateFactory,
     UserFactory,
     CourseFactory,
+    ProgramRequirementFactory,
 )
 
 
@@ -16,32 +17,34 @@ pytestmark = pytest.mark.django_db
 
 # pylint: disable=unused-argument
 @patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
-@patch("courses.signals.generate_program_certificate", autospec=True)
+@patch("courses.signals.generate_multiple_programs_certificate", autospec=True)
 def test_create_course_certificate(generate_program_cert_mock, mock_on_commit):
     """
-    Test that generate_program_certificate is called when a course
+    Test that generate_multiple_programs_certificate is called when a course
     certificate is created
     """
     user = UserFactory.create()
     course_run = CourseRunFactory.create()
+    ProgramRequirementFactory.add_root(course_run.course.program)
+    course_run.course.program.add_requirement(course_run.course)
     cert = CourseRunCertificateFactory.create(user=user, course_run=course_run)
     generate_program_cert_mock.assert_called_once_with(
-        user, cert.course_run.course.program
+        user, [cert.course_run.course.program]
     )
     cert.save()
     generate_program_cert_mock.assert_called_once_with(
-        user, cert.course_run.course.program
+        user, [cert.course_run.course.program]
     )
 
 
 # pylint: disable=unused-argument
 @patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
-@patch("courses.signals.generate_program_certificate", autospec=True)
+@patch("courses.signals.generate_multiple_programs_certificate", autospec=True)
 def test_generate_program_certificate_not_called(
     generate_program_cert_mock, mock_on_commit
 ):
     """
-    Test that generate_program_certificate is not called when a course
+    Test that generate_multiple_programs_certificate is not called when a course
     is not associated with program.
     """
     user = UserFactory.create()

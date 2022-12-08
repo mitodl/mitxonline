@@ -4,57 +4,15 @@ Tests for utils
 """
 from courses.factories import (
     CourseFactory,
-    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
 )
-from courses.models import ProgramCertificate
 from courses.utils import (
-    generate_program_certificate,
     get_program_certificate_by_enrollment,
 )
-
-
-def test_generate_program_certificate_already_exist(user, program):
-    """
-    Test that generate_program_certificate return (None, False) and not create program certificate
-    if program certificate already exist.
-    """
-    program_certificate = ProgramCertificateFactory.create(program=program, user=user)
-    result = generate_program_certificate(user=user, program=program)
-    assert result == (program_certificate, False)
-    assert len(ProgramCertificate.objects.all()) == 1
-
-
-def test_generate_program_certificate_failure(user, program):
-    """
-    Test that generate_program_certificate return (None, False) and not create program certificate
-    if there is not any course_run certificate for the given course.
-    """
-    course = CourseFactory.create(program=program)
-    CourseRunFactory.create_batch(3, course=course)
-
-    result = generate_program_certificate(user=user, program=program)
-    assert result == (None, False)
-    assert len(ProgramCertificate.objects.all()) == 0
-
-
-def test_generate_program_certificate_success(user, program):
-    """
-    Test that generate_program_certificate generate a program certificate
-    """
-    course = CourseFactory.create(program=program)
-    course_run = CourseRunFactory.create(course=course)
-
-    CourseRunCertificateFactory.create(user=user, course_run=course_run)
-
-    certificate, created = generate_program_certificate(user=user, program=program)
-    assert created is True
-    assert isinstance(certificate, ProgramCertificate)
-    assert len(ProgramCertificate.objects.all()) == 1
 
 
 def test_get_program_certificate_by_enrollment(user, program):

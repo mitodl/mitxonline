@@ -27,6 +27,7 @@ from courses.api import (
     process_course_run_grade_certificate,
     sync_course_mode,
     sync_course_runs,
+    generate_program_certificate,
 )
 from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
@@ -38,12 +39,19 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
-    ProgramEnrollmentFactory,
     ProgramFactory,
+    ProgramCertificateFactory,
+    ProgramEnrollmentFactory,
+    ProgramRequirementFactory,
 )
 
 # pylint: disable=redefined-outer-name
-from courses.models import CourseRunEnrollment, ProgramEnrollment, ProgramRequirement
+from courses.models import (
+    CourseRunEnrollment,
+    ProgramCertificate,
+    ProgramEnrollment,
+    ProgramRequirement,
+)
 from main.test_utils import MockHttpError
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -1211,3 +1219,67 @@ def test_check_program_for_orphans(caplog, has_empty_tree, has_orphans):
 
     if not has_orphans and not has_empty_tree:
         assert len(check_program_for_orphans(program)) == 0
+
+
+def test_generate_program_certificate_failure_missing_certificates(user, program):
+    """
+    Test that generate_program_certificate return (None, False) and not create program certificate
+    if there is not any course_run certificate for the given course.
+    """
+    course = CourseFactory.create(program=program)
+    CourseRunFactory.create_batch(3, course=course)
+    ProgramRequirementFactory.add_root(program)
+    program.add_requirement(course)
+
+    result = generate_program_certificate(user=user, program=program)
+    assert result == (None, False)
+    assert len(ProgramCertificate.objects.all()) == 0
+
+
+def test_generate_program_certificate_failure_not_all_passed(user, program):
+    """
+    Test that generate_program_certificate return (None, False) and not create program certificate
+    if there is not any course_run certificate for the given course.
+    """
+    courses = CourseFactory.create_batch(3, program=program)
+    course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+    CourseRunCertificateFactory.create_batch(
+        2, user=user, course_run=factory.Iterator(course_runs)
+    )
+    ProgramRequirementFactory.add_root(program)
+    program.add_requirement(courses[0])
+    program.add_requirement(courses[1])
+    program.add_requirement(courses[2])
+
+    result = generate_program_certificate(user=user, program=program)
+    assert result == (None, False)
+    assert len(ProgramCertificate.objects.all()) == 0
+
+
+def test_generate_program_certificate_success(user, program):
+    """
+    Test that generate_program_certificate generate a program certificate
+    """
+    course = CourseFactory.create(program=program)
+    ProgramRequirementFactory.add_root(program)
+    program.add_requirement(course)
+    course_run = CourseRunFactory.create(course=course)
+    CourseRunGradeFactory.create(course_run=course_run, user=user, passed=True, grade=1)
+
+    CourseRunCertificateFactory.create(user=user, course_run=course_run)
+
+    certificate, created = generate_program_certificate(user=user, program=program)
+    assert created is True
+    assert isinstance(certificate, ProgramCertificate)
+    assert len(ProgramCertificate.objects.all()) == 1
+
+
+def test_generate_program_certificate_already_exist(user, program):
+    """
+    Test that generate_program_certificate return (None, False) and not create program certificate
+    if program certificate already exist.
+    """
+    program_certificate = ProgramCertificateFactory.create(program=program, user=user)
+    result = generate_program_certificate(user=user, program=program)
+    assert result == (program_certificate, False)
+    assert len(ProgramCertificate.objects.all()) == 1
