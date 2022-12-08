@@ -79,9 +79,7 @@ def test_send_enrollment_failure_message(user, mocker, is_program):
 def test_send_partner_school_sharing_message(mocker):
     """Test that the partner school message goes to the right spot"""
     record = LearnerProgramRecordShareFactory()
-    record_link = SITE_BASE_URL + reverse(
-        "shared_learner_record_from_uuid", kwargs={"uuid": record.share_uuid}
-    )
+    record_link = f"{SITE_BASE_URL}/records/shared/{record.share_uuid}"
 
     patched_get_message_sender = mocker.patch("courses.mail_api.get_message_sender")
     mock_sender = patched_get_message_sender.return_value.__enter__.return_value
