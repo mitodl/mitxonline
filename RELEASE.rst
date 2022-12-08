@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.54.4 (Released December 08, 2022)
+--------------
+
+- fix: program certificate creation should use ProgramRequirement tree (#1239)
+- Updates program drawer to handle empty requirements trees, adds function to check for invalid trees
+
 Version 0.54.3 (Released December 07, 2022)
 --------------
 
