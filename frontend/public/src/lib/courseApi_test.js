@@ -107,7 +107,14 @@ describe("Course API", () => {
         future,
         null,
         "run is not in progress",
-        { active: true, datestr: "" }
+        { active: false, datestr: "" }
+      ],
+      [
+        exampleUrl,
+        past,
+        past,
+        "run is not in progress",
+        { active: false, datestr: "" }
       ],
       [exampleUrl, null, null, "run has no start date", null]
     ].forEach(([coursewareUrl, startDate, endDate, desc, expLinkable]) => {

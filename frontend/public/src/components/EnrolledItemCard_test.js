@@ -148,8 +148,22 @@ describe("EnrolledItemCard", () => {
     assert.isTrue(detailText.startsWith(" | Active"))
   })
 
-  it("Course detail shows `Starts` when start date in future", async () => {
+  it("Course detail shows `Starts` when start date and end date are in the future", async () => {
     enrollmentCardProps.enrollment.run.start_date = moment().add(7, "d")
+    enrollmentCardProps.enrollment.run.end_date = moment().add(14, "d")
+    const inner = await renderedCard()
+    const detail = inner.find(".enrolled-item").find(".detail")
+    assert.isTrue(detail.exists())
+    const detailText = detail
+      .find("span")
+      .at(0)
+      .text()
+    assert.isTrue(detailText.startsWith(" | Starts"))
+  })
+
+  it("Course detail shows `Starts` when start date is in the future and end date is null", async () => {
+    enrollmentCardProps.enrollment.run.start_date = moment().add(7, "d")
+    enrollmentCardProps.enrollment.run.end_date = null
     const inner = await renderedCard()
     const detail = inner.find(".enrolled-item").find(".detail")
     assert.isTrue(detail.exists())
