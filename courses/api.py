@@ -988,3 +988,34 @@ def generate_multiple_programs_certificate(user, programs):
         result = generate_program_certificate(user, program)
         results.append(result)
     return results
+
+
+def manage_program_certificate_access(user, program, revoke_state):
+    """
+    Revokes/Un-Revokes a program certificate.
+
+    Args:
+        user (User): a Django user.
+        program (Program): A Program model object.
+        revoke_state (bool): A flag representing True(Revoke), False(Un-Revoke)
+
+    Returns:
+        bool: A boolean representing the revoke/unrevoke success
+    """
+
+    try:
+        program_certificate = ProgramCertificate.all_objects.get(
+            user=user, program=program
+        )
+    except ProgramCertificate.DoesNotExist:
+        log.warning(
+            "Program certificate for user: %s and program: %s does not exist.",
+            user.username,
+            program.readable_id,
+        )
+        return False
+
+    program_certificate.is_revoked = revoke_state
+    program_certificate.save()
+
+    return True
