@@ -5,15 +5,15 @@ Check the usages of this command below:
 
 **Certificate Creation**
 
-2. Generate Pogram certificate for a user
+1. Generate Pogram certificate for a user
 ./manage.py manage_program_certificates —-create -—program=<program_readable_id> -—user=<username or email>
 
 **Revoke/Un-revoke Certificates**
 
-3. Revoke a certificate for a user
+2. Revoke a certificate for a user
 ./mange.py manage_program_certificates -—revoke -—user=<username or email> -—program=<program_readable_id>
 
-4. Un-Revoke a certificate for a user
+3. Un-Revoke a certificate for a user
 ./mange.py manage_program_certificates -—unrevoke —-program=<program_readable_id> -—user=<username or email>
 
 """
