@@ -55,7 +55,9 @@
         </ul>
       </div>
       <div class="col-xl-4 col-lg-5 col-md-6 cold-sm-12">
-        <span class="copyright">&copy; {% now "Y" %} Massachusetts Institute of Technology</span>
+        {% block copyright %}
+          {% include "copyright.html" %}
+        {% endblock %}
       </div>
     </div>
   </div>
