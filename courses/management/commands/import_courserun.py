@@ -88,6 +88,22 @@ class Command(BaseCommand):
                 app_label="courses", model="courserun"
             ).get()
 
+        program = None
+
+        if kwargs["program"] is not None:
+            try:
+                if kwargs["program"].isnumeric():
+                    program = Program.objects.filter(pk=kwargs["program"]).get()
+                else:
+                    program = Program.objects.filter(
+                        readable_id=kwargs["program"]
+                    ).get()
+            except:
+                self.stdout.write(
+                    self.style.ERROR(f"Program {kwargs['program']} not found.")
+                )
+                return False
+
         if kwargs["courserun"] is not None:
             try:
                 course = edx_course_detail.get_detail(
@@ -105,19 +121,6 @@ class Command(BaseCommand):
                 )
                 return False
         elif kwargs["program"] is not None and kwargs["run_tag"] is not None:
-            try:
-                if kwargs["program"].isnumeric():
-                    program = Program.objects.filter(pk=kwargs["program"]).get()
-                else:
-                    program = Program.objects.filter(
-                        readable_id=kwargs["program"]
-                    ).get()
-            except:
-                self.stdout.write(
-                    self.style.ERROR(f"Program {kwargs['program']} not found.")
-                )
-                return False
-
             for course in program.courses.all():
                 if course.courseruns.filter(run_tag=kwargs["run_tag"]).count() == 0:
                     try:
@@ -148,7 +151,22 @@ class Command(BaseCommand):
             course_readable_id = edx_course.course_id.removesuffix(f"+{courserun_tag}")
 
             try:
-                course = Course.objects.filter(readable_id=course_readable_id).get()
+                (course, created) = Course.objects.filter(
+                    readable_id=course_readable_id
+                ).get_or_create(
+                    program=program,
+                    title=edx_course.name,
+                    readable_id=course_readable_id,
+                    live=kwargs["live"],
+                )
+
+                if created:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Created course for {course_readable_id}: {course}"
+                        )
+                    )
+
                 new_run = CourseRun.objects.create(
                     course=course,
                     run_tag=courserun_tag,
@@ -175,7 +193,9 @@ class Command(BaseCommand):
 
                 if kwargs["create_cms_page"]:
                     try:
-                        create_default_courseware_page(new_run.course)
+                        create_default_courseware_page(
+                            new_run.course, live=kwargs["live"]
+                        )
                         self.stdout.write(
                             self.style.SUCCESS(
                                 f"Created CMS page for {new_run.course.readable_id}"
