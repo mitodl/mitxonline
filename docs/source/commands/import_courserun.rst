@@ -9,7 +9,7 @@ You can also optionally have it create a CMS page for the course, if one doesn't
 
 Furthermore, you can specify a price, and it will create (or update) product(s) for the courserun(s) with the specified price. Created products will use the readable ID for the courserun as the product description and will be made active depending on the courserun. This command will not update existing courseruns; only new ones that it creates will get products.
 
-The course itself must exist for this to work. No data in the course is updated. Any specified courserun that doesn't exist in edX will be skipped - it won't make empty course runs for you (use Django Admin or ``create_courseware`` if you want to do that, since you'll need to specify a few things that you can't here.) Similarly, any courserun that already exists will be skipped - ``sync_courserun``, which runs on a regular basis, will handle syncing the pertinent data for it.
+If the course does not exist, it will be created with the same data as the edX course. Any specified courserun that doesn't exist in edX will be skipped - it won't make empty course runs for you (use Django Admin or ``create_courseware`` if you want to do that, since you'll need to specify a few things that you can't here.) Similarly, any courserun that already exists will be skipped - ``sync_courserun``, which runs on a regular basis, will handle syncing the pertinent data for it.
 
 New courseruns will be created with the following data synced from the edX course_details API call:
 * Start and end dates
@@ -23,14 +23,22 @@ You may want to adjust these after they're created.
 Syntax
 ------
 
-``import_courserun [--courserun <courserun>] [--program <program> --run-tag <run tag>] [--live] [--create-cms-page] [--price <price>]``
+To create an individual courserun:
+
+``import_courserun [--courserun <courserun>] [--program <program>] [--live] [--create-cms-page] [--price <price>]``
+
+To walk a program:
+
+``import_courserun [--program <program>] [--run-tag <run tag>] [--live] [--create-cms-page] [--price <price>]``
 
 Options
 -------
 
 * ``--courserun <courserun>`` - The courserun to check for. Takes precedence over ``--program``.
-* ``--program <program>`` - The program to look through. Requires ``--run_tag``. Specify either the numeric database ID or the readable ID for the program.
-* ``--run-tag <run tag>`` - The run tag to use for the new courseruns. Required for ``--program``.
+* ``--program <program>``
+   * _If walking a program:_ The program to walk through. Requires ``--run_tag``. Specify either the numeric database ID or the readable ID for the program.
+   * _If creating a single courserun:_ The program the course should belong to, if any.
+* ``--run-tag <run tag>`` - The run tag to use for the new courseruns. Required for ``--program``; don't use otherwise.
 * ``--live`` - Make the course live. (Default is to set the flag to false.)
 * ``--create-cms-page`` - Attempt to create a basic CMS page for the course, in a similar fashion to ``create_courseware_page``. If this fails (for instance, if the course already has a CMS page), this step will be skipped.
 * ``--price <price>`` - Create (or update) a product for the courserun with the specified price. If the command creates multiple courseruns, this will create a product for each.
