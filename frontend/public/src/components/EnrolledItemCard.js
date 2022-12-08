@@ -385,11 +385,11 @@ export class EnrolledItemCard extends React.Component<
                 toggle={this.toggleMenuVisibility.bind(this)}
                 id={`enrollmentDropdown-${enrollment.id}`}
               >
-                <DropdownToggle className="d-inline-flex unstyled dot-menu">
+                <DropdownToggle className="d-inline-flex unstyled dot-menu" aria-label={menuTitle}>
                   <span
                     className="material-icons"
-                    aria-label={menuTitle}
                     title={menuTitle}
+                    aria-hidden="true"
                   >
                     more_vert
                   </span>
