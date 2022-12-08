@@ -3,13 +3,8 @@
 import logging
 from requests.exceptions import HTTPError
 from courses.models import (
-    Course,
     CourseRunEnrollment,
-    CourseRunCertificate,
     ProgramCertificate,
-    ProgramEnrollment,
-    ProgramRequirement,
-    ProgramRequirementNodeType,
 )
 
 
@@ -31,115 +26,6 @@ def exception_logging_generator(generator):
 
 def is_grade_valid(override_grade: float):
     return 0.0 <= override_grade <= 1.0
-
-
-def has_earned_program_cert(user, program):
-    """
-    Checks if a user has earned all the course certificates required
-    for a given program.
-
-    Args:
-        user (User): a Django user.
-        program (programs.models.Program): program where the user is enrolled.
-
-    Returns:
-        bool: True if a user has earned all the course certificates required
-              for a given program else False
-    """
-    passed_courses = Course.objects.filter(
-        in_programs__program=program,
-        courseruns__courseruncertificates__user=user,
-        courseruns__courseruncertificates__is_revoked=False,
-    )
-    root = ProgramRequirement.get_root_nodes().get(program=program)
-
-    def _has_earned(node):
-        if node.is_root or node.is_all_of_operator:
-            # has passed all of the child requirements
-            return all(_has_earned(child) for child in node.get_children())
-        elif node.is_min_number_of_operator:
-            # has passed a minimum of the child requirements
-            return len(list(filter(_has_earned, node.get_children()))) >= int(
-                node.operator_value
-            )
-        elif node.is_course:
-            # has passed the reference course
-            return node.course in passed_courses
-
-    return _has_earned(root)
-
-
-def generate_program_certificate(user, program):
-    """
-    Create a program certificate if the user has a course certificate
-    for each course in the program. Also, It will create the
-    program enrollment if it does not exist for the user.
-
-    Args:
-        user (User): a Django user.
-        program (programs.models.Program): program where the user is enrolled.
-
-    Returns:
-        (ProgramCertificate or None, bool): A tuple containing a
-        ProgramCertificate (or None if one was not found or created) paired
-        with a boolean indicating whether the certificate was newly created.
-    """
-    existing_cert_queryset = ProgramCertificate.objects.filter(
-        user=user, program=program
-    )
-    if existing_cert_queryset.exists():
-        ProgramEnrollment.objects.get_or_create(
-            program=program, user=user, defaults={"active": True, "change_status": None}
-        )
-        return existing_cert_queryset.first(), False
-
-    if not has_earned_program_cert(user, program):
-        return None, False
-
-    program_cert = ProgramCertificate.objects.create(user=user, program=program)
-    if program_cert:
-        log.info(
-            "Program certificate for [%s] in program [%s] is created.",
-            user.username,
-            program.title,
-        )
-        _, created = ProgramEnrollment.objects.get_or_create(
-            program=program, user=user, defaults={"active": True, "change_status": None}
-        )
-
-        if created:
-            log.info(
-                "Program enrollment for [%s] in program [%s] is created.",
-                user.username,
-                program.title,
-            )
-
-    return program_cert, True
-
-
-def generate_multiple_programs_certificate(user, programs):
-    """
-    Create a program certificate if the user has a course certificate
-    for each course in the program. Also, It will create the
-    program enrollment if it does not exist for the user.
-
-    Args:
-        user (User): a Django user.
-        programs (list of objects of programs.models.Program): programs where the user is enrolled.
-
-    Returns:
-        list of [(ProgramCertificate or None, bool), (ProgramCertificate or None, bool)]: the return
-        result is ordered as the order of programs list
-
-    (ProgramCertificate or None, bool): A tuple containing a
-    ProgramCertificate (or None if one was not found or created) paired
-    with a boolean indicating whether the certificate was newly created.
-    """
-    results = []
-    for program in programs:
-        result = generate_program_certificate(user, program)
-        results.append(result)
-    return results
 
 
 def get_program_certificate_by_enrollment(enrollment):

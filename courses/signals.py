@@ -9,7 +9,7 @@ from courses.models import (
     CourseRunCertificate,
     Program,
 )
-from courses.utils import generate_multiple_programs_certificate
+from courses.api import generate_multiple_programs_certificate
 
 
 @receiver(
