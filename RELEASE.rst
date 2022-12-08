@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.54.5
+--------------
+
+- Adds courserun importing from edX (like sync_courserun, but moreso) (#1256)
+- Fixes the URL in the partner school email (#1248)
+
 Version 0.54.4 (Released December 08, 2022)
 --------------
 
