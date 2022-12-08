@@ -141,7 +141,13 @@ export class DashboardPage extends React.Component<
                 </>
               )}
             </nav>
-            <div id="enrollment-items" className="enrolled-items" aria-live="polite">{this.renderCurrentTab()}</div>
+            <div
+              id="enrollment-items"
+              className="enrolled-items"
+              aria-live="polite"
+            >
+              {this.renderCurrentTab()}
+            </div>
 
             <ProgramEnrollmentDrawer
               isHidden={this.state.programDrawerVisibility}
