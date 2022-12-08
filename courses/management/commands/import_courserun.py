@@ -20,6 +20,7 @@ create_courseware_page command for the course run.
 from decimal import Decimal
 from urllib import parse
 
+import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
@@ -191,20 +192,21 @@ class Command(BaseCommand):
                         )
 
                 if kwargs["price"] and kwargs["price"].isnumeric():
-                    (course_product, created) = Product.objects.update_or_create(
-                        content_type=content_type,
-                        object_id=new_run.id,
-                        price=Decimal(kwargs["price"]),
-                        description=new_run.courseware_id,
-                        is_active=True,
-                    )
-
-                    course_product.save()
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"Created product {course_product} for {new_run.courseware_id}"
+                    with reversion.create_revision():
+                        (course_product, created) = Product.objects.update_or_create(
+                            content_type=content_type,
+                            object_id=new_run.id,
+                            price=Decimal(kwargs["price"]),
+                            description=new_run.courseware_id,
+                            is_active=True,
                         )
-                    )
+
+                        course_product.save()
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                f"Created product {course_product} for {new_run.courseware_id}"
+                            )
+                        )
             except Exception as e:
                 self.stdout.write(
                     self.style.ERROR(
