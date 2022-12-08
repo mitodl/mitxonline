@@ -17,14 +17,17 @@ take care of it). If the creation is successful, this will optionally run the
 create_courseware_page command for the course run.
 """
 
+from decimal import Decimal
 from urllib import parse
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
 from django.db.models import Q
 
 from cms.api import create_default_courseware_page
 from courses.models import Course, CourseRun, Program
+from ecommerce.models import Product
 from openedx.api import get_edx_api_course_detail_client
 
 
@@ -69,9 +72,21 @@ class Command(BaseCommand):
             help="Create a draft CMS page for the course too",
         )
 
+        parser.add_argument(
+            "--price",
+            help="Create a matching product with the specified price for the generated course run(s).",
+            type=str,
+            nargs="?",
+        )
+
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
         edx_course_detail = get_edx_api_course_detail_client()
         edx_courses = []
+
+        if kwargs["price"] and kwargs["price"].isnumeric():
+            content_type = ContentType.objects.filter(
+                app_label="courses", model="courserun"
+            ).get()
 
         if kwargs["courserun"] is not None:
             try:
@@ -174,6 +189,22 @@ class Command(BaseCommand):
                                 f"Could not create CMS page {new_run.course.readable_id}, skipping it: {e}"
                             )
                         )
+
+                if kwargs["price"] and kwargs["price"].isnumeric():
+                    (course_product, created) = Product.objects.update_or_create(
+                        content_type=content_type,
+                        object_id=new_run.id,
+                        price=Decimal(kwargs["price"]),
+                        description=new_run.courseware_id,
+                        is_active=True,
+                    )
+
+                    course_product.save()
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Created product {course_product} for {new_run.courseware_id}"
+                        )
+                    )
             except Exception as e:
                 self.stdout.write(
                     self.style.ERROR(
