@@ -243,7 +243,7 @@ def create_run_enrollments(
     """
     successful_enrollments = []
 
-    def send_enrollment_emails(enrollment):
+    def send_enrollment_emails():
         subscribe_edx_course_emails.delay(enrollment.id)
 
     try:
