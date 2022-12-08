@@ -12,7 +12,7 @@ MITx Online Commands
    create_product
    create_user
    generate_discount_code
-
+   import_courserun
 
 Indices and tables
 ==================
