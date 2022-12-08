@@ -234,7 +234,9 @@ class Command(BaseCommand):
 
         call_command("create_product", "course-v1:edX+E2E-101+course", 999)
         call_command("create_product", "course-v1:edX+DemoX+Demo_Course", 999)
-        call_command("createinitialrevisions", "ecommerce.Product", comment="Initial revision.")
+        call_command(
+            "createinitialrevisions", "ecommerce.Product", comment="Initial revision."
+        )
 
         # Step 8: create the learner and enroll them (unless told not to)
         self.stdout.write(self.style.SUCCESS("Creating the learner..."))
