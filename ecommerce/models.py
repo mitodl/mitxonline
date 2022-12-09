@@ -1,40 +1,41 @@
-from datetime import datetime
-import pytz
 import uuid
-from django.utils.functional import cached_property
+from datetime import datetime
+from decimal import Decimal
+
+import pytz
+import reversion
 from django.conf import settings
-from django.db import models, transaction
-from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from courses.models import CourseRun, PaidCourseRun
+from django.core.exceptions import ValidationError
+from django.db import models, transaction
+from django.utils.functional import cached_property
 from django_fsm import FSMField, transition
 from mitol.common.models import TimestampedModel
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
-import reversion
+from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
+
+from courses.api import create_run_enrollments
+from courses.models import CourseRun, PaidCourseRun
 from ecommerce.constants import (
-    DISCOUNT_TYPES,
-    REDEMPTION_TYPES,
-    TRANSACTION_TYPE_PAYMENT,
-    TRANSACTION_TYPE_REFUND,
-    TRANSACTION_TYPES,
-    REFERENCE_NUMBER_PREFIX,
-    REDEMPTION_TYPE_ONE_TIME,
-    REDEMPTION_TYPE_ONE_TIME_PER_USER,
-    REDEMPTION_TYPE_UNLIMITED,
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
+    DISCOUNT_TYPES,
+    REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_ONE_TIME_PER_USER,
+    REDEMPTION_TYPE_UNLIMITED,
+    REDEMPTION_TYPES,
+    REFERENCE_NUMBER_PREFIX,
+    TRANSACTION_TYPE_PAYMENT,
+    TRANSACTION_TYPE_REFUND,
+    TRANSACTION_TYPES,
 )
-from users.models import User
-from decimal import Decimal
-from courses.api import create_run_enrollments
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
 from main.settings import TIME_ZONE
-
-from mitol.common.utils.datetime import now_in_utc
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from users.models import User
 
 User = get_user_model()
 
@@ -240,7 +241,7 @@ class Discount(TimestampedModel):
     redemption_type = models.CharField(choices=REDEMPTION_TYPES, max_length=30)
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
     discount_code = models.CharField(max_length=50)
-    for_flexible_pricing = models.BooleanField(null=False, default=True)
+    for_flexible_pricing = models.BooleanField(null=False, default=False)
     activation_date = models.DateTimeField(
         null=True,
         blank=True,
