@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.54.5
+Version 0.54.5 (Released December 09, 2022)
 --------------
 
 - Adds courserun importing from edX (like sync_courserun, but moreso) (#1256)
