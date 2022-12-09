@@ -85,19 +85,25 @@ export class DashboardPage extends React.Component<
 
     if (this.state.currentTab === DashboardTab.programs) {
       return (
-        <EnrolledProgramList
-          key={"enrolled-programs"}
-          enrollments={programEnrollments}
-          toggleDrawer={this.toggleDrawer.bind(this)}
-        ></EnrolledProgramList>
+        <div>
+          <h1 className="hide-element">Programs</h1>
+          <EnrolledProgramList
+            key={"enrolled-programs"}
+            enrollments={programEnrollments}
+            toggleDrawer={this.toggleDrawer.bind(this)}
+          ></EnrolledProgramList>
+        </div>
       )
     }
 
     return (
-      <EnrolledCourseList
-        key={"enrolled-courses"}
-        enrollments={enrollments}
-      ></EnrolledCourseList>
+      <div>
+        <h1 className="hide-element">My Courses</h1>
+        <EnrolledCourseList
+          key={"enrolled-courses"}
+          enrollments={enrollments}
+        ></EnrolledCourseList>
+      </div>
     )
   }
 
@@ -115,7 +121,7 @@ export class DashboardPage extends React.Component<
       <DocumentTitle title={`${SETTINGS.site_name} | ${DASHBOARD_PAGE_TITLE}`}>
         <div className="std-page-body dashboard container">
           <Loader isLoading={isLoading}>
-            <h1>
+            <nav className="tabs" aria-controls="enrollment-items">
               {!isProgramUIEnabled() ? (
                 <>My Courses</>
               ) : (
@@ -134,8 +140,14 @@ export class DashboardPage extends React.Component<
                   </button>
                 </>
               )}
-            </h1>
-            <div className="enrolled-items">{this.renderCurrentTab()}</div>
+            </nav>
+            <div
+              id="enrollment-items"
+              className="enrolled-items"
+              aria-live="polite"
+            >
+              {this.renderCurrentTab()}
+            </div>
 
             <ProgramEnrollmentDrawer
               isHidden={this.state.programDrawerVisibility}

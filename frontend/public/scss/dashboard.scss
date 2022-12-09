@@ -17,6 +17,18 @@ $enrolled-passed-bg: #3E775D;
 $enrolled-passed-fg: #ffffff;
 
 .enrolled-items {
+  .hide-element {
+    // hidden elements for screenreaders only
+    border: 0;
+    clip: rect(1px 1px 1px 1px); /* IE6, IE7 */
+    clip: rect(1px, 1px, 1px, 1px);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px; 
+  } 
   .card {
     display: flex;
 
@@ -197,7 +209,7 @@ $enrolled-passed-fg: #ffffff;
   }
 }
 
-.dashboard h1 {
+.dashboard .tabs {
   margin-bottom: 38px;
   font-size: 38px;
 
