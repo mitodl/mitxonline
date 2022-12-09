@@ -458,8 +458,6 @@ export class EnrolledItemCard extends React.Component<
     const courseRunStatusMessageText = null
     const menuTitle = `Program information for ${enrollment.program.title}`
 
-    const courseId = enrollment.program.readable_id
-
     return (
       <div
         className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3"
@@ -499,7 +497,6 @@ export class EnrolledItemCard extends React.Component<
               </a>
             </div>
             <div className="detail pt-1">
-              {courseId}
               {startDateDescription === null}
               {courseRunStatusMessageText}
               <div className="enrollment-extra-links d-flex pr-2">
