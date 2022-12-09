@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.54.6
+--------------
+
+- Flipping the default for `for_flexible_pricing` from True to False (#1268)
+
 Version 0.54.5 (Released December 09, 2022)
 --------------
 
