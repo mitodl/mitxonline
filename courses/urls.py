@@ -14,15 +14,15 @@ router.register(
 router.register(
     r"partnerschools", v1.PartnerSchoolViewSet, basename="partner_schools_api"
 )
+router.register(
+    r"program_enrollments",
+    v1.UserProgramEnrollmentsViewSet,
+    basename="user_program_enrollments_api",
+)
+
 urlpatterns = [
     re_path(r"^api/v1/", include(router.urls)),
     re_path(r"^api/", include(router.urls)),
-    re_path(
-        r"^api//v1/program_enrollments",
-        v1.get_user_program_enrollments,
-        name="user-program-enrollments-api",
-    ),
-    re_path(r"^api/program_enrollments", v1.get_user_program_enrollments),
     path("api/records/program/<pk>/share/", v1.get_learner_record_share),
     path("api/records/program/<pk>/revoke/", v1.revoke_learner_record_share),
     path("api/records/program/<pk>/", v1.get_learner_record),

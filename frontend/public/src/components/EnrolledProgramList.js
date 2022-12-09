@@ -17,7 +17,7 @@ export class EnrolledProgramList extends React.Component<EnrolledProgramListProp
 
     return (
       <EnrolledItemCard
-        key={enrollment.id}
+        key={`program-item-${enrollment.program.id}`}
         enrollment={enrollment}
         toggleProgramDrawer={toggleDrawer}
       ></EnrolledItemCard>

@@ -38,7 +38,7 @@ import {
 } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
-import type { RunEnrollment, Program } from "../flow/courseTypes"
+import type { RunEnrollment, Program, ProgramEnrollment } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
 
 type EnrolledItemCardProps = {
@@ -59,6 +59,7 @@ type EnrolledItemCardState = {
   submittingEnrollmentId: number | null,
   emailSettingsModalVisibility: boolean,
   verifiedUnenrollmentModalVisibility: boolean,
+  programUnenrollmentModalVisibility: boolean,
   menuVisibility: boolean
 }
 
@@ -70,6 +71,7 @@ export class EnrolledItemCard extends React.Component<
     submittingEnrollmentId:              null,
     emailSettingsModalVisibility:        false,
     verifiedUnenrollmentModalVisibility: false,
+    programUnenrollmentModalVisibility:  false,
     menuVisibility:                      false
   }
 
@@ -84,6 +86,14 @@ export class EnrolledItemCard extends React.Component<
     const { verifiedUnenrollmentModalVisibility } = this.state
     this.setState({
       verifiedUnenrollmentModalVisibility: !verifiedUnenrollmentModalVisibility
+    })
+  }
+
+  toggleProgramUnenrollmentModalVisibility = () => {
+    const { programUnenrollmentModalVisibility } = this.state
+    console.log("fartin in the wind")
+    this.setState({
+      programUnenrollmentModalVisibility: !programUnenrollmentModalVisibility
     })
   }
 
@@ -258,6 +268,42 @@ export class EnrolledItemCard extends React.Component<
             </a>{" "}
             for assistance.
           </p>
+        </ModalBody>
+      </Modal>
+    )
+  }
+
+  renderProgramUnenrollmentModal(enrollment: ProgramEnrollment) {
+    const { programUnenrollmentModalVisibility } = this.state
+
+    return (
+      <Modal
+        id={`program-unenrollment-${enrollment.program.id}-modal`}
+        className="text-center"
+        isOpen={programUnenrollmentModalVisibility}
+        toggle={() => this.toggleProgramUnenrollmentModalVisibility()}
+      >
+        <ModalHeader
+          toggle={() => this.toggleProgramUnenrollmentModalVisibility()}
+        >
+          Unenroll From {enrollment.program.title}
+        </ModalHeader>
+        <ModalBody>
+          <p>
+            Are you sure you wish to unenroll from {enrollment.program.title}?
+          </p>
+          <Button
+            type="submit"
+            color="success"
+            onClick={() => this.toggleProgramUnenrollmentModalVisibility()}
+          >
+            God Yes
+          </Button>{" "}
+          <Button
+            onClick={() => this.toggleProgramUnenrollmentModalVisibility()}
+          >
+            Hell No
+          </Button>
         </ModalBody>
       </Modal>
     )
@@ -453,6 +499,7 @@ export class EnrolledItemCard extends React.Component<
 
   renderProgramEnrollment() {
     const { enrollment } = this.props
+    const { menuVisibility } = this.state
 
     const title = enrollment.program.title
     const startDateDescription = null
@@ -460,6 +507,10 @@ export class EnrolledItemCard extends React.Component<
     const pageLocation = null
     const courseRunStatusMessageText = null
     const menuTitle = `Program information for ${enrollment.program.title}`
+
+    const courseId = enrollment.program.readable_id
+
+    // const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
 
     return (
       <div
@@ -486,18 +537,37 @@ export class EnrolledItemCard extends React.Component<
                   {title}
                 </a>
               </h2>
-              <a
-                rel="noopener noreferrer"
-                href="#program_enrollment_drawer"
-                aria-flowto="program_enrollment_drawer"
-                aria-haspopup="dialog"
-                className="text-body material-icons"
-                aria-label={menuTitle}
-                title={menuTitle}
-                onClick={this.toggleProgramInfo.bind(this)}
+              <Dropdown
+                isOpen={menuVisibility}
+                toggle={this.toggleMenuVisibility.bind(this)}
+                id={`programEnrollmentDropdown-${enrollment.id}`}
               >
-                more_vert
-              </a>
+                <DropdownToggle
+                  className="d-inline-flex unstyled dot-menu"
+                  aria-label={menuTitle}
+                >
+                  <span
+                    className="material-icons"
+                    title={menuTitle}
+                    aria-hidden="true"
+                  >
+                    more_vert
+                  </span>
+                </DropdownToggle>
+                <DropdownMenu right>
+                  <span id={`unenrollButtonWrapper-${enrollment.id}`}>
+                    <DropdownItem
+                      className="unstyled d-block"
+                      onClick={() =>
+                        this.toggleProgramUnenrollmentModalVisibility()
+                      }
+                    >
+                      Unenroll
+                    </DropdownItem>
+                    {this.renderProgramUnenrollmentModal(enrollment)}
+                  </span>
+                </DropdownMenu>
+              </Dropdown>
             </div>
             <div className="detail pt-1">
               {startDateDescription === null}
