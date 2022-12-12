@@ -148,7 +148,9 @@ export const makeCertificate = (): Certificate => ({
   uuid: casual.uuid
 })
 
-export const makeProgramEnrollment = (cert: boolean = false): ProgramEnrollment => ({
+export const makeProgramEnrollment = (
+  cert: boolean = false
+): ProgramEnrollment => ({
   program:     makeProgram(),
   enrollments: makeCourseRunEnrollment(),
   certificate: cert ? makeCertificate() : undefined

@@ -64,7 +64,9 @@ describe("EnrolledItemCard", () => {
           enrollment={enrollmentCardProps.enrollment}
           currentUser={currentUser}
           deactivateEnrollment={enrollmentCardProps.deactivateEnrollment}
-          deactivateProgramEnrollment={enrollmentCardProps.deactivateProgramEnrollment}
+          deactivateProgramEnrollment={
+            enrollmentCardProps.deactivateProgramEnrollment
+          }
           courseEmailsSubscription={
             enrollmentCardProps.courseEmailsSubscription
           }
