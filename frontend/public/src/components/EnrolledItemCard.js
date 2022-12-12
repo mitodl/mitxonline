@@ -562,10 +562,6 @@ export class EnrolledItemCard extends React.Component<
     const courseRunStatusMessageText = null
     const menuTitle = `Program information for ${enrollment.program.title}`
 
-    const courseId = enrollment.program.readable_id
-
-    // const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
-
     return (
       <div
         className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3"
