@@ -330,12 +330,10 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         """
 
         program = Program.objects.get(pk=pk)
-        (enrollment, created) = ProgramEnrollment.objects.filter(
-            user=request.user, program=program
-        ).update_or_create(
+        (enrollment, created) = ProgramEnrollment.objects.update_or_create(
             user=request.user,
             program=program,
-            change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
+            defaults={"change_status": ENROLL_CHANGE_STATUS_UNENROLLED},
         )
 
         return self.list(request)

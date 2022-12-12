@@ -22,6 +22,7 @@ import {
   enrollmentsQuery,
   enrollmentsQueryKey,
   deactivateEnrollmentMutation,
+  deactivateProgramEnrollmentMutation,
   courseEmailsSubscriptionMutation
 } from "../lib/queries/enrollment"
 import { currentUserSelector } from "../lib/queries/users"
@@ -38,13 +39,18 @@ import {
 } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
-import type { RunEnrollment, Program, ProgramEnrollment } from "../flow/courseTypes"
+import type {
+  RunEnrollment,
+  Program,
+  ProgramEnrollment
+} from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
 
 type EnrolledItemCardProps = {
   enrollment: RunEnrollment | Program,
   currentUser: CurrentUser,
   deactivateEnrollment: (enrollmentId: number) => Promise<any>,
+  deactivateProgramEnrollment: (programId: number) => Promise<any>,
   courseEmailsSubscription: (
     enrollmentId: number,
     emailsSubscription: string
@@ -91,7 +97,6 @@ export class EnrolledItemCard extends React.Component<
 
   toggleProgramUnenrollmentModalVisibility = () => {
     const { programUnenrollmentModalVisibility } = this.state
-    console.log("fartin in the wind")
     this.setState({
       programUnenrollmentModalVisibility: !programUnenrollmentModalVisibility
     })
@@ -144,6 +149,37 @@ export class EnrolledItemCard extends React.Component<
     } finally {
       this.setState({ submittingEnrollmentId: null })
     }
+  }
+
+  async onProgramUnenrollment(program: Program) {
+    const { deactivateProgramEnrollment, addUserNotification } = this.props
+
+    let userMessage, messageType
+
+    try {
+      const resp = await deactivateProgramEnrollment(program.id)
+      if (isSuccessResponse(resp)) {
+        messageType = ALERT_TYPE_SUCCESS
+        userMessage = `You have been successfully unenrolled from ${program.title}.`
+      } else {
+        throw new Error("program unenrollment failed")
+      }
+    } catch (e) {
+      messageType = ALERT_TYPE_DANGER
+      userMessage = `Something went wrong with your request to unenroll. Please contact support at ${SETTINGS.support_email}.`
+    }
+
+    addUserNotification({
+      "unenroll-status": {
+        type:  messageType,
+        props: {
+          text: userMessage
+        }
+      }
+    })
+    // Scroll to the top of the page to make sure the user sees the message
+    window.scrollTo(0, 0)
+    this.toggleProgramUnenrollmentModalVisibility()
   }
 
   async onSubmitEmailSettings(payload: Object) {
@@ -291,18 +327,19 @@ export class EnrolledItemCard extends React.Component<
         <ModalBody>
           <p>
             Are you sure you wish to unenroll from {enrollment.program.title}?
+            You will not be unenrolled from any courses within the program.
           </p>
           <Button
             type="submit"
             color="success"
-            onClick={() => this.toggleProgramUnenrollmentModalVisibility()}
+            onClick={() => this.onProgramUnenrollment(enrollment.program)}
           >
-            God Yes
+            Unenroll
           </Button>{" "}
           <Button
             onClick={() => this.toggleProgramUnenrollmentModalVisibility()}
           >
-            Hell No
+            Cancel
           </Button>
         </ModalBody>
       </Modal>
@@ -630,6 +667,9 @@ const mapPropsToConfig = () => [enrollmentsQuery()]
 const deactivateEnrollment = (enrollmentId: number) =>
   mutateAsync(deactivateEnrollmentMutation(enrollmentId))
 
+const deactivateProgramEnrollment = (programId: number) =>
+  mutateAsync(deactivateProgramEnrollmentMutation(programId))
+
 const courseEmailsSubscription = (
   enrollmentId: number,
   emailsSubscription: string
@@ -640,6 +680,7 @@ const courseEmailsSubscription = (
 
 const mapDispatchToProps = {
   deactivateEnrollment,
+  deactivateProgramEnrollment,
   courseEmailsSubscription,
   addUserNotification
 }

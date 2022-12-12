@@ -11,7 +11,8 @@ import { shouldIf } from "../lib/test_utils"
 import IntegrationTestHelper from "../util/integration_test_helper"
 import {
   makeCourseRunEnrollment,
-  makeCourseRunEnrollmentWithProduct
+  makeCourseRunEnrollmentWithProduct,
+  makeProgramEnrollment
 } from "../factories/course"
 import { makeUser } from "../factories/user"
 import * as courseApi from "../lib/courseApi"
@@ -40,6 +41,10 @@ describe("EnrolledItemCard", () => {
         .stub()
         .withArgs(userEnrollment.id)
         .returns(Promise),
+      deactivateProgramEnrollment: helper.sandbox
+        .stub()
+        .withArgs(userEnrollment.id)
+        .returns(Promise),
       courseEmailsSubscription: helper.sandbox
         .stub()
         .withArgs(userEnrollment.id, "test")
@@ -59,6 +64,7 @@ describe("EnrolledItemCard", () => {
           enrollment={enrollmentCardProps.enrollment}
           currentUser={currentUser}
           deactivateEnrollment={enrollmentCardProps.deactivateEnrollment}
+          deactivateProgramEnrollment={enrollmentCardProps.deactivateProgramEnrollment}
           courseEmailsSubscription={
             enrollmentCardProps.courseEmailsSubscription
           }
@@ -73,27 +79,37 @@ describe("EnrolledItemCard", () => {
   afterEach(() => {
     helper.cleanup()
   })
-  ;["audit", "verified"].forEach(([mode]) => {
-    it("renders the card", async () => {
-      const testEnrollment = makeCourseRunEnrollmentWithProduct()
+  ;["audit", "verified", "program"].forEach(mode => {
+    it(`renders the card for enrollment mode ${mode}`, async () => {
+      const testEnrollment =
+        mode === "program"
+          ? makeProgramEnrollment()
+          : makeCourseRunEnrollmentWithProduct()
       userEnrollment = testEnrollment
       enrollmentCardProps.enrollment = testEnrollment
       const inner = await renderedCard()
       const enrolledItems = inner.find(".enrolled-item")
       assert.lengthOf(enrolledItems, 1)
       const enrolledItem = enrolledItems.at(0)
-      assert.equal(
-        enrolledItem.find("h2").text(),
-        userEnrollment.run.course.title
-      )
-      if (mode === "verified") {
-        const pricingLinks = inner.find(".pricing-links")
-        assert.isFalse(pricingLinks.exists())
+      if (mode !== "program") {
+        assert.equal(
+          enrolledItem.find("h2").text(),
+          userEnrollment.run.course.title
+        )
+        if (mode === "verified") {
+          const pricingLinks = inner.find(".pricing-links")
+          assert.isFalse(pricingLinks.exists())
+        }
+      } else {
+        assert.equal(
+          enrolledItem.find("h2").text(),
+          testEnrollment.program.title
+        )
       }
     })
   })
-  ;["audit", "verified"].forEach(([mode]) => {
-    it("renders the card without upsell message when ecommerce disabled", async () => {
+  ;["audit", "verified"].forEach(mode => {
+    it(`renders the card in mode ${mode} without upsell message when ecommerce disabled`, async () => {
       const testEnrollment = makeCourseRunEnrollmentWithProduct()
       userEnrollment = testEnrollment
       enrollmentCardProps.enrollment = testEnrollment
@@ -118,7 +134,7 @@ describe("EnrolledItemCard", () => {
       }
     })
   })
-  ;["audit", "verified"].forEach(([mode]) => {
+  ;["audit", "verified"].forEach(mode => {
     it("does not render the pricing links when upgrade deadline has passed", async () => {
       enrollmentCardProps.enrollment.enrollment_mode = mode
       const inner = await renderedCard()
@@ -217,5 +233,14 @@ describe("EnrolledItemCard", () => {
         assert.equal(text, "Financial assistance?")
       }
     })
+  })
+
+  it("renders the program unenrollment verification modal", async () => {
+    enrollmentCardProps.enrollment = makeProgramEnrollment()
+
+    const inner = await renderedCard()
+    const modalId = `program-unenrollment-${enrollmentCardProps.enrollment.program.id}-modal`
+    const modals = inner.find(`#${modalId}`)
+    assert.lengthOf(modals, 1)
   })
 })

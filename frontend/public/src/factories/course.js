@@ -6,6 +6,7 @@ import { incrementer } from "./util"
 import type { LearnerRecordUser } from "../flow/authTypes"
 
 import type {
+  Certificate,
   CourseRun,
   CourseRunDetail,
   CourseRunEnrollment,
@@ -142,9 +143,15 @@ export const makeProgram = (): Program => ({
   courses:     [makeCourseDetailWithRuns()]
 })
 
-export const makeProgramEnrollment = (): ProgramEnrollment => ({
+export const makeCertificate = (): Certificate => ({
+  link: `/certificate/program/${casual.uuid}`,
+  uuid: casual.uuid
+})
+
+export const makeProgramEnrollment = (cert: boolean = false): ProgramEnrollment => ({
   program:     makeProgram(),
-  enrollments: makeCourseRunEnrollment()
+  enrollments: makeCourseRunEnrollment(),
+  certificate: cert ? makeCertificate() : undefined
 })
 
 export const makeLearnerRecordCertificate = (): LearnerRecordCertificate => ({
