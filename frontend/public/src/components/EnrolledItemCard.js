@@ -154,6 +154,8 @@ export class EnrolledItemCard extends React.Component<
   async onProgramUnenrollment(program: Program) {
     const { deactivateProgramEnrollment, addUserNotification } = this.props
 
+    this.toggleProgramUnenrollmentModalVisibility()
+
     let userMessage, messageType
 
     try {
@@ -179,7 +181,6 @@ export class EnrolledItemCard extends React.Component<
     })
     // Scroll to the top of the page to make sure the user sees the message
     window.scrollTo(0, 0)
-    this.toggleProgramUnenrollmentModalVisibility()
   }
 
   async onSubmitEmailSettings(payload: Object) {
@@ -256,8 +257,14 @@ export class EnrolledItemCard extends React.Component<
                     type="checkbox"
                     name="subscribeEmails"
                     checked={values.subscribeEmails}
+                    aria-labelledby={`verified-unenrollment-${values.enrollmentId}-email-checkbox`}
                   />{" "}
-                  <label check>Receive course emails</label>
+                  <label
+                    id={`verified-unenrollment-${values.enrollmentId}-email-checkbox`}
+                    check
+                  >
+                    Receive course emails
+                  </label>
                 </section>
                 <Button type="submit" color="success">
                   Save Settings
@@ -284,13 +291,17 @@ export class EnrolledItemCard extends React.Component<
         className="text-center"
         isOpen={verifiedUnenrollmentModalVisibility}
         toggle={() => this.toggleVerifiedUnenrollmentModalVisibility()}
+        role="dialog"
+        aria-labelledby={`verified-unenrollment-${enrollment.id}-modal-header`}
+        aria-describedby={`verified-unenrollment-${enrollment.id}-modal-body`}
       >
         <ModalHeader
           toggle={() => this.toggleVerifiedUnenrollmentModalVisibility()}
+          id={`verified-unenrollment-${enrollment.id}-modal-header`}
         >
           Unenroll From {enrollment.run.course_number}
         </ModalHeader>
-        <ModalBody>
+        <ModalBody id={`verified-unenrollment-${enrollment.id}-modal-body`}>
           <p>
             You are enrolled in the certificate track for{" "}
             {enrollment.run.course_number} {enrollment.run.title}. You can't
@@ -318,13 +329,19 @@ export class EnrolledItemCard extends React.Component<
         className="text-center"
         isOpen={programUnenrollmentModalVisibility}
         toggle={() => this.toggleProgramUnenrollmentModalVisibility()}
+        role="dialog"
+        aria-labelledby={`program-unenrollment-${enrollment.program.id}-modal-header`}
+        aria-describedby={`program-unenrollment-${enrollment.program.id}-modal-body`}
       >
         <ModalHeader
+          id={`program-unenrollment-${enrollment.program.id}-modal-header`}
           toggle={() => this.toggleProgramUnenrollmentModalVisibility()}
         >
           Unenroll From {enrollment.program.title}
         </ModalHeader>
-        <ModalBody>
+        <ModalBody
+          id={`program-unenrollment-${enrollment.program.id}-modal-body`}
+        >
           <p>
             Are you sure you wish to unenroll from {enrollment.program.title}?
             You will not be unenrolled from any courses within the program.
