@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.55.0
+--------------
+
+- added program certificates migration from micromasters
+- Run command to create initial revisions in `configure_instance` (#1262)
+- Removed program readable ID from the card. (#1274)
+- 1253: dashboard courses and programs tabs aren't screen reader accessible (#1267)
+
 Version 0.54.6 (Released December 09, 2022)
 --------------
 
