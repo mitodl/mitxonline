@@ -1,16 +1,16 @@
 """
-Meta-command to help set up a freshly configured MITxOnline instance. 
+Meta-command to help set up a freshly configured MITxOnline instance.
 
 Running this will perform the following functions:
 - Configures a superuser account.
-- Creates the OAuth2 application record for edX (optionally with an existing 
+- Creates the OAuth2 application record for edX (optionally with an existing
   client ID and secret).
 - Creating a program.
-- Creating financial assistance tiers, and a flexible price request form for 
+- Creating financial assistance tiers, and a flexible price request form for
   the program.
-- Creating course entries for the default courses that come with devstack. 
+- Creating course entries for the default courses that come with devstack.
 - Creating product entries and course about pages for these courses.
-- Creating a new learner account, and optionally enrolling them in the course. 
+- Creating a new learner account, and optionally enrolling them in the course.
 
 The default program is "program-v1:MITx+DEDP" (Data, Economics and Development
 Policy), and the two courses that it will make are:
@@ -18,7 +18,7 @@ Policy), and the two courses that it will make are:
 - E2E Test Course (course-v1:edX+E2E-101+course)
 
 The Demonstration Course will be added to the DEDP program but E2E Test Course
-will not. 
+will not.
 
 The learner account will have these parameters:
 - Username: testlearner
@@ -31,18 +31,18 @@ The learner account will have these parameters:
 The product for the courses will both be $999 so they are under the limit
 for test CyberSource transactions.
 
-This uses other management commands to complete these tasks. So, if you just 
+This uses other management commands to complete these tasks. So, if you just
 want to run part of this, use one of these commands:
 - createsuperuser to create the super user
 - configure_wagtail for initial setup of Wagtail assets
 - configure_tiers for creating the program tiers and discounts
 - create_course for creating the courses and runs
-- create_user for creating the learner account (which also uses 
+- create_user for creating the learner account (which also uses
   create_enrollment internally)
 - sync_courserun for syncing course run data with devstack
 
 There are some steps that this command won't do for you:
-- Creating any additional courses/programs/etc. 
+- Creating any additional courses/programs/etc.
 - Completing the integration between MITxOnline and devstack - there are still
   steps that you need to take to finish that process
 
@@ -234,6 +234,9 @@ class Command(BaseCommand):
 
         call_command("create_product", "course-v1:edX+E2E-101+course", 999)
         call_command("create_product", "course-v1:edX+DemoX+Demo_Course", 999)
+        call_command(
+            "createinitialrevisions", "ecommerce.Product", comment="Initial revision."
+        )
 
         # Step 8: create the learner and enroll them (unless told not to)
         self.stdout.write(self.style.SUCCESS("Creating the learner..."))
