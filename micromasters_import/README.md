@@ -30,6 +30,21 @@ FROM foreign_data.courses_courserun as run
         ON course_ids.micromasters_id = run.course_id
 ```
 
+## Importing users data
+The way we match users from MicroMasters to MITxOnline is to use their social auth accounts they have explicitly linked from MicroMasters. 
+If users don't have "mitxonline" social auth accounts on MicroMasters, then their data can't be imported
+
+e.g. migrate user's enrollment data from MicroMasters to MITxOnline
+```sql
+SELECT
+  
+FROM micromasters.dashboard_cachedenrollment AS mm_enrollment
+JOIN micromasters.social_auth_usersocialauth AS mm_social
+  ON mm_enrollment.user_id = mm_social.user_id
+JOIN public.users_user AS mo_user
+  ON mm_social.uid = mo_user.username
+WHERE mm_social.provider = 'mitxonline'
+```
 
 ## Testing
 

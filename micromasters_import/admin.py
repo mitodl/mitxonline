@@ -13,6 +13,7 @@ class ProgramIdAdmin(admin.ModelAdmin):
 
     model = ProgramId
     list_display = ("program", "micromasters_id")
+    raw_id_fields = ("program_certificate_revision",)
 
 
 class CourseIdAdmin(admin.ModelAdmin):
