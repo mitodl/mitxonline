@@ -27,11 +27,23 @@ class ProgramId(models.Model):
     micromasters_id = models.IntegerField(
         unique=True,
         null=False,
-        help_text="The primary key of the record in MicroMasters",
+        help_text="The primary key of the program in MicroMasters",
     )
 
     program = models.OneToOneField(
-        "courses.Program", unique=True, null=False, on_delete=models.CASCADE
+        "courses.Program",
+        unique=True,
+        null=False,
+        on_delete=models.CASCADE,
+        help_text="The primary key of the program in MITxOnline",
+    )
+
+    program_certificate_revision = models.ForeignKey(
+        PageRevision,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        help_text="Program certificate page revision ID in MITxOnline (Used for importing program certificates)",
     )
 
 
