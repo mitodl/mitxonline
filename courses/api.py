@@ -917,7 +917,7 @@ def has_earned_program_cert(user, program):
     return _has_earned(root)
 
 
-def generate_program_certificate(user, program):
+def generate_program_certificate(user, program, force_create=False):
     """
     Create a program certificate if the user has a course certificate
     for each course in the program. Also, It will create the
@@ -926,6 +926,8 @@ def generate_program_certificate(user, program):
     Args:
         user (User): a Django user.
         program (programs.models.Program): program where the user is enrolled.
+        force_create (bool): Default False, ignores the requirement of passing
+                            the courses for the program certificate if True
 
     Returns:
         (ProgramCertificate or None, bool): A tuple containing a
@@ -941,7 +943,7 @@ def generate_program_certificate(user, program):
         )
         return existing_cert_queryset.first(), False
 
-    if not has_earned_program_cert(user, program):
+    if not force_create and not has_earned_program_cert(user, program):
         return None, False
 
     program_cert = ProgramCertificate.objects.create(user=user, program=program)

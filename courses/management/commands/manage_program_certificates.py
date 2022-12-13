@@ -3,17 +3,20 @@ Management command to revoke, un revoke or create a certificate for a program fo
 
 Check the usages of this command below:
 
-**Certificate Creation**
+**Program Certificate Creation**
 
-1. Generate Pogram certificate for a user
+1. Generate Program certificate for a user
 ./manage.py manage_program_certificates —-create -—program=<program_readable_id> -—user=<username or email>
 
-**Revoke/Un-revoke Certificates**
+2. Forcefully Generate Program certificate for a user use -f or --force
+./manage.py manage_program_certificates —-create -—program=<program_readable_id> -—user=<username or email> -f
 
-2. Revoke a certificate for a user
+**Revoke/Un-revoke Program Certificates**
+
+3. Revoke a program certificate for a user
 ./mange.py manage_program_certificates -—revoke -—user=<username or email> -—program=<program_readable_id>
 
-3. Un-Revoke a certificate for a user
+4. Un-Revoke a program certificate for a user
 ./mange.py manage_program_certificates -—unrevoke —-program=<program_readable_id> -—user=<username or email>
 
 """
@@ -34,10 +37,7 @@ class Command(BaseCommand):
         python manage.py manage_program_certificates
     """
 
-    help = (
-        "Revoke, un revoke or create a certificate for a program for the given User "
-        "or Users when no user is provided"
-    )
+    help = "Revoke, un revoke or create a program certificate for a program for the given User"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -59,6 +59,16 @@ class Command(BaseCommand):
         parser.add_argument(
             "--create", dest="create", action="store_true", required=False
         )
+        parser.add_argument(
+            "-f",
+            "--force",
+            action="store_true",
+            dest="force",
+            help=(
+                "If provided, the certificate will be generated even if all required "
+                "courses for the program are not passed"
+            ),
+        )
 
         super().add_arguments(parser)
 
@@ -69,21 +79,30 @@ class Command(BaseCommand):
         unrevoke = options.get("unrevoke")
         create = options.get("create")
         program = options.get("program")
+        user = options.get("user")
+        force_create = options.get("force", False)
 
-        if not (revoke or unrevoke) and not create:
+        if not (revoke or unrevoke) and not create and not user:
             raise CommandError(
                 "The command needs a valid action e.g. --revoke, --unrevoke, --create."
             )
+
+        # A user is needed for revoke/un-revoke and certificate creation
+        if not user:
+            raise CommandError("The command needs a valid user.")
+
         try:
-            user = fetch_user(options["user"]) if options["user"] else None
+            user = fetch_user(user)
         except User.DoesNotExist:
-            user = None
+            raise CommandError(
+                "Could not find a user with <username or email>={}.".format(user)
+            )
 
         # A program is needed for revoke/un-revoke and certificate creation
         if not program:
             raise CommandError("The command needs a valid program.")
 
-        # Unable to obtain a program object based on the provided courseware id
+        # Unable to obtain a program object based on the provided program readable id
         try:
             program = Program.objects.get(readable_id=program)
         except Program.DoesNotExist:
@@ -93,9 +112,6 @@ class Command(BaseCommand):
 
         # Handle revoke/un-revoke of a certificate
         if revoke or unrevoke:
-            if not user:
-                raise CommandError("Revoke/Un-revoke operation needs a valid user.")
-
             revoke_status = manage_program_certificate_access(
                 user=user,
                 program=program,
@@ -114,23 +130,25 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.WARNING("No changes made."))
 
-        # Handle the creation of the certificates.
-        # Also check if the certificate creation was requested with grade override. (Generally useful when we want to
-        # create a certificate for a user while overriding the grade value)
+        # Handle the creation of the program certificate.
         elif create:
 
-            # While overriding grade we force create the certificate
+            # if -f or --force argument is provided, we'll forcefully genrate the program certificate
             certificate, created_cert = generate_program_certificate(
-                user=user,
-                program=program,
+                user=user, program=program, force_create=force_create
             )
+            success_result = True
 
-            if certificate and created_cert:
+            if created_cert:
                 cert_status = "created"
             elif certificate and not created_cert:
                 cert_status = "already exists"
             else:
-                cert_status = "ignored, certificates for requied courses are missing"
+                success_result = False
+                cert_status = (
+                    "ignored, certificates for required courses are missing, use "
+                    "-f or --force argument to forcefully create a program certificate"
+                )
 
             result_summary = "Certificate: {}".format(cert_status)
 
@@ -140,5 +158,7 @@ class Command(BaseCommand):
                 program.readable_id,
                 result_summary,
             )
-
-            self.stdout.write(self.style.SUCCESS(result))
+            result_output = self.style.SUCCESS(result)
+            if not success_result:
+                result_output = self.style.ERROR(result)
+            self.stdout.write(result_output)

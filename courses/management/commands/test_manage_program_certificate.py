@@ -1,4 +1,4 @@
-"""Tests for Certificates management command"""
+"""Tests for Program Certificates management command"""
 
 import pytest
 from courses.management.commands import manage_program_certificates
@@ -28,7 +28,7 @@ def edx_grade_json(user):
     }
 
 
-def test_certificate_management_no_argument():
+def test_program_certificate_management_no_argument():
     """Test that command throws error when no input is provided"""
 
     with pytest.raises(CommandError) as command_error:
@@ -39,8 +39,11 @@ def test_certificate_management_no_argument():
     )
 
 
-def test_certificate_management_invalid_program():
-    """Test that certificate management command throws proper error when no valid program is supplied"""
+def test_program_certificate_management_invalid_program():
+    """
+    Test that program certificate management command throws proper error when
+    no valid program is supplied
+    """
 
     test_user = UserFactory.create()
     with pytest.raises(CommandError) as command_error:
@@ -65,7 +68,7 @@ def test_certificate_management_invalid_program():
         ("test", None, True),
     ],
 )
-def test_certificate_management_revoke_unrevoke_invalid_args(
+def test_program_certificate_management_revoke_unrevoke_invalid_args(
     username, revoke, unrevoke
 ):
     """Test that the command throws proper error when revoke, un-revoke operations are not given proper arguments"""
@@ -78,7 +81,12 @@ def test_certificate_management_revoke_unrevoke_invalid_args(
             unrevoke=unrevoke,
             program=program.readable_id,
         )
-    assert str(command_error.value) == "Revoke/Un-revoke operation needs a valid user."
+    if not username:
+        assert str(command_error.value) == "The command needs a valid user."
+    else:
+        assert str(
+            command_error.value
+        ) == "Could not find a user with <username or email>={}.".format(username)
 
 
 @pytest.mark.parametrize(
@@ -88,8 +96,11 @@ def test_certificate_management_revoke_unrevoke_invalid_args(
         (None, True),
     ],
 )
-def test_certificate_management_revoke_unrevoke_success(user, revoke, unrevoke):
-    """Test that certificate revoke, un-revoke work as expected and manage the certificate access properly"""
+def test_program_certificate_management_revoke_unrevoke_success(user, revoke, unrevoke):
+    """
+    Test that program certificate revoke, un-revoke work as
+    expected and manage the program certificate access properly
+    """
     program = ProgramFactory.create()
     certificate = ProgramCertificateFactory(
         program=program, user=user, is_revoked=False if revoke else True
@@ -105,9 +116,11 @@ def test_certificate_management_revoke_unrevoke_success(user, revoke, unrevoke):
     assert certificate.is_revoked is (False if unrevoke else True)
 
 
-def test_certificate_management_create(user):
-    """Test that create operation for certificate management command creates the certificates for a single user
-    when a user is provided"""
+def test_program_certificate_management_create(user):
+    """
+    Test that create operation for program certificate management command
+    creates the program certificate for a user
+    """
     program = ProgramFactory.create()
     course = CourseFactory.create(program=program)
     ProgramRequirementFactory.add_root(program)
@@ -117,6 +130,30 @@ def test_certificate_management_create(user):
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
     manage_program_certificates.Command().handle(
         create=True, program=program.readable_id, user=user.username
+    )
+
+    generated_certificates = ProgramCertificate.objects.filter(
+        user=user, program=program
+    )
+
+    assert generated_certificates.count() == 1
+
+
+def test_program_certificate_management_force_create(user):
+    """
+    Test that create operation for program certificate management command
+    forcefully creates the certificate for a user
+    """
+    program = ProgramFactory.create()
+    course = CourseFactory.create(program=program)
+    ProgramRequirementFactory.add_root(program)
+    program.add_requirement(course)
+    course_run = CourseRunFactory.create(course=course)
+    CourseRunGradeFactory.create(
+        course_run=course_run, user=user, passed=False, grade=0
+    )
+    manage_program_certificates.Command().handle(
+        create=True, program=program.readable_id, user=user.username, force=True
     )
 
     generated_certificates = ProgramCertificate.objects.filter(

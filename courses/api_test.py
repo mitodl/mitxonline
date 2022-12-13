@@ -23,6 +23,7 @@ from courses.api import (
     get_user_enrollments,
     get_user_relevant_course_run,
     manage_course_run_certificate_access,
+    manage_program_certificate_access,
     override_user_grade,
     process_course_run_grade_certificate,
     sync_course_mode,
@@ -1282,6 +1283,26 @@ def test_generate_program_certificate_success(user, program):
     assert len(ProgramCertificate.objects.all()) == 1
 
 
+def test_force_generate_program_certificate_success(user, program):
+    """
+    Test that generate_program_certificate generate a program certificate
+    """
+    course = CourseFactory.create(program=program)
+    ProgramRequirementFactory.add_root(program)
+    program.add_requirement(course)
+    course_run = CourseRunFactory.create(course=course)
+    CourseRunGradeFactory.create(
+        course_run=course_run, user=user, passed=False, grade=0
+    )
+
+    certificate, created = generate_program_certificate(
+        user=user, program=program, force_create=True
+    )
+    assert created is True
+    assert isinstance(certificate, ProgramCertificate)
+    assert len(ProgramCertificate.objects.all()) == 1
+
+
 def test_generate_program_certificate_already_exist(user, program):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
@@ -1291,3 +1312,27 @@ def test_generate_program_certificate_already_exist(user, program):
     result = generate_program_certificate(user=user, program=program)
     assert result == (program_certificate, False)
     assert len(ProgramCertificate.objects.all()) == 1
+
+
+def test_program_certificates_access():
+    """Tests that the revoke and unrevoke for a program certificates sets the states properly"""
+    test_certificate = ProgramCertificateFactory.create(is_revoked=False)
+
+    # Revoke a program certificate
+    manage_program_certificate_access(
+        user=test_certificate.user,
+        program=test_certificate.program,
+        revoke_state=True,
+    )
+
+    test_certificate.refresh_from_db()
+    assert test_certificate.is_revoked is True
+
+    # Unrevoke a program certificate
+    manage_program_certificate_access(
+        user=test_certificate.user,
+        program=test_certificate.program,
+        revoke_state=False,
+    )
+    test_certificate.refresh_from_db()
+    assert test_certificate.is_revoked is False
