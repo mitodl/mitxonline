@@ -283,6 +283,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     enrollment_start = serializers.SerializerMethodField()
     topics = serializers.SerializerMethodField()
     requirements = serializers.SerializerMethodField()
+    req_tree = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         """Serializer for courses"""
@@ -370,6 +371,9 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return formatted_reqs
 
+    def get_req_tree(self, instance):
+        return ProgramRequirementTreeSerializer(instance.requirements_root).data
+
     class Meta:
         model = models.Program
         fields = [
@@ -382,6 +386,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "enrollment_start",
             "topics",
             "requirements",
+            "req_tree",
         ]
 
 

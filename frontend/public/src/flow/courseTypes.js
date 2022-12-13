@@ -66,12 +66,19 @@ export type ProgramEnrollments = {
   required: Array<number>,
 }
 
+export type ProgramRequirement = {
+  id: number,
+  data: RequirementNode,
+  children: Array<ProgramRequirement>,
+}
+
 export type Program = {
   id: number,
   title: string,
   readable_id: string,
   courses: Array<CourseDetailWithRuns>,
   requirements: ?ProgramEnrollments,
+  req_tree: Array<ProgramRequirement>,
 }
 
 export type ProgramEnrollment = {
@@ -93,12 +100,6 @@ export type RequirementNode = {
   program: number,
   course: ?number,
   title: ?string,
-}
-
-export type ProgramRequirement = {
-  id: number,
-  data: RequirementNode,
-  children: Array<ProgramRequirement>,
 }
 
 export type LearnerRecordGrade = {

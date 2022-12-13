@@ -2,7 +2,10 @@ import React from "react"
 
 import EnrolledItemCard from "./EnrolledItemCard"
 import ProgramCourseInfoCard from "./ProgramCourseInfoCard"
-import { enrollmentHasPassingGrade } from "../lib/courseApi"
+import {
+  extractCoursesFromNode,
+  enrollmentHasPassingGrade
+} from "../lib/courseApi"
 import { areLearnerRecordsEnabled } from "../lib/util"
 import type {
   ProgramEnrollment,
@@ -20,10 +23,12 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     const { enrollment } = this.props
     let found = undefined
 
-    for (let i = 0; i < course.courseruns.length; i++) {
-      found = enrollment.enrollments.find(
-        elem => elem.run.id === course.courseruns[i].id
-      )
+    if (course.courseruns) {
+      for (let i = 0; i < course.courseruns.length; i++) {
+        found = enrollment.enrollments.find(
+          elem => elem.run.id === course.courseruns[i].id
+        )
+      }
     }
 
     if (found === undefined) {
@@ -78,24 +83,25 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
       <React.Fragment
         key={`drawer-course-list-${enrollment.program.readable_id}`}
       >
-        <div className="row enrolled-items" id="program_enrolled_items">
-          <h6>REQUIRED ({enrollment.program.requirements.required.length})</h6>
+        {enrollment.program.req_tree[0].children.map(node => {
+          const interiorCourses = extractCoursesFromNode(node, enrollment)
 
-          {enrollment.program.courses.map(courseEnrollment =>
-            this.isRequired(courseEnrollment)
-              ? this.renderCourseInfoCard(courseEnrollment)
-              : null
-          )}
-        </div>
-        <div className="row enrolled-items" id="program_unenrolled_items">
-          <h6>OPTIONAL ({enrollment.program.requirements.electives.length})</h6>
+          return (
+            <div
+              className="row enrolled-items"
+              id={`program_enrolled_node_${node.id}`}
+              key={`program_enrolled_node_${node.id}`}
+            >
+              <h6 className="text-uppercase">
+                {node.data.title} ({interiorCourses.length})
+              </h6>
 
-          {enrollment.program.courses.map(courseEnrollment => {
-            return this.isElective(courseEnrollment)
-              ? this.renderCourseInfoCard(courseEnrollment)
-              : null
-          })}
-        </div>
+              {interiorCourses.map(courseEnrollment =>
+                this.renderCourseInfoCard(courseEnrollment)
+              )}
+            </div>
+          )
+        })}
       </React.Fragment>
     )
   }
