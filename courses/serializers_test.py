@@ -4,11 +4,9 @@ Tests for course serializers
 # pylint: disable=unused-argument, redefined-outer-name
 from datetime import datetime, timedelta
 
-import factory
-from flexiblepricing.constants import FlexiblePriceStatus
-from flexiblepricing.factories import FlexiblePriceFactory
-import pytest
 import bleach
+import factory
+import pytest
 import pytz
 from django.contrib.auth.models import AnonymousUser
 
@@ -17,9 +15,9 @@ from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    CourseRunGradeFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
-    CourseRunGradeFactory,
 )
 from courses.models import CourseTopic, ProgramRequirement, ProgramRequirementNodeType
 from courses.serializers import (
@@ -27,16 +25,18 @@ from courses.serializers import (
     BaseProgramSerializer,
     CourseRunDetailSerializer,
     CourseRunEnrollmentSerializer,
+    CourseRunGradeSerializer,
     CourseRunSerializer,
     CourseSerializer,
     ProgramEnrollmentSerializer,
-    ProgramSerializer,
     ProgramRequirementSerializer,
     ProgramRequirementTreeSerializer,
-    CourseRunGradeSerializer,
+    ProgramSerializer,
 )
-from ecommerce.serializers import BaseProductSerializer
 from ecommerce.factories import ProductFactory
+from ecommerce.serializers import BaseProductSerializer
+from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
 
 pytestmark = [pytest.mark.django_db]
@@ -103,6 +103,9 @@ def test_serialize_program(mock_context):
             ),
             "topics": [{"name": topic.name} for topic in topics],
             "requirements": formatted_reqs,
+            "req_tree": ProgramRequirementTreeSerializer(
+                program.get_requirements_root()
+            ).data,
         },
     )
 
