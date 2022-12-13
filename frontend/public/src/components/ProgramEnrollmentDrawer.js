@@ -160,10 +160,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
             <div className="row chrome" id="program_enrollment_subtite">
               <p>
                 Program overview: {enrollment.program.courses.length} courses |{" "}
-                {passedCourses} passed |{" "}
-                {enrollment.program.courses.length -
-                  enrollment.enrollments.length}{" "}
-                not enrolled
+                {passedCourses} passed
                 {areLearnerRecordsEnabled() ? (
                   <>
                     <br />
