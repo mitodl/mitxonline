@@ -93,6 +93,87 @@ const makeCourseDetail = (): CourseDetail => ({
   feature_image_src: casual.url
 })
 
+const makeRequirementRootNode = (program: Program) => ({
+  id:   genProgramRequirementId.next().value,
+  data: {
+    node_type: "program_root",
+    program:   program.id
+  },
+  children: [
+    {
+      id:   genProgramRequirementId.next().value,
+      data: {
+        node_type: "operator",
+        program:   program.id,
+        operator:  "all_of",
+        title:     "Required Courses"
+      },
+      children: []
+    },
+    {
+      id:   genProgramRequirementId.next().value,
+      data: {
+        node_type:      "operator",
+        program:        program.id,
+        operator:       "min_number_of",
+        operator_value: 1,
+        title:          "Elective Courses"
+      },
+      children: []
+    }
+  ]
+})
+
+const makeDEDPSampleRequirementsTree = (
+  program: Program,
+  courses: Array<LearnerRecordCourse | CourseDetail>,
+  shouldBeCompleted: boolean
+) => {
+  // Makes a requirements tree that looks like it did for DEDP in RC for 3T2022.
+  // You need to pass in an array of 7 courses.
+
+  // make root node
+  // root nodes have two children - both operators, one for reqs and one for electives
+  const rn = makeRequirementRootNode(program)
+
+  // add courses to the Required Courses node
+  for (let i = 0; i < 3; i++) {
+    rn.children[0].children.push(
+      makeRequirementCourseNode(courses[i], rn.children[0], shouldBeCompleted)
+    )
+  }
+
+  // add base-level electives
+  for (let i = 3; i < 5; i++) {
+    rn.children[1].children.push(
+      makeRequirementCourseNode(courses[i], rn.children[1], shouldBeCompleted)
+    )
+  }
+
+  // add nested operator and electives
+  const nestedElectiveOp = {
+    id:   genProgramRequirementId.next().value,
+    data: {
+      node_type:      "operator",
+      program:        program.id,
+      operator:       "min_number_of",
+      operator_value: 1,
+      title:          "One of"
+    },
+    children: []
+  }
+
+  for (let i = 5; i < courses.length; i++) {
+    nestedElectiveOp.children.push(
+      makeRequirementCourseNode(courses[i], nestedElectiveOp, shouldBeCompleted)
+    )
+  }
+
+  rn.children[1].children.push(nestedElectiveOp)
+
+  return rn
+}
+
 export const makeCourseDetailWithRuns = (): CourseDetailWithRuns => {
   return {
     ...makeCourseRun(),
@@ -142,6 +223,21 @@ export const makeProgram = (): Program => ({
   readable_id: casual.word,
   courses:     [makeCourseDetailWithRuns()]
 })
+
+export const makeProgramWithReqTree = (): Program => {
+  const program = makeProgram()
+
+  // for the reqtree stuff to work, the program needs 6 more courses
+  for (let i = 0; i < 6; i++) {
+    program.courses.push(makeCourseDetailWithRuns())
+  }
+
+  program.req_tree = [
+    makeDEDPSampleRequirementsTree(program, program.courses, false)
+  ]
+
+  return program
+}
 
 export const makeCertificate = (): Certificate => ({
   link: `/certificate/program/${casual.uuid}`,
@@ -210,7 +306,7 @@ export const makeLearnerRecordUser = (): LearnerRecordUser => ({
 })
 
 export const makeRequirementCourseNode = (
-  course: LearnerRecordCourse,
+  course: LearnerRecordCourse | CourseDetail,
   parentNode: ProgramRequirement,
   shouldBeCompleted: boolean
 ): ProgramRequirement => {
@@ -224,12 +320,14 @@ export const makeRequirementCourseNode = (
     children: []
   }
 
-  if (shouldBeCompleted || casual.coin_flip) {
-    course.grade = makeLearnerRecordGrade()
-    course.certificate = makeLearnerRecordCertificate()
-  }
+  if (Object.getOwnPropertyNames(course).includes("grade")) {
+    if (shouldBeCompleted || casual.coin_flip) {
+      course.grade = makeLearnerRecordGrade()
+      course.certificate = makeLearnerRecordCertificate()
+    }
 
-  course.reqtype = parentNode.data.title
+    course.reqtype = parentNode.data.title
+  }
 
   return courseNode
 }
@@ -262,75 +360,13 @@ export const makeLearnerRecord = (
     partner_schools: partnerSchools
   }
 
-  // make root node
-  // root nodes have two children - both operators, one for reqs and one for electives
-  const rn = {
-    id:   genProgramRequirementId.next().value,
-    data: {
-      node_type: "program_root",
-      program:   learnerRecord.program.id
-    },
-    children: [
-      {
-        id:   genProgramRequirementId.next().value,
-        data: {
-          node_type: "operator",
-          program:   learnerRecord.program.id,
-          operator:  "all_of",
-          title:     "Required Courses"
-        },
-        children: []
-      },
-      {
-        id:   genProgramRequirementId.next().value,
-        data: {
-          node_type:      "operator",
-          program:        learnerRecord.program.id,
-          operator:       "min_number_of",
-          operator_value: 1,
-          title:          "Elective Courses"
-        },
-        children: []
-      }
-    ]
-  }
-
-  // add courses to the Required Courses node
-  for (let i = 0; i < 3; i++) {
-    rn.children[0].children.push(
-      makeRequirementCourseNode(courses[i], rn.children[0], shouldBeCompleted)
+  learnerRecord.program.requirements = [
+    makeDEDPSampleRequirementsTree(
+      learnerRecord.program,
+      courses,
+      shouldBeCompleted
     )
-  }
-
-  // add base-level electives
-  for (let i = 3; i < 5; i++) {
-    rn.children[1].children.push(
-      makeRequirementCourseNode(courses[i], rn.children[1], shouldBeCompleted)
-    )
-  }
-
-  // add nested operator and electives
-  const nestedElectiveOp = {
-    id:   genProgramRequirementId.next().value,
-    data: {
-      node_type:      "operator",
-      program:        learnerRecord.program.id,
-      operator:       "min_number_of",
-      operator_value: 1,
-      title:          "One of"
-    },
-    children: []
-  }
-
-  for (let i = 5; i < courses.length; i++) {
-    nestedElectiveOp.children.push(
-      makeRequirementCourseNode(courses[i], nestedElectiveOp, shouldBeCompleted)
-    )
-  }
-
-  rn.children[1].children.push(nestedElectiveOp)
-
-  learnerRecord.program.requirements = [rn]
+  ]
   learnerRecord.program.courses = courses
 
   return learnerRecord
