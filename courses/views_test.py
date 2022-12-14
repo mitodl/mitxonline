@@ -7,35 +7,36 @@ import operator as op
 import pytest
 from django.db.models import Count, Q
 from django.urls import reverse
-from requests import HTTPError, ConnectionError as RequestsConnectionError
+from requests import ConnectionError as RequestsConnectionError
+from requests import HTTPError
 from rest_framework import status
 
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
+    BlockedCountryFactory,
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
-    BlockedCountryFactory,
 )
 from courses.models import CourseRun, ProgramEnrollment
 from courses.serializers import (
+    CourseRunEnrollmentSerializer,
     CourseRunSerializer,
     CourseSerializer,
     ProgramSerializer,
-    CourseRunEnrollmentSerializer,
 )
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from main import features
 from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_ENROLL_BLOCKED,
-    USER_MSG_TYPE_ENROLLED,
     USER_MSG_TYPE_ENROLL_FAILED,
+    USER_MSG_TYPE_ENROLLED,
 )
 from main.test_utils import assert_drf_json_equal
-from openedx.exceptions import NoEdxApiAuthError
 from main.utils import encode_json_cookie_value
+from openedx.exceptions import NoEdxApiAuthError
 
 pytestmark = [pytest.mark.django_db]
 
@@ -612,7 +613,7 @@ def test_program_enrollments(
     course_run = CourseRunFactory.create(course=course)
     course_run_enrollment = CourseRunEnrollmentFactory.create(run=course_run, user=user)
 
-    resp = user_drf_client.get(reverse("user-program-enrollments-api"))
+    resp = user_drf_client.get(reverse("user_program_enrollments_api-list"))
 
     assert resp.status_code == status.HTTP_200_OK
 

@@ -255,55 +255,88 @@ class UserEnrollmentsApiViewSet(
             raise NotImplementedError
 
 
-@api_view()
-@permission_classes([IsAuthenticated])
-def get_user_program_enrollments(request):
-    """
-    Returns a unified set of program and course enrollments for the current
-    user.
-    """
+class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
 
-    courseruns = (
-        CourseRunEnrollment.objects.filter(user=request.user)
-        .select_related("run__course__page")
-        .select_related("run__course__program")
-        .all()
-    )
+    def list(self, request):
+        """
+        Returns a unified set of program and course enrollments for the current
+        user.
+        """
 
-    program_list = {}
-
-    for enrollment in courseruns:
-        if enrollment.run.course.program is not None:
-            if enrollment.run.course.program.id in program_list:
-                program_list[enrollment.run.course.program.id]["enrollments"].append(
-                    enrollment
-                )
-            else:
-                program_list[enrollment.run.course.program.id] = {
-                    "enrollments": [enrollment],
-                    "program": enrollment.run.course.program,
-                    "certificate": get_program_certificate_by_enrollment(enrollment),
-                }
-
-    non_course_programs = (
-        ProgramEnrollment.objects.filter(user=request.user)
-        .exclude(program_id__in=program_list.keys())
-        .select_related("program")
-        .all()
-    )
-
-    program_list = list(program_list.values())
-
-    for enrollment in non_course_programs:
-        program_list.append(
-            {
-                "enrollments": [],
-                "program": enrollment.program,
-                "certificate": get_program_certificate_by_enrollment(enrollment),
-            }
+        courseruns = (
+            CourseRunEnrollment.objects.filter(user=request.user)
+            .select_related("run__course__page")
+            .select_related("run__course__program")
+            .all()
         )
 
-    return Response(UserProgramEnrollmentDetailSerializer(program_list, many=True).data)
+        program_list = {}
+
+        unenrollments = (
+            ProgramEnrollment.objects.filter(
+                user=request.user, change_status=ENROLL_CHANGE_STATUS_UNENROLLED
+            )
+            .values_list("program_id", flat=True)
+            .all()
+        )
+
+        for enrollment in courseruns:
+            if (
+                enrollment.run.course.program is not None
+                and enrollment.run.course.program.id not in unenrollments
+            ):
+                if enrollment.run.course.program.id in program_list:
+                    program_list[enrollment.run.course.program.id][
+                        "enrollments"
+                    ].append(enrollment)
+                else:
+                    program_list[enrollment.run.course.program.id] = {
+                        "enrollments": [enrollment],
+                        "program": enrollment.run.course.program,
+                        "certificate": get_program_certificate_by_enrollment(
+                            enrollment
+                        ),
+                    }
+
+        non_course_programs = (
+            ProgramEnrollment.objects.filter(user=request.user)
+            .exclude(program_id__in=program_list.keys())
+            .exclude(change_status=ENROLL_CHANGE_STATUS_UNENROLLED)
+            .select_related("program")
+            .all()
+        )
+
+        program_list = list(program_list.values())
+
+        for enrollment in non_course_programs:
+            program_list.append(
+                {
+                    "enrollments": [],
+                    "program": enrollment.program,
+                    "certificate": get_program_certificate_by_enrollment(enrollment),
+                }
+            )
+
+        return Response(
+            UserProgramEnrollmentDetailSerializer(program_list, many=True).data
+        )
+
+    def destroy(self, request, pk=None):
+        """
+        Unenroll the user from this program. This is simpler than the corresponding
+        function for CourseRunEnrollments; edX doesn't really know what programs
+        are so there's nothing to process there.
+        """
+
+        program = Program.objects.get(pk=pk)
+        (enrollment, created) = ProgramEnrollment.objects.update_or_create(
+            user=request.user,
+            program=program,
+            defaults={"change_status": ENROLL_CHANGE_STATUS_UNENROLLED},
+        )
+
+        return self.list(request)
 
 
 class PartnerSchoolViewSet(viewsets.ReadOnlyModelViewSet):

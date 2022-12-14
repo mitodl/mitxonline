@@ -101,6 +101,20 @@ export const deactivateEnrollmentMutation = (enrollmentId: number) => ({
   }
 })
 
+export const deactivateProgramEnrollmentMutation = (programId: number) => ({
+  url:     `/api/program_enrollments/${programId}/`,
+  options: {
+    ...getCsrfOptions(),
+    method: "DELETE"
+  },
+  transform: json => ({
+    program_enrollments: json
+  }),
+  update: {
+    program_enrollments: nextState
+  }
+})
+
 export const courseEmailsSubscriptionMutation = (
   enrollmentId: number,
   emailsSubscription: string = ""

@@ -109,10 +109,7 @@ export type LearnerRecordGrade = {
   grade_percent: number
 }
 
-export type LearnerRecordCertificate = {
-  uuid: string,
-  link: string
-}
+export type LearnerRecordCertificate = Certficate
 
 export type LearnerRecordCourse = {
   title: string,

@@ -22,6 +22,7 @@ import {
   enrollmentsQuery,
   enrollmentsQueryKey,
   deactivateEnrollmentMutation,
+  deactivateProgramEnrollmentMutation,
   courseEmailsSubscriptionMutation
 } from "../lib/queries/enrollment"
 import { currentUserSelector } from "../lib/queries/users"
@@ -38,13 +39,18 @@ import {
 } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
-import type { RunEnrollment, Program } from "../flow/courseTypes"
+import type {
+  RunEnrollment,
+  Program,
+  ProgramEnrollment
+} from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
 
 type EnrolledItemCardProps = {
   enrollment: RunEnrollment | Program,
   currentUser: CurrentUser,
   deactivateEnrollment: (enrollmentId: number) => Promise<any>,
+  deactivateProgramEnrollment: (programId: number) => Promise<any>,
   courseEmailsSubscription: (
     enrollmentId: number,
     emailsSubscription: string
@@ -59,6 +65,7 @@ type EnrolledItemCardState = {
   submittingEnrollmentId: number | null,
   emailSettingsModalVisibility: boolean,
   verifiedUnenrollmentModalVisibility: boolean,
+  programUnenrollmentModalVisibility: boolean,
   menuVisibility: boolean
 }
 
@@ -70,6 +77,7 @@ export class EnrolledItemCard extends React.Component<
     submittingEnrollmentId:              null,
     emailSettingsModalVisibility:        false,
     verifiedUnenrollmentModalVisibility: false,
+    programUnenrollmentModalVisibility:  false,
     menuVisibility:                      false
   }
 
@@ -84,6 +92,13 @@ export class EnrolledItemCard extends React.Component<
     const { verifiedUnenrollmentModalVisibility } = this.state
     this.setState({
       verifiedUnenrollmentModalVisibility: !verifiedUnenrollmentModalVisibility
+    })
+  }
+
+  toggleProgramUnenrollmentModalVisibility = () => {
+    const { programUnenrollmentModalVisibility } = this.state
+    this.setState({
+      programUnenrollmentModalVisibility: !programUnenrollmentModalVisibility
     })
   }
 
@@ -134,6 +149,38 @@ export class EnrolledItemCard extends React.Component<
     } finally {
       this.setState({ submittingEnrollmentId: null })
     }
+  }
+
+  async onProgramUnenrollment(program: Program) {
+    const { deactivateProgramEnrollment, addUserNotification } = this.props
+
+    this.toggleProgramUnenrollmentModalVisibility()
+
+    let userMessage, messageType
+
+    try {
+      const resp = await deactivateProgramEnrollment(program.id)
+      if (isSuccessResponse(resp)) {
+        messageType = ALERT_TYPE_SUCCESS
+        userMessage = `You have been successfully unenrolled from ${program.title}.`
+      } else {
+        throw new Error("program unenrollment failed")
+      }
+    } catch (e) {
+      messageType = ALERT_TYPE_DANGER
+      userMessage = `Something went wrong with your request to unenroll. Please contact support at ${SETTINGS.support_email}.`
+    }
+
+    addUserNotification({
+      "unenroll-status": {
+        type:  messageType,
+        props: {
+          text: userMessage
+        }
+      }
+    })
+    // Scroll to the top of the page to make sure the user sees the message
+    window.scrollTo(0, 0)
   }
 
   async onSubmitEmailSettings(payload: Object) {
@@ -210,8 +257,14 @@ export class EnrolledItemCard extends React.Component<
                     type="checkbox"
                     name="subscribeEmails"
                     checked={values.subscribeEmails}
+                    aria-labelledby={`verified-unenrollment-${values.enrollmentId}-email-checkbox`}
                   />{" "}
-                  <label check>Receive course emails</label>
+                  <label
+                    id={`verified-unenrollment-${values.enrollmentId}-email-checkbox`}
+                    check
+                  >
+                    Receive course emails
+                  </label>
                 </section>
                 <Button type="submit" color="success">
                   Save Settings
@@ -238,13 +291,17 @@ export class EnrolledItemCard extends React.Component<
         className="text-center"
         isOpen={verifiedUnenrollmentModalVisibility}
         toggle={() => this.toggleVerifiedUnenrollmentModalVisibility()}
+        role="dialog"
+        aria-labelledby={`verified-unenrollment-${enrollment.id}-modal-header`}
+        aria-describedby={`verified-unenrollment-${enrollment.id}-modal-body`}
       >
         <ModalHeader
           toggle={() => this.toggleVerifiedUnenrollmentModalVisibility()}
+          id={`verified-unenrollment-${enrollment.id}-modal-header`}
         >
           Unenroll From {enrollment.run.course_number}
         </ModalHeader>
-        <ModalBody>
+        <ModalBody id={`verified-unenrollment-${enrollment.id}-modal-body`}>
           <p>
             You are enrolled in the certificate track for{" "}
             {enrollment.run.course_number} {enrollment.run.title}. You can't
@@ -258,6 +315,49 @@ export class EnrolledItemCard extends React.Component<
             </a>{" "}
             for assistance.
           </p>
+        </ModalBody>
+      </Modal>
+    )
+  }
+
+  renderProgramUnenrollmentModal(enrollment: ProgramEnrollment) {
+    const { programUnenrollmentModalVisibility } = this.state
+
+    return (
+      <Modal
+        id={`program-unenrollment-${enrollment.program.id}-modal`}
+        className="text-center"
+        isOpen={programUnenrollmentModalVisibility}
+        toggle={() => this.toggleProgramUnenrollmentModalVisibility()}
+        role="dialog"
+        aria-labelledby={`program-unenrollment-${enrollment.program.id}-modal-header`}
+        aria-describedby={`program-unenrollment-${enrollment.program.id}-modal-body`}
+      >
+        <ModalHeader
+          id={`program-unenrollment-${enrollment.program.id}-modal-header`}
+          toggle={() => this.toggleProgramUnenrollmentModalVisibility()}
+        >
+          Unenroll From {enrollment.program.title}
+        </ModalHeader>
+        <ModalBody
+          id={`program-unenrollment-${enrollment.program.id}-modal-body`}
+        >
+          <p>
+            Are you sure you wish to unenroll from {enrollment.program.title}?
+            You will not be unenrolled from any courses within the program.
+          </p>
+          <Button
+            type="submit"
+            color="success"
+            onClick={() => this.onProgramUnenrollment(enrollment.program)}
+          >
+            Unenroll
+          </Button>{" "}
+          <Button
+            onClick={() => this.toggleProgramUnenrollmentModalVisibility()}
+          >
+            Cancel
+          </Button>
         </ModalBody>
       </Modal>
     )
@@ -447,6 +547,7 @@ export class EnrolledItemCard extends React.Component<
 
   renderProgramEnrollment() {
     const { enrollment } = this.props
+    const { menuVisibility } = this.state
 
     const title = enrollment.program.title
     const startDateDescription = null
@@ -480,18 +581,37 @@ export class EnrolledItemCard extends React.Component<
                   {title}
                 </a>
               </h2>
-              <a
-                rel="noopener noreferrer"
-                href="#program_enrollment_drawer"
-                aria-flowto="program_enrollment_drawer"
-                aria-haspopup="dialog"
-                className="text-body material-icons"
-                aria-label={menuTitle}
-                title={menuTitle}
-                onClick={this.toggleProgramInfo.bind(this)}
+              <Dropdown
+                isOpen={menuVisibility}
+                toggle={this.toggleMenuVisibility.bind(this)}
+                id={`programEnrollmentDropdown-${enrollment.id}`}
               >
-                more_vert
-              </a>
+                <DropdownToggle
+                  className="d-inline-flex unstyled dot-menu"
+                  aria-label={menuTitle}
+                >
+                  <span
+                    className="material-icons"
+                    title={menuTitle}
+                    aria-hidden="true"
+                  >
+                    more_vert
+                  </span>
+                </DropdownToggle>
+                <DropdownMenu right>
+                  <span id={`unenrollButtonWrapper-${enrollment.id}`}>
+                    <DropdownItem
+                      className="unstyled d-block"
+                      onClick={() =>
+                        this.toggleProgramUnenrollmentModalVisibility()
+                      }
+                    >
+                      Unenroll
+                    </DropdownItem>
+                    {this.renderProgramUnenrollmentModal(enrollment)}
+                  </span>
+                </DropdownMenu>
+              </Dropdown>
             </div>
             <div className="detail pt-1">
               {startDateDescription === null}
@@ -554,6 +674,9 @@ const mapPropsToConfig = () => [enrollmentsQuery()]
 const deactivateEnrollment = (enrollmentId: number) =>
   mutateAsync(deactivateEnrollmentMutation(enrollmentId))
 
+const deactivateProgramEnrollment = (programId: number) =>
+  mutateAsync(deactivateProgramEnrollmentMutation(programId))
+
 const courseEmailsSubscription = (
   enrollmentId: number,
   emailsSubscription: string
@@ -564,6 +687,7 @@ const courseEmailsSubscription = (
 
 const mapDispatchToProps = {
   deactivateEnrollment,
+  deactivateProgramEnrollment,
   courseEmailsSubscription,
   addUserNotification
 }
