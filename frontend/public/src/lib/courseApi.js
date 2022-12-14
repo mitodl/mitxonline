@@ -49,7 +49,15 @@ export const courseRunStatusMessage = (run: CourseRun) => {
   const startDateDescription = generateStartDateText(run)
   if (startDateDescription !== null) {
     if (startDateDescription.active) {
-      if (moment(run.end_date).isBefore(moment())) {
+      return (
+        <span>
+          {" "}
+          |<strong className="active-enrollment-text"> Active</strong> from{" "}
+          {startDateDescription.datestr}
+        </span>
+      )
+    } else {
+      if (run.end_date !== null && moment(run.end_date).isBefore(moment())) {
         const dateString = parseDateString(run.end_date)
         return (
           <span>
@@ -61,21 +69,11 @@ export const courseRunStatusMessage = (run: CourseRun) => {
         return (
           <span>
             {" "}
-            |<strong className="active-enrollment-text">
-              {" "}
-              Active
-            </strong> from {startDateDescription.datestr}
+            | <strong className="text-dark">Starts</strong>{" "}
+            {startDateDescription.datestr}
           </span>
         )
       }
-    } else {
-      return (
-        <span>
-          {" "}
-          | <strong className="text-dark">Starts</strong>{" "}
-          {startDateDescription.datestr}
-        </span>
-      )
     }
   } else {
     return null
@@ -87,9 +85,16 @@ export const generateStartDateText = (run: CourseRunDetail) => {
     const now = moment()
     const startDate = parseDateString(run.start_date)
     const formattedStartDate = formatPrettyDateTimeAmPmTz(startDate)
-    return now.isBefore(startDate)
-      ? { active: false, datestr: formattedStartDate }
-      : { active: true, datestr: formattedStartDate }
+    if (run.end_date) {
+      const endDate = parseDateString(run.end_date)
+      return now.isAfter(startDate) && now.isBefore(endDate)
+        ? { active: true, datestr: formattedStartDate }
+        : { active: false, datestr: formattedStartDate }
+    } else {
+      return now.isAfter(startDate)
+        ? { active: true, datestr: formattedStartDate }
+        : { active: false, datestr: formattedStartDate }
+    }
   }
 
   return null

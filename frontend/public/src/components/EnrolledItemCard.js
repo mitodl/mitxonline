@@ -370,12 +370,6 @@ export class EnrolledItemCard extends React.Component<
                       Enrolled in certificate track
                     </span>
                   ) : null}
-                  {startDateDescription !== null &&
-                  startDateDescription.active ? (
-                      <span className="badge badge-in-progress mr-2">
-                      In Progress
-                      </span>
-                    ) : null}
                 </div>
 
                 <h2 className="my-0 mr-3">{title}</h2>
