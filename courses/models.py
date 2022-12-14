@@ -7,6 +7,7 @@ import uuid
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
@@ -19,7 +20,7 @@ from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
 from treebeard.mp_tree import MP_Node
-from wagtail.core.models import PageRevision
+from wagtail.core.models import Page, PageRevision
 
 from courses.constants import (
     ENROLL_CHANGE_STATUS_CHOICES,
@@ -658,6 +659,23 @@ class CourseRun(TimestampedModel):
         )
 
 
+def limit_to_certificate_pages():
+    """
+    A callable for the limit_choices_to param in the FKs for certificate pages
+    to limit the choices to certificate pages, rather than every page in the
+    CMS.
+    """
+    content_type = ContentType.objects.filter(
+        app_label="cms", model="certificatepage"
+    ).get()
+
+    avaialble_revisions = Page.objects.filter(content_type=content_type).values_list(
+        "id", flat=True
+    )
+
+    return {"page_id__in": avaialble_revisions}
+
+
 class BaseCertificate(models.Model):
     """
     Common properties for certificate models
@@ -695,7 +713,10 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         related_name="courseruncertificates",
     )
     certificate_page_revision = models.ForeignKey(
-        PageRevision, null=True, on_delete=models.CASCADE
+        PageRevision,
+        null=True,
+        on_delete=models.CASCADE,
+        limit_choices_to=limit_to_certificate_pages,
     )
 
     objects = ActiveCertificates()
@@ -758,7 +779,10 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
 
     program = models.ForeignKey(Program, null=False, on_delete=models.CASCADE)
     certificate_page_revision = models.ForeignKey(
-        PageRevision, null=True, on_delete=models.CASCADE
+        PageRevision,
+        null=True,
+        on_delete=models.CASCADE,
+        limit_choices_to=limit_to_certificate_pages,
     )
 
     objects = ActiveCertificates()
