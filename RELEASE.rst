@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.55.0
+Version 0.55.0 (Released December 14, 2022)
 --------------
 
 - added program certificates migration from micromasters
