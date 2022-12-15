@@ -51,7 +51,9 @@ def test_program_certificate_management_invalid_program():
         manage_program_certificates.Command().handle(
             user=test_user.username, create=True
         )
-    assert str(command_error.value) == "Could not find program with readable_id={}.".format(None)
+    assert str(
+        command_error.value
+    ) == "Could not find program with readable_id={}.".format(None)
 
     with pytest.raises(CommandError) as command_error:
         manage_program_certificates.Command().handle(
