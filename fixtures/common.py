@@ -8,7 +8,7 @@ from django.test.client import Client
 from rest_framework.test import APIClient
 
 from users.factories import UserFactory
-from courses.factories import ProgramFactory
+from courses.factories import CourseFactory, ProgramFactory, ProgramRequirementFactory
 
 
 @pytest.fixture
@@ -79,6 +79,14 @@ def mock_context(mocker, user):
 def program():
     """Program object fixture"""
     return ProgramFactory.create()
+
+
+@pytest.fixture()
+def program_with_requirements():
+    """Program with requirement root object fixture"""
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    return program
 
 
 @pytest.fixture

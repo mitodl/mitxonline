@@ -46,9 +46,11 @@ class Command(BaseCommand):
             help="The id, email or username of the enrolled User",
             required=True,
         )
-        group = parser.add_mutually_exclusive_group()
-        group.add_argument(
-            "--program", type=str, help="The 'readable_id' value for a Program"
+        parser.add_argument(
+            "--program",
+            type=str,
+            help="The id, email or username of the enrolled User",
+            required=True,
         )
         parser.add_argument(
             "--revoke", dest="revoke", action="store_true", required=False
@@ -87,20 +89,12 @@ class Command(BaseCommand):
                 "The command needs a valid action e.g. --revoke, --unrevoke, --create."
             )
 
-        # A user is needed for revoke/un-revoke and certificate creation
-        if not user:
-            raise CommandError("The command needs a valid user.")
-
         try:
             user = fetch_user(user)
         except User.DoesNotExist:
             raise CommandError(
                 "Could not find a user with <username or email>={}.".format(user)
             )
-
-        # A program is needed for revoke/un-revoke and certificate creation
-        if not program:
-            raise CommandError("The command needs a valid program.")
 
         # Unable to obtain a program object based on the provided program readable id
         try:
@@ -133,7 +127,7 @@ class Command(BaseCommand):
         # Handle the creation of the program certificate.
         elif create:
 
-            # if -f or --force argument is provided, we'll forcefully genrate the program certificate
+            # If -f or --force argument is provided, we'll forcefully generate the program certificate
             certificate, created_cert = generate_program_certificate(
                 user=user, program=program, force_create=force_create
             )

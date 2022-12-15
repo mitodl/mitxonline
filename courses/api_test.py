@@ -1230,73 +1230,79 @@ def test_check_program_for_orphans(caplog, has_empty_tree, has_orphans):
         assert len(check_program_for_orphans(program)) == 0
 
 
-def test_generate_program_certificate_failure_missing_certificates(user, program):
+def test_generate_program_certificate_failure_missing_certificates(
+    user, program_with_requirements
+):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
     if there is not any course_run certificate for the given course.
     """
-    course = CourseFactory.create(program=program)
+    course = CourseFactory.create(program=program_with_requirements)
     CourseRunFactory.create_batch(3, course=course)
-    ProgramRequirementFactory.add_root(program)
-    program.add_requirement(course)
+    ProgramRequirementFactory.add_root(program_with_requirements)
+    program_with_requirements.add_requirement(course)
 
-    result = generate_program_certificate(user=user, program=program)
+    result = generate_program_certificate(user=user, program=program_with_requirements)
     assert result == (None, False)
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_generate_program_certificate_failure_not_all_passed(user, program):
+def test_generate_program_certificate_failure_not_all_passed(
+    user, program_with_requirements
+):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
     if there is not any course_run certificate for the given course.
     """
-    courses = CourseFactory.create_batch(3, program=program)
+    courses = CourseFactory.create_batch(3, program=program_with_requirements)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     CourseRunCertificateFactory.create_batch(
         2, user=user, course_run=factory.Iterator(course_runs)
     )
-    ProgramRequirementFactory.add_root(program)
-    program.add_requirement(courses[0])
-    program.add_requirement(courses[1])
-    program.add_requirement(courses[2])
+    program_with_requirements.add_requirement(courses[0])
+    program_with_requirements.add_requirement(courses[1])
+    program_with_requirements.add_requirement(courses[2])
 
-    result = generate_program_certificate(user=user, program=program)
+    result = generate_program_certificate(user=user, program=program_with_requirements)
     assert result == (None, False)
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_generate_program_certificate_success(user, program):
+def test_generate_program_certificate_success(user, program_with_requirements):
     """
     Test that generate_program_certificate generate a program certificate
     """
-    course = CourseFactory.create(program=program)
-    ProgramRequirementFactory.add_root(program)
-    program.add_requirement(course)
+    course = CourseFactory.create(program=program_with_requirements)
+    program_with_requirements.add_requirement(course)
     course_run = CourseRunFactory.create(course=course)
     CourseRunGradeFactory.create(course_run=course_run, user=user, passed=True, grade=1)
 
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
 
-    certificate, created = generate_program_certificate(user=user, program=program)
+    certificate, created = generate_program_certificate(
+        user=user, program=program_with_requirements
+    )
     assert created is True
     assert isinstance(certificate, ProgramCertificate)
     assert len(ProgramCertificate.objects.all()) == 1
 
 
-def test_force_generate_program_certificate_success(user, program):
+def test_force_generate_program_certificate_success(user, program_with_requirements):
     """
-    Test that generate_program_certificate generate a program certificate
+    Test that force creating a program certificate with generate_program_certificate generates
+    a program certificate without matching program certificate requirements.
     """
-    course = CourseFactory.create(program=program)
-    ProgramRequirementFactory.add_root(program)
-    program.add_requirement(course)
-    course_run = CourseRunFactory.create(course=course)
-    CourseRunGradeFactory.create(
-        course_run=course_run, user=user, passed=False, grade=0
+    courses = CourseFactory.create_batch(3, program=program_with_requirements)
+    course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+    CourseRunCertificateFactory.create_batch(
+        2, user=user, course_run=factory.Iterator(course_runs)
     )
+    program_with_requirements.add_requirement(courses[0])
+    program_with_requirements.add_requirement(courses[1])
+    program_with_requirements.add_requirement(courses[2])
 
     certificate, created = generate_program_certificate(
-        user=user, program=program, force_create=True
+        user=user, program=program_with_requirements, force_create=True
     )
     assert created is True
     assert isinstance(certificate, ProgramCertificate)
