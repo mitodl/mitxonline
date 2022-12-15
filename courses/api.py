@@ -217,7 +217,12 @@ def get_user_enrollments(user):
 
 
 def create_run_enrollments(
-    user, runs, *, keep_failed_enrollments=False, mode=EDX_DEFAULT_ENROLLMENT_MODE
+    user,
+    runs,
+    *,
+    keep_failed_enrollments=False,
+    mode=EDX_DEFAULT_ENROLLMENT_MODE,
+    force_enrollment=False,
 ):
     """
     Creates local records of a user's enrollment in course runs, and attempts to enroll them
@@ -228,6 +233,8 @@ def create_run_enrollments(
         runs (iterable of CourseRun): The course runs to enroll in
         keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
             in the database even if the enrollment fails in edX.
+        force_enrollment (bool): If True, Enforces Enrollment after the enrollment end date
+                                    has been passed or upgrade_deadline is ended
 
     Returns:
         (list of CourseRunEnrollment, bool): A list of enrollment objects that were successfully
@@ -240,7 +247,9 @@ def create_run_enrollments(
         subscribe_edx_course_emails.delay(enrollment.id)
 
     try:
-        enroll_in_edx_course_runs(user, runs, mode=mode)
+        enroll_in_edx_course_runs(
+            user, runs, mode=mode, force_enrollment=force_enrollment
+        )
     except (
         EdxApiEnrollErrorException,
         UnknownEdxApiEnrollException,

@@ -52,6 +52,13 @@ class Command(BaseCommand):
             "--code", type=str, help="The enrollment code for the course", required=True
         )
         parser.add_argument(
+            "-f",
+            "--force",
+            action="store_true",
+            dest="force",
+            help="If provided, user will be enrolled even if edX enrollment end date is expired",
+        )
+        parser.add_argument(
             "-k",
             "--keep-failed-enrollments",
             action="store_true",
@@ -63,6 +70,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         """Handle command execution"""
         user = fetch_user(options["user"])
+        force_enrollment = options["force"]
 
         run = CourseRun.objects.filter(courseware_id=options["run"]).first()
         if run is None:
@@ -86,7 +94,7 @@ class Command(BaseCommand):
                 )
             )
 
-        if not run.is_upgradable:
+        if not force_enrollment and not run.is_upgradable:
             raise CommandError(
                 "The course with courseware_id={} is not upgradeable or the upgrade deadline has been passed".format(
                     options["run"]
@@ -133,6 +141,7 @@ class Command(BaseCommand):
                 [run],
                 keep_failed_enrollments=options["keep_failed_enrollments"],
                 mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                force_enrollment=force_enrollment,
             )
             if not successful_enrollments:
                 raise CommandError("Failed to create the enrollment record")

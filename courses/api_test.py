@@ -318,9 +318,11 @@ def test_create_run_enrollments(
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
 
     successful_enrollments, edx_request_success = create_run_enrollments(
-        user, runs, mode=enrollment_mode
+        user, runs, mode=enrollment_mode, force_enrollment=False
     )
-    patched_edx_enroll.assert_called_once_with(user, runs, mode=enrollment_mode)
+    patched_edx_enroll.assert_called_once_with(
+        user, runs, mode=enrollment_mode, force_enrollment=False
+    )
 
     with django_capture_on_commit_callbacks(execute=True):
         assert patched_send_enrollment_email.call_count == num_runs
@@ -365,7 +367,10 @@ def test_create_run_enrollments_upgrade(mocker, user, is_active):
         user, runs=[test_enrollment.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
     patched_edx_enroll.assert_called_once_with(
-        user, [test_enrollment.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user,
+        [test_enrollment.run],
+        mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        force_enrollment=False,
     )
 
     patched_send_enrollment_email.assert_called_once()
@@ -401,7 +406,7 @@ def test_create_run_enrollments_api_fail(mocker, user, exception_cls):
         keep_failed_enrollments=True,
     )
     patched_edx_enroll.assert_called_once_with(
-        user, [run], mode=EDX_DEFAULT_ENROLLMENT_MODE
+        user, [run], mode=EDX_DEFAULT_ENROLLMENT_MODE, force_enrollment=False
     )
     patched_log_exception.assert_called_once()
     patched_send_enrollment_email.assert_not_called()
@@ -447,7 +452,7 @@ def test_create_run_enrollments_enroll_api_fail(
         keep_failed_enrollments=keep_failed_enrollments,
     )
     patched_edx_enroll.assert_called_once_with(
-        user, runs, mode=EDX_DEFAULT_ENROLLMENT_MODE
+        user, runs, mode=EDX_DEFAULT_ENROLLMENT_MODE, force_enrollment=False
     )
     patched_log_exception.assert_called_once()
     patched_send_enrollment_email.assert_not_called()
@@ -484,7 +489,7 @@ def test_create_run_enrollments_creation_fail(mocker, user):
         runs,
     )
     patched_edx_enroll.assert_called_once_with(
-        user, runs, mode=EDX_DEFAULT_ENROLLMENT_MODE
+        user, runs, mode=EDX_DEFAULT_ENROLLMENT_MODE, force_enrollment=False
     )
     patched_log_exception.assert_called_once()
     patched_mail_api.send_course_run_enrollment_email.assert_not_called()
@@ -1144,7 +1149,7 @@ def test_create_run_enrollments_upgrade(mocker, user):
         mode=EDX_ENROLLMENT_AUDIT_MODE,
     )
     patched_edx_enroll.assert_called_once_with(
-        user, [test_course_run], mode=EDX_ENROLLMENT_AUDIT_MODE
+        user, [test_course_run], mode=EDX_ENROLLMENT_AUDIT_MODE, force_enrollment=False
     )
 
     patched_send_enrollment_email.assert_called_once()
@@ -1164,7 +1169,10 @@ def test_create_run_enrollments_upgrade(mocker, user):
     )
 
     patched_edx_enroll.assert_called_once_with(
-        user, [test_course_run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user,
+        [test_course_run],
+        mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        force_enrollment=False,
     )
 
     assert edx_request_success is False
