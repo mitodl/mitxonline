@@ -7,7 +7,6 @@ import uuid
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
@@ -20,7 +19,7 @@ from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
 from treebeard.mp_tree import MP_Node
-from wagtail.core.models import Page, PageRevision
+from wagtail.core.models import PageRevision
 
 from courses.constants import (
     ENROLL_CHANGE_STATUS_CHOICES,
@@ -665,11 +664,9 @@ def limit_to_certificate_pages():
     to limit the choices to certificate pages, rather than every page in the
     CMS.
     """
-    content_type = ContentType.objects.filter(
-        app_label="cms", model="certificatepage"
-    ).get()
+    from cms.models import CertificatePage
 
-    avaialble_revisions = Page.objects.filter(content_type=content_type).values_list(
+    avaialble_revisions = CertificatePage.objects.filter(live=True).values_list(
         "id", flat=True
     )
 
@@ -760,6 +757,32 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
             )
         )
 
+    def clean(self):
+        from cms.models import CertificatePage, CoursePage
+
+        certpage = CertificatePage.objects.filter(
+            pk=self.certificate_page_revision.page_id,
+        )
+
+        if not certpage.exists():
+            raise ValidationError(
+                {
+                    "certificate_page_revision": f"The selected page {self.certificate_page_revision.page} is not a certificate page."
+                }
+            )
+
+        certpage = certpage.get()
+
+        if (
+            not isinstance(certpage.parent, CoursePage)
+            or not certpage.parent.course == self.course_run.course
+        ):
+            raise ValidationError(
+                {
+                    "certificate_page_revision": f"The selected certificate page {certpage} is not for this course {self.course_run.course}."
+                }
+            )
+
     def save(self, *args, **kwargs):
         if not self.certificate_page_revision:
             certificate_page = (
@@ -769,6 +792,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
             )
             if certificate_page:
                 self.certificate_page_revision = certificate_page.get_latest_revision()
+
         super(CourseRunCertificate, self).save(*args, **kwargs)
 
 
@@ -781,6 +805,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
     certificate_page_revision = models.ForeignKey(
         PageRevision,
         null=True,
+        blank=True,
         on_delete=models.CASCADE,
         limit_choices_to=limit_to_certificate_pages,
     )
@@ -830,6 +855,32 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
             user=self.user.username, program=self.program.text_id, uuid=self.uuid
         )
 
+    def clean(self):
+        from cms.models import CertificatePage, ProgramPage
+
+        certpage = CertificatePage.objects.filter(
+            pk=self.certificate_page_revision.page_id,
+        )
+
+        if not certpage.exists():
+            raise ValidationError(
+                {
+                    "certificate_page_revision": f"The selected page {self.certificate_page_revision.page} is not a certificate page."
+                }
+            )
+
+        certpage = certpage.get()
+
+        if (
+            not isinstance(certpage.parent, ProgramPage)
+            or not certpage.parent.program == self.program
+        ):
+            raise ValidationError(
+                {
+                    "certificate_page_revision": f"The selected certificate page {certpage} is not for this program {self.program}."
+                }
+            )
+
     def save(self, *args, **kwargs):  # pylint: disable=signature-differs
         if not self.certificate_page_revision:
             certificate_page = (
@@ -839,6 +890,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
             )
             if certificate_page:
                 self.certificate_page_revision = certificate_page.get_latest_revision()
+
         super().save(*args, **kwargs)
 
 
