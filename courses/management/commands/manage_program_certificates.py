@@ -84,7 +84,7 @@ class Command(BaseCommand):
         user = options.get("user")
         force_create = options.get("force", False)
 
-        if not (revoke or unrevoke) and not create and not user:
+        if not (revoke or unrevoke) and not create:
             raise CommandError(
                 "The command needs a valid action e.g. --revoke, --unrevoke, --create."
             )
