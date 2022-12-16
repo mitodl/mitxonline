@@ -13,17 +13,17 @@ from mitol.common.factories import UserFactory
 
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from cms.factories import (
+    CertificatePageFactory,
     CoursePageFactory,
     FlexiblePricingFormFactory,
     ProgramPageFactory,
     ResourcePageFactory,
-    CertificatePageFactory,
 )
 from cms.models import (
-    FlexiblePricingRequestSubmission,
-    CoursePage,
-    ProgramPage,
     CertificatePage,
+    CoursePage,
+    FlexiblePricingRequestSubmission,
+    ProgramPage,
     SignatoryPage,
 )
 from courses.factories import (
@@ -32,7 +32,7 @@ from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
 )
-from courses.models import CourseRun
+from courses.models import CourseRun, limit_to_certificate_pages
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
 from ecommerce.factories import ProductFactory
 from flexiblepricing.api import determine_courseware_flexible_price_discount

@@ -6,13 +6,20 @@ import factory
 import pytest
 from django.core.exceptions import ValidationError
 from mitol.common.utils.datetime import now_in_utc
+from wagtail.core.models import Page
 
+from cms.factories import (
+    CertificatePageFactory,
+    CoursePageFactory,
+    ProgramPageFactory,
+    ResourcePageFactory,
+)
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from courses.factories import (
     CourseFactory,
+    CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
-    CourseRunCertificateFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
@@ -22,6 +29,7 @@ from courses.models import (
     CourseRunEnrollment,
     ProgramRequirement,
     ProgramRequirementNodeType,
+    limit_to_certificate_pages,
 )
 from main.test_utils import format_as_iso8601
 from users.factories import UserFactory
@@ -1013,3 +1021,44 @@ def test_program_add_elective():
 
     add_and_check()
     add_and_check()
+
+
+def test_certificate_choice_limits():
+    """
+    The limit_choices_to callable should return just certificate page IDs as
+    options. We'll make two - one for a course and one for a program - and they
+    both should show up.
+    """
+    ResourcePageFactory.create()
+    course_page = CoursePageFactory.create(certificate_page=None)
+    course_certificate_page = CertificatePageFactory.create(
+        parent=course_page,
+        product_name="product_name",
+        CEUs="1.8",
+        signatories__0__signatory__page__name="Name",
+        signatories__0__signatory__page__title_1="Title_1",
+        signatories__0__signatory__page__title_2="Title_2",
+        signatories__0__signatory__page__organization="Organization",
+        signatories__0__signatory__page__signature_image__title="Image",
+    )
+    program_page = ProgramPageFactory.create(certificate_page=None)
+    program_certificate_page = CertificatePageFactory.create(
+        parent=program_page,
+        product_name="product_name",
+        CEUs="2.8",
+        signatories__0__signatory__page__name="Name",
+        signatories__0__signatory__page__title_1="Title_1",
+        signatories__0__signatory__page__title_2="Title_2",
+        signatories__0__signatory__page__organization="Organization",
+        signatories__0__signatory__page__signature_image__title="Image",
+    )
+
+    choices = limit_to_certificate_pages()
+
+    assert "page_id__in" in choices
+    assert len(choices["page_id__in"]) == 2
+
+    assert course_certificate_page.id in choices["page_id__in"]
+    assert program_certificate_page.id in choices["page_id__in"]
+
+    assert len(choices["page_id__in"]) != Page.objects.count()
