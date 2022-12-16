@@ -555,6 +555,7 @@ export class EnrolledItemCard extends React.Component<
     const pageLocation = null
     const courseRunStatusMessageText = null
     const menuTitle = `Program information for ${enrollment.program.title}`
+    const hasPassed = enrollment.certificate ? true : false
 
     return (
       <div
@@ -570,17 +571,28 @@ export class EnrolledItemCard extends React.Component<
 
           <div className="col-12 col-md px-3 py-3 py-md-0 box">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
-              <h2 className="my-0 mr-3">
-                <a
-                  rel="noopener noreferrer"
-                  href="#program_enrollment_drawer"
-                  aria-flowto="program_enrollment_drawer"
-                  aria-haspopup="dialog"
-                  onClick={() => this.toggleProgramInfo()}
-                >
-                  {title}
-                </a>
-              </h2>
+              <div className="d-flex flex-column">
+                <div className="align-content-start d-flex enrollment-mode-container flex-wrap pb-1">
+                  {hasPassed ? (
+                    <span className="badge badge-enrolled-passed mr-2">
+                      <img src="/static/images/done.svg" alt="Check" /> Program
+                      passed
+                    </span>
+                  ) : null}
+                </div>
+                
+                <h2 className="my-0 mr-3">
+                  <a
+                    rel="noopener noreferrer"
+                    href="#program_enrollment_drawer"
+                    aria-flowto="program_enrollment_drawer"
+                    aria-haspopup="dialog"
+                    onClick={() => this.toggleProgramInfo()}
+                  >
+                    {title}
+                  </a>
+                </h2>
+              </div>
               <Dropdown
                 isOpen={menuVisibility}
                 toggle={this.toggleMenuVisibility.bind(this)}
@@ -640,7 +652,7 @@ export class EnrolledItemCard extends React.Component<
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    View certificate
+                    View program certificate
                   </a>
                 ) : null}
               </div>
