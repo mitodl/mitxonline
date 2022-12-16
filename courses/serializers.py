@@ -372,7 +372,12 @@ class ProgramSerializer(serializers.ModelSerializer):
         return formatted_reqs
 
     def get_req_tree(self, instance):
-        return ProgramRequirementTreeSerializer(instance.requirements_root).data
+        req_root = instance.get_requirements_root()
+
+        if req_root is None:
+            return []
+
+        return ProgramRequirementTreeSerializer(instance=req_root).data
 
     class Meta:
         model = models.Program

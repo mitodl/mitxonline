@@ -94,6 +94,16 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
   renderProgramOverview() {
     const { enrollment } = this.props
 
+    if (enrollment.program.req_tree.length === 0) {
+      let passed = 0
+
+      enrollment.enrollments.forEach(elem => {
+        passed += elem.grades.reduce((acc, grade) => grade.passed ? acc += 1 : acc, 0) ? 1 : 0
+      })
+
+      return (<>{enrollment.program.courses.length} courses | {passed} passed</>)
+    }
+
     const requiredEnrollments = extractCoursesFromNode(
       enrollment.program.req_tree[0].children[0],
       enrollment

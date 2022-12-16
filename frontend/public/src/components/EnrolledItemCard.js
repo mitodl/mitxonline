@@ -555,6 +555,7 @@ export class EnrolledItemCard extends React.Component<
     const pageLocation = null
     const courseRunStatusMessageText = null
     const menuTitle = `Program information for ${enrollment.program.title}`
+    const courseCount = enrollment.program.requirements.required ? enrollment.program.requirements.electives.length + enrollment.program.requirements.required.length : enrollment.program.courses.length
     const hasPassed = enrollment.certificate ? true : false
 
     return (
@@ -636,8 +637,8 @@ export class EnrolledItemCard extends React.Component<
                   aria-haspopup="dialog"
                   onClick={() => this.toggleProgramInfo()}
                 >
-                  {enrollment.program.courses.length} course
-                  {enrollment.program.courses.length > 1 ? "s" : null}
+                  {courseCount} course
+                  {courseCount > 1 ? "s" : null}
                 </a>
                 {pageLocation ? (
                   <a className="pr-2" href={pageLocation.page_url}>
