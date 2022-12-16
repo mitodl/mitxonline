@@ -666,11 +666,11 @@ def limit_to_certificate_pages():
     """
     from cms.models import CertificatePage
 
-    avaialble_revisions = CertificatePage.objects.filter(live=True).values_list(
+    available_revisions = CertificatePage.objects.filter(live=True).values_list(
         "id", flat=True
     )
 
-    return {"page_id__in": avaialble_revisions}
+    return {"page_id__in": available_revisions}
 
 
 class BaseCertificate(models.Model):
@@ -712,6 +712,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
     certificate_page_revision = models.ForeignKey(
         PageRevision,
         null=True,
+        blank=True,
         on_delete=models.CASCADE,
         limit_choices_to=limit_to_certificate_pages,
     )
