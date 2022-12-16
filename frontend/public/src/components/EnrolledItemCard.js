@@ -576,7 +576,7 @@ export class EnrolledItemCard extends React.Component<
                   {hasPassed ? (
                     <span className="badge badge-enrolled-passed mr-2">
                       <img src="/static/images/done.svg" alt="Check" /> Program
-                      passed
+                      completed
                     </span>
                   ) : null}
                 </div>
