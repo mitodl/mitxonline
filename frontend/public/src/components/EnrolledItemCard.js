@@ -580,7 +580,6 @@ export class EnrolledItemCard extends React.Component<
                     </span>
                   ) : null}
                 </div>
-                
                 <h2 className="my-0 mr-3">
                   <a
                     rel="noopener noreferrer"
