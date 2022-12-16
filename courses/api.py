@@ -917,7 +917,7 @@ def has_earned_program_cert(user, program):
     return _has_earned(root)
 
 
-def generate_program_certificate(user, program):
+def generate_program_certificate(user, program, force_create=False):
     """
     Create a program certificate if the user has a course certificate
     for each course in the program. Also, It will create the
@@ -926,6 +926,8 @@ def generate_program_certificate(user, program):
     Args:
         user (User): a Django user.
         program (programs.models.Program): program where the user is enrolled.
+        force_create (bool): Default False, ignores the requirement of passing
+                            the courses for the program certificate if True
 
     Returns:
         (ProgramCertificate or None, bool): A tuple containing a
@@ -941,7 +943,7 @@ def generate_program_certificate(user, program):
         )
         return existing_cert_queryset.first(), False
 
-    if not has_earned_program_cert(user, program):
+    if not force_create and not has_earned_program_cert(user, program):
         return None, False
 
     program_cert = ProgramCertificate.objects.create(user=user, program=program)
@@ -988,3 +990,34 @@ def generate_multiple_programs_certificate(user, programs):
         result = generate_program_certificate(user, program)
         results.append(result)
     return results
+
+
+def manage_program_certificate_access(user, program, revoke_state):
+    """
+    Revokes/Un-Revokes a program certificate.
+
+    Args:
+        user (User): a Django user.
+        program (Program): A Program model object.
+        revoke_state (bool): A flag representing True(Revoke), False(Un-Revoke)
+
+    Returns:
+        bool: A boolean representing the revoke/unrevoke success
+    """
+
+    try:
+        program_certificate = ProgramCertificate.all_objects.get(
+            user=user, program=program
+        )
+    except ProgramCertificate.DoesNotExist:
+        log.warning(
+            "Program certificate for user: %s and program: %s does not exist.",
+            user.username,
+            program.readable_id,
+        )
+        return False
+
+    program_certificate.is_revoked = revoke_state
+    program_certificate.save()
+
+    return True
