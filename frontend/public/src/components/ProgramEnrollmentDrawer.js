@@ -98,10 +98,19 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
       let passed = 0
 
       enrollment.enrollments.forEach(elem => {
-        passed += elem.grades.reduce((acc, grade) => grade.passed ? acc += 1 : acc, 0) ? 1 : 0
+        passed += elem.grades.reduce(
+          (acc, grade) => (grade.passed ? (acc += 1) : acc),
+          0
+        )
+          ? 1
+          : 0
       })
 
-      return (<>{enrollment.program.courses.length} courses | {passed} passed</>)
+      return (
+        <>
+          {enrollment.program.courses.length} courses | {passed} passed
+        </>
+      )
     }
 
     const requiredEnrollments = extractCoursesFromNode(
