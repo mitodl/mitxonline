@@ -15,7 +15,8 @@ import type {
   RunEnrollment,
   RequirementNode,
   LearnerRecord,
-  ProgramRequirement
+  ProgramRequirement,
+  ProgramEnrollment
 } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
 
@@ -131,6 +132,37 @@ const isNodeCompleted = (
   )
 
   return course && course.grade && course.certificate
+}
+
+export const extractCoursesFromNode = (
+  node: ProgramRequirement,
+  enrollment: ProgramEnrollment
+) => {
+  // Processes the node, and returns the courses that are within it. If there
+  // are nested operators, this will walk them but it won't group the courses
+  // based on them.
+
+  if (node.data.node_type === NODETYPE_COURSE) {
+    const retCourse = enrollment.program.courses.find(
+      elem => elem.id === node.data.course
+    )
+
+    if (retCourse) {
+      return [retCourse]
+    }
+
+    return []
+  } else if (node.data.node_type === NODETYPE_OPERATOR) {
+    let courseList = []
+
+    node.children.forEach(child => {
+      courseList = courseList.concat(extractCoursesFromNode(child, enrollment))
+    })
+
+    return courseList
+  }
+
+  return []
 }
 
 const walkNodes = (node: ProgramRequirement, learnerRecord: LearnerRecord) => {

@@ -2,7 +2,7 @@ import React from "react"
 
 import EnrolledItemCard from "./EnrolledItemCard"
 import ProgramCourseInfoCard from "./ProgramCourseInfoCard"
-import { enrollmentHasPassingGrade } from "../lib/courseApi"
+import { extractCoursesFromNode } from "../lib/courseApi"
 import { areLearnerRecordsEnabled } from "../lib/util"
 import type {
   ProgramEnrollment,
@@ -18,12 +18,15 @@ interface ProgramEnrollmentDrawerProps {
 export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDrawerProps> {
   renderCourseInfoCard(course: CourseDetailWithRuns) {
     const { enrollment } = this.props
+
     let found = undefined
 
-    for (let i = 0; i < course.courseruns.length; i++) {
-      found = enrollment.enrollments.find(
-        elem => elem.run.id === course.courseruns[i].id
-      )
+    if (course.courseruns) {
+      for (let i = 0; i < course.courseruns.length; i++) {
+        found = enrollment.enrollments.find(
+          elem => elem.run.id === course.courseruns[i].id
+        )
+      }
     }
 
     if (found === undefined) {
@@ -44,33 +47,6 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     )
   }
 
-  isRequired(course) {
-    const { enrollment } = this.props
-
-    return enrollment.program.requirements.required.indexOf(course.id) >= 0
-  }
-
-  isElective(course) {
-    const { enrollment } = this.props
-
-    return enrollment.program.requirements.electives.indexOf(course.id) >= 0
-  }
-
-  passedCount() {
-    const { enrollment } = this.props
-
-    let i = 0
-    let passedFlags = 0
-
-    for (i = 0; i < enrollment.enrollments.length; i++) {
-      if (enrollmentHasPassingGrade(enrollment.enrollments[i])) {
-        passedFlags++
-      }
-    }
-
-    return passedFlags
-  }
-
   renderCourseCards() {
     const { enrollment } = this.props
 
@@ -78,24 +54,25 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
       <React.Fragment
         key={`drawer-course-list-${enrollment.program.readable_id}`}
       >
-        <div className="row enrolled-items" id="program_enrolled_items">
-          <h6>REQUIRED ({enrollment.program.requirements.required.length})</h6>
+        {enrollment.program.req_tree[0].children.map(node => {
+          const interiorCourses = extractCoursesFromNode(node, enrollment)
 
-          {enrollment.program.courses.map(courseEnrollment =>
-            this.isRequired(courseEnrollment)
-              ? this.renderCourseInfoCard(courseEnrollment)
-              : null
-          )}
-        </div>
-        <div className="row enrolled-items" id="program_unenrolled_items">
-          <h6>OPTIONAL ({enrollment.program.requirements.electives.length})</h6>
+          return (
+            <div
+              className="row enrolled-items"
+              id={`program_enrolled_node_${node.id}`}
+              key={`program_enrolled_node_${node.id}`}
+            >
+              <h6 className="text-uppercase">
+                {node.data.title} ({interiorCourses.length})
+              </h6>
 
-          {enrollment.program.courses.map(courseEnrollment => {
-            return this.isElective(courseEnrollment)
-              ? this.renderCourseInfoCard(courseEnrollment)
-              : null
-          })}
-        </div>
+              {interiorCourses.map(courseEnrollment =>
+                this.renderCourseInfoCard(courseEnrollment)
+              )}
+            </div>
+          )
+        })}
       </React.Fragment>
     )
   }
@@ -114,6 +91,62 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     )
   }
 
+  renderProgramOverview() {
+    const { enrollment } = this.props
+
+    if (enrollment.program.req_tree.length === 0) {
+      let passed = 0
+
+      enrollment.enrollments.forEach(elem => {
+        passed += elem.grades.reduce(
+          (acc, grade) => (grade.passed ? (acc += 1) : acc),
+          0
+        )
+          ? 1
+          : 0
+      })
+
+      return (
+        <>
+          {enrollment.program.courses.length} courses | {passed} passed
+        </>
+      )
+    }
+
+    const requiredEnrollments = extractCoursesFromNode(
+      enrollment.program.req_tree[0].children[0],
+      enrollment
+    )
+    const electiveEnrollments = extractCoursesFromNode(
+      enrollment.program.req_tree[0].children[1],
+      enrollment
+    )
+    const allEnrollments = requiredEnrollments.concat(electiveEnrollments)
+
+    const passedCount = allEnrollments.reduce((acc, indEnrollment) => {
+      let passed = 0
+
+      for (let i = 0; i < enrollment.enrollments.length; i++) {
+        if (enrollment.enrollments[i].run.course.id === indEnrollment.id) {
+          for (let p = 0; p < enrollment.enrollments[i].grades.length; p++) {
+            if (enrollment.enrollments[i].grades[p].passed) {
+              passed = 1
+              break
+            }
+          }
+        }
+      }
+
+      return acc + passed
+    }, 0)
+
+    return (
+      <>
+        {allEnrollments.length} courses | {passedCount} passed
+      </>
+    )
+  }
+
   render() {
     const { isHidden, enrollment, showDrawer } = this.props
 
@@ -126,11 +159,19 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     const backgroundClass = isHidden
       ? "drawer-background open"
       : "drawer-background"
+
     const drawerClass = `nav-drawer ${isHidden ? "open" : "closed"}`
 
-    const passedCourses = enrollment === null ? null : this.passedCount()
+    if (enrollment === null) {
+      return null
+    }
 
-    return enrollment === null ? null : (
+    const enrolledItemCards =
+      enrollment.program.requirements.length === 0
+        ? this.renderFlatCourseCards()
+        : this.renderCourseCards()
+
+    return (
       <>
         <div className={backgroundClass}>
           <div
@@ -159,8 +200,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
             </div>
             <div className="row chrome" id="program_enrollment_subtite">
               <p>
-                Program overview: {enrollment.program.courses.length} courses |{" "}
-                {passedCourses} passed
+                Program overview: {this.renderProgramOverview()}
                 {areLearnerRecordsEnabled() ? (
                   <>
                     <br />
@@ -175,9 +215,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
                 ) : null}
               </p>
             </div>
-            {enrollment.program.requirements.length === 0
-              ? this.renderFlatCourseCards()
-              : this.renderCourseCards()}
+            {enrolledItemCards}
           </div>
         </div>
       </>

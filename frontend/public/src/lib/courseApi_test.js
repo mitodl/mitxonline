@@ -4,12 +4,17 @@ import {
   isWithinEnrollmentPeriod,
   generateStartDateText,
   isFinancialAssistanceAvailable,
-  learnerProgramIsCompleted
+  learnerProgramIsCompleted,
+  extractCoursesFromNode
 } from "./courseApi"
 import { assert } from "chai"
 import moment from "moment"
 
-import { makeCourseRunDetail, makeLearnerRecord } from "../factories/course"
+import {
+  makeCourseRunDetail,
+  makeLearnerRecord,
+  makeProgramWithReqTree
+} from "../factories/course"
 import { makeUser } from "../factories/user"
 
 import type { CourseRunDetail } from "../flow/courseTypes"
@@ -161,6 +166,29 @@ describe("Course API", () => {
           assert.isNotOk(learnerProgramIsCompleted(learnerRecord))
         }
       })
+    })
+  })
+
+  describe("extractCoursesFromNode", () => {
+    it("returns a flattened list of courses for the node", () => {
+      // the learner record will generate a requirements tree in the proper
+      // format, so we're just using that factory here
+      const programEnrollment = {
+        program:     makeProgramWithReqTree(),
+        enrollments: []
+      }
+
+      const requirements = extractCoursesFromNode(
+        programEnrollment.program.req_tree[0].children[0],
+        programEnrollment
+      )
+      const electives = extractCoursesFromNode(
+        programEnrollment.program.req_tree[0].children[1],
+        programEnrollment
+      )
+
+      assert.equal(requirements.length, 3)
+      assert.equal(electives.length, 4)
     })
   })
 })

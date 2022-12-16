@@ -4,11 +4,9 @@ Tests for course serializers
 # pylint: disable=unused-argument, redefined-outer-name
 from datetime import datetime, timedelta
 
-import factory
-from flexiblepricing.constants import FlexiblePriceStatus
-from flexiblepricing.factories import FlexiblePriceFactory
-import pytest
 import bleach
+import factory
+import pytest
 import pytz
 from django.contrib.auth.models import AnonymousUser
 
@@ -17,9 +15,9 @@ from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
+    CourseRunGradeFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
-    CourseRunGradeFactory,
 )
 from courses.models import CourseTopic, ProgramRequirement, ProgramRequirementNodeType
 from courses.serializers import (
@@ -27,16 +25,18 @@ from courses.serializers import (
     BaseProgramSerializer,
     CourseRunDetailSerializer,
     CourseRunEnrollmentSerializer,
+    CourseRunGradeSerializer,
     CourseRunSerializer,
     CourseSerializer,
     ProgramEnrollmentSerializer,
-    ProgramSerializer,
     ProgramRequirementSerializer,
     ProgramRequirementTreeSerializer,
-    CourseRunGradeSerializer,
+    ProgramSerializer,
 )
-from ecommerce.serializers import BaseProductSerializer
 from ecommerce.factories import ProductFactory
+from ecommerce.serializers import BaseProductSerializer
+from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
 
 pytestmark = [pytest.mark.django_db]
@@ -54,7 +54,11 @@ def test_base_program_serializer():
     }
 
 
-def test_serialize_program(mock_context):
+@pytest.mark.parametrize(
+    "remove_tree",
+    [True, False],
+)
+def test_serialize_program(mock_context, remove_tree):
     """Test Program serialization"""
     program = ProgramFactory.create()
     run1 = CourseRunFactory.create(course__program=program, course__page=None)
@@ -70,17 +74,26 @@ def test_serialize_program(mock_context):
     course1.topics.set([topics[0], topics[1]])
     course2.topics.set([topics[1], topics[2]])
 
+    if remove_tree:
+        program.get_requirements_root().delete()
+        program.refresh_from_db()
+
     data = ProgramSerializer(instance=program, context=mock_context).data
 
     formatted_reqs = {"required": [], "electives": []}
 
-    req_root = program.get_requirements_root()
+    if not remove_tree:
+        req_root = program.get_requirements_root()
 
-    for node in req_root.get_children():
-        if node.operator == ProgramRequirement.Operator.ALL_OF:
-            formatted_reqs["required"] = [req.course.id for req in node.get_children()]
-        else:
-            formatted_reqs["electives"] = [req.course.id for req in node.get_children()]
+        for node in req_root.get_children():
+            if node.operator == ProgramRequirement.Operator.ALL_OF:
+                formatted_reqs["required"] = [
+                    req.course.id for req in node.get_children()
+                ]
+            else:
+                formatted_reqs["electives"] = [
+                    req.course.id for req in node.get_children()
+                ]
 
     assert_drf_json_equal(
         data,
@@ -102,7 +115,12 @@ def test_serialize_program(mock_context):
                 sorted(runs, key=lambda run: run.enrollment_start)[0].enrollment_start
             ),
             "topics": [{"name": topic.name} for topic in topics],
-            "requirements": formatted_reqs,
+            "requirements": formatted_reqs if not remove_tree else [],
+            "req_tree": ProgramRequirementTreeSerializer(
+                program.get_requirements_root()
+            ).data
+            if not remove_tree
+            else [],
         },
     )
 
