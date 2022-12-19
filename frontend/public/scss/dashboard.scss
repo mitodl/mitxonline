@@ -27,8 +27,8 @@ $enrolled-passed-fg: #ffffff;
     overflow: hidden;
     padding: 0;
     position: absolute;
-    width: 1px; 
-  } 
+    width: 1px;
+  }
   .card {
     display: flex;
 
@@ -267,12 +267,22 @@ $enrolled-passed-fg: #ffffff;
   .row.chrome {
     margin-top: 15px !important;
     margin-bottom: 15px !important;
-    
+
     button.close {
       position: absolute;
-      top: 20px;
+      top: 36px;
       right: 30px;
       float: none !important;
+      width: 24px;
+      height: 24px;
+
+      span {
+        background-image: url('/static/images/close-drawer.png');
+        background-repeat: no-repeat;
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+      }
     }
   }
 
@@ -283,7 +293,7 @@ $enrolled-passed-fg: #ffffff;
 
 .drawer-background {
   display: none;
-  
+
   &.open {
     display: block;
     position: fixed;
