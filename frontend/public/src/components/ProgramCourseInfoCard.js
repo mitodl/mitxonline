@@ -27,10 +27,10 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
           course.courseruns[0]
         )
       }
+    }
 
-      if (course.courseruns[0].page) {
-        courseDetailsPage = course.courseruns[0].page.page_url
-      }
+    if (course.page) {
+      courseDetailsPage = course.page.page_url
     }
 
     if (course.financial_assistance_form_url) {
