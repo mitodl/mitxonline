@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.55.1
+Version 0.55.1 (Released December 19, 2022)
 --------------
 
 - fix: certificate template improvements (#1261)
