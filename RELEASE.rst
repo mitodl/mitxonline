@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.55.1 (Released December 19, 2022)
+--------------
+
+- fix: certificate template improvements (#1261)
+- feat: management command for creating, revoking program certificates (#1260)
+- fix: edx-api-client requirement update (#1287)
+- Edx verified force enrollment after enrollment end date (#1225)
+- Updates program UI to enable unenrollments
+- Program drawer remove not enrolled (#1278)
+- 1252: dashboard course should not be in progress and ended at the same time (#1279)
+
 Version 0.55.0 (Released December 14, 2022)
 --------------
 
