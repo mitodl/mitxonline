@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.56.0
+Version 0.56.0 (Released December 20, 2022)
 --------------
 
 - Changing the URL so that it ends in /home (rather than /, which directed learners to the about page) (#1295)
