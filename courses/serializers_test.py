@@ -229,6 +229,7 @@ def test_serialize_course_with_page_fields(
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "live": True,
         },
     )
     patched_get_wagtail_src.assert_called_once_with(course_page.feature_image)
