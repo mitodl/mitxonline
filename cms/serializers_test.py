@@ -1,18 +1,19 @@
 """
 Tests for cms serializers
 """
-from cms.models import FlexiblePricingRequestForm
+import bleach
 import pytest
+from django.test.client import RequestFactory
+
 from cms.factories import (
     CoursePageFactory,
     FlexiblePricingFormFactory,
     ProgramPageFactory,
 )
+from cms.models import FlexiblePricingRequestForm
 from cms.serializers import CoursePageSerializer
 from courses.factories import CourseFactory, ProgramFactory
 from main.test_utils import assert_drf_json_equal
-from django.test.client import RequestFactory
-import bleach
 
 pytestmark = [pytest.mark.django_db]
 
@@ -53,6 +54,7 @@ def test_serialize_course_page(
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "live": True,
         },
     )
     patched_get_wagtail_src.assert_called_once_with(course_page.feature_image)
@@ -92,6 +94,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "live": True,
         },
     )
 
@@ -130,6 +133,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_no_parent(
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "live": True,
         },
     )
 
@@ -168,6 +172,7 @@ def test_serialize_course_page_with_flex_price_form_as_program_child(
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "live": True,
         },
     )
 
@@ -204,5 +209,6 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
             "instructors": [],
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
+            "live": True,
         },
     )
