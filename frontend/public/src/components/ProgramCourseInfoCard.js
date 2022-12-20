@@ -80,9 +80,9 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
             </div>
           </div>
         </div>
-        {courseDetailsPage ? (
-          <div className="row flex-grow-1 pt-3">
-            <div className="col pl-0 pr-0">
+        <div className="row flex-grow-1 pt-3">
+          <div className="col pl-0 pr-0">
+            {courseDetailsPage ? (
               <div className="upgrade-item-description detail d-md-flex flex-column px-4 justify-content-between pb-3">
                 <div className=" w-100 ">
                   <strong>Enroll today</strong> for free, and start learning
@@ -109,9 +109,9 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
                   </div>
                 </div>
               </div>
-            </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
       </div>
     )
   }
