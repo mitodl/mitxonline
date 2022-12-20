@@ -326,8 +326,8 @@ export class EnrolledItemCard extends React.Component<
   renderUnverifiedUnenrollmentModal(enrollment: RunEnrollment) {
     const { runUnenrollmentModalVisibility } = this.state
     const now = moment()
-    const endDate = enrollment.run.end_date
-      ? parseDateString(enrollment.run.end_date)
+    const endDate = enrollment.run.enrollment_end
+      ? parseDateString(enrollment.run.enrollment_end)
       : null
     const formattedEndDate = endDate ? formatPrettyDateTimeAmPmTz(endDate) : ""
     return (
