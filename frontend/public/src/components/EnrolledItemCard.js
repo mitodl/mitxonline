@@ -76,11 +76,11 @@ export class EnrolledItemCard extends React.Component<
   EnrolledItemCardState
 > {
   state = {
-    submittingEnrollmentId:              null,
-    emailSettingsModalVisibility:        false,
+    submittingEnrollmentId:             null,
+    emailSettingsModalVisibility:       false,
     runUnenrollmentModalVisibility:     false,
-    programUnenrollmentModalVisibility:  false,
-    menuVisibility:                      false
+    programUnenrollmentModalVisibility: false,
+    menuVisibility:                     false
   }
 
   toggleEmailSettingsModalVisibility = () => {
@@ -326,9 +326,13 @@ export class EnrolledItemCard extends React.Component<
   renderUnverifiedUnenrollmentModal(enrollment: RunEnrollment) {
     const { runUnenrollmentModalVisibility } = this.state
     const now = moment()
-    const endDate = enrollment.run.end_date ? parseDateString(enrollment.run.end_date) : null
-    const formattedEndDate = endDate ? formatPrettyDateTimeAmPmTz(endDate) : null
-    return  (
+    const endDate = enrollment.run.end_date
+      ? parseDateString(enrollment.run.end_date)
+      : null
+    const formattedEndDate = endDate
+      ? formatPrettyDateTimeAmPmTz(endDate)
+      : null
+    return (
       <Modal
         id={`run-unenrollment-${enrollment.run.id}-modal`}
         className="text-center"
@@ -344,12 +348,14 @@ export class EnrolledItemCard extends React.Component<
         >
           Unenroll From {enrollment.run.title}
         </ModalHeader>
-        <ModalBody
-          id={`run-unenrollment-${enrollment.run.id}-modal-body`}
-        >
+        <ModalBody id={`run-unenrollment-${enrollment.run.id}-modal-body`}>
           <p>
             Are you sure you wish to unenroll from {enrollment.run.title}?
-            {endDate ? (now.isAfter(endDate) ? "You won't be able to re-enroll" : `You won't be able to re-enroll after ${ formattedEndDate }`) : null}
+            {endDate
+              ? now.isAfter(endDate)
+                ? "You won't be able to re-enroll"
+                : `You won't be able to re-enroll after ${formattedEndDate}`
+              : null}
           </p>
           <Button
             type="submit"
@@ -358,9 +364,7 @@ export class EnrolledItemCard extends React.Component<
           >
             Unenroll
           </Button>{" "}
-          <Button
-            onClick={() => this.toggleRunUnenrollmentModalVisibility()}
-          >
+          <Button onClick={() => this.toggleRunUnenrollmentModalVisibility()}>
             Cancel
           </Button>
         </ModalBody>
@@ -369,8 +373,8 @@ export class EnrolledItemCard extends React.Component<
   }
 
   renderRunUnenrollmentModal(enrollment: RunEnrollment) {
-    return enrollment.enrollment_mode === "verified" ?
-      this.renderVerifiedUnenrollmentModal(enrollment)
+    return enrollment.enrollment_mode === "verified"
+      ? this.renderVerifiedUnenrollmentModal(enrollment)
       : this.renderUnverifiedUnenrollmentModal(enrollment)
   }
 
