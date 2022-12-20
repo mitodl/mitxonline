@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.56.0
+--------------
+
+- Changing the URL so that it ends in /home (rather than /, which directed learners to the about page) (#1295)
+- Updates the program drawer to use the requirements tree (#1281)
+- fix: program certificate link text (#1282)
+- Updates course run and program certificate models to limit choices just to certificate pages in admin
+
 Version 0.55.1 (Released December 19, 2022)
 --------------
 
