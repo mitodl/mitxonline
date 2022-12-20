@@ -29,7 +29,7 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
       }
     }
 
-    if (course.page) {
+    if (course.page && course.page.live) {
       courseDetailsPage = course.page.page_url
     }
 

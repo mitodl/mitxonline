@@ -1,10 +1,8 @@
 """CMS app serializers"""
-from django.templatetags.static import static
-from rest_framework import serializers
 import bleach
 from django.contrib.contenttypes.models import ContentType
-
-from django.contrib.contenttypes.models import ContentType
+from django.templatetags.static import static
+from rest_framework import serializers
 
 from cms import models
 from cms.api import get_wagtail_img_src
@@ -22,6 +20,7 @@ class CoursePageSerializer(serializers.ModelSerializer):
     description = serializers.SerializerMethodField()
     current_price = serializers.SerializerMethodField()
     instructors = serializers.SerializerMethodField()
+    live = serializers.SerializerMethodField()
 
     def get_feature_image_src(self, instance):
         """Serializes the source of the feature_image"""
@@ -116,6 +115,9 @@ class CoursePageSerializer(serializers.ModelSerializer):
 
         return returnable_members
 
+    def get_live(self, instance):
+        return instance.live
+
     class Meta:
         model = models.CoursePage
         fields = [
@@ -125,4 +127,5 @@ class CoursePageSerializer(serializers.ModelSerializer):
             "description",
             "current_price",
             "instructors",
+            "live",
         ]
