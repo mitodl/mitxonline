@@ -185,7 +185,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
             aria-hidden={!isHidden ? true : false}
           >
             <div
-              className="row chrome d-flex flex-row pr-2"
+              className="row chrome d-flex flex-row mr-3"
               id="program_enrollment_title"
             >
               <h3 className="flex-grow-1">{enrollment.program.title}</h3>
