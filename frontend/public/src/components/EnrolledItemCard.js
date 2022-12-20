@@ -329,9 +329,7 @@ export class EnrolledItemCard extends React.Component<
     const endDate = enrollment.run.end_date
       ? parseDateString(enrollment.run.end_date)
       : null
-    const formattedEndDate = endDate
-      ? formatPrettyDateTimeAmPmTz(endDate)
-      : null
+    const formattedEndDate = endDate ? formatPrettyDateTimeAmPmTz(endDate) : ""
     return (
       <Modal
         id={`run-unenrollment-${enrollment.run.id}-modal`}
