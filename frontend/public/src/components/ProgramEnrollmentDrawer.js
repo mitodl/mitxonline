@@ -22,13 +22,12 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     let found = undefined
 
     if (course.courseruns) {
-      for (let i = 0; i < course.courseruns.length; i++) {
-        found = enrollment.enrollments.find(
-          elem => elem.run.id === course.courseruns[i].id
-        )
+      for (let i = 0; i < enrollment.enrollments.length; i++) {
+        if (enrollment.enrollments[i].run.course.readable_id === course.readable_id) {
+          found = enrollment.enrollments[i]
+        }
       }
     }
-
     if (found === undefined) {
       return (
         <ProgramCourseInfoCard
