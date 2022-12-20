@@ -108,7 +108,7 @@ export class DashboardPage extends React.Component<
   }
 
   render() {
-    const { isLoading } = this.props
+    const { isLoading, programEnrollments } = this.props
 
     const myCourseClasses = `dash-tab${
       this.state.currentTab === DashboardTab.courses ? " active" : ""
@@ -116,13 +116,16 @@ export class DashboardPage extends React.Component<
     const programsClasses = `dash-tab${
       this.state.currentTab === DashboardTab.programs ? " active" : ""
     }`
+    const programEnrollmentsLength = programEnrollments
+      ? programEnrollments.length
+      : -1
 
     return (
       <DocumentTitle title={`${SETTINGS.site_name} | ${DASHBOARD_PAGE_TITLE}`}>
         <div className="std-page-body dashboard container">
           <Loader isLoading={isLoading}>
             <nav className="tabs" aria-controls="enrollment-items">
-              {!isProgramUIEnabled() ? (
+              {!isProgramUIEnabled() || !programEnrollmentsLength > 0 ? (
                 <>My Courses</>
               ) : (
                 <>
