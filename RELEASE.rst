@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.56.2
+--------------
+
+- Revert "Removes feature flag; small styling adjustment on My Courses tab when no Programs tab"
+- Removes feature flag; small styling adjustment on My Courses tab when no Programs tab
+- fix: don't show programs tab if user isn't enrolled in a program (#1303)
+- Update course message if already enrolled (#1300)
+
 Version 0.56.1 (Released December 21, 2022)
 --------------
 
