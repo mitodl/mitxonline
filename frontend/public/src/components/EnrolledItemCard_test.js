@@ -31,7 +31,6 @@ describe("EnrolledItemCard", () => {
     userEnrollment = makeCourseRunEnrollment()
     currentUser = makeUser()
     SETTINGS.features = {
-      enable_program_ui:      false,
       enable_learner_records: false
     }
     enrollmentCardProps = {
@@ -128,7 +127,6 @@ describe("EnrolledItemCard", () => {
         assert.isFalse(pricingLinks.exists())
       } else {
         SETTINGS.features = {
-          enable_program_ui:      false,
           enable_learner_records: false
         }
         const pricingLinks = inner.find(".pricing-links")
