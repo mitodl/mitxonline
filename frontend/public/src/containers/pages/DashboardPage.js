@@ -118,14 +118,14 @@ export class DashboardPage extends React.Component<
     }`
     const programEnrollmentsLength = programEnrollments
       ? programEnrollments.length
-      : -1
+      : 0
 
     return (
       <DocumentTitle title={`${SETTINGS.site_name} | ${DASHBOARD_PAGE_TITLE}`}>
         <div className="std-page-body dashboard container">
           <Loader isLoading={isLoading}>
             <nav className="tabs" aria-controls="enrollment-items">
-              {!isProgramUIEnabled() || !programEnrollmentsLength > 0 ? (
+              {!isProgramUIEnabled() || programEnrollmentsLength <= 0 ? (
                 <>My Courses</>
               ) : (
                 <>
