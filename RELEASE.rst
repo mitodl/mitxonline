@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.56.1 (Released December 21, 2022)
+--------------
+
+- fix: Fix courseware URL in command (#1305)
+- Updates button styling to sync border widths; updates close button on drawer
+- Fixed program info card to render course details link properly
+
 Version 0.56.0 (Released December 20, 2022)
 --------------
 
