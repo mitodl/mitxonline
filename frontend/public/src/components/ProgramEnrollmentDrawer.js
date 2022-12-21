@@ -23,7 +23,10 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
 
     if (course.courseruns) {
       for (let i = 0; i < enrollment.enrollments.length; i++) {
-        if (enrollment.enrollments[i].run.course.readable_id === course.readable_id) {
+        if (
+          enrollment.enrollments[i].run.course.readable_id ===
+          course.readable_id
+        ) {
           found = enrollment.enrollments[i]
         }
       }
