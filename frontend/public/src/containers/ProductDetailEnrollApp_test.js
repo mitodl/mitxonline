@@ -52,7 +52,6 @@ describe("ProductDetailEnrollApp", () => {
       {}
     )
     SETTINGS.features = {
-      enable_program_ui:      false,
       enable_learner_records: false
     }
 

@@ -20,7 +20,6 @@ import {
   courseEmailsSubscriptionMutation
 } from "../../lib/queries/enrollment"
 import { currentUserSelector } from "../../lib/queries/users"
-import { isProgramUIEnabled } from "../../lib/util"
 import { addUserNotification } from "../../actions"
 import { ProgramEnrollmentDrawer } from "../../components/ProgramEnrollmentDrawer"
 
@@ -125,8 +124,10 @@ export class DashboardPage extends React.Component<
         <div className="std-page-body dashboard container">
           <Loader isLoading={isLoading}>
             <nav className="tabs" aria-controls="enrollment-items">
-              {!isProgramUIEnabled() || programEnrollmentsLength <= 0 ? (
-                <>My Courses</>
+              {programEnrollmentsLength === 0 ? (
+                <>
+                  <strong style={{ "font-size": "75%" }}>My Courses</strong>
+                </>
               ) : (
                 <>
                   <button
