@@ -180,7 +180,7 @@ class Command(BaseCommand):
                     is_self_paced=edx_course.is_self_paced(),
                     courseware_url_path=parse.urljoin(
                         settings.OPENEDX_API_BASE_URL,
-                        f"/courses/{edx_course.course_id}/home",
+                        f"/courses/{edx_course.course_id}/course",
                     ),
                 )
 
