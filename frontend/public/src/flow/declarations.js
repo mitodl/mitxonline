@@ -12,6 +12,7 @@ declare type Settings = {
   recaptchaKey: ?string,
   support_email: string,
   features: {
+    enable_program_ui: boolean,
     enable_learner_records: boolean,
   },
   site_name: string,
