@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.56.1
+Version 0.56.1 (Released December 21, 2022)
 --------------
 
 - fix: Fix courseware URL in command (#1305)
