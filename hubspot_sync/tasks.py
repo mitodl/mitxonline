@@ -85,17 +85,17 @@ def sync_product_with_hubspot(bootcamp_run_id: int) -> str:
 
 
 @app.task
-def sync_deal_with_hubspot(application_id: int) -> str:
+def sync_deal_with_hubspot(order_id: int) -> str:
     """
     Sync an Order with a hubspot deal
 
     Args:
-        application_id(int): The Order id
+        order_id(int): The Order id
 
     Returns:
         str: The hubspot id for the deal
     """
-    return api.sync_deal_with_hubspot(application_id).id
+    return api.sync_deal_with_hubspot(order_id).id
 
 
 @app.task(acks_late=True)

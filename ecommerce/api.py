@@ -2,46 +2,41 @@
 
 import logging
 
-from django.urls import reverse
-from django.db import transaction
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
-from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
-from main.utils import redirect_with_user_message
-from ecommerce.constants import REFUND_SUCCESS_STATES, ZERO_PAYMENT_DATA
-from ecommerce.tasks import perform_unenrollment_from_order
-from courses.api import deactivate_run_enrollment
-from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
-
-from main.constants import (
-    USER_MSG_TYPE_ENROLL_BLOCKED,
-    USER_MSG_TYPE_ENROLL_DUPLICATED,
-    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
-    USER_MSG_TYPE_DISCOUNT_INVALID,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
-)
-
-from mitol.payment_gateway.api import (
-    CartItem as GatewayCartItem,
-    Order as GatewayOrder,
-    PaymentGateway,
-    ProcessorResponse,
-)
+from django.db import transaction
+from django.urls import reverse
+from ipware import get_client_ip
+from mitol.common.utils.datetime import now_in_utc
+from mitol.payment_gateway.api import CartItem as GatewayCartItem
+from mitol.payment_gateway.api import Order as GatewayOrder
+from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
 from mitol.payment_gateway.exceptions import RefundDuplicateException
 
-from mitol.common.utils.datetime import now_in_utc
-from ipware import get_client_ip
-
+from courses.api import deactivate_run_enrollment
+from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
+from ecommerce.constants import REFUND_SUCCESS_STATES, ZERO_PAYMENT_DATA
 from ecommerce.models import (
     Basket,
-    BasketItem,
-    PendingOrder,
-    UserDiscount,
     BasketDiscount,
+    BasketItem,
+    Discount,
     FulfilledOrder,
     Order,
-    Discount,
+    PendingOrder,
+    UserDiscount,
 )
+from ecommerce.tasks import perform_unenrollment_from_order
 from flexiblepricing.api import determine_courseware_flexible_price_discount
+from hubspot_sync.task_helpers import sync_hubspot_deal
+from main.constants import (
+    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_DISCOUNT_INVALID,
+    USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+)
+from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+from main.utils import redirect_with_user_message
 
 log = logging.getLogger(__name__)
 

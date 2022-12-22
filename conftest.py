@@ -19,11 +19,7 @@ def default_settings(monkeypatch, settings):
 @pytest.fixture(autouse=True)
 def mocked_signals(mocker):
     """Mock hubspot_sync signals"""
-    mock_sync_product = mocker.patch("ecommerce.signals.sync_hubspot_product")
-    mock_sync_order = mocker.patch("ecommerce.signals.sync_hubspot_deal")
-    return SimpleNamespace(
-        mock_sync_order=mock_sync_order, mock_sync_product=mock_sync_product
-    )
+    mocker.patch("ecommerce.signals.sync_hubspot_product")
 
 
 def pytest_addoption(parser):
