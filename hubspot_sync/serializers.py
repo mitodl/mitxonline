@@ -12,6 +12,10 @@ from ecommerce.models import DiscountRedemption, Product
 from hubspot_sync.api import format_product_name, get_hubspot_id_for_object
 from main.utils import format_decimal
 
+"""
+Map order state to hubspot ids for pipeline stages
+These IDs are specific to the prod & sandbox accounts for mitxonline
+"""
 ORDER_STATUS_MAPPING = {
     models.Order.STATE.FULFILLED: "48288390",
     models.Order.STATE.PENDING: "48288388",
