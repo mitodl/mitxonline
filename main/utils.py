@@ -1,5 +1,6 @@
 """mitx_online utilities"""
 import json
+from decimal import Decimal
 from enum import Flag, auto
 from typing import Set, Tuple, TypeVar, Union
 from urllib.parse import quote_plus
@@ -186,3 +187,8 @@ def parse_supplied_date(datearg):
 
     retDate = retDate.replace(tzinfo=pytz.timezone(TIME_ZONE))
     return retDate
+
+
+def format_decimal(amount: Decimal):
+    """Return a Decimal as a formatted string with 2 decimal places"""
+    return f"{amount:0.2f}"

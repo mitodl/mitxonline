@@ -45,7 +45,7 @@ class ProgramRunAdmin(admin.ModelAdmin):
     """Admin for ProgramRun"""
 
     model = ProgramRun
-    list_display = ("id", "program", "run_tag", "full_readable_id")
+    list_display = ("id", "program", "run_tag", "readable_id")
     list_filter = ["program"]
     raw_id_fields = ("program",)
 

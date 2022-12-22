@@ -1,4 +1,6 @@
 """Project conftest"""
+from types import SimpleNamespace
+
 import pytest
 
 from fixtures.common import *
@@ -12,6 +14,16 @@ def default_settings(monkeypatch, settings):
 
     settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
     settings.FEATURES[features.SYNC_ON_DASHBOARD_LOAD] = False
+
+
+@pytest.fixture(autouse=True)
+def mocked_signals(mocker):
+    """Mock hubspot_sync signals"""
+    mock_sync_product = mocker.patch("ecommerce.signals.sync_hubspot_product")
+    mock_sync_order = mocker.patch("ecommerce.signals.sync_hubspot_deal")
+    return SimpleNamespace(
+        mock_sync_order=mock_sync_order, mock_sync_product=mock_sync_product
+    )
 
 
 def pytest_addoption(parser):
