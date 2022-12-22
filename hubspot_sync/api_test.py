@@ -9,6 +9,7 @@ from reversion.models import Version
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Product
 from hubspot_sync import api
+from hubspot_sync.api import get_hubspot_id_for_object
 from hubspot_sync.conftest import FAKE_HUBSPOT_ID
 from hubspot_sync.serializers import (
     LineSerializer,
@@ -266,7 +267,7 @@ def test_sync_deal_hubspot_ids_to_hubspot(
     # This deal should be ignored
     SimplePublicObjectFactory(
         properties={
-            "dealname": "XPRO-ORDER-MANUAL",
+            "dealname": "MITXONLINE-ORDER-MANUAL",
             "amount": "400.00",
         }
     )
@@ -303,3 +304,65 @@ def test_sync_deal_hubspot_ids_to_hubspot(
     assert HubspotObject.objects.filter(content_type__model="line").count() == min(
         deal_matches, line_matches
     )
+
+
+@pytest.mark.parametrize("match_lines,quantity", [[True, 2], [False, 3]])
+def test_sync_deal_line_hubspot_ids_to_hubspot_two_lines(
+    mocker, mock_hubspot_api, match_lines, quantity
+):
+    """Matches should be made correctly for an order with 2 lines"""
+    order = OrderFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    version = Version.objects.get_for_object(product).first()
+    hs_order = HubspotObjectFactory.create(
+        content_object=order,
+        content_type=ContentType.objects.get_for_model(order),
+        object_id=order.id,
+    )
+    hs_product = HubspotObjectFactory.create(
+        content_object=product,
+        content_type=ContentType.objects.get_for_model(Product),
+        object_id=product.id,
+    )
+    lines = (
+        LineFactory.create(order=order, product_version=version, quantity=1),
+        LineFactory.create(order=order, product_version=version, quantity=quantity),
+    )
+    lines_response = [
+        SimplePublicObjectFactory(
+            properties={"hs_product_id": hs_product.hubspot_id, "quantity": 1},
+        ),
+        SimplePublicObjectFactory(
+            properties={"hs_product_id": hs_product.hubspot_id, "quantity": 2},
+        ),
+    ]
+    mocker.patch(
+        "hubspot_sync.api.get_line_items_for_deal", return_value=lines_response
+    )
+    assert (
+        api.sync_deal_line_hubspot_ids_to_db(order, hs_order.hubspot_id) is match_lines
+    )
+
+
+@pytest.mark.parametrize("error", [True, False])
+def test_get_hubspot_id_for_user(mocker, user, error):
+    """get_hubspot_id_for_user should call find_contact and create HubspotObject"""
+    hs_user = SimplePublicObjectFactory() if not error else ValueError
+    mocker.patch("hubspot_sync.api.find_contact", side_effect=[hs_user])
+    mock_log = mocker.patch("hubspot_sync.api.log.exception")
+    get_hubspot_id_for_object(user)
+    if error:
+        mock_log.assert_called_once()
+    else:
+        assert HubspotObject.objects.filter(hubspot_id=hs_user.id).exists()
+
+
+def test_get_hubspot_id_raises(mocker, user):
+    """get_hubspot_id should handle errors appropriately"""
+    mocker.patch("hubspot_sync.api.find_contact", side_effect=[ValueError])
+    mock_log = mocker.patch("hubspot_sync.api.log.exception")
+    with pytest.raises(ValueError) as exc:
+        get_hubspot_id_for_object(user, raise_error=True)
+    mock_log.assert_called_once()
+    assert f"Hubspot id could not be found for user for id {user.id}" == str(exc.value)

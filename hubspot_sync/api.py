@@ -248,7 +248,6 @@ def sync_deal_line_hubspot_ids_to_db(order, hubspot_order_id) -> bool:
         bool: True if matches found for all the order lines
 
     """
-    client = HubspotApi()
     line_items = get_line_items_for_deal(hubspot_order_id)
     order_line = order.lines.first()
 
@@ -263,9 +262,8 @@ def sync_deal_line_hubspot_ids_to_db(order, hubspot_order_id) -> bool:
         matches += 1
     else:  # Multiple lines, need to match by product and quantity
         for line in line_items:
-            details = client.crm.line_items.basic_api.get_by_id(line.id)
             hs_product = HubspotObject.objects.filter(
-                hubspot_id=details.properties["hs_product_id"],
+                hubspot_id=line.properties["hs_product_id"],
                 content_type=ContentType.objects.get_for_model(Product),
             ).first()
             if hs_product:
