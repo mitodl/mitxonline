@@ -351,8 +351,8 @@ export class EnrolledItemCard extends React.Component<
             Are you sure you wish to unenroll from {enrollment.run.title}?
             {endDate
               ? now.isAfter(endDate)
-                ? " You won't be able to re-enroll"
-                : ` You won't be able to re-enroll after ${formattedEndDate}`
+                ? " You won't be able to re-enroll."
+                : ` You won't be able to re-enroll after ${formattedEndDate}.`
               : null}
           </p>
           <Button
