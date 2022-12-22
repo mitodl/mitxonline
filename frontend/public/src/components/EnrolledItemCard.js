@@ -1,6 +1,8 @@
 // @flow
 /* global SETTINGS:false */
 import React from "react"
+import moment from "moment"
+import { parseDateString, formatPrettyDateTimeAmPmTz } from "../lib/util"
 import { Formik, Form, Field } from "formik"
 import {
   Dropdown,
@@ -64,7 +66,7 @@ type EnrolledItemCardProps = {
 type EnrolledItemCardState = {
   submittingEnrollmentId: number | null,
   emailSettingsModalVisibility: boolean,
-  verifiedUnenrollmentModalVisibility: boolean,
+  runUnenrollmentModalVisibility: boolean,
   programUnenrollmentModalVisibility: boolean,
   menuVisibility: boolean
 }
@@ -74,11 +76,11 @@ export class EnrolledItemCard extends React.Component<
   EnrolledItemCardState
 > {
   state = {
-    submittingEnrollmentId:              null,
-    emailSettingsModalVisibility:        false,
-    verifiedUnenrollmentModalVisibility: false,
-    programUnenrollmentModalVisibility:  false,
-    menuVisibility:                      false
+    submittingEnrollmentId:             null,
+    emailSettingsModalVisibility:       false,
+    runUnenrollmentModalVisibility:     false,
+    programUnenrollmentModalVisibility: false,
+    menuVisibility:                     false
   }
 
   toggleEmailSettingsModalVisibility = () => {
@@ -88,17 +90,17 @@ export class EnrolledItemCard extends React.Component<
     })
   }
 
-  toggleVerifiedUnenrollmentModalVisibility = () => {
-    const { verifiedUnenrollmentModalVisibility } = this.state
-    this.setState({
-      verifiedUnenrollmentModalVisibility: !verifiedUnenrollmentModalVisibility
-    })
-  }
-
   toggleProgramUnenrollmentModalVisibility = () => {
     const { programUnenrollmentModalVisibility } = this.state
     this.setState({
       programUnenrollmentModalVisibility: !programUnenrollmentModalVisibility
+    })
+  }
+
+  toggleRunUnenrollmentModalVisibility = () => {
+    const { runUnenrollmentModalVisibility } = this.state
+    this.setState({
+      runUnenrollmentModalVisibility: !runUnenrollmentModalVisibility
     })
   }
 
@@ -117,13 +119,14 @@ export class EnrolledItemCard extends React.Component<
     }
   }
 
-  async onDeactivate(enrollment: RunEnrollment) {
+  async onDeactivate() {
+    this.toggleRunUnenrollmentModalVisibility()
+  }
+
+  async onRunUnenrollment(enrollment: RunEnrollment) {
     const { deactivateEnrollment, addUserNotification } = this.props
 
-    if (enrollment.enrollment_mode === "verified") {
-      this.toggleVerifiedUnenrollmentModalVisibility()
-      return
-    }
+    this.toggleRunUnenrollmentModalVisibility()
 
     this.setState({ submittingEnrollmentId: enrollment.id })
     try {
@@ -283,25 +286,25 @@ export class EnrolledItemCard extends React.Component<
   }
 
   renderVerifiedUnenrollmentModal(enrollment: RunEnrollment) {
-    const { verifiedUnenrollmentModalVisibility } = this.state
+    const { runUnenrollmentModalVisibility } = this.state
 
     return (
       <Modal
-        id={`verified-unenrollment-${enrollment.id}-modal`}
+        id={`run-unenrollment-${enrollment.id}-modal`}
         className="text-center"
-        isOpen={verifiedUnenrollmentModalVisibility}
-        toggle={() => this.toggleVerifiedUnenrollmentModalVisibility()}
+        isOpen={runUnenrollmentModalVisibility}
+        toggle={() => this.toggleRunUnenrollmentModalVisibility()}
         role="dialog"
-        aria-labelledby={`verified-unenrollment-${enrollment.id}-modal-header`}
-        aria-describedby={`verified-unenrollment-${enrollment.id}-modal-body`}
+        aria-labelledby={`run-unenrollment-${enrollment.id}-modal-header`}
+        aria-describedby={`run-unenrollment-${enrollment.id}-modal-body`}
       >
         <ModalHeader
-          toggle={() => this.toggleVerifiedUnenrollmentModalVisibility()}
-          id={`verified-unenrollment-${enrollment.id}-modal-header`}
+          toggle={() => this.toggleRunUnenrollmentModalVisibility()}
+          id={`run-unenrollment-${enrollment.id}-modal-header`}
         >
           Unenroll From {enrollment.run.course_number}
         </ModalHeader>
-        <ModalBody id={`verified-unenrollment-${enrollment.id}-modal-body`}>
+        <ModalBody id={`run-unenrollment-${enrollment.id}-modal-body`}>
           <p>
             You are enrolled in the certificate track for{" "}
             {enrollment.run.course_number} {enrollment.run.title}. You can't
@@ -318,6 +321,59 @@ export class EnrolledItemCard extends React.Component<
         </ModalBody>
       </Modal>
     )
+  }
+
+  renderUnverifiedUnenrollmentModal(enrollment: RunEnrollment) {
+    const { runUnenrollmentModalVisibility } = this.state
+    const now = moment()
+    const endDate = enrollment.run.enrollment_end
+      ? parseDateString(enrollment.run.enrollment_end)
+      : null
+    const formattedEndDate = endDate ? formatPrettyDateTimeAmPmTz(endDate) : ""
+    return (
+      <Modal
+        id={`run-unenrollment-${enrollment.run.id}-modal`}
+        className="text-center"
+        isOpen={runUnenrollmentModalVisibility}
+        toggle={() => this.toggleRunUnenrollmentModalVisibility()}
+        role="dialog"
+        aria-labelledby={`run-unenrollment-${enrollment.run.id}-modal-header`}
+        aria-describedby={`run-unenrollment-${enrollment.run.id}-modal-body`}
+      >
+        <ModalHeader
+          id={`run-unenrollment-${enrollment.run.id}-modal-header`}
+          toggle={() => this.toggleRunUnenrollmentModalVisibility()}
+        >
+          Unenroll From {enrollment.run.title}
+        </ModalHeader>
+        <ModalBody id={`run-unenrollment-${enrollment.run.id}-modal-body`}>
+          <p>
+            Are you sure you wish to unenroll from {enrollment.run.title}?
+            {endDate
+              ? now.isAfter(endDate)
+                ? " You won't be able to re-enroll."
+                : ` You won't be able to re-enroll after ${formattedEndDate}.`
+              : null}
+          </p>
+          <Button
+            type="submit"
+            color="success"
+            onClick={() => this.onRunUnenrollment(enrollment.run)}
+          >
+            Unenroll
+          </Button>{" "}
+          <Button onClick={() => this.toggleRunUnenrollmentModalVisibility()}>
+            Cancel
+          </Button>
+        </ModalBody>
+      </Modal>
+    )
+  }
+
+  renderRunUnenrollmentModal(enrollment: RunEnrollment) {
+    return enrollment.enrollment_mode === "verified"
+      ? this.renderVerifiedUnenrollmentModal(enrollment)
+      : this.renderUnverifiedUnenrollmentModal(enrollment)
   }
 
   renderProgramUnenrollmentModal(enrollment: ProgramEnrollment) {
@@ -499,7 +555,7 @@ export class EnrolledItemCard extends React.Component<
                     >
                       Unenroll
                     </DropdownItem>
-                    {this.renderVerifiedUnenrollmentModal(enrollment)}
+                    {this.renderRunUnenrollmentModal(enrollment)}
                   </span>
                   <span id="subscribeButtonWrapper">
                     <DropdownItem

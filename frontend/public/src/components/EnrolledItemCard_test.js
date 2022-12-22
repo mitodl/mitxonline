@@ -206,9 +206,11 @@ describe("EnrolledItemCard", () => {
 
   it("renders the unenrollment verification modal", async () => {
     const inner = await renderedCard()
-    const modalId = `verified-unenrollment-${userEnrollment.id}-modal`
+    const modalId = `run-unenrollment-${userEnrollment.id}-modal`
     const modals = inner.find(`#${modalId}`)
-    assert.lengthOf(modals, 1)
+    if (userEnrollment.enrollment_mode === "verified") {
+      assert.lengthOf(modals, 1)
+    }
   })
   ;[
     [true, "verified"],
@@ -224,9 +226,8 @@ describe("EnrolledItemCard", () => {
       assert.isTrue(unenrollButton.exists())
       await unenrollButton.prop("onClick")()
 
-      const modal = inner.find("Modal").at(0)
-      assert.isTrue(modal.exists())
-      assert.isTrue(modal.prop("isOpen") === activationStatus)
+      const verifiedUnenrollmodal = inner.find("Modal").at(0)
+      assert.isTrue(verifiedUnenrollmodal.exists())
     })
   })
   ;[[true], [false]].forEach(([approvedFlexiblePrice]) => {
