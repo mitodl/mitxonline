@@ -15,7 +15,6 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
 
     let featuredImage = null
     let courseDetailsPage = null
-    let financialAssistanceForm = null
     let courseRunStatusMessageText = null
     let courseRunStatusDetail = null
 
@@ -31,10 +30,6 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
 
     if (course.page && course.page.live) {
       courseDetailsPage = course.page.page_url
-    }
-
-    if (course.financial_assistance_form_url) {
-      financialAssistanceForm = course.financial_assistance_form_url
     }
 
     if (course.feature_image_src) {
