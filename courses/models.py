@@ -4,6 +4,9 @@ Course models
 import logging
 import operator as op
 import uuid
+from decimal import ROUND_HALF_EVEN
+from decimal import Context as DecimalContext
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
@@ -1110,7 +1113,11 @@ class CourseRunGrade(TimestampedModel, AuditableModel, ValidateOnSaveMixin):
     @property
     def grade_percent(self):
         """Returns the grade field value as a number out of 100 (or None if the value is None)"""
-        return self.grade * 100 if self.grade is not None else None
+        return (
+            Decimal(self.grade * 100, DecimalContext(prec=2, rounding=ROUND_HALF_EVEN))
+            if self.grade is not None
+            else None
+        )
 
     @property
     def is_certificate_eligible(self):
