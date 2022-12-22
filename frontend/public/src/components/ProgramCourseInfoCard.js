@@ -89,25 +89,6 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
                   from MIT faculty. Courses are always free until you want to
                   get a certificate.
                 </div>
-                <div className="enrollment-extra-links d-flex d-md-flex justify-content-center w-100">
-                  <div className="pr-4 my-auto">
-                    {financialAssistanceForm ? (
-                      <a href={financialAssistanceForm}>
-                        Financial assistance?
-                      </a>
-                    ) : null}
-                  </div>
-                  <div className="my-auto">
-                    <form method="get" action={courseDetailsPage}>
-                      <button
-                        type="submit"
-                        className="btn btn-primary btn-gradient-red"
-                      >
-                        Enroll
-                      </button>
-                    </form>
-                  </div>
-                </div>
               </div>
             ) : null}
           </div>
