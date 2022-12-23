@@ -1,4 +1,3 @@
-import { useList } from "@pankod/refine-core";
 import React from "react"
 import {
     Button,
@@ -11,38 +10,39 @@ import {
 import { Discount_Redemption_Types } from "../../constants";
 
 export const DiscountFilterForm: React.FC<{ formProps: FormProps }> = ({ formProps }) => {
-  const FlexiblePricingCoursewareList: any[] | undefined = [];
-  const DiscountList = useList({
-      resource: "discounts",
-  });
-  if (DiscountList.data) {
-      DiscountList.data.data.map(item => {
-          FlexiblePricingCoursewareList.push({
-              'label': item.readable_id,
-              'value': item.type + ':' + item.id
-          })
-      })
-  }
-
   const flexPriceOpts = [
-    { label: '', value: '' }, { label: 'For Financial Assistance', value: true }, { label: 'Regular Discount', value: false }
+    { label: '', value: '' }, { label: 'For Financial Assistance', value: 'yes' }, { label: 'Regular Discount', value: 'no' }
+  ]
+  const redemptionOpts = [
+    { label: '', value: '' }, { label: 'Redeemed', value: 'yes' }, { label: 'Not Redeemed', value: 'no' }
   ]
 
   return (
       <Form layout="inline" {...formProps}>
           <Form.Item label="Search by Code" name="q">
-              <Input placeholder="Discount Code" prefix={<Icons.SearchOutlined />}></Input>
+              <Input
+                placeholder="Discount Code"
+                style={{ minWidth: 400 }}
+                prefix={<Icons.SearchOutlined />}
+                allowClear={true}
+            ></Input>
           </Form.Item>
           <Form.Item label="Search by Type" name="redemption_type">
               <Select
-                  style={{ minWidth: 200 }}
                   options={Discount_Redemption_Types}
+                  style={{ minWidth: 250 }}
                   allowClear={true} />
           </Form.Item>
           <Form.Item label="Search by Financial Assistance" name="for_flexible_pricing">
               <Select
-                  style={{ minWidth: 250 }}
                   options={flexPriceOpts}
+                  style={{ minWidth: 250 }}
+                  allowClear={true} />
+          </Form.Item>
+          <Form.Item label="Filter by Redemption Status" name="is_redeemed">
+              <Select
+                  options={redemptionOpts}
+                  style={{ minWidth: 250 }}
                   allowClear={true} />
           </Form.Item>
           <Form.Item>

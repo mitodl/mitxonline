@@ -29,7 +29,7 @@ export const DiscountList: React.FC = () => {
         initialPageSize: 40,
         onSearch: (params) => {
             const filters: CrudFilters = [];
-            const { q, redemption_type, for_flexible_pricing } = params;
+            const { q, redemption_type, for_flexible_pricing, is_redeemed } = params;
 
             filters.push({
                 field: 'q',
@@ -47,6 +47,12 @@ export const DiscountList: React.FC = () => {
                 field: 'for_flexible_pricing',
                 operator: 'eq',
                 value: for_flexible_pricing
+            });
+
+            filters.push({
+                field: 'is_redeemed',
+                operator: 'eq',
+                value: is_redeemed
             });
 
             return filters;

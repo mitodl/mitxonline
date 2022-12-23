@@ -92,5 +92,6 @@ export interface IFlexiblePriceStatusModalProps {
 export interface IDiscountFilters {
     q: string;
     redemption_type: string;
-    for_flexible_pricing: boolean;
+    for_flexible_pricing: string;
+    is_redeemed: string;
 }
