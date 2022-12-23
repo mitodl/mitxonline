@@ -67,7 +67,7 @@ coreapi==2.3.3
     # via djoser
 coreschema==0.0.4
     # via coreapi
-cryptography==3.4.7
+cryptography==38.0.4
     # via
     #   cybersource-rest-client-python
     #   jwcrypto
