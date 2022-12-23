@@ -151,13 +151,14 @@ class Command(BaseCommand):
             course_readable_id = edx_course.course_id.removesuffix(f"+{courserun_tag}")
 
             try:
-                (course, created) = Course.objects.filter(
-                    readable_id=course_readable_id
-                ).get_or_create(
-                    program=program,
-                    title=edx_course.name,
+                (course, created) = Course.objects.get_or_create(
                     readable_id=course_readable_id,
-                    live=kwargs["live"],
+                    defaults={
+                        "program": program,
+                        "title": edx_course.name,
+                        "readable_id": course_readable_id,
+                        "live": kwargs["live"],
+                    },
                 )
 
                 if created:
