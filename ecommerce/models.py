@@ -256,6 +256,10 @@ class Discount(TimestampedModel):
     def __str__(self):
         return f"{self.amount} {self.discount_type} {self.redemption_type} - {self.discount_code}"
 
+    @cached_property
+    def is_redeemed(self):
+        return DiscountRedemption.objects.filter(redeemed_discount=self).exists()
+
     def check_validity(self, user: User):
         """
         Enforces the redemption rules for a given discount.

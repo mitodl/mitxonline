@@ -439,6 +439,7 @@ class DiscountSerializer(serializers.ModelSerializer):
             "max_redemptions",
             "discount_code",
             "for_flexible_pricing",
+            "is_redeemed",
         ]
         depth = 2
 

@@ -88,3 +88,9 @@ export interface IFlexiblePriceStatusModalProps {
     status: string;
     onClose: Function;
 }
+
+export interface IDiscountFilters {
+    q: string;
+    redemption_type: string;
+    for_flexible_pricing: boolean;
+}
