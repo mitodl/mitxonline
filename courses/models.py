@@ -505,6 +505,12 @@ class CourseRun(TimestampedModel):
         db_index=True,
         help_text=f"The last day the course is active. {SYNCED_COURSE_RUN_FIELD_MSG}",
     )
+    certificate_available_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=f"The day certificates should be available to users. {SYNCED_COURSE_RUN_FIELD_MSG}",
+    )
     enrollment_start = models.DateTimeField(
         null=True,
         blank=True,

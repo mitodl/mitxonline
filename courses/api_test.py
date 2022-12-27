@@ -979,7 +979,7 @@ def test_generate_course_certificates_no_valid_course_run(settings, courses_api_
     CourseRunFactory.create_batch(
         5,
         is_self_paced=False,
-        end_date=now_in_utc()
+        certificate_available_date=now_in_utc()
         - timedelta(hours=settings.CERTIFICATE_CREATION_DELAY_IN_HOURS + 1),
     )
     generate_course_run_certificates()
@@ -1033,7 +1033,7 @@ def test_course_certificates_with_course_end_date_self_paced_combination(
     settings.CERTIFICATE_CREATION_DELAY_IN_HOURS = 1
     course_run = passed_grade_with_enrollment.course_run
     course_run.is_self_paced = self_paced
-    course_run.end_date = end_date
+    course_run.certificate_available_date = end_date
     course_run.save()
 
     user = passed_grade_with_enrollment.user
@@ -1061,7 +1061,7 @@ def test_generate_course_certificates_with_course_end_date(
     """Test that certificates are generated for passed grades when there are valid course runs for certificates"""
     settings.CERTIFICATE_CREATION_DELAY_IN_HOURS = 1
     course_run = passed_grade_with_enrollment.course_run
-    course_run.end_date = now_in_utc()
+    course_run.certificate_available_date = now_in_utc()
     course_run.save()
 
     user = passed_grade_with_enrollment.user
