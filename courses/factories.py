@@ -86,6 +86,10 @@ class CourseRunFactory(DjangoModelFactory):
     end_date = factory.Faker(
         "date_time_this_year", before_now=False, after_now=True, tzinfo=pytz.utc
     )
+    certificate_available_date = factory.Faker(
+        "date_time_this_year", before_now=False, after_now=True, tzinfo=pytz.utc
+    )
+
     enrollment_start = factory.Faker(
         "date_time_this_month", before_now=True, after_now=False, tzinfo=pytz.utc
     )
