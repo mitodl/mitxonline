@@ -108,13 +108,22 @@ export const isFinancialAssistanceAvailable = (run: CourseRunDetail) => {
 export const enrollmentHasPassingGrade = (enrollment: RunEnrollment) => {
   if (enrollment.grades && enrollment.grades.length > 0) {
     for (let i = 0; i < enrollment.grades.length; i++) {
-      if (enrollment.grades[i].passed) {
+      if (enrollment.grades[i].passed && checkPassedDates(enrollment.run)) {
         return true
       }
     }
   }
 
   return false
+}
+
+const checkPassedDates = (run: CourseRunDetail) => {
+  if (run.is_self_paced) {
+    return true
+  } else {
+    const now = moment()
+    return (notNil(run.end_date) && moment(run.end_date).isBefore(now) && notNil(run.certificate_available_date) && moment(run.certificate_available_date).isBefore(now))
+  }
 }
 
 const isNodeCompleted = (
