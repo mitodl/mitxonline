@@ -122,7 +122,12 @@ const checkPassedDates = (run: CourseRunDetail) => {
     return true
   } else {
     const now = moment()
-    return (notNil(run.end_date) && moment(run.end_date).isBefore(now) && notNil(run.certificate_available_date) && moment(run.certificate_available_date).isBefore(now))
+    return (
+      notNil(run.end_date) &&
+      moment(run.end_date).isBefore(now) &&
+      notNil(run.certificate_available_date) &&
+      moment(run.certificate_available_date).isBefore(now)
+    )
   }
 }
 
