@@ -108,7 +108,7 @@ export const isFinancialAssistanceAvailable = (run: CourseRunDetail) => {
 export const enrollmentHasPassingGrade = (enrollment: RunEnrollment) => {
   if (enrollment.grades && enrollment.grades.length > 0) {
     for (let i = 0; i < enrollment.grades.length; i++) {
-      if (enrollment.grades[i].passed && checkPassedDates(enrollment.run)) {
+      if (enrollment.grades[i].passed && isPassBadgeEligible(enrollment.run)) {
         return true
       }
     }
@@ -117,7 +117,7 @@ export const enrollmentHasPassingGrade = (enrollment: RunEnrollment) => {
   return false
 }
 
-const checkPassedDates = (run: CourseRunDetail) => {
+const isPassBadgeEligible = (run: CourseRunDetail) => {
   if (run.is_self_paced) {
     return true
   } else {

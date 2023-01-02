@@ -42,21 +42,13 @@ export type Certificate = {
   uuid: string
 }
 
-export type CourseRunGrade = {
-  grade:         number,
-  letter_grade:  string,
-  passed:        boolean,
-  set_by_admin:  boolean,
-  grade_percent: number,
-}
-
 export type RunEnrollment = {
   run: CourseRunDetail,
   id: number,
   edx_emails_subscription: ?string,
   enrollment_mode: string,
   certificate: ?Certificate,
-  grades: Array<CourseRunGrade>,
+  grades: Array<LearnerRecordGrade>,
 }
 
 export type CourseDetailWithRuns = CourseDetail & {
