@@ -39,9 +39,9 @@ pytestmark = [pytest.mark.django_db]
 @pytest.mark.parametrize(
     "text_id, expected",
     [
-        ["course-v1:xPRO+SysEngxNAV+R1", "Run 1"],
-        ["course-v1:xPRO+SysEngxNAV+R10", "Run 10"],
-        ["course-v1:xPRO+SysEngxNAV", "course-v1:xPRO+SysEngxNAV"],
+        ["course-v1:MITxOnline+SysEngxNAV+R1", "Run 1"],
+        ["course-v1:MITxOnline+SysEngxNAV+R10", "Run 10"],
+        ["course-v1:MITxOnline+SysEngxNAV", "course-v1:MITxOnline+SysEngxNAV"],
     ],
 )
 def test_serialize_product(text_id, expected):

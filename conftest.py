@@ -17,7 +17,7 @@ def default_settings(monkeypatch, settings):
 
 
 @pytest.fixture(autouse=True)
-def mocked_signals(mocker):
+def mocked_product_signal(mocker):
     """Mock hubspot_sync signals"""
     mocker.patch("ecommerce.signals.sync_hubspot_product")
 

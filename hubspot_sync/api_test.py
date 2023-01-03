@@ -258,7 +258,7 @@ def test_sync_deal_hubspot_ids_to_hubspot(
     deals = [
         SimplePublicObjectFactory(
             properties={
-                "dealname": f"XPRO-ORDER-{line.order.id}",
+                "dealname": f"MITXONLINE-ORDER-{line.order.id}",
                 "amount": str(line.order.total_price_paid),
             }
         )

@@ -1,5 +1,5 @@
 """
-Management command to sync all Users, BootcampRuns (deals) and Orders (BootcampApplications) with Hubspot
+Management command to sync all Users, Products, Orders, Lines with Hubspot
 """
 import sys
 
@@ -15,13 +15,13 @@ from users.models import User
 
 class Command(BaseCommand):
     """
-    Sync all Users, BootcampRuns (deals) and Orders (BootcampApplications) with Hubspot
+    Sync all Users, with Hubspot
     """
 
     create = None
     object_ids = None
     help = (
-        "Sync all Users, Deals, Products, and Lines with Hubspot. Hubspot API key must be set and Hubspot settings"
+        "Sync all Users, Products, Orders, Lines with Hubspot. Hubspot API key must be set and Hubspot settings"
         "must be configured with configure_hubspot_settings"
     )
 
@@ -126,7 +126,7 @@ class Command(BaseCommand):
 
     def sync_all(self):
         """
-        Sync all Users, BootcampRuns, BootcampApplications with Hubspot.
+        Sync all Users, Products, Orders, Lines with Hubspot.
         All products and contacts should be synced before syncing deals/line items.
         """
         self.sync_contacts()

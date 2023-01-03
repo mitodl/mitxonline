@@ -202,7 +202,7 @@ INSTALLED_APPS = (
     "compat",
     "hijack",
     "hijack_admin",
-    "ecommerce.apps.EcommerceConfig",
+    "ecommerce",
     "flexiblepricing",
     "micromasters_import",
     # ol-dango apps, must be after this project's apps for template precedence
@@ -1110,7 +1110,7 @@ MITOL_HUBSPOT_API_RETRIES = get_int(
 )
 MITOL_HUBSPOT_API_ID_PREFIX = get_string(
     name="MITOL_HUBSPOT_API_ID_PREFIX",
-    default="XPRO",
+    default="MITXONLINE",
     description="The prefix to use for hubspot unique_app_id field values",
 )
 HUBSPOT_PIPELINE_ID = get_string(

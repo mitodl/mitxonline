@@ -71,17 +71,17 @@ def sync_contact_with_hubspot(user_id: int) -> str:
 
 
 @app.task
-def sync_product_with_hubspot(bootcamp_run_id: int) -> str:
+def sync_product_with_hubspot(product_id: int) -> str:
     """
-    Sync a product with a hubspot product
+    Sync a MITxOnline Product with a hubspot product
 
     Args:
-        bootcamp_run_id(int): The BootcampRun id
+        product_id(int): The Product id
 
     Returns:
         str: The hubspot id for the product
     """
-    return api.sync_product_with_hubspot(bootcamp_run_id).id
+    return api.sync_product_with_hubspot(product_id).id
 
 
 @app.task
@@ -285,7 +285,7 @@ def batch_upsert_associations_chunked(order_ids: List[int]):
     Upsert batches of deal-contact and line-deal associations
 
     Args:
-        order_ids(list): List of BootcampApplication IDs
+        order_ids(list): List of Order IDs
     """
     contact_associations_batch = []
     line_associations_batch = []
@@ -343,7 +343,7 @@ def batch_upsert_associations(self, order_ids: List[int] = None):
     Upsert chunked batches of deal-contact and line-deal associations
 
     Args:
-        order_ids(list): List of BootcampApplication IDs
+        order_ids(list): List of Order IDs
     """
     deal_ids = Order.objects.all()
     if order_ids:

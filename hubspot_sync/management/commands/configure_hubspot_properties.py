@@ -14,6 +14,11 @@ from mitol.hubspot_api.api import (
 )
 
 from ecommerce import models
+from ecommerce.constants import (
+    DISCOUNT_TYPE_DOLLARS_OFF,
+    DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PERCENT_OFF,
+)
 
 CUSTOM_ECOMMERCE_PROPERTIES = {
     # defines which hubspot properties are mapped with which local properties when objects are synced.
@@ -44,37 +49,37 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
                     {
                         "value": models.Order.STATE.ERRORED,
                         "label": models.Order.STATE.ERRORED,
-                        "displayOrder": 1,
+                        "displayOrder": 2,
                         "hidden": False,
                     },
                     {
                         "value": models.Order.STATE.DECLINED,
                         "label": models.Order.STATE.DECLINED,
-                        "displayOrder": 1,
+                        "displayOrder": 3,
                         "hidden": False,
                     },
                     {
                         "value": models.Order.STATE.PENDING,
                         "label": models.Order.STATE.PENDING,
-                        "displayOrder": 0,
+                        "displayOrder": 4,
                         "hidden": False,
                     },
                     {
                         "value": models.Order.STATE.REFUNDED,
                         "label": models.Order.STATE.REFUNDED,
-                        "displayOrder": 1,
+                        "displayOrder": 5,
                         "hidden": False,
                     },
                     {
                         "value": models.Order.STATE.PARTIALLY_REFUNDED,
                         "label": models.Order.STATE.PARTIALLY_REFUNDED,
-                        "displayOrder": 1,
+                        "displayOrder": 6,
                         "hidden": False,
                     },
                     {
                         "value": models.Order.STATE.REVIEW,
                         "label": models.Order.STATE.REVIEW,
-                        "displayOrder": 1,
+                        "displayOrder": 7,
                         "hidden": False,
                     },
                 ],
@@ -98,10 +103,30 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
             {
                 "name": "discount_type",
                 "label": "Discount Type",
-                "description": "Type of discount (percent-off or dollars-off)",
+                "description": "Type of discount (percent-off or dollars-off or fixed-price)",
                 "groupName": "coupon",
-                "type": "string",
-                "fieldType": "text",
+                "type": "enumeration",
+                "fieldType": "select",
+                "options": [
+                    {
+                        "value": DISCOUNT_TYPE_PERCENT_OFF,
+                        "label": DISCOUNT_TYPE_PERCENT_OFF,
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": DISCOUNT_TYPE_DOLLARS_OFF,
+                        "label": DISCOUNT_TYPE_DOLLARS_OFF,
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                    {
+                        "value": DISCOUNT_TYPE_FIXED_PRICE,
+                        "label": DISCOUNT_TYPE_FIXED_PRICE,
+                        "displayOrder": 2,
+                        "hidden": False,
+                    },
+                ],
             },
             {
                 "name": "coupon_code",

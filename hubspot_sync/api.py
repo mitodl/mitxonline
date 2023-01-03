@@ -7,7 +7,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 from hubspot.crm.objects import SimplePublicObject, SimplePublicObjectInput
 from mitol.hubspot_api.api import (
-    HubspotApi,
     HubspotAssociationType,
     HubspotObjectType,
     associate_objects_request,
@@ -206,7 +205,7 @@ def sync_deal_hubspot_ids_to_db() -> bool:
     (and optionally lines) have hubspot ids
 
     Returns:
-        bool: True if matches found for all Orders and B2BOrders (and optionally their lines)
+        bool: True if matches found for all Orders (and optionally their lines)
     """
     ct_order = ContentType.objects.get_for_model(Order)
     deals = get_all_objects(
@@ -241,7 +240,7 @@ def sync_deal_line_hubspot_ids_to_db(order, hubspot_order_id) -> bool:
     Create HubspotObjects for all of a deal's line items, return True if matches found for all lines
 
     Args:
-        order(Order or B2BOrder): The order to sync Hubspot line items for
+        order(Order): The order to sync Hubspot line items for
         hubspot_order_id(str): The Hubspot deal id
 
     Returns:
@@ -291,7 +290,7 @@ def get_hubspot_id_for_object(
     Get the hubspot id for an object, querying Hubspot if necessary
 
     Args:
-        obj(object): The object (Order, B2BOrder, Product, Line, B2BLine or User) to get the id for
+        obj(object): The object (Order, Product, Line, or User) to get the id for
         raise_error(bool): raise an error if not found (default False)
 
     Returns:

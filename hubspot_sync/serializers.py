@@ -8,13 +8,17 @@ from rest_framework import serializers
 from ecommerce import models
 from ecommerce.constants import DISCOUNT_TYPE_DOLLARS_OFF, DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.discounts import resolve_product_version
-from ecommerce.models import DiscountRedemption, Product
+from ecommerce.models import Product
 from hubspot_sync.api import format_product_name, get_hubspot_id_for_object
 from main.utils import format_decimal
 
 """
 Map order state to hubspot ids for pipeline stages
 These IDs are specific to the prod & sandbox accounts for mitxonline
+48288379: Checkout Abandoned
+48288388: Checkout Pending
+48288389: Checkout Completed
+48288390: Processed
 """
 ORDER_STATUS_MAPPING = {
     models.Order.STATE.FULFILLED: "48288390",
