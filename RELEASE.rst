@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.56.2
+Version 0.56.2 (Released January 03, 2023)
 --------------
 
 - Revert "Removes feature flag; small styling adjustment on My Courses tab when no Programs tab"
