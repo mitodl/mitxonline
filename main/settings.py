@@ -202,7 +202,7 @@ INSTALLED_APPS = (
     "compat",
     "hijack",
     "hijack_admin",
-    "ecommerce.apps.EcommerceConfig",
+    "ecommerce",
     "flexiblepricing",
     "micromasters_import",
     # ol-dango apps, must be after this project's apps for template precedence
