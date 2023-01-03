@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.57.0
+--------------
+
+- Bump @xmldom/xmldom from 0.7.5 to 0.7.9 (#1216)
+- Bump ejs from 3.1.6 to 3.1.8 (#1201)
+- Bump loader-utils from 1.4.0 to 1.4.2 (#1217)
+- Fixing command to fix get_or_create call (#1307)
+- Fixes the course model to round the grade - this was causing a test failure (#1299)
+- fix:dashboard confirmation dialog for unenrolling from courses (#1301)
+
 Version 0.56.2 (Released January 03, 2023)
 --------------
 
