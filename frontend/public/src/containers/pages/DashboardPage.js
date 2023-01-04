@@ -140,7 +140,7 @@ export class DashboardPage extends React.Component<
                     className={programsClasses}
                     onClick={() => this.toggleTab(DashboardTab.programs)}
                   >
-                    Programs
+                    My Programs
                   </button>
                 </>
               )}
