@@ -69,9 +69,9 @@ class Command(BaseCommand):
 
     def sync_deals(self):
         """
-        Sync all applications with deals in hubspot
+        Sync all orders with deals in hubspot
         """
-        sys.stdout.write("  Syncing applications with hubspot deals...\n")
+        sys.stdout.write("  Syncing orders with hubspot deals...\n")
         task = batch_upsert_hubspot_objects.delay(
             HubspotObjectType.DEALS.value,
             ContentType.objects.get_for_model(Order).model,
@@ -90,9 +90,9 @@ class Command(BaseCommand):
 
     def sync_lines(self):
         """
-        Sync all applications with line_items in hubspot
+        Sync all orders with line_items in hubspot
         """
-        sys.stdout.write("  Syncing application lines with hubspot line_items...\n")
+        sys.stdout.write("  Syncing order lines with hubspot line_items...\n")
         task = batch_upsert_hubspot_objects.delay(
             HubspotObjectType.LINES.value,
             ContentType.objects.get_for_model(Line).model,
@@ -104,7 +104,7 @@ class Command(BaseCommand):
         task.get()
         total_seconds = (now_in_utc() - start).total_seconds()
         self.stdout.write(
-            "Syncing of application lines to hubspot finished, took {} seconds\n".format(
+            "Syncing of order lines to hubspot finished, took {} seconds\n".format(
                 total_seconds
             )
         )
@@ -160,24 +160,24 @@ class Command(BaseCommand):
             help="Sync all products",
         )
         parser.add_argument(
-            "--applications",
+            "--orders",
             "--deals",
             dest="sync_deals",
             action="store_true",
-            help="Sync all bootcamp applications (deals)",
+            help="Sync all bootcamp orders (deals)",
         )
         parser.add_argument(
             "--lines",
             "--line_items",
             dest="sync_lines",
             action="store_true",
-            help="Sync all application line items",
+            help="Sync all order line items",
         )
         parser.add_argument(
             "--associations",
             dest="sync_associations",
             action="store_true",
-            help="Sync all application associations",
+            help="Sync all order associations",
         )
         parser.add_argument(
             "mode",

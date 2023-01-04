@@ -110,8 +110,8 @@ def batch_upsert_hubspot_deals_chunked(ids: List[int]) -> List[str]:
         list(str): List of hubspot deal ids
     """
     results = []
-    for application in Order.objects.filter(id__in=ids):
-        results.append(api.sync_deal_with_hubspot(application.id).id)
+    for order in Order.objects.filter(id__in=ids):
+        results.append(api.sync_deal_with_hubspot(order.id).id)
         time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
     return results
 

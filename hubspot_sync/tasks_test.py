@@ -274,18 +274,18 @@ def test_batch_upsert_associations(settings, mocker, mocked_celery):
         "hubspot_sync.tasks.batch_upsert_associations_chunked"
     )
     settings.HUBSPOT_MAX_CONCURRENT_TASKS = 4
-    application_ids = sorted([app.id for app in OrderFactory.create_batch(10)])
+    order_ids = sorted([app.id for app in OrderFactory.create_batch(10)])
     with pytest.raises(TabError):
         batch_upsert_associations.delay()
-    mock_assoc_chunked.s.assert_any_call(application_ids[0:3])
-    mock_assoc_chunked.s.assert_any_call(application_ids[6:9])
-    mock_assoc_chunked.s.assert_any_call([application_ids[9]])
+    mock_assoc_chunked.s.assert_any_call(order_ids[0:3])
+    mock_assoc_chunked.s.assert_any_call(order_ids[6:9])
+    mock_assoc_chunked.s.assert_any_call([order_ids[9]])
     assert mock_assoc_chunked.s.call_count == 4
 
     with pytest.raises(TabError):
-        batch_upsert_associations.delay(application_ids[3:5])
-    mock_assoc_chunked.s.assert_any_call([application_ids[3]])
-    mock_assoc_chunked.s.assert_any_call([application_ids[4]])
+        batch_upsert_associations.delay(order_ids[3:5])
+    mock_assoc_chunked.s.assert_any_call([order_ids[3]])
+    mock_assoc_chunked.s.assert_any_call([order_ids[4]])
 
 
 def test_batch_upsert_associations_chunked(settings, mocker):
