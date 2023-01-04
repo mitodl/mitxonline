@@ -195,6 +195,8 @@ class Command(BaseCommand):
                     log.warn(
                         f"IntegrityError caught processing certificate for {course_run.courseware_id} for user {user} - certificate was likely already revoked."
                     )
+                    created_cert = False
+                    deleted_cert = False
 
                 if created_grade:
                     grade_status = "created"

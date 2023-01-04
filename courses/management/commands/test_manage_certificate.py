@@ -1,19 +1,20 @@
 """Tests for Certificates management command"""
 
-import pytest
 import factory
-from courses.management.commands import manage_certificates
-from courses.models import CourseRun, CourseRunCertificate, CourseRunGrade
+import pytest
 from django.core.management.base import CommandError
-from users.factories import UserFactory
+from edx_api.grades.models import CurrentGrade
+
 from courses.factories import (
-    CourseRunFactory,
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
+    CourseRunFactory,
     CourseRunGradeFactory,
 )
+from courses.management.commands import manage_certificates
+from courses.models import CourseRun, CourseRunCertificate, CourseRunGrade
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
-from edx_api.grades.models import CurrentGrade
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -117,7 +118,8 @@ def test_certificate_management_revoke_unrevoke_success(user, revoke, unrevoke):
     assert certificate.is_revoked is (False if unrevoke else True)
 
 
-def test_certificate_management_create(mocker, user, edx_grade_json):
+@pytest.mark.parametrize("revoked", [True, False])
+def test_certificate_management_create(mocker, user, edx_grade_json, revoked):
     """Test that create operation for certificate management command creates the certificates for a single user
     when a user is provided"""
     edx_grade = CurrentGrade(edx_grade_json)
@@ -125,6 +127,12 @@ def test_certificate_management_create(mocker, user, edx_grade_json):
     CourseRunEnrollmentFactory.create(
         user=user, run=course_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
     )
+
+    if revoked:
+        # In this case, create a revoked cert first - it should get skipped.
+        certificate = CourseRunCertificateFactory(
+            course_run=course_run, user=user, is_revoked=True
+        )
 
     mocker.patch(
         "courses.management.commands.manage_certificates.get_edx_grades_with_users",
@@ -141,7 +149,11 @@ def test_certificate_management_create(mocker, user, edx_grade_json):
     )
     generated_grades = CourseRunGrade.objects.filter(user=user, course_run=course_run)
 
-    assert generated_certificates.count() == 1
+    assert (
+        generated_certificates.count() == 1
+        if not revoked
+        else generated_certificates.count() == 0
+    )
     assert generated_grades.count() == 1
 
 
