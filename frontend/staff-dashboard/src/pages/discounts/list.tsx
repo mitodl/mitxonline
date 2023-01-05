@@ -96,6 +96,16 @@ export const DiscountList: React.FC = () => {
                                 }}
                             />
                             <Table.Column
+                                dataIndex="activation_date"
+                                title="Active From"
+                                render={(value) => value ? (<DateField format="LLL" value={value} />) : (<em>---</em>)}
+                            />
+                            <Table.Column
+                                dataIndex="expiration_date"
+                                title="Expires"
+                                render={(value) => value ? (<DateField format="LLL" value={value} />) : (<em>---</em>)}
+                            />
+                            <Table.Column
                                 dataIndex="createdAt"
                                 title="Created At"
                                 render={(value) => <DateField format="LLL" value={value} />}

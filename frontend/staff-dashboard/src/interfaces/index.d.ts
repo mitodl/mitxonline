@@ -14,6 +14,8 @@ export interface IDiscount {
     redemption_type: string;
     max_redemptions: number;
     for_flexible_pricing: boolean;
+    activation_date: Date;
+    expiration_date: Date;
 }
 
 export interface IDiscountRedemption {
@@ -39,6 +41,19 @@ export interface IDiscountProductRaw {
     id: number|null;
     discount_id: number|null;
     product_id: number|null;
+}
+
+export interface IDiscountTier {
+    id: number;
+    discount: number;
+    current: boolean;
+    income_threshold_usd: number;
+    courseware_object: {
+        title: string;
+        readable_id: string;
+        id: number;
+        type: string;
+    }
 }
 
 export interface ICourseware {

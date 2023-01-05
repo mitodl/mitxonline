@@ -440,6 +440,8 @@ class DiscountSerializer(serializers.ModelSerializer):
             "discount_code",
             "for_flexible_pricing",
             "is_redeemed",
+            "activation_date",
+            "expiration_date",
         ]
         depth = 2
 

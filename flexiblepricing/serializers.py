@@ -25,6 +25,26 @@ class CountryIncomeThresholdSerializer(serializers.ModelSerializer):
         fields = ["id", "country_code", "income_threshold"]
 
 
+class FlexiblePriceTierSerializer(serializers.ModelSerializer):
+    courseware_object = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.FlexiblePriceTier
+        fields = [
+            "id",
+            "courseware_object",
+            "discount",
+            "current",
+            "income_threshold_usd",
+        ]
+
+    def get_courseware_object(self, instance):
+        if instance.courseware_content_type.model == "course":
+            return BaseCourseSerializer(instance=instance.courseware_object).data
+        else:
+            return BaseProgramSerializer(instance=instance.courseware_object).data
+
+
 class FlexiblePriceSerializer(serializers.ModelSerializer):
     """
     Serializer for flexible price requests

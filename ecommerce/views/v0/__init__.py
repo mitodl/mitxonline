@@ -60,6 +60,8 @@ from ecommerce.serializers import (
     UserDiscountSerializer,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
+from flexiblepricing.models import FlexiblePriceTier
+from flexiblepricing.serializers import FlexiblePriceTierSerializer
 from main.constants import (
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
@@ -199,7 +201,6 @@ class DiscountViewSet(ModelViewSet):
     pagination_class = RefinePagination
 
     def get_queryset(self):
-        log.debug("wooba wooba")
         queryset = Discount.objects.all()
 
         name_search = self.request.query_params.get("q")
@@ -259,6 +260,18 @@ class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
 
     serializer_class = UserDiscountMetaSerializer
     queryset = UserDiscount.objects.all()
+    authentication_classes = (SessionAuthentication, TokenAuthentication)
+    permission_classes = (IsAuthenticated, IsAdminUser)
+    pagination_class = RefinePagination
+
+
+class NestedDiscountTierViewSet(NestedViewSetMixin, ModelViewSet):
+    """
+    API view set for Flexible Pricing Tiers. This one is for use within a Discount.
+    """
+
+    serializer_class = FlexiblePriceTierSerializer
+    queryset = FlexiblePriceTier.objects.all()
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated, IsAdminUser)
     pagination_class = RefinePagination

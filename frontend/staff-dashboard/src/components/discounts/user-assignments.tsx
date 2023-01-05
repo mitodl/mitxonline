@@ -3,7 +3,6 @@ import {
     useTable,
     List,
 } from "@pankod/refine-antd";
-import moment from "moment";
 
 export const UserAssignments = (props: any) => {
     const { record } = props
