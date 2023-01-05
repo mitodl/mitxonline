@@ -3,22 +3,23 @@ import logging
 import re
 from collections import defaultdict
 
-from requests import HTTPError
-from requests.exceptions import ConnectionError as RequestsConnectionError
-from openedx.exceptions import EdxApiRegistrationValidationException
-
 import pycountry
 from django.db import transaction
+from requests import HTTPError
+from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from social_django.models import UserSocialAuth
 
+from hubspot_sync.task_helpers import sync_hubspot_user
+
 # from ecommerce.api import fetch_and_serialize_unused_coupons
 from mail import verification_api
 from main.serializers import WriteableSerializerMethodField
+from openedx.api import check_username_exists_in_edx
+from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.tasks import change_edx_user_email_async
 from users.models import ChangeEmailRequest, LegalAddress, Profile, User
-from openedx.api import check_username_exists_in_edx
 
 log = logging.getLogger()
 
@@ -188,6 +189,7 @@ class UserSerializer(serializers.ModelSerializer):
                 if legal_address.is_valid():
                     legal_address.save()
 
+        sync_hubspot_user(user)
         return user
 
     def update(self, instance, validated_data):
@@ -210,6 +212,7 @@ class UserSerializer(serializers.ModelSerializer):
 
             user = super().update(instance, validated_data)
 
+        sync_hubspot_user(user)
         return user
 
     class Meta:

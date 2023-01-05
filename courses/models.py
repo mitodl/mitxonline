@@ -256,7 +256,12 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
         unique_together = ("program", "run_tag")
 
     @property
-    def full_readable_id(self):
+    def title(self):
+        """Return the program title"""
+        return self.program.title
+
+    @property
+    def readable_id(self):
         """
         Returns the program's readable id with this program run's suffix
 

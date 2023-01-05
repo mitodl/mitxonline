@@ -1,7 +1,8 @@
-from factory import fuzzy, SubFactory
-from factory.django import DjangoModelFactory
-import faker
 import random
+
+import faker
+from factory import SubFactory, fuzzy
+from factory.django import DjangoModelFactory
 
 from courses.factories import CourseRunFactory
 from ecommerce import models
@@ -12,7 +13,6 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
 )
-
 from users.factories import UserFactory
 
 FAKE = faker.Factory.create()
@@ -126,3 +126,12 @@ class LineFactory(DjangoModelFactory):
 
     class Meta:
         model = models.Line
+
+
+class DiscountRedemptionFactory(DjangoModelFactory):
+    redeemed_by = SubFactory(UserFactory)
+    redeemed_discount = SubFactory(DiscountFactory)
+    redeemed_order = SubFactory(OrderFactory)
+
+    class Meta:
+        model = models.DiscountRedemption

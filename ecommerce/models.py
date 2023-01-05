@@ -426,6 +426,8 @@ class Order(TimestampedModel):
 
     # override save method to auto-fill generated_rerefence_number
     def save(self, *args, **kwargs):
+        from hubspot_sync.task_helpers import sync_hubspot_deal
+
         # initial save in order to get primary key for new order
         super().save(*args, **kwargs)
 
@@ -436,6 +438,7 @@ class Order(TimestampedModel):
         if self.reference_number is None:
             self.reference_number = self._generate_reference_number()
             super().save(*args, **kwargs)
+        sync_hubspot_deal(self)
 
     # Flag to determine if the order is in review status - if it is, then
     # we need to not step on the basket that may or may not exist when it is

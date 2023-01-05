@@ -147,6 +147,18 @@
       "description": "This server's host IP",
       "required": false
     },
+    "HUBSPOT_MAX_CONCURRENT_TASKS": {
+      "description": "Max number of concurrent Hubspot tasks to run",
+      "required": false
+    },
+    "HUBSPOT_PIPELINE_ID": {
+      "description": "Hubspot ID for the ecommerce pipeline",
+      "required": false
+    },
+    "HUBSPOT_TASK_DELAY": {
+      "description": "Number of milliseconds to wait between consecutive Hubspot calls",
+      "required": false
+    },
     "LOGOUT_REDIRECT_URL": {
       "description": "Url to redirect to after logout, typically Open edX's own logout url",
       "required": false
@@ -249,6 +261,18 @@
     },
     "MITOL_GOOGLE_SHEETS_REFUNDS_SKIP_ROW_COL": {
       "description": "The zero-based index of the enrollment change sheet column that indicates whether the row should be skipped",
+      "required": false
+    },
+    "MITOL_HUBSPOT_API_ID_PREFIX": {
+      "description": "The prefix to use for hubspot unique_app_id field values",
+      "required": false
+    },
+    "MITOL_HUBSPOT_API_PRIVATE_TOKEN": {
+      "description": "Hubspot private token to authenticate with API",
+      "required": false
+    },
+    "MITOL_HUBSPOT_API_RETRIES": {
+      "description": "Number of times to retry a failed hubspot API request",
       "required": false
     },
     "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY": {

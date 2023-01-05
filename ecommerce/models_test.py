@@ -1,51 +1,50 @@
-import pytest
 import random
 from decimal import Decimal, getcontext
-from mitol.common.utils import now_in_utc
+
+import pytest
 import reversion
-
-from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from mitol.common.utils import now_in_utc
 
-from users.factories import UserFactory
-
-from ecommerce.models import (
-    Order,
-    DiscountRedemption,
-    Basket,
-    BasketItem,
-    UserDiscount,
-    BasketDiscount,
-    PendingOrder,
-    Product,
-    FulfilledOrder,
-    RefundedOrder,
-    Transaction,
-)
 from ecommerce import api
-from ecommerce.factories import (
-    ProductFactory,
-    DiscountFactory,
-    BasketFactory,
-    OneTimeDiscountFactory,
-    OneTimePerUserDiscountFactory,
-    UnlimitedUseDiscountFactory,
-    SetLimitDiscountFactory,
-    BasketItemFactory,
-    OrderFactory,
-)
-from ecommerce.discounts import (
-    DiscountType,
-    PercentDiscount,
-    FixedPriceDiscount,
-    DollarsOffDiscount,
-)
-from ecommerce.views_test import user
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
 )
+from ecommerce.discounts import (
+    DiscountType,
+    DollarsOffDiscount,
+    FixedPriceDiscount,
+    PercentDiscount,
+)
+from ecommerce.factories import (
+    BasketFactory,
+    BasketItemFactory,
+    DiscountFactory,
+    OneTimeDiscountFactory,
+    OneTimePerUserDiscountFactory,
+    OrderFactory,
+    ProductFactory,
+    SetLimitDiscountFactory,
+    UnlimitedUseDiscountFactory,
+)
+from ecommerce.models import (
+    Basket,
+    BasketDiscount,
+    BasketItem,
+    DiscountRedemption,
+    FulfilledOrder,
+    Order,
+    PendingOrder,
+    Product,
+    RefundedOrder,
+    Transaction,
+    UserDiscount,
+)
+from ecommerce.views_test import user
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -311,7 +310,7 @@ def test_product_multiple_active_for_single_purchasable_object():
         pass
 
 
-def test_order_update_reference_number(user):
+def test_order_update_reference_number(mocked_hubspot_deal_sync, user):
     """Test when order is created/updated, reference_number is updated in db"""
     order = Order(purchaser=user, total_price_paid=10)
     order.save()
@@ -325,6 +324,7 @@ def test_order_update_reference_number(user):
     assert (
         existing_order.reference_number == existing_order._generate_reference_number()
     )
+    assert mocked_hubspot_deal_sync.call_count == 2
 
 
 def test_duplicated_product_lines_validation(basket):

@@ -191,6 +191,7 @@ INSTALLED_APPS = (
     "main",
     "authentication",
     "courses",
+    "hubspot_sync",
     "mail.apps.MailApp",
     "users",
     "cms",
@@ -209,6 +210,7 @@ INSTALLED_APPS = (
     "mitol.google_sheets.apps.GoogleSheetsApp",
     "mitol.google_sheets_refunds.apps.GoogleSheetsRefundsApp",
     # "mitol.digitalcredentials.apps.DigitalCredentialsApp",
+    "mitol.hubspot_api",
     "mitol.mail.apps.MailApp",
     "mitol.authentication.apps.TransitionalAuthenticationApp",
     "mitol.payment_gateway.apps.PaymentGatewayApp"
@@ -1093,4 +1095,36 @@ MITX_ONLINE_FASTLY_URL = get_string(
     name="FASTLY_URL",
     default="https://api.fastly.com",
     description="The URL to the Fastly API.",
+)
+
+# Hubspot sync settings
+MITOL_HUBSPOT_API_PRIVATE_TOKEN = get_string(
+    name="MITOL_HUBSPOT_API_PRIVATE_TOKEN",
+    default=None,
+    description="Hubspot private token to authenticate with API",
+)
+MITOL_HUBSPOT_API_RETRIES = get_int(
+    name="MITOL_HUBSPOT_API_RETRIES",
+    default=3,
+    description="Number of times to retry a failed hubspot API request",
+)
+MITOL_HUBSPOT_API_ID_PREFIX = get_string(
+    name="MITOL_HUBSPOT_API_ID_PREFIX",
+    default="MITXONLINE",
+    description="The prefix to use for hubspot unique_app_id field values",
+)
+HUBSPOT_PIPELINE_ID = get_string(
+    name="HUBSPOT_PIPELINE_ID",
+    default="default",
+    description="Hubspot ID for the ecommerce pipeline",
+)
+HUBSPOT_MAX_CONCURRENT_TASKS = get_int(
+    name="HUBSPOT_MAX_CONCURRENT_TASKS",
+    default=4,
+    description="Max number of concurrent Hubspot tasks to run",
+)
+HUBSPOT_TASK_DELAY = get_int(
+    name="HUBSPOT_TASK_DELAY",
+    default=1000,
+    description="Number of milliseconds to wait between consecutive Hubspot calls",
 )
