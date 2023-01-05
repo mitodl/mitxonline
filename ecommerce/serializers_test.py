@@ -143,6 +143,9 @@ def test_product_flexible_price_serializer(mock_context):
                 "id": flexible_price.tier.discount.id,
                 "max_redemptions": flexible_price.tier.discount.max_redemptions,
                 "redemption_type": flexible_price.tier.discount.redemption_type,
+                "activation_date": flexible_price.tier.discount.activation_date,
+                "expiration_date": flexible_price.tier.discount.expiration_date,
+                "is_redeemed": flexible_price.tier.discount.is_redeemed,
             },
         },
     )
