@@ -29,7 +29,6 @@ import logging
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
-from django.db import IntegrityError
 
 from courses.api import (
     ensure_course_run_grade,
