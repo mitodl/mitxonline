@@ -182,21 +182,10 @@ class Command(BaseCommand):
                     )
 
                 # While overriding grade we force create the certificate
-                try:
-                    (
-                        _,
-                        created_cert,
-                        deleted_cert,
-                    ) = process_course_run_grade_certificate(
-                        course_run_grade=course_run_grade,
-                        should_force_create=is_grade_override,
-                    )
-                except IntegrityError:
-                    log.warn(
-                        f"IntegrityError caught processing certificate for {course_run.courseware_id} for user {user} - certificate was likely already revoked."
-                    )
-                    created_cert = False
-                    deleted_cert = False
+                (_, created_cert, deleted_cert,) = process_course_run_grade_certificate(
+                    course_run_grade=course_run_grade,
+                    should_force_create=is_grade_override,
+                )
 
                 if created_grade:
                     grade_status = "created"
