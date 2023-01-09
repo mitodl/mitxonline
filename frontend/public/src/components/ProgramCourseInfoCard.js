@@ -75,19 +75,6 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
             </div>
           </div>
         </div>
-        <div className="row flex-grow-1 pt-3">
-          <div className="col pl-0 pr-0">
-            {courseDetailsPage ? (
-              <div className="upgrade-item-description detail d-md-flex flex-column px-4 justify-content-between pb-3">
-                <div className=" w-100 ">
-                  <strong>Enroll today</strong> for free, and start learning
-                  from MIT faculty. Courses are always free until you want to
-                  get a certificate.
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
       </div>
     )
   }
