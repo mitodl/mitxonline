@@ -332,21 +332,21 @@ export class EnrolledItemCard extends React.Component<
     const formattedEndDate = endDate ? formatPrettyDateTimeAmPmTz(endDate) : ""
     return (
       <Modal
-        id={`run-unenrollment-${enrollment.run.id}-modal`}
+        id={`run-unenrollment-${enrollment.id}-modal`}
         className="text-center"
         isOpen={runUnenrollmentModalVisibility}
         toggle={() => this.toggleRunUnenrollmentModalVisibility()}
         role="dialog"
-        aria-labelledby={`run-unenrollment-${enrollment.run.id}-modal-header`}
-        aria-describedby={`run-unenrollment-${enrollment.run.id}-modal-body`}
+        aria-labelledby={`run-unenrollment-${enrollment.id}-modal-header`}
+        aria-describedby={`run-unenrollment-${enrollment.id}-modal-body`}
       >
         <ModalHeader
-          id={`run-unenrollment-${enrollment.run.id}-modal-header`}
+          id={`run-unenrollment-${enrollment.id}-modal-header`}
           toggle={() => this.toggleRunUnenrollmentModalVisibility()}
         >
           Unenroll From {enrollment.run.title}
         </ModalHeader>
-        <ModalBody id={`run-unenrollment-${enrollment.run.id}-modal-body`}>
+        <ModalBody id={`run-unenrollment-${enrollment.id}-modal-body`}>
           <p>
             Are you sure you wish to unenroll from {enrollment.run.title}?
             {endDate
@@ -358,7 +358,7 @@ export class EnrolledItemCard extends React.Component<
           <Button
             type="submit"
             color="success"
-            onClick={() => this.onRunUnenrollment(enrollment.run)}
+            onClick={() => this.onRunUnenrollment(enrollment)}
           >
             Unenroll
           </Button>{" "}
