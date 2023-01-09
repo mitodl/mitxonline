@@ -25,8 +25,6 @@ Check the usages of this command below:
 
 """
 
-import logging
-
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
@@ -42,8 +40,6 @@ from openedx.api import get_edx_grades_with_users
 from users.api import fetch_user
 
 User = get_user_model()
-
-log = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
