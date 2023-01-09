@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from django.db.models.query import QuerySet
 from mitol.common.utils import now_in_utc
@@ -683,10 +683,16 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
         return None, False, (delete_count > 0)
 
     elif should_create:
-        certificate, created = CourseRunCertificate.objects.get_or_create(
-            user=user, course_run=course_run
-        )
-        return certificate, created, False
+        try:
+            certificate, created = CourseRunCertificate.objects.get_or_create(
+                user=user, course_run=course_run
+            )
+            return certificate, created, False
+        except IntegrityError:
+            log.warn(
+                f"IntegrityError caught processing certificate for {course_run.courseware_id} for user {user} - certificate was likely already revoked."
+            )
+
     return None, False, False
 
 

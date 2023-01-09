@@ -25,18 +25,19 @@ Check the usages of this command below:
 
 """
 
-from django.core.management.base import BaseCommand, CommandError
-from users.api import fetch_user
-from courses.api import (
-    manage_course_run_certificate_access,
-    ensure_course_run_grade,
-    process_course_run_grade_certificate,
-    override_user_grade,
-)
-from courses.utils import is_grade_valid
-from courses.models import CourseRun, CourseRunGrade
-from openedx.api import get_edx_grades_with_users
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand, CommandError
+
+from courses.api import (
+    ensure_course_run_grade,
+    manage_course_run_certificate_access,
+    override_user_grade,
+    process_course_run_grade_certificate,
+)
+from courses.models import CourseRun
+from courses.utils import is_grade_valid
+from openedx.api import get_edx_grades_with_users
+from users.api import fetch_user
 
 User = get_user_model()
 
@@ -176,7 +177,7 @@ class Command(BaseCommand):
                     )
 
                 # While overriding grade we force create the certificate
-                _, created_cert, deleted_cert = process_course_run_grade_certificate(
+                (_, created_cert, deleted_cert,) = process_course_run_grade_certificate(
                     course_run_grade=course_run_grade,
                     should_force_create=is_grade_override,
                 )
