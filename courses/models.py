@@ -1118,9 +1118,12 @@ class CourseRunGrade(TimestampedModel, AuditableModel, ValidateOnSaveMixin):
     @property
     def grade_percent(self):
         """Returns the grade field value as a number out of 100 (or None if the value is None)"""
-        getcontext().prec = 2
-        getcontext().rounding = ROUND_HALF_EVEN
-        return Decimal(100) * Decimal(self.grade) if self.grade is not None else None
+        TWOPLACES = Decimal(10) ** -2
+        return (
+            Decimal(self.grade * 100).quantize(TWOPLACES)
+            if self.grade is not None
+            else None
+        )
 
     @property
     def is_certificate_eligible(self):
