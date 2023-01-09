@@ -15,7 +15,6 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
 
     let featuredImage = null
     let courseDetailsPage = null
-    let financialAssistanceForm = null
     let courseRunStatusMessageText = null
     let courseRunStatusDetail = null
 
@@ -31,10 +30,6 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
 
     if (course.page && course.page.live) {
       courseDetailsPage = course.page.page_url
-    }
-
-    if (course.financial_assistance_form_url) {
-      financialAssistanceForm = course.financial_assistance_form_url
     }
 
     if (course.feature_image_src) {
@@ -78,38 +73,6 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
               </div>
               <br />
             </div>
-          </div>
-        </div>
-        <div className="row flex-grow-1 pt-3">
-          <div className="col pl-0 pr-0">
-            {courseDetailsPage ? (
-              <div className="upgrade-item-description detail d-md-flex flex-column px-4 justify-content-between pb-3">
-                <div className=" w-100 ">
-                  <strong>Enroll today</strong> for free, and start learning
-                  from MIT faculty. Courses are always free until you want to
-                  get a certificate.
-                </div>
-                <div className="enrollment-extra-links d-flex d-md-flex justify-content-center w-100">
-                  <div className="pr-4 my-auto">
-                    {financialAssistanceForm ? (
-                      <a href={financialAssistanceForm}>
-                        Financial assistance?
-                      </a>
-                    ) : null}
-                  </div>
-                  <div className="my-auto">
-                    <form method="get" action={courseDetailsPage}>
-                      <button
-                        type="submit"
-                        className="btn btn-primary btn-gradient-red"
-                      >
-                        Enroll
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </div>
         </div>
       </div>
