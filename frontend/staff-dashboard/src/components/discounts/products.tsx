@@ -4,8 +4,13 @@ import {
   List,
 } from "@pankod/refine-antd";
 
-export const Products = (props: any) => {
-  const { record } = props
+interface IProductsTableProps {
+  record: any;
+  showDelete?: boolean;
+}
+
+export const Products = (props: IProductsTableProps) => {
+  const { record, showDelete } = props
   const { tableProps } = useTable({
       resource: `discounts/${record?.id}/products`
   });
@@ -30,6 +35,7 @@ export const Products = (props: any) => {
                   title="Readable ID"
                   render={(value) => value.purchasable_object.readable_id }
                 ></Table.Column>
+                {showDelete ? (<Table.Column dataIndex="id" title="" render={(value) => (`${value} actions!`)}></Table.Column>) : null }
             </Table>
         </List>
       </>

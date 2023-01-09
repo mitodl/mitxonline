@@ -82,6 +82,44 @@ class ProductsPagination(RefinePagination):
     default_limit = 2
 
 
+class AllProductViewSet(ReadOnlyModelViewSet):
+    """This doesn't filter unenrollable products out, and adds name search for
+    courseware object readable id. It's really for the staff dashboard."""
+
+    serializer_class = ProductSerializer
+    pagination_class = ProductsPagination
+
+    def get_queryset(self):
+        name_search = self.request.query_params.get("q")
+
+        if name_search is None:
+            return Product.objects.all()
+
+        matching_courserun_ids = CourseRun.objects.filter(
+            courseware_id__contains=name_search
+        ).values_list("id", flat=True)
+
+        matching_program_ids = Program.objects.filter(
+            readable_id__contains=name_search
+        ).values_list("id", flat=True)
+
+        return (
+            Product.objects.filter(
+                (
+                    Q(object_id__in=matching_courserun_ids)
+                    & Q(content_type__model="courserun")
+                )
+                | (
+                    Q(object_id__in=matching_program_ids)
+                    & Q(content_type__model="program")
+                )
+                | (Q(description__contains=name_search))
+            )
+            .select_related("content_type")
+            .prefetch_related("purchasable_object")
+        )
+
+
 class ProductViewSet(ReadOnlyModelViewSet):
     serializer_class = ProductSerializer
     pagination_class = ProductsPagination

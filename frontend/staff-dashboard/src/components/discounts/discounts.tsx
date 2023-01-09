@@ -6,6 +6,8 @@ import {
   DatePicker,
 } from "@pankod/refine-antd";
 
+import { AddProductForm } from "./add-product-form";
+
 interface IDiscountFormProps {
   formProps: any;
 } 
@@ -13,7 +15,7 @@ interface IDiscountFormProps {
 export const DiscountForm = (props: IDiscountFormProps) => {
   const { formProps } = props;
 
-  return (
+  return (<>
     <Form {...formProps} layout="vertical">
         <Form.Item label="Discount Code" name="discount_code">
             <Input />
@@ -55,5 +57,7 @@ export const DiscountForm = (props: IDiscountFormProps) => {
           <Input type="datetime-local" />
         </Form.Item>
     </Form>
-  );
+
+    <AddProductForm discountId={1}></AddProductForm>
+  </>);
 };
