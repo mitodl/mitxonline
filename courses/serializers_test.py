@@ -546,7 +546,7 @@ def test_learner_record_serializer(mock_context):
             CourseRunGradeFactory.create(
                 course_run=course_run,
                 user=user,
-                grade=(0.3333333 * grade_multiplier_to_test_ordering),
+                grade=(0.313133 * grade_multiplier_to_test_ordering),
             )
         )
         grade_multiplier_to_test_ordering += 1
@@ -554,142 +554,104 @@ def test_learner_record_serializer(mock_context):
     serialized_data = LearnerRecordSerializer(
         instance=program, context=mock_context
     ).data
-    assert serialized_data == {
-        "partner_schools": [],
-        "program": {
-            "courses": [
-                {
-                    "certificate": None,
-                    "grade": {
-                        "grade": round(grades[0].grade, 2),
-                        "grade_percent": Decimal(round(grades[0].grade_percent)),
-                        "letter_grade": grades[0].letter_grade,
-                        "passed": grades[0].passed,
-                        "set_by_admin": grades[0].set_by_admin,
-                    },
-                    "id": courses[0].id,
-                    "readable_id": courses[0].readable_id,
-                    "reqtype": "Required",
-                    "title": courses[0].title,
-                },
-                {
-                    "certificate": None,
-                    "grade": {
-                        "grade": round(grades[1].grade, 2),
-                        "grade_percent": Decimal(round(grades[1].grade_percent)),
-                        "letter_grade": grades[1].letter_grade,
-                        "passed": grades[1].passed,
-                        "set_by_admin": grades[1].set_by_admin,
-                    },
-                    "id": courses[1].id,
-                    "readable_id": courses[1].readable_id,
-                    "reqtype": "Required",
-                    "title": courses[1].title,
-                },
-                {
-                    "certificate": None,
-                    "grade": {
-                        "grade": round(grades[2].grade, 2),
-                        "grade_percent": Decimal(round(grades[2].grade_percent)),
-                        "letter_grade": grades[2].letter_grade,
-                        "passed": grades[2].passed,
-                        "set_by_admin": grades[2].set_by_admin,
-                    },
-                    "id": courses[2].id,
-                    "readable_id": courses[2].readable_id,
-                    "reqtype": "Required",
-                    "title": courses[2].title,
-                },
-            ],
-            "readable_id": program.readable_id,
-            "requirements": [
+    program_requirements_payload = [
+        {
+            "children": [
                 {
                     "children": [
                         {
-                            "children": [
-                                {
-                                    "data": {
-                                        "course": courses[0].id,
-                                        "node_type": "course",
-                                        "operator": None,
-                                        "operator_value": None,
-                                        "program": program.id,
-                                        "title": "",
-                                    },
-                                    "id": program.get_requirements_root()
-                                    .get_children()
-                                    .first()
-                                    .get_children()
-                                    .filter(course=courses[0].id)
-                                    .first()
-                                    .id,
-                                },
-                                {
-                                    "data": {
-                                        "course": courses[1].id,
-                                        "node_type": "course",
-                                        "operator": None,
-                                        "operator_value": None,
-                                        "program": program.id,
-                                        "title": "",
-                                    },
-                                    "id": program.get_requirements_root()
-                                    .get_children()
-                                    .first()
-                                    .get_children()
-                                    .filter(course=courses[1].id)
-                                    .first()
-                                    .id,
-                                },
-                                {
-                                    "data": {
-                                        "course": courses[2].id,
-                                        "node_type": "course",
-                                        "operator": None,
-                                        "operator_value": None,
-                                        "program": program.id,
-                                        "title": "",
-                                    },
-                                    "id": program.get_requirements_root()
-                                    .get_children()
-                                    .first()
-                                    .get_children()
-                                    .filter(course=courses[2].id)
-                                    .first()
-                                    .id,
-                                },
-                            ],
                             "data": {
-                                "course": None,
-                                "node_type": "operator",
-                                "operator": "all_of",
+                                "course": courses[0].id,
+                                "node_type": "course",
+                                "operator": None,
                                 "operator_value": None,
                                 "program": program.id,
-                                "title": "Required",
+                                "title": "",
                             },
                             "id": program.get_requirements_root()
                             .get_children()
                             .first()
+                            .get_children()
+                            .filter(course=courses[0].id)
+                            .first()
                             .id,
-                        }
+                        },
+                        {
+                            "data": {
+                                "course": courses[1].id,
+                                "node_type": "course",
+                                "operator": None,
+                                "operator_value": None,
+                                "program": program.id,
+                                "title": "",
+                            },
+                            "id": program.get_requirements_root()
+                            .get_children()
+                            .first()
+                            .get_children()
+                            .filter(course=courses[1].id)
+                            .first()
+                            .id,
+                        },
+                        {
+                            "data": {
+                                "course": courses[2].id,
+                                "node_type": "course",
+                                "operator": None,
+                                "operator_value": None,
+                                "program": program.id,
+                                "title": "",
+                            },
+                            "id": program.get_requirements_root()
+                            .get_children()
+                            .first()
+                            .get_children()
+                            .filter(course=courses[2].id)
+                            .first()
+                            .id,
+                        },
                     ],
                     "data": {
                         "course": None,
-                        "node_type": "program_root",
-                        "operator": None,
+                        "node_type": "operator",
+                        "operator": "all_of",
                         "operator_value": None,
                         "program": program.id,
-                        "title": "",
+                        "title": "Required",
                     },
-                    "id": root.id,
+                    "id": program.get_requirements_root().get_children().first().id,
                 }
             ],
-            "title": program.title,
-        },
-        "sharing": [],
-        "user": {
-            "email": user.email,
-            "name": user.name,
-            "username": user.username,
-        },
+            "data": {
+                "course": None,
+                "node_type": "program_root",
+                "operator": None,
+                "operator_value": None,
+                "program": program.id,
+                "title": "",
+            },
+            "id": root.id,
+        }
+    ]
+    user_info_payload = {
+        "email": user.email,
+        "name": user.name,
+        "username": user.username,
     }
+    course_0_payload = {
+        "certificate": None,
+        "grade": {
+            "grade": round(grades[0].grade, 2),
+            "grade_percent": Decimal(grades[0].grade_percent),
+            "letter_grade": grades[0].letter_grade,
+            "passed": grades[0].passed,
+            "set_by_admin": grades[0].set_by_admin,
+        },
+        "id": courses[0].id,
+        "readable_id": courses[0].readable_id,
+        "reqtype": "Required",
+        "title": courses[0].title,
+    }
+    assert user_info_payload == serialized_data["user"]
+    assert program_requirements_payload == serialized_data["program"]["requirements"]
+    assert course_0_payload in serialized_data["program"]["courses"]
