@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.56.3
+Version 0.56.3 (Released January 09, 2023)
 --------------
 
 - fix: 404 enrollment not found (#1323)
