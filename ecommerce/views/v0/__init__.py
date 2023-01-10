@@ -82,12 +82,14 @@ class ProductsPagination(RefinePagination):
     default_limit = 2
 
 
-class AllProductViewSet(ReadOnlyModelViewSet):
+class AllProductViewSet(ModelViewSet):
     """This doesn't filter unenrollable products out, and adds name search for
     courseware object readable id. It's really for the staff dashboard."""
 
     serializer_class = ProductSerializer
     pagination_class = ProductsPagination
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
 
     def get_queryset(self):
         name_search = self.request.query_params.get("q")
@@ -279,6 +281,37 @@ class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated, IsAdminUser)
     pagination_class = RefinePagination
+
+    def partial_update(self, request, **kwargs):
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+
+        (discount_product, created) = DiscountProduct.objects.get_or_create(
+            discount=discount, product_id=request.data["product_id"]
+        )
+
+        return Response(
+            DiscountProductSerializer(
+                DiscountProduct.objects.filter(discount=discount).all(), many=True
+            ).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, **kwargs):
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+        product = Product.objects.get(pk=kwargs["pk"])
+
+        discount_product = DiscountProduct.objects.filter(
+            discount=discount, product=product
+        ).get()
+
+        if discount_product is not None:
+            discount_product.delete()
+
+        return Response(
+            DiscountProductSerializer(
+                DiscountProduct.objects.filter(discount=discount).all(), many=True
+            ).data
+        )
 
 
 class NestedDiscountRedemptionViewSet(NestedViewSetMixin, ModelViewSet):

@@ -6,6 +6,7 @@ import {
   Row,
 } from "@pankod/refine-antd";
 import { useState } from "react";
+import { Products } from "./products";
 
 import type { IProduct } from "interfaces";
 
@@ -48,6 +49,7 @@ const ProductResult = (props: IProductResultProps) => {
 }
 
 export const AddProductForm = (props: IAddProductFormProps) => {
+  const { discountId } = props;
   const [ searchTerm, setSearchTerm ] = useState("");
 
   const performFilter = (ev: any) => {
@@ -65,5 +67,7 @@ export const AddProductForm = (props: IAddProductFormProps) => {
         {searchTerm !== "" ? (<ProductResult searchTerm={searchTerm}></ProductResult>) : null}
       </Col>
     </Row>
+
+    <Products record={{ id: discountId }} showDelete={true}></Products>
   </>);
 }

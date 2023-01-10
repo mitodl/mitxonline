@@ -3,10 +3,9 @@ import {
   Input,
   InputNumber,
   Select,
-  DatePicker,
 } from "@pankod/refine-antd";
 
-import { AddProductForm } from "./add-product-form";
+import { Products } from "./products";
 
 interface IDiscountFormProps {
   formProps: any;
@@ -58,6 +57,6 @@ export const DiscountForm = (props: IDiscountFormProps) => {
         </Form.Item>
     </Form>
 
-    <AddProductForm discountId={1}></AddProductForm>
+    {formProps.initialValues ? <Products record={formProps.initialValues} showDelete={true}></Products> : null}
   </>);
 };
