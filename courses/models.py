@@ -1119,7 +1119,7 @@ class CourseRunGrade(TimestampedModel, AuditableModel, ValidateOnSaveMixin):
     def grade_percent(self):
         """Returns the grade field value as a number out of 100 (or None if the value is None)"""
         return (
-            Decimal(self.grade * 100).quantize(Decimal(1))
+            Decimal(self.grade * 100).quantize(exp=Decimal(1), rounding=ROUND_HALF_EVEN)
             if self.grade is not None
             else None
         )
