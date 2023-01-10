@@ -760,6 +760,7 @@ class LearnerRecordSerializer(serializers.BaseSerializer):
                 .order_by("-grade")
                 .first()
             )
+            grade.grade = round(grade.grade, 2)
 
             if grade is not None:
                 fmt_course["grade"] = CourseRunGradeSerializer(grade).data

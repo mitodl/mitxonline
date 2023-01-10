@@ -4,7 +4,7 @@ Course models
 import logging
 import operator as op
 import uuid
-from decimal import ROUND_HALF_EVEN
+from decimal import ROUND_HALF_EVEN, getcontext
 from decimal import Context as DecimalContext
 from decimal import Decimal
 
@@ -1119,7 +1119,7 @@ class CourseRunGrade(TimestampedModel, AuditableModel, ValidateOnSaveMixin):
     def grade_percent(self):
         """Returns the grade field value as a number out of 100 (or None if the value is None)"""
         return (
-            Decimal(self.grade * 100, DecimalContext(prec=2, rounding=ROUND_HALF_EVEN))
+            Decimal(self.grade * 100).quantize(exp=Decimal(1), rounding=ROUND_HALF_EVEN)
             if self.grade is not None
             else None
         )

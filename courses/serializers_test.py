@@ -3,6 +3,7 @@ Tests for course serializers
 """
 # pylint: disable=unused-argument, redefined-outer-name
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 import bleach
 import factory
@@ -28,6 +29,7 @@ from courses.serializers import (
     CourseRunGradeSerializer,
     CourseRunSerializer,
     CourseSerializer,
+    LearnerRecordSerializer,
     ProgramEnrollmentSerializer,
     ProgramRequirementSerializer,
     ProgramRequirementTreeSerializer,
@@ -507,3 +509,149 @@ def test_program_requirement_deletion():
         root1
     ]  # just the one root node
     assert list(ProgramRequirement.get_tree(parent=root2)) == expected
+
+
+def test_learner_record_serializer(mock_context):
+    """Verify that saving the requirements for one program doesn't affect other programs"""
+
+    program = ProgramFactory.create()
+    courses = CourseFactory.create_batch(3, program=program)
+    root = program.requirements_root
+
+    user = mock_context["request"].user
+
+    # build the same basic tree structure for both
+    required = root.add_child(
+        program=program,
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        title="Required",
+        operator=ProgramRequirement.Operator.ALL_OF,
+    )
+    course_runs = []
+    grades = []
+    grade_multiplier_to_test_ordering = 1
+    for course in courses:
+        required.add_child(
+            program=program,
+            node_type=ProgramRequirementNodeType.COURSE,
+            course=course,
+        )
+        course_run = CourseRunFactory.create(course=course)
+        course_run_enrollment = CourseRunEnrollmentFactory.create(
+            run=course_run, user=user
+        )
+        course_runs.append(course_run)
+
+        grades.append(
+            CourseRunGradeFactory.create(
+                course_run=course_run,
+                user=user,
+                grade=(0.313133 * grade_multiplier_to_test_ordering),
+            )
+        )
+        grade_multiplier_to_test_ordering += 1
+
+    serialized_data = LearnerRecordSerializer(
+        instance=program, context=mock_context
+    ).data
+    program_requirements_payload = [
+        {
+            "children": [
+                {
+                    "children": [
+                        {
+                            "data": {
+                                "course": courses[0].id,
+                                "node_type": "course",
+                                "operator": None,
+                                "operator_value": None,
+                                "program": program.id,
+                                "title": "",
+                            },
+                            "id": program.get_requirements_root()
+                            .get_children()
+                            .first()
+                            .get_children()
+                            .filter(course=courses[0].id)
+                            .first()
+                            .id,
+                        },
+                        {
+                            "data": {
+                                "course": courses[1].id,
+                                "node_type": "course",
+                                "operator": None,
+                                "operator_value": None,
+                                "program": program.id,
+                                "title": "",
+                            },
+                            "id": program.get_requirements_root()
+                            .get_children()
+                            .first()
+                            .get_children()
+                            .filter(course=courses[1].id)
+                            .first()
+                            .id,
+                        },
+                        {
+                            "data": {
+                                "course": courses[2].id,
+                                "node_type": "course",
+                                "operator": None,
+                                "operator_value": None,
+                                "program": program.id,
+                                "title": "",
+                            },
+                            "id": program.get_requirements_root()
+                            .get_children()
+                            .first()
+                            .get_children()
+                            .filter(course=courses[2].id)
+                            .first()
+                            .id,
+                        },
+                    ],
+                    "data": {
+                        "course": None,
+                        "node_type": "operator",
+                        "operator": "all_of",
+                        "operator_value": None,
+                        "program": program.id,
+                        "title": "Required",
+                    },
+                    "id": program.get_requirements_root().get_children().first().id,
+                }
+            ],
+            "data": {
+                "course": None,
+                "node_type": "program_root",
+                "operator": None,
+                "operator_value": None,
+                "program": program.id,
+                "title": "",
+            },
+            "id": root.id,
+        }
+    ]
+    user_info_payload = {
+        "email": user.email,
+        "name": user.name,
+        "username": user.username,
+    }
+    course_0_payload = {
+        "certificate": None,
+        "grade": {
+            "grade": round(grades[0].grade, 2),
+            "grade_percent": Decimal(grades[0].grade_percent),
+            "letter_grade": grades[0].letter_grade,
+            "passed": grades[0].passed,
+            "set_by_admin": grades[0].set_by_admin,
+        },
+        "id": courses[0].id,
+        "readable_id": courses[0].readable_id,
+        "reqtype": "Required",
+        "title": courses[0].title,
+    }
+    assert user_info_payload == serialized_data["user"]
+    assert program_requirements_payload == serialized_data["program"]["requirements"]
+    assert course_0_payload in serialized_data["program"]["courses"]
