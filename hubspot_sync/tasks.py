@@ -18,6 +18,8 @@ from mitol.hubspot_api.models import HubspotObject
 from ecommerce.models import Order
 from hubspot_sync import api
 from hubspot_sync.api import get_hubspot_id_for_object
+from hubspot_sync.decorators import raise_429
+from hubspot_sync.exceptions import TooManyRequestsException
 from main.celery import app
 from users.models import User
 
@@ -56,7 +58,14 @@ def batched_chunks(
     return chunks(batch_ids, chunk_size=max_chunk_size)
 
 
-@app.task
+@app.task(
+    acks_late=True,
+    autoretry_for=(TooManyRequestsException,),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429()
 def sync_contact_with_hubspot(user_id: int) -> str:
     """
     Sync a user with a hubspot contact
@@ -70,7 +79,14 @@ def sync_contact_with_hubspot(user_id: int) -> str:
     return api.sync_contact_with_hubspot(user_id).id
 
 
-@app.task
+@app.task(
+    acks_late=True,
+    autoretry_for=(TooManyRequestsException,),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429()
 def sync_product_with_hubspot(product_id: int) -> str:
     """
     Sync a MITxOnline Product with a hubspot product
@@ -84,7 +100,14 @@ def sync_product_with_hubspot(product_id: int) -> str:
     return api.sync_product_with_hubspot(product_id).id
 
 
-@app.task
+@app.task(
+    acks_late=True,
+    autoretry_for=(TooManyRequestsException,),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429()
 def sync_deal_with_hubspot(order_id: int) -> str:
     """
     Sync an Order with a hubspot deal
@@ -98,48 +121,14 @@ def sync_deal_with_hubspot(order_id: int) -> str:
     return api.sync_deal_with_hubspot(order_id).id
 
 
-@app.task(acks_late=True)
-def batch_upsert_hubspot_deals_chunked(ids: List[int]) -> List[str]:
-    """
-    Batch sync hubspot deals with matching Order ids
-
-    Args:
-        ids(list): List of object ids to process
-
-    Returns:
-        list(str): List of hubspot deal ids
-    """
-    results = []
-    for order in Order.objects.filter(id__in=ids):
-        results.append(api.sync_deal_with_hubspot(order.id).id)
-        time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
-    return results
-
-
-@app.task(bind=True)
-def batch_upsert_hubspot_deals(self, create: bool):
-    """
-    Batch create/update deals in hubspot
-
-    Args:
-        create(bool): Create if true, update if false
-    """
-    content_type = ContentType.objects.get_for_model(Order)
-    synced_ids = HubspotObject.objects.filter(content_type=content_type).values_list(
-        "object_id", flat=True
-    )
-    unsynced_ids = Order.objects.exclude(id__in=synced_ids).values_list("id", flat=True)
-    object_ids = sorted(unsynced_ids if create else synced_ids)
-    # Try to avoid too many consecutive tasks that could trigger rate limiting
-    chunk_size = max_concurrent_chunk_size(len(object_ids))
-    chunked_tasks = [
-        batch_upsert_hubspot_deals_chunked.s(chunk)
-        for chunk in chunks(object_ids, chunk_size=chunk_size)
-    ]
-    raise self.replace(celery.group(chunked_tasks))
-
-
-@app.task(acks_late=True)
+@app.task(
+    acks_late=True,
+    autoretry_for=(TooManyRequestsException,),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429()
 def batch_create_hubspot_objects_chunked(
     hubspot_type: str, ct_model_name: str, object_ids: List[int]
 ) -> List[str]:
@@ -191,7 +180,14 @@ def batch_create_hubspot_objects_chunked(
     return created_ids
 
 
-@app.task(acks_late=True)
+@app.task(
+    acks_late=True,
+    autoretry_for=(TooManyRequestsException,),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429()
 def batch_update_hubspot_objects_chunked(
     hubspot_type: str, ct_model_name: str, object_ids: List[Tuple[int, str]]
 ) -> List[str]:
@@ -248,7 +244,6 @@ def batch_upsert_hubspot_objects(  # pylint:disable=too-many-arguments
     """
     content_type = ContentType.objects.get_by_natural_key(app_label, model_name)
     if not object_ids:
-
         synced_object_ids = HubspotObject.objects.filter(
             content_type=content_type
         ).values_list("object_id", "hubspot_id")
