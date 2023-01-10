@@ -1,0 +1,95 @@
+"""
+Management command to unenroll enrollment for a course run for the given User
+
+Check the usages of this command below:
+
+**Unenroll enrollment**
+
+1. Unenroll enrollment for user
+./manage.py unenroll_enrollment -—user=<username or email> -—run=<course_run_courseware_id>
+
+**Keep failed enrollments**
+
+4. Keep failed enrollments
+./manage.py unenroll_enrollment -—user=<username or email> -—run=<course_run_courseware_id> -k or --keep-failed-enrollments
+"""
+from django.contrib.auth import get_user_model
+from django.core.management.base import CommandError
+
+from courses.api import deactivate_run_enrollment
+from courses.models import CourseRun
+from courses.management.utils import EnrollmentChangeCommand, enrollment_summary
+from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from users.api import fetch_user
+
+User = get_user_model()
+
+
+class Command(EnrollmentChangeCommand):
+    """Sets a user's enrollment to 'unenrolled' and deactivates it"""
+
+    help = "Sets a user's enrollment to 'unenrolled' and deactivates it"
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--user",
+            type=str,
+            help="The id, email, or username of the enrolled User",
+            required=True,
+        )
+        parser.add_argument(
+            "--run",
+            type=str,
+            help="The 'courseware_id' value for an enrolled CourseRun",
+            required=True,
+        )
+        parser.add_argument(
+            "-k",
+            "--keep-failed-enrollments",
+            action="store_true",
+            dest="keep_failed_enrollments",
+            help="If provided, enrollment records will be kept even if edX enrollment fails",
+        )
+
+        super().add_arguments(parser)
+
+    def handle(self, *args, **options):
+        """Handle command execution"""
+        user = options.get("user", "")
+        try:
+            user = fetch_user(options.get("user", ""))
+        except User.DoesNotExist:
+            raise CommandError(
+                "Could not find a user with <username or email>={}".format(user)
+            )
+        courseware_id = options.get("run")
+        course_run = CourseRun.objects.filter(courseware_id=courseware_id).first()
+        if course_run is None:
+            raise CommandError(
+                "Could not find course run with courseware_id={}".format(courseware_id)
+            )
+
+        keep_failed_enrollments = options.get("keep_failed_enrollments")
+        enrollment, _ = self.fetch_enrollment(user, options)
+        run_enrollment = deactivate_run_enrollment(
+            enrollment,
+            change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
+            keep_failed_enrollments=keep_failed_enrollments,
+        )
+
+        if run_enrollment:
+            success_msg = "Unenrolled enrollments for user: {} ({})\nEnrollment affected: {}".format(
+                enrollment.user.username,
+                enrollment.user.email,
+                enrollment_summary(run_enrollment),
+            )
+
+            self.stdout.write(self.style.SUCCESS(success_msg))
+        else:
+            self.stdout.write(
+                self.style.ERROR(
+                    "Failed to unenroll the enrollment - 'for' user: {} ({}) from course ({})\n".format(
+                        user.username, user.email, options["run"]
+                    )
+                )
+            )
