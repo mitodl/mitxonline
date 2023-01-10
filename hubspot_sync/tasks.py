@@ -65,7 +65,7 @@ def batched_chunks(
     retry_backoff=60,
     retry_jitter=True,
 )
-@raise_429()
+@raise_429
 def sync_contact_with_hubspot(user_id: int) -> str:
     """
     Sync a user with a hubspot contact
@@ -86,7 +86,7 @@ def sync_contact_with_hubspot(user_id: int) -> str:
     retry_backoff=60,
     retry_jitter=True,
 )
-@raise_429()
+@raise_429
 def sync_product_with_hubspot(product_id: int) -> str:
     """
     Sync a MITxOnline Product with a hubspot product
@@ -107,7 +107,7 @@ def sync_product_with_hubspot(product_id: int) -> str:
     retry_backoff=60,
     retry_jitter=True,
 )
-@raise_429()
+@raise_429
 def sync_deal_with_hubspot(order_id: int) -> str:
     """
     Sync an Order with a hubspot deal
@@ -128,7 +128,7 @@ def sync_deal_with_hubspot(order_id: int) -> str:
     retry_backoff=60,
     retry_jitter=True,
 )
-@raise_429()
+@raise_429
 def batch_create_hubspot_objects_chunked(
     hubspot_type: str, ct_model_name: str, object_ids: List[int]
 ) -> List[str]:
@@ -187,7 +187,7 @@ def batch_create_hubspot_objects_chunked(
     retry_backoff=60,
     retry_jitter=True,
 )
-@raise_429()
+@raise_429
 def batch_update_hubspot_objects_chunked(
     hubspot_type: str, ct_model_name: str, object_ids: List[Tuple[int, str]]
 ) -> List[str]:
@@ -274,7 +274,14 @@ def batch_upsert_hubspot_objects(  # pylint:disable=too-many-arguments
     raise self.replace(celery.group(chunked_tasks))
 
 
-@app.task(acks_late=True)
+@app.task(
+    acks_late=True,
+    autoretry_for=(TooManyRequestsException,),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429
 def batch_upsert_associations_chunked(order_ids: List[int]):
     """
     Upsert batches of deal-contact and line-deal associations
