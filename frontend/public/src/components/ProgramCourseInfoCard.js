@@ -76,8 +76,7 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
           </div>
         </div>
         <div className="row flex-grow-1 pt-3">
-          <div className="col pl-0 pr-0">
-          </div>
+          <div className="col pl-0 pr-0"></div>
         </div>
       </div>
     )
