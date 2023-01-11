@@ -55,12 +55,12 @@ class Command(EnrollmentChangeCommand):
 
     def handle(self, *args, **options):
         """Handle command execution"""
-        user = options.get("user", "")
+        username = options.get("user", "")
         try:
-            user = fetch_user(options.get("user", ""))
+            user = fetch_user(username)
         except User.DoesNotExist:
             raise CommandError(
-                "Could not find a user with <username or email>={}".format(user)
+                "Could not find a user with <username or email>={}".format(username)
             )
         courseware_id = options.get("run")
         course_run = CourseRun.objects.filter(courseware_id=courseware_id).first()
