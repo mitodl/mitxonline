@@ -74,6 +74,7 @@ from main.constants import (
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
 from main.views import RefinePagination
+from users.models import User
 
 log = logging.getLogger(__name__)
 
@@ -98,11 +99,11 @@ class AllProductViewSet(ModelViewSet):
             return Product.objects.all()
 
         matching_courserun_ids = CourseRun.objects.filter(
-            courseware_id__contains=name_search
+            courseware_id__icontains=name_search
         ).values_list("id", flat=True)
 
         matching_program_ids = Program.objects.filter(
-            readable_id__contains=name_search
+            readable_id__icontains=name_search
         ).values_list("id", flat=True)
 
         return (
@@ -115,7 +116,7 @@ class AllProductViewSet(ModelViewSet):
                     Q(object_id__in=matching_program_ids)
                     & Q(content_type__model="program")
                 )
-                | (Q(description__contains=name_search))
+                | (Q(description__icontains=name_search))
             )
             .select_related("content_type")
             .prefetch_related("purchasable_object")
@@ -334,6 +335,35 @@ class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated, IsAdminUser)
     pagination_class = RefinePagination
+
+    def partial_update(self, request, **kwargs):
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+
+        (discount_user, created) = UserDiscount.objects.get_or_create(
+            discount=discount, user_id=request.data["user_id"]
+        )
+
+        return Response(
+            UserDiscountMetaSerializer(
+                UserDiscount.objects.filter(discount=discount).all(), many=True
+            ).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, **kwargs):
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+        user = User.objects.get(pk=kwargs["pk"])
+
+        discount_user = UserDiscount.objects.filter(discount=discount, user=user).get()
+
+        if discount_user is not None:
+            discount_user.delete()
+
+        return Response(
+            UserDiscountMetaSerializer(
+                UserDiscount.objects.filter(discount=discount).all(), many=True
+            ).data
+        )
 
 
 class NestedDiscountTierViewSet(NestedViewSetMixin, ModelViewSet):

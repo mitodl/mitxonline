@@ -8,6 +8,7 @@ from users.views import (
     CountriesStatesViewSet,
     CurrentUserRetrieveUpdateViewSet,
     UserRetrieveViewSet,
+    UsersViewSet,
 )
 
 router = routers.DefaultRouter()
@@ -16,6 +17,7 @@ router.register(r"countries", CountriesStatesViewSet, basename="countries_api")
 router.register(
     r"change-emails", ChangeEmailRequestViewSet, basename="change_email_api"
 )
+router.register(r"user_search", UsersViewSet, basename="users_search_api")
 
 urlpatterns = [
     path(

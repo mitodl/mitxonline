@@ -1,3 +1,16 @@
+export interface ILegalAddress {
+    first_name: string;
+    last_name: string;
+    country: string;
+}
+
+export interface IUser {
+    id: number;
+    username: string;
+    email: string;
+    legal_address?: ILegalAddress;
+}
+
 export interface IProduct {
     id: number;
     price: number;

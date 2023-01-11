@@ -6,6 +6,7 @@ import {
 } from "@pankod/refine-antd";
 
 import { Products } from "./products";
+import { UserAssignments } from "./user-assignments";
 
 interface IDiscountFormProps {
   formProps: any;
@@ -58,5 +59,7 @@ export const DiscountForm = (props: IDiscountFormProps) => {
     </Form>
 
     {formProps.initialValues ? <Products record={formProps.initialValues} showDelete={true}></Products> : null}
+    
+    {formProps.initialValues ? <UserAssignments record={formProps.initialValues} showDelete={true}></UserAssignments> : null}
   </>);
 };

@@ -94,6 +94,24 @@ class PublicUserSerializer(serializers.ModelSerializer):
         fields = ("id", "username", "name", "created_on", "updated_on")
 
 
+class StaffDashboardUserSerializer(serializers.ModelSerializer):
+    """Serializer for data we care about in the staff dashboard"""
+
+    legal_address = LegalAddressSerializer(allow_null=True)
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "name",
+            "email",
+            "legal_address",
+            "is_staff",
+            "is_superuser",
+        )
+
+
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for users"""
 
