@@ -10,7 +10,7 @@ Check the usages of this command below:
 
 **Keep failed enrollments**
 
-4. Keep failed enrollments
+2. Keep failed enrollments
 ./manage.py unenroll_enrollment -—user=<username or email> -—run=<course_run_courseware_id> -k or --keep-failed-enrollments
 """
 from django.contrib.auth import get_user_model
