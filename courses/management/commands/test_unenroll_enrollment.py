@@ -3,6 +3,7 @@
 import pytest
 
 from django.core.management.base import CommandError
+from types import SimpleNamespace
 
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
@@ -15,15 +16,22 @@ from users.factories import UserFactory
 pytestmark = [pytest.mark.django_db]
 
 
+@pytest.fixture()
+def patches(mocker):  # pylint: disable=missing-docstring
+    edx_unenroll = mocker.patch("courses.api.unenroll_edx_course_run")
+    log_exception = mocker.patch("courses.api.log.exception")
+    return SimpleNamespace(
+        edx_unenroll=edx_unenroll,
+        log_exception=log_exception,
+    )
+
+
 def test_unenroll_enrollment_no_argument():
     """Test that command throws error when no input is provided"""
 
     with pytest.raises(CommandError) as command_error:
         unenroll_enrollment.Command().handle()
-    assert (
-        str(command_error.value)
-        == "Could not find a user with <username or email>="
-    )
+    assert str(command_error.value) == "Could not find a user with <username or email>="
 
 
 def test_unenroll_enrollment_invalid_run():
@@ -61,39 +69,53 @@ def test_unenroll_enrollment_invalid_user():
     )
 
 
-def test_unenroll_enrollment(mocker):
+def test_unenroll_enrollment(patches):
     """
     Test that user unenrolled from the course properly
     """
     enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
     assert enrollment.change_status is None
-    with pytest.raises(CommandError) as command_error:
-        unenroll_enrollment.Command().handle(
-            run=enrollment.run.courseware_id,
-            user=enrollment.user.username,
-        )
-    edx_unenroll = mocker.patch("courses.api.unenroll_edx_course_run")
-    edx_unenroll.assert_called_once_with(enrollment)
-    enrollment.refresh_from_db()
-    assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
-
-
-def test_unenroll_enrollment_without_edx(user):
-    """
-    Test that user unenrolled from the course properly
-    """
-    run = CourseRunFactory(user=user)
-    enrollment = CourseRunEnrollmentFactory(
-        user=user,
-        runs=run
+    assert enrollment.active is True
+    assert enrollment.edx_enrolled is True
+    unenroll_enrollment.Command().handle(
+        run=enrollment.run.courseware_id,
+        user=enrollment.user.username,
     )
-    assert enrollment.change_status is None
-    with pytest.raises(CommandError) as command_error:
-        unenroll_enrollment.Command().handle(
-            run=enrollment.run.courseware_id,
-            user=enrollment.user.username,
-            keep_failed_enrollments=True
-        )
-    assert str(command_error.value) is None
+    patches.edx_unenroll.assert_called_once_with(enrollment)
     enrollment.refresh_from_db()
     assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+    assert enrollment.active is False
+    assert enrollment.edx_enrolled is False
+
+
+def test_unenroll_enrollment_without_edx():
+    """
+    Test that user unenrolled from the course properly without edx
+    """
+    enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
+    assert enrollment.change_status is None
+    assert enrollment.active is True
+    assert enrollment.edx_enrolled is True
+    # User will not be unenrolled
+    # Unenrolling without mocker and keep_failed_enrollments argument
+    unenroll_enrollment.Command().handle(
+        run=enrollment.run.courseware_id,
+        user=enrollment.user.username,
+    )
+    enrollment.refresh_from_db()
+    # Enrollment will remain as it is
+    assert enrollment.change_status is None
+    assert enrollment.active is True
+    assert enrollment.edx_enrolled is True
+    # User will not unenrolled
+    # Unenrolling with keep_failed_enrollments argument
+    unenroll_enrollment.Command().handle(
+        run=enrollment.run.courseware_id,
+        user=enrollment.user.username,
+        keep_failed_enrollments=True,
+    )
+    enrollment.refresh_from_db()
+    assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
+    assert enrollment.active is False
+    # Enrollment will remain edx_enrolled
+    assert enrollment.edx_enrolled is True

@@ -78,7 +78,7 @@ class Command(EnrollmentChangeCommand):
         )
 
         if run_enrollment:
-            success_msg = "Unenrolled enrollments for user: {} ({})\nEnrollment affected: {}".format(
+            success_msg = "Unenrolled enrollment for user: {} ({})\nEnrollment affected: {}".format(
                 enrollment.user.username,
                 enrollment.user.email,
                 enrollment_summary(run_enrollment),
