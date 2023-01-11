@@ -90,7 +90,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
             ) : null}
           </span>
         </td>
-        <td>{course.readable_id}</td>
+        <td>{course.readable_id.split("+")[1] || course.readable_id}</td>
         <td>{course.grade ? course.grade.grade_percent : ""}</td>
         <td>{course.grade ? course.grade.letter_grade : ""}</td>
         <td className="learner-record-cert-status">
