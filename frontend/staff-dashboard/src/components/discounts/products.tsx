@@ -110,7 +110,15 @@ export const Products = (props: IProductsTableProps) => {
             </Table>
         </List>
 
-        <Modal title="Add Product" visible={showAddModal} onCancel={() => setShowAddModal(false)} onOk={() => setShowAddModal(false)}>
+        <Modal 
+            title="Assign Products"
+            visible={showAddModal}
+            onCancel={() => setShowAddModal(false)}
+            onOk={() => setShowAddModal(false)}
+            footer={[
+                <Button key="submit" type="primary" onClick={() => setShowAddModal(false)}>Close</Button>
+            ]}
+        >
           <Row>
             <Col sm={24}>
               <label>

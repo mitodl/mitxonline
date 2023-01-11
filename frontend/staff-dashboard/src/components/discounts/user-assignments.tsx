@@ -101,7 +101,15 @@ export const UserAssignments = (props: IUserAssignmentsTableProps) => {
             </Table>
         </List>
 
-        <Modal title="Assign Users" visible={showAddModal} onCancel={() => setShowAddModal(false)} onOk={() => setShowAddModal(false)}>
+        <Modal 
+            title="Assign Users"
+            visible={showAddModal}
+            onCancel={() => setShowAddModal(false)}
+            onOk={() => setShowAddModal(false)}
+            footer={[
+                <Button key="submit" type="primary" onClick={() => setShowAddModal(false)}>Close</Button>
+            ]}
+        >
             <Row>
                 <Col sm={24}>
                     <p>Assigning a user to a discount automatically applies the discount when the user checks out. Other users can still apply the discount manually if they're aware of the discount code.</p>
