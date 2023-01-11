@@ -157,7 +157,9 @@ export const extractCoursesFromNode = (
 
     if (node.children) {
       node.children.forEach(child => {
-        courseList = courseList.concat(extractCoursesFromNode(child, enrollment))
+        courseList = courseList.concat(
+          extractCoursesFromNode(child, enrollment)
+        )
       })
     }
 
