@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.56.4
+Version 0.56.4 (Released January 11, 2023)
 --------------
 
 - 1326: decimal grades on the learner record (#1331)
