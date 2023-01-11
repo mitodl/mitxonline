@@ -127,49 +127,68 @@ const makeRequirementRootNode = (program: Program) => ({
 const makeDEDPSampleRequirementsTree = (
   program: Program,
   courses: Array<LearnerRecordCourse | CourseDetail>,
-  shouldBeCompleted: boolean
+  shouldBeCompleted: boolean,
+  includeElectives: boolean,
+  includeRequirements: boolean
 ) => {
   // Makes a requirements tree that looks like it did for DEDP in RC for 3T2022.
   // You need to pass in an array of 7 courses.
+
+  // @param includeElectives: if true, will associate some of the courses to the elective node's children.
+  // @param includeRequirements: if true, will associate some of the courses to the required node's children.
 
   // make root node
   // root nodes have two children - both operators, one for reqs and one for electives
   const rn = makeRequirementRootNode(program)
 
   // add courses to the Required Courses node
-  for (let i = 0; i < 3; i++) {
-    rn.children[0].children.push(
-      makeRequirementCourseNode(courses[i], rn.children[0], shouldBeCompleted)
-    )
+  if (includeRequirements) {
+    for (let i = 0; i < 3; i++) {
+      rn.children[0].children.push(
+        makeRequirementCourseNode(courses[i], rn.children[0], shouldBeCompleted)
+      )
+    }
+  } else {
+    // The children array of the required node is undefined unless there are required courses.
+    rn.children[0].children = undefined
   }
 
   // add base-level electives
-  for (let i = 3; i < 5; i++) {
-    rn.children[1].children.push(
-      makeRequirementCourseNode(courses[i], rn.children[1], shouldBeCompleted)
-    )
-  }
+  if (includeElectives) {
+    for (let i = 3; i < 5; i++) {
+      rn.children[1].children.push(
+        makeRequirementCourseNode(courses[i], rn.children[1], shouldBeCompleted)
+      )
+    }
 
-  // add nested operator and electives
-  const nestedElectiveOp = {
-    id:   genProgramRequirementId.next().value,
-    data: {
-      node_type:      "operator",
-      program:        program.id,
-      operator:       "min_number_of",
-      operator_value: 1,
-      title:          "One of"
-    },
-    children: []
-  }
+    // add nested operator and electives
+    const nestedElectiveOp = {
+      id:   genProgramRequirementId.next().value,
+      data: {
+        node_type:      "operator",
+        program:        program.id,
+        operator:       "min_number_of",
+        operator_value: 1,
+        title:          "One of"
+      },
+      children: []
+    }
 
-  for (let i = 5; i < courses.length; i++) {
-    nestedElectiveOp.children.push(
-      makeRequirementCourseNode(courses[i], nestedElectiveOp, shouldBeCompleted)
-    )
-  }
+    for (let i = 5; i < courses.length; i++) {
+      nestedElectiveOp.children.push(
+        makeRequirementCourseNode(
+          courses[i],
+          nestedElectiveOp,
+          shouldBeCompleted
+        )
+      )
+    }
 
-  rn.children[1].children.push(nestedElectiveOp)
+    rn.children[1].children.push(nestedElectiveOp)
+  } else {
+    // The children array of the elective node is undefined unless there are elective courses.
+    rn.children[1].children = undefined
+  }
 
   return rn
 }
@@ -233,7 +252,37 @@ export const makeProgramWithReqTree = (): Program => {
   }
 
   program.req_tree = [
-    makeDEDPSampleRequirementsTree(program, program.courses, false)
+    makeDEDPSampleRequirementsTree(program, program.courses, false, true, true)
+  ]
+
+  return program
+}
+
+export const makeProgramWithOnlyRequirements = (): Program => {
+  const program = makeProgram()
+
+  // for the reqtree stuff to work, the program needs 6 more courses
+  for (let i = 0; i < 6; i++) {
+    program.courses.push(makeCourseDetailWithRuns())
+  }
+
+  program.req_tree = [
+    makeDEDPSampleRequirementsTree(program, program.courses, false, false, true)
+  ]
+
+  return program
+}
+
+export const makeProgramWithOnlyElectives = (): Program => {
+  const program = makeProgram()
+
+  // for the reqtree stuff to work, the program needs 6 more courses
+  for (let i = 0; i < 6; i++) {
+    program.courses.push(makeCourseDetailWithRuns())
+  }
+
+  program.req_tree = [
+    makeDEDPSampleRequirementsTree(program, program.courses, false, true, false)
   ]
 
   return program
@@ -364,7 +413,9 @@ export const makeLearnerRecord = (
     makeDEDPSampleRequirementsTree(
       learnerRecord.program,
       courses,
-      shouldBeCompleted
+      shouldBeCompleted,
+      true,
+      true
     )
   ]
   learnerRecord.program.courses = courses
