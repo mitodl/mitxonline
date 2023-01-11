@@ -44,10 +44,10 @@ export const DiscountForm = (props: IDiscountFormProps) => {
         <Form.Item label="Amount" name="amount">
             <InputNumber precision={2} />
         </Form.Item>
-        <Form.Item label="Flexible Pricing" name="for_flexible_pricing">
+        <Form.Item label="Financial Assistance" name="for_flexible_pricing">
             <Select defaultValue={false} options={[
                 { label: 'Regular Discount', value: false },
-                { label: 'Flexible Pricing Tier Discount', value: true }
+                { label: 'Financial Assistance Tier Discount', value: true }
             ]}></Select>
         </Form.Item>
         <Form.Item label="Activation Date" name="activation_date">
