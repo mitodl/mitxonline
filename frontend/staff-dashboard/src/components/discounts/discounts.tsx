@@ -58,8 +58,8 @@ export const DiscountForm = (props: IDiscountFormProps) => {
         </Form.Item>
     </Form>
 
-    {formProps.initialValues ? <Products record={formProps.initialValues} showDelete={true}></Products> : null}
+    {formProps.initialValues ? <Products record={formProps.initialValues} isManagement={true}></Products> : null}
     
-    {formProps.initialValues ? <UserAssignments record={formProps.initialValues} showDelete={true}></UserAssignments> : null}
+    {formProps.initialValues ? <UserAssignments record={formProps.initialValues} isManagement={true}></UserAssignments> : null}
   </>);
 };

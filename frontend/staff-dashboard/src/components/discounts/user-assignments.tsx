@@ -16,7 +16,7 @@ import type { IUser, IUserDiscount } from "interfaces";
 
 interface IUserAssignmentsTableProps {
     record: any;
-    showDelete?: boolean;
+    isManagement?: boolean;
 }
 
 interface IUserAssignmentResultProps {
@@ -57,7 +57,7 @@ const UserResult = (props: IUserAssignmentResultProps) => {
 
 
 export const UserAssignments = (props: IUserAssignmentsTableProps) => {
-    const { record, showDelete } = props
+    const { record, isManagement } = props
 
     if (record === undefined) {
         return null;
@@ -90,14 +90,14 @@ export const UserAssignments = (props: IUserAssignmentsTableProps) => {
         });
     }
 
-    const customButtons = showDelete ? (<Button size="middle" onClick={() => setShowAddModal(true)}><PlusSquareOutlined /> Assign User</Button>) : null;
+    const customButtons = isManagement ? (<Button size="middle" onClick={() => setShowAddModal(true)}><PlusSquareOutlined /> Assign User</Button>) : null;
 
     return (<>
         <List title="Assigned Users" resource="discounts/user" canCreate={false} pageHeaderProps={{ extra: (customButtons)}}>
             <Table {...tableProps} rowKey="id">
                 <Table.Column dataIndex="id" title="ID"></Table.Column>
                 <Table.Column dataIndex="user" title="User" render={(value: any) => value.name}></Table.Column>
-                {showDelete ? (<Table.Column dataIndex="product" title="" render={(value, record: IUserDiscount) => (<Button size="small" onClick={() => hndRemoveUser(record.user)}>Delete</Button>)}></Table.Column>) : null }
+                {isManagement ? (<Table.Column dataIndex="product" title="" render={(value, record: IUserDiscount) => (<Button size="small" onClick={() => hndRemoveUser(record.user)}>Delete</Button>)}></Table.Column>) : null }
             </Table>
         </List>
 

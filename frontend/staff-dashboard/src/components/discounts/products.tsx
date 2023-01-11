@@ -16,7 +16,7 @@ import type { IProduct, IDiscountProduct } from "interfaces";
 
 interface IProductsTableProps {
   record: any;
-  showDelete?: boolean;
+  isManagement?: boolean;
 }
 
 interface IProductResultProps {
@@ -56,7 +56,7 @@ const ProductResult = (props: IProductResultProps) => {
 
 
 export const Products = (props: IProductsTableProps) => {
-  const { record, showDelete } = props
+  const { record, isManagement } = props
   const { tableProps } = useTable({
       resource: `discounts/${record?.id}/products`
   });
@@ -84,7 +84,7 @@ export const Products = (props: IProductsTableProps) => {
     });
   }
 
-  const customButtons = showDelete ? (<Button size="middle" onClick={() => setShowAddModal(true)}><PlusSquareOutlined /> Add Product</Button>) : null;
+  const customButtons = isManagement ? (<Button size="middle" onClick={() => setShowAddModal(true)}><PlusSquareOutlined /> Add Product</Button>) : null;
 
   return (
       <>
@@ -106,7 +106,7 @@ export const Products = (props: IProductsTableProps) => {
                   title="Readable ID"
                   render={(value) => value.purchasable_object.readable_id }
                 ></Table.Column>
-                {showDelete ? (<Table.Column dataIndex="product" title="" render={(value, record: IDiscountProduct) => (<Button size="small" onClick={() => hndRemoveProduct(record.product)}>Delete</Button>)}></Table.Column>) : null }
+                {isManagement ? (<Table.Column dataIndex="product" title="" render={(value, record: IDiscountProduct) => (<Button size="small" onClick={() => hndRemoveProduct(record.product)}>Delete</Button>)}></Table.Column>) : null }
             </Table>
         </List>
 
