@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.56.4
+--------------
+
+- 1326: decimal grades on the learner record (#1331)
+- add the row back for formatting (#1332)
+- Program Drawer: remove enroll button (#1314)
+
 Version 0.56.3 (Released January 09, 2023)
 --------------
 
