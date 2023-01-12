@@ -93,36 +93,45 @@ const makeCourseDetail = (): CourseDetail => ({
   feature_image_src: casual.url
 })
 
-const makeRequirementRootNode = (program: Program) => ({
-  id:   genProgramRequirementId.next().value,
-  data: {
-    node_type: "program_root",
-    program:   program.id
-  },
-  children: [
-    {
-      id:   genProgramRequirementId.next().value,
-      data: {
-        node_type: "operator",
-        program:   program.id,
-        operator:  "all_of",
-        title:     "Required Courses"
-      },
-      children: undefined
+const makeRequirementRootNode = (
+  program: Program,
+  includeRequirements: boolean,
+  includeElectives: boolean
+) => {
+  const requirementsChildrenArray = includeRequirements ? [] : undefined
+  const electivesChildrenArray = includeElectives ? [] : undefined
+  const result = {
+    id:   genProgramRequirementId.next().value,
+    data: {
+      node_type: "program_root",
+      program:   program.id
     },
-    {
-      id:   genProgramRequirementId.next().value,
-      data: {
-        node_type:      "operator",
-        program:        program.id,
-        operator:       "min_number_of",
-        operator_value: 1,
-        title:          "Elective Courses"
+    children: [
+      {
+        id:   genProgramRequirementId.next().value,
+        data: {
+          node_type: "operator",
+          program:   program.id,
+          operator:  "all_of",
+          title:     "Required Courses"
+        },
+        children: requirementsChildrenArray
       },
-      children: undefined
-    }
-  ]
-})
+      {
+        id:   genProgramRequirementId.next().value,
+        data: {
+          node_type:      "operator",
+          program:        program.id,
+          operator:       "min_number_of",
+          operator_value: 1,
+          title:          "Elective Courses"
+        },
+        children: electivesChildrenArray
+      }
+    ]
+  }
+  return result
+}
 
 const makeDEDPSampleRequirementsTree = (
   program: Program,
@@ -139,11 +148,14 @@ const makeDEDPSampleRequirementsTree = (
 
   // make root node
   // root nodes have two children - both operators, one for reqs and one for electives
-  const rn = makeRequirementRootNode(program)
+  const rn = makeRequirementRootNode(
+    program,
+    includeElectives,
+    includeRequirements
+  )
 
   // add courses to the Required Courses node
-  if (includeRequirements) {
-    rn.children[0].children = []
+  if (rn.children[0].children) {
     for (let i = 0; i < 3; i++) {
       rn.children[0].children.push(
         makeRequirementCourseNode(courses[i], rn.children[0], shouldBeCompleted)
@@ -152,8 +164,7 @@ const makeDEDPSampleRequirementsTree = (
   }
 
   // add base-level electives
-  if (includeElectives) {
-    rn.children[1].children = []
+  if (rn.children[1].children) {
     for (let i = 3; i < 5; i++) {
       rn.children[1].children.push(
         makeRequirementCourseNode(courses[i], rn.children[1], shouldBeCompleted)
@@ -182,8 +193,9 @@ const makeDEDPSampleRequirementsTree = (
         )
       )
     }
-
-    rn.children[1].children.push(nestedElectiveOp)
+    if (rn.children[1].children) {
+      rn.children[1].children.push(nestedElectiveOp)
+    }
   }
 
   return rn

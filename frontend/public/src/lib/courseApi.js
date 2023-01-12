@@ -155,17 +155,13 @@ export const extractCoursesFromNode = (
   } else if (node.data.node_type === NODETYPE_OPERATOR) {
     let courseList = []
 
-    node.children.forEach(child => {
-      courseList = courseList.concat(extractCoursesFromNode(child, enrollment))
-    })
-
-    // if (node.children) {
-    //   node.children.forEach(child => {
-    //     courseList = courseList.concat(
-    //       extractCoursesFromNode(child, enrollment)
-    //     )
-    //   })
-    // }
+    if (node.children) {
+      node.children.forEach(child => {
+        courseList = courseList.concat(
+          extractCoursesFromNode(child, enrollment)
+        )
+      })
+    }
 
     return courseList
   }
