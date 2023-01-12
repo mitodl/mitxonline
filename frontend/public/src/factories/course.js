@@ -150,8 +150,8 @@ const makeDEDPSampleRequirementsTree = (
   // root nodes have two children - both operators, one for reqs and one for electives
   const rn = makeRequirementRootNode(
     program,
-    includeElectives,
-    includeRequirements
+    includeRequirements,
+    includeElectives
   )
 
   // add courses to the Required Courses node
