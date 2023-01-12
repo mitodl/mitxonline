@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.56.5 (Released January 12, 2023)
+--------------
+
+- Fix: Program courses drawer won't open if program has no elective or required courses (#1338)
+
 Version 0.56.4 (Released January 11, 2023)
 --------------
 
