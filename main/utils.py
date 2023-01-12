@@ -49,7 +49,6 @@ def get_js_settings(request: HttpRequest):
         "support_email": settings.EMAIL_SUPPORT,
         "site_name": settings.SITE_NAME,
         "features": {
-            "enable_program_ui": features.is_enabled(features.ENABLE_PROGRAM_UI),
             "enable_learner_records": features.is_enabled(
                 features.ENABLE_LEARNER_RECORDS
             ),
