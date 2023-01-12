@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.57.0
+Version 0.57.0 (Released January 12, 2023)
 --------------
 
 - Removing feature flag for program UI; small styling change to My Courses tab (#1311)
