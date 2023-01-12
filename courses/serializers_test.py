@@ -282,7 +282,11 @@ def test_serialize_course_run_detail():
         "enrollment_end": drf_datetime(course_run.enrollment_end),
         "expiration_date": drf_datetime(course_run.expiration_date),
         "upgrade_deadline": drf_datetime(course_run.upgrade_deadline),
+        "certificate_available_date": drf_datetime(
+            course_run.certificate_available_date
+        ),
         "is_upgradable": course_run.is_upgradable,
+        "is_self_paced": False,
         "id": course_run.id,
         "products": BaseProductSerializer(course_run.products, many=True).data,
         "page": None,
