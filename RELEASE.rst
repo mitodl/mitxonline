@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.57.0
+--------------
+
+- Removing feature flag for program UI; small styling change to My Courses tab (#1311)
+- fix: Display course passed tag based on course dates and pacing (#1317)
+
 Version 0.56.5 (Released January 12, 2023)
 --------------
 
