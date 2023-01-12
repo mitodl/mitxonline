@@ -98,6 +98,10 @@ const makeRequirementRootNode = (
   includeRequirements: boolean,
   includeElectives: boolean
 ) => {
+  // @param includeElectives: if true, will define "children" under the requirements operator node as an empty array.
+  // If false, the "children" variable will be undefined.
+  // @param includeRequirements: if true, will define "children" under the electives operator node as an empty array.
+  // If false, the "children" variable will be undefined.
   const requirementsChildrenArray = includeRequirements ? [] : undefined
   const electivesChildrenArray = includeElectives ? [] : undefined
   const result = {
