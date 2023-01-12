@@ -13,7 +13,9 @@ import moment from "moment"
 import {
   makeCourseRunDetail,
   makeLearnerRecord,
-  makeProgramWithReqTree
+  makeProgramWithReqTree,
+  makeProgramWithOnlyRequirements,
+  makeProgramWithOnlyElectives
 } from "../factories/course"
 import { makeUser } from "../factories/user"
 
@@ -188,6 +190,48 @@ describe("Course API", () => {
       )
 
       assert.equal(requirements.length, 3)
+      assert.equal(electives.length, 4)
+    })
+
+    it("returns a flattened list of courses for the node without any elective courses", () => {
+      // the learner record will generate a requirements tree in the proper
+      // format, so we're just using that factory here
+      const programEnrollment = {
+        program:     makeProgramWithOnlyRequirements(),
+        enrollments: []
+      }
+
+      const requirements = extractCoursesFromNode(
+        programEnrollment.program.req_tree[0].children[0],
+        programEnrollment
+      )
+      const electives = extractCoursesFromNode(
+        programEnrollment.program.req_tree[0].children[1],
+        programEnrollment
+      )
+
+      assert.equal(requirements.length, 3)
+      assert.equal(electives.length, 0)
+    })
+
+    it("returns a flattened list of courses for the node without any required courses", () => {
+      // the learner record will generate a requirements tree in the proper
+      // format, so we're just using that factory here
+      const programEnrollment = {
+        program:     makeProgramWithOnlyElectives(),
+        enrollments: []
+      }
+
+      const requirements = extractCoursesFromNode(
+        programEnrollment.program.req_tree[0].children[0],
+        programEnrollment
+      )
+      const electives = extractCoursesFromNode(
+        programEnrollment.program.req_tree[0].children[1],
+        programEnrollment
+      )
+
+      assert.equal(requirements.length, 0)
       assert.equal(electives.length, 4)
     })
   })
