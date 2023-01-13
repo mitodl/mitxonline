@@ -279,38 +279,6 @@ class DiscountViewSet(ModelViewSet):
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = DiscountFilterSet
 
-    # def get_queryset(self):
-    #     queryset = Discount.objects.all()
-
-    #     name_search = self.request.query_params.get("q")
-
-    #     if name_search is not None:
-    #         queryset = queryset.filter(discount_code__contains=name_search)
-
-    #     redemption_search = self.request.query_params.get("redemption_type")
-
-    #     if redemption_search is not None:
-    #         queryset = queryset.filter(redemption_type=redemption_search)
-
-    #     finaid_search = self.request.query_params.get("for_flexible_pricing")
-
-    #     if finaid_search == "yes":
-    #         queryset = queryset.filter(for_flexible_pricing=True)
-    #     elif finaid_search == "no":
-    #         queryset = queryset.filter(for_flexible_pricing=False)
-
-    #     redeemed_search = self.request.query_params.get("is_redeemed")
-
-    #     if redeemed_search is not None:
-    #         queryset = queryset.annotate(num_redemptions=Count("order_redemptions"))
-
-    #         if redeemed_search == "yes":
-    #             queryset = queryset.filter(num_redemptions__gt=0)
-    #         elif redeemed_search == "no":
-    #             queryset = queryset.filter(num_redemptions=0)
-
-    #     return queryset.order_by("-created_on")
-
 
 class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
     """API view set for Discounts"""
