@@ -18,12 +18,29 @@ from mitol.hubspot_api.models import HubspotObject
 from ecommerce.models import Order
 from hubspot_sync import api
 from hubspot_sync.api import get_hubspot_id_for_object
-from hubspot_sync.decorators import raise_429
+from hubspot_sync.decorators import raise_429, single_task
 from hubspot_sync.exceptions import TooManyRequestsException
 from main.celery import app
 from users.models import User
 
 log = logging.getLogger(__name__)
+
+
+def task_obj_lock(
+    func_name: str, args: List[object], kwargs: dict
+) -> str:  # @pylint:unused-argument
+    """
+    Determine a task lock name for a specific task function and object id
+
+    Args:
+        func_name: str: Name of a task function
+        args: Task function arguments, first should be object id
+        kwargs: Any keyword arguments sent to the task function
+
+    Returns:
+        str: The lock id for the task and object
+    """
+    return f"{func_name}_{args[0]}"
 
 
 def max_concurrent_chunk_size(obj_count: int) -> int:
@@ -60,12 +77,13 @@ def batched_chunks(
 
 @app.task(
     acks_late=True,
-    autoretry_for=(TooManyRequestsException,),
+    autoretry_for=(TooManyRequestsException, BlockingIOError),
     max_retries=3,
     retry_backoff=60,
     retry_jitter=True,
 )
 @raise_429
+@single_task(10, key=task_obj_lock)
 def sync_contact_with_hubspot(user_id: int) -> str:
     """
     Sync a user with a hubspot contact
@@ -81,12 +99,13 @@ def sync_contact_with_hubspot(user_id: int) -> str:
 
 @app.task(
     acks_late=True,
-    autoretry_for=(TooManyRequestsException,),
+    autoretry_for=(TooManyRequestsException, BlockingIOError),
     max_retries=3,
     retry_backoff=60,
     retry_jitter=True,
 )
 @raise_429
+@single_task(10, key=task_obj_lock)
 def sync_product_with_hubspot(product_id: int) -> str:
     """
     Sync a MITxOnline Product with a hubspot product
@@ -102,12 +121,13 @@ def sync_product_with_hubspot(product_id: int) -> str:
 
 @app.task(
     acks_late=True,
-    autoretry_for=(TooManyRequestsException,),
+    autoretry_for=(TooManyRequestsException, BlockingIOError),
     max_retries=3,
     retry_backoff=60,
     retry_jitter=True,
 )
 @raise_429
+@single_task(10, key=task_obj_lock)
 def sync_deal_with_hubspot(order_id: int) -> str:
     """
     Sync an Order with a hubspot deal
