@@ -438,7 +438,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
           <div className="std-page-body learner-record container">
             <div className="row">
               <div className="col-12 d-flex justify-content-between learner-record-header flex-column">
-                <div className="d-flex flex-row mb-2 align-items-end">
+                <div className="d-flex mb-2 align-items-end">
                   <p className="w-50">MITx Online Program Record</p>
                   {isSharedRecord ? (
                     <div className="w-50 text-right learner-record-sharing-controls">
@@ -493,7 +493,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                     </div>
                   ) : null}
                 </div>
-                <div className="d-flex flex-row">
+                <div className="d-flex flex-sm-row flex-column">
                   <h1 className="flex-grow-1 learner-record-program-title">
                     {learnerRecord ? learnerRecord.program.title : null}
                   </h1>
@@ -523,7 +523,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
 
             <div className="row">
               <div className="col-12 d-flex justify-content-between">
-                <table className="learner-record-table">
+                <table className="learner-record-table table-responsive">
                   <thead>
                     <tr>
                       <th>Course Name</th>
