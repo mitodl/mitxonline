@@ -6,6 +6,7 @@ from mitol.common.utils import now_in_utc
 from oauth2_provider.contrib.rest_framework import IsAuthenticatedOrTokenHasScope
 from rest_framework import mixins, viewsets
 from rest_framework.authentication import SessionAuthentication
+from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
@@ -102,15 +103,6 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAdminUser]
     pagination_class = RefinePagination
-
-    def get_queryset(self):
-        name_search = self.request.query_params.get("q")
-
-        if name_search is None:
-            return User.objects.all()
-
-        return User.objects.filter(
-            Q(username__icontains=name_search)
-            | Q(name__icontains=name_search)
-            | Q(email__icontains=name_search)
-        ).all()
+    filter_backends = [SearchFilter]
+    search_fields = ["username", "name", "email"]
+    queryset = User.objects.all()

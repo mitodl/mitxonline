@@ -2,7 +2,9 @@
 MITxOnline ecommerce views
 """
 import logging
+from distutils.util import strtobool
 
+import django_filters
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import transaction
@@ -233,45 +235,81 @@ class BasketDiscountViewSet(ReadOnlyModelViewSet):
         return BasketDiscount.objects.filter(redeemed_basket__user=self.request.user)
 
 
+class DiscountFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(
+        field_name="discount_code", label="q", lookup_expr="icontains"
+    )
+    for_flexible_pricing = django_filters.TypedChoiceFilter(
+        field_name="for_flexible_pricing",
+        choices=(("yes", "True"), ("no", "False")),
+        coerce=strtobool,
+    )
+    is_redeemed = django_filters.ChoiceFilter(
+        method="redeemed_filter", choices=(("yes", "yes"), ("no", "no"))
+    )
+
+    def redeemed_filter(self, qs, name, value):
+        qs = qs.annotate(num_redemptions=Count("order_redemptions"))
+
+        if value == "yes":
+            qs = qs.filter(num_redemptions__gt=0)
+        elif value == "no":
+            qs = qs.filter(num_redemptions=0)
+
+        return qs
+
+    class Meta:
+        model = Discount
+        fields = [
+            "q",
+            "redemption_type",
+            "for_flexible_pricing",
+            "is_redeemed",
+        ]
+
+
 class DiscountViewSet(ModelViewSet):
     """API view set for Discounts"""
 
+    queryset = Discount.objects.order_by("-created_on").all()
     serializer_class = DiscountSerializer
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated, IsAdminUser)
     pagination_class = RefinePagination
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
+    filterset_class = DiscountFilterSet
 
-    def get_queryset(self):
-        queryset = Discount.objects.all()
+    # def get_queryset(self):
+    #     queryset = Discount.objects.all()
 
-        name_search = self.request.query_params.get("q")
+    #     name_search = self.request.query_params.get("q")
 
-        if name_search is not None:
-            queryset = queryset.filter(discount_code__contains=name_search)
+    #     if name_search is not None:
+    #         queryset = queryset.filter(discount_code__contains=name_search)
 
-        redemption_search = self.request.query_params.get("redemption_type")
+    #     redemption_search = self.request.query_params.get("redemption_type")
 
-        if redemption_search is not None:
-            queryset = queryset.filter(redemption_type=redemption_search)
+    #     if redemption_search is not None:
+    #         queryset = queryset.filter(redemption_type=redemption_search)
 
-        finaid_search = self.request.query_params.get("for_flexible_pricing")
+    #     finaid_search = self.request.query_params.get("for_flexible_pricing")
 
-        if finaid_search == "yes":
-            queryset = queryset.filter(for_flexible_pricing=True)
-        elif finaid_search == "no":
-            queryset = queryset.filter(for_flexible_pricing=False)
+    #     if finaid_search == "yes":
+    #         queryset = queryset.filter(for_flexible_pricing=True)
+    #     elif finaid_search == "no":
+    #         queryset = queryset.filter(for_flexible_pricing=False)
 
-        redeemed_search = self.request.query_params.get("is_redeemed")
+    #     redeemed_search = self.request.query_params.get("is_redeemed")
 
-        if redeemed_search is not None:
-            queryset = queryset.annotate(num_redemptions=Count("order_redemptions"))
+    #     if redeemed_search is not None:
+    #         queryset = queryset.annotate(num_redemptions=Count("order_redemptions"))
 
-            if redeemed_search == "yes":
-                queryset = queryset.filter(num_redemptions__gt=0)
-            elif redeemed_search == "no":
-                queryset = queryset.filter(num_redemptions=0)
+    #         if redeemed_search == "yes":
+    #             queryset = queryset.filter(num_redemptions__gt=0)
+    #         elif redeemed_search == "no":
+    #             queryset = queryset.filter(num_redemptions=0)
 
-        return queryset.order_by("-created_on")
+    #     return queryset.order_by("-created_on")
 
 
 class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
@@ -303,10 +341,7 @@ class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
 
         discount_product = DiscountProduct.objects.filter(
             discount=discount, product=product
-        ).get()
-
-        if discount_product is not None:
-            discount_product.delete()
+        ).delete()
 
         return Response(
             DiscountProductSerializer(
@@ -354,10 +389,9 @@ class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
         discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
         user = User.objects.get(pk=kwargs["pk"])
 
-        discount_user = UserDiscount.objects.filter(discount=discount, user=user).get()
-
-        if discount_user is not None:
-            discount_user.delete()
+        discount_user = UserDiscount.objects.filter(
+            discount=discount, user=user
+        ).delete()
 
         return Response(
             UserDiscountMetaSerializer(

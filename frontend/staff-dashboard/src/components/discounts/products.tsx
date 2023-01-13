@@ -29,7 +29,7 @@ const ProductResult = (props: IProductResultProps) => {
   const { tableProps } = useTable<IProduct>({
     resource: 'products/all',
     permanentFilter: [{
-      field: "q",
+      field: "search",
       operator: "eq",
       value: searchTerm
     }]

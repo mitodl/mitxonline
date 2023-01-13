@@ -29,7 +29,7 @@ const UserResult = (props: IUserAssignmentResultProps) => {
     const { tableProps } = useTable<IUser>({
         resource: 'user_search',
         permanentFilter: [{
-            field: "q",
+            field: "search",
             operator: "eq",
             value: searchTerm
         }]

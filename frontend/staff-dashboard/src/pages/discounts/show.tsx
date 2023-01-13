@@ -16,7 +16,7 @@ export const DiscountShow = () => {
             <h2>
                 <Space>
                     Discount Detail
-                    { record?.for_flexible_pricing ? (<Tag color="green">Flexible Pricing Tier</Tag>) : null }
+                    { record?.for_flexible_pricing ? (<Tag color="green">Financial Assistance Tier</Tag>) : null }
                     { record?.redemption_type !== "unlimited" && record?.is_redeemed ? (<Tag color="red">Redeemed</Tag>) : null }
                 </Space>
             </h2>
