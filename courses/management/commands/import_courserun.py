@@ -81,11 +81,10 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
-            "--block-country",
-            action="append",
-            default=[],
-            dest="blocked_countries",
-            help="Single or multiple countries to block enrollments.",
+            "--block_countries",
+            type=str,
+            help="Comma separated list of countries to block enrollments.",
+            nargs="?",
         )
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
@@ -235,7 +234,7 @@ class Command(BaseCommand):
                             )
                         )
 
-                for country_name in kwargs["blocked_countries"]:
+                for country_name in kwargs["block_countries"].split(","):
                     country_code = countries.by_name(country_name)
                     if country_code:
                         BlockedCountry.objects.get_or_create(
