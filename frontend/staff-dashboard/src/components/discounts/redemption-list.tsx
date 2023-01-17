@@ -20,13 +20,18 @@ export const RedemptionList = (props: any) => {
                     dataIndex="redeemed_by" 
                     title="Redeemed By"
                     render={(value) => {
-                        return value.username;
+                        return (<>{value.username}<br />{value.email}</>);
                     }}
                 ></Table.Column>
                 <Table.Column 
                     dataIndex="redeemed_on" 
                     title="Redeemed On"
                     render={(value) => <DateField format="LLL" value={value} />}
+                ></Table.Column>
+                <Table.Column 
+                    dataIndex="redeemed_order" 
+                    title="Order"
+                    render={(value) => value.reference_number}
                 ></Table.Column>
             </Table>
         </List>

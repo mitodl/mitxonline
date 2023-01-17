@@ -52,7 +52,7 @@ export const DiscountShow = () => {
 
             {record ? <RedemptionList record={record} key={`redemptions-${record?.id}`} /> : null}
 
-            {record ? <FinAidTiers record={record} key={`tiers-${record?.id}`} /> : null}
+            {record && record.for_flexible_pricing ? <FinAidTiers record={record} key={`tiers-${record?.id}`} /> : null}
 
             {record ? <UserAssignments record={record} key={`assignees-${record?.id}`} /> : null}
 

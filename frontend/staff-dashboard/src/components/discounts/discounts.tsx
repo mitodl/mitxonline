@@ -3,7 +3,9 @@ import {
   Input,
   InputNumber,
   Select,
+  DatePicker,
 } from "@pankod/refine-antd";
+import dayjs from 'dayjs';
 
 import { Products } from "./products";
 import { UserAssignments } from "./user-assignments";
@@ -15,7 +17,12 @@ interface IDiscountFormProps {
 export const DiscountForm = (props: IDiscountFormProps) => {
   const { formProps } = props;
 
-  return (<>
+  if (formProps.initialValues !== undefined) {
+    formProps.initialValues.activation_date = dayjs(formProps.initialValues.activation_date).format("YYYY-MM-DD HH:mm:ss");
+    formProps.initialValues.expiration_date = dayjs(formProps.initialValues.expiration_date).format("YYYY-MM-DD HH:mm:ss");
+  }
+
+  return formProps.initialValues !== undefined ? (<>
     <Form {...formProps} layout="vertical">
         <Form.Item label="Discount Code" name="discount_code">
             <Input />
@@ -30,7 +37,7 @@ export const DiscountForm = (props: IDiscountFormProps) => {
         <Form.Item noStyle shouldUpdate={(prev, cur) => prev.redemption_type !== cur.redemption_type}>
         {({ getFieldValue }) => getFieldValue('redemption_type') === 'unlimited' ? (
             <Form.Item label="Maximum Redemptions" name="max_redemptions">
-                <InputNumber precision={0} />
+                <InputNumber precision={0} min={0} />
             </Form.Item>
         ) : null}
         </Form.Item>
@@ -45,7 +52,7 @@ export const DiscountForm = (props: IDiscountFormProps) => {
             <InputNumber precision={2} />
         </Form.Item>
         <Form.Item label="Financial Assistance" name="for_flexible_pricing">
-            <Select defaultValue={false} options={[
+            <Select options={[
                 { label: 'Regular Discount', value: false },
                 { label: 'Financial Assistance Tier Discount', value: true }
             ]}></Select>
@@ -53,13 +60,14 @@ export const DiscountForm = (props: IDiscountFormProps) => {
         <Form.Item label="Activation Date" name="activation_date">
             <Input type="datetime-local" />
         </Form.Item>
+
         <Form.Item label="Expiration Date" name="expiration_date">
-          <Input type="datetime-local" />
+            <Input type="datetime-local" />
         </Form.Item>
     </Form>
 
     {formProps.initialValues ? <Products record={formProps.initialValues} isManagement={true}></Products> : null}
     
     {formProps.initialValues ? <UserAssignments record={formProps.initialValues} isManagement={true}></UserAssignments> : null}
-  </>);
+  </>) : null;
 };

@@ -97,6 +97,7 @@ export const UserAssignments = (props: IUserAssignmentsTableProps) => {
             <Table {...tableProps} rowKey="id">
                 <Table.Column dataIndex="id" title="ID"></Table.Column>
                 <Table.Column dataIndex="user" title="User" render={(value: any) => value.name}></Table.Column>
+                <Table.Column dataIndex="user" title="Email" render={(value: any) => value.email}></Table.Column>
                 {isManagement ? (<Table.Column dataIndex="product" title="" render={(value, record: IUserDiscount) => (<Button size="small" onClick={() => hndRemoveUser(record.user)}>Delete</Button>)}></Table.Column>) : null }
             </Table>
         </List>

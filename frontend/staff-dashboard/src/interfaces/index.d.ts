@@ -19,6 +19,16 @@ export interface IProduct {
     purchasable_object: object;
 }
 
+export interface IRedeemedOrder {
+    id: number;
+    created_on: Date;
+    updated_on: Date;
+    state: string;
+    total_price_paid: number;
+    reference_number: string;
+    purchaser: number;
+}
+
 export interface IDiscount {
     id: number;
     discount_code: string;
@@ -35,7 +45,7 @@ export interface IDiscountRedemption {
     redemption_date: string;
     redeemed_by: Object;
     redeemed_discount: Object<IDiscount>;
-    redeemed_order: Object;
+    redeemed_order: IRedeemedOrder;
 }
 
 export interface IUserDiscount {
