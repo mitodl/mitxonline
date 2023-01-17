@@ -11,6 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
 from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectInput
 from mitol.hubspot_api.api import HubspotAssociationType, HubspotObjectType
+from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObjectFactory
 from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
@@ -19,7 +20,6 @@ from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order, Product
 from hubspot_sync import tasks
 from hubspot_sync.api import make_contact_sync_message
-from hubspot_sync.exceptions import TooManyRequestsException
 from hubspot_sync.tasks import (
     batch_upsert_associations,
     batch_upsert_associations_chunked,

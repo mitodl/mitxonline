@@ -11,15 +11,16 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
 from hubspot.crm.objects import BatchInputSimplePublicObjectInput
+from mitol.common.decorators import single_task
 from mitol.common.utils.collections import chunks
 from mitol.hubspot_api.api import HubspotApi, HubspotAssociationType, HubspotObjectType
+from mitol.hubspot_api.decorators import raise_429
+from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.models import HubspotObject
 
 from ecommerce.models import Order
 from hubspot_sync import api
 from hubspot_sync.api import get_hubspot_id_for_object
-from hubspot_sync.decorators import raise_429, single_task
-from hubspot_sync.exceptions import TooManyRequestsException
 from main.celery import app
 from users.models import User
 
