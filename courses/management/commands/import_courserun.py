@@ -24,9 +24,10 @@ import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
+from django_countries import countries
 
 from cms.api import create_default_courseware_page
-from courses.models import Course, CourseRun, Program
+from courses.models import BlockedCountry, Course, CourseRun, Program
 from ecommerce.models import Product
 from openedx.api import get_edx_api_course_detail_client
 
@@ -77,6 +78,14 @@ class Command(BaseCommand):
             help="Create a matching product with the specified price for the generated course run(s).",
             type=str,
             nargs="?",
+        )
+
+        parser.add_argument(
+            "--block-country",
+            action="append",
+            default=[],
+            dest="blocked_countries",
+            help="Single or multiple countries to block enrollments.",
         )
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
@@ -225,6 +234,26 @@ class Command(BaseCommand):
                                 f"Created product {course_product} for {new_run.courseware_id}"
                             )
                         )
+
+                for country_name in kwargs["blocked_countries"]:
+                    country_code = countries.by_name(country_name)
+                    if country_code:
+                        BlockedCountry.objects.get_or_create(
+                            course=course, country=country_code
+                        )
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                f"Blocked Enrollments for {country_name} ({country_code})."
+                            )
+                        )
+                        continue
+
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"Could not block country {country_name}. "
+                            f"Please verify that it is a valid country name."
+                        )
+                    )
             except Exception as e:
                 self.stdout.write(
                     self.style.ERROR(
