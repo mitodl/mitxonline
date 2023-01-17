@@ -114,7 +114,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
             {learnerRecord.user.name}
           </span>
           <br />
-          {learnerRecord.user.email} | {learnerRecord.user.username}
+          {learnerRecord.user.username} | {learnerRecord.user.email}
         </div>
       </div>
     ) : null
@@ -435,120 +435,126 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
     return (
       <DocumentTitle title={`${SETTINGS.site_name} | ${RECORDS_PAGE_TITLE}`}>
         <Loader isLoading={isLoading}>
-          <div className="std-page-body learner-record container">
-            <div className="row">
-              <div className="col-12 d-flex justify-content-between learner-record-header flex-column">
-                <div className="d-flex mb-2 align-items-end">
-                  <p className="w-50">MITx Online Program Record</p>
-                  {isSharedRecord ? (
-                    <div className="w-50 text-right learner-record-sharing-controls">
-                      {!hasSharingEnabled ? (
-                        <button
-                          key="togglesharing"
-                          className="btn btn-primary"
-                          type="button"
-                          onClick={() => this.onEnableRecordSharing()}
-                        >
-                          {isEnablingSharing ? (
-                            <>Please Wait...</>
-                          ) : (
-                            <>Allow Record Sharing</>
-                          )}
-                        </button>
-                      ) : null}
-                      {hasSharingEnabled ? (
-                        <>
-                          <button
-                            key="sendlearnerrecord"
-                            className="btn btn-primary"
-                            type="button"
-                            onClick={() =>
-                              this.togglePartnerSchoolSharingDialog()
-                            }
-                          >
-                            Send Learner Record
-                          </button>
-                          <button
-                            key="sharingdialog"
-                            className="btn btn-primary"
-                            type="button"
-                            onClick={() => this.toggleSharingLinkDialog()}
-                          >
-                            Share
-                          </button>
-                          <button
-                            key="revokesharing"
-                            className="btn btn-primary"
-                            type="button"
-                            onClick={() => this.onRevokeSharing()}
-                          >
-                            {isRevoking ? (
-                              <>Revoking Access...</>
-                            ) : (
-                              <>Revoke Sharing</>
-                            )}
-                          </button>
-                        </>
-                      ) : null}
-                    </div>
+          <div className="std-page-body container">
+            <div className="d-flex flex-row-reverse">
+              {isSharedRecord ? (
+                <div className="d-flex learner-record-sharing-controls mb-2">
+                  {!hasSharingEnabled ? (
+                    <button
+                      key="togglesharing"
+                      className="btn btn-primary mdl-button"
+                      type="button"
+                      onClick={() => this.onEnableRecordSharing()}
+                    >
+                      {isEnablingSharing ? (
+                        <>Please Wait...</>
+                      ) : (
+                        <>Allow Record Sharing</>
+                      )}
+                    </button>
+                  ) : null}
+                  {hasSharingEnabled ? (
+                    <>
+                      <button
+                        key="sendlearnerrecord"
+                        className="btn btn-primary"
+                        type="button"
+                        onClick={() => this.togglePartnerSchoolSharingDialog()}
+                      >
+                        Send Learner Record
+                      </button>
+                      <button
+                        key="sharingdialog"
+                        className="btn btn-primary"
+                        type="button"
+                        onClick={() => this.toggleSharingLinkDialog()}
+                      >
+                        Share
+                      </button>
+                      <button
+                        key="revokesharing"
+                        className="btn btn-primary"
+                        type="button"
+                        onClick={() => this.onRevokeSharing()}
+                      >
+                        {isRevoking ? (
+                          <>Revoking Access...</>
+                        ) : (
+                          <>Revoke Sharing</>
+                        )}
+                      </button>
+                    </>
                   ) : null}
                 </div>
-                <div className="d-flex flex-sm-row flex-column">
-                  <h1 className="flex-grow-1 learner-record-program-title">
-                    {learnerRecord ? learnerRecord.program.title : null}
-                  </h1>
-                  <div id="learner-record-school-name">
-                    <img
-                      src="/static/images/mitx-online-logo.png"
-                      alt="MITx Online Logo"
-                    />
+              ) : null}
+            </div>
+            <hr className="d-md-none" />
+            <div className="learner-record">
+              <div className="row">
+                <div className="col-12 d-flex justify-content-between learner-record-header flex-column">
+                  <div className="d-flex mb-2">
+                    <div className="d-flex flex-column">
+                      <p className="w-50">MITx Online Program Record</p>
+                      <h1 className="flex-grow-1 learner-record-program-title">
+                        {learnerRecord ? learnerRecord.program.title : null}
+                      </h1>
+                    </div>
+                    <div
+                      className="d-none d-md-block"
+                      id="learner-record-school-name"
+                    >
+                      <img
+                        src="/static/images/mitx-online-logo.png"
+                        alt="MITx Online Logo"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    {!this.isProgramCompleted() ? (
+                      <span className="badge badge-learner-completion badge-partially-completed">
+                        Partially Completed
+                      </span>
+                    ) : null}
+                    {this.isProgramCompleted() ? (
+                      <span className="badge badge-learner-completion badge-completed">
+                        Completed
+                      </span>
+                    ) : null}
                   </div>
                 </div>
-                <div>
-                  {!this.isProgramCompleted() ? (
-                    <span className="badge badge-learner-completion badge-partially-completed">
-                      Partially Completed
-                    </span>
-                  ) : null}
-                  {this.isProgramCompleted() ? (
-                    <span className="badge badge-learner-completion badge-completed">
-                      Completed
-                    </span>
-                  ) : null}
-                </div>
               </div>
-            </div>
 
-            {this.renderLearnerInfo()}
+              {this.renderLearnerInfo()}
 
-            <div className="row">
-              <div className="col-12 d-flex justify-content-between">
-                <table className="learner-record-table table-responsive">
-                  <thead>
-                    <tr>
-                      <th>Course Name</th>
-                      <th>Course ID</th>
-                      <th>
-                        Highest
-                        <br />
-                        Grade
-                        <br />
-                        Earned
-                      </th>
-                      <th>
-                        Letter
-                        <br />
-                        Grade
-                      </th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {learnerRecord
-                      ? learnerRecord.program.courses.map(this.renderCourse)
-                      : null}
-                  </tbody>
-                </table>
+              <div className="row">
+                <div className="col-12 d-flex justify-content-between">
+                  <table className="learner-record-table">
+                    <thead>
+                      <tr>
+                        <th>Course Name</th>
+                        <th>Course ID</th>
+                        <th>
+                          Highest
+                          <br />
+                          Grade
+                          <br />
+                          Earned
+                        </th>
+                        <th>
+                          Letter
+                          <br />
+                          Grade
+                        </th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {learnerRecord
+                        ? learnerRecord.program.courses.map(this.renderCourse)
+                        : null}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 

@@ -1,8 +1,3 @@
-div.std-page-body.learner-record.container {
-  padding-left: 0;
-  padding-right: 0;
-}
-
 #learner-record-school-name img {
   width: 245px;
 }
@@ -20,7 +15,7 @@ div.std-page-body.learner-record.container {
 span.badge-learner-completion {
   color: white;
   background-color: #f0ad4e;
-  font-size: 125%;
+  font-size: 14px;
   font-weight: normal;
 }
 
@@ -29,6 +24,25 @@ div.learner-record-user-profile {
 
   span.learner-record-user-name {
     font-size: 150%;
+  }
+}
+
+div.learner-record {
+  @media (min-width:960px) { 
+    border: 1px solid #c2c2c2;
+    border-radius: 8px;
+    padding: 30px;
+    margin-top: 1em;
+  }
+
+  @media (max-width:960px) {
+    overflow-x: auto;
+  }
+  
+  h1 {
+    font-size: 32px;
+    font-weight: 500;
+    line-height: 1.1;
   }
 }
 
@@ -53,6 +67,13 @@ table.learner-record-table {
 div.learner-record-sharing-controls {
   button.btn {
     padding: 8px 10px !important;
+    font-weight: 400;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 1px 2px rgb(0 0 0 / 24%);
+    border: none;
+    line-height: 35px;
+    text-align: center;
+    border-radius: 0.25rem;
+    font-size: 15px;
   }
 
   button:not(:first-child) {
