@@ -31,6 +31,9 @@ The learner account will have these parameters:
 The product for the courses will both be $999 so they are under the limit
 for test CyberSource transactions.
 
+If the --tutor/-T option is passed, the command will use the local.overhang.io
+address for links to edX rather than edx.odl.local:18000. 
+
 This uses other management commands to complete these tasks. So, if you just
 want to run part of this, use one of these commands:
 - createsuperuser to create the super user
@@ -106,8 +109,19 @@ class Command(BaseCommand):
             nargs="?",
         )
 
+        parser.add_argument(
+            "--tutor",
+            "-T",
+            help="Configure for Tutor.",
+            action="store_true",
+            dest="tutor",
+        )
+
     def handle(self, *args, **kwargs):
         """Coordinates the other commands."""
+
+        edx_host = "local.overhang.io" if kwargs["tutor"] else "edx.odl.local:18000"
+        edx_gateway_port = "" if kwargs["tutor"] else ":18000"
 
         # Step -1: run createsuperuesr
         if kwargs["superuser"]:
@@ -122,8 +136,8 @@ class Command(BaseCommand):
             if kwargs["platform"] == "macos":
                 redirects = "\n".join(
                     [
-                        "http://edx.odl.local:18000/auth/complete/mitxpro-oauth2/",
-                        "http://host.docker.internal:18000/auth/complete/mitxpro-oauth2/",
+                        f"http://{edx_host}/auth/complete/mitxpro-oauth2/",
+                        f"http://host.docker.internal{edx_gateway_port}/auth/complete/mitxpro-oauth2/",
                     ]
                 )
             else:
@@ -137,8 +151,8 @@ class Command(BaseCommand):
 
                 redirects = "\n".join(
                     [
-                        "http://edx.odl.local:18000/auth/complete/mitxpro-oauth2/",
-                        f"http://{kwargs['gateway']}:18000/auth/complete/mitxpro-oauth2/",
+                        f"http://{edx_host}/auth/complete/mitxpro-oauth2/",
+                        f"http://{kwargs['gateway']}{edx_gateway_port}/auth/complete/mitxpro-oauth2/",
                     ]
                 )
 
@@ -200,7 +214,7 @@ class Command(BaseCommand):
             "Demonstration Course",
             live=True,
             create_run="Demo_Course",
-            run_url="http://edx.odl.local:18000/courses/course-v1:edX+DemoX+Demo_Course/",
+            run_url=f"http://{edx_host}/courses/course-v1:edX+DemoX+Demo_Course/",
             program="program-v1:MITx+DEDP",
         )
 
@@ -211,7 +225,7 @@ class Command(BaseCommand):
             "E2E Test Course",
             live=True,
             create_run="course",
-            run_url="http://edx.odl.local:18000/courses/course-v1:edX+E2E-101+course/",
+            run_url=f"http://{edx_host}/courses/course-v1:edX+E2E-101+course/",
         )
 
         self.stdout.write(self.style.SUCCESS("Syncing course runs (this may fail)..."))
