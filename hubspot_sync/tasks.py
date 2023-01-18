@@ -34,7 +34,7 @@ def task_obj_lock(
     Determine a task lock name for a specific task function and object id
 
     Args:
-        func_name: str: Name of a task function
+        func_name(str): Name of a task function
         args: Task function arguments, first should be object id
         kwargs: Any keyword arguments sent to the task function
 
