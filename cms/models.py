@@ -541,7 +541,7 @@ class HomePage(Page):
     def products(self):
         future_data = []
         past_data = []
-        for page in self.featured_products.all():
+        for page in self.featured_products.filter(course_product_page__live=True):
             if page.course_product_page:
                 product_page = page.course_product_page.specific
                 run = product_page.product.first_unexpired_run
