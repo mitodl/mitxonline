@@ -177,7 +177,11 @@ class Command(BaseCommand):
                     )
 
                 # While overriding grade we force create the certificate
-                (_, created_cert, deleted_cert,) = process_course_run_grade_certificate(
+                (
+                    certificate,
+                    created_cert,
+                    deleted_cert,
+                ) = process_course_run_grade_certificate(
                     course_run_grade=course_run_grade,
                     should_force_create=is_grade_override,
                 )
@@ -199,7 +203,7 @@ class Command(BaseCommand):
                     cert_status = "created"
                 elif deleted_cert:
                     cert_status = "deleted"
-                elif course_run_grade.passed:
+                elif course_run_grade.passed and certificate:
                     cert_status = "already exists"
                 else:
                     cert_status = "ignored"
