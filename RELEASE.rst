@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.57.1
+--------------
+
+- Retry Hubspot API calls on 429 errors (#1334)
+- Use on_commit in signal to avoid trying to sync a product to hubspot before it has been saved to the db (#1351)
+- Updates discounts in the staff dashboard to reflect the current state of the art (#1324)
+- fix: incorrect output from manage_certificates command when auditing (#1355)
+- Bump pillow from 9.0.1 to 9.3.0 (#1231)
+- Bump json5 from 1.0.1 to 1.0.2 (#1322)
+- feat: unenroll without a refund (#1333)
+
 Version 0.57.0 (Released January 12, 2023)
 --------------
 
