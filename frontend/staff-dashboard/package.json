@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@ant-design/icons": "^5.0.0",
     "@craco/craco": "6.4.3",
     "@pankod/refine-antd": "3.22.1",
     "@pankod/refine-core": "3.22.1",
@@ -16,6 +17,7 @@
     "@types/react": "17.0.44",
     "@types/react-dom": "17.0.15",
     "craco-less": "2.0.0",
+    "dayjs": "^1.11.7",
     "eslint-config-react": "1.1.7",
     "oidc-client-ts": "2.0.3",
     "react": "17.0.2",

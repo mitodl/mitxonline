@@ -1,9 +1,32 @@
+export interface ILegalAddress {
+    first_name: string;
+    last_name: string;
+    country: string;
+}
+
+export interface IUser {
+    id: number;
+    username: string;
+    email: string;
+    legal_address?: ILegalAddress;
+}
+
 export interface IProduct {
     id: number;
     price: number;
     description: string;
     is_active: boolean;
     purchasable_object: object;
+}
+
+export interface IRedeemedOrder {
+    id: number;
+    created_on: Date;
+    updated_on: Date;
+    state: string;
+    total_price_paid: number;
+    reference_number: string;
+    purchaser: number;
 }
 
 export interface IDiscount {
@@ -14,13 +37,15 @@ export interface IDiscount {
     redemption_type: string;
     max_redemptions: number;
     for_flexible_pricing: boolean;
+    activation_date: Date;
+    expiration_date: Date;
 }
 
 export interface IDiscountRedemption {
     redemption_date: string;
     redeemed_by: Object;
     redeemed_discount: Object<IDiscount>;
-    redeemed_order: Object;
+    redeemed_order: IRedeemedOrder;
 }
 
 export interface IUserDiscount {
@@ -39,6 +64,19 @@ export interface IDiscountProductRaw {
     id: number|null;
     discount_id: number|null;
     product_id: number|null;
+}
+
+export interface IDiscountTier {
+    id: number;
+    discount: number;
+    current: boolean;
+    income_threshold_usd: number;
+    courseware_object: {
+        title: string;
+        readable_id: string;
+        id: number;
+        type: string;
+    }
 }
 
 export interface ICourseware {
@@ -87,4 +125,11 @@ export interface IFlexiblePriceStatusModalProps {
     record: IFlexiblePriceRequest;
     status: string;
     onClose: Function;
+}
+
+export interface IDiscountFilters {
+    q: string;
+    redemption_type: string;
+    for_flexible_pricing: string;
+    is_redeemed: string;
 }

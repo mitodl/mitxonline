@@ -1,28 +1,29 @@
 from django.urls import include, re_path
-from rest_framework_extensions.routers import NestedRouterMixin
 from rest_framework.routers import SimpleRouter
-
+from rest_framework_extensions.routers import NestedRouterMixin
 
 """ TODO: clean this up later (make the views look more like the courses one) """
+from ecommerce.admin import AdminRefundOrderView
 from ecommerce.views.v0 import (
+    AllProductViewSet,
     BackofficeCallbackView,
-    ProductViewSet,
-    BasketViewSet,
-    BasketItemViewSet,
-    CheckoutCallbackView,
     BasketDiscountViewSet,
+    BasketItemViewSet,
+    BasketViewSet,
     CheckoutApiViewSet,
+    CheckoutCallbackView,
     CheckoutInterstitialView,
     CheckoutProductView,
+    DiscountViewSet,
+    NestedDiscountProductViewSet,
+    NestedDiscountRedemptionViewSet,
+    NestedDiscountTierViewSet,
+    NestedUserDiscountViewSet,
     OrderHistoryViewSet,
     OrderReceiptView,
-    DiscountViewSet,
-    NestedDiscountRedemptionViewSet,
-    NestedUserDiscountViewSet,
+    ProductViewSet,
     UserDiscountViewSet,
-    NestedDiscountProductViewSet,
 )
-from ecommerce.admin import AdminRefundOrderView
 
 
 class SimpleRouterWithNesting(NestedRouterMixin, SimpleRouter):
@@ -30,6 +31,7 @@ class SimpleRouterWithNesting(NestedRouterMixin, SimpleRouter):
 
 
 router = SimpleRouterWithNesting()
+router.register(r"products/all", AllProductViewSet, basename="all_products_api")
 router.register(r"products", ProductViewSet, basename="products_api")
 router.register(r"checkout", CheckoutApiViewSet, basename="checkout_api")
 router.register(r"orders/history", OrderHistoryViewSet, basename="orderhistory_api")
@@ -54,6 +56,12 @@ discountsRouter.register(
     r"products",
     NestedDiscountProductViewSet,
     basename="discounts_api-products",
+    parents_query_lookups=["discount"],
+)
+discountsRouter.register(
+    r"tiers",
+    NestedDiscountTierViewSet,
+    basename="discounts_api-tiers",
     parents_query_lookups=["discount"],
 )
 

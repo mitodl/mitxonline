@@ -2,97 +2,127 @@
 MITxOnline ecommerce views
 """
 import logging
-from main.utils import redirect_with_user_message
-from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
-from rest_framework import mixins, status
-from rest_framework.response import Response
-from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
-from rest_framework.viewsets import (
-    ReadOnlyModelViewSet,
-    GenericViewSet,
-    ViewSet,
-    ModelViewSet,
-)
-from rest_framework.views import APIView
-from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from rest_framework.decorators import action
+from distutils.util import strtobool
 
+import django_filters
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.db import transaction
+from django.db.models import Count, Q
+from django.http import Http404, HttpResponse
+from django.shortcuts import render
+from django.urls import reverse
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import RedirectView, TemplateView, View
+from mitol.common.utils import now_in_utc
+from mitol.payment_gateway.api import PaymentGateway
+from rest_framework import mixins, status
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework.decorators import action
+from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
+from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.viewsets import (
+    GenericViewSet,
+    ModelViewSet,
+    ReadOnlyModelViewSet,
+    ViewSet,
+)
+from rest_framework_extensions.mixins import NestedViewSetMixin
+
+from courses.models import Course, CourseRun, Program, ProgramRun
+from ecommerce import api
+from ecommerce.discounts import DiscountType
+from ecommerce.models import (
+    Basket,
+    BasketDiscount,
+    BasketItem,
+    Discount,
+    DiscountProduct,
+    DiscountRedemption,
+    Order,
+    Product,
+    UserDiscount,
+)
+from ecommerce.serializers import (
+    BasketDiscountSerializer,
+    BasketItemSerializer,
+    BasketSerializer,
+    BasketWithProductSerializer,
+    DiscountProductSerializer,
+    DiscountRedemptionSerializer,
+    DiscountSerializer,
+    OrderHistorySerializer,
+    OrderSerializer,
+    ProductSerializer,
+    UserDiscountMetaSerializer,
+    UserDiscountSerializer,
+)
+from flexiblepricing.api import determine_courseware_flexible_price_discount
+from flexiblepricing.models import FlexiblePriceTier
+from flexiblepricing.serializers import FlexiblePriceTierSerializer
 from main.constants import (
+    USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
     USER_MSG_TYPE_PAYMENT_DECLINED,
     USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
     USER_MSG_TYPE_PAYMENT_REVIEW,
-    USER_MSG_TYPE_ENROLL_BLOCKED,
 )
-
-from django.views.generic import TemplateView, RedirectView, View
-from django.http import HttpResponse, Http404
-from django.shortcuts import render
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db import transaction
-from django.db.models import Q, Count
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
-from django.urls import reverse
-
-from mitol.common.utils import now_in_utc
-from rest_framework_extensions.mixins import NestedViewSetMixin
-from mitol.payment_gateway.api import PaymentGateway
-
-from courses.models import (
-    CourseRun,
-    Course,
-    Program,
-    ProgramRun,
-)
-
-from ecommerce import api
-from ecommerce.discounts import DiscountType
-from ecommerce.serializers import (
-    OrderHistorySerializer,
-    ProductSerializer,
-    BasketSerializer,
-    BasketItemSerializer,
-    BasketDiscountSerializer,
-    BasketWithProductSerializer,
-    OrderSerializer,
-    DiscountSerializer,
-    DiscountRedemptionSerializer,
-    DiscountProductSerializer,
-    UserDiscountSerializer,
-    UserDiscountMetaSerializer,
-)
-from ecommerce.models import (
-    Product,
-    Basket,
-    BasketItem,
-    Discount,
-    DiscountRedemption,
-    DiscountProduct,
-    BasketDiscount,
-    UserDiscount,
-    Order,
-)
-
-from flexiblepricing.api import determine_courseware_flexible_price_discount
+from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
+from main.utils import redirect_with_user_message
+from main.views import RefinePagination
+from users.models import User
 
 log = logging.getLogger(__name__)
 
 
-class ECommerceDefaultPagination(LimitOffsetPagination):
-    default_limit = 10
-    limit_query_param = "l"
-    offset_query_param = "o"
-    max_limit = 50
-
-
-class ProductsPagination(ECommerceDefaultPagination):
+class ProductsPagination(RefinePagination):
     default_limit = 2
+
+
+class AllProductViewSet(ModelViewSet):
+    """This doesn't filter unenrollable products out, and adds name search for
+    courseware object readable id. It's really for the staff dashboard."""
+
+    serializer_class = ProductSerializer
+    pagination_class = ProductsPagination
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def get_queryset(self):
+        name_search = self.request.query_params.get("search")
+
+        if name_search is None:
+            return Product.objects.all()
+
+        matching_courserun_ids = CourseRun.objects.filter(
+            courseware_id__icontains=name_search
+        ).values_list("id", flat=True)
+
+        matching_program_ids = Program.objects.filter(
+            readable_id__icontains=name_search
+        ).values_list("id", flat=True)
+
+        return (
+            Product.objects.filter(
+                (
+                    Q(object_id__in=matching_courserun_ids)
+                    & Q(content_type__model="courserun")
+                )
+                | (
+                    Q(object_id__in=matching_program_ids)
+                    & Q(content_type__model="program")
+                )
+                | (Q(description__icontains=name_search))
+            )
+            .select_related("content_type")
+            .prefetch_related("purchasable_object")
+        )
 
 
 class ProductViewSet(ReadOnlyModelViewSet):
@@ -205,14 +235,49 @@ class BasketDiscountViewSet(ReadOnlyModelViewSet):
         return BasketDiscount.objects.filter(redeemed_basket__user=self.request.user)
 
 
+class DiscountFilterSet(django_filters.FilterSet):
+    q = django_filters.CharFilter(
+        field_name="discount_code", label="q", lookup_expr="icontains"
+    )
+    for_flexible_pricing = django_filters.TypedChoiceFilter(
+        field_name="for_flexible_pricing",
+        choices=(("yes", "True"), ("no", "False")),
+        coerce=strtobool,
+    )
+    is_redeemed = django_filters.ChoiceFilter(
+        method="redeemed_filter", choices=(("yes", "yes"), ("no", "no"))
+    )
+
+    def redeemed_filter(self, qs, name, value):
+        qs = qs.annotate(num_redemptions=Count("order_redemptions"))
+
+        if value == "yes":
+            qs = qs.filter(num_redemptions__gt=0)
+        elif value == "no":
+            qs = qs.filter(num_redemptions=0)
+
+        return qs
+
+    class Meta:
+        model = Discount
+        fields = [
+            "q",
+            "redemption_type",
+            "for_flexible_pricing",
+            "is_redeemed",
+        ]
+
+
 class DiscountViewSet(ModelViewSet):
     """API view set for Discounts"""
 
+    queryset = Discount.objects.order_by("-created_on").all()
     serializer_class = DiscountSerializer
-    queryset = Discount.objects.all()
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated, IsAdminUser)
-    pagination_class = ECommerceDefaultPagination
+    pagination_class = RefinePagination
+    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
+    filterset_class = DiscountFilterSet
 
 
 class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
@@ -222,7 +287,35 @@ class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
     queryset = DiscountProduct.objects.all()
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated, IsAdminUser)
-    pagination_class = ECommerceDefaultPagination
+    pagination_class = RefinePagination
+
+    def partial_update(self, request, **kwargs):
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+
+        (discount_product, created) = DiscountProduct.objects.get_or_create(
+            discount=discount, product_id=request.data["product_id"]
+        )
+
+        return Response(
+            DiscountProductSerializer(
+                DiscountProduct.objects.filter(discount=discount).all(), many=True
+            ).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, **kwargs):
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+        product = Product.objects.get(pk=kwargs["pk"])
+
+        discount_product = DiscountProduct.objects.filter(
+            discount=discount, product=product
+        ).delete()
+
+        return Response(
+            DiscountProductSerializer(
+                DiscountProduct.objects.filter(discount=discount).all(), many=True
+            ).data
+        )
 
 
 class NestedDiscountRedemptionViewSet(NestedViewSetMixin, ModelViewSet):
@@ -232,7 +325,7 @@ class NestedDiscountRedemptionViewSet(NestedViewSetMixin, ModelViewSet):
     queryset = DiscountRedemption.objects.all()
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated, IsAdminUser)
-    pagination_class = ECommerceDefaultPagination
+    pagination_class = RefinePagination
 
 
 class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
@@ -244,7 +337,47 @@ class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
     queryset = UserDiscount.objects.all()
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated, IsAdminUser)
-    pagination_class = ECommerceDefaultPagination
+    pagination_class = RefinePagination
+
+    def partial_update(self, request, **kwargs):
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+
+        (discount_user, created) = UserDiscount.objects.get_or_create(
+            discount=discount, user_id=request.data["user_id"]
+        )
+
+        return Response(
+            UserDiscountMetaSerializer(
+                UserDiscount.objects.filter(discount=discount).all(), many=True
+            ).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, **kwargs):
+        discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
+        user = User.objects.get(pk=kwargs["pk"])
+
+        discount_user = UserDiscount.objects.filter(
+            discount=discount, user=user
+        ).delete()
+
+        return Response(
+            UserDiscountMetaSerializer(
+                UserDiscount.objects.filter(discount=discount).all(), many=True
+            ).data
+        )
+
+
+class NestedDiscountTierViewSet(NestedViewSetMixin, ModelViewSet):
+    """
+    API view set for Flexible Pricing Tiers. This one is for use within a Discount.
+    """
+
+    serializer_class = FlexiblePriceTierSerializer
+    queryset = FlexiblePriceTier.objects.all()
+    authentication_classes = (SessionAuthentication, TokenAuthentication)
+    permission_classes = (IsAuthenticated, IsAdminUser)
+    pagination_class = RefinePagination
 
 
 class UserDiscountViewSet(ModelViewSet):
@@ -254,7 +387,7 @@ class UserDiscountViewSet(ModelViewSet):
     queryset = UserDiscount.objects.all()
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated, IsAdminUser)
-    pagination_class = ECommerceDefaultPagination
+    pagination_class = RefinePagination
 
 
 class CheckoutApiViewSet(ViewSet):
@@ -592,7 +725,7 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
 
 class OrderHistoryViewSet(ReadOnlyModelViewSet):
     serializer_class = OrderHistorySerializer
-    pagination_class = ECommerceDefaultPagination
+    pagination_class = RefinePagination
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):

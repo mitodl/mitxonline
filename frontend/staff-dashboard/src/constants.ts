@@ -66,3 +66,21 @@ export const Denied_Justifications = [
     },
 ];
 
+export const Discount_Redemption_Types = [
+    {
+        label: '',
+        value: '',
+    },
+    {
+        label: 'Unlimited',
+        value: 'unlimited',
+    },
+    {
+        label: 'One Time',
+        value: 'one-time',
+    },
+    {
+        label: 'One Time Per User',
+        value: 'one-time-per-user',
+    },
+]

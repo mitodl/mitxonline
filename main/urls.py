@@ -52,7 +52,7 @@ urlpatterns = [
     re_path(r"^dashboard/", index, name="user-dashboard"),
     # social django needs to be here to preempt the login
     path("", include("social_django.urls", namespace="social")),
-    re_path(r"^staff-dashboard/", refine, name="staff-dashboard"),
+    re_path(r"^staff-dashboard/.*", refine, name="staff-dashboard"),
     path("signin/", index, name="login"),
     path("signin/password/", index, name="login-password"),
     re_path(r"^signin/forgot-password/$", index, name="password-reset"),

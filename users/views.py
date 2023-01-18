@@ -1,13 +1,17 @@
 """User views"""
 import pycountry
 from django.db import transaction
+from django.db.models import Q
 from mitol.common.utils import now_in_utc
 from oauth2_provider.contrib.rest_framework import IsAuthenticatedOrTokenHasScope
 from rest_framework import mixins, viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.filters import SearchFilter
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from main.permissions import UserIsOwnerPermission
+from main.views import RefinePagination
 from openedx import tasks
 from users.models import ChangeEmailRequest, User
 from users.serializers import (
@@ -15,6 +19,7 @@ from users.serializers import (
     ChangeEmailRequestUpdateSerializer,
     CountrySerializer,
     PublicUserSerializer,
+    StaffDashboardUserSerializer,
     UserSerializer,
 )
 
@@ -88,3 +93,16 @@ class CountriesStatesViewSet(viewsets.ViewSet):
         queryset = sorted(list(pycountry.countries), key=lambda country: country.name)
         serializer = CountrySerializer(queryset, many=True)
         return Response(serializer.data)
+
+
+class UsersViewSet(viewsets.ReadOnlyModelViewSet):
+    """Provides an API for listing system users. This is for the staff
+    dashboard."""
+
+    serializer_class = StaffDashboardUserSerializer
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+    pagination_class = RefinePagination
+    filter_backends = [SearchFilter]
+    search_fields = ["username", "name", "email"]
+    queryset = User.objects.all()

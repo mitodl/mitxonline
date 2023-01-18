@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
 import {
-    Pagination, 
+    Pagination,
     CrudSorting,
     CrudFilters,
     CrudOperators,
@@ -72,7 +72,7 @@ const generateFilter = (filters?: CrudFilters) => {
     const queryFilters: { [key: string]: string } = {};
     if (filters) {
         filters.map((filter) => {
-            if (filter.operator !== "or") {
+            if (filter.operator !== "or" && filter.value !== '') {
                 const { field, operator, value } = filter;
 
                 if (field === "q") {
@@ -93,7 +93,7 @@ const generatePagination = (pagination?: Pagination) => {
     const current = pagination?.current || 1;
     const pageSize = pagination?.pageSize || 3;
 
-    return { 
+    return {
         o: (current - 1) * pageSize,
         l: pageSize
     };
@@ -107,7 +107,7 @@ const useDrfDataProvider = (
 
     simpleDataProvider.getList = async ({ resource, pagination, filters, sort }) => {
         const url = `${apiUrl}/${resource}/`;
-        
+
         const query = {
             ...generateFilter(filters),
             ...generateSort(sort),
