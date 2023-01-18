@@ -95,7 +95,7 @@ class AllProductViewSet(ModelViewSet):
     permission_classes = [IsAdminUser]
 
     def get_queryset(self):
-        name_search = self.request.query_params.get("q")
+        name_search = self.request.query_params.get("search")
 
         if name_search is None:
             return Product.objects.all()
