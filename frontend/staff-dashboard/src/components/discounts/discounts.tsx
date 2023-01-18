@@ -22,7 +22,7 @@ export const DiscountForm = (props: IDiscountFormProps) => {
     formProps.initialValues.expiration_date = dayjs(formProps.initialValues.expiration_date).format("YYYY-MM-DD HH:mm:ss");
   }
 
-  return formProps.initialValues !== undefined ? (<>
+  return (<>
     <Form {...formProps} layout="vertical">
         <Form.Item label="Discount Code" name="discount_code">
             <Input />
@@ -69,5 +69,5 @@ export const DiscountForm = (props: IDiscountFormProps) => {
     {formProps.initialValues ? <Products record={formProps.initialValues} isManagement={true}></Products> : null}
     
     {formProps.initialValues ? <UserAssignments record={formProps.initialValues} isManagement={true}></UserAssignments> : null}
-  </>) : null;
+  </>);
 };
