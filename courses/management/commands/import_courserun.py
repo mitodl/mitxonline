@@ -234,25 +234,33 @@ class Command(BaseCommand):
                             )
                         )
 
-                for country_name in kwargs["block_countries"].split(","):
-                    country_code = countries.by_name(country_name)
-                    if country_code:
-                        BlockedCountry.objects.get_or_create(
-                            course=course, country=country_code
-                        )
+                if kwargs["block_countries"]:
+                    for code_or_name in kwargs["block_countries"].split(","):
+
+                        country_code = countries.by_name(code_or_name)
+                        if not country_code:
+                            country_name = countries.countries.get(code_or_name, None)
+                            country_code = code_or_name if country_name else None
+                        else:
+                            country_name = code_or_name
+
+                        if country_code:
+                            BlockedCountry.objects.get_or_create(
+                                course=course, country=country_code
+                            )
+                            self.stdout.write(
+                                self.style.SUCCESS(
+                                    f"Blocked Enrollments for {country_name} ({country_code})."
+                                )
+                            )
+                            continue
+
                         self.stdout.write(
-                            self.style.SUCCESS(
-                                f"Blocked Enrollments for {country_name} ({country_code})."
+                            self.style.ERROR(
+                                f"Could not block country {code_or_name}. "
+                                f"Please verify that it is a valid country name or code."
                             )
                         )
-                        continue
-
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"Could not block country {country_name}. "
-                            f"Please verify that it is a valid country name."
-                        )
-                    )
             except Exception as e:
                 self.stdout.write(
                     self.style.ERROR(
