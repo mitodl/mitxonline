@@ -189,7 +189,7 @@ class UserSerializer(serializers.ModelSerializer):
 
         username = validated_data.pop("username")
         email = validated_data.pop("email")
-        password = validated_data.pop("password")
+        password = validated_data.pop("password", None)
 
         with transaction.atomic():
             user = User.objects.create_user(

@@ -91,11 +91,14 @@ def create_user_via_email(
     
     if backend.name == EmailAuth.name or flow == SocialAuthState.FLOW_REGISTER:
         data = strategy.request_data().copy()
-        expected_data_fields = {"name", "password", "username"}
+        expected_data_fields = ("name", "password", "username")
 
     elif backend.name == OpenIdConnectAuth.name:
-        data = response
-        expected_data_fields = {"name", "username"}
+        data = response.copy()
+        data["legal_address"] = data["address"]
+        data["legal_address"]["first_name"] = data["given_name"]
+        data["legal_address"]["last_name"] = data["family_name"]
+        expected_data_fields = ("name", "username")
     else:
         return {}
 
@@ -104,7 +107,7 @@ def create_user_via_email(
 
     context = {}
     print(response)
-    if any(field for field in expected_data_fields if field not in data):
+    if not all(field in data for field in expected_data_fields):
         raise RequirePasswordAndPersonalInfoException(backend, current_partial)
     if len(data.get("name", 0)) < NAME_MIN_LENGTH:
         raise RequirePasswordAndPersonalInfoException(
@@ -117,6 +120,7 @@ def create_user_via_email(
     serializer = UserSerializer(data=data, context=context)
 
     if not serializer.is_valid():
+        print(serializer.errors)
         raise RequirePasswordAndPersonalInfoException(
             backend,
             current_partial,
