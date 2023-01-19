@@ -1,58 +1,57 @@
-import pytest
+import operator as op
 import random
-import pytz
-
+import uuid
 from datetime import datetime, timedelta
-from main.test_utils import assert_drf_json_equal
-from main.constants import (
-    USER_MSG_COOKIE_NAME,
-    USER_MSG_TYPE_ENROLL_DUPLICATED,
-    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
-)
-from main.utils import encode_json_cookie_value
-from main.settings import TIME_ZONE
-from django.urls import reverse
+
+import pytest
+import pytz
+import reversion
 from django.conf import settings
 from django.forms.models import model_to_dict
+from django.urls import reverse
+from mitol.common.utils.datetime import now_in_utc
 from rest_framework import status
 
-import operator as op
-import reversion
-import uuid
-
 from courses.factories import CourseRunFactory, ProgramRunFactory
+from courses.models import PaidCourseRun
 from ecommerce.api import generate_checkout_payload
+from ecommerce.constants import DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
-    ProductFactory,
-    DiscountFactory,
-    BasketItemFactory,
     BasketFactory,
+    BasketItemFactory,
+    DiscountFactory,
+    ProductFactory,
 )
 from ecommerce.models import (
     Basket,
     BasketItem,
-    Order,
     Discount,
-    UserDiscount,
     DiscountProduct,
+    Order,
     PendingOrder,
+    UserDiscount,
 )
-from courses.models import PaidCourseRun
-from ecommerce.constants import DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.serializers import (
-    ProductSerializer,
-    BasketSerializer,
     BasketItemSerializer,
-    DiscountSerializer,
+    BasketSerializer,
     BasketWithProductSerializer,
+    DiscountSerializer,
+    ProductSerializer,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
+from main.constants import (
+    USER_MSG_COOKIE_NAME,
+    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+)
+from main.settings import TIME_ZONE
+from main.test_utils import assert_drf_json_equal
+from main.utils import encode_json_cookie_value
 from users.factories import UserFactory
-from mitol.common.utils.datetime import now_in_utc
 
 pytestmark = [pytest.mark.django_db]
 
@@ -206,9 +205,21 @@ def create_basket_with_product(user, product):
     return basket
 
 
-@pytest.mark.parametrize("try_flex_pricing_discount", [True, False])
+@pytest.mark.parametrize(
+    ["try_flex_pricing_discount", "try_whitespace"],
+    [
+        [True, False],
+        [False, True],
+        [True, True],
+    ],
+)
 def test_redeem_discount(
-    user, user_drf_client, products, discounts, try_flex_pricing_discount
+    user,
+    user_drf_client,
+    products,
+    discounts,
+    try_flex_pricing_discount,
+    try_whitespace,
 ):
     """
     Bootstraps a basket (see create_basket) and then attempts to redeem a
@@ -218,6 +229,10 @@ def test_redeem_discount(
     The try_flex_pricing_discount sets whether or not the discount should be
     flagged to be used with a Flexible Pricing tier. If it is, then the
     redemption attempt should fail.
+
+    The try_whitespace flag sets whether or not the discount should have some
+    whitespace appended/prepended to it - the redemption code should strip this
+    and the code should apply successfully.
     """
     basket = create_basket(user, products)
 
@@ -230,6 +245,11 @@ def test_redeem_discount(
         discount.for_flexible_pricing = True
         discount.save()
         discount.refresh_from_db()
+
+    if try_whitespace:
+        # limit the discount_code to 47 so we can shove some blank characters in
+        discount.discount_code = discount.discount_code[0:45]
+        discount.discount_code = f"   {discount.discount_code}  "[0:50]
 
     resp = user_drf_client.post(
         reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
@@ -427,7 +447,7 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
     Applies a discount, then hits the start checkout view, which should create
     an Order record and its associated line items.
     """
-    test_redeem_discount(user, user_drf_client, products, discounts, False)
+    test_redeem_discount(user, user_drf_client, products, discounts, False, False)
 
     resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
 
@@ -446,7 +466,7 @@ def test_start_checkout_with_invalid_discounts(user, user_client, products, disc
     """
     check_delta = timedelta(days=30)
 
-    test_redeem_discount(user, user_client, products, discounts, False)
+    test_redeem_discount(user, user_client, products, discounts, False, False)
 
     for discount in discounts:
         discount.activation_date = (
@@ -1027,7 +1047,7 @@ def test_start_checkout_with_zero_value(user, user_client, products):
     discount = DiscountFactory.create(
         discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=100
     )
-    test_redeem_discount(user, user_client, products, [discount], False)
+    test_redeem_discount(user, user_client, products, [discount], False, False)
 
     resp = user_client.get(reverse("checkout_interstitial_page"))
 

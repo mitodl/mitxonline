@@ -427,7 +427,7 @@ class CheckoutApiViewSet(ViewSet):
 
         try:
             discount = Discount.objects.filter(for_flexible_pricing=False).get(
-                discount_code=request.data["discount"]
+                discount_code=request.data["discount"].strip()
             )
 
             if not api.check_discount_for_products(discount, basket):
