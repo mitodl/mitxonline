@@ -890,11 +890,53 @@ CACHES = {
 }
 
 AUTHENTICATION_BACKENDS = (
+    "social_core.backends.open_id_connect.OpenIdConnectAuth",
     "social_core.backends.email.EmailAuth",
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
 )
 
+SOCIAL_AUTH_OIDC_OIDC_ENDPOINT = get_string(
+    name="SOCIAL_AUTH_OIDC_OIDC_ENDPOINT",
+    default="",
+    description="COLLIN TO COMPLETE",
+)
+
+SOCIAL_AUTH_OIDC_KEY = get_string(
+    name="SOCIAL_AUTH_OIDC_KEY",
+    default="",
+    description="COLLIN TO COMPLETE",
+)
+
+SOCIAL_AUTH_OIDC_SECRET = get_string(
+    name="SOCIAL_AUTH_OIDC_SECRET",
+    default="",
+    description="COLLIN TO COMPLETE",
+)
+
+USERINFO_URL = get_string(
+    name="USERINFO_URL",
+    default="",
+    description="COLLIN TO COMPLETE",
+)
+
+ACCESS_TOKEN_URL = get_string(
+    name="ACCESS_TOKEN_URL",
+    default="",
+    description="COLLIN TO COMPLETE",
+)
+
+AUTHORIZATION_URL = get_string(
+    name="AUTHORIZATION_URL",
+    default="",
+    description="COLLIN TO COMPLETE",
+)
+
+OIDC_ENDPOINT = get_string(
+    name="OIDC_ENDPOINT",
+    default="",
+    description="COLLIN TO COMPLETE",
+)
 
 # required for migrations
 OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = "oauth2_provider.AccessToken"

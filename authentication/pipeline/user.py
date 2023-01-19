@@ -7,6 +7,7 @@ from django.conf import settings
 from django.db import IntegrityError
 from mitol.common.utils import dict_without_keys
 from social_core.backends.email import EmailAuth
+from social_core.backends.open_id_connect import OpenIdConnectAuth
 from social_core.exceptions import AuthException
 from social_core.pipeline.partial import partial
 
@@ -72,7 +73,7 @@ def get_username(
 
 @partial
 def create_user_via_email(
-    strategy, backend, user=None, flow=None, current_partial=None, *args, **kwargs
+    strategy, backend, user=None, response=None, flow=None, current_partial=None, *args, **kwargs
 ):  # pylint: disable=too-many-arguments,unused-argument
     """
     Creates a new user if needed and sets the password and name.
@@ -87,15 +88,22 @@ def create_user_via_email(
     Raises:
         RequirePasswordAndPersonalInfoException: if the user hasn't set password or name
     """
-    if backend.name != EmailAuth.name or flow != SocialAuthState.FLOW_REGISTER:
+    
+    if backend.name == EmailAuth.name or flow == SocialAuthState.FLOW_REGISTER:
+        data = strategy.request_data().copy()
+        expected_data_fields = {"name", "password", "username"}
+
+    elif backend.name == OpenIdConnectAuth.name:
+        data = response
+        expected_data_fields = {"name", "username"}
+    else:
         return {}
 
     if user is not None:
         raise UnexpectedExistingUserException(backend, current_partial)
 
     context = {}
-    data = strategy.request_data().copy()
-    expected_data_fields = {"name", "password", "username"}
+    print(response)
     if any(field for field in expected_data_fields if field not in data):
         raise RequirePasswordAndPersonalInfoException(backend, current_partial)
     if len(data.get("name", 0)) < NAME_MIN_LENGTH:

@@ -423,7 +423,7 @@ social-auth-app-django==4.0.0
     #   -r requirements.in
     #   djoser
     #   mitol-django-authentication
-social-auth-core==4.1.0
+social-auth-core[openidconnect]==4.3.0
     # via social-auth-app-django
 soupsieve==2.2.1
     # via beautifulsoup4
