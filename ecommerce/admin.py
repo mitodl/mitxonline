@@ -1,7 +1,5 @@
 """Admin management for Ecommerce module"""
 
-import logging
-
 from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
