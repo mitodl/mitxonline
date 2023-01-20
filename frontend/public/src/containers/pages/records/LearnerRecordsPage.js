@@ -32,6 +32,8 @@ import type {
   LearnerRecordCourse
 } from "../../../flow/courseTypes"
 
+import type { CurrentUser } from "../flow/authTypes"
+
 type Props = {
   learnerRecord: LearnerRecord,
   isSharedRecord: boolean,
@@ -44,7 +46,8 @@ type Props = {
     partnerSchoolId: number | null
   ) => Promise<any>,
   revokeRecordSharing: (programId: number) => Promise<any>,
-  match: any
+  match: any,
+  currentUser: CurrentUser
 }
 
 type State = {
@@ -464,7 +467,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
   }
 
   // Render the course record table differently based on screen size.
-  renderLearnerRecordTable(learnerRecord) {
+  renderLearnerRecordTable(learnerRecord: LearnerRecord) {
     return (
       <div>
         {/* Display for mobile screens. */}
