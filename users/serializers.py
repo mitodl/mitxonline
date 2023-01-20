@@ -189,6 +189,7 @@ class UserSerializer(serializers.ModelSerializer):
 
         username = validated_data.pop("username")
         email = validated_data.pop("email")
+        # Collin, is it safe to create a user with no password set?
         password = validated_data.pop("password", None)
 
         with transaction.atomic():
