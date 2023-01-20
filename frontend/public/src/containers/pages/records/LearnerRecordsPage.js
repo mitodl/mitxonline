@@ -76,7 +76,8 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
     return parseInt(this.props.match.params.program.length)
   }
 
-  renderCourse(course: LearnerRecordCourse) {
+  // Renders program's courses table.
+  renderCourseTableRow(course: LearnerRecordCourse) {
     return (
       <tr key={`learner-record-course-${course.id}`}>
         <td className="d-flex">
@@ -103,6 +104,39 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
       </tr>
     )
   }
+
+  // Renders program's courses list items.
+  renderCourseListItem(course: LearnerRecordCourse) {
+    return (
+      <div key={`learner-record-course-${course.id}`} className="list-group-item d-flex flex-column justify-content-between align-items-start">
+        <div className="d-flex w-100 justify-content-between">
+          <h5 className="mb-1">{course.title}</h5>
+          <span className="learner-record-req-badges pr-2">
+            {course.reqtype === "Required Courses" ? (
+              <span className="badge badge-danger">Core</span>
+            ) : null}
+            {course.reqtype === "Elective Courses" ? (
+              <span className="badge badge-success">Elective</span>
+            ) : null}
+          </span>
+        </div>
+        {course.grade ? <p className="mb-1">Grade: {course.grade.grade_percent}</p> : ""}
+      </div>
+    )
+  }
+
+  // <tr key={`learner-record-course-${course.id}`}>
+  //   <td>{course.readable_id}</td>
+  //   <td>{course.grade ? course.grade.grade_percent : ""}</td>
+  //   <td>{course.grade ? course.grade.letter_grade : ""}</td>
+  //   <td className="learner-record-cert-status">
+  //     {course.certificate ? (
+  //       <span className="badge badge-success">Certificate Earned</span>
+  //     ) : (
+  //       <span className="badge badge-secondary">Not Earned</span>
+  //     )}
+  //   </td>
+  // </tr>
 
   renderLearnerInfo() {
     const { learnerRecord } = this.props
@@ -425,6 +459,133 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
     )
   }
 
+  // Render the course record table differently based on screen size.
+  renderLearnerRecordTable(learnerRecord) {
+    return (
+      <div>
+        {/* Display for mobile screens. */}
+        <div className="d-md-none">
+          <hr/>
+          <div className="learner-record">
+            <div className="row">
+              <div className="col-12 d-flex justify-content-between learner-record-header flex-column">
+                <div className="d-flex mb-2">
+                  <div className="d-flex flex-column">
+                    <p className="w-50">MITx Online Program Record</p>
+                    <h1 className="flex-grow-1 learner-record-program-title">
+                      {learnerRecord ? learnerRecord.program.title : null}
+                    </h1>
+                  </div>
+                  <div
+                    id="learner-record-school-name"
+                  >
+                    <img
+                      src="/static/images/mitx-online-logo.png"
+                      alt="MITx Online Logo"
+                    />
+                  </div>
+                </div>
+                <div>
+                  {!this.isProgramCompleted() ? (
+                    <span className="badge badge-learner-completion badge-partially-completed">
+                      Partially Completed
+                    </span>
+                  ) : null}
+                  {this.isProgramCompleted() ? (
+                    <span className="badge badge-learner-completion badge-completed">
+                      Completed
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {this.renderLearnerInfo()}
+
+            <div className="col-12 mt-2 d-flex justify-content-between">
+              <div className="list-group">
+                {learnerRecord
+                  ? learnerRecord.program.courses.map(this.renderCourseListItem)
+                  : null}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* {Display for desktop screens.} */}
+        <div className="d-none d-md-block">
+          <div className="learner-record">
+            <div className="row">
+              <div className="col-12 d-flex justify-content-between learner-record-header flex-column">
+                <div className="d-flex mb-2">
+                  <div className="d-flex flex-column">
+                    <p className="w-50">MITx Online Program Record</p>
+                    <h1 className="flex-grow-1 learner-record-program-title">
+                      {learnerRecord ? learnerRecord.program.title : null}
+                    </h1>
+                  </div>
+                  <div
+                    id="learner-record-school-name"
+                  >
+                    <img
+                      src="/static/images/mitx-online-logo.png"
+                      alt="MITx Online Logo"
+                    />
+                  </div>
+                </div>
+                <div>
+                  {!this.isProgramCompleted() ? (
+                    <span className="badge badge-learner-completion badge-partially-completed">
+                      Partially Completed
+                    </span>
+                  ) : null}
+                  {this.isProgramCompleted() ? (
+                    <span className="badge badge-learner-completion badge-completed">
+                      Completed
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {this.renderLearnerInfo()}
+
+            <div className="row">
+              <div className="col-12 d-flex justify-content-between">
+                <table className="learner-record-table">
+                  <thead>
+                    <tr>
+                      <th>Course Name</th>
+                      <th>Course ID</th>
+                      <th>
+                        Highest
+                        <br />
+                        Grade
+                        <br />
+                        Earned
+                      </th>
+                      <th>
+                        Letter
+                        <br />
+                        Grade
+                      </th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {learnerRecord
+                      ? learnerRecord.program.courses.map(this.renderCourseTableRow)
+                      : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   render() {
     const { learnerRecord, isLoading } = this.props
     const { isRevoking, isEnablingSharing } = this.state
@@ -488,75 +649,10 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                 </div>
               ) : null}
             </div>
-            <hr className="d-md-none" />
-            <div className="learner-record">
-              <div className="row">
-                <div className="col-12 d-flex justify-content-between learner-record-header flex-column">
-                  <div className="d-flex mb-2">
-                    <div className="d-flex flex-column">
-                      <p className="w-50">MITx Online Program Record</p>
-                      <h1 className="flex-grow-1 learner-record-program-title">
-                        {learnerRecord ? learnerRecord.program.title : null}
-                      </h1>
-                    </div>
-                    <div
-                      className="d-none d-md-block"
-                      id="learner-record-school-name"
-                    >
-                      <img
-                        src="/static/images/mitx-online-logo.png"
-                        alt="MITx Online Logo"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    {!this.isProgramCompleted() ? (
-                      <span className="badge badge-learner-completion badge-partially-completed">
-                        Partially Completed
-                      </span>
-                    ) : null}
-                    {this.isProgramCompleted() ? (
-                      <span className="badge badge-learner-completion badge-completed">
-                        Completed
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
 
-              {this.renderLearnerInfo()}
-
-              <div className="row">
-                <div className="col-12 d-flex justify-content-between">
-                  <table className="learner-record-table">
-                    <thead>
-                      <tr>
-                        <th>Course Name</th>
-                        <th>Course ID</th>
-                        <th>
-                          Highest
-                          <br />
-                          Grade
-                          <br />
-                          Earned
-                        </th>
-                        <th>
-                          Letter
-                          <br />
-                          Grade
-                        </th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {learnerRecord
-                        ? learnerRecord.program.courses.map(this.renderCourse)
-                        : null}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            {learnerRecord
+              ? this.renderLearnerRecordTable(learnerRecord)
+              : null}
 
             {learnerRecord
               ? this.renderPartnerSchoolSharingDialog(learnerRecord)
