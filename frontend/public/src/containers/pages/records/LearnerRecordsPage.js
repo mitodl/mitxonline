@@ -91,7 +91,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
             ) : null}
           </span>
         </td>
-        <td>{course.readable_id}</td>
+        <td>{course.readable_id.split("+")[1] || course.readable_id}</td>
         <td>{course.grade ? course.grade.grade_percent : ""}</td>
         <td>{course.grade ? course.grade.letter_grade : ""}</td>
         <td className="learner-record-cert-status">
@@ -108,10 +108,13 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
   // Renders program's courses list items.
   renderCourseListItem(course: LearnerRecordCourse) {
     return (
-      <div key={`learner-record-course-${course.id}`} className="list-group-item d-flex flex-column justify-content-between align-items-start">
+      <div
+        key={`learner-record-course-${course.id}`}
+        className="list-group-item d-flex flex-column justify-content-between align-items-start"
+      >
         <div className="d-flex w-100 justify-content-between">
           <h5 className="mb-1">{course.title}</h5>
-          <span className="learner-record-req-badges pr-2">
+          <span className="learner-record-req-badges pl-2">
             {course.reqtype === "Required Courses" ? (
               <span className="badge badge-danger">Core</span>
             ) : null}
@@ -120,38 +123,39 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
             ) : null}
           </span>
         </div>
-        {course.grade ? <p className="mb-1">Grade: {course.grade.grade_percent}</p> : ""}
+        {course.readable_id.split("+")[1] || course.readable_id}
+        {course.grade ? (
+          <p className="mb-1">Grade: {course.grade.grade_percent}</p>
+        ) : (
+          ""
+        )}
+        {course.certificate ? (
+          <span className="badge badge-success">Certificate Earned</span>
+        ) : (
+          <span className="badge badge-secondary">Not Earned</span>
+        )}
       </div>
     )
   }
 
-  // <tr key={`learner-record-course-${course.id}`}>
-  //   <td>{course.readable_id}</td>
-  //   <td>{course.grade ? course.grade.grade_percent : ""}</td>
-  //   <td>{course.grade ? course.grade.letter_grade : ""}</td>
-  //   <td className="learner-record-cert-status">
-  //     {course.certificate ? (
-  //       <span className="badge badge-success">Certificate Earned</span>
-  //     ) : (
-  //       <span className="badge badge-secondary">Not Earned</span>
-  //     )}
-  //   </td>
-  // </tr>
-
   renderLearnerInfo() {
     const { learnerRecord } = this.props
-
-    return learnerRecord && learnerRecord.user ? (
-      <div className="row">
-        <div className="col-12 learner-record-user-profile">
-          <span className="learner-record-user-name">
-            {learnerRecord.user.name}
-          </span>
-          <br />
-          {learnerRecord.user.username} | {learnerRecord.user.email}
+    // Only display the leaner info if the current user is different from the leanerRecord's user
+    // or the visitor is not logged in.
+    return learnerRecord &&
+      learnerRecord.user &&
+      (!this.props.currentUser ||
+        this.props.currentUser.username !== learnerRecord.user.username) ? (
+        <div className="row">
+          <div className="col-12 learner-record-user-profile">
+            <span className="learner-record-user-name">
+              {learnerRecord.user.name}
+            </span>
+            <br />
+            {learnerRecord.user.username} | {learnerRecord.user.email}
+          </div>
         </div>
-      </div>
-    ) : null
+      ) : null
   }
 
   renderSharingLinkDialog(learnerRecord: LearnerRecord) {
@@ -465,24 +469,17 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
       <div>
         {/* Display for mobile screens. */}
         <div className="d-md-none">
-          <hr/>
           <div className="learner-record">
             <div className="row">
               <div className="col-12 d-flex justify-content-between learner-record-header flex-column">
-                <div className="d-flex mb-2">
+                <div className="d-flex">
                   <div className="d-flex flex-column">
-                    <p className="w-50">MITx Online Program Record</p>
-                    <h1 className="flex-grow-1 learner-record-program-title">
-                      {learnerRecord ? learnerRecord.program.title : null}
-                    </h1>
-                  </div>
-                  <div
-                    id="learner-record-school-name"
-                  >
-                    <img
-                      src="/static/images/mitx-online-logo.png"
-                      alt="MITx Online Logo"
-                    />
+                    <h3 className="learner-record-program-title">
+                      {learnerRecord
+                        ? learnerRecord.program.title
+                        : "MITx Online Program Record"}
+                    </h3>
+                    <p>Program Record</p>
                   </div>
                 </div>
                 <div>
@@ -501,8 +498,9 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
             </div>
 
             {this.renderLearnerInfo()}
-
-            <div className="col-12 mt-2 d-flex justify-content-between">
+            <hr />
+            <h4>Courses</h4>
+            <div className="mt-2 d-flex justify-content-between">
               <div className="list-group">
                 {learnerRecord
                   ? learnerRecord.program.courses.map(this.renderCourseListItem)
@@ -517,16 +515,14 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
           <div className="learner-record">
             <div className="row">
               <div className="col-12 d-flex justify-content-between learner-record-header flex-column">
-                <div className="d-flex mb-2">
+                <div className="d-flex">
                   <div className="d-flex flex-column">
                     <p className="w-50">MITx Online Program Record</p>
                     <h1 className="flex-grow-1 learner-record-program-title">
                       {learnerRecord ? learnerRecord.program.title : null}
                     </h1>
                   </div>
-                  <div
-                    id="learner-record-school-name"
-                  >
+                  <div id="learner-record-school-name">
                     <img
                       src="/static/images/mitx-online-logo.png"
                       alt="MITx Online Logo"
@@ -574,7 +570,9 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                   </thead>
                   <tbody>
                     {learnerRecord
-                      ? learnerRecord.program.courses.map(this.renderCourseTableRow)
+                      ? learnerRecord.program.courses.map(
+                        this.renderCourseTableRow
+                      )
                       : null}
                   </tbody>
                 </table>
@@ -597,7 +595,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
       <DocumentTitle title={`${SETTINGS.site_name} | ${RECORDS_PAGE_TITLE}`}>
         <Loader isLoading={isLoading}>
           <div className="std-page-body container">
-            <div className="d-flex flex-row-reverse">
+            <div className="d-flex flex-row-reverse mb-4">
               {isSharedRecord ? (
                 <div className="d-flex learner-record-sharing-controls mb-2">
                   {!hasSharingEnabled ? (
