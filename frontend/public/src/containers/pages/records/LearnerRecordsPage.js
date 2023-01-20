@@ -147,7 +147,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
     // or the visitor is not logged in.
     return learnerRecord &&
       learnerRecord.user &&
-      (!this.props.currentUser ||
+      (!this.props.currentUser.is_authenticated ||
         this.props.currentUser.username !== learnerRecord.user.username) ? (
         <div className="row">
           <div className="col-12 learner-record-user-profile">
