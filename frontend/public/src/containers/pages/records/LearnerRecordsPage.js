@@ -32,7 +32,7 @@ import type {
   LearnerRecordCourse
 } from "../../../flow/courseTypes"
 
-import type { CurrentUser } from "../flow/authTypes"
+import type { CurrentUser } from "../../flow/authTypes"
 
 type Props = {
   learnerRecord: LearnerRecord,
