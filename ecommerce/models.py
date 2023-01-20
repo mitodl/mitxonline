@@ -565,6 +565,16 @@ class FulfillableOrder:
             transaction.on_commit(self.send_ecommerce_order_receipt)
 
 
+class CancelableOrder:
+    @transition(field="state", source=(Order.STATE.REVIEW), target=Order.STATE.CANCELED)
+    def cancel(self):
+        self.status = Order.STATE.CANCELED
+        self.save()
+
+        # find discount redemptions and clear them
+        self.discounts.all().delete()
+
+
 class PendingOrder(FulfillableOrder, Order):
     """An order that is pending payment"""
 
@@ -751,7 +761,7 @@ class FulfilledOrder(Order):
         proxy = True
 
 
-class ReviewOrder(FulfillableOrder, Order):
+class ReviewOrder(FulfillableOrder, CancelableOrder, Order):
     """An order that has been placed under review by the payment processor."""
 
     class Meta:
