@@ -473,30 +473,26 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
         {/* Display for mobile screens. */}
         <div className="d-md-none">
           <div className="learner-record">
-            <div className="row">
-              <div className="col-12 d-flex justify-content-between learner-record-header flex-column">
-                <div className="d-flex">
-                  <div className="d-flex flex-column">
-                    <h3 className="learner-record-program-title">
-                      {learnerRecord
-                        ? learnerRecord.program.title
-                        : "MITx Online Program Record"}
-                    </h3>
-                    <p>Program Record</p>
-                  </div>
-                </div>
-                <div>
-                  {!this.isProgramCompleted() ? (
-                    <span className="badge badge-learner-completion badge-partially-completed">
-                      Partially Completed
-                    </span>
-                  ) : null}
-                  {this.isProgramCompleted() ? (
-                    <span className="badge badge-learner-completion badge-completed">
-                      Completed
-                    </span>
-                  ) : null}
-                </div>
+            <div className="m-0 d-flex flex-column">
+              <div>
+                <h3 className="learner-record-program-title">
+                  {learnerRecord
+                    ? learnerRecord.program.title
+                    : "MITx Online Program Record"}
+                </h3>
+                <p>Program Record</p>
+              </div>
+              <div>
+                {!this.isProgramCompleted() ? (
+                  <span className="badge badge-learner-completion badge-partially-completed">
+                    Partially Completed
+                  </span>
+                ) : null}
+                {this.isProgramCompleted() ? (
+                  <span className="badge badge-learner-completion badge-completed">
+                    Completed
+                  </span>
+                ) : null}
               </div>
             </div>
 
@@ -516,34 +512,33 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
         {/* {Display for desktop screens.} */}
         <div className="d-none d-md-block">
           <div className="learner-record">
-            <div className="row">
-              <div className="col-12 d-flex justify-content-between learner-record-header flex-column">
-                <div className="d-flex">
-                  <div className="d-flex flex-column">
-                    <p className="w-50">MITx Online Program Record</p>
-                    <h1 className="flex-grow-1 learner-record-program-title">
-                      {learnerRecord ? learnerRecord.program.title : null}
-                    </h1>
-                  </div>
-                  <div id="learner-record-school-name">
-                    <img
-                      src="/static/images/mitx-online-logo.png"
-                      alt="MITx Online Logo"
-                    />
-                  </div>
+            <div className="flex-column">
+              <div>
+                <div
+                  className="d-flex justify-content-between"
+                  id="learner-record-school-name"
+                >
+                  <p className="w-50">MITx Online Program Record</p>
+                  <img
+                    src="/static/images/mitx-online-logo.png"
+                    alt="MITx Online Logo"
+                  />
                 </div>
-                <div>
-                  {!this.isProgramCompleted() ? (
-                    <span className="badge badge-learner-completion badge-partially-completed">
-                      Partially Completed
-                    </span>
-                  ) : null}
-                  {this.isProgramCompleted() ? (
-                    <span className="badge badge-learner-completion badge-completed">
-                      Completed
-                    </span>
-                  ) : null}
-                </div>
+              </div>
+              <h1 className="flex-grow-1 learner-record-program-title w-50">
+                {learnerRecord ? learnerRecord.program.title : null}
+              </h1>
+              <div>
+                {!this.isProgramCompleted() ? (
+                  <span className="badge badge-learner-completion badge-partially-completed">
+                    Partially Completed
+                  </span>
+                ) : null}
+                {this.isProgramCompleted() ? (
+                  <span className="badge badge-learner-completion badge-completed">
+                    Completed
+                  </span>
+                ) : null}
               </div>
             </div>
 
