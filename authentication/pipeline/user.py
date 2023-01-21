@@ -102,11 +102,11 @@ def create_user_via_email(
     else:
         return {}
 
+    # COLLIN NEED TO HANDLE WHEN THE USER ALREADY EXISTS -> SKIP CREATE AND JUST UPDATE
     if user is not None:
         raise UnexpectedExistingUserException(backend, current_partial)
 
     context = {}
-    print(response)
     if not all(field in data for field in expected_data_fields):
         raise RequirePasswordAndPersonalInfoException(backend, current_partial)
     if len(data.get("name", 0)) < NAME_MIN_LENGTH:

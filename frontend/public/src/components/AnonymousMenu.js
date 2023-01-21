@@ -24,7 +24,7 @@ const AnonymousMenu = ({ useScreenOverlay }: Props) => {
       <li {...(listItemProps || {})}>
         <MixedLink
           id={"login".concat(identifierPostfix)}
-          dest={routes.login.begin}
+          dest="http://mitxonline.odl.local:8013/login/oidc/"
           className="simple"
           aria-label="Sign In"
         >
@@ -34,7 +34,7 @@ const AnonymousMenu = ({ useScreenOverlay }: Props) => {
       <li {...(listItemProps || {})}>
         <MixedLink
           id={"createAccount".concat(identifierPostfix)}
-          dest={routes.register.begin}
+          dest="http://mitxonline.odl.local:8013/login/oidc/"
           className="simple button"
           aria-label="Create Account"
         >

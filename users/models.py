@@ -152,6 +152,7 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     is_active = models.BooleanField(
         default=False, help_text="The user account is active"
     )
+    keycloak_uuid = models.UUIDField(unique=True, blank=True, null=True)
 
     objects = UserManager()
     faulty_openedx_users = FaultyOpenEdxUserManager()
