@@ -108,7 +108,7 @@ class StaffDashboardUserSerializer(serializers.ModelSerializer):
             "email",
             "legal_address",
             "is_staff",
-            "is_superuser",
+            "is_superuser"
         )
 
 
@@ -128,6 +128,7 @@ class UserSerializer(serializers.ModelSerializer):
         ],
         required=False,
     )
+    keycloak_uuid = serializers.CharField(allow_null=True, required=False)
     legal_address = LegalAddressSerializer(allow_null=True)
     grants = serializers.SerializerMethodField(read_only=True, required=False)
 
@@ -191,12 +192,15 @@ class UserSerializer(serializers.ModelSerializer):
         email = validated_data.pop("email")
         # Collin, is it safe to create a user with no password set?
         password = validated_data.pop("password", None)
+        
+        keycloak_uuid = validated_data.pop("id", None)
 
         with transaction.atomic():
             user = User.objects.create_user(
                 username,
                 email=email,
                 password=password,
+                keycloak_uuid=keycloak_uuid,
                 **validated_data,
             )
 
@@ -248,17 +252,17 @@ class UserSerializer(serializers.ModelSerializer):
             "is_editor",
             "is_staff",
             "is_superuser",
+            "is_superuser",
             "created_on",
             "updated_on",
             "grants",
+            "keycloak_uuid",
         )
         read_only_fields = (
             "username",
             "is_anonymous",
             "is_authenticated",
             "is_editor",
-            "is_staff",
-            "is_superuser",
             "created_on",
             "updated_on",
             "grants",

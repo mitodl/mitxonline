@@ -98,15 +98,17 @@ def create_user_via_email(
         data["legal_address"] = data["address"]
         data["legal_address"]["first_name"] = data["given_name"]
         data["legal_address"]["last_name"] = data["family_name"]
+        data["is_staff"] = True if "staff" in data["roles"] else False
+        data["is_superuser"] = True if "superuser" in data["roles"] else False
         expected_data_fields = ("name", "username")
+        print(data)
     else:
         return {}
 
     # COLLIN NEED TO HANDLE WHEN THE USER ALREADY EXISTS -> SKIP CREATE AND JUST UPDATE
-    if user is not None:
-        raise UnexpectedExistingUserException(backend, current_partial)
+    # if user is not None:
+    #     raise UnexpectedExistingUserException(backend, current_partial)
 
-    context = {}
     if not all(field in data for field in expected_data_fields):
         raise RequirePasswordAndPersonalInfoException(backend, current_partial)
     if len(data.get("name", 0)) < NAME_MIN_LENGTH:
@@ -117,7 +119,7 @@ def create_user_via_email(
         )
 
     data["email"] = kwargs.get("email", kwargs.get("details", {}).get("email"))
-    serializer = UserSerializer(data=data, context=context)
+    serializer = UserSerializer(data=data) if user is None else UserSerializer(user, data=data)
 
     if not serializer.is_valid():
         print(serializer.errors)
@@ -128,6 +130,7 @@ def create_user_via_email(
             field_errors=dict_without_keys(serializer.errors, "non_field_errors"),
         )
 
+    
     try:
         created_user = serializer.save()
     except IntegrityError:

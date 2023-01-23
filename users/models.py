@@ -82,7 +82,7 @@ class UserManager(BaseUserManager):
     use_in_migrations = True
 
     @transaction.atomic
-    def _create_user(self, username, email, password, **extra_fields):
+    def _create_user(self, username, email, password, keycloak_uuid, **extra_fields):
         """Create and save a user with the given email and password"""
         email = self.normalize_email(email)
         fields = {**extra_fields, "email": email}
@@ -94,11 +94,11 @@ class UserManager(BaseUserManager):
         _post_create_user(user)
         return user
 
-    def create_user(self, username, email=None, password=None, **extra_fields):
+    def create_user(self, username, email=None, password=None, keycloak_uuid=None, **extra_fields):
         """Create a user"""
         extra_fields.setdefault("is_staff", False)
         extra_fields.setdefault("is_superuser", False)
-        return self._create_user(username, email, password, **extra_fields)
+        return self._create_user(username, email, password, keycloak_uuid, **extra_fields)
 
     def create_superuser(self, username, email, password, **extra_fields):
         """Create a superuser"""
