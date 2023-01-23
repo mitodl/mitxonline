@@ -28,6 +28,7 @@ from ecommerce.models import (
     PendingOrder,
     Product,
     RefundedOrder,
+    ReviewOrder,
     Transaction,
     UserDiscount,
 )
@@ -256,6 +257,42 @@ class CanceledOrderAdmin(BaseOrderAdmin):
         return super().get_queryset(request).filter(state=Order.STATE.CANCELED)
 
 
+@admin.register(ReviewOrder)
+class ReviewOrderAdmin(TimestampedModelAdmin):
+    """Admin for ReviewOrder"""
+
+    model = ReviewOrder
+
+    search_fields = [
+        "id",
+        "purchaser__email",
+        "purchaser__username",
+        "reference_number",
+    ]
+    list_display = ["id", "state", "get_purchaser", "total_price_paid"]
+    inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
+    readonly_fields = ["reference_number"]
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    @display(description="Purchaser")
+    def get_purchaser(self, obj: Order):
+        return f"{obj.purchaser.name} ({obj.purchaser.email})"
+
+    def get_queryset(self, request):
+        """Filter only to canceled orders"""
+        return super().get_queryset(request).filter(state=Order.STATE.REVIEW)
+
+    def response_change(self, request, obj):
+        if "refund" in request.POST:
+            return HttpResponseRedirect(
+                "%s/?order=%s" % (reverse("refund-order"), obj.id)
+            )
+
+        return super().response_change(request, obj)
+
+
 @admin.register(FulfilledOrder)
 class FulfilledOrderAdmin(TimestampedModelAdmin):
     """Admin for FulfilledOrder"""
@@ -414,5 +451,70 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
                 "order": order,
                 "form_valid": True,
                 "errors": {},
+            },
+        )
+
+
+class AdminCancelOrderView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    template_name = "review_cancel_order_confirm.html"
+    permission_required = "is_superuser"
+
+    def post(self, request):
+        try:
+            order = ReviewOrder.objects.get(pk=request.POST["order"])
+
+            if request.POST["action"] == "process_cancel":
+                order.cancel()
+                order.save()
+
+                messages.success(
+                    request,
+                    f"Order {request.GET['order']} canceled.",
+                )
+
+                return HttpResponseRedirect(
+                    reverse("admin:ecommerce_revieworder_changelist")
+                )
+
+            return render(
+                request,
+                self.template_name,
+                {
+                    "order": order,
+                },
+            )
+        except NotImplementedError:
+            messages.error(request, f"Order {request.POST['order']} can't be refunded.")
+            return HttpResponseRedirect(
+                reverse("admin:ecommerce_refundedorder_changelist")
+            )
+        except ObjectDoesNotExist:
+            messages.error(
+                request,
+                f"Order {request.POST['order']} could not be found - is it in Review?",
+            )
+            return HttpResponseRedirect(
+                reverse("admin:ecommerce_fulfilledorder_changelist")
+            )
+
+    def get(self, request):
+        try:
+            order = ReviewOrder.objects.get(pk=request.GET["order"])
+            if order.state != Order.STATE.REVIEW:
+                raise ObjectDoesNotExist()
+        except ObjectDoesNotExist:
+            messages.error(
+                request,
+                f"Order {request.GET['order']} could not be found - is it in Review?",
+            )
+            return HttpResponseRedirect(
+                reverse("admin:ecommerce_revieworder_changelist")
+            )
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "order": order,
             },
         )
