@@ -26,27 +26,26 @@ from authentication import api as auth_api
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from main.utils import get_partitioned_set_difference
 from openedx.constants import (
-    EDX_ENROLLMENT_AUDIT_MODE,
     EDX_DEFAULT_ENROLLMENT_MODE,
+    EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     PLATFORM_EDX,
     PRO_ENROLL_MODE_ERROR_TEXTS,
 )
-
 from openedx.exceptions import (
+    EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
+    EdxApiRegistrationValidationException,
     NoEdxApiAuthError,
     OpenEdXOAuth2Error,
     OpenEdxUserCreateError,
+    UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
-    EdxApiEmailSettingsErrorException,
-    UnknownEdxApiEmailSettingsException,
-    EdxApiRegistrationValidationException,
 )
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
-from openedx.utils import edx_url, SyncResult
+from openedx.utils import SyncResult, edx_url
 from users.api import fetch_user
 
 log = logging.getLogger(__name__)
@@ -289,17 +288,39 @@ def repair_faulty_edx_user(user):
                 edX auth token was created.
     """
     created_user, created_auth_token = False, False
-    if (
-        find_object_with_matching_attr(
-            user.openedx_users.all(), "platform", value=PLATFORM_EDX
-        )
-        is None
-    ):
-        create_edx_user(user)
-        created_user = True
+    try:
+        if (
+            find_object_with_matching_attr(
+                user.openedx_users.all(), "platform", value=PLATFORM_EDX
+            )
+            is None
+        ):
+            create_edx_user(user)
+            created_user = True
+    except Exception as e:
+        # 409 means we have a username conflict - pass in that case so we can
+        # try to create the api auth tokens; re-raise otherwise
+
+        if str(e).contains("code: 409"):
+            pass
+        else:
+            raise Exception from e
+
     if not hasattr(user, "openedx_api_auth"):
         create_edx_auth_token(user)
         created_auth_token = True
+
+        if (
+            find_object_with_matching_attr(
+                user.openedx_users.all(), "platform", value=PLATFORM_EDX
+            )
+            is None
+        ):
+            # if we could create an auth token, then this user's just disconnected for some reason
+            # so go ahead and create the OpenEdxUser record for them (if there isn't one)
+            (edx_user, forced_create) = user.openedx_users.get_or_create()
+            edx_user.save()
+
     return created_user, created_auth_token
 
 
