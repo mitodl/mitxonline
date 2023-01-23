@@ -24,9 +24,10 @@ import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
+from django_countries import countries
 
 from cms.api import create_default_courseware_page
-from courses.models import Course, CourseRun, Program
+from courses.models import BlockedCountry, Course, CourseRun, Program
 from ecommerce.models import Product
 from openedx.api import get_edx_api_course_detail_client
 
@@ -76,6 +77,13 @@ class Command(BaseCommand):
             "--price",
             help="Create a matching product with the specified price for the generated course run(s).",
             type=str,
+            nargs="?",
+        )
+
+        parser.add_argument(
+            "--block_countries",
+            type=str,
+            help="Comma separated list of countries to block enrollments. Both Country Name and ISO code are supported",
             nargs="?",
         )
 
@@ -223,6 +231,34 @@ class Command(BaseCommand):
                         self.stdout.write(
                             self.style.SUCCESS(
                                 f"Created product {course_product} for {new_run.courseware_id}"
+                            )
+                        )
+
+                if kwargs["block_countries"]:
+                    for code_or_name in kwargs["block_countries"].split(","):
+
+                        country_code = countries.by_name(code_or_name)
+                        if not country_code:
+                            country_name = countries.countries.get(code_or_name, None)
+                            country_code = code_or_name if country_name else None
+                        else:
+                            country_name = code_or_name
+
+                        if country_code:
+                            BlockedCountry.objects.get_or_create(
+                                course=course, country=country_code
+                            )
+                            self.stdout.write(
+                                self.style.SUCCESS(
+                                    f"Blocked Enrollments for {country_name} ({country_code})."
+                                )
+                            )
+                            continue
+
+                        self.stdout.write(
+                            self.style.ERROR(
+                                f"Could not block country {code_or_name}. "
+                                f"Please verify that it is a valid country name or code."
                             )
                         )
             except Exception as e:
