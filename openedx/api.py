@@ -301,7 +301,7 @@ def repair_faulty_edx_user(user):
         # 409 means we have a username conflict - pass in that case so we can
         # try to create the api auth tokens; re-raise otherwise
 
-        if str(e).contains("code: 409"):
+        if "code: 409" in str(e):
             pass
         else:
             raise Exception from e
