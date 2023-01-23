@@ -83,7 +83,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--block_countries",
             type=str,
-            help="Comma separated list of countries to block enrollments.",
+            help="Comma separated list of countries to block enrollments. Both Country Name and ISO code are supported",
             nargs="?",
         )
 
