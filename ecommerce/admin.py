@@ -270,8 +270,6 @@ class ReviewOrderAdmin(TimestampedModelAdmin):
         "reference_number",
     ]
     list_display = ["id", "state", "get_purchaser", "total_price_paid"]
-    list_fields = ["state"]
-    list_filter = ["state"]
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     readonly_fields = ["reference_number"]
 
