@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.58.0
+--------------
+
+- Makes it easier to cancel an order in the Review state (#1367)
+- Updates discount application code to strip whitespace
+- feat(import_courserun): add ability to block countries (#1352)
+- fix: Fix program learner record when there is no grade (#1364)
+- Only display course number (#1345)
+- Removed check for values before rendering the create discount form (#1361)
+- fix: show only published/live product pages on home page (#1356)
+- fix: Fix admin search for redeemed discounts (#1359)
+
 Version 0.57.1 (Released January 24, 2023)
 --------------
 
