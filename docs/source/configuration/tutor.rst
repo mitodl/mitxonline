@@ -49,14 +49,7 @@ Course ID                       Course Title
 =============================== ====================
 course-v1:edX+DemoX+Demo_Course Demonstration Course
 course-v1:edX+E2E-101+course    E2E Test Course
-
-
-
-
-
-
-
-
+=============================== ====================
 
 
 If you have a devstack instance handy, you can export these and import them into Tutor. Otherwise, just create them and make sure to set dates for the courses (they default to 2030 otherwise).
@@ -104,16 +97,17 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
 3. Change into the configuration root for Tutor: ``cd "$(tutor config printroot)"``
 4. Create a ``env/build/openedx/private.txt`` with the required extensions:
 
-.. code-block:: text
-  social-auth-mitxpro
-  mitxpro-openedx-extensions
+```
+social-auth-mitxpro
+mitxpro-openedx-extensions
+```
 
 5. Edit the ``env/apps/openedx/config/lms.env.yml`` file and add:
 
-.. code-block:: yaml
-  FEATURES:
-    SKIP_EMAIL_VALIDATION: true
-
+```
+FEATURES:
+  SKIP_EMAIL_VALIDATION: true
+```
 
 to the ``FEATURES`` block (should be at the top).
 
@@ -158,12 +152,13 @@ to the ``FEATURES`` block (should be at the top).
   * Client ID and Client Secret: from record created by ``configure_instance`` when you set up MITx Online.
   * Other settings:
 
-.. code-block:: json
-	{
-	  "AUTHORIZATION_URL": "http://mitxonline.odl.local:8013/oauth2/authorize/",
-	  "ACCESS_TOKEN_URL": "http://<MITXONLINE_GATEWAY_IP>:8013/oauth2/token/",
-	  "API_ROOT": "http://<MITXONLINE_GATEWAY_IP>:8013/"
-	}
+```
+{
+  "AUTHORIZATION_URL": "http://mitxonline.odl.local:8013/oauth2/authorize/",
+  "ACCESS_TOKEN_URL": "http://<MITXONLINE_GATEWAY_IP>:8013/oauth2/token/",
+  "API_ROOT": "http://<MITXONLINE_GATEWAY_IP>:8013/"
+}
+```
 
 where MITXONLINE_GATEWAY_IP is the IP from the ``mitxonline_default`` network from the first step.
 
