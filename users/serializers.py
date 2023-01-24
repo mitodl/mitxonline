@@ -143,17 +143,17 @@ class UserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(USERNAME_ERROR_MSG)
 
         openedx_username_taken = False
-        try:
-            openedx_username_taken = check_username_exists_in_edx(trimmed_value)
-        except (
-            HTTPError,
-            RequestsConnectionError,
-            EdxApiRegistrationValidationException,
-        ):
-            log.exception(
-                "edX username verification failure for username: %s",
-                trimmed_value,
-            )
+        # try:
+        #     openedx_username_taken = check_username_exists_in_edx(trimmed_value)
+        # except (
+        #     HTTPError,
+        #     RequestsConnectionError,
+        #     EdxApiRegistrationValidationException,
+        # ):
+        #     log.exception(
+        #         "edX username verification failure for username: %s",
+        #         trimmed_value,
+        #     )
         if openedx_username_taken:
             raise serializers.ValidationError(USERNAME_ALREADY_EXISTS_MSG)
         return trimmed_value

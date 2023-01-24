@@ -53,6 +53,9 @@ def handler500(request):
     return HttpResponseServerError(
         render_to_string("500.html", request=request, context=get_base_context(request))
     )
+    
+def login(request):
+    return redirect_to_login(reverse("admin:index"), login_url="/login/oidc")
 
 
 def cms_signin_redirect_to_site_signin(request):
