@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.57.1
+Version 0.57.1 (Released January 24, 2023)
 --------------
 
 - Retry Hubspot API calls on 429 errors (#1334)
