@@ -106,7 +106,8 @@ mitxpro-openedx-extensions
 
 ```
 FEATURES:
-  SKIP_EMAIL_VALIDATION: true
+SKIP_EMAIL_VALIDATION: true
+^-- there should be 2 spaces here
 ```
 
 to the ``FEATURES`` block (should be at the top).
@@ -154,9 +155,9 @@ to the ``FEATURES`` block (should be at the top).
 
 ```
 {
-  "AUTHORIZATION_URL": "http://mitxonline.odl.local:8013/oauth2/authorize/",
-  "ACCESS_TOKEN_URL": "http://<MITXONLINE_GATEWAY_IP>:8013/oauth2/token/",
-  "API_ROOT": "http://<MITXONLINE_GATEWAY_IP>:8013/"
+"AUTHORIZATION_URL": "http://mitxonline.odl.local:8013/oauth2/authorize/",
+"ACCESS_TOKEN_URL": "http://<MITXONLINE_GATEWAY_IP>:8013/oauth2/token/",
+"API_ROOT": "http://<MITXONLINE_GATEWAY_IP>:8013/"
 }
 ```
 
