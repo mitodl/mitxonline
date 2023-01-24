@@ -3,7 +3,6 @@ import React from "react"
 import EnrolledItemCard from "./EnrolledItemCard"
 import ProgramCourseInfoCard from "./ProgramCourseInfoCard"
 import { extractCoursesFromNode } from "../lib/courseApi"
-import { areLearnerRecordsEnabled } from "../lib/util"
 import type {
   ProgramEnrollment,
   CourseDetailWithRuns
@@ -203,18 +202,14 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
             <div className="row chrome" id="program_enrollment_subtite">
               <p>
                 Program overview: {this.renderProgramOverview()}
-                {areLearnerRecordsEnabled() ? (
-                  <>
-                    <br />
-                    <a
-                      href={`/records/${enrollment.program.id}/`}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      View program record
-                    </a>
-                  </>
-                ) : null}
+                <br />
+                <a
+                  href={`/records/${enrollment.program.id}/`}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  View program record
+                </a>
               </p>
             </div>
             {enrolledItemCards}
