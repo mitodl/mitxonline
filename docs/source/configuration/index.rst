@@ -7,5 +7,4 @@ Configuration
    open_edx
    tutor
    ecommerce
-   refine_admin
    quickstart
