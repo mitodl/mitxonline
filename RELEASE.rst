@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.58.0
+Version 0.58.0 (Released January 24, 2023)
 --------------
 
 - Makes it easier to cancel an order in the Review state (#1367)
