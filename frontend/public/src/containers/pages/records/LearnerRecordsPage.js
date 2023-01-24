@@ -82,7 +82,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
   // Renders program's courses table.
   renderCourseTableRow(course: LearnerRecordCourse) {
     return (
-      <tr key={`learner-record-course-${course.id}`}>
+      <tr scope="row" key={`learner-record-course-${course.id}`}>
         <td className="d-flex">
           <span className="flex-grow-1">{course.title}</span>
           <span className="learner-record-req-badges pr-2">
@@ -549,8 +549,8 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                 <table className="learner-record-table">
                   <thead>
                     <tr>
-                      <th>Course Name</th>
-                      <th>Course ID</th>
+                      <th scope="col">Course Name</th>
+                      <th scope="col">Course ID</th>
                       <th>
                         Highest
                         <br />
