@@ -6,7 +6,7 @@ mitX Online
 
 # Initial Setup
 
-mitxonline follows the same [initial setup steps outlined in the common OL web app guide](http://mitodl.github.io/handbook/common-web-app-guide.html).
+mitxonline follows the same [initial setup steps outlined in the common OL web app guide](https://mitodl.github.io/handbook/how-to/common-web-app-guide.html).
 Run through those steps **including the addition of `/etc/hosts` aliases and the optional step for running the
 `createsuperuser` command**.
 
