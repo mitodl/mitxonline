@@ -4,7 +4,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 from json import dumps
-from urllib.parse import quote_plus, urljoin
+from urllib.parse import quote_plus
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -14,7 +14,6 @@ from django.db import models
 from django.forms import ChoiceField, DecimalField
 from django.http import Http404
 from django.template.response import TemplateResponse
-from django.templatetags.static import static
 from django.urls import reverse
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
@@ -58,7 +57,7 @@ from cms.constants import (
 )
 from cms.forms import CertificatePageForm
 from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset
-from courses.models import Course, CourseRunCertificate, ProgramCertificate, Program
+from courses.models import Course, CourseRunCertificate, Program, ProgramCertificate
 from flexiblepricing.api import (
     determine_auto_approval,
     determine_courseware_flexible_price_discount,
@@ -73,7 +72,6 @@ from flexiblepricing.models import (
     FlexiblePrice,
     FlexiblePricingRequestSubmission,
 )
-from main import features
 from main.views import get_base_context
 
 log = logging.getLogger()
@@ -747,6 +745,20 @@ class ProductPage(Page):
         blank=True,
         help_text="The faculty members to display on this page",
     )
+
+    def save(self, clean=True, user=None, log_action=False, **kwargs):
+        """
+        Updates related courseware object title.
+        """
+        super().save(clean=clean, user=user, log_action=log_action, **kwargs)
+
+        courseware_object = None
+        if self.is_course_page:
+            courseware_object = getattr(self, "course")
+        elif self.is_program_page:
+            courseware_object = getattr(self, "program")
+        courseware_object.title = self.title
+        courseware_object.save()
 
     def _get_child_page_of_type(self, cls):
         """Gets the first child page of the given type if it exists"""

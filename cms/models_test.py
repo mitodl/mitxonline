@@ -539,3 +539,20 @@ def test_certificate_for_program_page():
         assert signatory.value.title_2 == "Title_2"
         assert signatory.value.organization == "Organization"
         assert signatory.value.signature_image.title == "Image"
+
+
+@pytest.mark.parametrize("test_course", [True, False])
+def test_courseware_title_synced_with_product_page_title(test_course):
+    """Tests that Courseware title is synced with the Course Page title"""
+    product_page = CoursePageFactory() if test_course else ProgramPageFactory()
+    updated_title = "Updated Courseware Page Title"
+    product_page.title = updated_title
+    product_page.save()
+
+    courseware = (
+        getattr(product_page, "course")
+        if test_course
+        else getattr(product_page, "program")
+    )
+
+    assert courseware.title == updated_title
