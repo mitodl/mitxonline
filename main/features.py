@@ -5,7 +5,6 @@ from django.conf import settings
 
 IGNORE_EDX_FAILURES = "IGNORE_EDX_FAILURES"
 SYNC_ON_DASHBOARD_LOAD = "SYNC_ON_DASHBOARD_LOAD"
-ENABLE_LEARNER_RECORDS = "ENABLE_LEARNER_RECORDS"
 
 
 def is_enabled(name, default=None):
