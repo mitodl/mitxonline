@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.58.1
+--------------
+
+- Removes the ENABLE_LEARNER_RECORDS feature flag. (#1375)
+- feat: add search and filters on Discount admin model (#1381)
+- 1346 learner record UI improvements (#1368)
+- Update README.md (#1369)
+- Updates repair_faulty_edx_user to reconnect edX users (#1371)
+
 Version 0.58.0 (Released January 24, 2023)
 --------------
 
