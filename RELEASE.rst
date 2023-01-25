@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.58.1
+Version 0.58.1 (Released January 25, 2023)
 --------------
 
 - Removes the ENABLE_LEARNER_RECORDS feature flag. (#1375)
