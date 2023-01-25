@@ -3,7 +3,13 @@ import factory
 import pytest
 from django.contrib.auth import get_user_model
 
-from users.api import fetch_user, fetch_users, find_available_username, get_user_by_id
+from users.api import (
+    fetch_user,
+    fetch_users,
+    find_available_username,
+    get_user_by_id,
+    make_normalized_username,
+)
 from users.factories import UserFactory
 from users.utils import usernameify
 
@@ -166,3 +172,26 @@ def test_full_username_creation():
     assert available_username == "{}1".format(
         new_generated_username[0 : expected_username_max - 1]
     )
+
+
+def test_username_normalization():
+    """
+    Tests the make_normalized_username function for proper functionality. This
+    doesn't strictly require a User object, so this uses a set string with
+    accented characters that should be normalized to low-ASCII characters.
+    (For completeness, this also tests the version of the function in the
+    models test.)
+
+    The characters in accented_string is not a complete list of characters that
+    will be converted. It is, however, a list of characters that will be
+    converted (other than ø, which is dropped).
+    """
+
+    accented_string = "áéíóúâêîôûäëïöüåçø"
+    unaccented_string = "aeiouaeiouaeiouac"
+
+    assert unaccented_string == make_normalized_username(accented_string)
+
+    from users.models_test import normalize_username
+
+    assert unaccented_string == normalize_username(accented_string)

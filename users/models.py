@@ -87,7 +87,11 @@ class UserManager(BaseUserManager):
         email = self.normalize_email(email)
         fields = {**extra_fields, "email": email}
         if username is not None:
+            from users.api import make_normalized_username
+
+            normalized_username = make_normalized_username(username)
             fields["username"] = username
+            fields["normalized_username"] = normalized_username
         user = self.model(**fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -144,6 +148,9 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     # NOTE: Username max length was set to 50 before we lowered it. We're hardcoding this
     # value here now until we are ready to migrate the max length at the database level.
     username = models.CharField(unique=True, max_length=USERNAME_MAX_LEN)
+    normalized_username = models.CharField(
+        max_length=USERNAME_MAX_LEN, blank=False, unique=True
+    )
     email = models.EmailField(blank=False, unique=True)
     name = models.TextField(blank=True, default="")
     is_staff = models.BooleanField(
@@ -159,6 +166,12 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     def get_full_name(self):
         """Returns the user's fullname"""
         return self.name
+
+    def make_normalized_username(self):
+        """Calls the API make_normalized_username and stores the result"""
+        from users.api import make_normalized_username
+
+        self.normalized_username = make_normalized_username(self.username)
 
     @property
     def is_editor(self) -> bool:
