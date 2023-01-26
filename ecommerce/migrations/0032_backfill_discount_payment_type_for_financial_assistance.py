@@ -5,12 +5,13 @@ from django.db import migrations
 
 def backfill_payment_type_for_financial_assistance(apps, schema_editor):
     Discount = apps.get_model("ecommerce", "Discount")
+    Discount.objects.filter(for_flexible_pricing=True).update(payment_type="FA")
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ecommerce', '0031_discount_payment_type'),
+        ("ecommerce", "0031_discount_payment_type"),
     ]
 
     operations = [
