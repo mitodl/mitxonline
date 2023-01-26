@@ -757,6 +757,7 @@ class ProductPage(Page):
             courseware_object = getattr(self, "program")
         courseware_object.title = self.title
         courseware_object.save()
+
         return super().save(clean=clean, user=user, log_action=log_action, **kwargs)
 
     def _get_child_page_of_type(self, cls):
