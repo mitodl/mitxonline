@@ -41,7 +41,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
 
     return (
       <EnrolledItemCard
-        key={found.readable_id}
+        key={found.run.course.readable_id}
         enrollment={found}
         isProgramCard={true}
       ></EnrolledItemCard>
@@ -52,9 +52,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     const { enrollment } = this.props
 
     return (
-      <React.Fragment
-        key={`drawer-course-list-${enrollment.program.readable_id}`}
-      >
+      <React.Fragment>
         {enrollment.program.req_tree[0].children.map(node => {
           const interiorCourses = extractCoursesFromNode(node, enrollment)
 
