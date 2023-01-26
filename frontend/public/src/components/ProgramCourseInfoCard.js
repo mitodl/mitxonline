@@ -43,14 +43,11 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
     }
 
     return (
-      <div
-        className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3"
-        key={course.readable_id}
-      >
+      <div className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3">
         <div className="row flex-grow-1">
           {featuredImage}
           <div className="col-12 col-md px-3 py-3 py-md-0 box">
-            <div className="align-content-start d-flex enrollment-mode-container w-100">
+            <div className="align-content-start enrollment-mode-container w-100">
               {courseRunStatusDetail !== null &&
               courseRunStatusDetail.active ? (
                   <span className="badge badge-in-progress mr-2">

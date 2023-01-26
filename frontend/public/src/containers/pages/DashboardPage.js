@@ -126,7 +126,7 @@ export class DashboardPage extends React.Component<
             <nav className="tabs" aria-controls="enrollment-items">
               {programEnrollmentsLength === 0 ? (
                 <>
-                  <strong style={{ "font-size": "75%" }}>My Courses</strong>
+                  <strong style={{ fontSize: "75%" }}>My Courses</strong>
                 </>
               ) : (
                 <>
