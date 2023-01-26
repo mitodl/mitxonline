@@ -1,17 +1,15 @@
 """Tests for users.serializers"""
-from requests import HTTPError
-from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
-from openedx.exceptions import EdxApiRegistrationValidationException
 import pytest
 import responses
 from django.contrib.auth.models import AnonymousUser
-
 from django.test.client import RequestFactory
-from rest_framework.exceptions import ValidationError
-from rest_framework import status
-
+from requests import HTTPError
 from requests.exceptions import ConnectionError as RequestsConnectionError
+from rest_framework import status
+from rest_framework.exceptions import ValidationError
 
+from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
+from openedx.exceptions import EdxApiRegistrationValidationException
 from users.factories import UserFactory
 from users.models import ChangeEmailRequest, LegalAddress
 from users.serializers import (
@@ -243,9 +241,7 @@ def test_username_validation_connection_exception(
     UserSerializer should raise a RequestsConnectionError or HTTPError if the connection to OpenEdx
     fails.  The serializer should still be valid.
     """
-    mocker.patch(
-        "openedx.api.check_username_exists_in_edx", side_effect=exception_raised
-    )
+    mocker.patch("openedx.api.validate_username_with_edx", side_effect=exception_raised)
 
     serializer = UserSerializer(
         data={

@@ -16,7 +16,7 @@ from hubspot_sync.task_helpers import sync_hubspot_user
 # from ecommerce.api import fetch_and_serialize_unused_coupons
 from mail import verification_api
 from main.serializers import WriteableSerializerMethodField
-from openedx.api import check_username_exists_in_edx
+from openedx.api import validate_username_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.tasks import change_edx_user_email_async
 from users.models import ChangeEmailRequest, LegalAddress, Profile, User
@@ -40,6 +40,10 @@ USERNAME_ERROR_MSG = "Username can only contain letters, numbers, spaces, and th
 USERNAME_ALREADY_EXISTS_MSG = (
     "A user already exists with this username. Please try a different one."
 )
+
+OPENEDX_USERNAME_VALIDATION_MSGS_MAP = {
+    "It looks like this username is already taken": USERNAME_ALREADY_EXISTS_MSG
+}
 
 
 class LegalAddressSerializer(serializers.ModelSerializer):
@@ -141,9 +145,12 @@ class UserSerializer(serializers.ModelSerializer):
         if not re.fullmatch(USERNAME_RE, trimmed_value):
             raise serializers.ValidationError(USERNAME_ERROR_MSG)
 
-        openedx_username_taken = False
+        openedx_validation_msg = ""
         try:
-            openedx_username_taken = check_username_exists_in_edx(trimmed_value)
+            openedx_validation_msg = validate_username_with_edx(trimmed_value)
+            openedx_validation_msg = OPENEDX_USERNAME_VALIDATION_MSGS_MAP.get(
+                openedx_validation_msg, openedx_validation_msg
+            )
         except (
             HTTPError,
             RequestsConnectionError,
@@ -153,8 +160,8 @@ class UserSerializer(serializers.ModelSerializer):
                 "edX username verification failure for username: %s",
                 trimmed_value,
             )
-        if openedx_username_taken:
-            raise serializers.ValidationError(USERNAME_ALREADY_EXISTS_MSG)
+        if openedx_validation_msg:
+            raise serializers.ValidationError(openedx_validation_msg)
         return trimmed_value
 
     def get_email(self, instance):

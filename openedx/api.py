@@ -769,16 +769,15 @@ def unsubscribe_from_edx_course_emails(user, course_run):
     return result
 
 
-def check_username_exists_in_edx(username):
+def validate_username_with_edx(username):
     """
-    Returns true if the username exists within Open edX.
-    Returns false if the username does not exists in Open edX.
+    Returns validation message after validating it with edX.
 
     Args:
         username (str): the username
 
     Raises:
-        EdxApiRegistrationValidationException: Raised if the edX API HTTP request fails
+        EdxApiRegistrationValidationException: Raised if response status is not OK.
     """
 
     req_session = requests.Session()
@@ -794,8 +793,4 @@ def check_username_exists_in_edx(username):
     if resp.status_code != status.HTTP_200_OK:
         raise EdxApiRegistrationValidationException(username, resp)
     result = resp.json()
-    return result["validation_decisions"][
-        "username"
-    ] == "It looks like {} belongs to an existing account. Try again with a different username.".format(
-        username
-    )
+    return result["validation_decisions"]["username"]

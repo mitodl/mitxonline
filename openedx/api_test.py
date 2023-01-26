@@ -21,7 +21,6 @@ from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
     OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS,
     OPENEDX_REGISTRATION_VALIDATION_PATH,
-    check_username_exists_in_edx,
     create_edx_auth_token,
     create_edx_user,
     create_user,
@@ -36,6 +35,7 @@ from openedx.api import (
     unsubscribe_from_edx_course_emails,
     update_edx_user_email,
     update_edx_user_name,
+    validate_username_with_edx,
 )
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -97,12 +97,12 @@ def test_create_user(user, mocker):
     """
 
 
-def edx_username_validation_response_mock(username_exists, settings, username=None):
+def edx_username_validation_response_mock(username_exists, settings):
     if username_exists:
         validation_decisions = {"username": ""}
     else:
         validation_decisions = {
-            "username": f"It looks like {username} belongs to an existing account. Try again with a different username."
+            "username": "It looks like this username is already taken"
         }
     responses.add(
         responses.POST,
@@ -182,27 +182,27 @@ def test_create_edx_user_conflict(settings, user):
 
 @responses.activate
 def test_validate_edx_username_conflict(settings, user):
-    """Test that check_username_exists_in_edx handles a username validation conflict"""
-    edx_username_validation_response_mock(True, settings, user.username)
+    """Test that validate_username_with_edx handles a username validation conflict"""
+    edx_username_validation_response_mock(True, settings)
 
-    assert check_username_exists_in_edx(user.username) == True
+    assert validate_username_with_edx(user.username)
 
 
 @responses.activate
 def test_validate_edx_username_conflict(settings, user):
-    """Test that check_username_exists_in_edx raises an exception for non-200 response"""
+    """Test that validate_username_with_edx raises an exception for non-200 response"""
     responses.add(
         responses.POST,
         settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
         json={
             "validation_decisions": {
-                "username": f"It looks like {user.username} belongs to an existing account. Try again with a different username."
+                "username": "It looks like this username is already taken"
             }
         },
         status=status.HTTP_400_BAD_REQUEST,
     )
     with pytest.raises(EdxApiRegistrationValidationException):
-        check_username_exists_in_edx(user.username)
+        validate_username_with_edx(user.username)
 
 
 @responses.activate
@@ -572,44 +572,6 @@ def test_retry_users_grace_period(mocker):
     assert repaired_users == [user_to_repair]
     patched_faulty_user_qset.assert_called_once()
     patched_repair_user.assert_called_once_with(user_to_repair)
-
-
-# def test_unenroll_edx_course_run(mocker):
-#     """Tests that unenroll_edx_course_run makes a call to unenroll in edX via the API client"""
-#     mock_client = mocker.MagicMock()
-#     run_enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
-#     courseware_id = run_enrollment.run.courseware_id
-#     enroll_return_value = mocker.Mock(json={"course_id": courseware_id})
-#     mock_client.enrollments.deactivate_enrollment = mocker.Mock(
-#         return_value=enroll_return_value
-#     )
-#     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
-#     deactivated_enrollment = unenroll_edx_course_run(run_enrollment)
-#
-#     mock_client.enrollments.deactivate_enrollment.assert_called_once_with(courseware_id)
-#     assert deactivated_enrollment == enroll_return_value
-
-
-# @pytest.mark.parametrize(
-#     "client_exception_raised,expected_exception",
-#     [
-#         [MockHttpError, EdxApiEnrollErrorException],
-#         [ValueError, UnknownEdxApiEnrollException],
-#         [Exception, UnknownEdxApiEnrollException],
-#     ],
-# )
-# def test_unenroll_edx_course_run_failure(
-#     mocker, client_exception_raised, expected_exception
-# ):
-#     """Tests that unenroll_edx_course_run translates exceptions raised by the API client"""
-#     run_enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
-#     mock_client = mocker.MagicMock()
-#     mock_client.enrollments.deactivate_enrollment = mocker.Mock(
-#         side_effect=client_exception_raised
-#     )
-#     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
-#     with pytest.raises(expected_exception):
-#         unenroll_edx_course_run(run_enrollment)
 
 
 def test_update_user_edx_name(mocker, user):

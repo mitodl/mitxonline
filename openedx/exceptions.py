@@ -133,7 +133,7 @@ class EdxApiRegistrationValidationException(Exception):
 
         Args:
             username (str): The username being compared for uniqueness
-            http_error (requests.exceptions.HTTPError): The exception from the API call which contains
+            http_error (requests.Response): The exception from the API call which contains
                 request and response data.
         """
         self.username = username
