@@ -750,8 +750,6 @@ class ProductPage(Page):
         """
         Updates related courseware object title.
         """
-        super().save(clean=clean, user=user, log_action=log_action, **kwargs)
-
         courseware_object = None
         if self.is_course_page:
             courseware_object = getattr(self, "course")
@@ -759,6 +757,7 @@ class ProductPage(Page):
             courseware_object = getattr(self, "program")
         courseware_object.title = self.title
         courseware_object.save()
+        return super().save(clean=clean, user=user, log_action=log_action, **kwargs)
 
     def _get_child_page_of_type(self, cls):
         """Gets the first child page of the given type if it exists"""
