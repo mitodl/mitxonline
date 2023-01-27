@@ -85,11 +85,11 @@ class CourseAdmin(admin.ModelAdmin):
             product_page_edit_url = (
                 f"{reverse('wagtailadmin_home')}/pages/{obj.page.id}/edit"
             )
-            product_page_edit_url = (
+            product_page_edit_link = (
                 f"<a href={product_page_edit_url} target='_blank'>CMS Product Page</a>"
             )
             help_texts = {
-                "title": f"You can update the course title using {product_page_edit_url}."
+                "title": f"You can update the course title using {product_page_edit_link}."
             }
             kwargs.update({"help_texts": help_texts})
 
