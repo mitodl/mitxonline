@@ -5,6 +5,7 @@ from django.contrib import admin
 from django.contrib.admin.decorators import display
 from django.db import models
 from django.forms import TextInput
+from django.urls import reverse
 from mitol.common.admin import TimestampedModelAdmin
 
 from courses.forms import ProgramAdminForm
@@ -67,6 +68,32 @@ class CourseAdmin(admin.ModelAdmin):
     formfield_overrides = {
         models.CharField: {"widget": TextInput(attrs={"size": "80"})}
     }
+
+    def get_readonly_fields(self, request, obj=None):
+        """
+        Adds `title` as readonly field while editing an existing object.
+        """
+        if obj:
+            return self.readonly_fields + ("title",)
+        return self.readonly_fields
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        """
+        Adds help text for `title` field while editing an existing object.
+        """
+        if obj:
+            product_page_edit_url = (
+                f"{reverse('wagtailadmin_home')}/pages/{obj.page.id}/edit"
+            )
+            product_page_edit_url = (
+                f"<a href={product_page_edit_url} target='_blank'>CMS Product Page</a>"
+            )
+            help_texts = {
+                "title": f"You can update the course title using {product_page_edit_url}."
+            }
+            kwargs.update({"help_texts": help_texts})
+
+        return super().get_form(request, obj=obj, change=change, **kwargs)
 
 
 class CourseRunAdmin(TimestampedModelAdmin):
