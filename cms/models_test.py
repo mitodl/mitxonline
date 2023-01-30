@@ -543,7 +543,7 @@ def test_certificate_for_program_page():
 
 @pytest.mark.parametrize("test_course", [True, False])
 def test_courseware_title_synced_with_product_page_title(test_course):
-    """Tests that Courseware title is synced with the Course Page title"""
+    """Tests that Courseware title is synced with the Course Page title from CMS"""
     product_page = CoursePageFactory() if test_course else ProgramPageFactory()
     updated_title = "Updated Courseware Page Title"
     product_page.title = updated_title
