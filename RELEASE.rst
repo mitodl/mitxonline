@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.59.0
+--------------
+
+- Updates program certficiate text
+
 Version 0.58.2 (Released January 26, 2023)
 --------------
 
