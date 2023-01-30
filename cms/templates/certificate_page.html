@@ -66,10 +66,10 @@
                     </div>
                     <span class="certify-text">This is to certify that</span>
                     <span class="certify-name">{{ learner_name }}</span>
-                    <span class="success-text">has successfully completed{% if is_program_certificate %} the{% endif %}</span>
+                    <span class="success-text">has successfully completed {% if is_program_certificate %}all courses and received passing grades to earn a MicroMasters program certificate in{% endif %}</span>
                     <span class="degree-text">{{ page.product_name }}</span>
                     {% if is_program_certificate %}
-                        <span class="program-degree-text">Professional Certificate Program<br></span>
+                        <span class="success-text">a program of study offered by MITx, an online learning initiative of the Massachusetts Institute of Technology<br></span>
                     {% endif %}
                     <span class="award-text">
                         {% if page.CEUs %} Awarded {{ CEUs }} Continuing Education Units (CEUs) <br> {% endif %}
