@@ -53,7 +53,8 @@ type DispatchProps = {|
     legalAddress: LegalAddress,
     partialToken: string
   ) => Promise<Response<AuthResponse>>,
-  getCurrentUser: () => Promise<Response<User>>
+  getCurrentUser: () => Promise<Response<User>>,
+  addUserNotification: Function
 |}
 
 type Props = {|
