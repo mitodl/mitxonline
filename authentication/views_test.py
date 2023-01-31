@@ -155,6 +155,10 @@ class AuthStateMachine(RuleBasedStateMachine):
         "users.serializers.UserSerializer.validate_username",
         return_value="dummy-username",
     )
+    mock_edx_username_patcher = patch(
+        "users.serializers.validate_username_with_edx",
+        return_value="",
+    )
     openedx_api_patcher = patch("authentication.pipeline.user.openedx_api")
     openedx_tasks_patcher = patch("authentication.pipeline.user.openedx_tasks")
 
@@ -168,6 +172,7 @@ class AuthStateMachine(RuleBasedStateMachine):
         # wrap the execution in a patch()
         self.mock_email_send = self.email_send_patcher.start()
         self.mock_api = self.mock_api_patcher.start()
+        self.mock_edx_username_api = self.mock_edx_username_patcher.start()
         self.mock_openedx_api = self.openedx_api_patcher.start()
         self.mock_openedx_tasks = self.openedx_tasks_patcher.start()
 
@@ -192,6 +197,7 @@ class AuthStateMachine(RuleBasedStateMachine):
         self.openedx_api_patcher.stop()
         self.openedx_tasks_patcher.stop()
         self.mock_api_patcher.stop()
+        self.mock_edx_username_patcher.stop()
 
         # end the transaction with a rollback to cleanup any state
         transaction.set_rollback(True)
