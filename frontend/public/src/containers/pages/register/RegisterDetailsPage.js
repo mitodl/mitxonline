@@ -2,7 +2,10 @@
 /* global SETTINGS: false */
 import React from "react"
 import DocumentTitle from "react-document-title"
-import { ALERT_TYPE_DANGER, REGISTER_DETAILS_PAGE_TITLE } from "../../../constants"
+import {
+  ALERT_TYPE_DANGER,
+  REGISTER_DETAILS_PAGE_TITLE
+} from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { Link } from "react-router-dom"
@@ -65,7 +68,7 @@ export class RegisterDetailsPage extends React.Component<Props> {
       history,
       registerDetails,
       params: { partialToken },
-      addUserNotification,
+      addUserNotification
     } = this.props
 
     try {
