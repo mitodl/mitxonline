@@ -145,23 +145,6 @@ class UserSerializer(serializers.ModelSerializer):
         if not re.fullmatch(USERNAME_RE, trimmed_value):
             raise serializers.ValidationError(USERNAME_ERROR_MSG)
 
-        openedx_validation_msg = ""
-        try:
-            openedx_validation_msg = validate_username_with_edx(trimmed_value)
-            openedx_validation_msg = OPENEDX_USERNAME_VALIDATION_MSGS_MAP.get(
-                openedx_validation_msg, openedx_validation_msg
-            )
-        except (
-            HTTPError,
-            RequestsConnectionError,
-            EdxApiRegistrationValidationException,
-        ):
-            log.exception(
-                "edX username verification failure for username: %s",
-                trimmed_value,
-            )
-        if openedx_validation_msg:
-            raise serializers.ValidationError(openedx_validation_msg)
         return trimmed_value
 
     def get_email(self, instance):
@@ -187,6 +170,26 @@ class UserSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"username": "This field is required."}
                 )
+
+        username = data.get("username")
+        if username:
+            try:
+                openedx_validation_msg = validate_username_with_edx(username)
+                openedx_validation_msg = OPENEDX_USERNAME_VALIDATION_MSGS_MAP.get(
+                    openedx_validation_msg, openedx_validation_msg
+                )
+            except (
+                HTTPError,
+                RequestsConnectionError,
+                EdxApiRegistrationValidationException,
+            ):
+                raise serializers.ValidationError(
+                    "Unable to register at this time, please try again later"
+                )
+
+            if openedx_validation_msg:
+                raise serializers.ValidationError({"username": openedx_validation_msg})
+
         return data
 
     def create(self, validated_data):
