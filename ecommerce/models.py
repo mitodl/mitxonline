@@ -31,6 +31,7 @@ from ecommerce.constants import (
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
     TRANSACTION_TYPES,
+    PAYMENT_TYPES,
 )
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
 from main.settings import TIME_ZONE
@@ -232,12 +233,6 @@ class BasketItem(TimestampedModel):
 class Discount(TimestampedModel):
     """Discount model"""
 
-    class PaymentType(models.TextChoices):
-        MARKETING = 'B2C'
-        SALES = 'B2B'
-        FINANCIAL_ASSISTANCE = 'FA'
-        CUSTOMER_SUPPORT = 'CS'
-
     amount = models.DecimalField(
         decimal_places=5,
         max_digits=20,
@@ -245,7 +240,7 @@ class Discount(TimestampedModel):
     automatic = models.BooleanField(default=False)
     discount_type = models.CharField(choices=DISCOUNT_TYPES, max_length=30)
     redemption_type = models.CharField(choices=REDEMPTION_TYPES, max_length=30)
-    payment_type = models.CharField(null=True, choices=PaymentType.choices, max_length=3)
+    payment_type = models.CharField(null=True, choices=PAYMENT_TYPES, max_length=30)
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
     discount_code = models.CharField(max_length=50)
     for_flexible_pricing = models.BooleanField(null=False, default=False)

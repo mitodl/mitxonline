@@ -21,7 +21,7 @@ from django.db import transaction
 from courses.api import create_run_enrollments
 from courses.models import CourseRun, PaidCourseRun
 from ecommerce.api import fulfill_completed_order
-from ecommerce.constants import ZERO_PAYMENT_DATA
+from ecommerce.constants import ZERO_PAYMENT_DATA, PAYMENT_TYPE_FINANCIAL_ASSISTANCE
 from ecommerce.discounts import DiscountType
 from ecommerce.models import PendingOrder, Product, Discount
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
@@ -102,7 +102,9 @@ class Command(BaseCommand):
             )
 
         discount = Discount.objects.filter(
-            for_flexible_pricing=False, discount_code=options["code"]
+            discount_code=options["code"]
+        ).exclude(
+            payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE
         ).first()
         if not discount:
             raise CommandError(

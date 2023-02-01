@@ -139,7 +139,7 @@ def test_product_flexible_price_serializer(mock_context):
                 "automatic": flexible_price.tier.discount.automatic,
                 "discount_code": flexible_price.tier.discount.discount_code,
                 "discount_type": flexible_price.tier.discount.discount_type,
-                "for_flexible_pricing": flexible_price.tier.discount.for_flexible_pricing,
+                "payment_type": flexible_price.tier.discount.payment_type,
                 "id": flexible_price.tier.discount.id,
                 "max_redemptions": flexible_price.tier.discount.max_redemptions,
                 "redemption_type": flexible_price.tier.discount.redemption_type,

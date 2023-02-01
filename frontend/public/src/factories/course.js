@@ -77,7 +77,7 @@ export const makeCourseRunWithProduct = (): CourseRun => ({
         redemption_type:      null,
         max_redemptions:      null,
         discount_code:        "",
-        for_flexible_pricing: false
+        payment_type: null
       }
     }
   ]

@@ -14,7 +14,7 @@ from rest_framework import status
 
 from courses.factories import CourseRunFactory, ProgramRunFactory
 from courses.models import PaidCourseRun
-from ecommerce.constants import DISCOUNT_TYPE_PERCENT_OFF
+from ecommerce.constants import DISCOUNT_TYPE_PERCENT_OFF, PAYMENT_TYPE_FINANCIAL_ASSISTANCE
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
     BasketFactory,
@@ -240,7 +240,7 @@ def test_redeem_discount(
     discount = discounts[random.randrange(0, len(discounts))]
 
     if try_flex_pricing_discount:
-        discount.for_flexible_pricing = True
+        discount.payment_type = PAYMENT_TYPE_FINANCIAL_ASSISTANCE
         discount.save()
         discount.refresh_from_db()
 

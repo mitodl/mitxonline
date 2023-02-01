@@ -16,7 +16,7 @@ export const DiscountShow = () => {
             <h2>
                 <Space>
                     Discount Detail
-                    { record?.for_flexible_pricing ? (<Tag color="green">Financial Assistance Tier</Tag>) : null }
+                    { record?.payment_type === 'financial-assistance' ? (<Tag color="green">Financial Assistance Tier</Tag>) : null }
                     { record?.redemption_type !== "unlimited" && record?.is_redeemed ? (<Tag color="red">Redeemed</Tag>) : null }
                 </Space>
             </h2>
@@ -29,6 +29,11 @@ export const DiscountShow = () => {
                     <Title level={5}>Redemption Type</Title>
                     <Text>
                         <Tag>{record?.redemption_type}</Tag>
+                    </Text>
+
+                    <Title level={5}>Payment Type</Title>
+                    <Text>
+                        <Tag>{record?.payment_type}</Tag>
                     </Text>
 
                     <Title level={5}>Amount</Title>
@@ -52,7 +57,7 @@ export const DiscountShow = () => {
 
             {record ? <RedemptionList record={record} key={`redemptions-${record?.id}`} /> : null}
 
-            {record && record.for_flexible_pricing ? <FinAidTiers record={record} key={`tiers-${record?.id}`} /> : null}
+            {record && record.payment_type === 'financial-assistance' ? <FinAidTiers record={record} key={`tiers-${record?.id}`} /> : null}
 
             {record ? <UserAssignments record={record} key={`assignees-${record?.id}`} /> : null}
 

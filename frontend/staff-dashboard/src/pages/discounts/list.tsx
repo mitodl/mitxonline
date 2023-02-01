@@ -29,7 +29,7 @@ export const DiscountList: React.FC = () => {
         initialPageSize: 40,
         onSearch: (params) => {
             const filters: CrudFilters = [];
-            const { q, redemption_type, for_flexible_pricing, is_redeemed } = params;
+            const { q, redemption_type, payment_type, is_redeemed } = params;
 
             filters.push({
                 field: 'q',
@@ -44,9 +44,9 @@ export const DiscountList: React.FC = () => {
             });
 
             filters.push({
-                field: 'for_flexible_pricing',
+                field: 'payment_type',
                 operator: 'eq',
-                value: for_flexible_pricing
+                value: payment_type
             });
 
             filters.push({
@@ -81,7 +81,7 @@ export const DiscountList: React.FC = () => {
                                 dataIndex="discount_code"
                                 title="Discount Code"
                                 render={(value, record: IDiscount) => {
-                                    return (<Space>{value} {record?.for_flexible_pricing ? (<Tag color="green">Financial Assistance Tier</Tag>) : null}</Space>)
+                                    return (<Space>{value} {record?.payment_type === "financial-assistance" ? (<Tag color="green">Financial Assistance Tier</Tag>) : null}</Space>)
                                 }} />
                             <Table.Column
                                 dataIndex="amount"
@@ -93,6 +93,13 @@ export const DiscountList: React.FC = () => {
                                 title="Discount Type"
                                 render={(value, record: any) => {
                                     return (<Space>{value} {record?.redemption_type !== "unlimited" && record?.is_redeemed ? (<Tag color="red">Redeemed</Tag>) : null}</Space>)
+                                }}
+                            />
+                            <Table.Column
+                                dataIndex="payment_type"
+                                title="Payment Type"
+                                render={(value, record: any) => {
+                                    return (<Space>{value}</Space>)
                                 }}
                             />
                             <Table.Column

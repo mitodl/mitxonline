@@ -35,6 +35,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import api
+from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE
 from ecommerce.discounts import DiscountType
 from ecommerce.models import (
     Basket,
@@ -236,11 +237,6 @@ class DiscountFilterSet(django_filters.FilterSet):
     q = django_filters.CharFilter(
         field_name="discount_code", label="q", lookup_expr="icontains"
     )
-    for_flexible_pricing = django_filters.TypedChoiceFilter(
-        field_name="for_flexible_pricing",
-        choices=(("yes", "True"), ("no", "False")),
-        coerce=strtobool,
-    )
     is_redeemed = django_filters.ChoiceFilter(
         method="redeemed_filter", choices=(("yes", "yes"), ("no", "no"))
     )
@@ -260,7 +256,7 @@ class DiscountFilterSet(django_filters.FilterSet):
         fields = [
             "q",
             "redemption_type",
-            "for_flexible_pricing",
+            "payment_type",
             "is_redeemed",
         ]
 
@@ -423,7 +419,7 @@ class CheckoutApiViewSet(ViewSet):
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 
         try:
-            discount = Discount.objects.filter(for_flexible_pricing=False).get(
+            discount = Discount.objects.exclude(payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE).get(
                 discount_code=request.data["discount"].strip()
             )
 

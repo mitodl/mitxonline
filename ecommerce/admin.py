@@ -103,7 +103,7 @@ class DiscountAdmin(admin.ModelAdmin):
     model = Discount
     search_fields = ["discount_type", "redemption_type", "discount_code"]
     list_display = ["id", "discount_code", "discount_type", "amount", "redemption_type", "payment_type"]
-    list_filter = ["discount_type", "redemption_type", "for_flexible_pricing", "payment_type"]
+    list_filter = ["discount_type", "redemption_type", "payment_type"]
 
 
 @admin.register(DiscountProduct)

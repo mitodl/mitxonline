@@ -14,7 +14,7 @@ from mitol.payment_gateway.exceptions import RefundDuplicateException
 
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
-from ecommerce.constants import REFUND_SUCCESS_STATES, ZERO_PAYMENT_DATA
+from ecommerce.constants import REFUND_SUCCESS_STATES, ZERO_PAYMENT_DATA, PAYMENT_TYPE_FINANCIAL_ASSISTANCE
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -189,7 +189,7 @@ def apply_user_discounts(request):
     discount = None
 
     BasketDiscount.objects.filter(
-        redeemed_basket=basket, redeemed_discount__for_flexible_pricing=True
+        redeemed_basket=basket, redeemed_discount__payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE
     ).delete()
     if BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0:
         return

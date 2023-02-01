@@ -43,7 +43,7 @@ export type Discount = {
   amount: number,
   discount_code: string,
   discount_type: string,
-  for_flexible_pricing: boolean
+  payment_type: string
 }
 
 export type Refund = {
