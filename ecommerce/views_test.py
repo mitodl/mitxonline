@@ -14,7 +14,10 @@ from rest_framework import status
 
 from courses.factories import CourseRunFactory, ProgramRunFactory
 from courses.models import PaidCourseRun
-from ecommerce.constants import DISCOUNT_TYPE_PERCENT_OFF, PAYMENT_TYPE_FINANCIAL_ASSISTANCE
+from ecommerce.constants import (
+    DISCOUNT_TYPE_PERCENT_OFF,
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+)
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
     BasketFactory,

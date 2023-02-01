@@ -21,9 +21,9 @@ from django.db import transaction
 from courses.api import create_run_enrollments
 from courses.models import CourseRun, PaidCourseRun
 from ecommerce.api import fulfill_completed_order
-from ecommerce.constants import ZERO_PAYMENT_DATA, PAYMENT_TYPE_FINANCIAL_ASSISTANCE
+from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE, ZERO_PAYMENT_DATA
 from ecommerce.discounts import DiscountType
-from ecommerce.models import PendingOrder, Product, Discount
+from ecommerce.models import Discount, PendingOrder, Product
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.api import fetch_user
 
@@ -101,11 +101,11 @@ class Command(BaseCommand):
                 )
             )
 
-        discount = Discount.objects.filter(
-            discount_code=options["code"]
-        ).exclude(
-            payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE
-        ).first()
+        discount = (
+            Discount.objects.filter(discount_code=options["code"])
+            .exclude(payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE)
+            .first()
+        )
         if not discount:
             raise CommandError(
                 "That enrollment code {} does not exist".format(options["code"])

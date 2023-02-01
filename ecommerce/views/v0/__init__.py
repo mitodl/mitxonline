@@ -419,9 +419,9 @@ class CheckoutApiViewSet(ViewSet):
             return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
 
         try:
-            discount = Discount.objects.exclude(payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE).get(
-                discount_code=request.data["discount"].strip()
-            )
+            discount = Discount.objects.exclude(
+                payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE
+            ).get(discount_code=request.data["discount"].strip())
 
             if not api.check_discount_for_products(discount, basket):
                 raise ObjectDoesNotExist()
