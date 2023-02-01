@@ -415,31 +415,6 @@ class AuthStateMachine(RuleBasedStateMachine):
             expect_authenticated=True,
         )
 
-    # @rule(auth_state=consumes(LoginPasswordAuthStates))
-    # def login_password_exports_temporary_error(self, auth_state):
-    #     """Login for a user who hasn't been OFAC verified yet"""
-    #     with override_settings(**get_cybersource_test_settings()), patch(
-    #         "authentication.pipeline.compliance.api.verify_user_with_exports",
-    #         side_effect=Exception("register_details_export_temporary_error"),
-    #     ):
-    #         assert_api_call_json(
-    #             self.client,
-    #             "psa-login-password",
-    #             {
-    #                 "flow": auth_state["flow"],
-    #                 "partial_token": auth_state["partial_token"],
-    #                 "password": self.password,
-    #             },
-    #             {
-    #                 "flow": auth_state["flow"],
-    #                 "partial_token": None,
-    #                 "state": SocialAuthState.STATE_ERROR_TEMPORARY,
-    #                 "errors": [
-    #                     "Unable to register at this time, please try again later"
-    #                 ],
-    #             },
-    #         )
-
     @rule(
         target=ConfirmationRedeemedAuthStates,
         auth_state=consumes(ConfirmationSentAuthStates),

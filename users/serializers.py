@@ -15,6 +15,7 @@ from hubspot_sync.task_helpers import sync_hubspot_user
 
 # from ecommerce.api import fetch_and_serialize_unused_coupons
 from mail import verification_api
+from main.constants import USER_REGISTRATION_FAILED_MSG
 from main.serializers import WriteableSerializerMethodField
 from openedx.api import validate_username_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
@@ -182,10 +183,9 @@ class UserSerializer(serializers.ModelSerializer):
                 HTTPError,
                 RequestsConnectionError,
                 EdxApiRegistrationValidationException,
-            ):
-                raise serializers.ValidationError(
-                    "Unable to register at this time, please try again later"
-                )
+            ) as exc:
+                log.exception("Unable to create user account", exc)
+                raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)
 
             if openedx_validation_msg:
                 raise serializers.ValidationError({"username": openedx_validation_msg})
