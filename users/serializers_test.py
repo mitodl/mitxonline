@@ -251,7 +251,8 @@ def test_username_validation_connection_exception(
             "legal_address": sample_address,
         }
     )
-    assert serializer.is_valid() is False
+    with pytest.raises(Exception):
+        assert serializer.is_valid() is False
 
 
 @responses.activate
