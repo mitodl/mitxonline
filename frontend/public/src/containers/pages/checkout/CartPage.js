@@ -125,7 +125,7 @@ export class CartPage extends React.Component<Props, CartState> {
       discounts &&
       discounts.length > 0 &&
       typeof discounts.find(
-        discount => discount.payment_type === 'financial-assistance'
+        discount => discount.payment_type === "financial-assistance"
       ) !== "undefined"
     ) {
       userFlexiblePriceExists = true
