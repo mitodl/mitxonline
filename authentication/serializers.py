@@ -13,6 +13,7 @@ from social_core.utils import (
     user_is_authenticated,
 )
 from social_django.views import _do_login as login
+
 from authentication.exceptions import (
     EmailBlockedException,
     InvalidPasswordException,
@@ -24,6 +25,7 @@ from authentication.exceptions import (
     UserTryAgainLaterException,
 )
 from authentication.utils import SocialAuthState
+from main.constants import USER_REGISTRATION_FAILED_MSG
 
 PARTIAL_PIPELINE_TOKEN_KEY = "partial_pipeline_token"
 
@@ -169,7 +171,7 @@ class SocialAuthSerializer(serializers.Serializer):
         except UserTryAgainLaterException:
             result = SocialAuthState(
                 SocialAuthState.STATE_ERROR_TEMPORARY,
-                errors=["Unable to register at this time, please try again later"],
+                errors=[USER_REGISTRATION_FAILED_MSG],
             )
         except AuthException as exc:
             log.exception("Received unexpected AuthException")
