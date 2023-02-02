@@ -65,7 +65,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
 
 from courses.models import Program
-from ecommerce.constants import REDEMPTION_TYPE_UNLIMITED, PAYMENT_TYPE_FINANCIAL_ASSISTANCE
+from ecommerce.constants import (
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    REDEMPTION_TYPE_UNLIMITED,
+)
 from ecommerce.models import Discount
 from flexiblepricing.models import FlexiblePriceTier
 
