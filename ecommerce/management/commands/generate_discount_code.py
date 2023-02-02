@@ -37,7 +37,8 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
-    REDEMPTION_TYPE_UNLIMITED, ALL_PAYMENT_TYPES,
+    REDEMPTION_TYPE_UNLIMITED,
+    ALL_PAYMENT_TYPES,
 )
 from ecommerce.models import Discount
 from main.utils import parse_supplied_date
@@ -80,7 +81,7 @@ class Command(BaseCommand):
             "--payment-type",
             type=str,
             help="Sets the payment type (marketing, sales, financial-assistance, customer-support, staff)",
-            required=True
+            required=True,
         )
 
         parser.add_argument(
@@ -135,9 +136,7 @@ class Command(BaseCommand):
 
         if payment_type not in ALL_PAYMENT_TYPES:
             self.stderr.write(
-                self.style.ERROR(
-                    f"Payment type {payment_type} is not valid."
-                )
+                self.style.ERROR(f"Payment type {payment_type} is not valid.")
             )
             exit(-1)
 

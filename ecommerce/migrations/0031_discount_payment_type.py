@@ -6,13 +6,23 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ecommerce', '0030_alter_discount_for_flexible_pricing'),
+        ("ecommerce", "0030_alter_discount_for_flexible_pricing"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='discount',
-            name='payment_type',
-            field=models.CharField(choices=[('marketing', 'marketing'), ('sales', 'sales'), ('financial-assistance', 'financial-assistance'), ('customer-support', 'customer-support'), ('staff', 'staff')], max_length=30, null=True),
+            model_name="discount",
+            name="payment_type",
+            field=models.CharField(
+                choices=[
+                    ("marketing", "marketing"),
+                    ("sales", "sales"),
+                    ("financial-assistance", "financial-assistance"),
+                    ("customer-support", "customer-support"),
+                    ("staff", "staff"),
+                ],
+                max_length=30,
+                null=True,
+            ),
         ),
     ]
