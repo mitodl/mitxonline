@@ -34,6 +34,10 @@ export const DiscountFilterForm: React.FC<{ formProps: FormProps }> = ({ formPro
         label: 'customer-support',
         value: 'customer-support',
     },
+    {
+        label: 'staff',
+        value: 'staff',
+    },
   ]
   const redemptionOpts = [
     { label: '', value: '' }, { label: 'Redeemed', value: 'yes' }, { label: 'Not Redeemed', value: 'no' }

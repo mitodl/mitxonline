@@ -56,7 +56,8 @@ export const DiscountForm = (props: IDiscountFormProps) => {
                 { label: 'marketing', value: 'marketing' },
                 { label: 'sales', value: 'sales' },
                 { label: 'financial-assistance', value: 'financial-assistance' },
-                { label: 'customer-support', value: 'customer-support' }
+                { label: 'customer-support', value: 'customer-support' },
+                { label: 'staff', value: 'staff' }
             ]}></Select>
         </Form.Item>
         <Form.Item label="Activation Date" name="activation_date">
