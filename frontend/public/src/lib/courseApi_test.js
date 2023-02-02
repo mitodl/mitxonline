@@ -15,7 +15,9 @@ import {
   makeLearnerRecord,
   makeProgramWithReqTree,
   makeProgramWithOnlyRequirements,
-  makeProgramWithOnlyElectives
+  makeProgramWithOnlyElectives,
+  makeProgramWithNoElectivesOrRequirements,
+  makeProgram
 } from "../factories/course"
 import { makeUser } from "../factories/user"
 
@@ -233,6 +235,43 @@ describe("Course API", () => {
 
       assert.equal(requirements.length, 0)
       assert.equal(electives.length, 4)
+    })
+
+    it("returns a flattened list of courses for the node without any required courses or elective courses", () => {
+      // the learner record will generate a requirements tree in the proper
+      // format, so we're just using that factory here
+      const programEnrollment = {
+        program:     makeProgramWithNoElectivesOrRequirements(),
+        enrollments: []
+      }
+
+      const requirements = extractCoursesFromNode(
+        programEnrollment.program.req_tree[0].children[0],
+        programEnrollment
+      )
+      const electives = extractCoursesFromNode(
+        programEnrollment.program.req_tree[0].children[1],
+        programEnrollment
+      )
+
+      assert.equal(requirements.length, 0)
+      assert.equal(electives.length, 0)
+    })
+
+    it("returns a flattened list of courses associated with the program without nodes", () => {
+      // the learner record will generate a requirements tree in the proper
+      // format, so we're just using that factory here
+      const programEnrollment = {
+        program:     makeProgram(),
+        enrollments: []
+      }
+
+      // Pass undefined which can occur when an admin user deletes the requirement or elective sections from the program record.
+      const requirements = extractCoursesFromNode(undefined, programEnrollment)
+      const electives = extractCoursesFromNode(undefined, programEnrollment)
+
+      assert.equal(requirements.length, 0)
+      assert.equal(electives.length, 0)
     })
   })
 })
