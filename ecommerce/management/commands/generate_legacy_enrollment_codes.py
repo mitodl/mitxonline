@@ -13,21 +13,25 @@ and this command will generate single-use per-user discounts for each learner
 and course combination (if a product exists for it). The course must be
 available for enrollment and must also have a product associated with it.
 """
+import csv
+import uuid
+
+import dateutil
+import pytz
 from django.core.management import BaseCommand
 from django.db import transaction
 from django.db.models import Q
 
-import csv
-import uuid
-import dateutil
-import pytz
-
-from courses.models import CourseRun, Course
+from courses.models import Course, CourseRun
+from ecommerce.constants import (
+    DISCOUNT_TYPE_PERCENT_OFF,
+    PAYMENT_TYPE_CUSTOMER_SUPPORT,
+    REDEMPTION_TYPE_ONE_TIME,
+)
 from ecommerce.models import Discount, DiscountProduct, UserDiscount
-from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, DISCOUNT_TYPE_PERCENT_OFF, PAYMENT_TYPE_CUSTOMER_SUPPORT
-from users.models import User
-from micromasters_import.models import CourseId
 from main.settings import TIME_ZONE
+from micromasters_import.models import CourseId
+from users.models import User
 
 
 class Command(BaseCommand):
