@@ -2,13 +2,29 @@
 
 from django.db import migrations
 
-from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE
+from ecommerce.constants import (
+    PAYMENT_TYPE_CUSTOMER_SUPPORT,
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    PAYMENT_TYPE_STAFF,
+)
 
 
-def backfill_payment_type_for_financial_assistance(apps, schema_editor):
+def backfill_payment_types(apps, schema_editor):
     discount = apps.get_model("ecommerce", "Discount")
+
+    # financial-assistance have `for_flexible_pricing=True`
     discount.objects.filter(for_flexible_pricing=True).update(
         payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE
+    )
+
+    # customer-support discount codes start with `CS-`
+    discount.objects.filter(discount_code__startswith="CS-").update(
+        payment_type=PAYMENT_TYPE_CUSTOMER_SUPPORT
+    )
+
+    # staff discount codes start with `JPAL-`
+    discount.objects.filter(discount_code__startswith="JPAL-").update(
+        payment_type=PAYMENT_TYPE_STAFF
     )
 
 
@@ -19,7 +35,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(
-            backfill_payment_type_for_financial_assistance, migrations.RunPython.noop
-        ),
+        migrations.RunPython(backfill_payment_types, migrations.RunPython.noop),
     ]
