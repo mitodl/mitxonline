@@ -33,7 +33,7 @@ Running, testing, and administering this app follows the same patterns as our ot
 
 *Note: for js tests, run the commands in `frontend/public`, or run via `yarn workspaces foreach run <command>` from the root.
 
-[See the common OL web app guide](http://mitodl.github.io/handbook/common-web-app-guide.html#running-and-accessing-the-app).
+[See the common OL web app guide](http://mitodl.github.io/handbook/how-to/common-web-app-guide.html#running-and-accessing-the-app).
 
 
 # Certificates
