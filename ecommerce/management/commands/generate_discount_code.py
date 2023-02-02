@@ -202,8 +202,7 @@ class Command(BaseCommand):
                     expiration_date=expiration_date,
                     activation_date=activation_date,
                     discount_code=code_to_generate,
-                    amount=amount,
-                    for_flexible_pricing=False,
+                    amount=amount
                 )
 
                 generated_codes.append(discount)
