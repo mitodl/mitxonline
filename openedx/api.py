@@ -536,7 +536,7 @@ def enroll_in_edx_course_runs(
 ):
     """
     Enrolls a user in edx course runs. If the user doesn't have a valid
-    set of API credentials, this will try to regenerate them.
+    set of API credentials, this will try to regenerate them (unless told not to).
 
     Args:
         user (users.models.User): The user to enroll
