@@ -300,6 +300,27 @@ export const makeProgramWithOnlyElectives = (): Program => {
   return program
 }
 
+export const makeProgramWithNoElectivesOrRequirements = (): Program => {
+  const program = makeProgram()
+
+  // for the reqtree stuff to work, the program needs 6 more courses
+  for (let i = 0; i < 6; i++) {
+    program.courses.push(makeCourseDetailWithRuns())
+  }
+
+  program.req_tree = [
+    makeDEDPSampleRequirementsTree(
+      program,
+      program.courses,
+      false,
+      false,
+      false
+    )
+  ]
+
+  return program
+}
+
 export const makeCertificate = (): Certificate => ({
   link: `/certificate/program/${casual.uuid}`,
   uuid: casual.uuid

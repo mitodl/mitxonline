@@ -155,29 +155,30 @@ export const extractCoursesFromNode = (
   // Processes the node, and returns the courses that are within it. If there
   // are nested operators, this will walk them but it won't group the courses
   // based on them.
+  if (typeof node !== "undefined") {
+    if (node.data.node_type === NODETYPE_COURSE) {
+      const retCourse = enrollment.program.courses.find(
+        elem => elem.id === node.data.course
+      )
 
-  if (node.data.node_type === NODETYPE_COURSE) {
-    const retCourse = enrollment.program.courses.find(
-      elem => elem.id === node.data.course
-    )
+      if (retCourse) {
+        return [retCourse]
+      }
 
-    if (retCourse) {
-      return [retCourse]
+      return []
+    } else if (node.data.node_type === NODETYPE_OPERATOR) {
+      let courseList = []
+
+      if (node.children) {
+        node.children.forEach(child => {
+          courseList = courseList.concat(
+            extractCoursesFromNode(child, enrollment)
+          )
+        })
+      }
+
+      return courseList
     }
-
-    return []
-  } else if (node.data.node_type === NODETYPE_OPERATOR) {
-    let courseList = []
-
-    if (node.children) {
-      node.children.forEach(child => {
-        courseList = courseList.concat(
-          extractCoursesFromNode(child, enrollment)
-        )
-      })
-    }
-
-    return courseList
   }
 
   return []
