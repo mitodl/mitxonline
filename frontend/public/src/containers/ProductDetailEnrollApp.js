@@ -4,7 +4,7 @@ import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { connectRequest } from "redux-query"
+import { connectRequest, mutateAsync } from "redux-query"
 import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 import Loader from "../components/Loader"
@@ -26,6 +26,7 @@ import {
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
+import { enrollmentMutation } from "../lib/queries/enrollment"
 
 type Props = {
   courseId: string,
@@ -34,7 +35,8 @@ type Props = {
   status: ?number,
   upgradeEnrollmentDialogVisibility: boolean,
   addProductToBasket: (user: number, productId: number) => Promise<any>,
-  currentUser: User
+  currentUser: User,
+  createEnrollment: (runId: number) => Promise<any>
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
@@ -52,6 +54,19 @@ export class ProductDetailEnrollApp extends React.Component<
 
   toggleUpgradeDialogVisibility = () => {
     const { upgradeEnrollmentDialogVisibility } = this.state
+    const { createEnrollment, courseRuns } = this.props
+    const run =
+      !this.getCurrentCourseRun() && courseRuns
+        ? courseRuns[0]
+        : this.getCurrentCourseRun()
+
+    if (!upgradeEnrollmentDialogVisibility) {
+      console.log(`creating enrollment for ${run.id}`)
+      createEnrollment(run)
+    } else {
+      window.location = "/dashboard/"
+    }
+
     this.setState({
       upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
     })
@@ -84,6 +99,7 @@ export class ProductDetailEnrollApp extends React.Component<
         ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run.products ? run.products[0] : null
+
     return product ? (
       <Modal
         id={`upgrade-enrollment-dialog`}
@@ -282,6 +298,9 @@ export class ProductDetailEnrollApp extends React.Component<
   }
 }
 
+const createEnrollment = (run: EnrollmentFlaggedCourseRun) =>
+  mutateAsync(enrollmentMutation(run.id))
+
 const mapStateToProps = createStructuredSelector({
   courseRuns:  courseRunsSelector,
   currentUser: currentUserSelector,
@@ -294,7 +313,11 @@ const mapPropsToConfig = props => [
   users.currentUserQuery()
 ]
 
+const mapDispatchToProps = {
+  createEnrollment
+}
+
 export default compose(
-  connect(mapStateToProps),
+  connect(mapStateToProps, mapDispatchToProps),
   connectRequest(mapPropsToConfig)
 )(ProductDetailEnrollApp)

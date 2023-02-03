@@ -114,7 +114,7 @@ def _validate_enrollment_post_request(
     """
     user = request.user
     run_id_str = request.data.get("run")
-    if run_id_str is not None and run_id_str.isdigit():
+    if run_id_str is not None and str(run_id_str).isdigit():
         run = (
             CourseRun.objects.filter(id=int(run_id_str))
             .select_related("course")
@@ -154,14 +154,25 @@ def create_enrollment_view(request):
         runs=[run],
         keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
     )
+
+    def respond(data, status=True):
+        """
+        Either return a redirect or Ok/Fail based on status.
+        """
+
+        if "isapi" in request.data:
+            return Response("Ok" if status else "Fail")
+
+        return HttpResponseRedirect(data)
+
     if edx_request_success or features.is_enabled(features.IGNORE_EDX_FAILURES):
-        resp = HttpResponseRedirect(reverse("user-dashboard"))
+        resp = respond(reverse("user-dashboard"))
         cookie_value = {
             "type": USER_MSG_TYPE_ENROLLED,
             "run": run.title,
         }
     else:
-        resp = HttpResponseRedirect(request.headers["Referer"])
+        resp = respond(request.headers["Referer"])
         cookie_value = {
             "type": USER_MSG_TYPE_ENROLL_FAILED,
         }

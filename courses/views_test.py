@@ -458,8 +458,12 @@ def test_user_enrollment_delete_other_fail(mocker, settings, user_drf_client, us
     patched_deactivate.assert_not_called()
 
 
-def test_create_enrollments(mocker, user_client):
-    """Create enrollment view should create an enrollment and include a user message in the response cookies"""
+@pytest.mark.parametrize("api_request", [True, False])
+def test_create_enrollments(mocker, user_client, api_request):
+    """
+    Create enrollment view should create an enrollment and include a user message in the response cookies.
+    Unless api_request is set to True, in which case we should get a string back.
+    """
     patched_create_enrollments = mocker.patch(
         "courses.views.v1.create_run_enrollments",
         return_value=(None, True),
@@ -467,17 +471,24 @@ def test_create_enrollments(mocker, user_client):
     run = CourseRunFactory.create()
     resp = user_client.post(
         reverse("create-enrollment-via-form"),
-        data={"run": str(run.id)},
+        data={"run": str(run.id), "isapi": "true"}
+        if api_request
+        else {"run": str(run.id)},
     )
-    assert resp.status_code == status.HTTP_302_FOUND
-    assert resp.url == reverse("user-dashboard")
-    assert USER_MSG_COOKIE_NAME in resp.cookies
-    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
-        {
-            "type": USER_MSG_TYPE_ENROLLED,
-            "run": run.title,
-        }
-    )
+
+    if api_request:
+        assert "Ok" in str(resp.content)
+    else:
+        assert resp.status_code == status.HTTP_302_FOUND
+        assert resp.url == reverse("user-dashboard")
+        assert USER_MSG_COOKIE_NAME in resp.cookies
+        assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+            {
+                "type": USER_MSG_TYPE_ENROLLED,
+                "run": run.title,
+            }
+        )
+
     patched_create_enrollments.assert_called_once()
 
 

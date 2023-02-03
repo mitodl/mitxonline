@@ -174,3 +174,16 @@ export const revokeLearnerRecordSharingLinkMutation = (programId: number) => ({
     learnerRecord: nextState
   }
 })
+
+export const enrollmentMutation = (runId: number) => ({
+  url:  `/enrollments/`,
+  body: {
+    run:   `${runId}`,
+    isapi: true
+  },
+  options: {
+    ...getCsrfOptions(),
+    method: "POST"
+  },
+  update: {}
+})

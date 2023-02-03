@@ -431,4 +431,23 @@ describe("ProductDetailEnrollApp", () => {
       }
     })
   })
+
+  it(`shows the enroll button and upsell message, and generates an enrollment when the button is clicked`, async () => {
+    courseRun["products"] = [
+      {
+        id:                     1,
+        price:                  10,
+        product_flexible_price: {}
+      }
+    ]
+    isWithinEnrollmentPeriodStub.returns(true)
+
+    const { inner } = await renderPage()
+
+    const enrollBtn = inner.find(".enroll-now").at(0)
+    assert.isTrue(enrollBtn.exists())
+    await enrollBtn.prop("onClick")()
+
+    sinon.assert.calledWith(helper.handleRequestStub, "/enrollments/", "POST")
+  })
 })
