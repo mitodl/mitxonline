@@ -243,7 +243,6 @@ class Discount(TimestampedModel):
     payment_type = models.CharField(null=True, choices=PAYMENT_TYPES, max_length=30)
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
     discount_code = models.CharField(max_length=50)
-    for_flexible_pricing = models.BooleanField(null=False, default=False)
     activation_date = models.DateTimeField(
         null=True,
         blank=True,

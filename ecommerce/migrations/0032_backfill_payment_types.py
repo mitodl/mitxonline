@@ -29,7 +29,7 @@ def backfill_payment_types(apps, schema_editor):
         payment_type=PAYMENT_TYPE_STAFF
     )
 
-    # marketing discount codes start with `MITALUM15-`
+    # marketing discount codes have multiple start codes
     discount.objects.filter(
         Q(discount_code__startswith="MITALUM15-")
         | Q(discount_code__startswith="14750x-")
