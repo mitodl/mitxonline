@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.59.1
+--------------
+
+- feat: Sync courseware title with CMS page title (#1382)
+- Bump ua-parser-js from 0.7.31 to 0.7.33 (#1394)
+- Bump terser from 5.12.1 to 5.16.2 (#1406)
+- Update readme (#1405)
+- fix: Fix edX username validation to avoid username collision (#1389)
+- Add a workflow for new issues
+
 Version 0.59.0 (Released January 30, 2023)
 --------------
 
