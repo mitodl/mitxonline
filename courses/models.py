@@ -4,9 +4,9 @@ Course models
 import logging
 import operator as op
 import uuid
-from decimal import ROUND_HALF_EVEN, getcontext
+from decimal import ROUND_HALF_EVEN
 from decimal import Context as DecimalContext
-from decimal import Decimal
+from decimal import Decimal, getcontext
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
@@ -304,12 +304,12 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
         object_id_field="courseware_object_id",
-        content_type_field="courseware_content_type"
+        content_type_field="courseware_content_type",
     )
     tiers = GenericRelation(
         "flexiblepricing.FlexiblePriceTier",
         object_id_field="courseware_object_id",
-        content_type_field="courseware_content_type"
+        content_type_field="courseware_content_type",
     )
 
     class Meta:
