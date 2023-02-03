@@ -37,6 +37,14 @@ def repair_faulty_openedx_users():
 
 
 @app.task(acks_late=True)
+def regenerate_openedx_auth_tokens(user_id):
+    """Calls the API method to repair A faulty Open edX user"""
+    user = User.objects.get(id=user_id)
+    api.create_edx_auth_token(user)
+    return user.email
+
+
+@app.task(acks_late=True)
 def change_edx_user_email_async(user_id):
     """
     Task to change edX user email in the background to avoid database level locks

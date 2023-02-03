@@ -20,6 +20,7 @@ from courses.api import (
     deactivate_run_enrollment,
     defer_enrollment,
     generate_course_run_certificates,
+    generate_program_certificate,
     get_user_enrollments,
     get_user_relevant_course_run,
     manage_course_run_certificate_access,
@@ -28,7 +29,6 @@ from courses.api import (
     process_course_run_grade_certificate,
     sync_course_mode,
     sync_course_runs,
-    generate_program_certificate,
 )
 from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
@@ -40,9 +40,9 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
-    ProgramFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
+    ProgramFactory,
     ProgramRequirementFactory,
 )
 
@@ -322,7 +322,11 @@ def test_create_run_enrollments(
         user, runs, mode=enrollment_mode, force_enrollment=False
     )
     patched_edx_enroll.assert_called_once_with(
-        user, runs, mode=enrollment_mode, force_enrollment=False
+        user,
+        runs,
+        mode=enrollment_mode,
+        force_enrollment=False,
+        regen_auth_tokens=False,
     )
 
     with django_capture_on_commit_callbacks(execute=True):
@@ -407,7 +411,11 @@ def test_create_run_enrollments_api_fail(mocker, user, exception_cls):
         keep_failed_enrollments=True,
     )
     patched_edx_enroll.assert_called_once_with(
-        user, [run], mode=EDX_DEFAULT_ENROLLMENT_MODE, force_enrollment=False
+        user,
+        [run],
+        mode=EDX_DEFAULT_ENROLLMENT_MODE,
+        force_enrollment=False,
+        regen_auth_tokens=False,
     )
     patched_log_exception.assert_called_once()
     patched_send_enrollment_email.assert_not_called()
@@ -453,7 +461,11 @@ def test_create_run_enrollments_enroll_api_fail(
         keep_failed_enrollments=keep_failed_enrollments,
     )
     patched_edx_enroll.assert_called_once_with(
-        user, runs, mode=EDX_DEFAULT_ENROLLMENT_MODE, force_enrollment=False
+        user,
+        runs,
+        mode=EDX_DEFAULT_ENROLLMENT_MODE,
+        force_enrollment=False,
+        regen_auth_tokens=False,
     )
     patched_log_exception.assert_called_once()
     patched_send_enrollment_email.assert_not_called()
@@ -490,7 +502,11 @@ def test_create_run_enrollments_creation_fail(mocker, user):
         runs,
     )
     patched_edx_enroll.assert_called_once_with(
-        user, runs, mode=EDX_DEFAULT_ENROLLMENT_MODE, force_enrollment=False
+        user,
+        runs,
+        mode=EDX_DEFAULT_ENROLLMENT_MODE,
+        force_enrollment=False,
+        regen_auth_tokens=False,
     )
     patched_log_exception.assert_called_once()
     patched_mail_api.send_course_run_enrollment_email.assert_not_called()
@@ -1150,7 +1166,11 @@ def test_create_run_enrollments_upgrade(mocker, user):
         mode=EDX_ENROLLMENT_AUDIT_MODE,
     )
     patched_edx_enroll.assert_called_once_with(
-        user, [test_course_run], mode=EDX_ENROLLMENT_AUDIT_MODE, force_enrollment=False
+        user,
+        [test_course_run],
+        mode=EDX_ENROLLMENT_AUDIT_MODE,
+        force_enrollment=False,
+        regen_auth_tokens=False,
     )
 
     patched_send_enrollment_email.assert_called_once()
@@ -1174,6 +1194,7 @@ def test_create_run_enrollments_upgrade(mocker, user):
         [test_course_run],
         mode=EDX_ENROLLMENT_VERIFIED_MODE,
         force_enrollment=False,
+        regen_auth_tokens=False,
     )
 
     assert edx_request_success is False
