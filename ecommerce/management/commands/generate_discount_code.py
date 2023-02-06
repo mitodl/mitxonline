@@ -22,7 +22,9 @@ option to specify an expiration date, or use --one-time to make the code a
 one-time discount. You can also set the discount type with --discount-type. The
 type should be one of the normal types (dollars-off, percent-off, or
 fixed-price). If the type is set to percent-off, the command will make sure your
-amount is 100% or less.
+amount is 100% or less. You can set the discount payment type using --payment-type.
+The payment type should be one of (`marketing`, `sales`, `financial-assistance`,
+`customer-support`, or `staff`).
 
 """
 
