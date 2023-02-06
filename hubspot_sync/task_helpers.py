@@ -1,7 +1,13 @@
 """ Task helper functions for ecommerce """
+import logging
+
 from django.conf import settings
 
 from hubspot_sync import tasks
+
+# pylint:disable-bare-except
+
+log = logging.getLogger(__name__)
 
 
 def sync_hubspot_user(user):
@@ -12,7 +18,12 @@ def sync_hubspot_user(user):
         user (User): The user to sync
     """
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
-        tasks.sync_contact_with_hubspot.delay(user.id)
+        try:
+            tasks.sync_contact_with_hubspot.delay(user.id)
+        except:
+            log.exception(
+                "Exception calling sync_contact_with_hubspot for user %s", user.username
+            )
 
 
 def sync_hubspot_deal(order):
@@ -24,7 +35,12 @@ def sync_hubspot_deal(order):
         order (Order): The order to sync
     """
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN and order.lines.first() is not None:
-        tasks.sync_deal_with_hubspot.apply_async(args=(order.id,), countdown=10)
+        try:
+            tasks.sync_deal_with_hubspot.apply_async(args=(order.id,), countdown=10)
+        except:
+            log.exception(
+                "Exception calling sync_deal_with_hubspot for order %d", order.id
+            )
 
 
 def sync_hubspot_product(product):
@@ -35,4 +51,9 @@ def sync_hubspot_product(product):
         product (Product): The product to sync
     """
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
-        tasks.sync_product_with_hubspot.delay(product.id)
+        try:
+            tasks.sync_product_with_hubspot.delay(product.id)
+        except:
+            log.exception(
+                "Exception calling sync_product_with_hubspot for product %d", product.id
+            )
