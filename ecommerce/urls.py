@@ -3,7 +3,7 @@ from rest_framework.routers import SimpleRouter
 from rest_framework_extensions.routers import NestedRouterMixin
 
 """ TODO: clean this up later (make the views look more like the courses one) """
-from ecommerce.admin import AdminCancelOrderView, AdminRefundOrderView
+from ecommerce.admin import AdminRefundOrderView
 from ecommerce.views.v0 import (
     AllProductViewSet,
     BackofficeCallbackView,
@@ -104,5 +104,4 @@ urlpatterns = [
     ),
     re_path(r"^cart/add", CheckoutProductView.as_view(), name="checkout-product"),
     re_path(r"^int_admin/refund", AdminRefundOrderView.as_view(), name="refund-order"),
-    re_path(r"^int_admin/cancel", AdminCancelOrderView.as_view(), name="cancel-order"),
 ]

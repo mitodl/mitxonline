@@ -227,7 +227,7 @@ def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=F
     order.fulfill(payment_data, already_enrolled=already_enrolled)
     order.save()
 
-    if not order.is_review and (basket and basket.compare_to_order(order)):
+    if basket and basket.compare_to_order(order):
         basket.delete()
 
 
@@ -300,35 +300,23 @@ def process_cybersource_payment_response(request, order):
         order.error()
         order.save()
         return_message = order.state
-    elif processor_response.state == ProcessorResponse.STATE_CANCELLED:
-        # Transaction cancelled
+    elif processor_response.state in [
+        ProcessorResponse.STATE_CANCELLED,
+        ProcessorResponse.STATE_REVIEW,
+    ]:
+        # Transaction cancelled or reviewed
         # Transaction could be cancelled for reasons that don't necessarily
         # mean that the entire order is invalid, so we'll do nothing with
-        # the order here (other than set it to Cancelled)
-        log.debug("Transaction cancelled: {msg}".format(msg=processor_response.message))
-        order.cancel()
-        order.save()
-        return_message = order.state
-    elif processor_response.state == ProcessorResponse.STATE_REVIEW:
-        # Transaction held for review in the payment processor's system
-        # The transaction is in limbo here - it may be approved or denied
-        # at a later time
+        # the order here (other than set it to Cancelled).
+        # Transaction could be
         log.debug(
-            "Transaction flagged for review: {msg}".format(
+            "Transaction cancelled/reviewed: {msg}".format(
                 msg=processor_response.message
             )
         )
-        basket = Basket.objects.filter(user=order.purchaser).first()
-        return_message = order.state
-        if basket:
-            if not basket.has_user_blocked_products(order.purchaser):
-                basket.delete()
-
-        order.review(request.POST)
+        order.cancel()
         order.save()
-
-        if basket and basket.compare_to_order(order):
-            basket.delete()
+        return_message = order.state
 
     elif (
         processor_response.state == ProcessorResponse.STATE_ACCEPTED
