@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.59.1
+Version 0.59.1 (Released February 07, 2023)
 --------------
 
 - feat: Sync courseware title with CMS page title (#1382)
