@@ -487,7 +487,7 @@ def test_start_checkout_with_invalid_discounts(user, user_client, products, disc
         ("CANCEL", reverse("cart"), Order.STATE.CANCELED, True),
         ("DECLINE", reverse("cart"), Order.STATE.DECLINED, True),
         ("ERROR", reverse("cart"), Order.STATE.ERRORED, True),
-        ("REVIEW", reverse("user-dashboard"), Order.STATE.PENDING, True),
+        ("REVIEW", reverse("cart"), Order.STATE.CANCELED, True),
         ("ACCEPT", reverse("user-dashboard"), Order.STATE.FULFILLED, False),
     ],
 )
@@ -880,7 +880,7 @@ def test_paid_and_unpaid_courserun_checkout(
         ("CANCEL", Order.STATE.CANCELED, True),
         ("DECLINE", Order.STATE.DECLINED, True),
         ("ERROR", Order.STATE.ERRORED, True),
-        ("REVIEW", Order.STATE.PENDING, True),
+        ("REVIEW", Order.STATE.CANCELED, True),
         ("ACCEPT", Order.STATE.FULFILLED, False),
     ],
 )
@@ -932,7 +932,7 @@ def test_checkout_api_result(
     order.refresh_from_db()
 
     if decision == "REVIEW":
-        assert order.is_review
+        assert not order.is_review
 
         # create a new basket and then resubmit for acceptance
         # basket should be extant afterwards
