@@ -14,7 +14,6 @@ from rest_framework import status
 
 from courses.factories import CourseRunFactory, ProgramRunFactory
 from courses.models import PaidCourseRun
-from ecommerce.api import generate_checkout_payload
 from ecommerce.constants import DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
@@ -39,7 +38,6 @@ from ecommerce.serializers import (
     DiscountSerializer,
     ProductSerializer,
 )
-from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from main.constants import (
@@ -545,29 +543,7 @@ def test_checkout_result(
 
     order.refresh_from_db()
 
-    if decision == "REVIEW":
-        assert order.is_review
-
-        # create a new basket and then resubmit for acceptance
-        # basket should be extant afterwards
-        # also create a new batch of products
-        #  - otherwise it might select one that's being used in the old basket
-        new_products = ProductFactory.create_batch(5)
-        basket = create_basket(user, new_products)
-
-        payload["decision"] = "ACCEPT"
-        resp = user_client.post(reverse("checkout-result-callback"), payload)
-        assert resp.status_code == 302
-        assert resp.url == expected_redirect_url
-
-        # test if course run is recorded in PaidCourseRun for fulfilled order
-        course_run = order.purchased_runs[0]
-        paid_courserun_count = PaidCourseRun.objects.filter(
-            order=order, course_run=course_run, user=order.purchaser
-        ).count()
-        assert paid_courserun_count == 1
-
-    elif decision == "ACCEPT":
+    if decision == "ACCEPT":
 
         # test if course run is recorded in PaidCourseRun for review order
         course_run = order.purchased_runs[0]
@@ -931,28 +907,7 @@ def test_checkout_api_result(
 
     order.refresh_from_db()
 
-    if decision == "REVIEW":
-        assert not order.is_review
-
-        # create a new basket and then resubmit for acceptance
-        # basket should be extant afterwards
-        # also create a new batch of products
-        #  - otherwise it might select one that's being used in the old basket
-        new_products = ProductFactory.create_batch(5)
-        basket = create_basket(user, new_products)
-
-        payload["decision"] = "ACCEPT"
-        resp = api_client.post(reverse("checkout_result_api"), payload)
-        assert resp.status_code == 200
-
-        # test if course run is recorded in PaidCourseRun for fulfilled order
-        course_run = order.purchased_runs[0]
-        paid_courserun_count = PaidCourseRun.objects.filter(
-            order=order, course_run=course_run, user=order.purchaser
-        ).count()
-        assert paid_courserun_count == 1
-
-    elif decision == "ACCEPT":
+    if decision == "ACCEPT":
 
         # test if course run is recorded in PaidCourseRun for review order
         course_run = order.purchased_runs[0]
