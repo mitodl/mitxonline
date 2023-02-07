@@ -10,10 +10,6 @@
     <a href="{% url 'refund-order' %}/?order={{ original.id }}" class="closelink">Refund Order</a>
 {% endif %}
 
-{% if original.state == 'review' %}
-    <a href="{% url 'cancel-order' %}/?order={{ original.id }}" class="closelink" style="background-color: #ba2121;">Cancel Order</a>
-{% endif %}
-
 {% if show_save_as_new %}<input type="submit" value="{% translate 'Save as new' %}" name="_saveasnew">{% endif %}
 {% if show_save_and_add_another %}<input type="submit" value="{% translate 'Save and add another' %}" name="_addanother">{% endif %}
 {% if show_save_and_continue %}<input type="submit" value="{% if can_change %}{% translate 'Save and continue editing' %}{% else %}{% translate 'Save and view' %}{% endif %}" name="_continue">{% endif %}

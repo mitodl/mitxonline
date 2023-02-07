@@ -129,7 +129,7 @@ class Basket(TimestampedModel):
         for item in basket_items:
             purchased_object = item.product.purchasable_object
             if isinstance(purchased_object, CourseRun):
-                # PaidCourseRun should only contain fulfilled or review orders
+                # PaidCourseRun should only contain fulfilled orders
                 if PaidCourseRun.fulfilled_paid_course_run_exists(
                     user, purchased_object
                 ):
@@ -544,7 +544,7 @@ class FulfillableOrder:
 
     @transition(
         field="state",
-        source=(Order.STATE.PENDING, Order.STATE.REVIEW),
+        source=Order.STATE.PENDING,
         target=Order.STATE.FULFILLED,
     )
     def fulfill(self, payment_data, already_enrolled=False):
@@ -563,16 +563,6 @@ class FulfillableOrder:
         if not already_enrolled:
             # send the receipt emails
             transaction.on_commit(self.send_ecommerce_order_receipt)
-
-
-class CancelableOrder:
-    @transition(field="state", source=(Order.STATE.REVIEW), target=Order.STATE.CANCELED)
-    def cancel(self):
-        self.status = Order.STATE.CANCELED
-        self.save()
-
-        # find discount redemptions and clear them
-        self.discounts.all().delete()
 
 
 class PendingOrder(FulfillableOrder, Order):
@@ -687,19 +677,6 @@ class PendingOrder(FulfillableOrder, Order):
         """Error this order"""
         pass
 
-    @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.REVIEW)
-    def review(self, payment_data):
-        """
-        Put the order into the review state. This should be mostly the same as
-        fulfilling it but we don't want to do enrollments here (but we do want
-        to store the transaction data, since there will technically be two of
-        them).
-        """
-        self.create_transaction(payment_data)
-
-        # record all the courserun in the order
-        self.create_paid_courseruns()
-
     class Meta:
         proxy = True
 
@@ -761,7 +738,7 @@ class FulfilledOrder(Order):
         proxy = True
 
 
-class ReviewOrder(FulfillableOrder, CancelableOrder, Order):
+class ReviewOrder(FulfillableOrder, Order):
     """An order that has been placed under review by the payment processor."""
 
     class Meta:

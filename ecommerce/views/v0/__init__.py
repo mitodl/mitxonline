@@ -5,8 +5,9 @@ import logging
 from distutils.util import strtobool
 
 import django_filters
+from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count, Q
 from django.http import Http404, HttpResponse
@@ -21,7 +22,6 @@ from rest_framework import mixins, status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import action
 from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
-from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -65,15 +65,12 @@ from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
 from main.constants import (
-    USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
     USER_MSG_TYPE_PAYMENT_DECLINED,
     USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
-    USER_MSG_TYPE_PAYMENT_REVIEW,
 )
-from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
 from main.views import RefinePagination
 from users.models import User
@@ -547,19 +544,6 @@ class CheckoutCallbackView(View):
             return redirect_with_user_message(
                 reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
             )
-        elif order_state == Order.STATE.REVIEW:
-            basket = Basket.objects.filter(user=order.purchaser).first()
-            if basket:
-                if basket.has_user_blocked_products(order.purchaser):
-                    return redirect_with_user_message(
-                        reverse("user-dashboard"),
-                        {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
-                    )
-                else:
-                    return redirect_with_user_message(
-                        reverse("user-dashboard"),
-                        {"type": USER_MSG_TYPE_PAYMENT_REVIEW},
-                    )
         elif order_state == Order.STATE.FULFILLED:
             return redirect_with_user_message(
                 reverse("user-dashboard"),
@@ -570,12 +554,12 @@ class CheckoutCallbackView(View):
             )
         else:
             if not PaymentGateway.validate_processor_response(
-                ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+                settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
             ):
                 log.info("Could not validate payment response for order")
             else:
                 processor_response = PaymentGateway.get_formatted_response(
-                    ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
+                    settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
                 )
             log.error(
                 "Checkout callback unknown error for transaction_id %s, state %s, reason_code %s, message %s, and ProcessorResponse %s",
