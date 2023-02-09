@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.60.0
+Version 0.60.0 (Released February 09, 2023)
 --------------
 
 - Log any exception thrown by hubspot task helpers (#1416)
