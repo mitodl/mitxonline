@@ -480,7 +480,7 @@ class Order(TimestampedModel):
         raise NotImplementedError()
 
     def _generate_reference_number(self):
-        return f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{737 + self.id}"
+        return f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{self.id}"
 
     @property
     def purchased_runs(self):
