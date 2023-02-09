@@ -32,3 +32,10 @@ def send_order_refund_email(order_id):
     order = Order.objects.get(pk=order_id)
 
     send_ecommerce_refund_message(order)
+
+
+@app.task(acks_late=True)
+def process_pending_order_resolutions():
+    from ecommerce.api import check_pending_orders_for_resolution
+
+    check_pending_orders_for_resolution()
