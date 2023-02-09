@@ -10,9 +10,6 @@ import {
 import {Discount_Redemption_Types} from "../../constants";
 
 export const DiscountFilterForm: React.FC<{ formProps: FormProps }> = ({ formProps }) => {
-  const flexPriceOpts = [
-    { label: '', value: '' }, { label: 'For Financial Assistance', value: 'yes' }, { label: 'Regular Discount', value: 'no' }
-  ]
   const DiscountPaymentTypesOpts = [
     {
         label: '',
@@ -37,6 +34,10 @@ export const DiscountFilterForm: React.FC<{ formProps: FormProps }> = ({ formPro
     {
         label: 'staff',
         value: 'staff',
+    },
+    {
+        label: 'legacy',
+        value: 'legacy',
     },
   ]
   const redemptionOpts = [
