@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.60.0
+--------------
+
+- Log any exception thrown by hubspot task helpers (#1416)
+- feat: Move orders to canceled if transaction is reviewed (#1419)
+- Updates enrollments to regenerate auth tokens if they're invalid
+- Updates enrollment upsell dialog to immediately create enrollments (#1410)
+- Fix and tests for undefined program course nodes (#1408)
+- Fix for heading and description height (#1409)
+
 Version 0.59.1 (Released February 07, 2023)
 --------------
 
