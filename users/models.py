@@ -1,8 +1,10 @@
 """User models"""
+import math
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pycountry
+import pytz
 from django.conf import settings
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
@@ -13,9 +15,10 @@ from django.utils.translation import gettext_lazy as _
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 
+from cms.constants import CMS_EDITORS_GROUP_NAME
+
 # Defined in edX Profile model
 from users.constants import USERNAME_MAX_LEN
-from cms.constants import CMS_EDITORS_GROUP_NAME
 
 MALE = "m"
 FEMALE = "f"
@@ -169,6 +172,32 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
             or self.groups.filter(name=CMS_EDITORS_GROUP_NAME).exists()
         )
 
+    def get_age(self):
+        """
+        Returns the user's computed age, using the profile year_of_birth field.
+        For COPPA reasons this calculates the year assuming Dec 31 @ 11:59:59.
+        """
+
+        if self.profile is None:
+            return None
+
+        approx_dob = datetime(
+            self.profile.year_of_birth,
+            12,
+            31,
+            hour=23,
+            minute=59,
+            second=59,
+            tzinfo=pytz.timezone(settings.TIME_ZONE),
+        )
+
+        return math.floor(
+            (datetime.now(tz=pytz.timezone(settings.TIME_ZONE)) - approx_dob).days / 365
+        )
+
+    def is_coppa_compliant(self):
+        return self.get_age() >= 13
+
     def __str__(self):
         """Str representation for the user"""
         return f"User username={self.username} email={self.email}"
@@ -248,6 +277,7 @@ class LegalAddress(TimestampedModel):
     country = models.CharField(
         max_length=2, blank=True, validators=[validate_iso_3166_1_code]
     )  # ISO-3166-1
+    state = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
         """Str representation for the legal address"""
@@ -258,6 +288,11 @@ class Profile(TimestampedModel):
     """A user's profile"""
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+
+    gender = models.CharField(
+        max_length=128, blank=True, null=True, choices=GENDER_CHOICES
+    )
+    year_of_birth = models.IntegerField(blank=True, null=True)
 
     def __str__(self):
         """Str representation for the profile"""

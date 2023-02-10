@@ -1,14 +1,20 @@
 """Tests for user models"""
 # pylint: disable=too-many-arguments, redefined-outer-name
+import math
+import random
+from datetime import datetime
+
 import factory
 import pytest
+import pytz
+from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from openedx.factories import OpenEdxApiAuthFactory, OpenEdxUserFactory
-from users.factories import UserFactory
+from users.factories import LegalAddressFactory, UserFactory
 from users.models import LegalAddress, User
 
 pytestmark = pytest.mark.django_db
@@ -123,3 +129,39 @@ def test_user_is_editor(is_staff, is_superuser, has_editor_group, exp_is_editor)
         user.groups.add(Group.objects.get(name=CMS_EDITORS_GROUP_NAME))
         user.save()
     assert user.is_editor is exp_is_editor
+
+
+def test_user_age():
+    """Tests to make sure the user age is calculated correctly"""
+
+    user = UserFactory.create()
+
+    # We approximate the date of birth to Dec 31, 23:59:59 in the year specified
+    approx_dob = datetime(
+        user.profile.year_of_birth,
+        12,
+        31,
+        hour=23,
+        minute=59,
+        second=59,
+        tzinfo=pytz.timezone(settings.TIME_ZONE),
+    )
+
+    # Then we subtract that approximate DOB from now and floor it so we're not
+    # accidentally granting access to people who aren't old enough
+    assert user.get_age() == math.floor(
+        (datetime.now(tz=pytz.timezone(settings.TIME_ZONE)) - approx_dob).days / 365
+    )
+
+
+@pytest.mark.parametrize("should_pass", [True, False])
+def test_user_coppa(should_pass):
+    """Tests a user to make sure they're within the range for COPPA"""
+    user = UserFactory.create()
+
+    if should_pass:
+        user.profile.year_of_birth = datetime.now().year - random.randint(13, 100)
+    else:
+        user.profile.year_of_birth = datetime.now().year - random.randint(0, 13)
+
+    assert user.is_coppa_compliant() == should_pass

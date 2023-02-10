@@ -1,11 +1,8 @@
 """Factory for Users"""
-from factory import (
-    Faker,
-    RelatedFactory,
-    SubFactory,
-    Trait,
-    fuzzy,
-)
+import random
+from datetime import datetime
+
+from factory import Faker, RelatedFactory, SubFactory, Trait, fuzzy
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyText
 from social_django.models import UserSocialAuth
@@ -60,6 +57,8 @@ class ProfileFactory(DjangoModelFactory):
     """Factory for Profile"""
 
     user = SubFactory("users.factories.UserFactory")
+
+    year_of_birth = datetime.now().year - random.randint(1, 100)
 
     class Meta:
         model = Profile
