@@ -358,7 +358,7 @@ def test_process_cybersource_payment_response(rf, mocker, user_client, user, pro
     assert result == Order.STATE.FULFILLED
 
 
-@pymark.test.parametrize("test_type", [[None, "fail", "empty"]])
+@pytest.mark.parametrize("test_type", [[None, "fail", "empty"]])
 def test_check_pending_orders_for_resolution(mocker, test_type):
     """
     Tests the pending order check. test_type can be:
