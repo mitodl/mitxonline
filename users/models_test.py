@@ -148,8 +148,8 @@ def test_user_coppa(should_pass):
     user = UserFactory.create()
 
     if should_pass:
-        user.user_profile.year_of_birth = datetime.now().year - random.randint(13, 100)
+        user.profile.year_of_birth = datetime.now().year - random.randint(13, 100)
     else:
-        user.user_profile.year_of_birth = datetime.now().year - random.randint(0, 13)
+        user.profile.year_of_birth = datetime.now().year - random.randint(0, 13)
 
     assert user.is_coppa_compliant() == should_pass

@@ -182,7 +182,7 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
         For COPPA reasons this calculates the year assuming Dec 31 @ 11:59:59.
         """
 
-        if self.user_profile is None:
+        if self.profile is None:
             return None
 
         from users.utils import determine_approx_age
@@ -290,6 +290,7 @@ class UserProfile(TimestampedModel):
     )
     year_of_birth = models.IntegerField(blank=True, null=True)
 
+<<<<<<< HEAD
     addl_field_flag = models.BooleanField(
         default=False,
         blank=True,
@@ -340,6 +341,12 @@ class UserProfile(TimestampedModel):
         blank=True,
         help_text="The learner identifies as type Other (not professional, student, or educator)",
     )
+=======
+    gender = models.CharField(
+        max_length=128, blank=True, null=True, choices=GENDER_CHOICES
+    )
+    year_of_birth = models.IntegerField(blank=True, null=True)
+>>>>>>> 34e780b (Added year of birth and gender fields to profile, added state to legal address)
 
     def __str__(self):
         """Str representation for the profile"""
