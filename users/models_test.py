@@ -138,7 +138,7 @@ def test_user_age():
 
     # We approximate the date of birth to Dec 31, 23:59:59 in the year specified
     approx_dob = datetime(
-        user.user_profile.year_of_birth,
+        user.profile.year_of_birth,
         12,
         31,
         hour=23,
@@ -160,8 +160,8 @@ def test_user_coppa(should_pass):
     user = UserFactory.create()
 
     if should_pass:
-        user.user_profile.year_of_birth = datetime.now().year - random.randint(13, 100)
+        user.profile.year_of_birth = datetime.now().year - random.randint(13, 100)
     else:
-        user.user_profile.year_of_birth = datetime.now().year - random.randint(0, 13)
+        user.profile.year_of_birth = datetime.now().year - random.randint(0, 13)
 
     assert user.is_coppa_compliant() == should_pass

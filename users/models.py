@@ -182,11 +182,11 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
         For COPPA reasons this calculates the year assuming Dec 31 @ 11:59:59.
         """
 
-        if self.user_profile is None:
+        if self.profile is None:
             return None
 
         approx_dob = datetime(
-            self.user_profile.year_of_birth,
+            self.profile.year_of_birth,
             12,
             31,
             hour=23,
@@ -294,6 +294,11 @@ class UserProfile(TimestampedModel):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="user_profile"
     )
+
+    gender = models.CharField(
+        max_length=128, blank=True, null=True, choices=GENDER_CHOICES
+    )
+    year_of_birth = models.IntegerField(blank=True, null=True)
 
     gender = models.CharField(
         max_length=128, blank=True, null=True, choices=GENDER_CHOICES
