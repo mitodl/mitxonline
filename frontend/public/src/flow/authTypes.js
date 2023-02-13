@@ -44,7 +44,7 @@ export type LegalAddress = {
   last_name: string,
   country: string,
   street_address?: Array<string>,
-  state_or_territory?: string,
+  state?: string,
   postal_code?: string,
   company?: string
 }

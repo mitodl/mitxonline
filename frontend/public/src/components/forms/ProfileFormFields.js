@@ -50,7 +50,15 @@ export const legalAddressValidation = yup.object().shape({
       .string()
       .label("Country")
       .length(2)
-      .required()
+      .required(),
+    state: yup
+      .string()
+      .label("State")
+      .when("country", {
+        is: (country) => country == "US",
+        then: (schema) => schema.required(),
+        else: (scheam) => schema.nullable()
+      })
   })
 })
 
@@ -90,9 +98,19 @@ type LegalAddressProps = {
   isNewAccount: boolean
 }
 
+const findStates = (country: string, countries: Array<Country>) => {
+  if (!countries) {
+    return null
+  }
+
+  const found_country = countries.find((elem) => elem.code === country)
+  return found_country && found_country.states ? found_country.states : null
+}
+
 export const LegalAddressFields = ({
   countries,
-  isNewAccount
+  isNewAccount,
+  values
 }: LegalAddressProps) => (
   <React.Fragment>
     <div className="form-group">
@@ -228,6 +246,33 @@ export const LegalAddressFields = ({
         component={FormError}
       />
     </div>
+    {findStates(values.legal_address.country, countries) ? (<div className="form-group">
+      <label htmlFor="legal_address.state" className="font-weight-bold">
+        State<span className="required">*</span>
+      </label>
+      <Field
+        component="select"
+        name="legal_address.state"
+        id="legal_address.state"
+        className="form-control"
+        autoComplete="state"
+        aria-describedby="legal_address.state_error"
+      >
+        <option value="">-----</option>
+        {findStates(values.legal_address.country, countries)
+          ? findStates(values.legal_address.country, countries).map((state, i) => (
+            <option key={i} value={state.code}>
+              {state.name}
+            </option>
+          ))
+          : null}
+      </Field>
+      <ErrorMessage
+        name="legal_address.state"
+        id="legal_address.state_error"
+        component={FormError}
+      />
+    </div>) : null}
   </React.Fragment>
 )
 
