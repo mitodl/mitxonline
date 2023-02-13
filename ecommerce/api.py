@@ -497,6 +497,7 @@ def check_pending_orders_for_resolution():
     for result in results:
         payload = results[result]
         if int(payload["reason_code"]) == 100:
+
             try:
                 order = PendingOrder.objects.filter(
                     state=PendingOrder.STATE.PENDING,
@@ -504,6 +505,7 @@ def check_pending_orders_for_resolution():
                 ).get()
 
                 order.fulfill(payload)
+                order.save()
 
                 log.info(f"Fulfilled order {order.reference_number}.")
             except Exception as e:
@@ -511,6 +513,7 @@ def check_pending_orders_for_resolution():
                     f"Couldn't process pending order for fulfillment {payload['req_reference_number']}: {str(e)}"
                 )
         else:
+
             try:
                 order = PendingOrder.objects.filter(
                     state=PendingOrder.STATE.PENDING,

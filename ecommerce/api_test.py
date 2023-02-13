@@ -1,5 +1,6 @@
 """Tests for Ecommerce api"""
 
+import json
 import random
 import uuid
 
@@ -358,7 +359,7 @@ def test_process_cybersource_payment_response(rf, mocker, user_client, user, pro
     assert result == Order.STATE.FULFILLED
 
 
-@pytest.mark.parametrize("test_type", [[None, "fail", "empty"]])
+@pytest.mark.parametrize("test_type", [None, "fail", "empty"])
 def test_check_pending_orders_for_resolution(mocker, test_type):
     """
     Tests the pending order check. test_type can be:
@@ -367,6 +368,15 @@ def test_check_pending_orders_for_resolution(mocker, test_type):
     - empty - order isn't pending
     """
     order = OrderFactory.create(state=Order.STATE.PENDING)
+
+    # mocking out the create_enrollment and create_paid_courserun calls
+    # we don't really care that it hits edX for this
+    mocker.patch(
+        "ecommerce.models.FulfillableOrder.create_enrollments", return_value=True
+    )
+    mocker.patch(
+        "ecommerce.models.FulfillableOrder.create_paid_courseruns", return_value=True
+    )
 
     test_payload = {
         "utf8": "",
@@ -426,12 +436,14 @@ def test_check_pending_orders_for_resolution(mocker, test_type):
 
     if test_type == "fail":
         test_payload["reason_code"] = "999"
-        retval = {f"{order.reference_number}": json.loads(test_payload)}
 
     if test_type == "empty":
-        order.state = Order.STATE.CANCELLED
+        order.state = Order.STATE.CANCELED
         order.save()
         order.refresh_from_db()
+
+    if test_type is None or test_type == "fail":
+        retval = {f"{order.reference_number}": test_payload}
 
     mocked_gateway_func = mocker.patch(
         "mitol.payment_gateway.api.CyberSourcePaymentGateway.find_and_get_transactions",
@@ -444,7 +456,7 @@ def test_check_pending_orders_for_resolution(mocker, test_type):
         assert not mocked_gateway_func.called
     elif test_type == "fail":
         order.refresh_from_db()
-        assert order.state == Order.STATE.CANCELLED
+        assert order.state == Order.STATE.CANCELED
     else:
         order.refresh_from_db()
         assert order.state == Order.STATE.FULFILLED
