@@ -59,9 +59,17 @@ def test_base_program_serializer():
 def test_serialize_program(mock_context, remove_tree):
     """Test Program serialization"""
     program = ProgramFactory.create()
-    run1 = CourseRunFactory.create(course__program=program, course__page=None)
+    run1 = CourseRunFactory.create(
+        course__program=program,
+        course__page=None,
+        start_date=datetime.now() + timedelta(days=1),
+    )
     course1 = run1.course
-    run2 = CourseRunFactory.create(course__program=program, course__page=None)
+    run2 = CourseRunFactory.create(
+        course__program=program,
+        course__page=None,
+        start_date=datetime.now() + timedelta(days=2),
+    )
     course2 = run2.course
     runs = (
         [run1, run2]
