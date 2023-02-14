@@ -290,9 +290,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     def get_courses(self, instance):
         """Serializer for courses"""
         return CourseSerializer(
-            instance.courses.filter(live=True)
-            .order_by("courseruns__start_date")
-            .select_related("page"),
+            instance.courses.filter(live=True).select_related("page"),
             many=True,
             context={"include_page_fields": True},
         ).data
