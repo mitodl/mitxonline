@@ -59,6 +59,7 @@ class UserProfileFactory(DjangoModelFactory):
     user = SubFactory("users.factories.UserFactory")
 
     year_of_birth = datetime.now().year - random.randint(1, 100)
+    gender = FuzzyChoice(GENDER_CHOICES)
 
     class Meta:
         model = UserProfile

@@ -182,19 +182,11 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
         For COPPA reasons this calculates the year assuming Dec 31 @ 11:59:59.
         """
 
-<<<<<<< HEAD
         if self.user_profile is None:
             return None
 
         approx_dob = datetime(
             self.user_profile.year_of_birth,
-=======
-        if self.profile is None:
-            return None
-
-        approx_dob = datetime(
-            self.profile.year_of_birth,
->>>>>>> b91f99c (Added year of birth and gender fields to profile, added state to legal address)
             12,
             31,
             hour=23,
