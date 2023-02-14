@@ -195,6 +195,7 @@ class UserSerializer(serializers.ModelSerializer):
         return instance.get_all_permissions()
 
     def validate(self, data):
+        log.error("UserSerializer validating things")
         request = self.context.get("request", None)
         # Certain fields are required only if a new User is being created (i.e.: the request method is POST)
         if request is not None and request.method == "POST":
@@ -231,6 +232,10 @@ class UserSerializer(serializers.ModelSerializer):
         """Create a new user"""
         legal_address_data = validated_data.pop("legal_address")
         user_profile_data = validated_data.pop("user_profile", None)
+
+        log.error(
+            "in the user serializer, here's legal_address_data", legal_address_data
+        )
 
         username = validated_data.pop("username")
         email = validated_data.pop("email")
