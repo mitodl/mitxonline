@@ -125,13 +125,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         """Gets the number of courses in this program"""
         return self.courses.count()
 
-    @cached_property
-    def next_run_date(self):
-        """Gets the start date of the next CourseRun of the first course (position_in_program=1) if one exists"""
-        first_course = self.courses.filter(position_in_program=1, live=True).first()
-        if first_course:
-            return first_course.next_run_date
-
     @property
     def is_catalog_visible(self):
         """Returns True if this program should be shown on in the catalog"""
@@ -140,17 +133,12 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
     @property
     def first_unexpired_run(self):
-        """Gets the earliest unexpired CourseRun of the first course (position_in_program=1) if one exists"""
-        first_course = self.courses.filter(position_in_program=1, live=True).first()
-        if first_course:
-            return first_course.first_unexpired_run
-
-    @property
-    def first_course_unexpired_runs(self):
-        """Gets the unexpired course runs for the first course (position_in_program=1) in this program"""
-        first_course = self.courses.filter(position_in_program=1, live=True).first()
-        if first_course:
-            return first_course.unexpired_runs
+        """Gets the earliest unexpired CourseRun"""
+        return (
+            CourseRun.objects.filter(course__in_programs__program=self)
+            .order_by("start_date")
+            .first()
+        )
 
     @property
     def text_id(self):
@@ -294,7 +282,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     program = models.ForeignKey(
         Program, on_delete=models.CASCADE, null=True, blank=True, related_name="courses"
     )
-    position_in_program = models.PositiveSmallIntegerField(null=True, blank=True)
     title = models.CharField(max_length=255)
     readable_id = models.CharField(
         max_length=255, unique=True, validators=[validate_url_path_field]
@@ -339,24 +326,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         relevant_run = self.first_unexpired_run
 
         return relevant_run.products.filter(is_active=True).all()
-
-    @cached_property
-    def next_run_date(self):
-        """Gets the start date of the next CourseRun if one exists"""
-        now = now_in_utc()
-        # NOTE: This is implemented with min() and courseruns.all() to allow for prefetch_related
-        #   optimization. You can get the desired start_date with a filtered and sorted query, but
-        #   that would run a new query even if prefetch_related was used.
-        return min(
-            (
-                course_run.start_date
-                for course_run in self.courseruns.all()
-                if course_run.live
-                and course_run.start_date
-                and course_run.start_date > now
-            ),
-            default=None,
-        )
 
     @property
     def is_catalog_visible(self):
@@ -461,22 +430,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         for branch_root in mpnode.get_root().get_children().all():
             if mpnode.is_descendant_of(branch_root):
                 return branch_root.title
-
-    def save(self, *args, **kwargs):  # pylint: disable=signature-differs
-        """Overridden save method"""
-        # If adding a Course to a Program without position specified, set it as the highest position + 1.
-        # WARNING: This is open to a race condition. Two near-simultaneous queries could end up with
-        #    the same position_in_program value for multiple Courses in one Program. This is very
-        #    unlikely (adding courses will be an admin-only task, and the position can be explicitly
-        #    provided), easily fixed, and the resulting bug would be very minor.
-        if self.program and not self.position_in_program:
-            last_position = (
-                self.program.courses.order_by("-position_in_program")
-                .values_list("position_in_program", flat=True)
-                .first()
-            )
-            self.position_in_program = 1 if not last_position else last_position + 1
-        return super().save(*args, **kwargs)
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"

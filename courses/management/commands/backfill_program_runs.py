@@ -53,7 +53,7 @@ class Command(BaseCommand):
         all_program_runs = (
             CourseRun.objects.filter(course_id__in=course_ids)
             .select_related("course")
-            .order_by("course__position_in_program")
+            .order_by("start_date")
         )
         # Build a dict of run suffixes to a list of runs that have that suffix
         run_map = defaultdict(list)
