@@ -78,6 +78,7 @@ export class RegisterDetailsPage extends React.Component<Props> {
         detailsData.password,
         detailsData.username,
         detailsData.legal_address,
+        detailsData.user_profile,
         partialToken
       )
 
@@ -156,6 +157,7 @@ const registerDetails = (
   password: string,
   username: string,
   legalAddress: LegalAddress,
+  userProfile: UserProfile,
   partialToken: string
 ) =>
   mutateAsync(
@@ -164,6 +166,7 @@ const registerDetails = (
       password,
       username,
       legalAddress,
+      userProfile,
       partialToken
     )
   )

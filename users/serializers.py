@@ -50,8 +50,8 @@ OPENEDX_USERNAME_VALIDATION_MSGS_MAP = {
 class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for profile"""
 
-    gender = serializers.CharField(max_length=128)
-    year_of_birth = serializers.IntegerField()
+    gender = serializers.CharField(max_length=128, required=False)
+    year_of_birth = serializers.IntegerField(required=False)
 
     class Meta:
         model = UserProfile
@@ -69,7 +69,7 @@ class LegalAddressSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(max_length=60)
     last_name = serializers.CharField(max_length=60)
     country = serializers.CharField(max_length=2)
-    state = serializers.CharField(max_length=10)
+    state = serializers.CharField(max_length=10, required=False)
 
     def validate_first_name(self, value):
         """Validates the first name of the user"""
@@ -81,6 +81,23 @@ class LegalAddressSerializer(serializers.ModelSerializer):
         """Validates the last name of the user"""
         if value and not USER_GIVEN_NAME_RE.match(value):
             raise serializers.ValidationError("Last name is not valid")
+        return value
+
+    def validate_state(self, value):
+        """We only want a state if there are states"""
+        if (
+            self.country is None
+            or pycountry.subdivisions.get(country_code=self.country) is None
+        ):
+            log.error("validate_state ain't got no country")
+            return value
+
+        if value and not pycountry.subdivisions.get(code=value):
+            log.error("validate_state actually failing")
+            raise serializers.ValidationError("Invalid state specified")
+
+        log.error("validate_state fell out the bottom")
+
         return value
 
     class Meta:
@@ -177,6 +194,7 @@ class UserSerializer(serializers.ModelSerializer):
         return instance.get_all_permissions()
 
     def validate(self, data):
+        log.error("UserSerializer validating things")
         request = self.context.get("request", None)
         # Certain fields are required only if a new User is being created (i.e.: the request method is POST)
         if request is not None and request.method == "POST":
@@ -213,6 +231,10 @@ class UserSerializer(serializers.ModelSerializer):
         """Create a new user"""
         legal_address_data = validated_data.pop("legal_address")
         user_profile_data = validated_data.pop("profile", None)
+
+        log.error(
+            "in the user serializer, here's legal_address_data", legal_address_data
+        )
 
         username = validated_data.pop("username")
         email = validated_data.pop("email")

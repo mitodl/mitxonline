@@ -7,8 +7,8 @@ import responses
 from django.test.client import Client
 from rest_framework.test import APIClient
 
-from users.factories import UserFactory
 from courses.factories import CourseFactory, ProgramFactory, ProgramRequirementFactory
+from users.factories import UserFactory
 
 
 @pytest.fixture
@@ -96,6 +96,7 @@ def valid_address_dict():
         first_name="Test",
         last_name="User",
         country="US",
+        state="MA",
     )
 
 

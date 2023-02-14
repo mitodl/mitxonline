@@ -50,7 +50,14 @@ export const legalAddressValidation = yup.object().shape({
       .string()
       .label("Country")
       .length(2)
-      .required()
+      .required(),
+    state: yup
+      .string()
+      .when("legal_address.country", {
+        is: (value) => value === "US",
+        then: yup.string().required(),
+        otherwise: yup.string().nullable(), 
+      }),
   })
 })
 
@@ -253,6 +260,30 @@ export const LegalAddressFields = ({
       <ErrorMessage
         name="legal_address.state"
         id="legal_address.state_error"
+        component={FormError}
+      />
+    </div>) : null}
+    {isNewAccount ? (<div className="form-group">
+      <label htmlFor="user_profile.year_of_birth" className="font-weight-bold">
+        Year of Birth<span className="required">*</span>
+      </label>
+      <Field
+        component="select"
+        name="user_profile.year_of_birth"
+        id="user_profile.year_of_birth"
+        className="form-control"
+        aria-describedby="user_profile.year_of_birth_error"
+      >
+        <option value="">-----</option>
+        {reverse(range(seedYear - 120, seedYear - 14)).map((year, i) => (
+          <option key={i} value={year}>
+            {year}
+          </option>
+        ))}
+      </Field>
+      <ErrorMessage
+        name="user_profile.year_of_birth"
+        id="user_profile.year_of_birth_error"
         component={FormError}
       />
     </div>) : null}
