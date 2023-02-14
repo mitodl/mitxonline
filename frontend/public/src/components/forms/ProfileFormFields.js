@@ -264,16 +264,16 @@ export const ProfileFields = () => (
     <div className="form-group">
       <div className="row">
         <div className="col">
-          <label htmlFor="profile.gender" className="font-weight-bold">
+          <label htmlFor="user_profile.gender" className="font-weight-bold">
             Gender
           </label>
 
           <Field
             component="select"
-            name="profile.gender"
-            id="profile.gender"
+            name="user_profile.gender"
+            id="user_profile.gender"
             className="form-control"
-            aria-describedby="profile.genderError"
+            aria-describedby="user_profile.genderError"
           >
             <option value="">-----</option>
             <option value="f">Female</option>
@@ -281,21 +281,21 @@ export const ProfileFields = () => (
             <option value="o">Other / Prefer not to say</option>
           </Field>
           <ErrorMessage
-            name="profile.gender"
-            id="profile.genderError"
+            name="user_profile.gender"
+            id="user_profile.genderError"
             component={FormError}
           />
         </div>
         <div className="col">
-          <label htmlFor="profile.year_of_birth" className="font-weight-bold">
+          <label htmlFor="user_profile.year_of_birth" className="font-weight-bold">
             Year of Birth<span className="required">*</span>
           </label>
           <Field
             component="select"
-            name="profile.year_of_birth"
-            id="profile.year_of_birth"
+            name="user_profile.year_of_birth"
+            id="user_profile.year_of_birth"
             className="form-control"
-            aria-describedby="profile.year_of_birth_error"
+            aria-describedby="user_profile.year_of_birth_error"
           >
             <option value="">-----</option>
             {reverse(range(seedYear - 120, seedYear - 14)).map((year, i) => (
@@ -305,8 +305,8 @@ export const ProfileFields = () => (
             ))}
           </Field>
           <ErrorMessage
-            name="profile.year_of_birth"
-            id="profile.year_of_birth_error"
+            name="user_profile.year_of_birth"
+            id="user_profile.year_of_birth_error"
             component={FormError}
           />
         </div>

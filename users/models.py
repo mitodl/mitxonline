@@ -76,7 +76,7 @@ def _post_create_user(user):
         user (users.models.User): the user that was just created
     """
     LegalAddress.objects.create(user=user)
-    Profile.objects.create(user=user)
+    UserProfile.objects.create(user=user)
 
 
 class UserManager(BaseUserManager):
@@ -178,11 +178,11 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
         For COPPA reasons this calculates the year assuming Dec 31 @ 11:59:59.
         """
 
-        if self.profile is None:
+        if self.user_profile is None:
             return None
 
         approx_dob = datetime(
-            self.profile.year_of_birth,
+            self.user_profile.year_of_birth,
             12,
             31,
             hour=23,
@@ -287,7 +287,9 @@ class LegalAddress(TimestampedModel):
 class UserProfile(TimestampedModel):
     """A user's profile"""
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="user_profile")
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="user_profile"
+    )
 
     gender = models.CharField(
         max_length=128, blank=True, null=True, choices=GENDER_CHOICES

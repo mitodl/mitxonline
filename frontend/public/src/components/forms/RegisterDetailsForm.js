@@ -22,7 +22,8 @@ const INITIAL_VALUES = {
   legal_address: {
     first_name: "",
     last_name:  "",
-    country:    ""
+    country:    "",
+    state:      "",
   }
 }
 

@@ -30,6 +30,7 @@ def sample_address():
         "first_name": "Test",
         "last_name": "User",
         "country": "US",
+        "state": "MA",
     }
 
 

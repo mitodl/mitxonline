@@ -20,7 +20,7 @@ from main.serializers import WriteableSerializerMethodField
 from openedx.api import validate_username_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.tasks import change_edx_user_email_async
-from users.models import ChangeEmailRequest, LegalAddress, UserProfile, User
+from users.models import ChangeEmailRequest, LegalAddress, User, UserProfile
 
 log = logging.getLogger()
 
@@ -49,15 +49,16 @@ OPENEDX_USERNAME_VALIDATION_MSGS_MAP = {
 
 class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for profile"""
+
     gender = serializers.CharField(max_length=128)
     year_of_birth = serializers.IntegerField()
 
     class Meta:
         model = UserProfile
-        fields = {
+        fields = (
             "gender",
             "year_of_birth",
-        }
+        )
 
 
 class LegalAddressSerializer(serializers.ModelSerializer):
@@ -234,7 +235,9 @@ class UserSerializer(serializers.ModelSerializer):
                     legal_address.save()
 
             if user_profile_data:
-                user_profile = UserProfileSerializer(user.user_profile, data=user_profile_data)
+                user_profile = UserProfileSerializer(
+                    user.user_profile, data=user_profile_data
+                )
                 if user_profile.is_valid():
                     user_profile.save()
 
@@ -257,7 +260,9 @@ class UserSerializer(serializers.ModelSerializer):
                     address_serializer.save()
 
             if user_profile_data:
-                user_profile_serializer = UserProfileSerializer(instance.user_profile, data=user_profile_data)
+                user_profile_serializer = UserProfileSerializer(
+                    instance.user_profile, data=user_profile_data
+                )
                 if user_profile_serializer.is_valid(raise_exception=True):
                     user_profile_serializer.save()
 

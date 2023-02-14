@@ -1,15 +1,14 @@
 """Tests of user pipeline actions"""
 # pylint: disable=redefined-outer-name
 
-from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
 import pytest
 import responses
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.db import IntegrityError
+from rest_framework import status
 from social_core.backends.email import EmailAuth
 from social_django.utils import load_backend, load_strategy
-from rest_framework import status
 
 from authentication.exceptions import (
     EmailBlockedException,
@@ -23,6 +22,7 @@ from authentication.exceptions import (
 )
 from authentication.pipeline import user as user_actions
 from authentication.utils import SocialAuthState
+from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
 from users.factories import UserFactory
 
 User = get_user_model()
@@ -58,6 +58,7 @@ def mock_create_user_strategy(mocker):
             "first_name": "Jane",
             "last_name": "Doe",
             "country": "US",
+            "state": "MA",
         },
     }
     return strategy
