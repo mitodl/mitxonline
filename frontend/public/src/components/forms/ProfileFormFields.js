@@ -64,21 +64,11 @@ export const profileValidation = yup.object().shape({
     gender: yup
       .string()
       .label("Gender")
-      .required(),
+      .nullable(),
     birth_year: yup
       .string()
       .label("Birth Year")
       .required(),
-    company: yup
-      .string()
-      .label("Company")
-      .trim()
-      .required(),
-    job_title: yup
-      .string()
-      .label("Job Title")
-      .trim()
-      .required()
   })
 })
 
@@ -90,9 +80,19 @@ type LegalAddressProps = {
   isNewAccount: boolean
 }
 
+const findStates = (country: string, countries: Array<Country>) => {
+  if (!countries) {
+    return null
+  }
+
+  const foundCountry = countries.find((elem) => elem.code === country)
+  return foundCountry && foundCountry.states && foundCountry.states.length > 0 ? foundCountry.states : null
+}
+
 export const LegalAddressFields = ({
   countries,
-  isNewAccount
+  isNewAccount,
+  values,
 }: LegalAddressProps) => (
   <React.Fragment>
     <div className="form-group">
@@ -222,12 +222,40 @@ export const LegalAddressFields = ({
           ))
           : null}
       </Field>
+
       <ErrorMessage
         name="legal_address.country"
         id="legal_address.country_error"
         component={FormError}
       />
     </div>
+    {findStates(values.legal_address.country, countries) ? (<div className="form-group">
+      <label htmlFor="legal_address.state" className="font-weight-bold">
+        State<span className="required">*</span>
+      </label>
+      <Field
+        component="select"
+        name="legal_address.state"
+        id="legal_address.state"
+        className="form-control"
+        autoComplete="state"
+        aria-describedby="legal_address.state_error"
+      >
+        <option value="">-----</option>
+        {findStates(values.legal_address.country, countries)
+          ? findStates(values.legal_address.country, countries).map((state, i) => (
+            <option key={i} value={state.code}>
+              {state.name}
+            </option>
+          ))
+          : null}
+      </Field>
+      <ErrorMessage
+        name="legal_address.state"
+        id="legal_address.state_error"
+        component={FormError}
+      />
+    </div>) : null}
   </React.Fragment>
 )
 
@@ -237,7 +265,7 @@ export const ProfileFields = () => (
       <div className="row">
         <div className="col">
           <label htmlFor="profile.gender" className="font-weight-bold">
-            Gender*
+            Gender
           </label>
 
           <Field
@@ -259,15 +287,15 @@ export const ProfileFields = () => (
           />
         </div>
         <div className="col">
-          <label htmlFor="profile.birth_year" className="font-weight-bold">
-            Year of Birth*
+          <label htmlFor="profile.year_of_birth" className="font-weight-bold">
+            Year of Birth<span className="required">*</span>
           </label>
           <Field
             component="select"
-            name="profile.birth_year"
-            id="profile.birth_year"
+            name="profile.year_of_birth"
+            id="profile.year_of_birth"
             className="form-control"
-            aria-describedby="profile.birth_year_error"
+            aria-describedby="profile.year_of_birth_error"
           >
             <option value="">-----</option>
             {reverse(range(seedYear - 120, seedYear - 14)).map((year, i) => (
@@ -277,13 +305,18 @@ export const ProfileFields = () => (
             ))}
           </Field>
           <ErrorMessage
-            name="profile.birth_year"
-            id="profile.birth_year_error"
+            name="profile.year_of_birth"
+            id="profile.year_of_birth_error"
             component={FormError}
           />
         </div>
       </div>
     </div>
+  </React.Fragment>
+)
+
+export const AddlProfileFields = () => (
+  <React.Fragment>
     <div className="form-group">
       <label htmlFor="profile.company" className="font-weight-bold">
         Company*

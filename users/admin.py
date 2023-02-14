@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from hijack_admin.admin import HijackUserAdminMixin
 from mitol.common.admin import TimestampedModelAdmin
 
-from users.models import BlockList, LegalAddress, Profile, User
+from users.models import BlockList, LegalAddress, UserProfile, User
 
 
 class UserLegalAddressInline(admin.StackedInline):
@@ -20,7 +20,7 @@ class UserLegalAddressInline(admin.StackedInline):
             {
                 "fields": (
                     ("first_name", "last_name"),
-                    "country",
+                    ("country", "state"),
                 )
             },
         ),
@@ -33,7 +33,7 @@ class UserLegalAddressInline(admin.StackedInline):
 class UserProfileInline(admin.StackedInline):
     """Admin view for the profile"""
 
-    model = Profile
+    model = UserProfile
     classes = ["collapse"]
 
     def has_delete_permission(self, request, obj=None):

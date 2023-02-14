@@ -44,7 +44,7 @@ export type LegalAddress = {
   last_name: string,
   country: string,
   street_address?: Array<string>,
-  state_or_territory?: string,
+  state?: string,
   postal_code?: string,
   company?: string
 }
@@ -60,12 +60,12 @@ export type UnusedCoupon = {
   expiration_date: string
 }
 
-export type Profile = {
-  gender: string,
-  birth_year: number,
-  company: string,
+export type UserProfile = {
+  gender: ?string,
+  year_of_birth: number,
+  company: ?string,
   industry: ?string,
-  job_title: string,
+  job_title: ?string,
   job_function: ?string,
   years_experience: ?number,
   company_size: ?number,
@@ -80,7 +80,8 @@ export type User = {
   name: string,
   created_on: string,
   updated_on: string,
-  legal_address: ?LegalAddress
+  legal_address: ?LegalAddress,
+  user_profile: ?UserProfile,
 }
 
 export type AnonymousUser = {

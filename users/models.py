@@ -284,10 +284,10 @@ class LegalAddress(TimestampedModel):
         return f"Legal address for {self.user}"
 
 
-class Profile(TimestampedModel):
+class UserProfile(TimestampedModel):
     """A user's profile"""
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="user_profile")
 
     gender = models.CharField(
         max_length=128, blank=True, null=True, choices=GENDER_CHOICES
@@ -296,7 +296,7 @@ class Profile(TimestampedModel):
 
     def __str__(self):
         """Str representation for the profile"""
-        return f"Profile for {self.user}"
+        return f"UserProfile for {self.user}"
 
 
 class BlockList(TimestampedModel):
