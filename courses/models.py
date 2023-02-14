@@ -301,8 +301,16 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     )
     live = models.BooleanField(default=False)
     topics = models.ManyToManyField(CourseTopic, blank=True)
-    flexible_prices = GenericRelation("flexiblepricing.FlexiblePrice")
-    tiers = GenericRelation("flexiblepricing.FlexiblePriceTier")
+    flexible_prices = GenericRelation(
+        "flexiblepricing.FlexiblePrice",
+        object_id_field="courseware_object_id",
+        content_type_field="courseware_content_type",
+    )
+    tiers = GenericRelation(
+        "flexiblepricing.FlexiblePriceTier",
+        object_id_field="courseware_object_id",
+        content_type_field="courseware_content_type",
+    )
 
     class Meta:
         ordering = ("program", "title")
