@@ -189,17 +189,4 @@ describe("RegisterDetailsForm", () => {
       })
     }
   )
-
-  it("displays the state field if the country has states", async () => {
-    const wrapper = renderForm()
-    const fieldName = `input[name="legal_address.country"]`
-
-    const formik = wrapper.find("Formik")
-    const input = findFormikFieldByName(formik, "legal_address.country")
-
-    input.simulate("change", { persist: () => {}, target: { name: fieldName, value: "US" }})
-    input.simulate("blur")
-
-    console.log(findFormikFieldByName(formik, "legal_address.state"))
-  })
 })
