@@ -20,7 +20,11 @@ from main.serializers import WriteableSerializerMethodField
 from openedx.api import validate_username_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.tasks import change_edx_user_email_async
+<<<<<<< HEAD
 from users.models import ChangeEmailRequest, LegalAddress, User, UserProfile
+=======
+from users.models import ChangeEmailRequest, LegalAddress, UserProfile, User
+>>>>>>> 1c71b9d (Makes profiles work)
 
 log = logging.getLogger()
 
