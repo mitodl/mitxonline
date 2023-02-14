@@ -36,7 +36,7 @@ export interface IDiscount {
     discount_type: string;
     redemption_type: string;
     max_redemptions: number;
-    for_flexible_pricing: boolean;
+    payment_type: string;
     activation_date: Date;
     expiration_date: Date;
 }
@@ -130,6 +130,6 @@ export interface IFlexiblePriceStatusModalProps {
 export interface IDiscountFilters {
     q: string;
     redemption_type: string;
-    for_flexible_pricing: string;
+    payment_type: string;
     is_redeemed: string;
 }

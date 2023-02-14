@@ -438,7 +438,7 @@ class DiscountSerializer(serializers.ModelSerializer):
             "redemption_type",
             "max_redemptions",
             "discount_code",
-            "for_flexible_pricing",
+            "payment_type",
             "is_redeemed",
             "activation_date",
             "expiration_date",

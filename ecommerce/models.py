@@ -23,6 +23,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
     DISCOUNT_TYPES,
+    PAYMENT_TYPES,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
@@ -239,9 +240,9 @@ class Discount(TimestampedModel):
     automatic = models.BooleanField(default=False)
     discount_type = models.CharField(choices=DISCOUNT_TYPES, max_length=30)
     redemption_type = models.CharField(choices=REDEMPTION_TYPES, max_length=30)
+    payment_type = models.CharField(null=True, choices=PAYMENT_TYPES, max_length=30)
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
     discount_code = models.CharField(max_length=50)
-    for_flexible_pricing = models.BooleanField(null=False, default=False)
     activation_date = models.DateTimeField(
         null=True,
         blank=True,

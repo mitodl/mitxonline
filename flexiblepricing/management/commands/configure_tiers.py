@@ -42,17 +42,17 @@ created if it's not there already)
 you specify --program)
 - Specify --program-abbrev "<abbreviation>" to use a different program
 abbreviation in the discount codes (defaults to DEDP, required if you specify
---program) 
-- Specify --tier-info <filename> to set different tier levels. This expects a 
+--program)
+- Specify --tier-info <filename> to set different tier levels. This expects a
 CSV file with "threshold amount,discount type,discount amount" as the data set.
-(Do not provide a header row.) Discount type should be "percent-off", 
-"dollars-off", or "fixed-price". 
+(Do not provide a header row.) Discount type should be "percent-off",
+"dollars-off", or "fixed-price".
 
 If you specify tier information, you must provide all the tiers you want to
-create - the specified information will override the default. In addition, you 
+create - the specified information will override the default. In addition, you
 must supply a zero income tier. This is a requirement and the command will quit
-if you don't have one set up, as that tier is used as the starting point for 
-financial assistance. 
+if you don't have one set up, as that tier is used as the starting point for
+financial assistance.
 
 """
 import csv
@@ -65,7 +65,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
 
 from courses.models import Program
-from ecommerce.constants import REDEMPTION_TYPE_UNLIMITED
+from ecommerce.constants import (
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    REDEMPTION_TYPE_UNLIMITED,
+)
 from ecommerce.models import Discount
 from flexiblepricing.models import FlexiblePriceTier
 
@@ -250,7 +253,7 @@ class Command(BaseCommand):
             if not found_discount:
                 found_discount = Discount(
                     **tier_config["discount"],
-                    for_flexible_pricing=True,
+                    payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
                     redemption_type=REDEMPTION_TYPE_UNLIMITED,
                 )
                 found_discount.save()
