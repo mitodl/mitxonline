@@ -312,7 +312,7 @@ def test_program_first_unexpired_run():
     Test that the first unexpired run of a program is returned
     """
     program = ProgramFactory()
-    course = CourseFactory.create(program=program)
+    course = CourseFactory()
     now = now_in_utc()
     end_date = now + timedelta(days=100)
     enr_end_date = now + timedelta(days=100)
@@ -324,6 +324,16 @@ def test_program_first_unexpired_run():
         live=True,
     )
 
+    root_node = program.requirements_root
+    required_courses_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    required_courses_node.add_child(
+        node_type=ProgramRequirementNodeType.COURSE, course=course
+    )
+
     # create another course and course run in program
     another_course = CourseFactory.create(program=program)
     second_run = CourseRunFactory.create(
@@ -331,6 +341,9 @@ def test_program_first_unexpired_run():
         course=another_course,
         end_date=end_date,
         enrollment_end=enr_end_date,
+    )
+    required_courses_node.add_child(
+        node_type=ProgramRequirementNodeType.COURSE, course=another_course
     )
 
     assert first_run.start_date < second_run.start_date
