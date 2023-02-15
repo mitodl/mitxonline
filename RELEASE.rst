@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.61.0
+--------------
+
+- fix: Fix flexible pricing generic relations (#1412)
+- feat: Add discount payment types (#1390)
+
 Version 0.60.0 (Released February 09, 2023)
 --------------
 
