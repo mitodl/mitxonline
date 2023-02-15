@@ -69,7 +69,7 @@ class LegalAddressSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(max_length=60)
     last_name = serializers.CharField(max_length=60)
     country = serializers.CharField(max_length=2)
-    state = serializers.CharField(max_length=10, required=False)
+    state = serializers.CharField(max_length=10, allow_blank=True, allow_null=True)
 
     def validate_first_name(self, value):
         """Validates the first name of the user"""
@@ -83,22 +83,18 @@ class LegalAddressSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Last name is not valid")
         return value
 
-    def validate_state(self, value):
+    def validate(self, data):
         """We only want a state if there are states"""
         if (
-            self.country is None
-            or pycountry.subdivisions.get(country_code=self.country) is None
+            data["country"] is None
+            or pycountry.subdivisions.get(country_code=data["country"]) is None
         ):
-            log.error("validate_state ain't got no country")
-            return value
+            return data
 
-        if value and not pycountry.subdivisions.get(code=value):
-            log.error("validate_state actually failing")
+        if data["state"] and not pycountry.subdivisions.get(code=data["state"]):
             raise serializers.ValidationError("Invalid state specified")
 
-        log.error("validate_state fell out the bottom")
-
-        return value
+        return data
 
     class Meta:
         model = LegalAddress
@@ -194,7 +190,6 @@ class UserSerializer(serializers.ModelSerializer):
         return instance.get_all_permissions()
 
     def validate(self, data):
-        log.error("UserSerializer validating things")
         request = self.context.get("request", None)
         # Certain fields are required only if a new User is being created (i.e.: the request method is POST)
         if request is not None and request.method == "POST":
@@ -230,11 +225,7 @@ class UserSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create a new user"""
         legal_address_data = validated_data.pop("legal_address")
-        user_profile_data = validated_data.pop("profile", None)
-
-        log.error(
-            "in the user serializer, here's legal_address_data", legal_address_data
-        )
+        user_profile_data = validated_data.pop("user_profile", None)
 
         username = validated_data.pop("username")
         email = validated_data.pop("email")
