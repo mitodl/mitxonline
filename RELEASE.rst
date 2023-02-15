@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.61.0
+Version 0.61.0 (Released February 15, 2023)
 --------------
 
 - fix: Fix flexible pricing generic relations (#1412)
