@@ -474,17 +474,32 @@ def unenroll_learner_from_order(order_id):
                 pass
 
 
-def check_pending_orders_for_resolution():
-    """Checks pending orders for resolution."""
+def check_and_process_pending_orders_for_resolution(refnos=None):
+    """
+    Checks pending orders for resolution. By default, this will pull all the 
+    pending orders that are in the system.
+    
+    Args:
+    - orders (list or None): check specific reference numbers 
+    Returns:
+    - Tuple of orders processed: fulfilled count, cancelled count
+
+    """
 
     gateway = PaymentGateway.get_gateway_class(ECOMMERCE_DEFAULT_PAYMENT_GATEWAY)
 
-    pending_orders = PendingOrder.objects.filter(
-        state=PendingOrder.STATE.PENDING
-    ).values_list("reference_number")
+    if refnos is not None:
+        pending_orders = PendingOrder.objects.filter(
+            state=PendingOrder.STATE.PENDING,
+            reference_number__in=refnos
+        ).values_list("reference_number")
+    else:
+        pending_orders = PendingOrder.objects.filter(
+            state=PendingOrder.STATE.PENDING
+        ).values_list("reference_number")
 
     if len(pending_orders) == 0:
-        return
+        return (0,0,0)
 
     log.info(f"Resolving {len(pending_orders)} orders")
 
@@ -492,7 +507,9 @@ def check_pending_orders_for_resolution():
 
     if len(results.keys()) == 0:
         log.info(f"No orders found to resolve.")
-        return
+        return (0,0,0)
+
+    fulfilled_count = cancel_count = error_count = 0
 
     for result in results:
         payload = results[result]
@@ -506,12 +523,14 @@ def check_pending_orders_for_resolution():
 
                 order.fulfill(payload)
                 order.save()
+                fulfilled_count += 1
 
                 log.info(f"Fulfilled order {order.reference_number}.")
             except Exception as e:
                 log.error(
                     f"Couldn't process pending order for fulfillment {payload['req_reference_number']}: {str(e)}"
                 )
+                error_count += 1
         else:
 
             try:
@@ -528,6 +547,7 @@ def check_pending_orders_for_resolution():
                     reason=f"Cancelled due to processor code {payload['reason_code']}",
                 )
                 order.save()
+                cancel_count += 1
 
                 log.info(
                     self.style.SUCCESS(f"Cancelled order {order.reference_number}.")
@@ -536,3 +556,6 @@ def check_pending_orders_for_resolution():
                 log.error(
                     f"Couldn't process pending order for cancellation {payload['req_reference_number']}: {str(e)}"
                 )
+                error_count += 1
+
+    return (fulfilled_count, cancel_count)

@@ -15,7 +15,7 @@ from reversion.models import Version
 
 from courses.factories import CourseRunEnrollmentFactory
 from ecommerce.api import (
-    check_pending_orders_for_resolution,
+    check_and_process_pending_orders_for_resolution,
     process_cybersource_payment_response,
     refund_order,
     unenroll_learner_from_order,
@@ -360,7 +360,7 @@ def test_process_cybersource_payment_response(rf, mocker, user_client, user, pro
 
 
 @pytest.mark.parametrize("test_type", [None, "fail", "empty"])
-def test_check_pending_orders_for_resolution(mocker, test_type):
+def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
     """
     Tests the pending order check. test_type can be:
     - None - there's an order and it was found
@@ -450,13 +450,16 @@ def test_check_pending_orders_for_resolution(mocker, test_type):
         return_value=retval,
     )
 
-    check_pending_orders_for_resolution()
+    (fulfilled, cancelled, errored) = check_and_process_pending_orders_for_resolution()
 
     if test_type == "empty":
         assert not mocked_gateway_func.called
+        assert (fulfilled, cancelled, errored) == (0, 0, 0)
     elif test_type == "fail":
         order.refresh_from_db()
         assert order.state == Order.STATE.CANCELED
+        assert (fulfilled, cancelled, errored) == (0, 1, 0)
     else:
         order.refresh_from_db()
         assert order.state == Order.STATE.FULFILLED
+        assert (fulfilled, cancelled, errored) == (1, 0, 0)
