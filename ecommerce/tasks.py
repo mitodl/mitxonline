@@ -36,6 +36,6 @@ def send_order_refund_email(order_id):
 
 @app.task(acks_late=True)
 def process_pending_order_resolutions():
-    from ecommerce.api import check_pending_orders_for_resolution
+    from ecommerce.api import check_and_process_pending_orders_for_resolution
 
-    check_pending_orders_for_resolution()
+    check_and_process_pending_orders_for_resolution()

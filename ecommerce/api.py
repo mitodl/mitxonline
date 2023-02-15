@@ -476,13 +476,13 @@ def unenroll_learner_from_order(order_id):
 
 def check_and_process_pending_orders_for_resolution(refnos=None):
     """
-    Checks pending orders for resolution. By default, this will pull all the 
+    Checks pending orders for resolution. By default, this will pull all the
     pending orders that are in the system.
-    
+
     Args:
-    - orders (list or None): check specific reference numbers 
+    - refnos (list or None): check specific reference numbers
     Returns:
-    - Tuple of orders processed: fulfilled count, cancelled count
+    - Tuple of counts: fulfilled count, cancelled count, error count
 
     """
 
@@ -490,16 +490,15 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
 
     if refnos is not None:
         pending_orders = PendingOrder.objects.filter(
-            state=PendingOrder.STATE.PENDING,
-            reference_number__in=refnos
-        ).values_list("reference_number")
+            state=PendingOrder.STATE.PENDING, reference_number__in=refnos
+        ).values_list("reference_number", flat=True)
     else:
         pending_orders = PendingOrder.objects.filter(
             state=PendingOrder.STATE.PENDING
-        ).values_list("reference_number")
+        ).values_list("reference_number", flat=True)
 
     if len(pending_orders) == 0:
-        return (0,0,0)
+        return (0, 0, 0)
 
     log.info(f"Resolving {len(pending_orders)} orders")
 
@@ -507,7 +506,7 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
 
     if len(results.keys()) == 0:
         log.info(f"No orders found to resolve.")
-        return (0,0,0)
+        return (0, 0, 0)
 
     fulfilled_count = cancel_count = error_count = 0
 
@@ -549,13 +548,11 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
                 order.save()
                 cancel_count += 1
 
-                log.info(
-                    self.style.SUCCESS(f"Cancelled order {order.reference_number}.")
-                )
+                log.info(f"Cancelled order {order.reference_number}.")
             except Exception as e:
                 log.error(
                     f"Couldn't process pending order for cancellation {payload['req_reference_number']}: {str(e)}"
                 )
                 error_count += 1
 
-    return (fulfilled_count, cancel_count)
+    return (fulfilled_count, cancel_count, error_count)
