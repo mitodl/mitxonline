@@ -115,7 +115,7 @@ def create_user_via_email(
             errors=serializer.errors.get("non_field_errors"),
             field_errors=dict_without_keys(serializer.errors, "non_field_errors"),
         )
-        log.error(e)
+
         raise e
 
         raise e
