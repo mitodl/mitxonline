@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.61.1
+--------------
+
+- Adds methods to check pending orders for resolution through CyberSource (#1423)
+- Bump django from 3.2.15 to 3.2.18 (#1431)
+
 Version 0.61.0 (Released February 15, 2023)
 --------------
 
