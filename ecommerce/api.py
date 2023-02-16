@@ -477,3 +477,87 @@ def unenroll_learner_from_order(order_id):
                     )
             except ObjectDoesNotExist:
                 pass
+
+
+def check_and_process_pending_orders_for_resolution(refnos=None):
+    """
+    Checks pending orders for resolution. By default, this will pull all the
+    pending orders that are in the system.
+
+    Args:
+    - refnos (list or None): check specific reference numbers
+    Returns:
+    - Tuple of counts: fulfilled count, cancelled count, error count
+
+    """
+
+    gateway = PaymentGateway.get_gateway_class(ECOMMERCE_DEFAULT_PAYMENT_GATEWAY)
+
+    if refnos is not None:
+        pending_orders = PendingOrder.objects.filter(
+            state=PendingOrder.STATE.PENDING, reference_number__in=refnos
+        ).values_list("reference_number", flat=True)
+    else:
+        pending_orders = PendingOrder.objects.filter(
+            state=PendingOrder.STATE.PENDING
+        ).values_list("reference_number", flat=True)
+
+    if len(pending_orders) == 0:
+        return (0, 0, 0)
+
+    log.info(f"Resolving {len(pending_orders)} orders")
+
+    results = gateway.find_and_get_transactions(pending_orders)
+
+    if len(results.keys()) == 0:
+        log.info(f"No orders found to resolve.")
+        return (0, 0, 0)
+
+    fulfilled_count = cancel_count = error_count = 0
+
+    for result in results:
+        payload = results[result]
+        if int(payload["reason_code"]) == 100:
+
+            try:
+                order = PendingOrder.objects.filter(
+                    state=PendingOrder.STATE.PENDING,
+                    reference_number=payload["req_reference_number"],
+                ).get()
+
+                order.fulfill(payload)
+                order.save()
+                fulfilled_count += 1
+
+                log.info(f"Fulfilled order {order.reference_number}.")
+            except Exception as e:
+                log.error(
+                    f"Couldn't process pending order for fulfillment {payload['req_reference_number']}: {str(e)}"
+                )
+                error_count += 1
+        else:
+
+            try:
+                order = PendingOrder.objects.filter(
+                    state=PendingOrder.STATE.PENDING,
+                    reference_number=payload["req_reference_number"],
+                ).get()
+
+                order.cancel()
+                order.transactions.create(
+                    transaction_id=payload["transaction_id"],
+                    amount=order.total_price_paid,
+                    data=payload,
+                    reason=f"Cancelled due to processor code {payload['reason_code']}",
+                )
+                order.save()
+                cancel_count += 1
+
+                log.info(f"Cancelled order {order.reference_number}.")
+            except Exception as e:
+                log.error(
+                    f"Couldn't process pending order for cancellation {payload['req_reference_number']}: {str(e)}"
+                )
+                error_count += 1
+
+    return (fulfilled_count, cancel_count, error_count)

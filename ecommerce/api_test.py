@@ -1,32 +1,33 @@
 """Tests for Ecommerce api"""
 
+import json
 import random
+import uuid
+
 import pytest
 import reversion
+from CyberSource.rest import ApiException
+from django.conf import settings
 from django.http import HttpRequest
 from django.urls import reverse
-from django.conf import settings
-import uuid
+from mitol.payment_gateway.api import ProcessorResponse
 from reversion.models import Version
+
 from courses.factories import CourseRunEnrollmentFactory
 from ecommerce.api import (
+    check_and_process_pending_orders_for_resolution,
     process_cybersource_payment_response,
     refund_order,
     unenroll_learner_from_order,
 )
-from ecommerce.models import Basket, BasketItem, FulfilledOrder, Order, Transaction
+from ecommerce.constants import TRANSACTION_TYPE_PAYMENT, TRANSACTION_TYPE_REFUND
 from ecommerce.factories import (
-    OrderFactory,
-    TransactionFactory,
-    ProductFactory,
     LineFactory,
+    OrderFactory,
+    ProductFactory,
+    TransactionFactory,
 )
-from ecommerce.constants import (
-    TRANSACTION_TYPE_PAYMENT,
-    TRANSACTION_TYPE_REFUND,
-)
-from mitol.payment_gateway.api import ProcessorResponse
-from CyberSource.rest import ApiException
+from ecommerce.models import Basket, BasketItem, FulfilledOrder, Order, Transaction
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -356,3 +357,109 @@ def test_process_cybersource_payment_response(rf, mocker, user_client, user, pro
     assert order.state == Order.STATE.PENDING
     result = process_cybersource_payment_response(request, order)
     assert result == Order.STATE.FULFILLED
+
+
+@pytest.mark.parametrize("test_type", [None, "fail", "empty"])
+def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
+    """
+    Tests the pending order check. test_type can be:
+    - None - there's an order and it was found
+    - fail - there's an order but the payment failed (failed status in CyberSource)
+    - empty - order isn't pending
+    """
+    order = OrderFactory.create(state=Order.STATE.PENDING)
+
+    # mocking out the create_enrollment and create_paid_courserun calls
+    # we don't really care that it hits edX for this
+    mocker.patch(
+        "ecommerce.models.FulfillableOrder.create_enrollments", return_value=True
+    )
+    mocker.patch(
+        "ecommerce.models.FulfillableOrder.create_paid_courseruns", return_value=True
+    )
+
+    test_payload = {
+        "utf8": "",
+        "message": "Request was processed successfully.",
+        "decision": "100",
+        "auth_code": "888888",
+        "auth_time": "2023-02-09T20:06:51Z",
+        "signature": "",
+        "req_amount": "999",
+        "req_locale": "en-us",
+        "auth_amount": "999",
+        "reason_code": "100",
+        "req_currency": "USD",
+        "auth_avs_code": "X",
+        "auth_response": "100",
+        "req_card_type": "",
+        "request_token": "",
+        "card_type_name": "",
+        "req_access_key": "",
+        "req_item_0_sku": "60-2",
+        "req_profile_id": "2BA30484-75E7-4C99-A7D4-8BD7ADE4552D",
+        "transaction_id": "6759732112426719104003",
+        "req_card_number": "",
+        "req_consumer_id": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+        "req_item_0_code": "60",
+        "req_item_0_name": "course-v1:edX+E2E-101+course",
+        "signed_date_time": "2023-02-09T20:06:51Z",
+        "auth_avs_code_raw": "I1",
+        "auth_trans_ref_no": "123456789619999",
+        "bill_trans_ref_no": "123456789619999",
+        "req_bill_to_email": "testlearner@odl.local",
+        "req_payment_method": "card",
+        "signed_field_names": "",
+        "req_bill_to_surname": "LEARNER",
+        "req_item_0_quantity": 1,
+        "req_line_item_count": 1,
+        "req_bill_to_forename": "TEST",
+        "req_card_expiry_date": "02-2025",
+        "req_reference_number": f"{order.reference_number}",
+        "req_transaction_type": "sale",
+        "req_transaction_uuid": "",
+        "req_item_0_tax_amount": "0",
+        "req_item_0_unit_price": "999",
+        "req_customer_ip_address": "172.19.0.8",
+        "req_bill_to_address_city": "Tallahasseeeeeeee",
+        "req_bill_to_address_line1": "555 123 Place",
+        "req_bill_to_address_state": "FL",
+        "req_merchant_defined_data1": "1",
+        "req_bill_to_address_country": "US",
+        "req_bill_to_address_postal_code": "81992",
+        "req_override_custom_cancel_page": "https://rc.mitxonline.mit.edu/checkout/result/",
+        "req_override_custom_receipt_page": "https://rc.mitxonline.mit.edu/checkout/result/",
+        "req_card_type_selection_indicator": "001",
+    }
+
+    retval = {}
+
+    if test_type == "fail":
+        test_payload["reason_code"] = "999"
+
+    if test_type == "empty":
+        order.state = Order.STATE.CANCELED
+        order.save()
+        order.refresh_from_db()
+
+    if test_type is None or test_type == "fail":
+        retval = {f"{order.reference_number}": test_payload}
+
+    mocked_gateway_func = mocker.patch(
+        "mitol.payment_gateway.api.CyberSourcePaymentGateway.find_and_get_transactions",
+        return_value=retval,
+    )
+
+    (fulfilled, cancelled, errored) = check_and_process_pending_orders_for_resolution()
+
+    if test_type == "empty":
+        assert not mocked_gateway_func.called
+        assert (fulfilled, cancelled, errored) == (0, 0, 0)
+    elif test_type == "fail":
+        order.refresh_from_db()
+        assert order.state == Order.STATE.CANCELED
+        assert (fulfilled, cancelled, errored) == (0, 1, 0)
+    else:
+        order.refresh_from_db()
+        assert order.state == Order.STATE.FULFILLED
+        assert (fulfilled, cancelled, errored) == (1, 0, 0)
