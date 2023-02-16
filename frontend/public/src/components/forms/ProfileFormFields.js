@@ -310,6 +310,8 @@ export const ProfileFields = () => (
             <option value="">-----</option>
             <option value="f">Female</option>
             <option value="m">Male</option>
+            <option value="t">Transgender</option>
+            <option value="nb">Non-binary/non-conforming</option>
             <option value="o">Other / Prefer not to say</option>
           </Field>
           <ErrorMessage

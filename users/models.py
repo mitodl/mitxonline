@@ -23,9 +23,13 @@ from users.constants import USERNAME_MAX_LEN
 MALE = "m"
 FEMALE = "f"
 OTHER = "o"
+TRANSGENDER = "t"
+NONBINARY = "nb"
 GENDER_CHOICES = (
     (MALE, "Male"),
     (FEMALE, "Female"),
+    (TRANSGENDER, "Transgender"),
+    (NONBINARY, "Non-binary/non-conforming"),
     (OTHER, "Other/Prefer Not to Say"),
 )
 
