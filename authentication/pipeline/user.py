@@ -95,13 +95,13 @@ def create_user_via_email(
 
     elif backend.name == OpenIdConnectAuth.name:
         data = response.copy()
-        data["legal_address"] = data["address"]
-        data["legal_address"]["first_name"] = data["given_name"]
-        data["legal_address"]["last_name"] = data["family_name"]
-        data["is_staff"] = True if "staff" in data["roles"] else False
-        data["is_superuser"] = True if "superuser" in data["roles"] else False
-        expected_data_fields = ("name", "username")
         print(data)
+        data["legal_address"] = {"country": data["country"]}
+        data["username"] = data["preferred_username"]
+        if "roles" in data:
+            data["is_staff"] = True if "staff" in data["roles"] else False
+            data["is_superuser"] = True if "superuser" in data["roles"] else False
+        expected_data_fields = ("name", "username")
     else:
         return {}
 
