@@ -2,7 +2,11 @@
 import React from "react"
 import { Formik, Form } from "formik"
 
-import { legalAddressValidation, LegalAddressFields, ProfileFields } from "./ProfileFormFields"
+import {
+  legalAddressValidation,
+  LegalAddressFields,
+  ProfileFields
+} from "./ProfileFormFields"
 
 import type { Country, User } from "../../flow/authTypes"
 
@@ -16,7 +20,7 @@ const getInitialValues = (user: User) => ({
   name:          user.name,
   email:         user.email,
   legal_address: user.legal_address,
-  user_profile:  user.user_profile,
+  user_profile:  user.user_profile
 })
 
 const EditProfileForm = ({ onSubmit, countries, user }: Props) => (

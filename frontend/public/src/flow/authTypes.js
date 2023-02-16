@@ -109,7 +109,7 @@ export type Country = {
 }
 
 export type ProfileForm = {
-  profile: Profile
+  profile: UserProfile
 }
 
 export type EmailFormValues = {

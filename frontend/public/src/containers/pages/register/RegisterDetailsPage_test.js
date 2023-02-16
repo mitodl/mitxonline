@@ -23,6 +23,9 @@ describe("RegisterDetailsPage", () => {
     password:      "password1",
     legal_address: {
       address: "main st"
+    },
+    user_profile: {
+      year_of_birth: 1999
     }
   }
   const partialToken = "partialTokenTestValue"

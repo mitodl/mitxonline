@@ -24,14 +24,16 @@ const INITIAL_VALUES = {
     first_name: "",
     last_name:  "",
     country:    "",
-    state:      "",
+    state:      ""
   }
 }
 
 const RegisterDetailsForm = ({ onSubmit, countries }: Props) => (
   <Formik
     onSubmit={onSubmit}
-    validationSchema={legalAddressValidation.concat(newAccountValidation).concat(profileValidation)}
+    validationSchema={legalAddressValidation
+      .concat(newAccountValidation)
+      .concat(profileValidation)}
     initialValues={INITIAL_VALUES}
     render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
       <Form>

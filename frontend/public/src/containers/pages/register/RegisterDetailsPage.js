@@ -30,6 +30,7 @@ import type { Response } from "redux-query"
 import type {
   AuthResponse,
   LegalAddress,
+  UserProfile,
   User,
   Country
 } from "../../../flow/authTypes"
@@ -51,6 +52,7 @@ type DispatchProps = {|
     password: string,
     username: string,
     legalAddress: LegalAddress,
+    userProfile: UserProfile,
     partialToken: string
   ) => Promise<Response<AuthResponse>>,
   getCurrentUser: () => Promise<Response<User>>,

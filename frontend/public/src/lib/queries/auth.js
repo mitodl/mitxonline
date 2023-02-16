@@ -4,7 +4,11 @@ import { pathOr, nthArg } from "ramda"
 import { FLOW_LOGIN, FLOW_REGISTER } from "../auth"
 import { getCsrfOptions } from "./util"
 
-import type { AuthResponse, LegalAddress, UserProfile } from "../../flow/authTypes"
+import type {
+  AuthResponse,
+  LegalAddress,
+  UserProfile
+} from "../../flow/authTypes"
 import type { updateEmailResponse } from "../../flow/authTypes"
 
 export const authSelector = (state: any) => state.entities.auth
