@@ -1,11 +1,11 @@
 """
-Looks up pending orders in CyberSource, and changes the status of the order if 
-necessary. 
+Looks up pending orders in CyberSource, and changes the status of the order if
+necessary.
 
 Occasionally, there may be a breakdown of communication between MITx Online and
 CyberSource, and orders that have gone through on the CyberSource end may not
 have their updated status reflected in MITx Online. This command will find those
-orders (or, alternatively, look at the specified order) and then will either 
+orders (or, alternatively, look at the specified order) and then will either
 fulfill or cancel the order as necessary.
 
 """
