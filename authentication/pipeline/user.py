@@ -98,9 +98,11 @@ def create_user_via_email(
         print(data)
         data["legal_address"] = {"country": data["country"]}
         data["username"] = data["preferred_username"]
-        if "roles" in data:
-            data["is_staff"] = True if "staff" in data["roles"] else False
-            data["is_superuser"] = True if "superuser" in data["roles"] else False
+        try:
+            data["is_staff"] = True if "is_staff" in data["resource_access"]["mitxonline-client-id"]["roles"] else False
+            data["is_superuser"] = True if "is_superuser" in data["resource_access"]["mitxonline-client-id"]["roles"] else False
+        except KeyError:
+            pass
         expected_data_fields = ("name", "username")
     else:
         return {}
