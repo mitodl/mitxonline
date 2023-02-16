@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.61.1
+Version 0.61.1 (Released February 16, 2023)
 --------------
 
 - Adds methods to check pending orders for resolution through CyberSource (#1423)
