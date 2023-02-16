@@ -1,5 +1,5 @@
 ``resolve_pending_order``
-===============
+=========================
 
 Looks up the specified pending order in CyberSource and resolves it. This can mean either fulfilling the order or cancelling it, depending on the status of the payment in CyberSource: if the order is found and the result code is 100, it will be fulfilled; otherwise, it will be cancelled.
 
