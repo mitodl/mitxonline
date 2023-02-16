@@ -494,7 +494,7 @@ class AuthStateMachine(RuleBasedStateMachine):
                 "first_name": "Sally",
                 "last_name": "Smith",
                 "country": "US",
-                "state": "MA",
+                "state": "US-MA",
             },
         }
 

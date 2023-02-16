@@ -53,8 +53,9 @@ export const legalAddressValidation = yup.object().shape({
       .required(),
     state: yup
       .string()
-      .when("legal_address.country", {
-        is: (value) => value === "US",
+      .label("State")
+      .when("country", {
+        is: (value) => value === "US" || value === "CA",
         then: yup.string().required(),
         otherwise: yup.string().nullable(), 
       }),
@@ -67,14 +68,14 @@ export const newAccountValidation = yup.object().shape({
 })
 
 export const profileValidation = yup.object().shape({
-  profile: yup.object().shape({
+  user_profile: yup.object().shape({
     gender: yup
       .string()
       .label("Gender")
       .nullable(),
-    birth_year: yup
+    year_of_birth: yup
       .string()
-      .label("Birth Year")
+      .label("Year of Birth")
       .required(),
   })
 })
@@ -328,7 +329,7 @@ export const ProfileFields = () => (
             className="form-control"
             aria-describedby="user_profile.year_of_birth_error"
           >
-            <option value="">-----</option>
+            <option>-----</option>
             {reverse(range(seedYear - 120, seedYear - 14)).map((year, i) => (
               <option key={i} value={year}>
                 {year}

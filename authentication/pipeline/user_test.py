@@ -58,7 +58,7 @@ def mock_create_user_strategy(mocker):
             "first_name": "Jane",
             "last_name": "Doe",
             "country": "US",
-            "state": "MA",
+            "state": "US-MA",
         },
     }
     return strategy

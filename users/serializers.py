@@ -69,7 +69,9 @@ class LegalAddressSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(max_length=60)
     last_name = serializers.CharField(max_length=60)
     country = serializers.CharField(max_length=2)
-    state = serializers.CharField(max_length=10, allow_blank=True, allow_null=True)
+    state = serializers.CharField(
+        max_length=10, required=False, allow_blank=True, allow_null=True
+    )
 
     def validate_first_name(self, value):
         """Validates the first name of the user"""
@@ -85,14 +87,17 @@ class LegalAddressSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """We only want a state if there are states"""
-        if (
-            data["country"] is None
-            or pycountry.subdivisions.get(country_code=data["country"]) is None
-        ):
+        # The CountriesStatesSerializer below only provides state options for
+        # US and Canada - pycountry has them for everything but we therefore
+        # only test for these two.
+        if not data["country"] in ["US", "CA"]:
             return data
-
-        if data["state"] and not pycountry.subdivisions.get(code=data["state"]):
-            raise serializers.ValidationError("Invalid state specified")
+        else:
+            if not "state" in data or (
+                data["country"] in ["US", "CA"]
+                and not pycountry.subdivisions.get(code=data["state"])
+            ):
+                raise serializers.ValidationError({"state": "Invalid state specified"})
 
         return data
 

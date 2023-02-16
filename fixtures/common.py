@@ -96,7 +96,28 @@ def valid_address_dict():
         first_name="Test",
         last_name="User",
         country="US",
-        state="MA",
+        state="US-MA",
+    )
+
+
+@pytest.fixture
+def invalid_address_dict():
+    """Yields a dict that will deserialize into an invalid US legal address"""
+    return dict(
+        first_name="Test",
+        last_name="User",
+        country="US",
+    )
+
+
+@pytest.fixture
+def intl_address_dict():
+    """Yields a dict that will deserialize into an valid non-US/CA legal address"""
+
+    return dict(
+        first_name="Test",
+        last_name="User",
+        country="JP",
     )
 
 
