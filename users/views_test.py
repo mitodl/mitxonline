@@ -71,6 +71,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
             "is_staff": False,
             "is_superuser": False,
             "grants": [],
+            "user_profile": None,
         }
         # patched_unused_coupon_api.assert_not_called()
     elif not is_anonymous and show_enrollment_codes:
@@ -83,6 +84,11 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
                 "first_name": user.legal_address.first_name,
                 "last_name": user.legal_address.last_name,
                 "country": user.legal_address.country,
+                "state": user.legal_address.state,
+            },
+            "user_profile": {
+                "gender": user.user_profile.gender,
+                "year_of_birth": user.user_profile.year_of_birth,
             },
             "is_anonymous": False,
             "is_authenticated": True,
@@ -203,6 +209,7 @@ def test_update_user_name_change(mocker, user_client, user, valid_address_dict):
         "name": new_name,
         "email": user.email,
         "legal_address": valid_address_dict,
+        "user_profile": None,
     }
 
     resp = user_client.patch(
@@ -224,6 +231,7 @@ def test_update_user_name_change_edx(mocker, user_client, user, valid_address_di
         "name": new_name,
         "email": user.email,
         "legal_address": valid_address_dict,
+        "user_profile": None,
     }
     resp = user_client.patch(
         reverse("users_api-me"), content_type="application/json", data=payload
@@ -244,6 +252,7 @@ def test_update_user_no_name_change_edx(mocker, user_client, user, valid_address
             "name": user.name,
             "email": user.email,
             "legal_address": valid_address_dict,
+            "user_profile": None,
         },
     )
 

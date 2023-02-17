@@ -20,7 +20,7 @@ from main.serializers import WriteableSerializerMethodField
 from openedx.api import validate_username_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.tasks import change_edx_user_email_async
-from users.models import ChangeEmailRequest, LegalAddress, Profile, User
+from users.models import ChangeEmailRequest, LegalAddress, User, UserProfile
 
 log = logging.getLogger()
 
@@ -47,6 +47,20 @@ OPENEDX_USERNAME_VALIDATION_MSGS_MAP = {
 }
 
 
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Serializer for profile"""
+
+    gender = serializers.CharField(max_length=128, required=False)
+    year_of_birth = serializers.IntegerField(required=False)
+
+    class Meta:
+        model = UserProfile
+        fields = (
+            "gender",
+            "year_of_birth",
+        )
+
+
 class LegalAddressSerializer(serializers.ModelSerializer):
     """Serializer for legal address"""
 
@@ -55,6 +69,9 @@ class LegalAddressSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(max_length=60)
     last_name = serializers.CharField(max_length=60)
     country = serializers.CharField(max_length=2)
+    state = serializers.CharField(
+        max_length=10, required=False, allow_blank=True, allow_null=True
+    )
 
     def validate_first_name(self, value):
         """Validates the first name of the user"""
@@ -68,12 +85,29 @@ class LegalAddressSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Last name is not valid")
         return value
 
+    def validate(self, data):
+        """We only want a state if there are states"""
+        # The CountriesStatesSerializer below only provides state options for
+        # US and Canada - pycountry has them for everything but we therefore
+        # only test for these two.
+        if not data["country"] in ["US", "CA"]:
+            return data
+        else:
+            if not "state" in data or (
+                data["country"] in ["US", "CA"]
+                and not pycountry.subdivisions.get(code=data["state"])
+            ):
+                raise serializers.ValidationError({"state": "Invalid state specified"})
+
+        return data
+
     class Meta:
         model = LegalAddress
         fields = (
             "first_name",
             "last_name",
             "country",
+            "state",
         )
 
 
@@ -134,6 +168,7 @@ class UserSerializer(serializers.ModelSerializer):
         required=False,
     )
     legal_address = LegalAddressSerializer(allow_null=True)
+    user_profile = UserProfileSerializer(allow_null=True, required=False)
     grants = serializers.SerializerMethodField(read_only=True, required=False)
 
     def validate_email(self, value):
@@ -195,7 +230,7 @@ class UserSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create a new user"""
         legal_address_data = validated_data.pop("legal_address")
-        profile_data = validated_data.pop("profile", None)
+        user_profile_data = validated_data.pop("user_profile", None)
 
         username = validated_data.pop("username")
         email = validated_data.pop("email")
@@ -217,12 +252,20 @@ class UserSerializer(serializers.ModelSerializer):
                 if legal_address.is_valid():
                     legal_address.save()
 
+            if user_profile_data:
+                user_profile = UserProfileSerializer(
+                    user.user_profile, data=user_profile_data
+                )
+                if user_profile.is_valid():
+                    user_profile.save()
+
         sync_hubspot_user(user)
         return user
 
     def update(self, instance, validated_data):
         """Update an existing user"""
         legal_address_data = validated_data.pop("legal_address", None)
+        user_profile_data = validated_data.pop("user_profile", None)
         password = validated_data.pop("password", None)
 
         with transaction.atomic():
@@ -233,6 +276,13 @@ class UserSerializer(serializers.ModelSerializer):
                 )
                 if address_serializer.is_valid(raise_exception=True):
                     address_serializer.save()
+
+            if user_profile_data:
+                user_profile_serializer = UserProfileSerializer(
+                    instance.user_profile, data=user_profile_data
+                )
+                if user_profile_serializer.is_valid(raise_exception=True):
+                    user_profile_serializer.save()
 
             # save() will be called in super().update()
             if password is not None:
@@ -252,6 +302,7 @@ class UserSerializer(serializers.ModelSerializer):
             "email",
             "password",
             "legal_address",
+            "user_profile",
             "is_anonymous",
             "is_authenticated",
             "is_editor",

@@ -109,12 +109,14 @@ def create_user_via_email(
     serializer = UserSerializer(data=data, context=context)
 
     if not serializer.is_valid():
-        raise RequirePasswordAndPersonalInfoException(
+        e = RequirePasswordAndPersonalInfoException(
             backend,
             current_partial,
             errors=serializer.errors.get("non_field_errors"),
             field_errors=dict_without_keys(serializer.errors, "non_field_errors"),
         )
+
+        raise e
 
     try:
         created_user = serializer.save()

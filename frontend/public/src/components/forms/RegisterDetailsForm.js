@@ -5,6 +5,7 @@ import { Formik, Form } from "formik"
 import {
   newAccountValidation,
   legalAddressValidation,
+  profileValidation,
   LegalAddressFields
 } from "./ProfileFormFields"
 
@@ -22,14 +23,17 @@ const INITIAL_VALUES = {
   legal_address: {
     first_name: "",
     last_name:  "",
-    country:    ""
+    country:    "",
+    state:      ""
   }
 }
 
 const RegisterDetailsForm = ({ onSubmit, countries }: Props) => (
   <Formik
     onSubmit={onSubmit}
-    validationSchema={legalAddressValidation.concat(newAccountValidation)}
+    validationSchema={legalAddressValidation
+      .concat(newAccountValidation)
+      .concat(profileValidation)}
     initialValues={INITIAL_VALUES}
     render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
       <Form>

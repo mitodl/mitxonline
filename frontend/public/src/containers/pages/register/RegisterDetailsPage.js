@@ -30,6 +30,7 @@ import type { Response } from "redux-query"
 import type {
   AuthResponse,
   LegalAddress,
+  UserProfile,
   User,
   Country
 } from "../../../flow/authTypes"
@@ -51,6 +52,7 @@ type DispatchProps = {|
     password: string,
     username: string,
     legalAddress: LegalAddress,
+    userProfile: UserProfile,
     partialToken: string
   ) => Promise<Response<AuthResponse>>,
   getCurrentUser: () => Promise<Response<User>>,
@@ -78,6 +80,7 @@ export class RegisterDetailsPage extends React.Component<Props> {
         detailsData.password,
         detailsData.username,
         detailsData.legal_address,
+        detailsData.user_profile,
         partialToken
       )
 
@@ -156,6 +159,7 @@ const registerDetails = (
   password: string,
   username: string,
   legalAddress: LegalAddress,
+  userProfile: UserProfile,
   partialToken: string
 ) =>
   mutateAsync(
@@ -164,6 +168,7 @@ const registerDetails = (
       password,
       username,
       legalAddress,
+      userProfile,
       partialToken
     )
   )

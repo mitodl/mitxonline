@@ -50,7 +50,15 @@ export const legalAddressValidation = yup.object().shape({
       .string()
       .label("Country")
       .length(2)
-      .required()
+      .required(),
+    state: yup
+      .string()
+      .label("State")
+      .when("country", {
+        is:        value => value === "US" || value === "CA",
+        then:      yup.string().required(),
+        otherwise: yup.string().nullable()
+      })
   })
 })
 
@@ -60,24 +68,14 @@ export const newAccountValidation = yup.object().shape({
 })
 
 export const profileValidation = yup.object().shape({
-  profile: yup.object().shape({
+  user_profile: yup.object().shape({
     gender: yup
       .string()
       .label("Gender")
-      .required(),
-    birth_year: yup
+      .nullable(),
+    year_of_birth: yup
       .string()
-      .label("Birth Year")
-      .required(),
-    company: yup
-      .string()
-      .label("Company")
-      .trim()
-      .required(),
-    job_title: yup
-      .string()
-      .label("Job Title")
-      .trim()
+      .label("Year of Birth")
       .required()
   })
 })
@@ -90,9 +88,21 @@ type LegalAddressProps = {
   isNewAccount: boolean
 }
 
+const findStates = (country: string, countries: Array<Country>) => {
+  if (!countries) {
+    return null
+  }
+
+  const foundCountry = countries.find(elem => elem.code === country)
+  return foundCountry && foundCountry.states && foundCountry.states.length > 0
+    ? foundCountry.states
+    : null
+}
+
 export const LegalAddressFields = ({
   countries,
-  isNewAccount
+  isNewAccount,
+  values
 }: LegalAddressProps) => (
   <React.Fragment>
     <div className="form-group">
@@ -222,12 +232,73 @@ export const LegalAddressFields = ({
           ))
           : null}
       </Field>
+
       <ErrorMessage
         name="legal_address.country"
         id="legal_address.country_error"
         component={FormError}
       />
     </div>
+    {findStates(values.legal_address.country, countries) ? (
+      <div className="form-group">
+        <label htmlFor="legal_address.state" className="font-weight-bold">
+          State<span className="required">*</span>
+        </label>
+        <Field
+          component="select"
+          name="legal_address.state"
+          id="legal_address.state"
+          className="form-control"
+          autoComplete="state"
+          aria-describedby="legal_address.state_error"
+        >
+          <option value="">-----</option>
+          {findStates(values.legal_address.country, countries)
+            ? findStates(values.legal_address.country, countries).map(
+              (state, i) => (
+                <option key={i} value={state.code}>
+                  {state.name}
+                </option>
+              )
+            )
+            : null}
+        </Field>
+        <ErrorMessage
+          name="legal_address.state"
+          id="legal_address.state_error"
+          component={FormError}
+        />
+      </div>
+    ) : null}
+    {isNewAccount ? (
+      <div className="form-group">
+        <label
+          htmlFor="user_profile.year_of_birth"
+          className="font-weight-bold"
+        >
+          Year of Birth<span className="required">*</span>
+        </label>
+        <Field
+          component="select"
+          name="user_profile.year_of_birth"
+          id="user_profile.year_of_birth"
+          className="form-control"
+          aria-describedby="user_profile.year_of_birth_error"
+        >
+          <option value="">-----</option>
+          {reverse(range(seedYear - 120, seedYear - 14)).map((year, i) => (
+            <option key={i} value={year}>
+              {year}
+            </option>
+          ))}
+        </Field>
+        <ErrorMessage
+          name="user_profile.year_of_birth"
+          id="user_profile.year_of_birth_error"
+          component={FormError}
+        />
+      </div>
+    ) : null}
   </React.Fragment>
 )
 
@@ -236,40 +307,45 @@ export const ProfileFields = () => (
     <div className="form-group">
       <div className="row">
         <div className="col">
-          <label htmlFor="profile.gender" className="font-weight-bold">
-            Gender*
+          <label htmlFor="user_profile.gender" className="font-weight-bold">
+            Gender
           </label>
 
           <Field
             component="select"
-            name="profile.gender"
-            id="profile.gender"
+            name="user_profile.gender"
+            id="user_profile.gender"
             className="form-control"
-            aria-describedby="profile.genderError"
+            aria-describedby="user_profile.genderError"
           >
             <option value="">-----</option>
             <option value="f">Female</option>
             <option value="m">Male</option>
+            <option value="t">Transgender</option>
+            <option value="nb">Non-binary/non-conforming</option>
             <option value="o">Other / Prefer not to say</option>
           </Field>
           <ErrorMessage
-            name="profile.gender"
-            id="profile.genderError"
+            name="user_profile.gender"
+            id="user_profile.genderError"
             component={FormError}
           />
         </div>
         <div className="col">
-          <label htmlFor="profile.birth_year" className="font-weight-bold">
-            Year of Birth*
+          <label
+            htmlFor="user_profile.year_of_birth"
+            className="font-weight-bold"
+          >
+            Year of Birth<span className="required">*</span>
           </label>
           <Field
             component="select"
-            name="profile.birth_year"
-            id="profile.birth_year"
+            name="user_profile.year_of_birth"
+            id="user_profile.year_of_birth"
             className="form-control"
-            aria-describedby="profile.birth_year_error"
+            aria-describedby="user_profile.year_of_birth_error"
           >
-            <option value="">-----</option>
+            <option>-----</option>
             {reverse(range(seedYear - 120, seedYear - 14)).map((year, i) => (
               <option key={i} value={year}>
                 {year}
@@ -277,13 +353,18 @@ export const ProfileFields = () => (
             ))}
           </Field>
           <ErrorMessage
-            name="profile.birth_year"
-            id="profile.birth_year_error"
+            name="user_profile.year_of_birth"
+            id="user_profile.year_of_birth_error"
             component={FormError}
           />
         </div>
       </div>
     </div>
+  </React.Fragment>
+)
+
+export const AddlProfileFields = () => (
+  <React.Fragment>
     <div className="form-group">
       <label htmlFor="profile.company" className="font-weight-bold">
         Company*

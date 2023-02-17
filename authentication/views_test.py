@@ -484,21 +484,24 @@ class AuthStateMachine(RuleBasedStateMachine):
     )
     def register_details(self, auth_state):
         """Complete the register confirmation details page"""
+        payload = {
+            "flow": auth_state["flow"],
+            "partial_token": auth_state["partial_token"],
+            "password": self.password,
+            "name": "Sally Smith",
+            "username": "custom-username",
+            "legal_address": {
+                "first_name": "Sally",
+                "last_name": "Smith",
+                "country": "US",
+                "state": "US-MA",
+            },
+        }
+
         response = assert_api_call(
             self.client,
             "psa-register-details",
-            payload={
-                "flow": auth_state["flow"],
-                "partial_token": auth_state["partial_token"],
-                "password": self.password,
-                "name": "Sally Smith",
-                "username": "custom-username",
-                "legal_address": {
-                    "first_name": "Sally",
-                    "last_name": "Smith",
-                    "country": "US",
-                },
-            },
+            payload=payload,
             expected={
                 "flow": auth_state["flow"],
                 "state": SocialAuthState.STATE_SUCCESS,

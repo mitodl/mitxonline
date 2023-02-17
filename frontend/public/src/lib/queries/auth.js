@@ -4,7 +4,11 @@ import { pathOr, nthArg } from "ramda"
 import { FLOW_LOGIN, FLOW_REGISTER } from "../auth"
 import { getCsrfOptions } from "./util"
 
-import type { AuthResponse, LegalAddress } from "../../flow/authTypes"
+import type {
+  AuthResponse,
+  LegalAddress,
+  UserProfile
+} from "../../flow/authTypes"
 import type { updateEmailResponse } from "../../flow/authTypes"
 
 export const authSelector = (state: any) => state.entities.auth
@@ -61,6 +65,7 @@ export default {
     password: string,
     username: string,
     legalAddress: LegalAddress,
+    userProfile: ?UserProfile,
     partialToken: string
   ) => ({
     ...DEFAULT_OPTIONS,
@@ -70,6 +75,7 @@ export default {
       password,
       username,
       legal_address: legalAddress,
+      user_profile:  userProfile,
       flow:          FLOW_REGISTER,
       partial_token: partialToken
     }
