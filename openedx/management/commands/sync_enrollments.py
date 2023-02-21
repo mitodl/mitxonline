@@ -30,7 +30,7 @@ class Command(BaseCommand):
         """Walk all users who are missing records and repair them"""
         try:
             user = fetch_user(options["user"])
-        except Exception as exc:  # pylint: disable=broad-except
+        except Exception as exc:
             self.stderr.write(self.style.ERROR(f"{str(exc)}"))
             sys.exit(1)
             
