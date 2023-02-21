@@ -354,7 +354,7 @@ def test_legal_address_serializer_invalid_name(valid_address_dict):
 def test_update_user_serializer_with_profile(
     settings, user, valid_address_dict, user_profile_dict, invalid_profile
 ):
-    """Test that a UserSerializer can be updated properly"""
+    """Tests that the UserSerializers works right with a supplied UserProfile"""
 
     if invalid_profile:
         user_profile_dict["year_of_birth"] = None

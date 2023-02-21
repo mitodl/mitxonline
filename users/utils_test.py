@@ -1,10 +1,16 @@
 """User utils tests"""
+import math
+import random
+from datetime import datetime
 from email.utils import parseaddr
 from unittest.mock import patch
 
 import pytest
+import pytz
+from django.conf import settings
 
 from users.utils import (
+    determine_approx_age,
     ensure_active_user,
     format_recipient,
     is_duplicate_username_error,
@@ -79,3 +85,23 @@ def test_format_recipient(user):
     name, email = parseaddr(format_recipient(user))
     assert name == user.name
     assert email == user.email
+
+
+def test_determine_approx_age():
+    """Verify that determine_approx_age works correctly"""
+
+    now = datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
+    test_year = now.year - random.randrange(0, 50)
+    test_end_of_year = datetime(
+        test_year,
+        12,
+        31,
+        hour=23,
+        minute=59,
+        second=59,
+        tzinfo=pytz.timezone(settings.TIME_ZONE),
+    )
+
+    assert determine_approx_age(test_year) == math.floor(
+        (now - test_end_of_year).days / 365
+    )

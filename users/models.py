@@ -185,19 +185,9 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
         if self.user_profile is None:
             return None
 
-        approx_dob = datetime(
-            self.user_profile.year_of_birth,
-            12,
-            31,
-            hour=23,
-            minute=59,
-            second=59,
-            tzinfo=pytz.timezone(settings.TIME_ZONE),
-        )
+        from users.utils import determine_approx_age
 
-        return math.floor(
-            (datetime.now(tz=pytz.timezone(settings.TIME_ZONE)) - approx_dob).days / 365
-        )
+        return determine_approx_age(self.user_profile.year_of_birth)
 
     def is_coppa_compliant(self):
         return self.get_age() >= 13
@@ -298,7 +288,7 @@ class UserProfile(TimestampedModel):
     gender = models.CharField(
         max_length=128, blank=True, null=True, choices=GENDER_CHOICES
     )
-    year_of_birth = models.IntegerField()
+    year_of_birth = models.IntegerField(blank=True, null=True)
 
     addl_field_flag = models.BooleanField(
         default=False,
@@ -306,33 +296,47 @@ class UserProfile(TimestampedModel):
         help_text="Flags if we've asked the user for additional information",
     )
 
-    company = models.CharField(max_length=128, blank=True, default="")
-    job_title = models.CharField(max_length=128, blank=True, default="")
-    industry = models.CharField(max_length=60, blank=True, default="")
-    job_function = models.CharField(max_length=60, blank=True, default="")
+    company = models.CharField(max_length=128, blank=True, null=True, default="")
+    job_title = models.CharField(max_length=128, blank=True, null=True, default="")
+    industry = models.CharField(max_length=60, blank=True, null=True, default="")
+    job_function = models.CharField(max_length=60, blank=True, null=True, default="")
     company_size = models.IntegerField(
         null=True, blank=True, choices=COMPANY_SIZE_CHOICES
     )
     years_experience = models.IntegerField(
         null=True, blank=True, choices=YRS_EXPERIENCE_CHOICES
     )
-    leadership_level = models.CharField(max_length=60, blank=True, default="")
+    leadership_level = models.CharField(
+        max_length=60, null=True, blank=True, default=""
+    )
     highest_education = models.CharField(
-        max_length=60, blank=True, default="", choices=HIGHEST_EDUCATION_CHOICES
+        null=True,
+        max_length=60,
+        blank=True,
+        default="",
+        choices=HIGHEST_EDUCATION_CHOICES,
     )
     type_is_student = models.BooleanField(
-        default=False, blank=True, help_text="The learner identifies as type Student"
+        null=True,
+        default=False,
+        blank=True,
+        help_text="The learner identifies as type Student",
     )
     type_is_professional = models.BooleanField(
         default=False,
+        null=True,
         blank=True,
         help_text="The learner identifies as type Professional",
     )
     type_is_educator = models.BooleanField(
-        default=False, blank=True, help_text="The learner identifies as type Educator"
+        null=True,
+        default=False,
+        blank=True,
+        help_text="The learner identifies as type Educator",
     )
     type_is_other = models.BooleanField(
         default=False,
+        null=True,
         blank=True,
         help_text="The learner identifies as type Other (not professional, student, or educator)",
     )

@@ -50,6 +50,15 @@ OPENEDX_USERNAME_VALIDATION_MSGS_MAP = {
 class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for profile"""
 
+    def validate_year_of_birth(self, value):
+        """Validates the year of birth field"""
+        from users.utils import determine_approx_age
+
+        if not (value and determine_approx_age(value) >= 13):
+            raise serializers.ValidationError("Year of Birth provided is under 13")
+
+        return value
+
     class Meta:
         model = UserProfile
         fields = (

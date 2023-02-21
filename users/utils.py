@@ -1,8 +1,12 @@
 """User app utility functions"""
 import logging
+import math
 import re
+from datetime import datetime
 from email.utils import formataddr
 
+import pytz
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from mitol.common.utils import get_error_response_summary
 from requests.exceptions import HTTPError
@@ -134,3 +138,21 @@ def ensure_active_user(user):
 def format_recipient(user: User) -> str:
     """Format the user as a recipient"""
     return formataddr((user.name, user.email))
+
+
+def determine_approx_age(year: int):
+    """Determines the approximage age based on the year"""
+
+    approx_dob = datetime(
+        year,
+        12,
+        31,
+        hour=23,
+        minute=59,
+        second=59,
+        tzinfo=pytz.timezone(settings.TIME_ZONE),
+    )
+
+    return math.floor(
+        (datetime.now(tz=pytz.timezone(settings.TIME_ZONE)) - approx_dob).days / 365
+    )
