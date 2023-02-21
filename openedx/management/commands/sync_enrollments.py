@@ -1,6 +1,7 @@
 """
 Management command to sync local enrollment records with edX
 """
+import sys
 from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand
 
@@ -27,7 +28,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         """Walk all users who are missing records and repair them"""
-        user = fetch_user(options["user"])
+        try:
+            user = fetch_user(options["user"])
+        except Exception as exc:  # pylint: disable=broad-except
+            self.stderr.write(self.style.ERROR(f"{str(exc)}"))
+            sys.exit(1)
+            
         self.stdout.write(
             f"Syncing enrollments for user '{user.username}' ({user.email})"
         )
