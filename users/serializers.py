@@ -50,14 +50,24 @@ OPENEDX_USERNAME_VALIDATION_MSGS_MAP = {
 class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for profile"""
 
-    gender = serializers.CharField(max_length=128, required=False)
-    year_of_birth = serializers.IntegerField(required=False)
-
     class Meta:
         model = UserProfile
         fields = (
             "gender",
             "year_of_birth",
+            "addl_field_flag",
+            "company",
+            "job_title",
+            "industry",
+            "job_function",
+            "company_size",
+            "years_experience",
+            "leadership_level",
+            "highest_education",
+            "type_is_student",
+            "type_is_professional",
+            "type_is_educator",
+            "type_is_other",
         )
 
 
@@ -278,9 +288,15 @@ class UserSerializer(serializers.ModelSerializer):
                     address_serializer.save()
 
             if user_profile_data:
-                user_profile_serializer = UserProfileSerializer(
-                    instance.user_profile, data=user_profile_data
-                )
+                try:
+                    user_profile_serializer = UserProfileSerializer(
+                        instance.user_profile, data=user_profile_data
+                    )
+                except:
+                    user_profile_serializer = UserProfileSerializer(
+                        UserProfile(user=instance), data=user_profile_data
+                    )
+
                 if user_profile_serializer.is_valid(raise_exception=True):
                     user_profile_serializer.save()
 
