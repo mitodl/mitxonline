@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.61.2
+--------------
+
+- Adds year of birth, gender, and a conditional state field to the user profile (#1436)
+
 Version 0.61.1 (Released February 16, 2023)
 --------------
 
