@@ -30,10 +30,10 @@ class Command(BaseCommand):
         """Walk all users who are missing records and repair them"""
         try:
             user = fetch_user(options["user"])
-        except Exception as exc:
+        except User.DoesNotExist as exc:
             self.stderr.write(self.style.ERROR(f"{str(exc)}"))
             sys.exit(1)
-            
+
         self.stdout.write(
             f"Syncing enrollments for user '{user.username}' ({user.email})"
         )
