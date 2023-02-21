@@ -74,9 +74,11 @@ export const profileValidation = yup.object().shape({
       .label("Gender")
       .nullable(),
     year_of_birth: yup
-      .string()
+      .number()
+      .min(13 - new Date().getFullYear())
       .label("Year of Birth")
       .required()
+      .typeError("Year of Birth is a required field")
   })
 })
 
@@ -285,7 +287,7 @@ export const LegalAddressFields = ({
           className="form-control"
           aria-describedby="user_profile.year_of_birth_error"
         >
-          <option value="">-----</option>
+          <option value="f">-----</option>
           {reverse(range(seedYear - 120, seedYear - 14)).map((year, i) => (
             <option key={i} value={year}>
               {year}
@@ -345,7 +347,7 @@ export const ProfileFields = () => (
             className="form-control"
             aria-describedby="user_profile.year_of_birth_error"
           >
-            <option>-----</option>
+            <option value="">-----</option>
             {reverse(range(seedYear - 120, seedYear - 14)).map((year, i) => (
               <option key={i} value={year}>
                 {year}

@@ -121,6 +121,16 @@ def intl_address_dict():
     )
 
 
+@pytest.fixture
+def user_profile_dict():
+    """Yields a dict that generates a basic user profile"""
+
+    return dict(
+        gender=None,
+        year_of_birth=1980,
+    )
+
+
 @pytest.fixture()
 def nplusone_fail(settings):
     """Configures the nplusone app to raise errors"""

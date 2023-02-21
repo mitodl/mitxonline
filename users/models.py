@@ -298,7 +298,7 @@ class UserProfile(TimestampedModel):
     gender = models.CharField(
         max_length=128, blank=True, null=True, choices=GENDER_CHOICES
     )
-    year_of_birth = models.IntegerField(blank=True, null=True)
+    year_of_birth = models.IntegerField()
 
     addl_field_flag = models.BooleanField(
         default=False,

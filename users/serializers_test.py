@@ -9,7 +9,12 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 
-from fixtures.common import intl_address_dict, invalid_address_dict, valid_address_dict
+from fixtures.common import (
+    intl_address_dict,
+    invalid_address_dict,
+    user_profile_dict,
+    valid_address_dict,
+)
 from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
 from openedx.exceptions import EdxApiRegistrationValidationException
 from users.factories import UserFactory
@@ -343,3 +348,30 @@ def test_legal_address_serializer_invalid_name(valid_address_dict):
         serializer = LegalAddressSerializer(data=valid_address_dict)
         with pytest.raises(ValidationError):
             serializer.is_valid(raise_exception=True)
+
+
+@pytest.mark.parametrize("invalid_profile", [True, False])
+def test_update_user_serializer_with_profile(
+    settings, user, valid_address_dict, user_profile_dict, invalid_profile
+):
+    """Test that a UserSerializer can be updated properly"""
+
+    if invalid_profile:
+        user_profile_dict["year_of_birth"] = None
+
+    serializer = UserSerializer(
+        instance=user,
+        data={
+            "password": "AgJw0123",
+            "legal_address": valid_address_dict,
+            "user_profile": user_profile_dict,
+        },
+        partial=True,
+    )
+
+    if invalid_profile:
+        assert not serializer.is_valid()
+    else:
+        assert serializer.is_valid()
+        serializer.save()
+        assert isinstance(user.legal_address, LegalAddress)
