@@ -66,7 +66,9 @@ class Command(BaseCommand):
             user = enrollment.user
             course_run = enrollment.run
             try:
-                enroll_in_edx_course_runs(user, [course_run])
+                enroll_in_edx_course_runs(
+                    user, [course_run], mode=enrollment.enrollment_mode
+                )
             except Exception as exc:  # pylint: disable=broad-except
                 self.stderr.write(self.style.ERROR(f"{str(exc)}"))
             else:
