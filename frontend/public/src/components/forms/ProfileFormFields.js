@@ -288,7 +288,7 @@ export const LegalAddressFields = ({
           aria-describedby="user_profile.year_of_birth_error"
         >
           <option value="f">-----</option>
-          {reverse(range(seedYear - 120, seedYear - 14)).map((year, i) => (
+          {reverse(range(seedYear - 120, seedYear - 13)).map((year, i) => (
             <option key={i} value={year}>
               {year}
             </option>
@@ -348,7 +348,7 @@ export const ProfileFields = () => (
             aria-describedby="user_profile.year_of_birth_error"
           >
             <option value="">-----</option>
-            {reverse(range(seedYear - 120, seedYear - 14)).map((year, i) => (
+            {reverse(range(seedYear - 120, seedYear - 13)).map((year, i) => (
               <option key={i} value={year}>
                 {year}
               </option>
