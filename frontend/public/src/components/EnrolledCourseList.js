@@ -7,16 +7,20 @@ import EnrolledItemCard from "./EnrolledItemCard"
 import type { RunEnrollment } from "../flow/courseTypes"
 
 type EnrolledCourseListProps = {
-  enrollments: RunEnrollment[]
+  enrollments: RunEnrollment[],
+  redirectToCourseHomepage: Function,
 }
 
 export class EnrolledCourseList extends React.Component<EnrolledCourseListProps> {
   renderEnrolledItemCard(enrollment: RunEnrollment) {
+    const { redirectToCourseHomepage } = this.props 
+
     return (
       <EnrolledItemCard
         key={enrollment.id}
         enrollment={enrollment}
         toggleProgramInfo={null}
+        redirectToCourseHomepage={redirectToCourseHomepage}
       ></EnrolledItemCard>
     )
   }

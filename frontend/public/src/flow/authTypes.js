@@ -70,7 +70,8 @@ export type UserProfile = {
   years_experience: ?number,
   company_size: ?number,
   leadership_level: ?string,
-  highest_education: ?string
+  highest_education: ?string,
+  addl_field_flag: Boolean
 }
 
 export type User = {

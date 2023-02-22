@@ -60,7 +60,8 @@ type EnrolledItemCardProps = {
   addUserNotification: Function,
   isLoading: boolean,
   toggleProgramDrawer: Function | null,
-  isProgramCard: boolean
+  isProgramCard: boolean,
+  redirectToCourseHomepage: Function,
 }
 
 type EnrolledItemCardState = {
@@ -420,13 +421,14 @@ export class EnrolledItemCard extends React.Component<
   }
 
   renderCourseEnrollment() {
-    const { enrollment, currentUser, isProgramCard } = this.props
+    const { enrollment, currentUser, isProgramCard, redirectToCourseHomepage } = this.props
 
     const { menuVisibility } = this.state
 
     const title = isLinkableCourseRun(enrollment.run, currentUser) ? (
       <a
         href={enrollment.run.courseware_url}
+        onClick={(ev) => redirectToCourseHomepage(enrollment.run.courseware_url, ev)}
         target="_blank"
         rel="noopener noreferrer"
       >

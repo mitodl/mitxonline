@@ -19,15 +19,22 @@ import {
   deactivateEnrollmentMutation,
   courseEmailsSubscriptionMutation
 } from "../../lib/queries/enrollment"
-import { currentUserSelector } from "../../lib/queries/users"
+import users, { currentUserSelector } from "../../lib/queries/users"
 import { addUserNotification } from "../../actions"
 import { ProgramEnrollmentDrawer } from "../../components/ProgramEnrollmentDrawer"
+import {
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Button,
+} from "reactstrap"
 
 import EnrolledCourseList from "../../components/EnrolledCourseList"
 import EnrolledProgramList from "../../components/EnrolledProgramList"
 
 import type { RunEnrollment, ProgramEnrollment } from "../../flow/courseTypes"
-import type { CurrentUser } from "../../flow/authTypes"
+import type { CurrentUser, User } from "../../flow/authTypes"
 
 // this needs pretty drastic cleanup but not until the program bits are refactored
 // to not depend on the props coming from here
@@ -41,8 +48,9 @@ type DashboardPageProps = {
     enrollmentId: number,
     emailsSubscription: string
   ) => Promise<any>,
+  triggerAddlInfoFlag: (currentUser: User) => Promise<any>,
   addUserNotification: Function,
-  closeDrawer: Function
+  closeDrawer: Function,
 }
 
 const DashboardTab = {
@@ -53,7 +61,9 @@ const DashboardTab = {
 type DashboardPageState = {
   programDrawerVisibility: boolean,
   programDrawerEnrollments: ?(any[]),
-  currentTab: string
+  currentTab: string,
+  showAddlProfileFieldsModal: boolean,
+  destinationUrl: string,
 }
 
 export class DashboardPage extends React.Component<
@@ -61,9 +71,11 @@ export class DashboardPage extends React.Component<
   DashboardPageState
 > {
   state = {
-    programDrawerVisibility:  false,
-    programDrawerEnrollments: null,
-    currentTab:               DashboardTab.courses
+    programDrawerVisibility:    false,
+    programDrawerEnrollments:   null,
+    currentTab:                 DashboardTab.courses,
+    showAddlProfileFieldsModal: false,
+    destinationUrl:             "",
   }
 
   toggleDrawer(enrollment: any) {
@@ -77,6 +89,43 @@ export class DashboardPage extends React.Component<
     if (tab === DashboardTab.courses || tab === DashboardTab.programs) {
       this.setState({ currentTab: tab })
     }
+  }
+
+  toggleAddlProfileFieldsModal() {
+    this.setState({
+      showAddlProfileFieldsModal: !this.state.showAddlProfileFieldsModal
+    })
+
+    if (!this.state.showAddlProfileFieldsModal && this.state.destinationUrl.length > 0) {
+      const target = this.state.destinationUrl
+      this.setState({
+        destinationUrl: ''
+      })
+      console.log(`setting target URL to ${target}`)
+      window.location = target
+    }
+  }
+
+  redirectToCourseHomepage(url: string, ev: any) {
+    /* 
+    If we've got addl_field_flag, then display the extra info modal. Otherwise,
+    send the learner directly to the page.
+    */
+
+    const { currentUser, triggerAddlInfoFlag } = this.props
+
+    if (currentUser.user_profile.addl_field_flag) {
+      return
+    }
+
+    ev.preventDefault()
+
+    this.setState({
+      destinationUrl: url,
+      showAddlProfileFieldsModal: true
+    })
+
+    triggerAddlInfoFlag(currentUser)
   }
 
   renderCurrentTab() {
@@ -101,8 +150,40 @@ export class DashboardPage extends React.Component<
         <EnrolledCourseList
           key={"enrolled-courses"}
           enrollments={enrollments}
+          redirectToCourseHomepage={this.redirectToCourseHomepage.bind(this)}
         ></EnrolledCourseList>
       </div>
+    )
+  }
+
+  renderAddlProfileFieldsModal() {
+    const { currentUser } = this.props
+    const { showAddlProfileFieldsModal } = this.state
+
+    return (
+      <Modal
+        id={`upgrade-enrollment-dialog`}
+        className="upgrade-enrollment-modal"
+        isOpen={showAddlProfileFieldsModal}
+        toggle={() => this.toggleAddlProfileFieldsModal()}
+      >
+        <ModalHeader 
+          id={`more-info-modal-${currentUser.id}`}
+          toggle={() => this.toggleAddlProfileFieldsModal()}>
+          Provide More Info
+        </ModalHeader>
+        <ModalBody>
+          <div className="row">
+            <div className="col-12">
+              <p>To help us with our education research missions, please tell us more about yourself. If you do not want to supply this information, simply click the Close button - we won't ask you again.</p>
+            </div>
+          </div>
+
+          </ModalBody>
+          <ModalFooter>
+            <Button type="cancel" className="btn" onClick={() => this.toggleAddlProfileFieldsModal()}>Close</Button>
+          </ModalFooter>
+      </Modal>
     )
   }
 
@@ -159,7 +240,10 @@ export class DashboardPage extends React.Component<
               showDrawer={() =>
                 this.setState({ programDrawerVisibility: false })
               }
+              redirectToCourseHomepage={this.redirectToCourseHomepage}
             ></ProgramEnrollmentDrawer>
+
+            {this.renderAddlProfileFieldsModal()}
           </Loader>
         </div>
       </DocumentTitle>
@@ -187,9 +271,19 @@ const courseEmailsSubscription = (
     courseEmailsSubscriptionMutation(enrollmentId, emailsSubscription)
   )
 
+const triggerAddlInfoFlag = (currentUser: User) => {
+  const updatedUser = currentUser
+  updatedUser.user_profile.addl_field_flag = true
+
+  return mutateAsync(
+    users.editProfileMutation(updatedUser)
+  )
+}
+
 const mapDispatchToProps = {
   deactivateEnrollment,
   courseEmailsSubscription,
+  triggerAddlInfoFlag,
   addUserNotification
 }
 
