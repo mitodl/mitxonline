@@ -5,9 +5,10 @@ import logging
 import requests
 from django.conf import settings
 from django.db import IntegrityError
+from django.db import transaction
 from mitol.common.utils import dict_without_keys
 from social_core.backends.email import EmailAuth
-from social_core.backends.open_id_connect import OpenIdConnectAuth
+from authentication.odl_open_id_connect import OdlOpenIdConnectAuth
 from social_core.exceptions import AuthException
 from social_core.pipeline.partial import partial
 
@@ -22,6 +23,7 @@ from authentication.exceptions import (
     UnexpectedExistingUserException,
     UserCreationFailedException,
 )
+from users.models import LegalAddress, User
 from authentication.utils import SocialAuthState, is_user_email_blocked
 from openedx import api as openedx_api
 from openedx import tasks as openedx_tasks
@@ -70,6 +72,74 @@ def get_username(
     """
     return {"username": None if not user else strategy.storage.user.get_username(user)}
 
+@partial
+def create_user_via_oidc(
+    strategy, backend, user=None, response=None, flow=None, current_partial=None, *args, **kwargs
+):  # pylint: disable=too-many-arguments,unused-argument
+    """
+    Creates a new user if needed and sets the password and name.
+    Args:
+        strategy (social_django.strategy.DjangoStrategy): the strategy used to authenticate
+        backend (social_core.backends.base.BaseAuth): the backend being used to authenticate
+        user (User): the current user
+        details (dict): Dict of user details
+        flow (str): the type of flow (login or register)
+        current_partial (Partial): the partial for the step in the pipeline
+
+    Raises:
+        RequirePasswordAndPersonalInfoException: if the user hasn't set password or name
+    """
+
+
+    if backend.name == OdlOpenIdConnectAuth.name:
+        data = response.copy()
+        print(data)
+        #data["legal_address"] = {"country": data["country"], "first_name": data["given_name"], "last_name": data["family_name"]}
+        try:
+            data["is_staff"] = "is_staff" in data["resource_access"]["mitxonline-client-id"]["roles"]
+            data["is_superuser"] = "is_superuser" in data["resource_access"]["mitxonline-client-id"]["roles"]
+        except KeyError:
+            pass
+    else:
+        return {}
+    
+    if user is None:
+        with transaction.atomic():
+            
+            if "is_staff" in data and "is_superuser" in data:
+                user = User.objects.create_superuser(
+                    data["email"],
+                    email=data["email"],
+                    password=None,
+                    naname=data["name"]
+                )
+            else:
+                user = User.objects.create_user(
+                    data["email"],
+                    email=data["email"],
+                    password=None,
+                    name=data["name"]
+                )
+                
+            LegalAddress.objects.create(
+                user = user,
+                first_name = data["given_name"],
+                last_name = data["family_name"],
+                country = data["country"]
+            )
+    else:
+        user.username=data["email"]
+        user.email=data["email"]
+        user.name=data["name"]
+        user.legal_address.first_name = data["given_name"]
+        user.legal_address.last_name = data["family_name"]
+        user.legal_address.country = data["country"]
+        user.legal_address.save()
+        user.save()
+        
+
+
+    return {"is_new": True, "user": user, "username": user.username}
 
 @partial
 def create_user_via_email(
@@ -93,7 +163,7 @@ def create_user_via_email(
         data = strategy.request_data().copy()
         expected_data_fields = ("name", "password", "username")
 
-    elif backend.name == OpenIdConnectAuth.name:
+    elif backend.name == OdlOpenIdConnectAuth.name:
         data = response.copy()
         print(data)
         data["legal_address"] = {"country": data["country"]}

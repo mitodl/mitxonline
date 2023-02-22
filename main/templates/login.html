@@ -9,7 +9,7 @@
     {{ form.as_p }}
     <button type="submit">Login</button>
   </form>
-  <a href="{% url 'social:begin' 'oidc' %}?next={{ request.path }}">Login with SSO</a>
+  <a href="{% url 'social:begin' 'odl-oidc' %}?next={{ request.path }}">Login with SSO</a>
   <br>
 </div>
 {% endblock %}

@@ -47,11 +47,27 @@ class LegalAddressSerializer(serializers.ModelSerializer):
 
     # NOTE: the model defines these as allowing empty values for backwards compatibility
     #       so we override them here to require them for new writes
+    first_name = serializers.CharField(max_length=60)
+    last_name = serializers.CharField(max_length=60)
     country = serializers.CharField(max_length=2)
+    
+    def validate_first_name(self, value):
+        """Validates the first name of the user"""
+        if value and not USER_GIVEN_NAME_RE.match(value):
+            raise serializers.ValidationError("First name is not valid")
+        return value
+
+    def validate_last_name(self, value):
+        """Validates the last name of the user"""
+        if value and not USER_GIVEN_NAME_RE.match(value):
+            raise serializers.ValidationError("Last name is not valid")
+        return value
 
     class Meta:
         model = LegalAddress
         fields = (
+            "first_name",
+            "last_name",
             "country",
         )
 
@@ -112,7 +128,6 @@ class UserSerializer(serializers.ModelSerializer):
         ],
         required=False,
     )
-    keycloak_uuid = serializers.CharField(allow_null=True, required=False)
     legal_address = LegalAddressSerializer(allow_null=True)
     grants = serializers.SerializerMethodField(read_only=True, required=False)
 
@@ -176,16 +191,13 @@ class UserSerializer(serializers.ModelSerializer):
         email = validated_data.pop("email")
         # Collin, is it safe to create a user with no password set?
         password = validated_data.pop("password", None)
-        
-        keycloak_uuid = validated_data.pop("id", None)
 
         with transaction.atomic():
             user = User.objects.create_user(
                 username,
                 email=email,
                 password=password,
-                keycloak_uuid=keycloak_uuid,
-                **validated_data,
+                **validated_data
             )
 
             # this side-effects such that user.legal_address and user.profile are updated in-place
@@ -239,8 +251,7 @@ class UserSerializer(serializers.ModelSerializer):
             "is_superuser",
             "created_on",
             "updated_on",
-            "grants",
-            "keycloak_uuid",
+            "grants"
         )
         read_only_fields = (
             "username",

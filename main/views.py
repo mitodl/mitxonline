@@ -55,7 +55,7 @@ def handler500(request):
     )
     
 def login(request):
-    return redirect_to_login(reverse("admin:index"), login_url="/login/oidc")
+    return redirect_to_login(reverse("admin:index"), login_url="/login/odl-oidc")
 
 
 def cms_signin_redirect_to_site_signin(request):

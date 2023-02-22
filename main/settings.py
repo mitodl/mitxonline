@@ -383,7 +383,7 @@ SOCIAL_AUTH_PIPELINE = (
     # NOTE: needs to be right before create_user so nothing overrides the username
     "authentication.pipeline.user.get_username",
     # Create a user if one doesn't exist, and require a password and name
-    "authentication.pipeline.user.create_user_via_email",
+    "authentication.pipeline.user.create_user_via_oidc",
     # verify the user against export compliance
     # "authentication.pipeline.compliance.verify_exports_compliance",
     # Create the record that associates the social account with the user.
@@ -890,26 +890,26 @@ CACHES = {
 }
 
 AUTHENTICATION_BACKENDS = (
-    "social_core.backends.open_id_connect.OpenIdConnectAuth",
+    "authentication.odl_open_id_connect.OdlOpenIdConnectAuth",
     "social_core.backends.email.EmailAuth",
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
 )
 
-SOCIAL_AUTH_OIDC_OIDC_ENDPOINT = get_string(
-    name="SOCIAL_AUTH_OIDC_OIDC_ENDPOINT",
+SOCIAL_AUTH_ODL_OIDC_OIDC_ENDPOINT = get_string(
+    name="SOCIAL_AUTH_ODL_OIDC_OIDC_ENDPOINT",
     default="",
     description="COLLIN TO COMPLETE",
 )
 
-SOCIAL_AUTH_OIDC_KEY = get_string(
-    name="SOCIAL_AUTH_OIDC_KEY",
+SOCIAL_AUTH_ODL_OIDC_KEY = get_string(
+    name="SOCIAL_AUTH_ODL_OIDC_KEY",
     default="",
     description="COLLIN TO COMPLETE",
 )
 
-SOCIAL_AUTH_OIDC_SECRET = get_string(
-    name="SOCIAL_AUTH_OIDC_SECRET",
+SOCIAL_AUTH_ODL_OIDC_SECRET = get_string(
+    name="SOCIAL_AUTH_ODL_OIDC_SECRET",
     default="",
     description="COLLIN TO COMPLETE",
 )
