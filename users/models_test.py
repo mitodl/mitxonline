@@ -136,21 +136,9 @@ def test_user_age():
 
     user = UserFactory.create()
 
-    # We approximate the date of birth to Dec 31, 23:59:59 in the year specified
-    approx_dob = datetime(
-        user.user_profile.year_of_birth,
-        12,
-        31,
-        hour=23,
-        minute=59,
-        second=59,
-        tzinfo=pytz.timezone(settings.TIME_ZONE),
-    )
-
-    # Then we subtract that approximate DOB from now and floor it so we're not
-    # accidentally granting access to people who aren't old enough
     assert user.get_age() == math.floor(
-        (datetime.now(tz=pytz.timezone(settings.TIME_ZONE)) - approx_dob).days / 365
+        datetime.now(tz=pytz.timezone(settings.TIME_ZONE)).year
+        - user.user_profile.year_of_birth
     )
 
 
