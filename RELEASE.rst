@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.61.2
+Version 0.61.2 (Released February 23, 2023)
 --------------
 
 - Updates the command to include the enrollment mode when running enroll_in_edx_course_runs (#1444)
