@@ -4,6 +4,7 @@ import { Formik, Form } from "formik"
 
 import {
   legalAddressValidation,
+  profileValidation,
   LegalAddressFields,
   ProfileFields
 } from "./ProfileFormFields"
@@ -26,7 +27,7 @@ const getInitialValues = (user: User) => ({
 const EditProfileForm = ({ onSubmit, countries, user }: Props) => (
   <Formik
     onSubmit={onSubmit}
-    validationSchema={legalAddressValidation}
+    validationSchema={legalAddressValidation.concat(profileValidation)}
     initialValues={getInitialValues(user)}
     render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
       <Form>

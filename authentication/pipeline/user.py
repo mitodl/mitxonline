@@ -118,6 +118,8 @@ def create_user_via_email(
 
         raise e
 
+        raise e
+
     try:
         created_user = serializer.save()
     except IntegrityError:
