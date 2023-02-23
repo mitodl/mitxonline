@@ -76,6 +76,7 @@ def get_username(
 def create_user_via_oidc(
     strategy, backend, user=None, response=None, flow=None, current_partial=None, *args, **kwargs
 ):  # pylint: disable=too-many-arguments,unused-argument
+    # COLLIN: update method description
     """
     Creates a new user if needed and sets the password and name.
     Args:
