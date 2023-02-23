@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.61.3
+Version 0.61.3 (Released February 23, 2023)
 --------------
 
 - Fixes some issues with validation for new profile fields; adds extended profile fields (#1443)
