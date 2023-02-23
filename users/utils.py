@@ -143,16 +143,4 @@ def format_recipient(user: User) -> str:
 def determine_approx_age(year: int):
     """Determines the approximage age based on the year"""
 
-    approx_dob = datetime(
-        year,
-        12,
-        31,
-        hour=23,
-        minute=59,
-        second=59,
-        tzinfo=pytz.timezone(settings.TIME_ZONE),
-    )
-
-    return math.floor(
-        (datetime.now(tz=pytz.timezone(settings.TIME_ZONE)) - approx_dob).days / 365
-    )
+    return datetime.now(tz=pytz.timezone(settings.TIME_ZONE)).year - year

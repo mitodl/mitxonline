@@ -92,16 +92,6 @@ def test_determine_approx_age():
 
     now = datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
     test_year = now.year - random.randrange(0, 50)
-    test_end_of_year = datetime(
-        test_year,
-        12,
-        31,
-        hour=23,
-        minute=59,
-        second=59,
-        tzinfo=pytz.timezone(settings.TIME_ZONE),
-    )
+    test_age = now.year - test_year
 
-    assert determine_approx_age(test_year) == math.floor(
-        (now - test_end_of_year).days / 365
-    )
+    assert determine_approx_age(test_year) == test_age
