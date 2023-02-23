@@ -22,35 +22,31 @@ import {
 import users, { currentUserSelector } from "../../lib/queries/users"
 import { addUserNotification } from "../../actions"
 import { ProgramEnrollmentDrawer } from "../../components/ProgramEnrollmentDrawer"
-import {
-  Modal,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Button,
-} from "reactstrap"
+import { Modal, ModalHeader, ModalBody } from "reactstrap"
 
 import EnrolledCourseList from "../../components/EnrolledCourseList"
 import EnrolledProgramList from "../../components/EnrolledProgramList"
 
+import AddlProfileFieldsForm from "../../components/forms/AddlProfileFieldsForm"
+
 import type { RunEnrollment, ProgramEnrollment } from "../../flow/courseTypes"
-import type { CurrentUser, User } from "../../flow/authTypes"
+import type { User } from "../../flow/authTypes"
 
 // this needs pretty drastic cleanup but not until the program bits are refactored
 // to not depend on the props coming from here
 type DashboardPageProps = {
   enrollments: RunEnrollment[],
   programEnrollments: ProgramEnrollment[],
-  currentUser: CurrentUser,
+  currentUser: User,
   isLoading: boolean,
   deactivateEnrollment: (enrollmentId: number) => Promise<any>,
   courseEmailsSubscription: (
     enrollmentId: number,
     emailsSubscription: string
   ) => Promise<any>,
-  triggerAddlInfoFlag: (currentUser: User) => Promise<any>,
+  updateAddlFields: (currentUser: User) => Promise<any>,
   addUserNotification: Function,
-  closeDrawer: Function,
+  closeDrawer: Function
 }
 
 const DashboardTab = {
@@ -63,7 +59,7 @@ type DashboardPageState = {
   programDrawerEnrollments: ?(any[]),
   currentTab: string,
   showAddlProfileFieldsModal: boolean,
-  destinationUrl: string,
+  destinationUrl: string
 }
 
 export class DashboardPage extends React.Component<
@@ -75,7 +71,7 @@ export class DashboardPage extends React.Component<
     programDrawerEnrollments:   null,
     currentTab:                 DashboardTab.courses,
     showAddlProfileFieldsModal: false,
-    destinationUrl:             "",
+    destinationUrl:             ""
   }
 
   toggleDrawer(enrollment: any) {
@@ -96,36 +92,49 @@ export class DashboardPage extends React.Component<
       showAddlProfileFieldsModal: !this.state.showAddlProfileFieldsModal
     })
 
-    if (!this.state.showAddlProfileFieldsModal && this.state.destinationUrl.length > 0) {
+    if (
+      !this.state.showAddlProfileFieldsModal &&
+      this.state.destinationUrl.length > 0
+    ) {
       const target = this.state.destinationUrl
       this.setState({
-        destinationUrl: ''
+        destinationUrl: ""
       })
-      console.log(`setting target URL to ${target}`)
-      window.location = target
+      window.open(target, "_blank")
     }
   }
 
   redirectToCourseHomepage(url: string, ev: any) {
-    /* 
+    /*
     If we've got addl_field_flag, then display the extra info modal. Otherwise,
     send the learner directly to the page.
     */
 
-    const { currentUser, triggerAddlInfoFlag } = this.props
+    const { currentUser, updateAddlFields } = this.props
 
-    if (currentUser.user_profile.addl_field_flag) {
+    if (currentUser.user_profile && currentUser.user_profile.addl_field_flag) {
       return
     }
 
     ev.preventDefault()
 
     this.setState({
-      destinationUrl: url,
+      destinationUrl:             url,
       showAddlProfileFieldsModal: true
     })
 
-    triggerAddlInfoFlag(currentUser)
+    updateAddlFields(currentUser)
+  }
+
+  async saveProfile(profileData: User, { setSubmitting }: Object) {
+    const { updateAddlFields } = this.props
+
+    try {
+      await updateAddlFields(profileData)
+    } finally {
+      setSubmitting(false)
+      this.toggleAddlProfileFieldsModal()
+    }
   }
 
   renderCurrentTab() {
@@ -167,22 +176,30 @@ export class DashboardPage extends React.Component<
         isOpen={showAddlProfileFieldsModal}
         toggle={() => this.toggleAddlProfileFieldsModal()}
       >
-        <ModalHeader 
+        <ModalHeader
           id={`more-info-modal-${currentUser.id}`}
-          toggle={() => this.toggleAddlProfileFieldsModal()}>
+          toggle={() => this.toggleAddlProfileFieldsModal()}
+        >
           Provide More Info
         </ModalHeader>
         <ModalBody>
           <div className="row">
             <div className="col-12">
-              <p>To help us with our education research missions, please tell us more about yourself. If you do not want to supply this information, simply click the Close button - we won't ask you again.</p>
+              <p>
+                To help us with our education research missions, please tell us
+                more about yourself. If you do not want to supply this
+                information, simply click the Close button - we won't ask you
+                again.
+              </p>
             </div>
           </div>
 
-          </ModalBody>
-          <ModalFooter>
-            <Button type="cancel" className="btn" onClick={() => this.toggleAddlProfileFieldsModal()}>Close</Button>
-          </ModalFooter>
+          <AddlProfileFieldsForm
+            onSubmit={this.saveProfile.bind(this)}
+            onCancel={() => this.toggleAddlProfileFieldsModal()}
+            user={currentUser}
+          ></AddlProfileFieldsForm>
+        </ModalBody>
       </Modal>
     )
   }
@@ -271,19 +288,24 @@ const courseEmailsSubscription = (
     courseEmailsSubscriptionMutation(enrollmentId, emailsSubscription)
   )
 
-const triggerAddlInfoFlag = (currentUser: User) => {
-  const updatedUser = currentUser
-  updatedUser.user_profile.addl_field_flag = true
+const updateAddlFields = (currentUser: User) => {
+  const updatedUser = {
+    name:          currentUser.name,
+    email:         currentUser.email,
+    legal_address: currentUser.legal_address,
+    user_profile:  {
+      ...currentUser.user_profile,
+      addl_field_flag: true
+    }
+  }
 
-  return mutateAsync(
-    users.editProfileMutation(updatedUser)
-  )
+  return mutateAsync(users.editProfileMutation(updatedUser))
 }
 
 const mapDispatchToProps = {
   deactivateEnrollment,
   courseEmailsSubscription,
-  triggerAddlInfoFlag,
+  updateAddlFields,
   addUserNotification
 }
 

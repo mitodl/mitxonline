@@ -25,7 +25,8 @@ describe("EnrolledItemCard", () => {
     currentUser,
     enrollmentCardProps,
     isFinancialAssistanceAvailableStub,
-    toggleProgramDrawer
+    toggleProgramDrawer,
+    redirectToCourseHomepage
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
@@ -56,6 +57,7 @@ describe("EnrolledItemCard", () => {
       "isFinancialAssistanceAvailable"
     )
     toggleProgramDrawer = helper.sandbox.stub().returns(Function)
+    redirectToCourseHomepage = helper.sandbox.stub().returns(Function)
 
     renderedCard = () =>
       shallow(
@@ -74,6 +76,7 @@ describe("EnrolledItemCard", () => {
           toggleProgramDrawer={toggleProgramDrawer}
           isLoading={false}
           isProgramCard={false}
+          redirectToCourseHomepage={redirectToCourseHomepage}
         />
       )
   })

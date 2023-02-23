@@ -8,12 +8,12 @@ import type { RunEnrollment } from "../flow/courseTypes"
 
 type EnrolledCourseListProps = {
   enrollments: RunEnrollment[],
-  redirectToCourseHomepage: Function,
+  redirectToCourseHomepage: Function
 }
 
 export class EnrolledCourseList extends React.Component<EnrolledCourseListProps> {
   renderEnrolledItemCard(enrollment: RunEnrollment) {
-    const { redirectToCourseHomepage } = this.props 
+    const { redirectToCourseHomepage } = this.props
 
     return (
       <EnrolledItemCard

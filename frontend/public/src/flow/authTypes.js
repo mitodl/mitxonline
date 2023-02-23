@@ -71,7 +71,11 @@ export type UserProfile = {
   company_size: ?number,
   leadership_level: ?string,
   highest_education: ?string,
-  addl_field_flag: Boolean
+  addl_field_flag: boolean,
+  type_is_student: ?boolean,
+  type_is_professional: ?boolean,
+  type_is_educator: ?boolean,
+  type_is_other: ?boolean,
 }
 
 export type User = {

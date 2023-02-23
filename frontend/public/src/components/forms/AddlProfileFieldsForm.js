@@ -3,19 +3,16 @@ import React from "react"
 import { Formik, Form } from "formik"
 
 import {
-  legalAddressValidation,
-  profileValidation,
-  addlProfileFieldsValidation,
-  LegalAddressFields,
   ProfileFields,
-  AddlProfileFields
+  AddlProfileFields,
+  profileValidation,
+  addlProfileFieldsValidation
 } from "./ProfileFormFields"
 
-import type { Country, User } from "../../flow/authTypes"
+import type { User } from "../../flow/authTypes"
 
 type Props = {
   onSubmit: Function,
-  countries: Array<Country>,
   user: User
 }
 
@@ -26,22 +23,13 @@ const getInitialValues = (user: User) => ({
   user_profile:  user.user_profile
 })
 
-const EditProfileForm = ({ onSubmit, countries, user }: Props) => (
+const AddlProfileFieldsForm = ({ onSubmit, user }: Props) => (
   <Formik
     onSubmit={onSubmit}
-    validationSchema={legalAddressValidation
-      .concat(profileValidation)
-      .concat(addlProfileFieldsValidation)}
+    validationSchema={profileValidation.concat(addlProfileFieldsValidation)}
     initialValues={getInitialValues(user)}
     render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
       <Form>
-        <LegalAddressFields
-          countries={countries}
-          setFieldValue={setFieldValue}
-          setFieldTouched={setFieldTouched}
-          values={values}
-          isNewAccount={false}
-        />
         <ProfileFields
           setFieldValue={setFieldValue}
           setFieldTouched={setFieldTouched}
@@ -68,4 +56,4 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => (
   />
 )
 
-export default EditProfileForm
+export default AddlProfileFieldsForm

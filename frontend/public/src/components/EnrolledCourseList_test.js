@@ -9,15 +9,19 @@ import IntegrationTestHelper from "../util/integration_test_helper"
 import { makeCourseRunEnrollment } from "../factories/course"
 
 describe("EnrolledCourseList", () => {
-  let helper, renderedCard, userEnrollments
+  let helper, renderedCard, userEnrollments, redirectToCourseHomepage
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
     userEnrollments = [makeCourseRunEnrollment(), makeCourseRunEnrollment()]
+    redirectToCourseHomepage = helper.sandbox.stub().returns(Function)
 
     renderedCard = () =>
       shallow(
-        <EnrolledCourseList enrollments={userEnrollments}></EnrolledCourseList>
+        <EnrolledCourseList
+          enrollments={userEnrollments}
+          redirectToCourseHomepage={redirectToCourseHomepage}
+        ></EnrolledCourseList>
       )
   })
 
