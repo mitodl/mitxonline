@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.61.2
+--------------
+
+- Updates the command to include the enrollment mode when running enroll_in_edx_course_runs (#1444)
+- fix: sync_enrollments command error message and exit (#1442)
+- Adds year of birth, gender, and a conditional state field to the user profile (#1436)
+
 Version 0.61.1 (Released February 16, 2023)
 --------------
 
