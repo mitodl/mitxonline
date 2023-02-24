@@ -52,7 +52,8 @@ describe("ProductDetailEnrollApp", () => {
       {}
     )
     SETTINGS.features = {
-      enable_learner_records: false
+      enable_learner_records:     false,
+      enable_addl_profile_fields: false
     }
 
     isWithinEnrollmentPeriodStub = helper.sandbox.stub(

@@ -503,7 +503,7 @@ export const AddlProfileFields = ({ values }: AddlProfileFieldsProps) => (
         />
         <div className="form-group">
           <label htmlFor="user_profile.company" className="font-weight-bold">
-            Company*
+            Company
           </label>
           <Field
             type="text"
@@ -520,7 +520,7 @@ export const AddlProfileFields = ({ values }: AddlProfileFieldsProps) => (
         </div>
         <div className="form-group">
           <label htmlFor="user_profile.job_title" className="font-weight-bold">
-            Job Title*
+            Job Title
           </label>
           <Field
             type="text"
