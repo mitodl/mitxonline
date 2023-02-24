@@ -72,9 +72,17 @@ def get_username(
     """
     return {"username": None if not user else strategy.storage.user.get_username(user)}
 
+
 @partial
 def create_user_via_oidc(
-    strategy, backend, user=None, response=None, flow=None, current_partial=None, *args, **kwargs
+    strategy,
+    backend,
+    user=None,
+    response=None,
+    flow=None,
+    current_partial=None,
+    *args,
+    **kwargs,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """
     Creates a new user if one does not already exist, updates an existing user's attributes.
@@ -87,58 +95,65 @@ def create_user_via_oidc(
         current_partial (Partial): the partial for the step in the pipeline
     """
 
-
     if backend.name == OdlOpenIdConnectAuth.name:
         data = response.copy()
         try:
-            data["is_staff"] = "is_staff" in data["resource_access"]["mitxonline-client-id"]["roles"]
-            data["is_superuser"] = "is_superuser" in data["resource_access"]["mitxonline-client-id"]["roles"]
+            data["is_staff"] = (
+                "is_staff" in data["resource_access"]["mitxonline-client-id"]["roles"]
+            )
+            data["is_superuser"] = (
+                "is_superuser"
+                in data["resource_access"]["mitxonline-client-id"]["roles"]
+            )
         except KeyError:
             pass
     else:
         return {}
-    
+
     if user is None:
         with transaction.atomic():
-            
+
             if "is_staff" in data and "is_superuser" in data:
                 user = User.objects.create_superuser(
                     data["email"],
                     email=data["email"],
                     password=None,
-                    naname=data["name"]
+                    naname=data["name"],
                 )
             else:
                 user = User.objects.create_user(
-                    data["email"],
-                    email=data["email"],
-                    password=None,
-                    name=data["name"]
+                    data["email"], email=data["email"], password=None, name=data["name"]
                 )
-                
+
             LegalAddress.objects.create(
-                user = user,
-                first_name = data["given_name"],
-                last_name = data["family_name"],
-                country = data["country"]
+                user=user,
+                first_name=data["given_name"],
+                last_name=data["family_name"],
+                country=data["country"],
             )
     else:
-        user.username=data["email"]
-        user.email=data["email"]
-        user.name=data["name"]
+        user.username = data["email"]
+        user.email = data["email"]
+        user.name = data["name"]
         user.legal_address.first_name = data["given_name"]
         user.legal_address.last_name = data["family_name"]
         user.legal_address.country = data["country"]
         user.legal_address.save()
         user.save()
-        
-
 
     return {"is_new": True, "user": user, "username": user.username}
 
+
 @partial
 def create_user_via_email(
-    strategy, backend, user=None, response=None, flow=None, current_partial=None, *args, **kwargs
+    strategy,
+    backend,
+    user=None,
+    response=None,
+    flow=None,
+    current_partial=None,
+    *args,
+    **kwargs,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """
     Creates a new user if needed and sets the password and name.
@@ -153,7 +168,7 @@ def create_user_via_email(
     Raises:
         RequirePasswordAndPersonalInfoException: if the user hasn't set password or name
     """
-   
+
     if backend.name != EmailAuth.name or flow != SocialAuthState.FLOW_REGISTER:
         data = strategy.request_data().copy()
         expected_data_fields = ("name", "password", "username")
@@ -163,8 +178,18 @@ def create_user_via_email(
         data["legal_address"] = {"country": data["country"]}
         data["username"] = data["preferred_username"]
         try:
-            data["is_staff"] = True if "is_staff" in data["resource_access"]["mitxonline-client-id"]["roles"] else False
-            data["is_superuser"] = True if "is_superuser" in data["resource_access"]["mitxonline-client-id"]["roles"] else False
+            data["is_staff"] = (
+                True
+                if "is_staff"
+                in data["resource_access"]["mitxonline-client-id"]["roles"]
+                else False
+            )
+            data["is_superuser"] = (
+                True
+                if "is_superuser"
+                in data["resource_access"]["mitxonline-client-id"]["roles"]
+                else False
+            )
         except KeyError:
             pass
         expected_data_fields = ("name", "username")
@@ -173,7 +198,7 @@ def create_user_via_email(
 
     if user is not None:
         raise UnexpectedExistingUserException(backend, current_partial)
-    
+
     context = {}
     data = strategy.request_data().copy()
     expected_data_fields = {"name", "password", "username"}

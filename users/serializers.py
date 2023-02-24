@@ -50,7 +50,7 @@ class LegalAddressSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(max_length=60)
     last_name = serializers.CharField(max_length=60)
     country = serializers.CharField(max_length=2)
-    
+
     def validate_first_name(self, value):
         """Validates the first name of the user"""
         if value and not USER_GIVEN_NAME_RE.match(value):
@@ -196,7 +196,7 @@ class UserSerializer(serializers.ModelSerializer):
                 username,
                 email=email,
                 password=password,
-                **validated_data
+                **validated_data,
             )
 
             # this side-effects such that user.legal_address and user.profile are updated in-place
@@ -250,13 +250,15 @@ class UserSerializer(serializers.ModelSerializer):
             "is_superuser",
             "created_on",
             "updated_on",
-            "grants"
+            "grants",
         )
         read_only_fields = (
             "username",
             "is_anonymous",
             "is_authenticated",
             "is_editor",
+            "is_staff",
+            "is_superuser",
             "created_on",
             "updated_on",
             "grants",
