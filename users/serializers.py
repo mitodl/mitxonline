@@ -247,7 +247,6 @@ class UserSerializer(serializers.ModelSerializer):
             "is_editor",
             "is_staff",
             "is_superuser",
-            "is_superuser",
             "created_on",
             "updated_on",
             "grants",
