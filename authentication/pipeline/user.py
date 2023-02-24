@@ -76,9 +76,8 @@ def get_username(
 def create_user_via_oidc(
     strategy, backend, user=None, response=None, flow=None, current_partial=None, *args, **kwargs
 ):  # pylint: disable=too-many-arguments,unused-argument
-    # COLLIN: update method description
     """
-    Creates a new user if needed and sets the password and name.
+    Creates a new user if one does not already exist, updates an existing user's attributes.
     Args:
         strategy (social_django.strategy.DjangoStrategy): the strategy used to authenticate
         backend (social_core.backends.base.BaseAuth): the backend being used to authenticate
@@ -86,16 +85,11 @@ def create_user_via_oidc(
         details (dict): Dict of user details
         flow (str): the type of flow (login or register)
         current_partial (Partial): the partial for the step in the pipeline
-
-    Raises:
-        RequirePasswordAndPersonalInfoException: if the user hasn't set password or name
     """
 
 
     if backend.name == OdlOpenIdConnectAuth.name:
         data = response.copy()
-        print(data)
-        #data["legal_address"] = {"country": data["country"], "first_name": data["given_name"], "last_name": data["family_name"]}
         try:
             data["is_staff"] = "is_staff" in data["resource_access"]["mitxonline-client-id"]["roles"]
             data["is_superuser"] = "is_superuser" in data["resource_access"]["mitxonline-client-id"]["roles"]
@@ -159,14 +153,13 @@ def create_user_via_email(
     Raises:
         RequirePasswordAndPersonalInfoException: if the user hasn't set password or name
     """
-    
-    if backend.name == EmailAuth.name or flow == SocialAuthState.FLOW_REGISTER:
+   
+    if backend.name != EmailAuth.name or flow != SocialAuthState.FLOW_REGISTER:
         data = strategy.request_data().copy()
         expected_data_fields = ("name", "password", "username")
 
     elif backend.name == OdlOpenIdConnectAuth.name:
         data = response.copy()
-        print(data)
         data["legal_address"] = {"country": data["country"]}
         data["username"] = data["preferred_username"]
         try:
@@ -178,11 +171,13 @@ def create_user_via_email(
     else:
         return {}
 
-    # COLLIN NEED TO HANDLE WHEN THE USER ALREADY EXISTS -> SKIP CREATE AND JUST UPDATE
-    # if user is not None:
-    #     raise UnexpectedExistingUserException(backend, current_partial)
-
-    if not all(field in data for field in expected_data_fields):
+    if user is not None:
+        raise UnexpectedExistingUserException(backend, current_partial)
+    
+    context = {}
+    data = strategy.request_data().copy()
+    expected_data_fields = {"name", "password", "username"}
+    if any(field for field in expected_data_fields if field not in data):
         raise RequirePasswordAndPersonalInfoException(backend, current_partial)
     if len(data.get("name", 0)) < NAME_MIN_LENGTH:
         raise RequirePasswordAndPersonalInfoException(
@@ -192,10 +187,9 @@ def create_user_via_email(
         )
 
     data["email"] = kwargs.get("email", kwargs.get("details", {}).get("email"))
-    serializer = UserSerializer(data=data) if user is None else UserSerializer(user, data=data)
+    serializer = UserSerializer(data=data, context=context)
 
     if not serializer.is_valid():
-        print(serializer.errors)
         raise RequirePasswordAndPersonalInfoException(
             backend,
             current_partial,
@@ -203,7 +197,6 @@ def create_user_via_email(
             field_errors=dict_without_keys(serializer.errors, "non_field_errors"),
         )
 
-    
     try:
         created_user = serializer.save()
     except IntegrityError:
