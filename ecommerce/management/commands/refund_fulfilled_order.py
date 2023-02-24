@@ -55,7 +55,9 @@ class Command(BaseCommand):
             raise CommandError("Please specify an action to take on the enrollment.")
 
         try:
-            order = Order.objects.filter(reference_number=kwargs["order"]).get()
+            order = Order.objects.filter(
+                state=Order.STATE.FULFILLED, reference_number=kwargs["order"]
+            ).get()
         except:
             raise CommandError("Couldn't find that order, or the order was ambiguous.")
 
