@@ -1,4 +1,5 @@
 // @flow
+/* global SETTINGS:false */
 import {
   all,
   complement,
@@ -19,8 +20,9 @@ import { assert } from "chai"
 import * as R from "ramda"
 import moment from "moment-timezone"
 
-import type Moment from "moment"
+import _has from "lodash/has"
 
+import type Moment from "moment"
 import type { HttpRespErrorMessage, HttpResponse } from "../flow/httpTypes"
 import type { Product } from "../flow/cartTypes"
 
@@ -251,4 +253,21 @@ export const getFlexiblePriceForProduct = (product: Product) => {
   default:
     return Number(product.price)
   }
+}
+
+export const intCheckFeatureFlag = (
+  flag: string,
+  document: Object,
+  settings: Object
+) => {
+  const params = new URLSearchParams(document.location.search)
+
+  return (
+    params.get(flag) !== null ||
+    (settings && settings.features && _has(settings.features, flag))
+  )
+}
+
+export const checkFeatureFlag = (flag: string) => {
+  return intCheckFeatureFlag(flag, document, SETTINGS)
 }

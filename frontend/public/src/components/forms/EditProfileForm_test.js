@@ -46,27 +46,27 @@ describe("EditProfileForm", () => {
     assert.ok(findFormikFieldByName(form, "legal_address.first_name").exists())
     assert.ok(findFormikFieldByName(form, "legal_address.last_name").exists())
     assert.ok(findFormikFieldByName(form, "legal_address.country").exists())
+    assert.ok(findFormikFieldByName(form, "user_profile.year_of_birth").exists())
     assert.ok(form.find("button[type='submit']").exists())
   })
 
   //
   ;[
-    ["legal_address.first_name", "", "First Name is a required field"],
-    ["legal_address.first_name", "  ", "First Name is a required field"],
-    ["legal_address.first_name", "Jane", ""],
-    ["legal_address.last_name", "", "Last Name is a required field"],
-    ["legal_address.last_name", "  ", "Last Name is a required field"],
-    ["legal_address.last_name", "Doe", ""],
-    ["name", "Full Name", ""],
-    ["name", "", "Full Name is a required field"],
-    ["name", "a".repeat(256), "Full Name must be at most 255 characters"]
-  ].forEach(([name, value, errorMessage]) => {
+    ["legal_address.first_name", "input", "", "First Name is a required field"],
+    ["legal_address.first_name", "input", "  ", "First Name is a required field"],
+    ["legal_address.first_name", "input", "Jane", ""],
+    ["legal_address.last_name", "input", "", "Last Name is a required field"],
+    ["legal_address.last_name", "input", "  ", "Last Name is a required field"],
+    ["legal_address.last_name", "input", "Doe", ""],
+    ["user_profile.year_of_birth", "select", "", "Year of Birth is a required field"],
+    ["user_profile.year_of_birth", "select", "1980", ""]
+  ].forEach(([name, type, value, errorMessage]) => {
     it(`validates the field name=${name}, value=${JSON.stringify(
       value
     )} and expects error=${JSON.stringify(errorMessage)}`, async () => {
       const wrapper = renderForm()
 
-      const input = wrapper.find(`input[name="${name}"]`)
+      const input = wrapper.find(`${type}[name="${name}"]`)
       input.simulate("change", { persist: () => {}, target: { name, value } })
       input.simulate("blur")
       await wait()
@@ -77,4 +77,5 @@ describe("EditProfileForm", () => {
       )
     })
   })
+
 })

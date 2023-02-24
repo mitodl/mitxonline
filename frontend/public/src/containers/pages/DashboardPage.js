@@ -7,7 +7,7 @@ import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
 import { connectRequest, mutateAsync } from "redux-query"
 import { pathOr } from "ramda"
-
+import { checkFeatureFlag } from "../../lib/util"
 import Loader from "../../components/Loader"
 import { DASHBOARD_PAGE_TITLE } from "../../constants"
 import {
@@ -112,7 +112,7 @@ export class DashboardPage extends React.Component<
 
     const { currentUser, updateAddlFields } = this.props
 
-    if (currentUser.user_profile && currentUser.user_profile.addl_field_flag) {
+    if (!checkFeatureFlag("enable_addl_profile_fields") || (currentUser.user_profile && currentUser.user_profile.addl_field_flag)) {
       return
     }
 
