@@ -169,9 +169,6 @@ def create_user_via_email(
         RequirePasswordAndPersonalInfoException: if the user hasn't set password or name
     """
     if backend.name != EmailAuth.name or flow != SocialAuthState.FLOW_REGISTER:
-        data = strategy.request_data().copy()
-        expected_data_fields = ("name", "password", "username")
-    else:
         return {}
 
     if user is not None:
