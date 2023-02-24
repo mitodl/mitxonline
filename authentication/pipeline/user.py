@@ -168,31 +168,9 @@ def create_user_via_email(
     Raises:
         RequirePasswordAndPersonalInfoException: if the user hasn't set password or name
     """
-
     if backend.name != EmailAuth.name or flow != SocialAuthState.FLOW_REGISTER:
         data = strategy.request_data().copy()
         expected_data_fields = ("name", "password", "username")
-
-    elif backend.name == OdlOpenIdConnectAuth.name:
-        data = response.copy()
-        data["legal_address"] = {"country": data["country"]}
-        data["username"] = data["preferred_username"]
-        try:
-            data["is_staff"] = (
-                True
-                if "is_staff"
-                in data["resource_access"]["mitxonline-client-id"]["roles"]
-                else False
-            )
-            data["is_superuser"] = (
-                True
-                if "is_superuser"
-                in data["resource_access"]["mitxonline-client-id"]["roles"]
-                else False
-            )
-        except KeyError:
-            pass
-        expected_data_fields = ("name", "username")
     else:
         return {}
 
