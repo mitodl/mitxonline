@@ -34,7 +34,7 @@ const AnonymousMenu = ({ useScreenOverlay }: Props) => {
       <li {...(listItemProps || {})}>
         <MixedLink
           id={"createAccount".concat(identifierPostfix)}
-          dest={routes.login.begin}
+          dest={routes.register.begin}
           className="simple button"
           aria-label="Create Account"
         >
