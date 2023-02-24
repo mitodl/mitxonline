@@ -46,19 +46,31 @@ describe("EditProfileForm", () => {
     assert.ok(findFormikFieldByName(form, "legal_address.first_name").exists())
     assert.ok(findFormikFieldByName(form, "legal_address.last_name").exists())
     assert.ok(findFormikFieldByName(form, "legal_address.country").exists())
-    assert.ok(findFormikFieldByName(form, "user_profile.year_of_birth").exists())
+    assert.ok(
+      findFormikFieldByName(form, "user_profile.year_of_birth").exists()
+    )
     assert.ok(form.find("button[type='submit']").exists())
   })
 
   //
   ;[
     ["legal_address.first_name", "input", "", "First Name is a required field"],
-    ["legal_address.first_name", "input", "  ", "First Name is a required field"],
+    [
+      "legal_address.first_name",
+      "input",
+      "  ",
+      "First Name is a required field"
+    ],
     ["legal_address.first_name", "input", "Jane", ""],
     ["legal_address.last_name", "input", "", "Last Name is a required field"],
     ["legal_address.last_name", "input", "  ", "Last Name is a required field"],
     ["legal_address.last_name", "input", "Doe", ""],
-    ["user_profile.year_of_birth", "select", "", "Year of Birth is a required field"],
+    [
+      "user_profile.year_of_birth",
+      "select",
+      "",
+      "Year of Birth is a required field"
+    ],
     ["user_profile.year_of_birth", "select", "1980", ""]
   ].forEach(([name, type, value, errorMessage]) => {
     it(`validates the field name=${name}, value=${JSON.stringify(
@@ -77,5 +89,4 @@ describe("EditProfileForm", () => {
       )
     })
   })
-
 })

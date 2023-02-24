@@ -53,12 +53,14 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
             values={values}
             isNewAccount={false}
           />
-          {checkFeatureFlag("enable_addl_profile_fields") ? (<AddlProfileFields
-            setFieldValue={setFieldValue}
-            setFieldTouched={setFieldTouched}
-            values={values}
-            isNewAccount={false}
-          />) : null}
+          {checkFeatureFlag("enable_addl_profile_fields") ? (
+            <AddlProfileFields
+              setFieldValue={setFieldValue}
+              setFieldTouched={setFieldTouched}
+              values={values}
+              isNewAccount={false}
+            />
+          ) : null}
           <div className="row submit-row no-gutters justify-content-end">
             <button
               type="submit"

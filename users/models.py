@@ -337,6 +337,7 @@ class UserProfile(TimestampedModel):
         blank=True,
         help_text="The learner identifies as type Other (not professional, student, or educator)",
     )
+
     def __str__(self):
         """Str representation for the profile"""
         return f"UserProfile for {self.user}"
