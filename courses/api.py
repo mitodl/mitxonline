@@ -248,14 +248,18 @@ def create_run_enrollments(
 
     try:
         enroll_in_edx_course_runs(
-            user, runs, mode=mode, force_enrollment=force_enrollment
+            user,
+            runs,
+            mode=mode,
+            force_enrollment=force_enrollment,
+            regen_auth_tokens=False,
         )
     except (
-        EdxApiEnrollErrorException,
         UnknownEdxApiEnrollException,
         NoEdxApiAuthError,
-        HTTPError,
         RequestsConnectionError,
+        EdxApiEnrollErrorException,
+        HTTPError,
     ):
         log.exception(
             "edX enrollment failure for user: %s, runs: %s",

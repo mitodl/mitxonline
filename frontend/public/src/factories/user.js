@@ -35,9 +35,9 @@ export const makeUser = (username: ?string): LoggedInUser => ({
   is_editor:        false,
   created_on:       casual.moment.format(),
   updated_on:       casual.moment.format(),
-  profile:          {
+  user_profile:     {
     gender:            "f",
-    birth_year:        1980,
+    year_of_birth:     1980,
     company:           casual.company_name,
     company_size:      99,
     industry:          "",

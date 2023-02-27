@@ -7,8 +7,8 @@ import responses
 from django.test.client import Client
 from rest_framework.test import APIClient
 
-from users.factories import UserFactory
 from courses.factories import CourseFactory, ProgramFactory, ProgramRequirementFactory
+from users.factories import UserFactory
 
 
 @pytest.fixture
@@ -96,6 +96,38 @@ def valid_address_dict():
         first_name="Test",
         last_name="User",
         country="US",
+        state="US-MA",
+    )
+
+
+@pytest.fixture
+def invalid_address_dict():
+    """Yields a dict that will deserialize into an invalid US legal address"""
+    return dict(
+        first_name="Test",
+        last_name="User",
+        country="US",
+    )
+
+
+@pytest.fixture
+def intl_address_dict():
+    """Yields a dict that will deserialize into an valid non-US/CA legal address"""
+
+    return dict(
+        first_name="Test",
+        last_name="User",
+        country="JP",
+    )
+
+
+@pytest.fixture
+def user_profile_dict():
+    """Yields a dict that generates a basic user profile"""
+
+    return dict(
+        gender=None,
+        year_of_birth=1980,
     )
 
 

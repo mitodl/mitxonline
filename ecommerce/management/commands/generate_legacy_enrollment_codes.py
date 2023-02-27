@@ -1,8 +1,8 @@
 """
-Generates enrollment (discount) codes for legacy users. 
+Generates enrollment (discount) codes for legacy users.
 
-This is for learners that have paid for a course but aren't enrolled in a 
-course run with a verified enrollment. The list is generated outside this 
+This is for learners that have paid for a course but aren't enrolled in a
+course run with a verified enrollment. The list is generated outside this
 command and is passed to it as a CSV file. The format of the file is:
 
 ```
@@ -10,24 +10,28 @@ learner email,course readable id or course readable id or micromasters course ID
 ```
 
 and this command will generate single-use per-user discounts for each learner
-and course combination (if a product exists for it). The course must be 
-available for enrollment and must also have a product associated with it. 
+and course combination (if a product exists for it). The course must be
+available for enrollment and must also have a product associated with it.
 """
+import csv
+import uuid
+
+import dateutil
+import pytz
 from django.core.management import BaseCommand
 from django.db import transaction
 from django.db.models import Q
 
-import csv
-import uuid
-import dateutil
-import pytz
-
-from courses.models import CourseRun, Course
+from courses.models import Course, CourseRun
+from ecommerce.constants import (
+    DISCOUNT_TYPE_PERCENT_OFF,
+    PAYMENT_TYPE_CUSTOMER_SUPPORT,
+    REDEMPTION_TYPE_ONE_TIME,
+)
 from ecommerce.models import Discount, DiscountProduct, UserDiscount
-from ecommerce.constants import REDEMPTION_TYPE_ONE_TIME, DISCOUNT_TYPE_PERCENT_OFF
-from users.models import User
-from micromasters_import.models import CourseId
 from main.settings import TIME_ZONE
+from micromasters_import.models import CourseId
+from users.models import User
 
 
 class Command(BaseCommand):
@@ -159,7 +163,7 @@ class Command(BaseCommand):
                             discount_type=DISCOUNT_TYPE_PERCENT_OFF,
                             redemption_type=REDEMPTION_TYPE_ONE_TIME,
                             discount_code=code,
-                            for_flexible_pricing=False,
+                            payment_type=PAYMENT_TYPE_CUSTOMER_SUPPORT,
                             expiration_date=expiration_date,
                         )
 

@@ -1,6 +1,92 @@
 Release Notes
 =============
 
+Version 0.61.3 (Released February 23, 2023)
+--------------
+
+- Fixes some issues with validation for new profile fields; adds extended profile fields (#1443)
+
+Version 0.61.2 (Released February 23, 2023)
+--------------
+
+- Updates the command to include the enrollment mode when running enroll_in_edx_course_runs (#1444)
+- fix: sync_enrollments command error message and exit (#1442)
+- Adds year of birth, gender, and a conditional state field to the user profile (#1436)
+
+Version 0.61.1 (Released February 16, 2023)
+--------------
+
+- Adds methods to check pending orders for resolution through CyberSource (#1423)
+- Bump django from 3.2.15 to 3.2.18 (#1431)
+
+Version 0.61.0 (Released February 15, 2023)
+--------------
+
+- fix: Fix flexible pricing generic relations (#1412)
+- feat: Add discount payment types (#1390)
+
+Version 0.60.0 (Released February 09, 2023)
+--------------
+
+- Log any exception thrown by hubspot task helpers (#1416)
+- feat: Move orders to canceled if transaction is reviewed (#1419)
+- Updates enrollments to regenerate auth tokens if they're invalid
+- Updates enrollment upsell dialog to immediately create enrollments (#1410)
+- Fix and tests for undefined program course nodes (#1408)
+- Fix for heading and description height (#1409)
+
+Version 0.59.1 (Released February 07, 2023)
+--------------
+
+- feat: Sync courseware title with CMS page title (#1382)
+- Bump ua-parser-js from 0.7.31 to 0.7.33 (#1394)
+- Bump terser from 5.12.1 to 5.16.2 (#1406)
+- Update readme (#1405)
+- fix: Fix edX username validation to avoid username collision (#1389)
+- Add a workflow for new issues
+
+Version 0.59.0 (Released January 30, 2023)
+--------------
+
+- Updates program certficiate text
+
+Version 0.58.2 (Released January 26, 2023)
+--------------
+
+- Fix (#1391)
+
+Version 0.58.1 (Released January 25, 2023)
+--------------
+
+- Removes the ENABLE_LEARNER_RECORDS feature flag. (#1375)
+- feat: add search and filters on Discount admin model (#1381)
+- 1346 learner record UI improvements (#1368)
+- Update README.md (#1369)
+- Updates repair_faulty_edx_user to reconnect edX users (#1371)
+
+Version 0.58.0 (Released January 24, 2023)
+--------------
+
+- Makes it easier to cancel an order in the Review state (#1367)
+- Updates discount application code to strip whitespace
+- feat(import_courserun): add ability to block countries (#1352)
+- fix: Fix program learner record when there is no grade (#1364)
+- Only display course number (#1345)
+- Removed check for values before rendering the create discount form (#1361)
+- fix: show only published/live product pages on home page (#1356)
+- fix: Fix admin search for redeemed discounts (#1359)
+
+Version 0.57.1 (Released January 24, 2023)
+--------------
+
+- Retry Hubspot API calls on 429 errors (#1334)
+- Use on_commit in signal to avoid trying to sync a product to hubspot before it has been saved to the db (#1351)
+- Updates discounts in the staff dashboard to reflect the current state of the art (#1324)
+- fix: incorrect output from manage_certificates command when auditing (#1355)
+- Bump pillow from 9.0.1 to 9.3.0 (#1231)
+- Bump json5 from 1.0.1 to 1.0.2 (#1322)
+- feat: unenroll without a refund (#1333)
+
 Version 0.57.0 (Released January 12, 2023)
 --------------
 

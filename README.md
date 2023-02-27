@@ -6,7 +6,7 @@ mitX Online
 
 # Initial Setup
 
-mitxonline follows the same [initial setup steps outlined in the common OL web app guide](http://mitodl.github.io/handbook/common-web-app-guide.html).
+mitxonline follows the same [initial setup steps outlined in the common OL web app guide](https://mitodl.github.io/handbook/how-to/common-web-app-guide.html).
 Run through those steps **including the addition of `/etc/hosts` aliases and the optional step for running the
 `createsuperuser` command**.
 
@@ -33,7 +33,7 @@ Running, testing, and administering this app follows the same patterns as our ot
 
 *Note: for js tests, run the commands in `frontend/public`, or run via `yarn workspaces foreach run <command>` from the root.
 
-[See the common OL web app guide](http://mitodl.github.io/handbook/common-web-app-guide.html#running-and-accessing-the-app).
+[See the common OL web app guide](http://mitodl.github.io/handbook/how-to/common-web-app-guide.html#running-and-accessing-the-app).
 
 
 # Certificates

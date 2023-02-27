@@ -127,21 +127,20 @@ class UnknownEdxApiEmailSettingsException(Exception):
 class EdxApiRegistrationValidationException(Exception):
     """An edX Registration Validation API call resulted in an error response"""
 
-    def __init__(self, username, http_error, msg=None):
+    def __init__(self, username, response, msg=None):
         """
         Sets exception properties and adds a default message
 
         Args:
             username (str): The username being compared for uniqueness
-            http_error (requests.exceptions.HTTPError): The exception from the API call which contains
-                request and response data.
+            response (requests.Response): edX response for username validation
         """
         self.username = username
-        self.http_error = http_error
+        self.response = response
         if msg is None:
             # Set some default useful error message
             msg = "EdX API error validating registration username {}.\n{}".format(
                 self.username,
-                get_error_response_summary(self.http_error),
+                get_error_response_summary(self.response),
             )
         super().__init__(msg)

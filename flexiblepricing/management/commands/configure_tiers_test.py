@@ -10,6 +10,7 @@ from django.core.management import call_command
 from factory import fuzzy
 
 from courses.models import Program
+from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE
 from ecommerce.factories import DiscountFactory
 from ecommerce.models import Discount
 from flexiblepricing.management.commands import configure_tiers
@@ -52,7 +53,7 @@ def test_tier_setup(with_existing_records, as_dedp):
         existing_program.save()
         existing_discount = DiscountFactory.create(
             discount_code=f"{discount_code_abbrev}-fa-tier1-1999",
-            for_flexible_pricing=True,
+            payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
         )
         existing_tier = FlexiblePriceTier(
             courseware_content_type=content_type,

@@ -1,5 +1,6 @@
 """Signals for ecommerce models"""
 from django.db.models.signals import post_save
+from django.db.transaction import on_commit
 from django.dispatch import receiver
 
 from ecommerce.models import Product
@@ -11,4 +12,4 @@ def sync_product(sender, instance, created, **kwargs):  # pylint:disable=unused-
     """
     Sync product to hubspot
     """
-    sync_hubspot_product(instance)
+    on_commit(lambda: sync_hubspot_product(instance))

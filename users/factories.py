@@ -1,16 +1,13 @@
 """Factory for Users"""
-from factory import (
-    Faker,
-    RelatedFactory,
-    SubFactory,
-    Trait,
-    fuzzy,
-)
+import random
+from datetime import datetime
+
+from factory import Faker, RelatedFactory, SubFactory, Trait, fuzzy
 from factory.django import DjangoModelFactory
-from factory.fuzzy import FuzzyText
+from factory.fuzzy import FuzzyChoice, FuzzyText
 from social_django.models import UserSocialAuth
 
-from users.models import GENDER_CHOICES, LegalAddress, Profile, User
+from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
 
 class UserFactory(DjangoModelFactory):
@@ -26,7 +23,7 @@ class UserFactory(DjangoModelFactory):
     is_active = True
 
     legal_address = RelatedFactory("users.factories.LegalAddressFactory", "user")
-    profile = RelatedFactory("users.factories.ProfileFactory", "user")
+    user_profile = RelatedFactory("users.factories.UserProfileFactory", "user")
 
     class Meta:
         model = User
@@ -56,10 +53,13 @@ class LegalAddressFactory(DjangoModelFactory):
         model = LegalAddress
 
 
-class ProfileFactory(DjangoModelFactory):
+class UserProfileFactory(DjangoModelFactory):
     """Factory for Profile"""
 
     user = SubFactory("users.factories.UserFactory")
 
+    year_of_birth = datetime.now().year - random.randint(1, 100)
+    gender = GENDER_CHOICES[random.randint(0, len(GENDER_CHOICES) - 1)][0]
+
     class Meta:
-        model = Profile
+        model = UserProfile

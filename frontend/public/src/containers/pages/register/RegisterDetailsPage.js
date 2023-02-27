@@ -2,7 +2,10 @@
 /* global SETTINGS: false */
 import React from "react"
 import DocumentTitle from "react-document-title"
-import { REGISTER_DETAILS_PAGE_TITLE } from "../../../constants"
+import {
+  ALERT_TYPE_DANGER,
+  REGISTER_DETAILS_PAGE_TITLE
+} from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { Link } from "react-router-dom"
@@ -27,9 +30,11 @@ import type { Response } from "redux-query"
 import type {
   AuthResponse,
   LegalAddress,
+  UserProfile,
   User,
   Country
 } from "../../../flow/authTypes"
+import { addUserNotification } from "../../../actions"
 
 type RegisterProps = {|
   location: Location,
@@ -47,9 +52,11 @@ type DispatchProps = {|
     password: string,
     username: string,
     legalAddress: LegalAddress,
+    userProfile: UserProfile,
     partialToken: string
   ) => Promise<Response<AuthResponse>>,
-  getCurrentUser: () => Promise<Response<User>>
+  getCurrentUser: () => Promise<Response<User>>,
+  addUserNotification: Function
 |}
 
 type Props = {|
@@ -63,7 +70,8 @@ export class RegisterDetailsPage extends React.Component<Props> {
     const {
       history,
       registerDetails,
-      params: { partialToken }
+      params: { partialToken },
+      addUserNotification
     } = this.props
 
     try {
@@ -72,8 +80,22 @@ export class RegisterDetailsPage extends React.Component<Props> {
         detailsData.password,
         detailsData.username,
         detailsData.legal_address,
+        detailsData.user_profile,
         partialToken
       )
+
+      if (body.errors) {
+        body.errors.forEach(error => {
+          addUserNotification({
+            "registration-failed-status": {
+              type:  ALERT_TYPE_DANGER,
+              props: {
+                text: error
+              }
+            }
+          })
+        })
+      }
 
       /* eslint-disable camelcase */
       handleAuthResponse(history, body, {
@@ -137,6 +159,7 @@ const registerDetails = (
   password: string,
   username: string,
   legalAddress: LegalAddress,
+  userProfile: UserProfile,
   partialToken: string
 ) =>
   mutateAsync(
@@ -145,6 +168,7 @@ const registerDetails = (
       password,
       username,
       legalAddress,
+      userProfile,
       partialToken
     )
   )
@@ -157,7 +181,8 @@ const getCurrentUser = () =>
 
 const mapDispatchToProps = {
   registerDetails,
-  getCurrentUser
+  getCurrentUser,
+  addUserNotification
 }
 
 export default compose(

@@ -1,8 +1,10 @@
 """User models"""
+import math
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pycountry
+import pytz
 from django.conf import settings
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
@@ -13,16 +15,21 @@ from django.utils.translation import gettext_lazy as _
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
 
+from cms.constants import CMS_EDITORS_GROUP_NAME
+
 # Defined in edX Profile model
 from users.constants import USERNAME_MAX_LEN
-from cms.constants import CMS_EDITORS_GROUP_NAME
 
 MALE = "m"
 FEMALE = "f"
 OTHER = "o"
+TRANSGENDER = "t"
+NONBINARY = "nb"
 GENDER_CHOICES = (
     (MALE, "Male"),
     (FEMALE, "Female"),
+    (TRANSGENDER, "Transgender"),
+    (NONBINARY, "Non-binary/non-conforming"),
     (OTHER, "Other/Prefer Not to Say"),
 )
 
@@ -73,7 +80,7 @@ def _post_create_user(user):
         user (users.models.User): the user that was just created
     """
     LegalAddress.objects.create(user=user)
-    Profile.objects.create(user=user)
+    UserProfile.objects.create(user=user)
 
 
 class UserManager(BaseUserManager):
@@ -145,7 +152,7 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     # value here now until we are ready to migrate the max length at the database level.
     username = models.CharField(unique=True, max_length=USERNAME_MAX_LEN)
     email = models.EmailField(blank=False, unique=True)
-    name = models.TextField(blank=True, default="")
+    name = models.CharField(blank=True, default="", max_length=255)
     is_staff = models.BooleanField(
         default=False, help_text="The user can access the admin site"
     )
@@ -168,6 +175,22 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
             or self.is_staff
             or self.groups.filter(name=CMS_EDITORS_GROUP_NAME).exists()
         )
+
+    def get_age(self):
+        """
+        Returns the user's computed age, using the profile year_of_birth field.
+        For COPPA reasons this calculates the year assuming Dec 31 @ 11:59:59.
+        """
+
+        if self.user_profile is None:
+            return None
+
+        from users.utils import determine_approx_age
+
+        return determine_approx_age(self.user_profile.year_of_birth)
+
+    def is_coppa_compliant(self):
+        return self.get_age() >= 13
 
     def __str__(self):
         """Str representation for the user"""
@@ -248,20 +271,79 @@ class LegalAddress(TimestampedModel):
     country = models.CharField(
         max_length=2, blank=True, validators=[validate_iso_3166_1_code]
     )  # ISO-3166-1
+    state = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
         """Str representation for the legal address"""
         return f"Legal address for {self.user}"
 
 
-class Profile(TimestampedModel):
+class UserProfile(TimestampedModel):
     """A user's profile"""
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="user_profile"
+    )
+
+    gender = models.CharField(
+        max_length=128, blank=True, null=True, choices=GENDER_CHOICES
+    )
+    year_of_birth = models.IntegerField(blank=True, null=True)
+
+    addl_field_flag = models.BooleanField(
+        default=False,
+        blank=True,
+        help_text="Flags if we've asked the user for additional information",
+    )
+
+    company = models.CharField(max_length=128, blank=True, null=True, default="")
+    job_title = models.CharField(max_length=128, blank=True, null=True, default="")
+    industry = models.CharField(max_length=60, blank=True, null=True, default="")
+    job_function = models.CharField(max_length=60, blank=True, null=True, default="")
+    company_size = models.IntegerField(
+        null=True, blank=True, choices=COMPANY_SIZE_CHOICES
+    )
+    years_experience = models.IntegerField(
+        null=True, blank=True, choices=YRS_EXPERIENCE_CHOICES
+    )
+    leadership_level = models.CharField(
+        max_length=60, null=True, blank=True, default=""
+    )
+    highest_education = models.CharField(
+        null=True,
+        max_length=60,
+        blank=True,
+        default="",
+        choices=HIGHEST_EDUCATION_CHOICES,
+    )
+    type_is_student = models.BooleanField(
+        null=True,
+        default=False,
+        blank=True,
+        help_text="The learner identifies as type Student",
+    )
+    type_is_professional = models.BooleanField(
+        default=False,
+        null=True,
+        blank=True,
+        help_text="The learner identifies as type Professional",
+    )
+    type_is_educator = models.BooleanField(
+        null=True,
+        default=False,
+        blank=True,
+        help_text="The learner identifies as type Educator",
+    )
+    type_is_other = models.BooleanField(
+        default=False,
+        null=True,
+        blank=True,
+        help_text="The learner identifies as type Other (not professional, student, or educator)",
+    )
 
     def __str__(self):
         """Str representation for the profile"""
-        return f"Profile for {self.user}"
+        return f"UserProfile for {self.user}"
 
 
 class BlockList(TimestampedModel):

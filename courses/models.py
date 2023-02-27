@@ -4,9 +4,9 @@ Course models
 import logging
 import operator as op
 import uuid
-from decimal import ROUND_HALF_EVEN, getcontext
+from decimal import ROUND_HALF_EVEN
 from decimal import Context as DecimalContext
-from decimal import Decimal
+from decimal import Decimal, getcontext
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
@@ -301,8 +301,16 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     )
     live = models.BooleanField(default=False)
     topics = models.ManyToManyField(CourseTopic, blank=True)
-    flexible_prices = GenericRelation("flexiblepricing.FlexiblePrice")
-    tiers = GenericRelation("flexiblepricing.FlexiblePriceTier")
+    flexible_prices = GenericRelation(
+        "flexiblepricing.FlexiblePrice",
+        object_id_field="courseware_object_id",
+        content_type_field="courseware_content_type",
+    )
+    tiers = GenericRelation(
+        "flexiblepricing.FlexiblePriceTier",
+        object_id_field="courseware_object_id",
+        content_type_field="courseware_content_type",
+    )
 
     class Meta:
         ordering = ("program", "title")
@@ -1199,12 +1207,11 @@ class PaidCourseRun(TimestampedModel):
         # Due to circular dependancy importing locally
         from ecommerce.models import Order
 
-        # PaidCourseRun should only contain fulfilled or review orders
-        # but in order to avoid false positive passing in order__state__in here
+        # PaidCourseRun should only contain fulfilled orders
         return cls.objects.filter(
             user=user,
             course_run=run,
-            order__state__in=[Order.STATE.FULFILLED, Order.STATE.REVIEW],
+            order__state=Order.STATE.FULFILLED,
         ).exists()
 
 

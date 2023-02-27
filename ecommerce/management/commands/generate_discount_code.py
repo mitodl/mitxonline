@@ -1,28 +1,30 @@
 """
-Generates discount (sometimes called enrollment) codes with some parameters. 
-This is meant to be an easy way to make these in bulk - for one-offs, you can 
-use this or go through Django Admin (or, eventually, the Staff Dashboard). 
+Generates discount (sometimes called enrollment) codes with some parameters.
+This is meant to be an easy way to make these in bulk - for one-offs, you can
+use this or go through Django Admin (or, eventually, the Staff Dashboard).
 
 Codes can be created in one of two ways: you can specify the codes themselves on
 the command line, or you can specify --count and --prefix and have it generate
-the codes. 
+the codes.
     * Codes (literally, the code that the learner will enter) are just listed
-      on the command line. Any number of these can be specified, but you must 
-      provide at least one if you're explicitly specifying the code. All codes 
+      on the command line. Any number of these can be specified, but you must
+      provide at least one if you're explicitly specifying the code. All codes
       will share the same options (type, amount, expiration date, etc.)
     * If you use --count and --prefix, the command will generate the specified
       amount of codes using the given prefix and a UUID. Discount code length is
       limited to 50 so your prefix must be 13 characters or less. Include any
       punctuation that you need in the prefix - the command will not, for
-      example, add a dash between the prefix and the UUID. 
+      example, add a dash between the prefix and the UUID.
 
 The default is to generate a dollars off discount code in the specified amount,
 without an expiration date, and with unlimited redemptions. Use the --expires
 option to specify an expiration date, or use --one-time to make the code a
 one-time discount. You can also set the discount type with --discount-type. The
-type should be one of the normal types (dollars-off, percent-off, or 
+type should be one of the normal types (dollars-off, percent-off, or
 fixed-price). If the type is set to percent-off, the command will make sure your
-amount is 100% or less. 
+amount is 100% or less. You can set the discount payment type using --payment-type.
+The payment type should be one of (`marketing`, `sales`, `financial-assistance`,
+`customer-support`, or `staff`).
 
 """
 
@@ -34,6 +36,7 @@ from django.core.management import BaseCommand
 
 from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
+    ALL_PAYMENT_TYPES,
     DISCOUNT_TYPE_PERCENT_OFF,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
@@ -77,6 +80,13 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
+            "--payment-type",
+            type=str,
+            help="Sets the payment type (marketing, sales, financial-assistance, customer-support, staff)",
+            required=True,
+        )
+
+        parser.add_argument(
             "--amount",
             type=str,
             nargs="?",
@@ -115,6 +125,7 @@ class Command(BaseCommand):
         codes_to_generate = []
         discount_type = kwargs["discount_type"]
         redemption_type = REDEMPTION_TYPE_UNLIMITED
+        payment_type = kwargs["payment_type"]
         amount = Decimal(kwargs["amount"])
 
         if kwargs["discount_type"] not in ALL_DISCOUNT_TYPES:
@@ -122,6 +133,12 @@ class Command(BaseCommand):
                 self.style.ERROR(
                     f"Discount type {kwargs['discount_type']} is not valid."
                 )
+            )
+            exit(-1)
+
+        if payment_type not in ALL_PAYMENT_TYPES:
+            self.stderr.write(
+                self.style.ERROR(f"Payment type {payment_type} is not valid.")
             )
             exit(-1)
 
@@ -183,11 +200,11 @@ class Command(BaseCommand):
                 discount = Discount.objects.create(
                     discount_type=discount_type,
                     redemption_type=redemption_type,
+                    payment_type=payment_type,
                     expiration_date=expiration_date,
                     activation_date=activation_date,
                     discount_code=code_to_generate,
                     amount=amount,
-                    for_flexible_pricing=False,
                 )
 
                 generated_codes.append(discount)

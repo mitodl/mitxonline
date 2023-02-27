@@ -14,7 +14,11 @@ from mitol.payment_gateway.exceptions import RefundDuplicateException
 
 from courses.api import deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
-from ecommerce.constants import REFUND_SUCCESS_STATES, ZERO_PAYMENT_DATA
+from ecommerce.constants import (
+    PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    REFUND_SUCCESS_STATES,
+    ZERO_PAYMENT_DATA,
+)
 from ecommerce.models import (
     Basket,
     BasketDiscount,
@@ -189,7 +193,8 @@ def apply_user_discounts(request):
     discount = None
 
     BasketDiscount.objects.filter(
-        redeemed_basket=basket, redeemed_discount__for_flexible_pricing=True
+        redeemed_basket=basket,
+        redeemed_discount__payment_type=PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     ).delete()
     if BasketDiscount.objects.filter(redeemed_basket=basket).count() > 0:
         return
@@ -227,7 +232,7 @@ def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=F
     order.fulfill(payment_data, already_enrolled=already_enrolled)
     order.save()
 
-    if not order.is_review and (basket and basket.compare_to_order(order)):
+    if basket and basket.compare_to_order(order):
         basket.delete()
 
 
@@ -300,35 +305,23 @@ def process_cybersource_payment_response(request, order):
         order.error()
         order.save()
         return_message = order.state
-    elif processor_response.state == ProcessorResponse.STATE_CANCELLED:
-        # Transaction cancelled
+    elif processor_response.state in [
+        ProcessorResponse.STATE_CANCELLED,
+        ProcessorResponse.STATE_REVIEW,
+    ]:
+        # Transaction cancelled or reviewed
         # Transaction could be cancelled for reasons that don't necessarily
         # mean that the entire order is invalid, so we'll do nothing with
-        # the order here (other than set it to Cancelled)
-        log.debug("Transaction cancelled: {msg}".format(msg=processor_response.message))
-        order.cancel()
-        order.save()
-        return_message = order.state
-    elif processor_response.state == ProcessorResponse.STATE_REVIEW:
-        # Transaction held for review in the payment processor's system
-        # The transaction is in limbo here - it may be approved or denied
-        # at a later time
+        # the order here (other than set it to Cancelled).
+        # Transaction could be
         log.debug(
-            "Transaction flagged for review: {msg}".format(
+            "Transaction cancelled/reviewed: {msg}".format(
                 msg=processor_response.message
             )
         )
-        basket = Basket.objects.filter(user=order.purchaser).first()
-        return_message = order.state
-        if basket:
-            if not basket.has_user_blocked_products(order.purchaser):
-                basket.delete()
-
-        order.review(request.POST)
+        order.cancel()
         order.save()
-
-        if basket and basket.compare_to_order(order):
-            basket.delete()
+        return_message = order.state
 
     elif (
         processor_response.state == ProcessorResponse.STATE_ACCEPTED
@@ -484,3 +477,87 @@ def unenroll_learner_from_order(order_id):
                     )
             except ObjectDoesNotExist:
                 pass
+
+
+def check_and_process_pending_orders_for_resolution(refnos=None):
+    """
+    Checks pending orders for resolution. By default, this will pull all the
+    pending orders that are in the system.
+
+    Args:
+    - refnos (list or None): check specific reference numbers
+    Returns:
+    - Tuple of counts: fulfilled count, cancelled count, error count
+
+    """
+
+    gateway = PaymentGateway.get_gateway_class(ECOMMERCE_DEFAULT_PAYMENT_GATEWAY)
+
+    if refnos is not None:
+        pending_orders = PendingOrder.objects.filter(
+            state=PendingOrder.STATE.PENDING, reference_number__in=refnos
+        ).values_list("reference_number", flat=True)
+    else:
+        pending_orders = PendingOrder.objects.filter(
+            state=PendingOrder.STATE.PENDING
+        ).values_list("reference_number", flat=True)
+
+    if len(pending_orders) == 0:
+        return (0, 0, 0)
+
+    log.info(f"Resolving {len(pending_orders)} orders")
+
+    results = gateway.find_and_get_transactions(pending_orders)
+
+    if len(results.keys()) == 0:
+        log.info(f"No orders found to resolve.")
+        return (0, 0, 0)
+
+    fulfilled_count = cancel_count = error_count = 0
+
+    for result in results:
+        payload = results[result]
+        if int(payload["reason_code"]) == 100:
+
+            try:
+                order = PendingOrder.objects.filter(
+                    state=PendingOrder.STATE.PENDING,
+                    reference_number=payload["req_reference_number"],
+                ).get()
+
+                order.fulfill(payload)
+                order.save()
+                fulfilled_count += 1
+
+                log.info(f"Fulfilled order {order.reference_number}.")
+            except Exception as e:
+                log.error(
+                    f"Couldn't process pending order for fulfillment {payload['req_reference_number']}: {str(e)}"
+                )
+                error_count += 1
+        else:
+
+            try:
+                order = PendingOrder.objects.filter(
+                    state=PendingOrder.STATE.PENDING,
+                    reference_number=payload["req_reference_number"],
+                ).get()
+
+                order.cancel()
+                order.transactions.create(
+                    transaction_id=payload["transaction_id"],
+                    amount=order.total_price_paid,
+                    data=payload,
+                    reason=f"Cancelled due to processor code {payload['reason_code']}",
+                )
+                order.save()
+                cancel_count += 1
+
+                log.info(f"Cancelled order {order.reference_number}.")
+            except Exception as e:
+                log.error(
+                    f"Couldn't process pending order for cancellation {payload['req_reference_number']}: {str(e)}"
+                )
+                error_count += 1
+
+    return (fulfilled_count, cancel_count, error_count)

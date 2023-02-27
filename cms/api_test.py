@@ -230,6 +230,21 @@ def test_home_page_featured_products_sorting(mocker):
 
 
 @pytest.mark.django_db
+def test_home_page_featured_products_published_only():
+    """Tests that featured products contain only published products/pages in the HomePage"""
+    home_page = HomePageFactory.create()
+    course_pages = CoursePageFactory.create_batch(2, parent=home_page)
+    unpublished_course_page = CoursePageFactory.create(parent=home_page, live=False)
+
+    for course_page in course_pages + [unpublished_course_page]:
+        HomeProductLink.objects.create(page=home_page, course_product_page=course_page)
+
+    featured_products = home_page.products
+    assert len(featured_products) == 2
+    assert unpublished_course_page not in featured_products
+
+
+@pytest.mark.django_db
 def test_create_courseware_page():
     ensure_home_page_and_site()
     ensure_product_index()

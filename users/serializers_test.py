@@ -1,17 +1,22 @@
 """Tests for users.serializers"""
-from requests import HTTPError
-from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
-from openedx.exceptions import EdxApiRegistrationValidationException
 import pytest
 import responses
 from django.contrib.auth.models import AnonymousUser
-
 from django.test.client import RequestFactory
-from rest_framework.exceptions import ValidationError
-from rest_framework import status
-
+from pytest_lazyfixture import lazy_fixture
+from requests import HTTPError
 from requests.exceptions import ConnectionError as RequestsConnectionError
+from rest_framework import status
+from rest_framework.exceptions import ValidationError
 
+from fixtures.common import (
+    intl_address_dict,
+    invalid_address_dict,
+    user_profile_dict,
+    valid_address_dict,
+)
+from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
+from openedx.exceptions import EdxApiRegistrationValidationException
 from users.factories import UserFactory
 from users.models import ChangeEmailRequest, LegalAddress
 from users.serializers import (
@@ -26,24 +31,14 @@ USERNAME = "my-username"
 
 
 @pytest.fixture()
-def sample_address():
-    """Return a legal address"""
-    return {
-        "first_name": "Test",
-        "last_name": "User",
-        "country": "US",
-    }
-
-
-@pytest.fixture()
 def application(settings):
     """Test data and settings needed for create_edx_user tests"""
     settings.OPENEDX_API_BASE_URL = "http://example.com"
 
 
-def test_validate_legal_address(sample_address):
+def test_validate_legal_address(valid_address_dict):
     """Test that correct address data validates"""
-    serializer = LegalAddressSerializer(data=sample_address)
+    serializer = LegalAddressSerializer(data=valid_address_dict)
     assert serializer.is_valid() is True
 
 
@@ -56,19 +51,37 @@ def test_validate_legal_address(sample_address):
         ["country", None, "This field may not be null."],
     ],
 )
-def test_validate_required_fields(sample_address, field, value, error):
+def test_validate_required_fields(valid_address_dict, field, value, error):
     """Test that missing required fields causes a validation error"""
-    sample_address[field] = value
-    serializer = LegalAddressSerializer(data=sample_address)
+    valid_address_dict[field] = value
+    serializer = LegalAddressSerializer(data=valid_address_dict)
     assert serializer.is_valid() is False
     assert str(serializer.errors[field][0]) == error
 
 
-def test_update_user_serializer(settings, user, sample_address):
+@pytest.mark.parametrize(
+    "address_type,error",
+    [
+        [lazy_fixture("valid_address_dict"), None],
+        [lazy_fixture("intl_address_dict"), None],
+        [lazy_fixture("invalid_address_dict"), "Invalid state specified"],
+    ],
+)
+def test_legal_address_validate_state_field(address_type, error):
+    """Tests that the LegalAddressSerializer properly validates the state field"""
+    serializer = LegalAddressSerializer(data=address_type)
+    if error is None:
+        assert serializer.is_valid()
+    else:
+        assert serializer.is_valid() is False
+        assert error in serializer.errors["state"]
+
+
+def test_update_user_serializer(settings, user, valid_address_dict):
     """Test that a UserSerializer can be updated properly"""
     serializer = UserSerializer(
         instance=user,
-        data={"password": "AgJw0123", "legal_address": sample_address},
+        data={"password": "AgJw0123", "legal_address": valid_address_dict},
         partial=True,
     )
     assert serializer.is_valid()
@@ -78,7 +91,7 @@ def test_update_user_serializer(settings, user, sample_address):
 
 @responses.activate
 @pytest.mark.django_db
-def test_create_user_serializer(settings, sample_address):
+def test_create_user_serializer(settings, valid_address_dict):
     """Test that a UserSerializer can be created properly"""
     responses.add(
         responses.POST,
@@ -91,7 +104,7 @@ def test_create_user_serializer(settings, sample_address):
             "username": "fakename",
             "email": "fake@fake.edu",
             "password": "fake",
-            "legal_address": sample_address,
+            "legal_address": valid_address_dict,
         }
     )
 
@@ -168,7 +181,7 @@ def test_update_user_email(
     ],
 )
 def test_username_validation(
-    sample_address, new_username, expect_valid, expect_saved_username, settings
+    valid_address_dict, new_username, expect_valid, expect_saved_username, settings
 ):
     """
     UserSerializer should raise a validation error if the given username has invalid characters,
@@ -188,7 +201,7 @@ def test_username_validation(
             "username": new_username,
             "email": "email@example.com",
             "password": "abcdefghi123",
-            "legal_address": sample_address,
+            "legal_address": valid_address_dict,
         }
     )
     is_valid = serializer.is_valid()
@@ -221,7 +234,7 @@ def test_username_validation_exception(user, settings):
             "username": user.username,
             "email": "email@example.com",
             "password": "abcdefghi123",
-            "legal_address": sample_address,
+            "legal_address": valid_address_dict,
         }
     )
     assert serializer.is_valid() is False
@@ -237,37 +250,36 @@ def test_username_validation_exception(user, settings):
     [EdxApiRegistrationValidationException, RequestsConnectionError, HTTPError],
 )
 def test_username_validation_connection_exception(
-    mocker, exception_raised, sample_address
+    mocker, exception_raised, valid_address_dict
 ):
     """
     UserSerializer should raise a RequestsConnectionError or HTTPError if the connection to OpenEdx
-    fails.  The serializer should still be valid.
+    fails.  The serializer should raise a validation error.
     """
-    mocker.patch(
-        "openedx.api.check_username_exists_in_edx", side_effect=exception_raised
-    )
+    mocker.patch("openedx.api.validate_username_with_edx", side_effect=exception_raised)
 
     serializer = UserSerializer(
         data={
             "username": "unique-username",
             "email": "email11111@example.com",
             "password": "abcdefghi123",
-            "legal_address": sample_address,
+            "legal_address": valid_address_dict,
         }
     )
-    assert serializer.is_valid() is True
+    with pytest.raises(Exception):
+        assert serializer.is_valid() is False
 
 
 @responses.activate
 @pytest.mark.django_db
-def test_user_create_required_fields_post(sample_address, settings):
+def test_user_create_required_fields_post(valid_address_dict, settings):
     """
     UserSerializer should raise a validation error if a new User is being created and certain fields aren't
     included in the data.
     """
     base_data = {
         "email": "email@example.com",
-        "legal_address": sample_address,
+        "legal_address": valid_address_dict,
     }
     rf = RequestFactory()
     # Request path does not matter here
@@ -293,14 +305,14 @@ def test_user_create_required_fields_post(sample_address, settings):
     assert str(serializer.errors["username"][0]) == "This field is required."
 
 
-def test_user_create_required_fields_not_post(sample_address):
+def test_user_create_required_fields_not_post(valid_address_dict):
     """
     If UserSerializer is given no request in the context, or that request is not a POST,
     it should not raise a validation error if certain fields are not included.
     """
     base_data = {
         "email": "email@example.com",
-        "legal_address": sample_address,
+        "legal_address": valid_address_dict,
     }
     serializer = UserSerializer(data=base_data)
     assert serializer.is_valid() is True
@@ -312,7 +324,7 @@ def test_user_create_required_fields_not_post(sample_address):
     assert serializer.is_valid() is True
 
 
-def test_legal_address_serializer_invalid_name(sample_address):
+def test_legal_address_serializer_invalid_name(valid_address_dict):
     """Test that LegalAddressSerializer raises an exception if any if the first or last name is not valid"""
 
     # To make sure that this test isn't flaky, Checking all the character and sequences that should match our name regex
@@ -320,17 +332,46 @@ def test_legal_address_serializer_invalid_name(sample_address):
     # Case 1: Make sure that invalid character(s) doesn't exist within the name
     for invalid_character in "~!@&)(+:'.?/,`-":
         # Replace the invalid character on 3 different places within name for rigorous testing of this case
-        sample_address["first_name"] = "{0}First{0} Name{0}".format(invalid_character)
-        sample_address["last_name"] = "{0}Last{0} Name{0}".format(invalid_character)
-        serializer = LegalAddressSerializer(data=sample_address)
+        valid_address_dict["first_name"] = "{0}First{0} Name{0}".format(
+            invalid_character
+        )
+        valid_address_dict["last_name"] = "{0}Last{0} Name{0}".format(invalid_character)
+        serializer = LegalAddressSerializer(data=valid_address_dict)
         with pytest.raises(ValidationError):
             serializer.is_valid(raise_exception=True)
 
     # Case 2: Make sure that name doesn't start with valid special character(s)
     # These characters are valid for a name but they shouldn't be at the start
     for valid_character in '^/$#*=[]`%_;<>{}"|':
-        sample_address["first_name"] = "{}First".format(valid_character)
-        sample_address["last_name"] = "{}Last".format(valid_character)
-        serializer = LegalAddressSerializer(data=sample_address)
+        valid_address_dict["first_name"] = "{}First".format(valid_character)
+        valid_address_dict["last_name"] = "{}Last".format(valid_character)
+        serializer = LegalAddressSerializer(data=valid_address_dict)
         with pytest.raises(ValidationError):
             serializer.is_valid(raise_exception=True)
+
+
+@pytest.mark.parametrize("invalid_profile", [True, False])
+def test_update_user_serializer_with_profile(
+    settings, user, valid_address_dict, user_profile_dict, invalid_profile
+):
+    """Tests that the UserSerializers works right with a supplied UserProfile"""
+
+    if invalid_profile:
+        user_profile_dict["year_of_birth"] = None
+
+    serializer = UserSerializer(
+        instance=user,
+        data={
+            "password": "AgJw0123",
+            "legal_address": valid_address_dict,
+            "user_profile": user_profile_dict,
+        },
+        partial=True,
+    )
+
+    if invalid_profile:
+        assert not serializer.is_valid()
+    else:
+        assert serializer.is_valid()
+        serializer.save()
+        assert isinstance(user.legal_address, LegalAddress)

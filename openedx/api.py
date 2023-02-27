@@ -26,27 +26,27 @@ from authentication import api as auth_api
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from main.utils import get_partitioned_set_difference
 from openedx.constants import (
-    EDX_ENROLLMENT_AUDIT_MODE,
     EDX_DEFAULT_ENROLLMENT_MODE,
+    EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     PLATFORM_EDX,
     PRO_ENROLL_MODE_ERROR_TEXTS,
 )
-
 from openedx.exceptions import (
+    EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
+    EdxApiRegistrationValidationException,
     NoEdxApiAuthError,
     OpenEdXOAuth2Error,
     OpenEdxUserCreateError,
+    UnknownEdxApiEmailSettingsException,
     UnknownEdxApiEnrollException,
     UserNameUpdateFailedException,
-    EdxApiEmailSettingsErrorException,
-    UnknownEdxApiEmailSettingsException,
-    EdxApiRegistrationValidationException,
 )
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
-from openedx.utils import edx_url, SyncResult
+from openedx.tasks import regenerate_openedx_auth_tokens
+from openedx.utils import SyncResult, edx_url
 from users.api import fetch_user
 
 log = logging.getLogger(__name__)
@@ -289,17 +289,39 @@ def repair_faulty_edx_user(user):
                 edX auth token was created.
     """
     created_user, created_auth_token = False, False
-    if (
-        find_object_with_matching_attr(
-            user.openedx_users.all(), "platform", value=PLATFORM_EDX
-        )
-        is None
-    ):
-        create_edx_user(user)
-        created_user = True
+    try:
+        if (
+            find_object_with_matching_attr(
+                user.openedx_users.all(), "platform", value=PLATFORM_EDX
+            )
+            is None
+        ):
+            create_edx_user(user)
+            created_user = True
+    except Exception as e:
+        # 409 means we have a username conflict - pass in that case so we can
+        # try to create the api auth tokens; re-raise otherwise
+
+        if "code: 409" in str(e):
+            pass
+        else:
+            raise Exception from e
+
     if not hasattr(user, "openedx_api_auth"):
         create_edx_auth_token(user)
         created_auth_token = True
+
+        if (
+            find_object_with_matching_attr(
+                user.openedx_users.all(), "platform", value=PLATFORM_EDX
+            )
+            is None
+        ):
+            # if we could create an auth token, then this user's just disconnected for some reason
+            # so go ahead and create the OpenEdxUser record for them (if there isn't one)
+            (edx_user, forced_create) = user.openedx_users.get_or_create()
+            edx_user.save()
+
     return created_user, created_auth_token
 
 
@@ -505,10 +527,16 @@ def get_edx_grades_with_users(course_run, user=None):
 
 
 def enroll_in_edx_course_runs(
-    user, course_runs, *, mode=EDX_DEFAULT_ENROLLMENT_MODE, force_enrollment=False
+    user,
+    course_runs,
+    *,
+    mode=EDX_DEFAULT_ENROLLMENT_MODE,
+    force_enrollment=False,
+    regen_auth_tokens=True,
 ):
     """
-    Enrolls a user in edx course runs
+    Enrolls a user in edx course runs. If the user doesn't have a valid
+    set of API credentials, this will try to regenerate them (unless told not to).
 
     Args:
         user (users.models.User): The user to enroll
@@ -516,6 +544,7 @@ def enroll_in_edx_course_runs(
         mode (str): The course mode to enroll the user with
         force_enrollment (bool): If True, Enforces Enrollment after the enrollment end date
                                     has been passed or upgrade_deadline is ended
+        regen_auth_token (bool): Regenerate the auth tokens if the learner's are invalid
 
     Returns:
         list of edx_api.enrollments.models.Enrollment:
@@ -525,11 +554,49 @@ def enroll_in_edx_course_runs(
         EdxApiEnrollErrorException: Raised if the underlying edX API HTTP request fails
         UnknownEdxApiEnrollException: Raised if an unknown error was encountered during the edX API request
     """
-    edx_client = get_edx_api_client(user)
     username = None
     if force_enrollment:
         edx_client = get_edx_api_service_client()
         username = user.username
+    else:
+        try:
+            edx_client = get_edx_api_client(user)
+        except (HTTPError, NoEdxApiAuthError) as exc:
+            log.exception(
+                "enroll_in_edx_course_runs got exception getting API client: %s %s",
+                type(exc),
+                exc,
+            )
+
+            if regen_auth_tokens and (
+                "Bad Request" in str(exc) or type(exc) == NoEdxApiAuthError
+            ):
+                if OpenEdxApiAuth.objects.filter(user=user).count():
+                    OpenEdxApiAuth.objects.filter(user=user).delete()
+                    user.refresh_from_db()
+
+                try:
+                    log.exception(
+                        "enroll_in_edx_course_runs: creating new auth tokens for %s",
+                        user,
+                    )
+                    create_edx_auth_token(user)
+                    user.refresh_from_db()
+                    edx_client = get_edx_api_client(user)
+                except Exception as auth_exc:
+                    log.exception(
+                        "enroll_in_edx_course_runs: got exception creating new auth token: %s",
+                        auth_exc,
+                    )
+                    raise auth_exc
+            elif not regen_auth_tokens and (
+                "Bad Request" in str(exc) or type(exc) == NoEdxApiAuthError
+            ):
+                regenerate_openedx_auth_tokens.delay(user.id)
+                raise exc
+            else:
+                raise exc
+
     results = []
     for course_run in course_runs:
         try:
@@ -748,16 +815,15 @@ def unsubscribe_from_edx_course_emails(user, course_run):
     return result
 
 
-def check_username_exists_in_edx(username):
+def validate_username_with_edx(username):
     """
-    Returns true if the username exists within Open edX.
-    Returns false if the username does not exists in Open edX.
+    Returns validation message after validating it with edX.
 
     Args:
         username (str): the username
 
     Raises:
-        EdxApiRegistrationValidationException: Raised if the edX API HTTP request fails
+        EdxApiRegistrationValidationException: Raised if response status is not OK.
     """
 
     req_session = requests.Session()
@@ -773,8 +839,4 @@ def check_username_exists_in_edx(username):
     if resp.status_code != status.HTTP_200_OK:
         raise EdxApiRegistrationValidationException(username, resp)
     result = resp.json()
-    return result["validation_decisions"][
-        "username"
-    ] == "It looks like {} belongs to an existing account. Try again with a different username.".format(
-        username
-    )
+    return result["validation_decisions"]["username"]

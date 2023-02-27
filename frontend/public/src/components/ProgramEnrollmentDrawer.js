@@ -3,7 +3,6 @@ import React from "react"
 import EnrolledItemCard from "./EnrolledItemCard"
 import ProgramCourseInfoCard from "./ProgramCourseInfoCard"
 import { extractCoursesFromNode } from "../lib/courseApi"
-import { areLearnerRecordsEnabled } from "../lib/util"
 import type {
   ProgramEnrollment,
   CourseDetailWithRuns
@@ -42,7 +41,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
 
     return (
       <EnrolledItemCard
-        key={found.readable_id}
+        key={found.run.course.readable_id}
         enrollment={found}
         isProgramCard={true}
       ></EnrolledItemCard>
@@ -53,9 +52,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     const { enrollment } = this.props
 
     return (
-      <React.Fragment
-        key={`drawer-course-list-${enrollment.program.readable_id}`}
-      >
+      <React.Fragment>
         {enrollment.program.req_tree[0].children.map(node => {
           const interiorCourses = extractCoursesFromNode(node, enrollment)
 
@@ -203,18 +200,14 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
             <div className="row chrome" id="program_enrollment_subtite">
               <p>
                 Program overview: {this.renderProgramOverview()}
-                {areLearnerRecordsEnabled() ? (
-                  <>
-                    <br />
-                    <a
-                      href={`/records/${enrollment.program.id}/`}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      View program record
-                    </a>
-                  </>
-                ) : null}
+                <br />
+                <a
+                  href={`/records/${enrollment.program.id}/`}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  View program record
+                </a>
               </p>
             </div>
             {enrolledItemCards}

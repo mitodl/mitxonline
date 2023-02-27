@@ -1,5 +1,4 @@
 // @flow
-/* global SETTINGS:false */
 import {
   all,
   complement,
@@ -252,13 +251,4 @@ export const getFlexiblePriceForProduct = (product: Product) => {
   default:
     return Number(product.price)
   }
-}
-
-export const areLearnerRecordsEnabled = () => {
-  const params = new URLSearchParams(document.location.search)
-
-  return (
-    params.get("enable_lr") !== null ||
-    (SETTINGS && SETTINGS.features && SETTINGS.features.enable_learner_records)
-  )
 }

@@ -4,10 +4,9 @@ Management command to retry edX enrollment for a user's course run enrollments
 from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand
 
+from courses.models import CourseRunEnrollment
 from openedx.api import enroll_in_edx_course_runs
 from users.api import fetch_users
-
-from courses.models import CourseRunEnrollment
 
 User = get_user_model()
 
@@ -67,9 +66,11 @@ class Command(BaseCommand):
             user = enrollment.user
             course_run = enrollment.run
             try:
-                enroll_in_edx_course_runs(user, [course_run])
+                enroll_in_edx_course_runs(
+                    user, [course_run], mode=enrollment.enrollment_mode
+                )
             except Exception as exc:  # pylint: disable=broad-except
-                self.stderr.write(self.style.ERROR(str(exc)))
+                self.stderr.write(self.style.ERROR(f"{str(exc)}"))
             else:
                 enrollment.edx_enrolled = True
                 enrollment.edx_emails_subscription = True

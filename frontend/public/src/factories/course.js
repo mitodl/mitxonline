@@ -71,13 +71,13 @@ export const makeCourseRunWithProduct = (): CourseRun => ({
       is_active:              true,
       price:                  casual.integer(1, 200),
       product_flexible_price: {
-        amount:               null,
-        automatic:            false,
-        discount_type:        null,
-        redemption_type:      null,
-        max_redemptions:      null,
-        discount_code:        "",
-        for_flexible_pricing: false
+        amount:          null,
+        automatic:       false,
+        discount_type:   null,
+        redemption_type: null,
+        max_redemptions: null,
+        discount_code:   "",
+        payment_type:    null
       }
     }
   ]
@@ -295,6 +295,27 @@ export const makeProgramWithOnlyElectives = (): Program => {
 
   program.req_tree = [
     makeDEDPSampleRequirementsTree(program, program.courses, false, true, false)
+  ]
+
+  return program
+}
+
+export const makeProgramWithNoElectivesOrRequirements = (): Program => {
+  const program = makeProgram()
+
+  // for the reqtree stuff to work, the program needs 6 more courses
+  for (let i = 0; i < 6; i++) {
+    program.courses.push(makeCourseDetailWithRuns())
+  }
+
+  program.req_tree = [
+    makeDEDPSampleRequirementsTree(
+      program,
+      program.courses,
+      false,
+      false,
+      false
+    )
   ]
 
   return program

@@ -7,11 +7,38 @@ import {
     Input,
     Icons,
 } from "@pankod/refine-antd";
-import { Discount_Redemption_Types } from "../../constants";
+import {Discount_Redemption_Types} from "../../constants";
 
 export const DiscountFilterForm: React.FC<{ formProps: FormProps }> = ({ formProps }) => {
-  const flexPriceOpts = [
-    { label: '', value: '' }, { label: 'For Financial Assistance', value: 'yes' }, { label: 'Regular Discount', value: 'no' }
+  const DiscountPaymentTypesOpts = [
+    {
+        label: '',
+        value: '',
+    },
+    {
+        label: 'marketing',
+        value: 'marketing',
+    },
+    {
+        label: 'sales',
+        value: 'sales',
+    },
+    {
+        label: 'financial-assistance',
+        value: 'financial-assistance',
+    },
+    {
+        label: 'customer-support',
+        value: 'customer-support',
+    },
+    {
+        label: 'staff',
+        value: 'staff',
+    },
+    {
+        label: 'legacy',
+        value: 'legacy',
+    },
   ]
   const redemptionOpts = [
     { label: '', value: '' }, { label: 'Redeemed', value: 'yes' }, { label: 'Not Redeemed', value: 'no' }
@@ -33,9 +60,9 @@ export const DiscountFilterForm: React.FC<{ formProps: FormProps }> = ({ formPro
                   style={{ minWidth: 250 }}
                   allowClear={true} />
           </Form.Item>
-          <Form.Item label="Search by Financial Assistance" name="for_flexible_pricing">
+          <Form.Item label="Search by Payment Type" name="payment_type">
               <Select
-                  options={flexPriceOpts}
+                  options={DiscountPaymentTypesOpts}
                   style={{ minWidth: 250 }}
                   allowClear={true} />
           </Form.Item>

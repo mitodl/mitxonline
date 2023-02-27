@@ -48,11 +48,7 @@ def get_js_settings(request: HttpRequest):
         "sentry_dsn": remove_password_from_url(settings.SENTRY_DSN),
         "support_email": settings.EMAIL_SUPPORT,
         "site_name": settings.SITE_NAME,
-        "features": {
-            "enable_learner_records": features.is_enabled(
-                features.ENABLE_LEARNER_RECORDS
-            ),
-        },
+        "features": {},
     }
 
 

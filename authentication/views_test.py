@@ -155,6 +155,10 @@ class AuthStateMachine(RuleBasedStateMachine):
         "users.serializers.UserSerializer.validate_username",
         return_value="dummy-username",
     )
+    mock_edx_username_patcher = patch(
+        "users.serializers.validate_username_with_edx",
+        return_value="",
+    )
     openedx_api_patcher = patch("authentication.pipeline.user.openedx_api")
     openedx_tasks_patcher = patch("authentication.pipeline.user.openedx_tasks")
 
@@ -168,6 +172,7 @@ class AuthStateMachine(RuleBasedStateMachine):
         # wrap the execution in a patch()
         self.mock_email_send = self.email_send_patcher.start()
         self.mock_api = self.mock_api_patcher.start()
+        self.mock_edx_username_api = self.mock_edx_username_patcher.start()
         self.mock_openedx_api = self.openedx_api_patcher.start()
         self.mock_openedx_tasks = self.openedx_tasks_patcher.start()
 
@@ -192,6 +197,7 @@ class AuthStateMachine(RuleBasedStateMachine):
         self.openedx_api_patcher.stop()
         self.openedx_tasks_patcher.stop()
         self.mock_api_patcher.stop()
+        self.mock_edx_username_patcher.stop()
 
         # end the transaction with a rollback to cleanup any state
         transaction.set_rollback(True)
@@ -409,31 +415,6 @@ class AuthStateMachine(RuleBasedStateMachine):
             expect_authenticated=True,
         )
 
-    # @rule(auth_state=consumes(LoginPasswordAuthStates))
-    # def login_password_exports_temporary_error(self, auth_state):
-    #     """Login for a user who hasn't been OFAC verified yet"""
-    #     with override_settings(**get_cybersource_test_settings()), patch(
-    #         "authentication.pipeline.compliance.api.verify_user_with_exports",
-    #         side_effect=Exception("register_details_export_temporary_error"),
-    #     ):
-    #         assert_api_call_json(
-    #             self.client,
-    #             "psa-login-password",
-    #             {
-    #                 "flow": auth_state["flow"],
-    #                 "partial_token": auth_state["partial_token"],
-    #                 "password": self.password,
-    #             },
-    #             {
-    #                 "flow": auth_state["flow"],
-    #                 "partial_token": None,
-    #                 "state": SocialAuthState.STATE_ERROR_TEMPORARY,
-    #                 "errors": [
-    #                     "Unable to register at this time, please try again later"
-    #                 ],
-    #             },
-    #         )
-
     @rule(
         target=ConfirmationRedeemedAuthStates,
         auth_state=consumes(ConfirmationSentAuthStates),
@@ -503,21 +484,24 @@ class AuthStateMachine(RuleBasedStateMachine):
     )
     def register_details(self, auth_state):
         """Complete the register confirmation details page"""
+        payload = {
+            "flow": auth_state["flow"],
+            "partial_token": auth_state["partial_token"],
+            "password": self.password,
+            "name": "Sally Smith",
+            "username": "custom-username",
+            "legal_address": {
+                "first_name": "Sally",
+                "last_name": "Smith",
+                "country": "US",
+                "state": "US-MA",
+            },
+        }
+
         response = assert_api_call(
             self.client,
             "psa-register-details",
-            payload={
-                "flow": auth_state["flow"],
-                "partial_token": auth_state["partial_token"],
-                "password": self.password,
-                "name": "Sally Smith",
-                "username": "custom-username",
-                "legal_address": {
-                    "first_name": "Sally",
-                    "last_name": "Smith",
-                    "country": "US",
-                },
-            },
+            payload=payload,
             expected={
                 "flow": auth_state["flow"],
                 "state": SocialAuthState.STATE_SUCCESS,

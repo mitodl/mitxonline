@@ -23,6 +23,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
     DISCOUNT_TYPES,
+    PAYMENT_TYPES,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
@@ -129,7 +130,7 @@ class Basket(TimestampedModel):
         for item in basket_items:
             purchased_object = item.product.purchasable_object
             if isinstance(purchased_object, CourseRun):
-                # PaidCourseRun should only contain fulfilled or review orders
+                # PaidCourseRun should only contain fulfilled orders
                 if PaidCourseRun.fulfilled_paid_course_run_exists(
                     user, purchased_object
                 ):
@@ -239,9 +240,9 @@ class Discount(TimestampedModel):
     automatic = models.BooleanField(default=False)
     discount_type = models.CharField(choices=DISCOUNT_TYPES, max_length=30)
     redemption_type = models.CharField(choices=REDEMPTION_TYPES, max_length=30)
+    payment_type = models.CharField(null=True, choices=PAYMENT_TYPES, max_length=30)
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
     discount_code = models.CharField(max_length=50)
-    for_flexible_pricing = models.BooleanField(null=False, default=False)
     activation_date = models.DateTimeField(
         null=True,
         blank=True,
@@ -544,7 +545,7 @@ class FulfillableOrder:
 
     @transition(
         field="state",
-        source=(Order.STATE.PENDING, Order.STATE.REVIEW),
+        source=Order.STATE.PENDING,
         target=Order.STATE.FULFILLED,
     )
     def fulfill(self, payment_data, already_enrolled=False):
@@ -676,19 +677,6 @@ class PendingOrder(FulfillableOrder, Order):
     def error(self):
         """Error this order"""
         pass
-
-    @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.REVIEW)
-    def review(self, payment_data):
-        """
-        Put the order into the review state. This should be mostly the same as
-        fulfilling it but we don't want to do enrollments here (but we do want
-        to store the transaction data, since there will technically be two of
-        them).
-        """
-        self.create_transaction(payment_data)
-
-        # record all the courserun in the order
-        self.create_paid_courseruns()
 
     class Meta:
         proxy = True

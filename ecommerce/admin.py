@@ -101,8 +101,16 @@ class BasketItemAdmin(VersionAdmin):
 @admin.register(Discount)
 class DiscountAdmin(admin.ModelAdmin):
     model = Discount
-    search_fields = ["discount_type", "redemption_type"]
-    list_display = ["id", "discount_code", "discount_type", "amount", "redemption_type"]
+    search_fields = ["discount_type", "redemption_type", "discount_code"]
+    list_display = [
+        "id",
+        "discount_code",
+        "discount_type",
+        "amount",
+        "redemption_type",
+        "payment_type",
+    ]
+    list_filter = ["discount_type", "redemption_type", "payment_type"]
 
 
 @admin.register(DiscountProduct)
@@ -135,8 +143,19 @@ class UserDiscountAdmin(admin.ModelAdmin):
 @admin.register(DiscountRedemption)
 class DiscountRedemptionAdmin(admin.ModelAdmin):
     model = DiscountRedemption
-    search_fields = ["redemption_date", "redeemed_discount", "redeemed_by"]
-    list_display = ["id", "redemption_date", "redeemed_discount", "redeemed_by"]
+    search_fields = [
+        "redeemed_discount__discount_code",
+        "redeemed_by__email",
+        "redeemed_by__username",
+        "redeemed_order__reference_number",
+    ]
+    list_display = [
+        "id",
+        "redemption_date",
+        "redeemed_discount",
+        "redeemed_by",
+        "redeemed_order",
+    ]
     readonly_fields = (
         "redemption_date",
         "redeemed_discount",

@@ -71,6 +71,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
             "is_staff": False,
             "is_superuser": False,
             "grants": [],
+            "user_profile": None,
         }
         # patched_unused_coupon_api.assert_not_called()
     elif not is_anonymous and show_enrollment_codes:
@@ -83,6 +84,24 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
                 "first_name": user.legal_address.first_name,
                 "last_name": user.legal_address.last_name,
                 "country": user.legal_address.country,
+                "state": user.legal_address.state,
+            },
+            "user_profile": {
+                "gender": user.user_profile.gender,
+                "year_of_birth": user.user_profile.year_of_birth,
+                "addl_field_flag": user.user_profile.addl_field_flag,
+                "company": user.user_profile.company,
+                "job_title": user.user_profile.job_title,
+                "industry": user.user_profile.industry,
+                "job_function": user.user_profile.job_function,
+                "company_size": user.user_profile.company_size,
+                "years_experience": user.user_profile.years_experience,
+                "leadership_level": user.user_profile.leadership_level,
+                "highest_education": user.user_profile.highest_education,
+                "type_is_student": user.user_profile.type_is_student,
+                "type_is_professional": user.user_profile.type_is_professional,
+                "type_is_educator": user.user_profile.type_is_educator,
+                "type_is_other": user.user_profile.type_is_other,
             },
             "is_anonymous": False,
             "is_authenticated": True,
@@ -203,6 +222,7 @@ def test_update_user_name_change(mocker, user_client, user, valid_address_dict):
         "name": new_name,
         "email": user.email,
         "legal_address": valid_address_dict,
+        "user_profile": None,
     }
 
     resp = user_client.patch(
@@ -224,6 +244,7 @@ def test_update_user_name_change_edx(mocker, user_client, user, valid_address_di
         "name": new_name,
         "email": user.email,
         "legal_address": valid_address_dict,
+        "user_profile": None,
     }
     resp = user_client.patch(
         reverse("users_api-me"), content_type="application/json", data=payload
@@ -244,6 +265,7 @@ def test_update_user_no_name_change_edx(mocker, user_client, user, valid_address
             "name": user.name,
             "email": user.email,
             "legal_address": valid_address_dict,
+            "user_profile": None,
         },
     )
 
