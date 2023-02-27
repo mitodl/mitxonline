@@ -23,7 +23,7 @@ from authentication.exceptions import (
     UnexpectedExistingUserException,
     UserCreationFailedException,
 )
-from users.models import LegalAddress, Profile, User
+from users.models import LegalAddress, User, UserProfile
 from authentication.utils import SocialAuthState, is_user_email_blocked
 from openedx import api as openedx_api
 from openedx import tasks as openedx_tasks
@@ -115,7 +115,7 @@ def create_user_via_oidc(
 
             if "is_staff" in data and "is_superuser" in data:
                 user = User.objects.create_superuser(
-                    data["email"],
+                    data["preferred_username"],
                     email=data["email"],
                     password=None,
                     naname=data["name"],
@@ -129,10 +129,42 @@ def create_user_via_oidc(
         user.email = data["email"]
         user.name = data["name"]
 
-    user.legal_address.first_name = data["given_name"]
-    user.legal_address.last_name = data["family_name"]
-    user.legal_address.country = data["country"]
-    user.legal_address.save()
+    # Update user's legal address record.
+    user.legal_address.first_name = data.get(
+        "given_name", user.legal_address.first_name
+    )
+    user.legal_address.last_name = data.get("family_name", user.legal_address.last_name)
+    user.legal_address.country = data.get("country", user.legal_address.country)
+    user.legal_address.state = data.get("state", user.legal_address.state)
+
+    # Update user's profile record.
+    user.user_profile.gender = data.get("gender", user.user_profile.gender)
+    user.user_profile.year_of_birth = data.get(
+        "year_of_birth", user.user_profile.year_of_birth
+    )
+    user.user_profile.company = data.get("company", user.user_profile.company)
+    user.user_profile.years_experience = data.get(
+        "years_experience", user.user_profile.years_experience
+    )
+    user.user_profile.leadership_level = data.get(
+        "leadership_level", user.user_profile.leadership_level
+    )
+    user.user_profile.highest_education = data.get(
+        "highest_education", user.user_profile.highest_education
+    )
+    user.user_profile.type_is_student = data.get(
+        "type_is_student", user.user_profile.type_is_student
+    )
+    user.user_profile.type_is_professional = data.get(
+        "type_is_professional", user.user_profile.type_is_professional
+    )
+    user.user_profile.type_is_educator = data.get(
+        "type_is_educator", user.user_profile.type_is_educator
+    )
+    user.user_profile.type_is_other = data.get(
+        "type_is_other", user.user_profile.type_is_other
+    )
+
     user.save()
 
     return {"is_new": True, "user": user, "username": user.username}
