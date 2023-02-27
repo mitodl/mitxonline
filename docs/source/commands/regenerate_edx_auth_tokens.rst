@@ -1,5 +1,5 @@
 ``regenerate_edx_auth_tokens``
-==================
+==============================
 
 Regenerates the authentication tokens for a specified learner. In essence, deletes the ``OpenEdxApiAuth`` record and then makes a call to edX to generate a new refresh and access token.
 
