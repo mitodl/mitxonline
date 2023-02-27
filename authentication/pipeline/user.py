@@ -118,13 +118,22 @@ def create_user_via_oidc(
                     data["preferred_username"],
                     email=data["email"],
                     password=None,
-                    naname=data["name"],
+                    name=data["name"],
+                    first_name=data["given_name"],
+                    last_name=data["family_name"],
                 )
             else:
                 user = User.objects.create_user(
-                    data["email"], email=data["email"], password=None, name=data["name"]
+                    data["preferred_username"],
+                    email=data["email"],
+                    password=None,
+                    name=data["name"],
+                    first_name=data["given_name"],
+                    last_name=data["family_name"],
                 )
     else:
+        user.first_name = data["given_name"]
+        user.last_name = data["family_name"]
         user.username = data["email"]
         user.email = data["email"]
         user.name = data["name"]
