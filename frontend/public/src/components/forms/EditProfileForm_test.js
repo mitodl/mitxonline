@@ -11,9 +11,10 @@ import {
   findFormikErrorByName
 } from "../../lib/test_utils"
 import { makeCountries, makeUser } from "../../factories/user"
+import * as utils from "../../lib/util"
 
 describe("EditProfileForm", () => {
-  let sandbox, onSubmitStub
+  let sandbox, onSubmitStub, checkFeatureFlagStub
 
   const countries = makeCountries()
   const user = makeUser()
@@ -30,6 +31,11 @@ describe("EditProfileForm", () => {
   beforeEach(() => {
     sandbox = sinon.createSandbox()
     onSubmitStub = sandbox.stub()
+    checkFeatureFlagStub = sandbox.stub(utils, "checkFeatureFlag").returns(true)
+  })
+
+  afterEach(() => {
+    checkFeatureFlagStub.restore()
   })
 
   it("passes onSubmit to Formik", () => {
@@ -88,5 +94,14 @@ describe("EditProfileForm", () => {
         errorMessage
       )
     })
+  })
+
+  it("renders the form and displays the additional fields if they're set", () => {
+    const wrapper = renderForm()
+    const form = wrapper.find("Formik")
+
+    assert.ok(findFormikFieldByName(form, "legal_address.state").exists())
+    assert.ok(findFormikFieldByName(form, "user_profile.type_is_professional"))
+    assert.ok(findFormikFieldByName(form, "user_profile.company").exists())
   })
 })

@@ -48,7 +48,7 @@ export const makeUser = (username: ?string): LoggedInUser => ({
     highest_education:    "Doctorate",
     addl_field_flag:      true,
     type_is_educator:     true,
-    type_is_professional: false,
+    type_is_professional: true,
     type_is_student:      false,
     type_is_other:        false
   },
