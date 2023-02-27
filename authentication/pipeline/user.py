@@ -8,7 +8,7 @@ from django.db import IntegrityError
 from django.db import transaction
 from mitol.common.utils import dict_without_keys
 from social_core.backends.email import EmailAuth
-from authentication.odl_open_id_connect import OdlOpenIdConnectAuth
+from authentication.backends.odl_open_id_connect import OdlOpenIdConnectAuth
 from social_core.exceptions import AuthException
 from social_core.pipeline.partial import partial
 
@@ -23,7 +23,7 @@ from authentication.exceptions import (
     UnexpectedExistingUserException,
     UserCreationFailedException,
 )
-from users.models import LegalAddress, User
+from users.models import LegalAddress, Profile, User
 from authentication.utils import SocialAuthState, is_user_email_blocked
 from openedx import api as openedx_api
 from openedx import tasks as openedx_tasks
@@ -124,22 +124,16 @@ def create_user_via_oidc(
                 user = User.objects.create_user(
                     data["email"], email=data["email"], password=None, name=data["name"]
                 )
-
-            LegalAddress.objects.create(
-                user=user,
-                first_name=data["given_name"],
-                last_name=data["family_name"],
-                country=data["country"],
-            )
     else:
         user.username = data["email"]
         user.email = data["email"]
         user.name = data["name"]
-        user.legal_address.first_name = data["given_name"]
-        user.legal_address.last_name = data["family_name"]
-        user.legal_address.country = data["country"]
-        user.legal_address.save()
-        user.save()
+
+    user.legal_address.first_name = data["given_name"]
+    user.legal_address.last_name = data["family_name"]
+    user.legal_address.country = data["country"]
+    user.legal_address.save()
+    user.save()
 
     return {"is_new": True, "user": user, "username": user.username}
 

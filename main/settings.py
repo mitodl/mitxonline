@@ -383,6 +383,7 @@ SOCIAL_AUTH_PIPELINE = (
     # NOTE: needs to be right before create_user so nothing overrides the username
     "authentication.pipeline.user.get_username",
     # Create a user if one doesn't exist, and require a password and name
+    "authentication.pipeline.user.create_user_via_email",
     "authentication.pipeline.user.create_user_via_oidc",
     # verify the user against export compliance
     # "authentication.pipeline.compliance.verify_exports_compliance",
@@ -890,7 +891,7 @@ CACHES = {
 }
 
 AUTHENTICATION_BACKENDS = (
-    "authentication.odl_open_id_connect.OdlOpenIdConnectAuth",
+    "authentication.backends.odl_open_id_connect.OdlOpenIdConnectAuth",
     "social_core.backends.email.EmailAuth",
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
