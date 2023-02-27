@@ -7,6 +7,7 @@ MITx Online Commands
 
    check_program_requirements
    configure_instance
+   configure_tiers
    create_courseware
    create_courseware_page
    create_product

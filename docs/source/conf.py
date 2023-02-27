@@ -18,7 +18,7 @@
 # -- Project information -----------------------------------------------------
 
 project = "MITx Online"
-copyright = "2021, OL Engineering"
+copyright = "2023, OL Engineering"
 author = "OL Engineering"
 
 
