@@ -20,8 +20,6 @@ import { assert } from "chai"
 import * as R from "ramda"
 import moment from "moment-timezone"
 
-import _has from "lodash/has"
-
 import type Moment from "moment"
 import type { HttpRespErrorMessage, HttpResponse } from "../flow/httpTypes"
 import type { Product } from "../flow/cartTypes"
@@ -264,7 +262,7 @@ export const intCheckFeatureFlag = (
 
   return (
     params.get(flag) !== null ||
-    (settings && settings.features && _has(settings.features, flag))
+    (settings && settings.features && settings.features[flag])
   )
 }
 

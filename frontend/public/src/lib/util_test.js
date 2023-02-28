@@ -347,7 +347,8 @@ describe("utility functions", () => {
   describe("checkFeatureFlag", () => {
     const SETTINGS = {
       features: {
-        test_flag: "yes"
+        test_flag:       true,
+        other_test_flag: false
       }
     }
 
@@ -357,6 +358,7 @@ describe("utility functions", () => {
 
     it("returns the flag setting if the feature flag is set", () => {
       assert.isTrue(intCheckFeatureFlag("test_flag", document, SETTINGS))
+      assert.isFalse(intCheckFeatureFlag("other_test_flag", document, SETTINGS))
       assert.isTrue(intCheckFeatureFlag("flagtwo", document, SETTINGS))
     })
   })
