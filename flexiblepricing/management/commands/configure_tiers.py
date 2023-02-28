@@ -1,58 +1,19 @@
 """
 Ensures there's a basic set of records present for financial assistance to work
-for DEDP (or other) courses. This includes:
+for a program or course.
+
+For a course, this includes:
+- Ensuring the course is available
+
+For a program, this includes:
 - A program (required for the tiers to be set up)
+
+For both, this includes:
 - A set of discounts, specific to the program
 - Tiers that are tied to these discounts
 
-The defaults for this are intended for use with DEDP and are:
-
-Program:
-- Readable ID is `program-v1:MITx+DEDP`
-- Name is `Data, Economics and Development Policy`
-
-Discounts: (year is the current year)
-Code               | Type        | Amount
------------------------------------------
-DEDP-fa-tier1-year | dollars-off | 750
-DEDP-fa-tier2-year | dollars-off | 650
-DEDP-fa-tier3-year | dollars-off | 500
-DEDP-fa-tier4-year | percent-off | 0
------------------------------------------
-
-Tiers:
-Threshold | Discount
-------------------------------
-0         | DEDP-fa-tier1-year
-25,000    | DEDP-fa-tier2-year
-50,000    | DEDP-fa-tier3-year
-75,000    | DEDP-fa-tier4-year
-------------------------------
-
-If discounts and tiers exist for the current year, this command will leave them
-alone. If they exist for prior years, they will be disabled (current=False for
-tiers and expiration date set to the past for discounts).
-
-If a program exists with the readable ID specified, that will be used.
-
-The defaults can be changed:
-- Specify --program <courseware-id> to use a different program (this will be
-created if it's not there already)
-- Specify --program-name "<name>" to use a different program name (required if
-you specify --program)
-- Specify --program-abbrev "<abbreviation>" to use a different program
-abbreviation in the discount codes (defaults to DEDP, required if you specify
---program)
-- Specify --tier-info <filename> to set different tier levels. This expects a
-CSV file with "threshold amount,discount type,discount amount" as the data set.
-(Do not provide a header row.) Discount type should be "percent-off",
-"dollars-off", or "fixed-price".
-
-If you specify tier information, you must provide all the tiers you want to
-create - the specified information will override the default. In addition, you
-must supply a zero income tier. This is a requirement and the command will quit
-if you don't have one set up, as that tier is used as the starting point for
-financial assistance.
+For more info on how this works, see the docs in
+docs/source/commands/configure_tiers.rst.
 
 """
 import csv
@@ -62,9 +23,9 @@ from datetime import date, datetime
 import pytz
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.management import BaseCommand
+from django.core.management import BaseCommand, CommandError
 
-from courses.models import Program
+from courses.models import Course, Program
 from ecommerce.constants import (
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     REDEMPTION_TYPE_UNLIMITED,
@@ -75,15 +36,16 @@ from flexiblepricing.models import FlexiblePriceTier
 
 class Command(BaseCommand):
     """
-    Sets up tiers and discounts for a specified program (or DEDP, by default)
+    Sets up tiers and discounts for a specified program or course (or DEDP, by default)
     """
 
-    help = "Sets up tiers and discounts for a specified program (or DEDP, by default)"
+    help = "Sets up tiers and discounts for a specified program or course (or DEDP, by default)"
     PROGRAM_READABLE_ID = "program-v1:MITx+DEDP"
     PROGRAM_TITLE = "Data, Economics and Development Policy"
     PROGRAM_ABBREV = "DEDP"
 
     def add_arguments(self, parser) -> None:
+        parser.add_argument("--course", type=str, help="Course ID to use", nargs="?")
         parser.add_argument(
             "--program",
             type=str,
@@ -91,7 +53,6 @@ class Command(BaseCommand):
             nargs="?",
             default=self.PROGRAM_READABLE_ID,
         )
-
         parser.add_argument(
             "--program-name",
             type=str,
@@ -99,7 +60,6 @@ class Command(BaseCommand):
             nargs="?",
             default=self.PROGRAM_TITLE,
         )
-
         parser.add_argument(
             "--program-abbrev",
             type=str,
@@ -107,7 +67,6 @@ class Command(BaseCommand):
             nargs="?",
             default=self.PROGRAM_ABBREV,
         )
-
         parser.add_argument(
             "--tier-info",
             type=FileType(mode="r"),
@@ -117,16 +76,25 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
         # Set defaults
 
-        readable_id = (
-            kwargs["program"] if "program" in kwargs else self.PROGRAM_READABLE_ID
-        )
-        program_title = (
-            kwargs["program_name"] if "program_name" in kwargs else self.PROGRAM_TITLE
-        )
-        program_abbrev = (
-            kwargs["program_abbrev"]
-            if "program_abbrev" in kwargs
-            else self.PROGRAM_ABBREV
+        try:
+            course = (
+                Course.objects.get(readable_id=kwargs["course"])
+                if "course" in kwargs and kwargs["course"] is not None
+                else None
+            )
+        except:
+            raise CommandError(
+                f"Couldn't find the course {kwargs['course']}, stopping."
+            )
+
+        discount_abbrev = (
+            (
+                kwargs["program_abbrev"]
+                if "program_abbrev" in kwargs
+                else self.PROGRAM_ABBREV
+            )
+            if not course
+            else course.readable_id
         )
 
         current_year = date.today().year
@@ -137,39 +105,41 @@ class Command(BaseCommand):
             {
                 "tier": {"threshold": 0},
                 "discount": {
-                    "discount_code": f"{program_abbrev}-fa-tier1-{current_year}",
-                    "discount_type": "dollars-off",
-                    "amount": 750,
+                    "discount_code": f"{discount_abbrev}-fa-tier1-{current_year}",
+                    "discount_type": "dollars-off" if not course else "percent-off",
+                    "amount": 750 if not course else 0.75,
                 },
             },
             {
                 "tier": {"threshold": 25000},
                 "discount": {
-                    "discount_code": f"{program_abbrev}-fa-tier2-{current_year}",
-                    "discount_type": "dollars-off",
-                    "amount": 650,
+                    "discount_code": f"{discount_abbrev}-fa-tier2-{current_year}",
+                    "discount_type": "dollars-off" if not course else "percent-off",
+                    "amount": 650 if not course else 0.50,
                 },
             },
             {
                 "tier": {"threshold": 50000},
                 "discount": {
-                    "discount_code": f"{program_abbrev}-fa-tier3-{current_year}",
-                    "discount_type": "dollars-off",
-                    "amount": 500,
+                    "discount_code": f"{discount_abbrev}-fa-tier3-{current_year}",
+                    "discount_type": "dollars-off" if not course else "percent-off",
+                    "amount": 500 if not course else 0.25,
                 },
             },
             {
                 "tier": {"threshold": 75000},
                 "discount": {
-                    "discount_code": f"{program_abbrev}-fa-tier4-{current_year}",
+                    "discount_code": f"{discount_abbrev}-fa-tier4-{current_year}",
                     "discount_type": "percent-off",
                     "amount": 0,
                 },
             },
         ]
-        content_type = ContentType.objects.filter(
-            app_label="courses", model="program"
-        ).first()
+        content_type = (
+            ContentType.objects.filter(app_label="courses", model="program").first()
+            if not course
+            else ContentType.objects.filter(app_label="courses", model="course").first()
+        )
 
         # Step zero: if the user supplied a defaults file, then parse that
 
@@ -191,7 +161,7 @@ class Command(BaseCommand):
                         {
                             "tier": {"threshold": row["threshold"]},
                             "discount": {
-                                "discount_code": f"{program_abbrev}-fa-tier{idx+1}-{current_year}",
+                                "discount_code": f"{discount_abbrev}-fa-tier{idx+1}-{current_year}",
                                 "discount_type": row["type"],
                                 "amount": row["value"],
                             },
@@ -212,27 +182,41 @@ class Command(BaseCommand):
                 return
 
         # Step one: get the DEDP program
-        self.stdout.write(f"Setting up the program {program_title} ({readable_id})...")
-        (program, created) = Program.objects.update_or_create(
-            readable_id=readable_id,
-            defaults={"title": program_title, "live": True},
-        )
-        if created:
-            self.stdout.write(f"Created new program {program.id}")
-        else:
-            self.stdout.write(f"Using existing program {program.id}")
+        if not course:
+            readable_id = (
+                kwargs["program"] if "program" in kwargs else self.PROGRAM_READABLE_ID
+            )
+            program_title = (
+                kwargs["program_name"]
+                if "program_name" in kwargs
+                else self.PROGRAM_TITLE
+            )
+
+            self.stdout.write(
+                f"Setting up the program {program_title} ({readable_id})..."
+            )
+            (program, created) = Program.objects.update_or_create(
+                readable_id=readable_id,
+                defaults={"title": program_title, "live": True},
+            )
+            if created:
+                self.stdout.write(f"Created new program {program.id}")
+            else:
+                self.stdout.write(f"Using existing program {program.id}")
 
         # Step two: get existing discounts
         discounts = Discount.objects.filter(
-            discount_code__startswith=f"{program_abbrev}-fa-tier",
+            discount_code__startswith=f"{discount_abbrev}-fa-tier",
             discount_code__endswith=str(current_year),
         ).all()
-        self.stdout.write(f"{len(discounts)} existing {program_abbrev} discounts")
+        self.stdout.write(f"{len(discounts)} existing {discount_abbrev} discounts")
 
         matched_discounts = []
 
         # Step three: process any extant discounts
         # We need one each with the settings noted in the docs above
+        courseware = course if course else program
+
         for tier_config in discounts_and_tiers:
             self.stdout.write(
                 f"Looking for {tier_config['discount']['amount']} {tier_config['discount']['discount_type']} discount for threshold {tier_config['tier']['threshold']}"
@@ -263,7 +247,7 @@ class Command(BaseCommand):
 
             (tier, created) = FlexiblePriceTier.objects.update_or_create(
                 income_threshold_usd=tier_config["tier"]["threshold"],
-                courseware_object_id=program.id,
+                courseware_object_id=courseware.id,
                 courseware_content_type=content_type,
                 defaults={"discount": found_discount, "current": True},
             )
@@ -278,7 +262,7 @@ class Command(BaseCommand):
                 )
 
         unmatched_discounts_qset = Discount.objects.filter(
-            discount_code__startswith=f"{program_abbrev}-fa-tier"
+            discount_code__startswith=f"{discount_abbrev}-fa-tier"
         ).exclude(id__in=[discount.id for discount in matched_discounts])
 
         unmatched_discounts = unmatched_discounts_qset.update(expiration_date=last_year)
@@ -286,7 +270,7 @@ class Command(BaseCommand):
         self.stdout.write(f"{unmatched_discounts} discounts expired")
 
         unmatched_tiers = FlexiblePriceTier.objects.filter(
-            courseware_object_id=program.id,
+            courseware_object_id=courseware.id,
             courseware_content_type=content_type,
             discount__in=unmatched_discounts_qset.all(),
         ).update(current=False)
