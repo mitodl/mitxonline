@@ -83,12 +83,59 @@ export const profileValidation = yup.object().shape({
   })
 })
 
+export const addlProfileFieldsValidation = yup.object().shape({
+  user_profile: yup.object().shape({
+    company: yup
+      .string()
+      .label("Company")
+      .nullable(),
+    job_title: yup
+      .string()
+      .label("Job Title")
+      .nullable(),
+    industry: yup
+      .string()
+      .label("Industry")
+      .nullable(),
+    job_function: yup
+      .string()
+      .label("Job Function")
+      .nullable(),
+    company_size: yup
+      .string()
+      .label("Company Size")
+      .nullable(),
+    years_experience: yup
+      .string()
+      .label("Years of Work Experience")
+      .nullable(),
+    leadership_level: yup
+      .string()
+      .label("Leadership Level")
+      .nullable(),
+    highest_education: yup
+      .string()
+      .label("Highest Level of Education")
+      .nullable(),
+    type_multi:           yup.string().nullable(),
+    type_is_student:      yup.boolean().nullable(),
+    type_is_professional: yup.boolean().nullable(),
+    type_is_educator:     yup.boolean().nullable(),
+    type_is_other:        yup.boolean().nullable()
+  })
+})
+
 type LegalAddressProps = {
   countries: Array<Country>,
   setFieldValue: Function,
   setFieldTouched: Function,
   values: Object,
   isNewAccount: boolean
+}
+
+type AddlProfileFieldsProps = {
+  values: Object,
+  setFieldValue: Function
 }
 
 const findStates = (country: string, countries: Array<Country>) => {
@@ -366,167 +413,260 @@ export const ProfileFields = () => (
   </React.Fragment>
 )
 
-export const AddlProfileFields = () => (
+export const AddlProfileFields = ({ values }: AddlProfileFieldsProps) => (
   <React.Fragment>
     <div className="form-group">
-      <label htmlFor="profile.company" className="font-weight-bold">
-        Company*
+      <label htmlFor="user_profile.type_multi" className="font-weight-bold">
+        Are you a:
       </label>
-      <Field
-        type="text"
-        name="profile.company"
-        id="profile.company"
-        aria-describedby="profile.companyError"
-        className="form-control"
-      />
-      <ErrorMessage
-        name="profile.company"
-        id="profile.companyError"
-        component={FormError}
-      />
-    </div>
-    <div className="form-group">
-      <label htmlFor="profile.job_title" className="font-weight-bold">
-        Job Title*
-      </label>
-      <Field
-        type="text"
-        name="profile.job_title"
-        id="profile.job_title"
-        aria-describedby="profile.job_title_error"
-        className="form-control"
-      />
-      <ErrorMessage
-        name="profile.job_title"
-        id="profile.job_title_error"
-        component={FormError}
-      />
-    </div>
-    <div className="form-group dotted" />
-    <div className="form-group">
-      <label htmlFor="profile.industry" className="font-weight-bold">
-        Industry
-      </label>
-      <Field
-        component="select"
-        name="profile.industry"
-        id="profile.industry"
-        className="form-control"
-      >
-        <option value="">-----</option>
-        {EMPLOYMENT_INDUSTRY.map((industry, i) => (
-          <option key={i} value={industry}>
-            {industry}
-          </option>
-        ))}
-      </Field>
-    </div>
-    <div className="form-group">
-      <label htmlFor="profile.job_function" className="font-weight-bold">
-        Job Function
-      </label>
-      <Field
-        component="select"
-        name="profile.job_function"
-        id="profile.job_function"
-        className="form-control"
-      >
-        <option value="">-----</option>
-        {EMPLOYMENT_FUNCTION.map((jobFunction, i) => (
-          <option key={i} value={jobFunction}>
-            {jobFunction}
-          </option>
-        ))}
-      </Field>
-    </div>
-    <div className="form-group">
-      <label htmlFor="profile.company_size" className="font-weight-bold">
-        Company Size
-      </label>
-      <Field
-        component="select"
-        name="profile.company_size"
-        id="profile.company_size"
-        className="form-control"
-      >
-        <option value="">-----</option>
-        {EMPLOYMENT_SIZE.map(([value, label], i) => (
-          <option key={i} value={value}>
-            {label}
-          </option>
-        ))}
-      </Field>
-    </div>
-    <div className="form-group">
       <div className="row">
-        <div className="col">
-          <label
-            htmlFor="profile.years_experience"
-            className="font-weight-bold"
-          >
-            Years of Work Experience
+        <div className="col-6">
+          <div className="form-check">
+            <Field
+              type="checkbox"
+              name="user_profile.type_is_student"
+              id="user_profile.type_is_student"
+              aria-describedby="user_profile.type_is_student"
+              className="form-check-input"
+              defaultChecked={values.user_profile.type_is_student}
+            />
+            <label
+              className="form-check-label"
+              htmlFor="user_profile.type_is_student"
+            >
+              {" "}
+              Student
+            </label>
+          </div>
+          <div className="form-check">
+            <Field
+              type="checkbox"
+              name="user_profile.type_is_professional"
+              id="user_profile.type_is_professional"
+              aria-describedby="user_profile.type_is_professional"
+              className="form-check-input"
+              defaultChecked={values.user_profile.type_is_professional}
+            />
+            <label
+              className="form-check-label"
+              htmlFor="user_profile.type_is_professional"
+            >
+              {" "}
+              Professional
+            </label>
+          </div>
+        </div>
+        <div className="col-6">
+          <div className="form-check">
+            <Field
+              type="checkbox"
+              name="user_profile.type_is_educator"
+              id="user_profile.type_is_educator"
+              aria-describedby="user_profile.type_is_educator"
+              className="form-check-input"
+              defaultChecked={values.user_profile.type_is_educator}
+            />
+            <label
+              className="form-check-label"
+              htmlFor="user_profile.type_is_educator"
+            >
+              {" "}
+              Educator
+            </label>
+          </div>
+          <div className="form-check">
+            <Field
+              type="checkbox"
+              name="user_profile.type_is_other"
+              id="user_profile.type_is_other"
+              aria-describedby="user_profile.type_is_other"
+              className="form-check-input"
+              defaultChecked={values.user_profile.type_is_other}
+            />
+            <label
+              className="form-check-label"
+              htmlFor="user_profile.type_is_other"
+            >
+              {" "}
+              Other
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+    {values.user_profile.type_is_professional ? (
+      <React.Fragment>
+        <Field
+          type="hidden"
+          name="user_profile.type_is_professional"
+          value={true}
+        />
+        <div className="form-group">
+          <label htmlFor="user_profile.company" className="font-weight-bold">
+            Company
+          </label>
+          <Field
+            type="text"
+            name="user_profile.company"
+            id="user_profile.company"
+            aria-describedby="user_profile.companyError"
+            className="form-control"
+          />
+          <ErrorMessage
+            name="user_profile.company"
+            id="user_profile.companyError"
+            component={FormError}
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="user_profile.job_title" className="font-weight-bold">
+            Job Title
+          </label>
+          <Field
+            type="text"
+            name="user_profile.job_title"
+            id="user_profile.job_title"
+            aria-describedby="user_profile.job_title_error"
+            className="form-control"
+          />
+          <ErrorMessage
+            name="user_profile.job_title"
+            id="user_profile.job_title_error"
+            component={FormError}
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="user_profile.industry" className="font-weight-bold">
+            Industry
           </label>
           <Field
             component="select"
-            name="profile.years_experience"
-            id="profile.years_experience"
+            name="user_profile.industry"
+            id="user_profile.industry"
             className="form-control"
           >
             <option value="">-----</option>
-            {EMPLOYMENT_EXPERIENCE.map(([value, label], i) => (
+            {EMPLOYMENT_INDUSTRY.map((industry, i) => (
+              <option key={i} value={industry}>
+                {industry}
+              </option>
+            ))}
+          </Field>
+        </div>
+        <div className="form-group">
+          <label
+            htmlFor="user_profile.job_function"
+            className="font-weight-bold"
+          >
+            Job Function
+          </label>
+          <Field
+            component="select"
+            name="user_profile.job_function"
+            id="user_profile.job_function"
+            className="form-control"
+          >
+            <option value="">-----</option>
+            {EMPLOYMENT_FUNCTION.map((jobFunction, i) => (
+              <option key={i} value={jobFunction}>
+                {jobFunction}
+              </option>
+            ))}
+          </Field>
+        </div>
+        <div className="form-group">
+          <label
+            htmlFor="user_profile.company_size"
+            className="font-weight-bold"
+          >
+            Company Size
+          </label>
+          <Field
+            component="select"
+            name="user_profile.company_size"
+            id="user_profile.company_size"
+            className="form-control"
+          >
+            <option value="">-----</option>
+            {EMPLOYMENT_SIZE.map(([value, label], i) => (
               <option key={i} value={value}>
                 {label}
               </option>
             ))}
           </Field>
         </div>
-        <div className="col">
-          <label
-            htmlFor="profile.leadership_level"
-            className="font-weight-bold"
-          >
-            Leadership Level
-          </label>
-          <Field
-            component="select"
-            name="profile.leadership_level"
-            id="profile.leadership_level"
-            className="form-control"
-          >
-            <option value="">-----</option>
-            {EMPLOYMENT_LEVEL.map((level, i) => (
-              <option key={i} value={level}>
-                {level}
-              </option>
-            ))}
-          </Field>
+        <div className="form-group">
+          <div className="row">
+            <div className="col">
+              <label
+                htmlFor="user_profile.years_experience"
+                className="font-weight-bold"
+              >
+                Years of Work Experience
+              </label>
+              <Field
+                component="select"
+                name="user_profile.years_experience"
+                id="user_profile.years_experience"
+                className="form-control"
+              >
+                <option value="">-----</option>
+                {EMPLOYMENT_EXPERIENCE.map(([value, label], i) => (
+                  <option key={i} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </Field>
+            </div>
+            <div className="col">
+              <label
+                htmlFor="user_profile.leadership_level"
+                className="font-weight-bold"
+              >
+                Leadership Level
+              </label>
+              <Field
+                component="select"
+                name="user_profile.leadership_level"
+                id="user_profile.leadership_level"
+                className="form-control"
+              >
+                <option value="">-----</option>
+                {EMPLOYMENT_LEVEL.map((level, i) => (
+                  <option key={i} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </Field>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-    <div className="form-group">
-      <div className="row">
-        <div className="col">
-          <label
-            htmlFor="profile.highest_education"
-            className="font-weight-bold"
-          >
-            Highest Level of Education
-          </label>
-          <Field
-            component="select"
-            name="profile.highest_education"
-            id="profile.highest_education"
-            className="form-control"
-          >
-            <option value="">-----</option>
-            {HIGHEST_EDUCATION_CHOICES.map((level, i) => (
-              <option key={i} value={level}>
-                {level}
-              </option>
-            ))}
-          </Field>
+        <div className="form-group">
+          <div className="row">
+            <div className="col">
+              <label
+                htmlFor="user_profile.highest_education"
+                className="font-weight-bold"
+              >
+                Highest Level of Education
+              </label>
+              <Field
+                component="select"
+                name="user_profile.highest_education"
+                id="user_profile.highest_education"
+                className="form-control"
+              >
+                <option value="">-----</option>
+                {HIGHEST_EDUCATION_CHOICES.map((level, i) => (
+                  <option key={i} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </Field>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </React.Fragment>
+    ) : null}
   </React.Fragment>
 )

@@ -182,9 +182,6 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
         For COPPA reasons this calculates the year assuming Dec 31 @ 11:59:59.
         """
 
-        if self.user_profile is None:
-            return None
-
         from users.utils import determine_approx_age
 
         return determine_approx_age(self.user_profile.year_of_birth)

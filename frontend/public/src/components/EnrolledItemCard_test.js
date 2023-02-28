@@ -25,14 +25,16 @@ describe("EnrolledItemCard", () => {
     currentUser,
     enrollmentCardProps,
     isFinancialAssistanceAvailableStub,
-    toggleProgramDrawer
+    toggleProgramDrawer,
+    redirectToCourseHomepage
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
     userEnrollment = makeCourseRunEnrollment()
     currentUser = makeUser()
     SETTINGS.features = {
-      enable_learner_records: false
+      enable_learner_records:     false,
+      enable_addl_profile_fields: false
     }
     enrollmentCardProps = {
       enrollment:           userEnrollment,
@@ -56,6 +58,7 @@ describe("EnrolledItemCard", () => {
       "isFinancialAssistanceAvailable"
     )
     toggleProgramDrawer = helper.sandbox.stub().returns(Function)
+    redirectToCourseHomepage = helper.sandbox.stub().returns(Function)
 
     renderedCard = () =>
       shallow(
@@ -74,6 +77,7 @@ describe("EnrolledItemCard", () => {
           toggleProgramDrawer={toggleProgramDrawer}
           isLoading={false}
           isProgramCard={false}
+          redirectToCourseHomepage={redirectToCourseHomepage}
         />
       )
   })
@@ -128,7 +132,8 @@ describe("EnrolledItemCard", () => {
         assert.isFalse(pricingLinks.exists())
       } else {
         SETTINGS.features = {
-          enable_learner_records: false
+          enable_learner_records:     false,
+          enable_addl_profile_fields: false
         }
         const pricingLinks = inner.find(".pricing-links")
         assert.isFalse(pricingLinks.exists())

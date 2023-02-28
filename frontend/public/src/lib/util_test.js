@@ -26,7 +26,8 @@ import {
   isSuccessResponse,
   isErrorResponse,
   isUnauthorizedResponse,
-  formatLocalePrice
+  formatLocalePrice,
+  intCheckFeatureFlag
 } from "./util"
 
 describe("utility functions", () => {
@@ -340,6 +341,25 @@ describe("utility functions", () => {
 
     it("formatLocalePrice returns a US-formatted price string equalling zero when the input is negative", () => {
       assert.equal(formatLocalePrice(null), "$0.00")
+    })
+  })
+
+  describe("checkFeatureFlag", () => {
+    const SETTINGS = {
+      features: {
+        test_flag:       true,
+        other_test_flag: false
+      }
+    }
+
+    const document = {
+      location: new URL("https://example.com/?test=arg&flagtwo")
+    }
+
+    it("returns the flag setting if the feature flag is set", () => {
+      assert.isTrue(intCheckFeatureFlag("test_flag", document, SETTINGS))
+      assert.isFalse(intCheckFeatureFlag("other_test_flag", document, SETTINGS))
+      assert.isTrue(intCheckFeatureFlag("flagtwo", document, SETTINGS))
     })
   })
 })

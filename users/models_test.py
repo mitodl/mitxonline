@@ -150,6 +150,6 @@ def test_user_coppa(should_pass):
     if should_pass:
         user.user_profile.year_of_birth = datetime.now().year - random.randint(13, 100)
     else:
-        user.user_profile.year_of_birth = datetime.now().year - random.randint(0, 13)
+        user.user_profile.year_of_birth = datetime.now().year - random.randint(0, 12)
 
     assert user.is_coppa_compliant() == should_pass

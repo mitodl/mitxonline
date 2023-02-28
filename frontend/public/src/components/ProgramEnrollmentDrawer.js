@@ -12,6 +12,7 @@ interface ProgramEnrollmentDrawerProps {
   enrollment: ProgramEnrollment | null,
   showDrawer: Function,
   isHidden: boolean,
+  redirectToCourseHomepage: Function,
 }
 
 export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDrawerProps> {
@@ -44,6 +45,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
         key={found.run.course.readable_id}
         enrollment={found}
         isProgramCard={true}
+        redirectToCourseHomepage={this.redirectToCourseHomepage}
       ></EnrolledItemCard>
     )
   }

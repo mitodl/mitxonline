@@ -1,12 +1,14 @@
 // @flow
 import React from "react"
 import { Formik, Form } from "formik"
-
+import { checkFeatureFlag } from "../../lib/util"
 import {
   legalAddressValidation,
   profileValidation,
+  addlProfileFieldsValidation,
   LegalAddressFields,
-  ProfileFields
+  ProfileFields,
+  AddlProfileFields
 } from "./ProfileFormFields"
 
 import type { Country, User } from "../../flow/authTypes"
@@ -24,38 +26,54 @@ const getInitialValues = (user: User) => ({
   user_profile:  user.user_profile
 })
 
-const EditProfileForm = ({ onSubmit, countries, user }: Props) => (
-  <Formik
-    onSubmit={onSubmit}
-    validationSchema={legalAddressValidation.concat(profileValidation)}
-    initialValues={getInitialValues(user)}
-    render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
-      <Form>
-        <LegalAddressFields
-          countries={countries}
-          setFieldValue={setFieldValue}
-          setFieldTouched={setFieldTouched}
-          values={values}
-          isNewAccount={false}
-        />
-        <ProfileFields
-          setFieldValue={setFieldValue}
-          setFieldTouched={setFieldTouched}
-          values={values}
-          isNewAccount={false}
-        />
-        <div className="row submit-row no-gutters justify-content-end">
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={isSubmitting}
-          >
-            Submit
-          </button>
-        </div>
-      </Form>
-    )}
-  />
-)
+const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
+  const validation = legalAddressValidation.concat(profileValidation)
+
+  if (checkFeatureFlag("enable_addl_profile_fields")) {
+    validation.concat(addlProfileFieldsValidation)
+  }
+
+  return (
+    <Formik
+      onSubmit={onSubmit}
+      validationSchema={validation}
+      initialValues={getInitialValues(user)}
+      render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
+        <Form>
+          <LegalAddressFields
+            countries={countries}
+            setFieldValue={setFieldValue}
+            setFieldTouched={setFieldTouched}
+            values={values}
+            isNewAccount={false}
+          />
+          <ProfileFields
+            setFieldValue={setFieldValue}
+            setFieldTouched={setFieldTouched}
+            values={values}
+            isNewAccount={false}
+          />
+          {checkFeatureFlag("enable_addl_profile_fields") ? (
+            <AddlProfileFields
+              setFieldValue={setFieldValue}
+              setFieldTouched={setFieldTouched}
+              values={values}
+              isNewAccount={false}
+            />
+          ) : null}
+          <div className="row submit-row no-gutters justify-content-end">
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isSubmitting}
+            >
+              Submit
+            </button>
+          </div>
+        </Form>
+      )}
+    />
+  )
+}
 
 export default EditProfileForm
