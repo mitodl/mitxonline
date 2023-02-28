@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.61.4
+Version 0.61.4 (Released February 28, 2023)
 --------------
 
 - Updated configure_tiers to work with courses as well as programs
