@@ -33,7 +33,6 @@
  
 3. **Create a new course** at: `/admin/courses/course/add/`
   - **Program**: if the course is a part of a program, select it from the pulldown
-  - **Position in program**: if in a program, set the order in the list of courses in the program (1 to x)
   - **Title**: the title of the course, e.g. `Leading Change in Organizations`
   - **Readable id**: the id, e.g. `course-v1:xPRO+LASERx3`
   - **Live**: Set to live when ready to launch. Note that you should not check this box for courses that will not need a catalog page, e.g. a SPOC or a private course. 

@@ -418,7 +418,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             None, "Elective Courses", or "Required Courses".
         """
-        if not self.program or not self.in_programs.count():
+        if not self.in_programs.count():
             return None
 
         # This will cause an error if the course has been added to its program's
@@ -430,6 +430,10 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         for branch_root in mpnode.get_root().get_children().all():
             if mpnode.is_descendant_of(branch_root):
                 return branch_root.title
+
+    # @property
+    # def program(self):
+    #     return getattr(self.in_programs.first(), "program", None)
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
