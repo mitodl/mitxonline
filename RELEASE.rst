@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.61.4
+--------------
+
+- Updated configure_tiers to work with courses as well as programs
+- Adding command for manually "refunding" the user's enrollment (#1451)
+- fix: limit user full name to 255 characters (#1440)
+
 Version 0.61.3 (Released February 23, 2023)
 --------------
 
