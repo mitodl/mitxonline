@@ -201,7 +201,7 @@ class Command(BaseCommand):
             live=True,
             create_run="Demo_Course",
             run_url="http://edx.odl.local:18000/courses/course-v1:edX+DemoX+Demo_Course/",
-            program="program-v1:MITx+DEDP"
+            program="program-v1:MITx+DEDP",
         )
 
         call_command(
