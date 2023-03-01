@@ -63,13 +63,11 @@ def test_serialize_program(mock_context, remove_tree):
     run1 = CourseRunFactory.create(
         course__program=program,
         course__page=None,
-        start_date=now() + timedelta(days=1),
     )
     course1 = run1.course
     run2 = CourseRunFactory.create(
         course__program=program,
         course__page=None,
-        start_date=now() + timedelta(days=2),
     )
     course2 = run2.course
     runs = (
