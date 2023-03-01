@@ -305,6 +305,36 @@ def test_order_refund_failure(mocker, fulfilled_transaction):
     assert not unenroll_task_mock.called
 
 
+def test_order_refund_failure_no_exception(mocker, fulfilled_transaction):
+    """Test that refund operation throws an exception if the gateway returns an error state"""
+    error_return = {
+        "state": ProcessorResponse.STATE_ERROR,
+        "message": "This is an error message. Testing 123456",
+    }
+
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.start_refund",
+        returns=error_return,
+    )
+    unenroll_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_unenrollment_from_order.delay"
+    )
+
+    with pytest.raises(Exception) as exc:
+        refund_response = refund_order(order_id=fulfilled_transaction.order.id)
+        assert "Testing 123456" in str(exc)
+
+    assert (
+        Transaction.objects.filter(
+            order=fulfilled_transaction.order.id,
+            transaction_type=TRANSACTION_TYPE_REFUND,
+        ).count()
+        == 0
+    )
+    # Unenrollment task should not run when API fails
+    assert not unenroll_task_mock.called
+
+
 def test_unenrollment_unenrolls_learner(mocker, user):
     """
     Test that unenroll_learner_from_order unenrolls the learner from an order
