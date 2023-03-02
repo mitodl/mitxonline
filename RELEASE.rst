@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.62.1
+--------------
+
+- Fixing a call to `set_rollback` that was incorrect
+
 Version 0.62.0 (Released March 02, 2023)
 --------------
 
