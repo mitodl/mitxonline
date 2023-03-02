@@ -100,7 +100,7 @@ To set up MITx Online:
 
       docker compose run --rm web ./manage.py configure_instance linux --gateway <ip>
 
-   where ``<ip>`` is the IP from the first step. You will need to supply passwords for the MITx Online superuser and test learner accounts. Make a note of the client ID and secret that it will print out at the end.
+   where ``<ip>`` is the IP from the first step. (On macOS, specify ``macos`` instead of ``linux``. You can also skip ``--gateway``.) You will need to supply passwords for the MITx Online superuser and test learner accounts. Make a note of the client ID and secret that it will print out at the end.
 #. Make some minor changes to the OAuth2 application record that was created.
 
    #. Go to https://mitxonline.odl.local:8013/admin/oauth2_provider/application/ and select the ``edx-oauth-app`` entry.
@@ -114,33 +114,34 @@ Note that some of these steps require editing the main configuration files for t
 These steps will also disable the AuthN SSO MFE, so from here on you'll get normal edX authentication screens (if you're not being bounced to MITx Online).
 
 
-#. Get the gateway IP of the ``mitxonline_default`` Docker network: ``docker network inspect mitxonline_default | grep Gateway``
+#. Get the gateway IP of the ``mitxonline_default`` Docker network::
+
+      docker network inspect mitxonline_default | grep Gateway
+
 #. Log into to edX using your superuser account, and make sure your session stays open. Sessions are pretty long-lived so this just means not closing the browser that you started the session in. (Part of this process will involve mostly breaking authentication so it's important that you are able to get into the admin.)
 #. Stop Tutor: ``tutor local stop``
-#. Change into the configuration root for Tutor:
-   .. code-block::
+#. Change into the configuration root for Tutor::
 
       cd "$(tutor config printroot)"
 
-#. Create a ``env/build/openedx/requirements/private.txt`` with the required extensions:
-   .. code-block::
+#. Create a ``env/build/openedx/requirements/private.txt`` with the required extensions::
 
       social-auth-mitxpro
       mitxpro-openedx-extensions
 
-#. Edit the ``env/apps/openedx/config/lms.env.yml`` file and add:
-   .. code-block::
+#. Edit the ``env/apps/openedx/config/lms.env.yml`` file and add::
 
       FEATURES:
         SKIP_EMAIL_VALIDATION: true
+
    to the ``FEATURES`` block (should be at the top).
 #. Edit the ``env/apps/openedx/settings/lms/production.py`` settings file.
 
-   * Add to the end of the file:
+   * Add to the end of the file::
 
-     * ``THIRD_PARTY_AUTH_BACKENDS = ['social_auth_mitxpro.backends.MITxProOAuth2']``
-     * ``AUTHENTICATION_BACKENDS.append('social_auth_mitxpro.backends.MITxProOAuth2')``
-     * ``IDA_LOGOUT_URI_LIST.append('http://mitxonline.odl.local:8013/logout/')`` - there's an existing one of these around like 300 in ``production.py`` too.
+     THIRD_PARTY_AUTH_BACKENDS = ['social_auth_mitxpro.backends.MITxProOAuth2']
+     AUTHENTICATION_BACKENDS.append('social_auth_mitxpro.backends.MITxProOAuth2')
+     IDA_LOGOUT_URI_LIST.append('http://mitxonline.odl.local:8013/logout/') # there's an existing one of these around like 300 in production.py too.
 
    * Find and update:
 
@@ -173,8 +174,7 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
    * Enable sso id verification is checked.
    * Backend name: ``mitxpro-oauth2``
    * Client ID and Client Secret: from record created by ``configure_instance`` when you set up MITx Online.
-   * Other settings:
-     .. code-block::
+   * Other settings::
 
         {
         "AUTHORIZATION_URL": "http://mitxonline.odl.local:8013/oauth2/authorize/",
