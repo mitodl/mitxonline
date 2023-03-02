@@ -442,9 +442,10 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
                 )
                 # PaymentGateway didn't raise an exception and instead gave a Response but the response status was not
                 # success so we manually rollback the transaction in this case.
-                transaction.set_rollback()
-                # Just return here if the refund failed, no matter if unenroll was requested or not
-                return False
+                transaction.rollback()
+                raise Exception(
+                    f"Payment gateway returned an error: {response.message}"
+                )
 
         except RefundDuplicateException:
             # Duplicate refund error during the API call will be treated as success, we just log it
