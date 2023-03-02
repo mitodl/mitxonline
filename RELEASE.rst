@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.62.0
+Version 0.62.0 (Released March 02, 2023)
 --------------
 
 - Adds additional demographic fields to the system; adds popup to collect more data when visiting a course
