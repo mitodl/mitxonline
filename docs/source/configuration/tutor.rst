@@ -160,7 +160,7 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
    * If you do have weird errors or settings not showing properly, make sure you edited the right yaml files *and* that they're using the right whitespace (i.e. don't use tabs).
 
 #. In a separate browser session of some kind (incognito/private browsing/other browser entirely), try to navigate to http://local.overhang.io . It should load but it should give you an error message. In the LMS logs, you should see an error message for "Can't fetch settings for disabled provider." This is proper operation - the OAuth2 settings aren't in place yet.
-#. In the superuser session you have open, go to http://local.overhang.io/admin . This should work. If you've been logged out, you should still be able to get in. If you can't (for instance, if you're getting 500 errors), you will need to turn off ``ENABLE_THIRD_PARTY_AUTH`` in ``FEATURES``\ , restart Tutor *using ``tutor local stop`` and ``start``\ , not using ``reboot``\ *\ , then try again.
+#. In the superuser session you have open, go to http://local.overhang.io/admin . This should work. If you've been logged out, you should still be able to get in. If you can't (for instance, if you're getting 500 errors), you will need to turn off ``ENABLE_THIRD_PARTY_AUTH`` in ``FEATURES``\ , restart Tutor using ``tutor local stop`` and ``start``\ , not using ``reboot``\ , then try again.
 #. Go to http://local.overhang.io/admin/third_party_auth/oauth2providerconfig/add/ and add a provider configuration:
 
    * Enabled is checked.
@@ -176,11 +176,11 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
    * Client ID and Client Secret: from record created by ``configure_instance`` when you set up MITx Online.
    * Other settings::
 
-        {
-        "AUTHORIZATION_URL": "http://mitxonline.odl.local:8013/oauth2/authorize/",
-        "ACCESS_TOKEN_URL": "http://<MITXONLINE_GATEWAY_IP>:8013/oauth2/token/",
-        "API_ROOT": "http://<MITXONLINE_GATEWAY_IP>:8013/"
-        }
+      {
+         "AUTHORIZATION_URL": "http://mitxonline.odl.local:8013/oauth2/authorize/",
+         "ACCESS_TOKEN_URL": "http://<MITXONLINE_GATEWAY_IP>:8013/oauth2/token/",
+         "API_ROOT": "http://<MITXONLINE_GATEWAY_IP>:8013/"
+      }
 
      where MITXONLINE_GATEWAY_IP is the IP from the ``mitxonline_default`` network from the first step. **Mac users**, use ``host.docker.internal`` for MITXONLINE_GATEWAY_IP.
 
