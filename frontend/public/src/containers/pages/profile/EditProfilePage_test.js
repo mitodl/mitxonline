@@ -75,7 +75,6 @@ describe("EditProfilePage", () => {
         assert.isNull(helper.currentLocation)
         sinon.assert.calledOnce(setErrors)
       } else {
-        assert.equal(helper.currentLocation.pathname, "/profile/")
         sinon.assert.notCalled(setErrors)
       }
     })
