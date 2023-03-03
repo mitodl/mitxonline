@@ -23,7 +23,7 @@ Preliminary Steps
 
 ``pyenv`` (and ``pyenv-virtualenv``\ ) are highly recommended for managing local Python versions. `Use the instructions on their GitHub page to install if you haven't already installed it. <https://github.com/pyenv/pyenv>`_
 
-You'll want to create at least a virtualenv for Tutor. As of this writing, Tutor uses Python 3.8.12 (in the LMS container at least); I have also successfully used 3.9.16 (but *not* 3.11 - that didn't work). You can optionally create a virtualenv for MITx Online too but that's not strictly necessary. (I have one so I can run black/isort/etc. without having to jump into a container to do it.)
+You'll want to create at least a virtualenv for Tutor. As of this writing, Tutor uses Python 3.8.12 (in the LMS container at least); I have also successfully used 3.9.16. 3.11 has *not* worked for me. You can optionally create a virtualenv for MITx Online too but that's not strictly necessary. (I have one so I can run black/isort/etc. without having to jump into a container to do it.)
 
 Tutor Setup, Part One
 ---------------------
@@ -134,11 +134,11 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
    to the ``FEATURES`` block (should be at the top).
 #. Edit the ``env/apps/openedx/settings/lms/production.py`` settings file.
 
-   * Add to the end of the file::
-
-     THIRD_PARTY_AUTH_BACKENDS = ['social_auth_mitxpro.backends.MITxProOAuth2']
-     AUTHENTICATION_BACKENDS.append('social_auth_mitxpro.backends.MITxProOAuth2')
-     IDA_LOGOUT_URI_LIST.append('http://mitxonline.odl.local:8013/logout/') # there's an existing one of these around like 300 in production.py too.
+   * Add to the end of the file:
+      
+      * ``THIRD_PARTY_AUTH_BACKENDS = ['social_auth_mitxpro.backends.MITxProOAuth2']``
+      * ``AUTHENTICATION_BACKENDS.append('social_auth_mitxpro.backends.MITxProOAuth2')``
+      * ``IDA_LOGOUT_URI_LIST.append('http://mitxonline.odl.local:8013/logout/')`` - there's an existing one of these around like 300 in production.py too.
 
    * Find and update:
 
@@ -171,13 +171,13 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
    * Enable sso id verification is checked.
    * Backend name: ``mitxpro-oauth2``
    * Client ID and Client Secret: from record created by ``configure_instance`` when you set up MITx Online.
-   * Other settings::
+   * Other settings:     
 
-      {
-         "AUTHORIZATION_URL": "http://mitxonline.odl.local:8013/oauth2/authorize/",
-         "ACCESS_TOKEN_URL": "http://<MITXONLINE_GATEWAY_IP>:8013/oauth2/token/",
-         "API_ROOT": "http://<MITXONLINE_GATEWAY_IP>:8013/"
-      }
+         {
+            "AUTHORIZATION_URL": "\http://mitxonline.odl.local:8013/oauth2/authorize/",
+            "ACCESS_TOKEN_URL": "\http://<MITXONLINE_GATEWAY_IP>:8013/oauth2/token/",
+            "API_ROOT": "\http://<MITXONLINE_GATEWAY_IP>:8013/"
+         }
 
      where MITXONLINE_GATEWAY_IP is the IP from the ``mitxonline_default`` network from the first step. **Mac users**, use ``host.docker.internal`` for MITXONLINE_GATEWAY_IP.
 
@@ -200,7 +200,7 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
    * ``sync_courserun --all ALL`` should sync the two test courses (if you made them).
    * ``repair_missing_courseware_records`` should also work.
 
-#. In the separate browser session from step 11, attempt to log in again. This time, you should be able to log in through MITx Online, and you should be able to get to the edX LMS dashboard. If not, then double-check your provider configuration settings and try again.
+#. In the separate browser session from step 12, attempt to log in again. This time, you should be able to log in through MITx Online, and you should be able to get to the edX LMS dashboard. If not, then double-check your provider configuration settings and try again.
 
    * Unlike devstack, the Tutor instance has an Update button for the provider configuration, so you can just update the record you put in.
    * If you are still getting "Can't fetch settings" errors, *make sure* your Site is set properly - there are three options by default and only one works. (This was typically the problem I had.)
@@ -211,3 +211,5 @@ Other Notes
 -----------
 
 **Trying to set configuration settings via ``tutor config`` will undo the specialty configuration above.** If you need to make changes to the configuration, either manually edit the ``env/apps/openedx/config/lms.env.yml`` file or the ``env/apps/openedx/settings/lms/production.py`` file and restart your Tutor instance.
+
+**Make sure your service worker account is active.** It's an easy checkbox to miss. 
