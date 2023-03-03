@@ -98,13 +98,10 @@ To set up MITx Online:
 
 #. Run the ``configure_instance`` command::
 
-      docker compose run --rm web ./manage.py configure_instance linux --gateway <ip>
+      docker compose run --rm web ./manage.py configure_instance linux --gateway <ip> --tutor
 
    where ``<ip>`` is the IP from the first step. (On macOS, specify ``macos`` instead of ``linux``. You can also skip ``--gateway``.) You will need to supply passwords for the MITx Online superuser and test learner accounts. Make a note of the client ID and secret that it will print out at the end.
-#. Make some minor changes to the OAuth2 application record that was created.
 
-   #. Go to https://mitxonline.odl.local:8013/admin/oauth2_provider/application/ and select the ``edx-oauth-app`` entry.
-   #. In ``Redirect uris``\ , change the ``edx.odl.local:18000`` to read ``local.overhang.io``.
 
 Tutor Setup, Part Two
 ---------------------
@@ -186,9 +183,18 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
 
 #. Configure Tutor for OAuth2 authentication from MITx Online.
 
-   * `Follow these instructions in the MITx Online documentation. <https://mitodl.github.io/mitxonline/configuration/open_edx.html#configure-open-edx-to-support-oauth2-authentication-from-mitx-online>`_
-   * You should have already set the ``OPENEDX_API_BASE_URL`` setting in the MITx Online Setup step; don't change it (but do add the API credentials).
+   * Go to http://local.overhang.io/admin/oauth2_provider/application/ and either add or edit the ``edx-oauth-app`` entry.
+   * Ensure these settings are set:
 
+      * Name: ``edx-oauth-app``
+      * Redirect uris: ``http://mitxonline.odl.local:8013/login/_private/complete``
+      * Client type: ``Confidential``
+      * Authorization grant type: ``Confidental``
+      * Skip authorization is checked.
+
+   * Save ``Client id`` and ``Client secret``.
+
+#. Update your MITx Online ``.env`` file. Set ``OPENEDX_API_CLIENT_ID`` and ``OPENEDX_API_CLIENT_SECRET`` to the values from the record you created or updated in the last step.
 #. You should now be able to run some MITx Online management commands to ensure the service worker is set up properly:
 
    * ``sync_courserun --all ALL`` should sync the two test courses (if you made them).
