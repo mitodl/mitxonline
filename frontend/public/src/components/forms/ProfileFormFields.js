@@ -416,6 +416,31 @@ export const ProfileFields = () => (
 export const AddlProfileFields = ({ values }: AddlProfileFieldsProps) => (
   <React.Fragment>
     <div className="form-group">
+      <div className="row">
+        <div className="col">
+          <label
+            htmlFor="user_profile.highest_education"
+            className="font-weight-bold"
+          >
+            Highest Level of Education
+          </label>
+          <Field
+            component="select"
+            name="user_profile.highest_education"
+            id="user_profile.highest_education"
+            className="form-control"
+          >
+            <option value="">-----</option>
+            {HIGHEST_EDUCATION_CHOICES.map((level, i) => (
+              <option key={i} value={level}>
+                {level}
+              </option>
+            ))}
+          </Field>
+        </div>
+      </div>
+    </div>
+    <div className="form-group">
       <label htmlFor="user_profile.type_multi" className="font-weight-bold">
         Are you a:
       </label>
@@ -633,31 +658,6 @@ export const AddlProfileFields = ({ values }: AddlProfileFieldsProps) => (
               >
                 <option value="">-----</option>
                 {EMPLOYMENT_LEVEL.map((level, i) => (
-                  <option key={i} value={level}>
-                    {level}
-                  </option>
-                ))}
-              </Field>
-            </div>
-          </div>
-        </div>
-        <div className="form-group">
-          <div className="row">
-            <div className="col">
-              <label
-                htmlFor="user_profile.highest_education"
-                className="font-weight-bold"
-              >
-                Highest Level of Education
-              </label>
-              <Field
-                component="select"
-                name="user_profile.highest_education"
-                id="user_profile.highest_education"
-                className="form-control"
-              >
-                <option value="">-----</option>
-                {HIGHEST_EDUCATION_CHOICES.map((level, i) => (
                   <option key={i} value={level}>
                     {level}
                   </option>

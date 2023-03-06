@@ -9,7 +9,6 @@ import { connectRequest, mutateAsync, requestAsync } from "redux-query"
 import { createStructuredSelector } from "reselect"
 
 import users, { currentUserSelector } from "../../../lib/queries/users"
-import { routes } from "../../../lib/urls"
 import queries from "../../../lib/queries"
 import EditProfileForm from "../../../components/forms/EditProfileForm"
 
@@ -39,7 +38,7 @@ type Props = {|
 
 export class EditProfilePage extends React.Component<Props> {
   async onSubmit(profileData: User, { setSubmitting, setErrors }: Object) {
-    const { editProfile, history } = this.props
+    const { editProfile } = this.props
 
     try {
       const {
@@ -51,7 +50,7 @@ export class EditProfilePage extends React.Component<Props> {
           email: errors[0]
         })
       } else {
-        history.push(routes.profile)
+        window.location.reload()
       }
     } finally {
       setSubmitting(false)
