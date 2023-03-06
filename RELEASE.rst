@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.62.2
+--------------
+
+- Moves Highest Level of Education field up (#1462)
+
 Version 0.62.1 (Released March 02, 2023)
 --------------
 
