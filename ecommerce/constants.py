@@ -79,7 +79,6 @@ CYBERSOURCE_CARD_TYPES = {
 
 REFUND_SUCCESS_STATES = [
     ProcessorResponse.STATE_ACCEPTED,
-    ProcessorResponse.STATE_DUPLICATE,
     ProcessorResponse.STATE_PENDING,
 ]
 

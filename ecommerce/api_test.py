@@ -177,12 +177,18 @@ def test_order_refund_success(mocker, order_state, unenroll, fulfilled_transacti
         "mitol.payment_gateway.api.PaymentGateway.start_refund",
         return_value=sample_response,
     )
-    refund_success = refund_order(
-        order_id=fulfilled_transaction.order.id, unenroll=unenroll
-    )
 
     if order_state == ProcessorResponse.STATE_DUPLICATE:
-        assert f"Duplicate refund request for order_id {fulfilled_transaction.order.id}"
+        with pytest.raises(Exception) as e:
+            refund_success = refund_order(
+                order_id=fulfilled_transaction.order.id, unenroll=unenroll
+            )
+
+        return
+    else:
+        refund_success = refund_order(
+            order_id=fulfilled_transaction.order.id, unenroll=unenroll
+        )
 
     # There should be two transaction objects (One for payment and other for refund)
     assert (

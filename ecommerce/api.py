@@ -421,35 +421,27 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
             ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, transaction_dict
         )
 
-        try:
-            response = PaymentGateway.start_refund(
-                ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
-                refund_gateway_request,
+        response = PaymentGateway.start_refund(
+            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+            refund_gateway_request,
+        )
+
+        if response.state in REFUND_SUCCESS_STATES:
+            # Record refund transaction with PaymentGateway's refund response
+            order.refund(
+                api_response_data=response.response_data,
+                amount=transaction_dict["req_amount"],
+                reason=refund_reason,
             )
-
-            if response.state in REFUND_SUCCESS_STATES:
-                # Record refund transaction with PaymentGateway's refund response
-                order.refund(
-                    api_response_data=response.response_data,
-                    amount=transaction_dict["req_amount"],
-                    reason=refund_reason,
-                )
-
-            else:
-                log.error(
-                    "There was an error with the Refund API request %s",
-                    response.message,
-                )
-                # PaymentGateway didn't raise an exception and instead gave a Response but the response status was not
-                # success so we manually rollback the transaction in this case.
-                transaction.rollback()
-                raise Exception(
-                    f"Payment gateway returned an error: {response.message}"
-                )
-
-        except RefundDuplicateException:
-            # Duplicate refund error during the API call will be treated as success, we just log it
-            log.info("Duplicate refund request for order_id %s", order.id)
+        else:
+            log.error(
+                "There was an error with the Refund API request %s",
+                response.message,
+            )
+            # PaymentGateway didn't raise an exception and instead gave a Response but the response status was not
+            # success so we manually rollback the transaction in this case.
+            transaction.rollback()
+            raise Exception(f"Payment gateway returned an error: {response.message}")
 
     # If unenroll requested, perform unenrollment after successful refund
     if unenroll:
