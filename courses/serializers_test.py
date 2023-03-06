@@ -63,17 +63,29 @@ def test_serialize_program(mock_context, remove_tree):
     run1 = CourseRunFactory.create(
         course__program=program,
         course__page=None,
+        start_date=now() + timedelta(hours=1),
     )
     course1 = run1.course
     run2 = CourseRunFactory.create(
         course__program=program,
         course__page=None,
+        start_date=now() + timedelta(hours=2),
     )
     course2 = run2.course
     runs = (
         [run1, run2]
-        + [CourseRunFactory.create(course=course1) for _ in range(2)]
-        + [CourseRunFactory.create(course=course2) for _ in range(2)]
+        + [
+            CourseRunFactory.create(
+                course=course1, start_date=now() + timedelta(hours=3)
+            )
+            for _ in range(2)
+        ]
+        + [
+            CourseRunFactory.create(
+                course=course2, start_date=now() + timedelta(hours=3)
+            )
+            for _ in range(2)
+        ]
     )
     topics = [CourseTopic.objects.create(name=f"topic{num}") for num in range(3)]
     course1.topics.set([topics[0], topics[1]])
