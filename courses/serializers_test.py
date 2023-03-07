@@ -6,10 +6,10 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import bleach
-import factory
 import pytest
 import pytz
 from django.contrib.auth.models import AnonymousUser
+from django.utils.timezone import now
 
 from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
 from courses.factories import (
@@ -17,7 +17,6 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
-    ProgramEnrollmentFactory,
     ProgramFactory,
 )
 from courses.models import CourseTopic, ProgramRequirement, ProgramRequirementNodeType
@@ -30,12 +29,10 @@ from courses.serializers import (
     CourseRunSerializer,
     CourseSerializer,
     LearnerRecordSerializer,
-    ProgramEnrollmentSerializer,
     ProgramRequirementSerializer,
     ProgramRequirementTreeSerializer,
     ProgramSerializer,
 )
-from ecommerce.factories import ProductFactory
 from ecommerce.serializers import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
@@ -63,14 +60,32 @@ def test_base_program_serializer():
 def test_serialize_program(mock_context, remove_tree):
     """Test Program serialization"""
     program = ProgramFactory.create()
-    run1 = CourseRunFactory.create(course__program=program, course__page=None)
+    run1 = CourseRunFactory.create(
+        course__program=program,
+        course__page=None,
+        start_date=now() + timedelta(hours=1),
+    )
     course1 = run1.course
-    run2 = CourseRunFactory.create(course__program=program, course__page=None)
+    run2 = CourseRunFactory.create(
+        course__program=program,
+        course__page=None,
+        start_date=now() + timedelta(hours=2),
+    )
     course2 = run2.course
     runs = (
         [run1, run2]
-        + [CourseRunFactory.create(course=course1) for _ in range(2)]
-        + [CourseRunFactory.create(course=course2) for _ in range(2)]
+        + [
+            CourseRunFactory.create(
+                course=course1, start_date=now() + timedelta(hours=3)
+            )
+            for _ in range(2)
+        ]
+        + [
+            CourseRunFactory.create(
+                course=course2, start_date=now() + timedelta(hours=3)
+            )
+            for _ in range(2)
+        ]
     )
     topics = [CourseTopic.objects.create(name=f"topic{num}") for num in range(3)]
     course1.topics.set([topics[0], topics[1]])
@@ -307,52 +322,6 @@ def test_serialize_course_run_enrollments(settings, receipts_enabled):
         "certificate": None,
         "approved_flexible_price_exists": False,
         "grades": [],
-    }
-
-
-def test_serialize_program_enrollments_assert():
-    """Test that ProgramEnrollmentSerializer throws an error when course run enrollments aren't provided"""
-    program_enrollment = ProgramEnrollmentFactory.build()
-    with pytest.raises(AssertionError):
-        ProgramEnrollmentSerializer(program_enrollment)
-
-
-@pytest.mark.parametrize("receipts_enabled", [True, False])
-def test_serialize_program_enrollments(settings, receipts_enabled):
-    """Test that ProgramEnrollmentSerializer has correct data"""
-    settings.ENABLE_ORDER_RECEIPTS = receipts_enabled
-    program = ProgramFactory.create()
-    course_run_enrollments = CourseRunEnrollmentFactory.create_batch(
-        3,
-        run=factory.Iterator(
-            [
-                CourseRunFactory.create(
-                    course=CourseFactory.create(program=program, position_in_program=2)
-                ),
-                CourseRunFactory.create(
-                    course=CourseFactory.create(program=program, position_in_program=1)
-                ),
-                CourseRunFactory.create(
-                    course=CourseFactory.create(program=None, position_in_program=None)
-                ),
-            ]
-        ),
-    )
-    program_enrollment = ProgramEnrollmentFactory.create(
-        program=program,
-    )
-    serialized_data = ProgramEnrollmentSerializer(
-        program_enrollment, context={"course_run_enrollments": course_run_enrollments}
-    ).data
-    assert serialized_data == {
-        "id": program_enrollment.id,
-        "program": BaseProgramSerializer(program).data,
-        # Only enrollments for the given program should be serialized, and they should be
-        # sorted by position in program.
-        "course_run_enrollments": CourseRunEnrollmentSerializer(
-            [course_run_enrollments[1], course_run_enrollments[0]], many=True
-        ).data,
-        "certificate": None,
     }
 
 

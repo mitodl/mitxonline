@@ -12,7 +12,7 @@ This will not run ``sync_course_run`` for you, so for best results, ensure the c
 Syntax
 ------
 
-``create_courseware <object> <readable id> <title> [--live] [--self-paced] [--create-run [create_run]] [--run-url [RUN_URL]] [--program [PROGRAM]] [--program-position [PROGRAM_POSITION]] [--run-tag [run-tag]] [--required] [--elective] [--force] [--start <date>] [--end <date>] [--enrollment-start <date>] [--enrollment-end <date>] [--upgrade <date>]``
+``create_courseware <object> <readable id> <title> [--live] [--self-paced] [--create-run [create_run]] [--run-url [RUN_URL]] [--program [PROGRAM]] [--run-tag [run-tag]] [--required] [--elective] [--force] [--start <date>] [--end <date>] [--enrollment-start <date>] [--enrollment-end <date>] [--upgrade <date>]``
 
 Checks
 ------
@@ -37,8 +37,7 @@ Programs have no additional options (any specified will be ignored).
 Courses can take the following options:
 
 * ``--program <PROGRAM>`` - The program to assign the course to.
-* ``--program-position <PROGRAM_POSITION>`` - The program position to set (default none).
-* ``--create-run <run tag>`` - Create a course run for this course with the specified run tag. 
+* ``--create-run <run tag>`` - Create a course run for this course with the specified run tag.
 * ``--run-url <url>`` - The courseware URL for the course run. (Only if ``--create-run`` is specified.)
 * ``--self-paced`` - The course run is self-paced. (Only if ``--create-run`` is specified.)
 * ``--required`` - The course is a requirement for the program.
@@ -48,7 +47,6 @@ Course runs can take the following options:
 
 * ``--program <PROGRAM>`` - The program to assign the course to. **Required.**
 * ``--run-tag <run tag>`` - The run tag to use. **Required.**
-* ``--program-position <PROGRAM_POSITION>`` - The program position to set (default none).
 * ``--run-url <url>`` - The courseware URL for the course run.
 * ``--self-paced`` - The course run is self-paced.
 * ``--start <date>`` - The date the course run should start.

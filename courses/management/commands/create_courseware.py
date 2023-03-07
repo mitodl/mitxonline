@@ -141,13 +141,6 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
-            "--program-position",
-            type=str,
-            nargs="?",
-            help="(Course only) The position the course should be in the program.",
-        )
-
-        parser.add_argument(
             "--required",
             help="(Course only) Make the course a requirement of the program.",
             action="store_true",
@@ -224,7 +217,6 @@ class Command(BaseCommand):
                 title=kwargs["title"],
                 readable_id=kwargs["courseware_id"],
                 live=kwargs["live"],
-                position_in_program=kwargs["program_position"],
             )
 
             self.stdout.write(

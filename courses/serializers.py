@@ -291,8 +291,9 @@ class ProgramSerializer(serializers.ModelSerializer):
         """Serializer for courses"""
         return CourseSerializer(
             instance.courses.filter(live=True)
-            .order_by("position_in_program")
-            .select_related("page"),
+            .select_related("page")
+            .order_by("id", "courseruns__start_date")
+            .distinct("id"),
             many=True,
             context={"include_page_fields": True},
         ).data
@@ -514,52 +515,6 @@ class ProgramCertificateSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.ProgramCertificate
         fields = ["uuid", "link"]
-
-
-class ProgramEnrollmentSerializer(serializers.ModelSerializer):
-    """ProgramEnrollmentSerializer model serializer"""
-
-    program = BaseProgramSerializer(read_only=True)
-    course_run_enrollments = serializers.SerializerMethodField()
-    certificate = serializers.SerializerMethodField(read_only=True)
-
-    def __init__(self, *args, **kwargs):
-        assert (
-            "context" in kwargs and "course_run_enrollments" in kwargs["context"]
-        ), "An iterable of course run enrollments must be passed in the context (key: course_run_enrollments)"
-        super().__init__(*args, **kwargs)
-
-    def get_certificate(self, enrollment):
-        """
-        Resolve a certificate for this enrollment if it exists
-        """
-        certificate = get_program_certificate_by_enrollment(enrollment)
-        if certificate:
-            return ProgramCertificateSerializer(certificate).data
-        return None
-
-    def get_course_run_enrollments(self, instance):
-        """Returns a serialized list of course run enrollments that belong to this program (in position order)"""
-        return CourseRunEnrollmentSerializer(
-            sorted(
-                (
-                    enrollment
-                    for enrollment in self.context["course_run_enrollments"]
-                    if enrollment.run.course.program_id == instance.program.id
-                ),
-                key=lambda enrollment: enrollment.run.course.position_in_program,
-            ),
-            many=True,
-        ).data
-
-    class Meta:
-        model = models.ProgramEnrollment
-        fields = [
-            "id",
-            "program",
-            "course_run_enrollments",
-            "certificate",
-        ]
 
 
 class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
