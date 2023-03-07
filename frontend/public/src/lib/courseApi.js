@@ -37,10 +37,13 @@ export const isLinkableCourseRun = (
 
 export const isWithinEnrollmentPeriod = (run: CourseRunDetail): boolean => {
   const enrollStart = run.enrollment_start ? moment(run.enrollment_start) : null
+  const enrollEnd = run.enrollment_end ? moment(run.enrollment_end) : null
   const now = moment()
-  const result = !!enrollStart && now.isAfter(enrollStart)
-  console.log("CP", result)
-  return true
+  return (
+    !!enrollStart &&
+    now.isAfter(enrollStart) &&
+    (isNil(enrollEnd) || now.isBefore(enrollEnd))
+  )
 }
 
 export const courseRunStatusMessage = (run: CourseRun) => {
