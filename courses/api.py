@@ -76,7 +76,6 @@ def get_user_relevant_course_run_qset(
     run_qset = (
         course.courseruns.exclude(start_date=None)
         .exclude(enrollment_start=None)
-        .filter(Q(end_date=None) | Q(end_date__gt=now))
     )
     if user and user.is_authenticated:
         user_enrollments = Count(
