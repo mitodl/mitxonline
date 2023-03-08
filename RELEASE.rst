@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.62.3 (Released March 08, 2023)
+--------------
+
+- feat!: remove `Course.position_in_program` (#1429)
+- Changes refund_order to let exceptions bubble up, and removes duplicate as a successful result (#1463)
+
 Version 0.62.2 (Released March 06, 2023)
 --------------
 
