@@ -1,14 +1,14 @@
 """Tests for Ecommerce api"""
 
-import json
 import random
 import uuid
+from datetime import datetime
 
 import pytest
+import pytz
 import reversion
 from CyberSource.rest import ApiException
 from django.conf import settings
-from django.http import HttpRequest
 from django.urls import reverse
 from mitol.payment_gateway.api import ProcessorResponse
 from reversion.models import Version
@@ -26,8 +26,16 @@ from ecommerce.factories import (
     OrderFactory,
     ProductFactory,
     TransactionFactory,
+    UnlimitedUseDiscountFactory,
 )
-from ecommerce.models import Basket, BasketItem, FulfilledOrder, Order, Transaction
+from ecommerce.models import (
+    Basket,
+    BasketItem,
+    DiscountRedemption,
+    FulfilledOrder,
+    Order,
+    Transaction,
+)
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -393,6 +401,58 @@ def test_process_cybersource_payment_response(rf, mocker, user_client, user, pro
     assert order.state == Order.STATE.PENDING
     result = process_cybersource_payment_response(request, order)
     assert result == Order.STATE.FULFILLED
+
+
+@pytest.mark.parametrize("include_discount", [True, False])
+def test_process_cybersource_payment_decline_response(
+    rf, mocker, user_client, user, products, include_discount
+):
+    """Test that ensures the response from Cybersource for an DECLINEd payment updates the orders state"""
+
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
+        return_value=True,
+    )
+    create_basket(user, products)
+
+    resp = user_client.post(reverse("checkout_api-start_checkout"))
+
+    payload = resp.json()["payload"]
+    payload = {
+        **{f"req_{key}": value for key, value in payload.items()},
+        "decision": "DECLINE",
+        "message": "payment processor message",
+        "transaction_id": "12345",
+    }
+
+    order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)
+
+    assert order.reference_number == payload["req_reference_number"]
+
+    if include_discount:
+        discount = UnlimitedUseDiscountFactory.create()
+        redemption = DiscountRedemption(
+            redeemed_by=user,
+            redeemed_discount=discount,
+            redeemed_order=order,
+            redemption_date=datetime.now(pytz.timezone(settings.TIME_ZONE)),
+        ).save()
+        order.refresh_from_db()
+
+    request = rf.post(reverse("checkout_result_api"), payload)
+
+    # This is checked on the BackofficeCallbackView and CheckoutCallbackView POST endpoints
+    # since we expect to receive a response to both from Cybersource.  If the current state is
+    # PENDING, then we should process the response.
+    assert order.state == Order.STATE.PENDING
+
+    if include_discount:
+        assert order.discounts.count() > 0
+
+    result = process_cybersource_payment_response(request, order)
+    assert result == Order.STATE.DECLINED
+    order.refresh_from_db()
+    assert order.discounts.count() == 0
 
 
 @pytest.mark.parametrize("test_type", [None, "fail", "empty"])

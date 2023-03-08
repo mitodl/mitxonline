@@ -670,8 +670,17 @@ class PendingOrder(FulfillableOrder, Order):
 
     @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.DECLINED)
     def decline(self):
-        """Decline this order"""
-        pass
+        """
+        Decline this order. This additionally clears the discount redemptions
+        for the order so the discounts can be reused.
+        """
+        for redemption in self.discounts.all():
+            redemption.delete()
+
+        self.state = Order.STATE.DECLINED
+        self.save()
+
+        return self
 
     @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.ERRORED)
     def error(self):
