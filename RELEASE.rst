@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.62.3
+Version 0.62.3 (Released March 08, 2023)
 --------------
 
 - feat!: remove `Course.position_in_program` (#1429)
