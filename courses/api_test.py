@@ -111,9 +111,9 @@ def courses_api_logs(mocker):
 
 
 @pytest.mark.parametrize("is_enrolled", [True, False])
-def test_get_user_relevant_course_run(user, dates, course, is_enrolled):
+def test_get_user_relevant_course_run(client, user, dates, course, is_enrolled):
     """
-    get_user_relevant_course_run should return an enrolled run if the end date isn't in the past, or the soonest course
+    get_user_relevant_course_run should return an enrolled run or the soonest course
     run that does not have a past enrollment end date.
     """
     # One run in the near future, one run in progress with an expired enrollment period, and one run in the far future.
@@ -142,9 +142,9 @@ def test_get_user_relevant_course_run(user, dates, course, is_enrolled):
 
 def test_get_user_relevant_course_run_invalid_dates(user, dates, course):
     """
-    get_user_relevant_course_run should ignore course runs with any of the following properties:
+    get_user_relevant_course_run should ignore course runs with any of the following properties when the user is not enrolled:
     1) No start date or enrollment start date
-    2) An end date in the past
+    2) An enrollment end date in the past
 
     """
     CourseRunFactory.create_batch(
@@ -193,8 +193,8 @@ def test_get_user_relevant_course_run_ignore_enrolled(user, dates, course):
         run=course_runs[1], user=user, edx_enrolled=False, active=True
     )
     returned_run = get_user_relevant_course_run(course=course, user=user)
-    # Returned course run should be the one with the unexpired enrollment period
-    assert returned_run == course_runs[2]
+    # Returned course run should be the one the user is enrolled in that is active in edx
+    assert returned_run == course_runs[0]
 
 
 def test_get_user_enrollments(user):
