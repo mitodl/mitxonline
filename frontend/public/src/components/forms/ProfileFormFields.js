@@ -56,8 +56,11 @@ export const legalAddressValidation = yup.object().shape({
       .string()
       .label("State")
       .when("country", {
-        is:        value => value === "US" || value === "CA",
-        then:      yup.string().required(),
+        is:   value => value === "US" || value === "CA",
+        then: yup
+          .string()
+          .required("State is a required field")
+          .typeError("State is a required field"),
         otherwise: yup.string().nullable()
       })
   })
