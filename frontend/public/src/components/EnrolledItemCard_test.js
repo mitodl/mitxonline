@@ -281,7 +281,7 @@ describe("EnrolledItemCard", () => {
   })
   ;[
     [true, "verified"],
-    [false, "audit"]
+    [true, "audit"]
   ].forEach(([activationStatus, enrollmentType]) => {
     it(`${shouldIf(
       activationStatus

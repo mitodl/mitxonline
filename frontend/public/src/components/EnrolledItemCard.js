@@ -286,45 +286,7 @@ export class EnrolledItemCard extends React.Component<
     )
   }
 
-  renderVerifiedUnenrollmentModal(enrollment: RunEnrollment) {
-    const { runUnenrollmentModalVisibility } = this.state
-
-    return (
-      <Modal
-        id={`run-unenrollment-${enrollment.id}-modal`}
-        className="text-center"
-        isOpen={runUnenrollmentModalVisibility}
-        toggle={() => this.toggleRunUnenrollmentModalVisibility()}
-        role="dialog"
-        aria-labelledby={`run-unenrollment-${enrollment.id}-modal-header`}
-        aria-describedby={`run-unenrollment-${enrollment.id}-modal-body`}
-      >
-        <ModalHeader
-          toggle={() => this.toggleRunUnenrollmentModalVisibility()}
-          id={`run-unenrollment-${enrollment.id}-modal-header`}
-        >
-          Unenroll From {enrollment.run.course_number}
-        </ModalHeader>
-        <ModalBody id={`run-unenrollment-${enrollment.id}-modal-body`}>
-          <p>
-            You are enrolled in the certificate track for{" "}
-            {enrollment.run.course_number} {enrollment.run.title}. You can't
-            unenroll from this course from My Courses.
-          </p>
-
-          <p>
-            To unenroll, please{" "}
-            <a href="https://mitxonline.zendesk.com/hc/en-us/requests/new">
-              contact customer support
-            </a>{" "}
-            for assistance.
-          </p>
-        </ModalBody>
-      </Modal>
-    )
-  }
-
-  renderUnverifiedUnenrollmentModal(enrollment: RunEnrollment) {
+  renderRunUnenrollmentModal(enrollment: RunEnrollment) {
     const { runUnenrollmentModalVisibility } = this.state
     const now = moment()
     const endDate = enrollment.run.enrollment_end
@@ -356,6 +318,17 @@ export class EnrolledItemCard extends React.Component<
                 : ` You won't be able to re-enroll after ${formattedEndDate}.`
               : null}
           </p>
+          {enrollment.enrollment_mode === "verified" ? (
+            <p>
+              You are enrolled in the certificate track for this course. If you
+              wish to request a refund for your payment for this course (if
+              any), please{" "}
+              <a href="https://mitxonline.zendesk.com/hc/en-us/requests/new">
+                contact customer support
+              </a>{" "}
+              for assistance.
+            </p>
+          ) : null}
           <Button
             type="submit"
             color="success"
@@ -369,12 +342,6 @@ export class EnrolledItemCard extends React.Component<
         </ModalBody>
       </Modal>
     )
-  }
-
-  renderRunUnenrollmentModal(enrollment: RunEnrollment) {
-    return enrollment.enrollment_mode === "verified"
-      ? this.renderVerifiedUnenrollmentModal(enrollment)
-      : this.renderUnverifiedUnenrollmentModal(enrollment)
   }
 
   renderProgramUnenrollmentModal(enrollment: ProgramEnrollment) {

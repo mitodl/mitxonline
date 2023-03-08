@@ -12,7 +12,7 @@ from mitol.payment_gateway.api import Order as GatewayOrder
 from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
 from mitol.payment_gateway.exceptions import RefundDuplicateException
 
-from courses.api import deactivate_run_enrollment
+from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from ecommerce.constants import (
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
@@ -29,7 +29,7 @@ from ecommerce.models import (
     PendingOrder,
     UserDiscount,
 )
-from ecommerce.tasks import perform_unenrollment_from_order
+from ecommerce.tasks import perform_downgrade_from_order
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from hubspot_sync.task_helpers import sync_hubspot_deal
 from main.constants import (
@@ -41,6 +41,7 @@ from main.constants import (
 )
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 from main.utils import redirect_with_user_message
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 
 log = logging.getLogger(__name__)
 
@@ -445,9 +446,28 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
 
     # If unenroll requested, perform unenrollment after successful refund
     if unenroll:
-        perform_unenrollment_from_order.delay(order.id)
+        perform_downgrade_from_order.delay(order.id)
 
     return True
+
+
+def downgrade_learner_from_order(order_id):
+    """
+    Pulls the learner's enrollments from a specified order and downgrades them
+    to audit.
+    """
+
+    order = Order.objects.get(pk=order_id)
+
+    # Forcing the enrollment here - if the refund comes after the end date
+    # for the course for whatever reason, we still want to revert the mode.
+    create_run_enrollments(
+        user=order.purchaser,
+        runs=order.purchased_runs,
+        keep_failed_enrollments=True,
+        mode=EDX_ENROLLMENT_AUDIT_MODE,
+        force_enrollment=True,
+    )
 
 
 def unenroll_learner_from_order(order_id):
