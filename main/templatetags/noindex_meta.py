@@ -12,5 +12,5 @@ def noindex_meta():
     return (
         mark_safe("""<meta name="robots" content="noindex">""")
         if settings.ENVIRONMENT not in ("production", "prod")
-        else None
+        else ""
     )
