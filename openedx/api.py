@@ -526,6 +526,29 @@ def get_edx_grades_with_users(course_run, user=None):
                 yield edx_grade, user
 
 
+def existing_edx_enrollment(user, course_id, mode):
+    """
+    Returns enrollment object if user is already enrolled in edx course run.
+
+    Args:
+        user (users.models.User): The user to enroll
+        courseware_id : The course runs to enroll in
+        mode (str): The course mode to enroll the user with
+
+    Returns:
+        (edx_api.enrollments.models.Enrollment or None):
+            The results of enrollments via the edx API client
+    """
+    edx_client = get_edx_api_client(user)
+    edx_enrollments = edx_client.enrollments.get_enrollments(
+        course_id=course_id, usernames=[user.username]
+    )
+    for enrollment in edx_enrollments:
+        if enrollment.mode == mode:
+            return enrollment
+    return None
+
+
 def enroll_in_edx_course_runs(
     user,
     course_runs,
@@ -600,13 +623,17 @@ def enroll_in_edx_course_runs(
     results = []
     for course_run in course_runs:
         try:
-            result = edx_client.enrollments.create_student_enrollment(
-                course_run.courseware_id,
-                mode=mode,
-                username=username,
-                force_enrollment=force_enrollment,
+            enrollment = existing_edx_enrollment(
+                user, course_run.courseware_id, mode=mode
             )
-            results.append(result)
+            if enrollment is None:
+                enrollment = edx_client.enrollments.create_student_enrollment(
+                    course_run.courseware_id,
+                    mode=mode,
+                    username=username,
+                    force_enrollment=force_enrollment,
+                )
+            results.append(enrollment)
         except HTTPError as exc:
             raise EdxApiEnrollErrorException(user, course_run, exc) from exc
         except Exception as exc:  # pylint: disable=broad-except
