@@ -147,7 +147,7 @@ export class ProductDetailEnrollApp extends React.Component<
               {needFinancialAssistanceLink}
             </div>
           </div>
-          <div className="cancel-link">{this.getEnrollmentForm(run)}</div>
+          <div className="cancel-link">{this.getEnrollmentForm()}</div>
           <div className="faq-link">
             <a
               href="https://mitxonline.zendesk.com/hc/en-us"
