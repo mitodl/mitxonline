@@ -990,6 +990,17 @@ class CourseRunEnrollment(EnrollmentModel):
         """
         return cls.objects.filter(user=user, run__course__program=program)
 
+    def deactivate_and_save(self, change_status, no_user=False):
+        """
+        For course run enrollments, we need to clear any PaidCourseRun records
+        for this enrollment (if any) so they can re-enroll later.
+        """
+        from courses.tasks import clear_unenrolled_paid_course_run
+
+        clear_unenrolled_paid_course_run.delay(self.id)
+
+        return super().deactivate_and_save(change_status, no_user)
+
     def to_dict(self):
         return {**super().to_dict(), "text_id": self.run.courseware_id}
 
