@@ -582,6 +582,14 @@ def sync_course_runs(runs):
             run.enrollment_start = course_detail.enrollment_start
             run.enrollment_end = course_detail.enrollment_end
             run.is_self_paced = course_detail.is_self_paced()
+            # Only sync the date if it's set in edX, Otherwise set it to course's end date
+            if course_detail.certificate_available_date:
+                run.certificate_available_date = (
+                    course_detail.certificate_available_date
+                )
+            else:
+                run.certificate_available_date = course_detail.end
+
             try:
                 run.save()
                 success_count += 1
