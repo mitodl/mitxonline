@@ -57,7 +57,7 @@ from cms.constants import (
 )
 from cms.forms import CertificatePageForm
 from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset
-from courses.models import Course, CourseRunCertificate, Program, ProgramCertificate
+from courses.models import Course, CourseRunCertificate, Program, ProgramCertificate, CourseRun
 from flexiblepricing.api import (
     determine_auto_approval,
     determine_courseware_flexible_price_discount,
@@ -1190,7 +1190,7 @@ class FlexiblePricingRequestForm(AbstractForm):
 
         return None
 
-    def get_parent_courseware(self):
+    def get_parent_courseware(self, request):
         """
         Returns the valid courseware object that is associated with the form.
         The rules for this are:
@@ -1205,6 +1205,14 @@ class FlexiblePricingRequestForm(AbstractForm):
         Returns:
             Course, Program, or None if not found
         """
+        # print("\n\n\n\n", CourseRun.objects.filter(courseware_id=request.GET.get("course_run_id")), "\n\n\n\n")
+        selected_course_run_id = request.GET.get("course_run_id") if request else None
+        course_run = (
+            CourseRun.objects.filter(courseware_id=selected_course_run_id).first()
+            if selected_course_run_id else None
+        )
+        if course_run:
+            course = course_run.course
 
         if (
             self.get_parent_product_page() is None
@@ -1239,7 +1247,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         Returns:
             FlexiblePrice, or None if not found.
         """
-        parent_courseware = self.get_parent_courseware()
+        parent_courseware = self.get_parent_courseware(request)
 
         if parent_courseware is None or request.user.id is None:
             return None
@@ -1290,10 +1298,17 @@ class FlexiblePricingRequestForm(AbstractForm):
             context = self.get_context(request)
             context["form"] = form
             return TemplateResponse(request, self.get_template(request), context)
+        elif request.method == 'POST':
+            form = self.get_form(request.POST, request.FILES, page=self, user=request.user)
+
+            if form.is_valid():
+                form_submission = self.process_form_submission(form, request)
+                return self.render_landing_page(request, form_submission, *args, **kwargs)
 
         return super().serve(request, *args, **kwargs)
 
-    def process_form_submission(self, form):
+    def process_form_submission(self, form, request=None):
+        print("\n\n\nREQUEST TYPE", type(request), request.GET.get("course_run_id", None), request.method, "\n\n\n")
         try:
             converted_income = determine_income_usd(
                 float(form.cleaned_data["your_income"]),
@@ -1302,7 +1317,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         except NotSupportedException:
             raise ValidationError("Currency not supported")
 
-        courseware = self.get_parent_courseware()
+        courseware = self.get_parent_courseware(request)
         income_usd = round(converted_income, 2)
         tier = determine_tier_courseware(courseware, income_usd)
 
@@ -1312,7 +1327,7 @@ class FlexiblePricingRequestForm(AbstractForm):
             user=form.user,
         )
 
-        flexible_price = self.get_previous_submission(form)
+        flexible_price = self.get_previous_submission(request)
 
         if flexible_price is None:
             flexible_price = FlexiblePrice(user=form.user, courseware_object=courseware)
@@ -1349,7 +1364,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         needs to respect the URL of that page or the form's action will be
         wrong.
         """
-        if not self.get_parent_courseware():
+        if not self.get_parent_courseware(request):
             return super().get_url_parts(request=request)
 
         url_parts = self.get_parent_product_page().get_url_parts(request=request)

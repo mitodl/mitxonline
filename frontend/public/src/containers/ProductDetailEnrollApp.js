@@ -92,7 +92,7 @@ export class ProductDetailEnrollApp extends React.Component<
       isFinancialAssistanceAvailable(run) &&
       !run.approved_flexible_price_exists ? (
           <p className="text-center financial-assistance-link">
-            <a href={run.page.financial_assistance_form_url}>
+            <a href={run.page.financial_assistance_form_url + "?course_run_id=" + encodeURIComponent(run.courseware_id)}>
             Need financial assistance?
             </a>
           </p>
