@@ -384,6 +384,7 @@ def test_enroll_in_edx_course_runs(mocker, user):
         side_effect=enroll_return_values
     )
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
     course_runs = CourseRunFactory.build_batch(2)
     enroll_results = enroll_in_edx_course_runs(user, course_runs)
     mock_client.enrollments.create_student_enrollment.assert_any_call(
@@ -411,6 +412,7 @@ def test_enroll_api_fail(mocker, user):
         side_effect=HTTPError(response=enrollment_response)
     )
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
+    mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
     course_run = CourseRunFactory.build()
 
     with pytest.raises(EdxApiEnrollErrorException):

@@ -539,7 +539,7 @@ def existing_edx_enrollment(user, course_id, mode):
         (edx_api.enrollments.models.Enrollment or None):
             The results of enrollments via the edx API client
     """
-    edx_client = get_edx_api_client(user)
+    edx_client = get_edx_api_service_client()
     edx_enrollments = edx_client.enrollments.get_enrollments(
         course_id=course_id, usernames=[user.username]
     )
