@@ -220,7 +220,15 @@ class ProgramAdminForm(ModelForm):
     def save(self, commit=True):
         """Save requirements"""
         program = super().save(commit=commit)
+        transaction.on_commit(self.save_requirements)
+        return program
+
+    def save_requirements(self):
+        """
+        Save related program requirements.
+        """
         with transaction.atomic():
+            program = self.instance
             root = program.get_requirements_root(for_update=True)
 
             if root is None:
@@ -238,8 +246,6 @@ class ProgramAdminForm(ModelForm):
             )
             serializer.is_valid(raise_exception=True)
             serializer.save()
-
-        return program
 
     class Meta:
         model = Program
