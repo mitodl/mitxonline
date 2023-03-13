@@ -177,8 +177,8 @@ def test_order_refund_success(mocker, order_state, unenroll, fulfilled_transacti
         message="",
         response_code="",
     )
-    unenroll_task_mock = mocker.patch(
-        "ecommerce.tasks.perform_unenrollment_from_order.delay"
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
     )
 
     mocker.patch(
@@ -217,9 +217,9 @@ def test_order_refund_success(mocker, order_state, unenroll, fulfilled_transacti
 
     # Unenrollment task should only run if unenrollment was requested
     if unenroll:
-        unenroll_task_mock.assert_called_once_with(fulfilled_transaction.order.id)
+        downgrade_task_mock.assert_called_once_with(fulfilled_transaction.order.id)
     else:
-        assert not unenroll_task_mock.called
+        assert not downgrade_task_mock.called
 
     # Refund transaction object should have appropriate data
     refund_transaction = Transaction.objects.filter(
@@ -248,8 +248,8 @@ def test_order_refund_success_with_ref_num(mocker, unenroll, fulfilled_transacti
         message="",
         response_code="",
     )
-    unenroll_task_mock = mocker.patch(
-        "ecommerce.tasks.perform_unenrollment_from_order.delay"
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
     )
 
     mocker.patch(
@@ -278,9 +278,9 @@ def test_order_refund_success_with_ref_num(mocker, unenroll, fulfilled_transacti
 
     # Unenrollment task should only run if unenrollment was requested
     if unenroll:
-        unenroll_task_mock.assert_called_once_with(fulfilled_transaction.order.id)
+        downgrade_task_mock.assert_called_once_with(fulfilled_transaction.order.id)
     else:
-        assert not unenroll_task_mock.called
+        assert not downgrade_task_mock.called
 
     # Refund transaction object should have appropriate data
     refund_transaction = Transaction.objects.filter(
@@ -301,8 +301,8 @@ def test_order_refund_failure(mocker, fulfilled_transaction):
         "mitol.payment_gateway.api.PaymentGateway.start_refund",
         side_effect=ApiException(),
     )
-    unenroll_task_mock = mocker.patch(
-        "ecommerce.tasks.perform_unenrollment_from_order.delay"
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
     )
 
     with pytest.raises(ApiException):
@@ -316,7 +316,7 @@ def test_order_refund_failure(mocker, fulfilled_transaction):
         == 0
     )
     # Unenrollment task should not run when API fails
-    assert not unenroll_task_mock.called
+    assert not downgrade_task_mock.called
 
 
 def test_order_refund_failure_no_exception(mocker, fulfilled_transaction):
@@ -330,8 +330,8 @@ def test_order_refund_failure_no_exception(mocker, fulfilled_transaction):
         "mitol.payment_gateway.api.PaymentGateway.start_refund",
         returns=error_return,
     )
-    unenroll_task_mock = mocker.patch(
-        "ecommerce.tasks.perform_unenrollment_from_order.delay"
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
     )
 
     with pytest.raises(Exception) as exc:
@@ -346,7 +346,7 @@ def test_order_refund_failure_no_exception(mocker, fulfilled_transaction):
         == 0
     )
     # Unenrollment task should not run when API fails
-    assert not unenroll_task_mock.called
+    assert not downgrade_task_mock.called
 
 
 def test_unenrollment_unenrolls_learner(mocker, user):

@@ -1,9 +1,12 @@
 import pytest
 import reversion
 
-from ecommerce.serializers_test import create_order_receipt
 from ecommerce.factories import ProductFactory
-from ecommerce.tasks import perform_unenrollment_from_order
+from ecommerce.serializers_test import create_order_receipt
+from ecommerce.tasks import (
+    perform_downgrade_from_order,
+    perform_unenrollment_from_order,
+)
 
 
 @pytest.fixture()
@@ -65,3 +68,14 @@ def test_delayed_unenrollment_unenrolls_user(mocker, user):
     unenroll_learner_mock = mocker.patch("ecommerce.api.unenroll_learner_from_order")
     perform_unenrollment_from_order.delay(order_id=1)
     unenroll_learner_mock.assert_called()
+
+
+@pytest.mark.django_db
+def test_delayed_downgrade_user(mocker, user):
+    """
+    Test that unenroll task properly calls the unenrollment functionality against an order
+    """
+
+    downgrade_learner_mock = mocker.patch("ecommerce.api.downgrade_learner_from_order")
+    perform_downgrade_from_order.delay(order_id=1)
+    downgrade_learner_mock.assert_called()

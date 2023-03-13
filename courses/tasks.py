@@ -11,6 +11,7 @@ from courses.models import (
     CourseRun,
     CourseRunEnrollment,
     LearnerProgramRecordShare,
+    PaidCourseRun,
     Program,
 )
 from main.celery import app
@@ -88,3 +89,26 @@ def check_for_program_orphans():
     for program in Program.objects.filter(live=True).all():
         log.info(f"check_for_program_orphans: checking program {program.readable_id}")
         check_program_for_orphans(program)
+
+
+@app.task
+def clear_unenrolled_paid_course_run(enrollment_id):
+    """
+    Pulls the order specified and clears any PaidCourseRun records for it. If
+    these exist, the user won't be able to re-buy into the course later if they
+    want to.
+    """
+    from ecommerce.models import Order
+
+    try:
+        enrollment = CourseRunEnrollment.all_objects.filter(id=enrollment_id).get()
+
+        PaidCourseRun.objects.filter(
+            user=enrollment.user,
+            course_run=enrollment.run,
+            order__state=Order.STATE.FULFILLED,
+        ).delete()
+    except Exception as e:
+        log.error(
+            f"Unable to clear paid course run records for enrollment ID {enrollment_id}: {str(e)}"
+        )
