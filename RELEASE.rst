@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.62.4
+Version 0.62.4 (Released March 13, 2023)
 --------------
 
 - fix: retry_failed_edx_enrollments should check for existing enrollments (permission fix) (#1479)
