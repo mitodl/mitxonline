@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.62.5
+Version 0.62.5 (Released March 13, 2023)
 --------------
 
 - Allows verified learners the ability to unenroll; adjusts flow for refunds (#1474)
