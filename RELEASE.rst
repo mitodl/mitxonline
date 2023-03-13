@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.62.4
+--------------
+
+- fix: retry_failed_edx_enrollments should check for existing enrollments (permission fix) (#1479)
+- fix: Fix program admin to add a new program (#1477)
+- 1473: duplicate enrollment emails (#1475)
+- 977: allow enrollment in archived courses (#1472)
+- fix: retry_failed_edx_enrollments should check for existing enrollments (#1458)
+- Declining an order should now clear redemptions associated with the order; added test for this (#1471)
+- Adds a typeError to the state field validation to suppress the default yup error (#1470)
+- 1455: Adds templatetag for noindex in non-prod (#1468)
+
 Version 0.62.3 (Released March 08, 2023)
 --------------
 
