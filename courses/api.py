@@ -277,7 +277,11 @@ def create_run_enrollments(
             enrollment, created = CourseRunEnrollment.all_objects.get_or_create(
                 user=user,
                 run=run,
-                defaults=dict(edx_enrolled=edx_request_success, enrollment_mode=mode),
+                defaults=dict(
+                    change_status=None,
+                    edx_enrolled=edx_request_success,
+                    enrollment_mode=mode,
+                ),
             )
 
             if run.course.program is not None:
