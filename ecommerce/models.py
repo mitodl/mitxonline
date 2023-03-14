@@ -535,39 +535,6 @@ class FulfillableOrder:
             amount=self.total_price_paid,
         )
 
-        # If the order has discounts, those discounts are one-time use, and they
-        # have been redeemed more than once, emit a log error so we're aware of
-        # it. (Discounts are only consumed by fulfilled orders, so there's the
-        # potential that the discount can be used by two orders if neither were
-        # fulfilled at the time.)
-
-        if self.discounts.count() > 0:
-            for redemption in self.discounts.all():
-                if (
-                    redemption.redeemed_discount.discount_type
-                    == REDEMPTION_TYPE_ONE_TIME
-                    and redemption.redeemed_discount.order_redemptions.filter(
-                        redeemed_order__state=Order.STATE.FULFILLED
-                    ).count()
-                    > 1
-                ):
-                    log.error(
-                        f"Warning: discount code {redemption.redeemed_discount.discount_code} is a one-time discount that's been redeemed more than once"
-                    )
-
-                if (
-                    redemption.redeemed_discount.discount_type
-                    == REDEMPTION_TYPE_ONE_TIME_PER_USER
-                    and redemption.redeemed_discount.order_redemptions.filter(
-                        redeemed_order__state=Order.STATE.FULFILLED,
-                        redeemed_by=self.purchaser,
-                    ).count()
-                    > 1
-                ):
-                    log.error(
-                        f"Warning: discount code {redemption.redeemed_discount.discount_code} is a one-time per-user discount that's been redeemed more than once"
-                    )
-
     def create_paid_courseruns(self):
         for run in self.purchased_runs:
             PaidCourseRun.objects.get_or_create(

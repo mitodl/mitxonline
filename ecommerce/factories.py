@@ -13,6 +13,7 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
 )
+from main.utils import now_datetime_with_tz
 from users.factories import UserFactory
 
 FAKE = faker.Factory.create()
@@ -132,6 +133,7 @@ class DiscountRedemptionFactory(DjangoModelFactory):
     redeemed_by = SubFactory(UserFactory)
     redeemed_discount = SubFactory(DiscountFactory)
     redeemed_order = SubFactory(OrderFactory)
+    redemption_date = now_datetime_with_tz()
 
     class Meta:
         model = models.DiscountRedemption

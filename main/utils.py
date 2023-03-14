@@ -1,5 +1,6 @@
 """mitx_online utilities"""
 import json
+from datetime import datetime
 from decimal import Decimal
 from enum import Flag, auto
 from typing import Set, Tuple, TypeVar, Union
@@ -191,3 +192,9 @@ def parse_supplied_date(datearg):
 def format_decimal(amount: Decimal):
     """Return a Decimal as a formatted string with 2 decimal places"""
     return f"{amount:0.2f}"
+
+
+def now_datetime_with_tz():
+    """Return now with the configured timezone."""
+
+    return datetime.now(tz=pytz.timezone(settings.TIME_ZONE))

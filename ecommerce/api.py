@@ -4,6 +4,7 @@ import logging
 
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.urls import reverse
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
@@ -16,6 +17,8 @@ from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from ecommerce.constants import (
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REFUND_SUCCESS_STATES,
     ZERO_PAYMENT_DATA,
 )
@@ -24,6 +27,7 @@ from ecommerce.models import (
     BasketDiscount,
     BasketItem,
     Discount,
+    DiscountRedemption,
     FulfilledOrder,
     Order,
     PendingOrder,
@@ -574,3 +578,77 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
                 error_count += 1
 
     return (fulfilled_count, cancel_count, error_count)
+
+
+def check_for_duplicate_discount_redemptions():
+    """
+    Checks for multiple redemptions for discount codes, and makes noise if there
+    are any.
+
+    For discounts that are one-time or one-time-per-user redemptions, there's a
+    possibility that the code can be redeemed more than once. This will check
+    for that and emit some log messages if so. (This can happen if the code is
+    entered into two orders and those orders are completed simultaneously.)
+
+    Returns:
+    - List of seen discount IDs
+    """
+
+    redemptions = (
+        DiscountRedemption.objects.filter(
+            Q(redeemed_discount__redemption_type=REDEMPTION_TYPE_ONE_TIME)
+            | Q(redeemed_discount__redemption_type=REDEMPTION_TYPE_ONE_TIME_PER_USER)
+        )
+        .filter(redeemed_order__state=Order.STATE.FULFILLED)
+        .prefetch_related("redeemed_discount")
+        .all()
+    )
+
+    seen = []
+
+    for redemption in redemptions:
+        if redemption.redeemed_discount.id in seen:
+            continue
+
+        if (
+            redemption.redeemed_discount.redemption_type == REDEMPTION_TYPE_ONE_TIME
+            and redemption.redeemed_discount.order_redemptions.filter(
+                redeemed_order__state=Order.STATE.FULFILLED
+            ).count()
+            > 1
+        ):
+            message = f"Discount code {redemption.redeemed_discount.discount_code} is a one-time discount that's been redeemed more than once"
+            log.error(message)
+            seen.append(redemption.redeemed_discount.id)
+
+        if (
+            redemption.redeemed_discount.redemption_type
+            == REDEMPTION_TYPE_ONE_TIME_PER_USER
+            and redemption.redeemed_discount.order_redemptions.filter(
+                redeemed_order__state=Order.STATE.FULFILLED
+            ).count()
+            > 1
+        ):
+            seen_user = []
+
+            for (
+                user_redemption
+            ) in redemption.redeemed_discount.order_redemptions.filter(
+                redeemed_order__state=Order.STATE.FULFILLED
+            ).all():
+                if user_redemption.redeemed_by.id in seen_user:
+                    continue
+
+                if (
+                    redemption.redeemed_discount.order_redemptions.filter(
+                        redeemed_by=user_redemption.redeemed_by
+                    ).count()
+                    > 1
+                ):
+                    message = f"Discount code {redemption.redeemed_discount.discount_code} is a one-time per-user discount that's been redeemed more than once by {user_redemption.redeemed_by}"
+                    log.error(message)
+                    seen_user.append(user_redemption.redeemed_by.id)
+
+            seen.append(redemption.redeemed_discount.id)
+
+    return seen
