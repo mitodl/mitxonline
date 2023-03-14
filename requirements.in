@@ -26,7 +26,7 @@ drf-extensions==0.7.1
 django-reversion==4.0.1
 django-storages==1.11.1
 djoser==2.1.0
-git+https://github.com/mitodl/edx-api-client@arslan/1340-certificate-available-date#egg=edx-api-client
+edx-api-client==1.7.0
 hubspot-api-client==6.1.0
 ipython
 mitol-django-common~=2.7.0

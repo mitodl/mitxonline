@@ -197,7 +197,7 @@ draftjs-exporter==2.1.7
     # via wagtail
 drf-extensions==0.7.1
     # via -r requirements.in
-edx-api-client @ git+https://github.com/mitodl/edx-api-client@arslan/1340-certificate-available-date
+edx-api-client==1.7.0
     # via -r requirements.in
 edx-opaque-keys==2.2.2
     # via mitol-django-openedx
