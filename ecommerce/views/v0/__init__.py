@@ -427,6 +427,9 @@ class CheckoutApiViewSet(ViewSet):
                 raise ObjectDoesNotExist()
 
             if not discount.check_validity(request.user):
+                log.error(
+                    f"Discount code {request.data['discount']} has already been redeemed"
+                )
                 raise ObjectDoesNotExist()
         except ObjectDoesNotExist:
             return Response(

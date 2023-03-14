@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -272,22 +273,31 @@ class Discount(TimestampedModel):
         """
         if (
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME
-            and DiscountRedemption.objects.filter(redeemed_discount=self).count() > 0
+            and DiscountRedemption.objects.filter(
+                redeemed_discount=self,
+                redeemed_order__state=Order.STATE.FULFILLED,
+            ).count()
+            > 0
         ):
             return False
 
         if (
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME_PER_USER
-            and DiscountRedemption.objects.filter(redeemed_discount=self)
-            .filter(redeemed_by=user)
-            .count()
+            and DiscountRedemption.objects.filter(
+                redeemed_discount=self,
+                redeemed_order__state=Order.STATE.FULFILLED,
+                redeemed_by=user,
+            ).count()
             > 0
         ):
             return False
 
         if (
             self.max_redemptions > 0
-            and DiscountRedemption.objects.filter(redeemed_discount=self).count()
+            and DiscountRedemption.objects.filter(
+                redeemed_discount=self,
+                redeemed_order__state=Order.STATE.FULFILLED,
+            ).count()
             >= self.max_redemptions
         ):
             return False
@@ -506,7 +516,7 @@ class FulfillableOrder:
     """class to handle common logics like fulfill, enrollment etc"""
 
     def create_transaction(self, payment_data):
-
+        log = logging.getLogger(__name__)
         transaction_id = payment_data.get("transaction_id")
         amount = payment_data.get("amount")
         # There are two use cases:
@@ -524,6 +534,39 @@ class FulfillableOrder:
             data=payment_data,
             amount=self.total_price_paid,
         )
+
+        # If the order has discounts, those discounts are one-time use, and they
+        # have been redeemed more than once, emit a log error so we're aware of
+        # it. (Discounts are only consumed by fulfilled orders, so there's the
+        # potential that the discount can be used by two orders if neither were
+        # fulfilled at the time.)
+
+        if self.discounts.count() > 0:
+            for redemption in self.discounts.all():
+                if (
+                    redemption.redeemed_discount.discount_type
+                    == REDEMPTION_TYPE_ONE_TIME
+                    and redemption.redeemed_discount.order_redemptions.filter(
+                        redeemed_order__state=Order.STATE.FULFILLED
+                    ).count()
+                    > 1
+                ):
+                    log.error(
+                        f"Warning: discount code {redemption.redeemed_discount.discount_code} is a one-time discount that's been redeemed more than once"
+                    )
+
+                if (
+                    redemption.redeemed_discount.discount_type
+                    == REDEMPTION_TYPE_ONE_TIME_PER_USER
+                    and redemption.redeemed_discount.order_redemptions.filter(
+                        redeemed_order__state=Order.STATE.FULFILLED,
+                        redeemed_by=self.purchaser,
+                    ).count()
+                    > 1
+                ):
+                    log.error(
+                        f"Warning: discount code {redemption.redeemed_discount.discount_code} is a one-time per-user discount that's been redeemed more than once"
+                    )
 
     def create_paid_courseruns(self):
         for run in self.purchased_runs:
