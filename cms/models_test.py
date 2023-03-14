@@ -571,12 +571,12 @@ def test_get_current_finaid_with_flex_price_for_expired_course_run(mocker):
     rf = RequestFactory()
     request = rf.get("/")
     request.user = UserFactory.create()
-    discount = DiscountFactory.create()
-    mocker.patch(
-        "flexiblepricing.api.is_courseware_flexible_price_approved", return_value=True
+    patched_flexible_price_approved = mocker.patch(
+        "flexiblepricing.api.is_courseware_flexible_price_approved"
     )
-    mocker.patch(
-        "flexiblepricing.api.determine_courseware_flexible_price_discount",
-        return_value=discount,
+    patched_flexible_price_discount = mocker.patch(
+        "flexiblepricing.api.determine_courseware_flexible_price_discount"
     )
     assert course_run.course.page.get_current_finaid(request) is None
+    patched_flexible_price_discount.assert_not_called()
+    patched_flexible_price_approved.assert_not_called()
