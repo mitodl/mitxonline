@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.62.7
+--------------
+
+- Adjust discount redemption checks to only consider orders in Fulfilled state for validity
+- Bump webpack from 5.71.0 to 5.76.0 (#1488)
+
 Version 0.62.6 (Released March 15, 2023)
 --------------
 
