@@ -325,7 +325,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """
         relevant_run = self.first_unexpired_run
 
-        return relevant_run.products.filter(is_active=True).all()
+        return (
+            relevant_run.products.filter(is_active=True).all() if relevant_run else None
+        )
 
     @property
     def is_catalog_visible(self):

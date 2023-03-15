@@ -6,6 +6,7 @@ import factory
 import pytest
 from django.core.exceptions import ValidationError
 from mitol.common.utils.datetime import now_in_utc
+from ecommerce.factories import ProductFactory
 from wagtail.core.models import Page
 
 from cms.factories import (
@@ -961,3 +962,12 @@ def test_certificate_choice_limits():
     assert program_certificate_page.id in choices["page_id__in"]
 
     assert len(choices["page_id__in"]) != Page.objects.count()
+
+
+def test_active_products_for_expired_course_run():
+    """No products should be returned if there are no active course runs for the course."""
+    now = now_in_utc()
+    course_run = CourseRunFactory.create(enrollment_end=now - timedelta(days=10))
+    ProductFactory.create(purchasable_object=course_run)
+
+    assert course_run.course.active_products is None

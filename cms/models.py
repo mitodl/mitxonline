@@ -905,8 +905,12 @@ class CoursePage(ProductPage):
         Returns:
             None, or a tuple of the original price and the discount to apply
         """
-        if is_courseware_flexible_price_approved(self.product, request.user):
-            ecommerce_product = self.product.active_products.first()
+        ecommerce_product = self.product.active_products
+        if (
+            is_courseware_flexible_price_approved(self.product, request.user)
+            and ecommerce_product
+        ):
+            ecommerce_product = ecommerce_product.first()
 
             discount = determine_courseware_flexible_price_discount(
                 ecommerce_product, request.user

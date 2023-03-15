@@ -1,6 +1,7 @@
 """Tests for Wagtail models"""
 import json
 from urllib.parse import quote_plus
+from datetime import timedelta
 
 import factory
 import pytest
@@ -10,6 +11,7 @@ from django.contrib.sessions.middleware import SessionMiddleware
 from django.test.client import RequestFactory
 from django.urls import resolve
 from mitol.common.factories import UserFactory
+from mitol.common.utils.datetime import now_in_utc
 
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from cms.factories import (
@@ -34,7 +36,7 @@ from courses.factories import (
 )
 from courses.models import CourseRun, limit_to_certificate_pages
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
-from ecommerce.factories import ProductFactory
+from ecommerce.factories import DiscountFactory, ProductFactory
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
@@ -556,3 +558,25 @@ def test_courseware_title_synced_with_product_page_title(test_course):
     )
 
     assert courseware.title == updated_title
+
+
+def test_get_current_finaid_with_flex_price_for_expired_course_run(mocker):
+    """
+    Tests that get_current_finaid returns None for a user approved for
+    financial aid on a course with only expired course runs.
+    """
+    now = now_in_utc()
+    course_run = CourseRunFactory.create(enrollment_end=now - timedelta(days=10))
+    ProductFactory.create(purchasable_object=course_run)
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = UserFactory.create()
+    patched_flexible_price_approved = mocker.patch(
+        "flexiblepricing.api.is_courseware_flexible_price_approved"
+    )
+    patched_flexible_price_discount = mocker.patch(
+        "flexiblepricing.api.determine_courseware_flexible_price_discount"
+    )
+    assert course_run.course.page.get_current_finaid(request) is None
+    patched_flexible_price_discount.assert_not_called()
+    patched_flexible_price_approved.assert_not_called()
