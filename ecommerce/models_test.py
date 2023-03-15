@@ -82,7 +82,7 @@ def basket():
 
 def perform_discount_redemption(user, discount):
     """Redeems a discount."""
-    order = Order(purchaser=user, total_price_paid=10)
+    order = Order(purchaser=user, state=Order.STATE.FULFILLED, total_price_paid=10)
     order.save()
 
     redemption = DiscountRedemption(

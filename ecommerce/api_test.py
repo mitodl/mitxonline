@@ -1,5 +1,6 @@
 """Tests for Ecommerce api"""
 
+import logging
 import random
 import uuid
 from datetime import datetime
@@ -16,13 +17,17 @@ from reversion.models import Version
 from courses.factories import CourseRunEnrollmentFactory
 from ecommerce.api import (
     check_and_process_pending_orders_for_resolution,
+    check_for_duplicate_discount_redemptions,
     process_cybersource_payment_response,
     refund_order,
     unenroll_learner_from_order,
 )
 from ecommerce.constants import TRANSACTION_TYPE_PAYMENT, TRANSACTION_TYPE_REFUND
 from ecommerce.factories import (
+    DiscountRedemptionFactory,
     LineFactory,
+    OneTimeDiscountFactory,
+    OneTimePerUserDiscountFactory,
     OrderFactory,
     ProductFactory,
     TransactionFactory,
@@ -559,3 +564,38 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
         order.refresh_from_db()
         assert order.state == Order.STATE.FULFILLED
         assert (fulfilled, cancelled, errored) == (1, 0, 0)
+
+
+@pytest.mark.parametrize("peruser", [True, False])
+def test_duplicate_redemption_check(peruser):
+    """
+    Tests the check for multiple discount redemptions. Set peruser to test a
+    one-time-per-user discount.
+    """
+
+    def make_stuff(user, discount):
+        """Helper function to DRY out the rest of the test"""
+        order = OrderFactory.create(purchaser=user, state=Order.STATE.FULFILLED)
+        redemption = DiscountRedemptionFactory.create(
+            redeemed_by=user, redeemed_discount=discount, redeemed_order=order
+        )
+
+        return (order, redemption)
+
+    discount = (
+        OneTimePerUserDiscountFactory.create()
+        if peruser
+        else OneTimeDiscountFactory.create()
+    )
+
+    user = UserFactory.create()
+    first_redemption = make_stuff(user, discount)
+
+    if not peruser:
+        user = UserFactory.create()
+
+    second_redemption = make_stuff(user, discount)
+
+    seen_ids = check_for_duplicate_discount_redemptions()
+
+    assert discount.id in seen_ids
