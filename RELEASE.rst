@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.62.7
+Version 0.62.7 (Released March 15, 2023)
 --------------
 
 - Adjust discount redemption checks to only consider orders in Fulfilled state for validity
