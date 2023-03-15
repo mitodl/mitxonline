@@ -25,6 +25,7 @@ from openedx.api import (
     create_edx_user,
     create_user,
     enroll_in_edx_course_runs,
+    existing_edx_enrollment,
     get_edx_api_client,
     get_valid_edx_api_auth,
     repair_faulty_edx_user,
@@ -40,6 +41,7 @@ from openedx.api import (
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
     EDX_ENROLLMENT_AUDIT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
     OPENEDX_REPAIR_GRACE_PERIOD_MINS,
     PLATFORM_EDX,
 )
@@ -785,3 +787,64 @@ def test_unsubscribe_from_edx_course_emails_failure(
 
     with pytest.raises(expected_exception):
         unsubscribe_from_edx_course_emails(user, run_enrollment.run)
+
+
+@pytest.mark.parametrize(
+    "edx_enrollment_is_active, edx_enrollment_mode, enrollment_mode_to_match, enrollment_is_active_to_match, existing_edx_enrollment_found",
+    [
+        (True, EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_AUDIT_MODE, True, True),
+        (False, EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_AUDIT_MODE, True, False),
+        (True, EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE, True, False),
+        (True, EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_VERIFIED_MODE, True, True),
+        (
+            False,
+            EDX_ENROLLMENT_VERIFIED_MODE,
+            EDX_ENROLLMENT_VERIFIED_MODE,
+            True,
+            False,
+        ),
+        (True, EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE, True, False),
+        (True, EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_AUDIT_MODE, False, False),
+        (True, EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE, False, False),
+    ],
+)
+def test_existing_edx_enrollment(
+    mocker,
+    user,
+    edx_enrollment_is_active,
+    edx_enrollment_mode,
+    enrollment_mode_to_match,
+    enrollment_is_active_to_match,
+    existing_edx_enrollment_found,
+):
+    """existing_edx_enrollment should return enrollments matching parameters provided."""
+    run_id = "course-v1:abc"
+    mock_client = mocker.MagicMock()
+    mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
+
+    mock_client.enrollments.get_enrollments = mocker.Mock(
+        return_value=[
+            mocker.Mock(mode=edx_enrollment_mode, is_active=edx_enrollment_is_active)
+        ]
+    )
+
+    if existing_edx_enrollment_found:
+        assert (
+            existing_edx_enrollment(
+                user,
+                run_id,
+                enrollment_mode_to_match,
+                is_active=enrollment_is_active_to_match,
+            )
+            is not None
+        )
+    else:
+        assert (
+            existing_edx_enrollment(
+                user,
+                run_id,
+                enrollment_mode_to_match,
+                is_active=enrollment_is_active_to_match,
+            )
+            is None
+        )

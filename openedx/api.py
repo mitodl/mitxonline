@@ -526,7 +526,7 @@ def get_edx_grades_with_users(course_run, user=None):
                 yield edx_grade, user
 
 
-def existing_edx_enrollment(user, course_id, mode):
+def existing_edx_enrollment(user, course_id, mode, is_active=True):
     """
     Returns enrollment object if user is already enrolled in edx course run.
 
@@ -534,6 +534,7 @@ def existing_edx_enrollment(user, course_id, mode):
         user (users.models.User): The user to enroll
         courseware_id : The course runs to enroll in
         mode (str): The course mode to enroll the user with
+        is_active (boolean): Whether the expected course run enrollment is active.
 
     Returns:
         (edx_api.enrollments.models.Enrollment or None):
@@ -544,7 +545,7 @@ def existing_edx_enrollment(user, course_id, mode):
         course_id=course_id, usernames=[user.username]
     )
     for enrollment in edx_enrollments:
-        if enrollment.mode == mode:
+        if enrollment.mode == mode and enrollment.is_active == is_active:
             return enrollment
     return None
 
