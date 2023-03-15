@@ -567,7 +567,7 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
 
 
 @pytest.mark.parametrize("peruser", [True, False])
-def test_duplicate_redemption_check(caplog, peruser):
+def test_duplicate_redemption_check(peruser):
     """
     Tests the check for multiple discount redemptions. Set peruser to test a
     one-time-per-user discount.
@@ -575,7 +575,7 @@ def test_duplicate_redemption_check(caplog, peruser):
 
     def make_stuff(user, discount):
         """Helper function to DRY out the rest of the test"""
-        order = OrderFactory.create(purchaser=user)
+        order = OrderFactory.create(purchaser=user, state=Order.STATE.FULFILLED)
         redemption = DiscountRedemptionFactory.create(
             redeemed_by=user, redeemed_discount=discount, redeemed_order=order
         )
