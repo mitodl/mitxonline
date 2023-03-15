@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.62.6
+Version 0.62.6 (Released March 15, 2023)
 --------------
 
 - Course page 500 error for expired course runs and flex price (#1486)
