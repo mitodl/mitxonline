@@ -32,7 +32,7 @@ The product for the courses will both be $999 so they are under the limit
 for test CyberSource transactions.
 
 If the --tutor/-T option is passed, the command will use the local.overhang.io
-address for links to edX rather than edx.odl.local:18000. 
+address for links to edX rather than edx.odl.local:18000.
 
 This uses other management commands to complete these tasks. So, if you just
 want to run part of this, use one of these commands:
@@ -117,11 +117,27 @@ class Command(BaseCommand):
             dest="tutor",
         )
 
+        parser.add_argument(
+            "--tutor-dev",
+            help="Configure for Tutor Dev/Nightly.",
+            action="store_true",
+            dest="tutordev",
+        )
+
+    def determine_edx_hostport(self, *args, **kwargs):
+        """Returns a tuple of the edX host and port depending on what the user's passed in"""
+
+        if kwargs["tutor"]:
+            return ("local.overhang.io", "")
+        elif kwargs["tutordev"]:
+            return ("local.overhang.io", ":8000")
+        else:
+            return ("edx.odl.local:18000", ":18000")
+
     def handle(self, *args, **kwargs):
         """Coordinates the other commands."""
 
-        edx_host = "local.overhang.io" if kwargs["tutor"] else "edx.odl.local:18000"
-        edx_gateway_port = "" if kwargs["tutor"] else ":18000"
+        (edx_host, edx_gateway_port) = self.determine_edx_hostport(**kwargs)
 
         # Step -1: run createsuperuesr
         if kwargs["superuser"]:

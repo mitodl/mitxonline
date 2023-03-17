@@ -6,7 +6,7 @@ These instructions describe setting up MITx Online and Tutor from scratch on Lin
 
 ..
 
-   These instructions may work for you if you need to do Open edX development too. However, these instructions *are not* geared towards that end. You may be able to replace calls to ``tutor local`` with calls to ``tutor dev``\ , but I had a number of problems with CORS headers when trying to log in. Your mileage may vary.
+   These instructions should work for a Tutor Dev or Tutor Nightly deployment as well. Specify ``--tutor-dev`` instead of ``--tutor`` when running ``configure_instance`` so the URLs have a port on them.
 
 
 At the end of this guide, you should have:
@@ -132,10 +132,10 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
         SKIP_EMAIL_VALIDATION: true
 
    to the ``FEATURES`` block (should be at the top).
-#. Edit the ``env/apps/openedx/settings/lms/production.py`` settings file.
+#. Edit the ``env/apps/openedx/settings/lms/production.py`` and/or ``env/apps/openedx/settings/lms/development.py`` settings file. (The former is used by a local instance, where the latter is used by both dev and nightly instances.)
 
    * Add to the end of the file:
-      
+
       * ``THIRD_PARTY_AUTH_BACKENDS = ['social_auth_mitxpro.backends.MITxProOAuth2']``
       * ``AUTHENTICATION_BACKENDS.append('social_auth_mitxpro.backends.MITxProOAuth2')``
       * ``IDA_LOGOUT_URI_LIST.append('http://mitxonline.odl.local:8013/logout/')`` - there's an existing one of these around like 300 in production.py too.
@@ -171,7 +171,7 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
    * Enable sso id verification is checked.
    * Backend name: ``mitxpro-oauth2``
    * Client ID and Client Secret: from record created by ``configure_instance`` when you set up MITx Online.
-   * Other settings:     
+   * Other settings:
 
          {
             "AUTHORIZATION_URL": "\http://mitxonline.odl.local:8013/oauth2/authorize/",
@@ -212,4 +212,8 @@ Other Notes
 
 **Trying to set configuration settings via ``tutor config`` will undo the specialty configuration above.** If you need to make changes to the configuration, either manually edit the ``env/apps/openedx/config/lms.env.yml`` file or the ``env/apps/openedx/settings/lms/production.py`` file and restart your Tutor instance.
 
-**Make sure your service worker account is active.** It's an easy checkbox to miss. 
+**Make sure your service worker account is active.** It's an easy checkbox to miss.
+
+**Restarting** If you want to rebuild from scratch, make sure you ``docker image prune``. It's also recommended to remove the Tutor project root folder - ``tutor config printroot`` will tell you where that is.
+
+**Running Multiple Tutor Instances** If you want to run more than one Tutor instance, it's pretty important to specify the project root explicitly or you may end up with one instance trying to use config files from another and things getting confused from there. `See the Tutor documentation for this. <https://docs.tutor.overhang.io/local.html#tutor-root>`_ (A suggestion: configure aliases to the ``tutor`` command that run ``tutor --root=<whatever>`` so you don't have to rely on environment variables, especially if you keep multiple terminal sessions going.)
