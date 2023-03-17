@@ -183,6 +183,42 @@ def test_create_edx_user_conflict(settings, user):
 
 
 @responses.activate
+@pytest.mark.parametrize(
+    "open_edx_user_record_exists,open_edx_user_record_has_been_synced",
+    itertools.product([True, False], [True, False]),
+)
+def test_create_edx_user_for_user_not_synced_with_edx(
+    mocker,
+    settings,
+    user,
+    open_edx_user_record_exists,
+    open_edx_user_record_has_been_synced,
+):
+    """Test that create_edx_user validates the user record on Edx if an OpenEdxUser record already exists."""
+
+    responses.add(
+        responses.POST,
+        f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
+        json=dict(success=True),
+        status=status.HTTP_200_OK,
+    )
+    OpenEdxUserFactory.create(
+        user=user, has_been_synced=open_edx_user_record_has_been_synced
+    )
+    mocker.patch(
+        "openedx.api.get_edx_api_client",
+        side_effect=ValueError("Unexpected error")
+        if not open_edx_user_record_exists
+        else None,
+    )
+
+    user_created_in_edx = create_edx_user(user)
+
+    assert OpenEdxUser.objects.get(user=user).has_been_synced is True
+    assert user_created_in_edx is False if open_edx_user_record_exists else True
+
+
+@responses.activate
 def test_validate_edx_username_conflict(settings, user):
     """Test that validate_username_with_edx handles a username validation conflict"""
     edx_username_validation_response_mock(True, settings)
@@ -502,19 +538,16 @@ def test_repair_faulty_edx_user(mocker, user, no_openedx_user, no_edx_auth):
     Tests that repair_faulty_edx_user creates OpenEdxUser/OpenEdxApiAuth objects as necessary and
     returns flags that indicate what was created
     """
-    patched_create_edx_user = mocker.patch("openedx.api.create_edx_user")
     patched_create_edx_auth_token = mocker.patch("openedx.api.create_edx_auth_token")
-    openedx_user = OpenEdxUserFactory.create(user=user)
-    patched_find_object = mocker.patch(
-        "openedx.api.find_object_with_matching_attr",
-        return_value=None if no_openedx_user else openedx_user,
+    OpenEdxUserFactory.create(user=user)
+    mocker.patch(
+        "openedx.api.create_edx_user",
+        return_value=True if no_openedx_user else False,
     )
     openedx_api_auth = None if no_edx_auth else OpenEdxApiAuthFactory.build()
     user.openedx_api_auth = openedx_api_auth
 
     created_user, created_auth_token = repair_faulty_edx_user(user)
-    patched_find_object.assert_called()
-    assert patched_create_edx_user.called is no_openedx_user
     assert patched_create_edx_auth_token.called is no_edx_auth
     assert created_user is no_openedx_user
     assert created_auth_token is no_edx_auth
