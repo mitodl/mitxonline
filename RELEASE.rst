@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.62.8
+--------------
+
+- fix and tests (#1491)
+- feat: sync certificate_available_date with edX (#1478)
+
 Version 0.62.7 (Released March 15, 2023)
 --------------
 
