@@ -12,6 +12,8 @@ asgiref==3.3.4
     # via
     #   django
     #   djoser
+asttokens==2.2.1
+    # via stack-data
 attrs==22.1.0
     # via pytest
 backcall==0.2.0
@@ -203,6 +205,8 @@ edx-opaque-keys==2.2.2
     # via mitol-django-openedx
 et-xmlfile==1.1.0
     # via openpyxl
+executing==1.2.0
+    # via stack-data
 factory-boy==3.2.0
     # via
     #   mitol-django-common
@@ -242,7 +246,7 @@ idna==2.10
     # via requests
 iniconfig==1.1.1
     # via pytest
-ipython==7.31.1
+ipython==8.10.0
     # via -r requirements.in
 ipython-genutils==0.2.0
     # via traitlets
@@ -322,7 +326,7 @@ pluggy==0.13.1
     #   pytest
 premailer==3.9.0
     # via mitol-django-mail
-prompt-toolkit==3.0.18
+prompt-toolkit==3.0.38
     # via
     #   click-repl
     #   ipython
@@ -330,6 +334,8 @@ psycopg2==2.9.5
     # via -r requirements.in
 ptyprocess==0.7.0
     # via pexpect
+pure-eval==0.2.2
+    # via stack-data
 py==1.10.0
     # via pytest
 pyasn1==0.4.8
@@ -414,6 +420,7 @@ sentry-sdk==1.4.2
     # via -r requirements.in
 six==1.16.0
     # via
+    #   asttokens
     #   bleach
     #   click-repl
     #   cybersource-rest-client-python
@@ -439,6 +446,8 @@ soupsieve==2.2.1
     # via beautifulsoup4
 sqlparse==0.4.2
     # via django
+stack-data==0.6.2
+    # via ipython
 stevedore==3.5.0
     # via edx-opaque-keys
 tablib[xls,xlsx]==3.0.0
