@@ -18,7 +18,7 @@ class OpenEdxUser(TimestampedModel):
         max_length=20, choices=OPENEDX_PLATFORM_CHOICES, default=PLATFORM_EDX
     )
     has_been_synced = models.BooleanField(
-        default=True,
+        default=False,
         help_text="Indicates whether a corresponding user has been created on the openedx platform",
     )
 

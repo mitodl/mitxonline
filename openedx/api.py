@@ -94,12 +94,21 @@ def create_edx_user(user):
     )
 
     with transaction.atomic():
-        _, created = OpenEdxUser.objects.select_for_update().get_or_create(
+        open_edx_user, created = OpenEdxUser.objects.select_for_update().get_or_create(
             user=user, platform=PLATFORM_EDX
         )
 
-        if not created:
-            return
+        if not created and open_edx_user.has_been_synced:
+            # Here we should check with edx that the user exists on that end.
+            try:
+                client = get_edx_api_client(user)
+                client.user_info.get_user_info()
+            except:
+                pass
+            else:
+                open_edx_user.has_been_synced = True
+                open_edx_user.save()
+                return False
 
         # a non-200 status here will ensure we rollback creation of the OpenEdxUser and try again
         req_session = requests.Session()
@@ -125,6 +134,9 @@ def create_edx_user(user):
             raise OpenEdxUserCreateError(
                 f"Error creating Open edX user. {get_error_response_summary(resp)}"
             )
+        open_edx_user.has_been_synced = True
+        open_edx_user.save()
+        return True
 
 
 @transaction.atomic
@@ -290,14 +302,7 @@ def repair_faulty_edx_user(user):
     """
     created_user, created_auth_token = False, False
     try:
-        if (
-            find_object_with_matching_attr(
-                user.openedx_users.all(), "platform", value=PLATFORM_EDX
-            )
-            is None
-        ):
-            create_edx_user(user)
-            created_user = True
+        created_user = create_edx_user(user)
     except Exception as e:
         # 409 means we have a username conflict - pass in that case so we can
         # try to create the api auth tokens; re-raise otherwise
