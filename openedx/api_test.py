@@ -205,17 +205,18 @@ def test_create_edx_user_for_user_not_synced_with_edx(
     OpenEdxUserFactory.create(
         user=user, has_been_synced=open_edx_user_record_has_been_synced
     )
-    mocker.patch(
-        "openedx.api.get_edx_api_client",
-        side_effect=ValueError("Unexpected error")
-        if not open_edx_user_record_exists
-        else None,
+    mock_client = mocker.MagicMock()
+    mock_client.user_info.get_user_info = mocker.Mock(
+        side_effect=Exception if not open_edx_user_record_exists else None,
     )
+    mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
 
     user_created_in_edx = create_edx_user(user)
 
     assert OpenEdxUser.objects.get(user=user).has_been_synced is True
-    assert user_created_in_edx is False if open_edx_user_record_exists else True
+    assert user_created_in_edx is not (
+        open_edx_user_record_exists and open_edx_user_record_has_been_synced
+    )
 
 
 @responses.activate
