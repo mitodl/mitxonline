@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.62.9
+Version 0.62.9 (Released March 20, 2023)
 --------------
 
 - Resolve issue when repairing user's edx synchronised records (#1496)
