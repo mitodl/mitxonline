@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.62.8
+Version 0.62.8 (Released March 20, 2023)
 --------------
 
 - fix and tests (#1491)
