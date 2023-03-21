@@ -41,7 +41,9 @@ export class EditProfilePage extends React.Component<Props> {
     const { editProfile } = this.props
 
     // setting this to true if you edit your profile at all
-    profileData.user_profile.addl_field_flag = true
+    if (profileData.user_profile) {
+      profileData.user_profile.addl_field_flag = true
+    }
 
     try {
       const {
