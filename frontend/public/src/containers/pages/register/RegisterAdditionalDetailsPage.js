@@ -2,121 +2,82 @@
 /* global SETTINGS: false */
 import React from "react"
 import DocumentTitle from "react-document-title"
-import {
-  ALERT_TYPE_DANGER,
-  REGISTER_EXTRA_DETAILS_PAGE_TITLE
-} from "../../../constants"
+import { Formik, Form } from "formik"
+import { REGISTER_EXTRA_DETAILS_PAGE_TITLE } from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { Link } from "react-router-dom"
 import { connectRequest, mutateAsync, requestAsync } from "redux-query"
 import { createStructuredSelector } from "reselect"
 
-import auth from "../../../lib/queries/auth"
-import users from "../../../lib/queries/users"
+import users, { currentUserSelector } from "../../../lib/queries/users"
 import { routes } from "../../../lib/urls"
-import {
-  STATE_ERROR,
-  handleAuthResponse,
-  STATE_REGISTER_DETAILS
-} from "../../../lib/auth"
 import queries from "../../../lib/queries"
-import { qsPartialTokenSelector } from "../../../lib/selectors"
 
-import RegisterDetailsForm from "../../../components/forms/RegisterDetailsForm"
+import {
+  addlProfileFieldsValidation,
+  AddlProfileFields
+} from "../../../components/forms/ProfileFormFields"
 
-import type { RouterHistory, Location } from "react-router"
 import type { Response } from "redux-query"
-import type {
-  AuthResponse,
-  LegalAddress,
-  UserProfile,
-  User,
-  Country
-} from "../../../flow/authTypes"
+import type { User } from "../../../flow/authTypes"
 import { addUserNotification } from "../../../actions"
 
-type RegisterProps = {|
-  location: Location,
-  history: RouterHistory,
-  params: { partialToken: string }
-|}
-
 type StateProps = {|
-  countries: Array<Country>
+  currentUser: User
 |}
 
 type DispatchProps = {|
-  registerDetails: (
-    name: string,
-    password: string,
-    username: string,
-    legalAddress: LegalAddress,
-    userProfile: UserProfile,
-    partialToken: string
-  ) => Promise<Response<AuthResponse>>,
-  getCurrentUser: () => Promise<Response<User>>,
-  addUserNotification: Function
+  editProfile: (userProfileData: User) => Promise<Response<User>>,
+  getCurrentUser: () => Promise<Response<User>>
 |}
 
 type Props = {|
-  ...RegisterProps,
   ...StateProps,
   ...DispatchProps
 |}
 
+const getInitialValues = (user: User) => ({
+  name:          user.name,
+  email:         user.email,
+  legal_address: user.legal_address,
+  user_profile:  user.user_profile
+})
+
 export class RegisterAdditionalDetailsPage extends React.Component<Props> {
   async onSubmit(detailsData: any, { setSubmitting, setErrors }: any) {
-    const {
-      history,
-      registerDetails,
-      params: { partialToken },
-      addUserNotification
-    } = this.props
+    const { editProfile } = this.props
+
+    // On this page, if the user selects stuff for learner type and education
+    // level, we also set the field flag so we don't ping the learner later to
+    // fill in data.
+
+    if (
+      detailsData.user_profile.highest_education !== "" &&
+      (detailsData.user_profile.type_is_educator ||
+        detailsData.user_profile.type_is_other ||
+        detailsData.user_profile.type_is_professional ||
+        detailsData.user_profile.type_is_student)
+    ) {
+      detailsData.user_profile.addl_field_flag = true
+    }
 
     try {
-      const { body } = await registerDetails(
-        detailsData.name,
-        detailsData.password,
-        detailsData.username,
-        detailsData.legal_address,
-        detailsData.user_profile,
-        partialToken
-      )
+      const {
+        body: { errors }
+      }: { body: Object } = await editProfile(detailsData)
 
-      if (body.errors) {
-        body.errors.forEach(error => {
-          addUserNotification({
-            "registration-failed-status": {
-              type:  ALERT_TYPE_DANGER,
-              props: {
-                text: error
-              }
-            }
-          })
-        })
+      if (errors && errors.length > 0) {
+        setErrors(errors)
+      } else {
+        window.location = routes.dashboard
       }
-
-      /* eslint-disable camelcase */
-      handleAuthResponse(history, body, {
-        [STATE_ERROR]: ({ field_errors }: AuthResponse) =>
-          setErrors(field_errors),
-        [STATE_REGISTER_DETAILS]: ({ field_errors }: AuthResponse) => {
-          // Validation failures will result in a 200 API response that still points to this page but contains
-          // field errors.
-          if (field_errors) {
-            setErrors(field_errors)
-          }
-        }
-      })
-      /* eslint-enable camelcase */
     } finally {
       setSubmitting(false)
     }
   }
 
   render() {
-    const { countries } = this.props
+    const { currentUser } = this.props
 
     return (
       <DocumentTitle
@@ -125,19 +86,42 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
         <div className="std-page-body container auth-page registration-page">
           <div className="auth-card card-shadow auth-form">
             <div className="auth-header">
-              <h1>Create an Account</h1>
+              <h1>About You</h1>
             </div>
             <div className="form-group">
-              {`Already have an ${SETTINGS.site_name} account? `}
-              <Link className="link-black" to={routes.login.begin}>
-                Sign in to your account
-              </Link>
+              Please tell us a bit about yourself. The data you provide here
+              will assist us in our research pursuits. All fields are optional.
             </div>
             <hr className="hr-class-margin" />
             <div className="auth-form">
-              <RegisterDetailsForm
+              <Formik
                 onSubmit={this.onSubmit.bind(this)}
-                countries={countries}
+                validationSchema={addlProfileFieldsValidation}
+                initialValues={getInitialValues(currentUser)}
+                render={({
+                  isSubmitting,
+                  setFieldValue,
+                  setFieldTouched,
+                  values
+                }) => (
+                  <Form>
+                    <AddlProfileFields
+                      setFieldValue={setFieldValue}
+                      setFieldTouched={setFieldTouched}
+                      values={values}
+                      isNewAccount={false}
+                    />
+                    <div className="row submit-row no-gutters justify-content-end">
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={isSubmitting}
+                      >
+                        Submit
+                      </button>
+                    </div>
+                  </Form>
+                )}
               />
             </div>
           </div>
@@ -148,30 +132,13 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
 }
 
 const mapStateToProps = createStructuredSelector({
-  params:    createStructuredSelector({ partialToken: qsPartialTokenSelector }),
-  countries: queries.users.countriesSelector
+  currentUser: currentUserSelector
 })
 
 const mapPropsToConfig = () => [queries.users.countriesQuery()]
 
-const registerDetails = (
-  name: string,
-  password: string,
-  username: string,
-  legalAddress: LegalAddress,
-  userProfile: UserProfile,
-  partialToken: string
-) =>
-  mutateAsync(
-    auth.registerDetailsMutation(
-      name,
-      password,
-      username,
-      legalAddress,
-      userProfile,
-      partialToken
-    )
-  )
+const editProfile = (userProfileData: User) =>
+  mutateAsync(users.editProfileMutation(userProfileData))
 
 const getCurrentUser = () =>
   requestAsync({
@@ -180,7 +147,7 @@ const getCurrentUser = () =>
   })
 
 const mapDispatchToProps = {
-  registerDetails,
+  editProfile,
   getCurrentUser,
   addUserNotification
 }

@@ -40,6 +40,9 @@ export class EditProfilePage extends React.Component<Props> {
   async onSubmit(profileData: User, { setSubmitting, setErrors }: Object) {
     const { editProfile } = this.props
 
+    // setting this to true if you edit your profile at all
+    profileData.user_profile.addl_field_flag = true
+
     try {
       const {
         body: { errors }

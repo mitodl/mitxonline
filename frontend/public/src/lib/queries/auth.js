@@ -81,6 +81,27 @@ export default {
     }
   }),
 
+  registerAdditionalDetailsMutation: (
+    name: string,
+    password: string,
+    username: string,
+    legalAddress: LegalAddress,
+    userProfile: ?UserProfile,
+    partialToken: string
+  ) => ({
+    ...DEFAULT_OPTIONS,
+    url:  "/api/register/extra/",
+    body: {
+      name,
+      password,
+      username,
+      legal_address: legalAddress,
+      user_profile:  userProfile,
+      flow:          FLOW_REGISTER,
+      partial_token: partialToken
+    }
+  }),
+
   forgotPasswordMutation: (email: string) => ({
     url:     "/api/password_reset/",
     body:    { email },
