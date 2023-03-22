@@ -190,9 +190,7 @@ export class DashboardPage extends React.Component<
             <div className="col-12">
               <p>
                 To help us with our education research missions, please tell us
-                more about yourself. If you do not want to supply this
-                information, simply click the Close button - we won't ask you
-                again.
+                more about yourself.
               </p>
             </div>
           </div>
@@ -201,6 +199,7 @@ export class DashboardPage extends React.Component<
             onSubmit={this.saveProfile.bind(this)}
             onCancel={() => this.toggleAddlProfileFieldsModal()}
             user={currentUser}
+            requireTypeFields={true}
           ></AddlProfileFieldsForm>
         </ModalBody>
       </Modal>
