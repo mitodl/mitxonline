@@ -333,7 +333,9 @@ export class ProductDetailEnrollApp extends React.Component<
               <a
                 href={run.courseware_url}
                 onClick={ev =>
-                  this.redirectToCourseHomepage(run.courseware_url, ev)
+                  run
+                    ? this.redirectToCourseHomepage(run.courseware_url, ev)
+                    : ev
                 }
                 className={`btn btn-primary btn-gradient-red highlight outline ${disableEnrolledBtn}`}
                 target="_blank"
