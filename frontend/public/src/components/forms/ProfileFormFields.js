@@ -115,18 +115,33 @@ export const addlProfileFieldsValidation = yup.object().shape({
     leadership_level: yup
       .string()
       .label("Leadership Level")
-      .nullable(),
-    highest_education: yup
-      .string()
-      .label("Highest Level of Education")
-      .nullable(),
-    type_multi:           yup.string().nullable(),
-    type_is_student:      yup.boolean().nullable(),
-    type_is_professional: yup.boolean().nullable(),
-    type_is_educator:     yup.boolean().nullable(),
-    type_is_other:        yup.boolean().nullable()
-  })
+      .nullable()
+  }),
+  highest_education: yup
+    .string()
+    .label("Highest Level of Education")
+    .nullable(),
+  type_is_student:      yup.boolean().nullable(),
+  type_is_professional: yup.boolean().nullable(),
+  type_is_educator:     yup.boolean().nullable(),
+  type_is_other:        yup.boolean().nullable()
 })
+
+export const requireLearnerTypeFields = {
+  name:      "require_learner_type_fields",
+  message:   "Please specify which category you fall into.",
+  exclusive: false,
+  params:    {},
+  test:      (testValue: any, context: any) => {
+    return (
+      testValue ||
+      context.parent.type_is_student ||
+      context.parent.type_is_professional ||
+      context.parent.type_is_educator ||
+      context.parent.type_is_other
+    )
+  }
+}
 
 type LegalAddressProps = {
   countries: Array<Country>,
@@ -138,7 +153,8 @@ type LegalAddressProps = {
 
 type AddlProfileFieldsProps = {
   values: Object,
-  setFieldValue: Function
+  setFieldValue: Function,
+  requireAddlFields: ?boolean
 }
 
 const findStates = (country: string, countries: Array<Country>) => {
@@ -416,7 +432,10 @@ export const ProfileFields = () => (
   </React.Fragment>
 )
 
-export const AddlProfileFields = ({ values }: AddlProfileFieldsProps) => (
+export const AddlProfileFields = ({
+  values,
+  requireAddlFields
+}: AddlProfileFieldsProps) => (
   <React.Fragment>
     <div className="form-group">
       <div className="row">
@@ -425,7 +444,7 @@ export const AddlProfileFields = ({ values }: AddlProfileFieldsProps) => (
             htmlFor="user_profile.highest_education"
             className="font-weight-bold"
           >
-            Highest Level of Education
+            Highest Level of Education{requireAddlFields ? "*" : ""}
           </label>
           <Field
             component="select"
@@ -440,12 +459,17 @@ export const AddlProfileFields = ({ values }: AddlProfileFieldsProps) => (
               </option>
             ))}
           </Field>
+          <ErrorMessage
+            name="user_profile.highest_education"
+            id="user_profile.highest_education_error"
+            component={FormError}
+          />
         </div>
       </div>
     </div>
     <div className="form-group">
       <label htmlFor="user_profile.type_multi" className="font-weight-bold">
-        Are you a:
+        Are you a{requireAddlFields ? "*" : ""}
       </label>
       <div className="row">
         <div className="col-6">
@@ -519,6 +543,15 @@ export const AddlProfileFields = ({ values }: AddlProfileFieldsProps) => (
               Other
             </label>
           </div>
+        </div>
+      </div>
+      <div className="row">
+        <div className="col-12">
+          <ErrorMessage
+            name="user_profile.type_is_student"
+            id="user_profile.type_is_student_Error"
+            component={FormError}
+          />
         </div>
       </div>
     </div>

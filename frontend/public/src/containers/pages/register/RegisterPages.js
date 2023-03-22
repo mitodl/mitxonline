@@ -8,6 +8,7 @@ import RegisterEmailPage from "./RegisterEmailPage"
 import RegisterConfirmPage from "./RegisterConfirmPage"
 import RegisterConfirmSentPage from "./RegisterConfirmSentPage"
 import RegisterDetailsPage from "./RegisterDetailsPage"
+import RegisterAdditionalDetailsPage from "./RegisterAdditionalDetailsPage"
 import RegisterDeniedPage from "./RegisterDeniedPage"
 import RegisterErrorPage from "./RegisterErrorPage"
 
@@ -29,6 +30,11 @@ const RegisterPages = () => (
         exact
         path={routes.register.details}
         component={RegisterDetailsPage}
+      />
+      <Route
+        exact
+        path={routes.register.additionalDetails}
+        component={RegisterAdditionalDetailsPage}
       />
       <Route exact path={routes.register.error} component={RegisterErrorPage} />
       <Route

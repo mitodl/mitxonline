@@ -63,6 +63,7 @@ urlpatterns = [
     ),
     path("create-account/", index, name="signup"),
     path("create-account/details/", index, name="signup-details"),
+    path("create-account/additional-details/", index, name="signup-addl-details"),
     path("create-account/denied/", index, name="signup-denied"),
     path("create-account/error/", index, name="signup-error"),
     path("create-account/confirm/", index, name="register-confirm"),

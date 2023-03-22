@@ -18,12 +18,15 @@ import { routes } from "../../../lib/urls"
 import {
   STATE_ERROR,
   handleAuthResponse,
-  STATE_REGISTER_DETAILS
+  STATE_REGISTER_DETAILS,
+  STATE_SUCCESS
 } from "../../../lib/auth"
 import queries from "../../../lib/queries"
 import { qsPartialTokenSelector } from "../../../lib/selectors"
+import { checkFeatureFlag } from "../../../lib/util"
 
 import RegisterDetailsForm from "../../../components/forms/RegisterDetailsForm"
+import { addUserNotification } from "../../../actions"
 
 import type { RouterHistory, Location } from "react-router"
 import type { Response } from "redux-query"
@@ -34,7 +37,6 @@ import type {
   User,
   Country
 } from "../../../flow/authTypes"
-import { addUserNotification } from "../../../actions"
 
 type RegisterProps = {|
   location: Location,
@@ -53,7 +55,8 @@ type DispatchProps = {|
     username: string,
     legalAddress: LegalAddress,
     userProfile: UserProfile,
-    partialToken: string
+    partialToken: string,
+    next: ?string
   ) => Promise<Response<AuthResponse>>,
   getCurrentUser: () => Promise<Response<User>>,
   addUserNotification: Function
@@ -95,6 +98,13 @@ export class RegisterDetailsPage extends React.Component<Props> {
             }
           })
         })
+      }
+
+      if (
+        body.state === STATE_SUCCESS &&
+        checkFeatureFlag("enable_addl_profile_fields")
+      ) {
+        body.redirect_url = routes.register.additionalDetails
       }
 
       /* eslint-disable camelcase */

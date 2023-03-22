@@ -27,6 +27,8 @@ import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
 import { enrollmentMutation } from "../lib/queries/enrollment"
+import { checkFeatureFlag } from "../lib/util"
+import AddlProfileFieldsForm from "../components/forms/AddlProfileFieldsForm"
 
 type Props = {
   courseId: string,
@@ -36,11 +38,14 @@ type Props = {
   upgradeEnrollmentDialogVisibility: boolean,
   addProductToBasket: (user: number, productId: number) => Promise<any>,
   currentUser: User,
-  createEnrollment: (runId: number) => Promise<any>
+  createEnrollment: (runId: number) => Promise<any>,
+  updateAddlFields: (currentUser: User) => Promise<any>
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
-  currentCourseRun: ?EnrollmentFlaggedCourseRun
+  showAddlProfileFieldsModal: boolean,
+  currentCourseRun: ?EnrollmentFlaggedCourseRun,
+  destinationUrl: string
 }
 
 export class ProductDetailEnrollApp extends React.Component<
@@ -49,7 +54,62 @@ export class ProductDetailEnrollApp extends React.Component<
 > {
   state = {
     upgradeEnrollmentDialogVisibility: false,
-    currentCourseRun:                  null
+    currentCourseRun:                  null,
+    showAddlProfileFieldsModal:        false,
+    destinationUrl:                    ""
+  }
+
+  toggleAddlProfileFieldsModal() {
+    this.setState({
+      showAddlProfileFieldsModal: !this.state.showAddlProfileFieldsModal
+    })
+
+    if (
+      !this.state.showAddlProfileFieldsModal &&
+      this.state.destinationUrl.length > 0
+    ) {
+      const target = this.state.destinationUrl
+      this.setState({
+        destinationUrl: ""
+      })
+      window.open(target, "_blank")
+    }
+  }
+
+  redirectToCourseHomepage(url: string, ev: any) {
+    /*
+    If we've got addl_field_flag, then display the extra info modal. Otherwise,
+    send the learner directly to the page.
+    */
+
+    const { currentUser, updateAddlFields } = this.props
+
+    if (
+      !checkFeatureFlag("enable_addl_profile_fields") ||
+      (currentUser.user_profile && currentUser.user_profile.addl_field_flag)
+    ) {
+      return
+    }
+
+    ev.preventDefault()
+
+    this.setState({
+      destinationUrl:             url,
+      showAddlProfileFieldsModal: true
+    })
+
+    updateAddlFields(currentUser)
+  }
+
+  async saveProfile(profileData: User, { setSubmitting }: Object) {
+    const { updateAddlFields } = this.props
+
+    try {
+      await updateAddlFields(profileData)
+    } finally {
+      setSubmitting(false)
+      this.toggleAddlProfileFieldsModal()
+    }
   }
 
   toggleUpgradeDialogVisibility = () => {
@@ -161,6 +221,7 @@ export class ProductDetailEnrollApp extends React.Component<
       </Modal>
     ) : null
   }
+
   getEnrollmentForm() {
     return (
       <form>
@@ -180,6 +241,44 @@ export class ProductDetailEnrollApp extends React.Component<
     if (dateElem) {
       dateElem.innerHTML = `<strong>${formatPrettyDate(date)}</strong>`
     }
+  }
+
+  renderAddlProfileFieldsModal() {
+    const { currentUser } = this.props
+    const { showAddlProfileFieldsModal } = this.state
+
+    return (
+      <Modal
+        id={`upgrade-enrollment-dialog`}
+        className="upgrade-enrollment-modal"
+        isOpen={showAddlProfileFieldsModal}
+        toggle={() => this.toggleAddlProfileFieldsModal()}
+      >
+        <ModalHeader
+          id={`more-info-modal-${currentUser.id}`}
+          toggle={() => this.toggleAddlProfileFieldsModal()}
+        >
+          Provide More Info
+        </ModalHeader>
+        <ModalBody>
+          <div className="row">
+            <div className="col-12">
+              <p>
+                To help us with our education research missions, please tell us
+                more about yourself.
+              </p>
+            </div>
+          </div>
+
+          <AddlProfileFieldsForm
+            onSubmit={this.saveProfile.bind(this)}
+            onCancel={() => this.toggleAddlProfileFieldsModal()}
+            user={currentUser}
+            requireTypeFields={true}
+          ></AddlProfileFieldsForm>
+        </ModalBody>
+      </Modal>
+    )
   }
 
   render() {
@@ -233,6 +332,11 @@ export class ProductDetailEnrollApp extends React.Component<
             {run.courseware_url ? (
               <a
                 href={run.courseware_url}
+                onClick={ev =>
+                  run
+                    ? this.redirectToCourseHomepage(run.courseware_url, ev)
+                    : ev
+                }
                 className={`btn btn-primary btn-gradient-red highlight outline ${disableEnrolledBtn}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -290,6 +394,7 @@ export class ProductDetailEnrollApp extends React.Component<
             {run ? this.renderUpgradeEnrollmentDialog() : null}
           </Fragment>
         )}
+        {currentUser ? this.renderAddlProfileFieldsModal() : null}
       </Loader>
     )
   }
@@ -297,6 +402,20 @@ export class ProductDetailEnrollApp extends React.Component<
 
 const createEnrollment = (run: EnrollmentFlaggedCourseRun) =>
   mutateAsync(enrollmentMutation(run.id))
+
+const updateAddlFields = (currentUser: User) => {
+  const updatedUser = {
+    name:          currentUser.name,
+    email:         currentUser.email,
+    legal_address: currentUser.legal_address,
+    user_profile:  {
+      ...currentUser.user_profile,
+      addl_field_flag: true
+    }
+  }
+
+  return mutateAsync(users.editProfileMutation(updatedUser))
+}
 
 const mapStateToProps = createStructuredSelector({
   courseRuns:  courseRunsSelector,
@@ -311,7 +430,8 @@ const mapPropsToConfig = props => [
 ]
 
 const mapDispatchToProps = {
-  createEnrollment
+  createEnrollment,
+  updateAddlFields
 }
 
 export default compose(
