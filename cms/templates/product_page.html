@@ -31,7 +31,7 @@
               >
               </video-js>
               {% else %}
-              <img src="{% feature_img_src page.feature_image %}" alt="{{ page.title }}">
+              <img src="{% feature_img_src page.feature_image %}" alt="">
               {% endif %}
             </div>
           </div>
@@ -91,7 +91,7 @@
                   </a>
                 </strong>
               </div>
-            </div>  
+            </div>
             {% endif %}
             {% if not finaid_price and page.price %}
             <div class="stat-col small">
@@ -105,7 +105,7 @@
                   {% endif %}
                 </strong>
               </div>
-            </div>  
+            </div>
             {% endif %}
           </div>
         </div>

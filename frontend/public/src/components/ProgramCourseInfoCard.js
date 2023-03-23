@@ -36,7 +36,7 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
       featuredImage = (
         <div className="col-12 col-md-auto px-0 px-md-3">
           <div className="img-container">
-            <img src={course.feature_image_src} alt="Preview image" />
+            <img src={course.feature_image_src} alt="" />
           </div>
         </div>
       )
