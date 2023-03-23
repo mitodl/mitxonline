@@ -48,7 +48,7 @@ export class CartItemCard extends React.Component<Props> {
     const startDateDescription = generateStartDateText(purchasableObject)
     const courseImage =
       course !== undefined && course.page !== null ? (
-        <img src={course.page.feature_image_src} alt={course.title} />
+        <img src={course.page.feature_image_src} alt="" />
       ) : null
     const cardKey = `cartsummarycard_${product.id}`
 
