@@ -50,6 +50,44 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     )
   }
 
+  /*
+   * Trap the navigation focus to the modal only.  This improves accessibility by restricting users
+   * to tab-navigate between elements in the modal and not the dashboard while the modal is open.
+   */
+  restrictFocusToDialog() {
+    const focusableElements = "button, [href]"
+    const modal = document.getElementById("program_enrollment_drawer")
+    if (modal) {
+      const firstFocusableElement = modal.querySelectorAll(focusableElements)[0] // get first element to be focused inside modal
+      const focusableContent = modal.querySelectorAll(focusableElements)
+      const lastFocusableElement = focusableContent[focusableContent.length - 1] // get last element to be focused inside modal
+      document.addEventListener("keydown", function(e) {
+        const isTabPressed = e.key === "Tab" || e.keyCode === 9
+
+        if (!isTabPressed) {
+          return
+        }
+
+        if (e.shiftKey) {
+          // if shift key pressed for shift + tab combination
+          if (document.activeElement === firstFocusableElement) {
+            lastFocusableElement.focus() // add focus for the last focusable element
+            e.preventDefault()
+          }
+        } else {
+          // if tab key is pressed
+          if (document.activeElement === lastFocusableElement) {
+            // if focused has reached to last focusable element then focus first focusable element after pressing tab
+            firstFocusableElement.focus() // add focus for the first focusable element
+            e.preventDefault()
+          }
+        }
+      })
+
+      firstFocusableElement.focus()
+    }
+  }
+
   renderCourseCards() {
     const { enrollment } = this.props
 
@@ -57,12 +95,14 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
       <React.Fragment>
         {enrollment.program.req_tree[0].children.map(node => {
           const interiorCourses = extractCoursesFromNode(node, enrollment)
+          const overviewAriaLabel = `${interiorCourses.length} ${node.data.title}`
 
           return (
             <div
               className="row enrolled-items"
               id={`program_enrolled_node_${node.id}`}
               key={`program_enrolled_node_${node.id}`}
+              aria-label={overviewAriaLabel}
             >
               <h6 className="text-uppercase">
                 {node.data.title} ({interiorCourses.length})
@@ -92,7 +132,12 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     )
   }
 
-  renderProgramOverview() {
+  /*
+   * Returns an array; the first item in the array equals the number of courses
+   * in the Program, the second number equals the number of courses in the
+   * program for which the user has a passing grade.
+   */
+  getNumberOfCoursesInProgram() {
     const { enrollment } = this.props
 
     if (enrollment.program.req_tree.length === 0) {
@@ -107,11 +152,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
           : 0
       })
 
-      return (
-        <>
-          {enrollment.program.courses.length} courses | {passed} passed
-        </>
-      )
+      return [enrollment.program.courses.length, passed]
     }
 
     const requiredEnrollments = extractCoursesFromNode(
@@ -141,9 +182,15 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
       return acc + passed
     }, 0)
 
+    return [allEnrollments.length, passedCount]
+  }
+
+  renderProgramOverview() {
+    const courseNumbers = this.getNumberOfCoursesInProgram()
+
     return (
       <>
-        {allEnrollments.length} courses | {passedCount} passed
+        {courseNumbers[0]} courses | {courseNumbers[1]} passed
       </>
     )
   }
@@ -155,6 +202,10 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
       if (isHidden) {
         showDrawer()
       }
+    }
+
+    if (isHidden) {
+      this.restrictFocusToDialog()
     }
 
     const backgroundClass = isHidden
@@ -172,50 +223,52 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
         ? this.renderFlatCourseCards()
         : this.renderCourseCards()
 
+    const courseNumbers = this.getNumberOfCoursesInProgram()
+
     return (
-      <>
-        <div className={backgroundClass}>
+      <div className={backgroundClass}>
+        <div
+          className={drawerClass}
+          id="program_enrollment_drawer"
+          role="dialog"
+          tabIndex="-1"
+          aria-modal="true"
+          aria-label={enrollment.program.title}
+          aria-description={`${courseNumbers[0]} courses, ${courseNumbers[1]} passed`}
+          aria-hidden={!isHidden ? true : false}
+        >
           <div
-            className={drawerClass}
-            id="program_enrollment_drawer"
-            tabIndex="-1"
-            role="dialog"
-            aria-modal="true"
-            aria-label="program courses"
-            aria-describedby="program_enrolled_items"
-            aria-hidden={!isHidden ? true : false}
+            className="row chrome d-flex flex-row mr-3"
+            id="program_enrollment_title"
           >
-            <div
-              className="row chrome d-flex flex-row mr-3"
-              id="program_enrollment_title"
+            <h3 id="dialog-title" className="flex-grow-1">
+              {enrollment.program.title}
+            </h3>
+            <button
+              type="button"
+              className="close"
+              aria-label="Close"
+              onClick={closeDrawer}
             >
-              <h3 className="flex-grow-1">{enrollment.program.title}</h3>
-              <button
-                type="button"
-                className="close"
-                aria-label="Close"
-                onClick={closeDrawer}
-              >
-                <span></span>
-              </button>
-            </div>
-            <div className="row chrome" id="program_enrollment_subtite">
-              <p>
-                Program overview: {this.renderProgramOverview()}
-                <br />
-                <a
-                  href={`/records/${enrollment.program.id}/`}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  View program record
-                </a>
-              </p>
-            </div>
-            {enrolledItemCards}
+              <span></span>
+            </button>
           </div>
+          <div className="row chrome">
+            <p>
+              Program overview: {this.renderProgramOverview()}
+              <br />
+              <a
+                href={`/records/${enrollment.program.id}/`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                View program record
+              </a>
+            </p>
+          </div>
+          {enrolledItemCards}
         </div>
-      </>
+      </div>
     )
   }
 }

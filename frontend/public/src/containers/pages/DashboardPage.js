@@ -221,7 +221,10 @@ export class DashboardPage extends React.Component<
 
     return (
       <DocumentTitle title={`${SETTINGS.site_name} | ${DASHBOARD_PAGE_TITLE}`}>
-        <div className="std-page-body dashboard container">
+        <div
+          className="std-page-body dashboard container"
+          aria-hidden={this.state.programDrawerVisibility}
+        >
           <Loader isLoading={isLoading}>
             <nav className="tabs" aria-controls="enrollment-items">
               {programEnrollmentsLength === 0 ? (

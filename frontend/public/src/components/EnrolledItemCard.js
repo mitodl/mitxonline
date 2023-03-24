@@ -666,6 +666,7 @@ export class EnrolledItemCard extends React.Component<
                   href="#program_enrollment_drawer"
                   aria-flowto="program_enrollment_drawer"
                   aria-haspopup="dialog"
+                  aria-label="Program's courses"
                   onClick={() => this.toggleProgramInfo()}
                 >
                   {courseCount} course
