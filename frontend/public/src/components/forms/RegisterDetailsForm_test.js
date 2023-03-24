@@ -74,7 +74,7 @@ describe("RegisterDetailsForm", () => {
 
       const input = wrapper.find(`input[name="${name}"]`)
       input.simulate("change", { persist: () => {}, target: { name, value } })
-      input.simulate("blur")
+      wrapper.simulate("submit")
       await wait()
       wrapper.update()
       assert.deepEqual(
@@ -137,7 +137,7 @@ describe("RegisterDetailsForm", () => {
             persist: () => {},
             target:  { name: fieldName, value: value }
           })
-          field.simulate("blur")
+          wrapper.simulate("submit")
           await wait()
           wrapper.update()
           assert.deepEqual(
@@ -178,7 +178,7 @@ describe("RegisterDetailsForm", () => {
             persist: () => {},
             target:  { name: fieldName, value: value }
           })
-          field.simulate("blur")
+          wrapper.simulate("submit")
           await wait()
           wrapper.update()
           assert.deepEqual(
