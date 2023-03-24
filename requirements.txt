@@ -131,7 +131,7 @@ django-cors-headers==3.11.0
     # via -r requirements.in
 django-countries==7.2.1
     # via -r requirements.in
-django-filter==2.4.0
+django-filter==22.1
     # via
     #   -r requirements.in
     #   wagtail
