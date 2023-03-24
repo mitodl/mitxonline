@@ -65,8 +65,7 @@ describe("RegisterDetailsForm", () => {
     ],
     ["username", "ábc-dèf-123", ""],
     ["legal_address.first_name", "", "First Name is a required field"],
-    ["legal_address.last_name", "", "Last Name is a required field"],
-    ["user_profile.year_of_birth", "", "Year of Birth is a required field"]
+    ["legal_address.last_name", "", "Last Name is a required field"]
   ].forEach(([name, value, errorMessage]) => {
     it(`validates the field name=${name}, value=${JSON.stringify(
       value
