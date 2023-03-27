@@ -428,8 +428,9 @@ export const AddlProfileFields = ({
             htmlFor="user_profile.highest_education"
             className="font-weight-bold"
           >
-            Highest Level of Education{requireAddlFields ? "*" : ""}
+            Highest Level of Education
           </label>
+          {requireAddlFields ? <span className="required">*</span> : ""}
           <Field
             component="select"
             name="user_profile.highest_education"
@@ -453,8 +454,9 @@ export const AddlProfileFields = ({
     </div>
     <div className="form-group">
       <label htmlFor="user_profile.type_multi" className="font-weight-bold">
-        Are you a{requireAddlFields ? "*" : ""}
+        Are you a
       </label>
+      {requireAddlFields ? <span className="required">*</span> : ""}
       <div className="row">
         <div className="col-6">
           <div className="form-check">

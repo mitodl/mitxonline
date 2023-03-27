@@ -19,14 +19,16 @@
             <form action="{% pageurl page %}" method="POST">
               {% csrf_token %}
               <div class="form-group">
-                <label for="your_income" id="your_income_label">Yearly Income{%if form.fields.your_income.required %}<span class="required">*</span>{% endif %}</label>
+                <label for="your_income" id="your_income_label">Yearly Income</label>
+                {%if form.fields.your_income.required %}<span class="required">*</span>{% endif %}
                 <input type="number" name="your_income" step="any" class="form-control {%if form.your_income.errors %}errored{% endif %}" id="your_income" aria-describedby="your_incomeError">
                 {% for error in form.your_income.errors %}
                   <div class="form-error" id="your_incomeError" role="alert">{{error}}</div>
                 {% endfor %}
               </div>
               <div class="form-group">
-                <label for="income_currency">Income Currency{%if form.fields.income_currency.required %}<span class="required">*</span>{% endif %}</label>
+                <label for="income_currency">Income Currency</label>
+                {%if form.fields.income_currency.required %}<span class="required">*</span>{% endif %}
                 <span class="income_currency_label">The currency you’re paid in.</span>
                 <select name="income_currency" id="income_currency" class="form-control {%if form.income_currency.errors %}errored{% endif %}">
                   <option value="">Choose</option>
@@ -39,8 +41,8 @@
                 {% endfor %}
               </div>
               <div class="form-group">
-                <input id="" type="checkbox" required="required" />
-                <span class="financial-assist-testify">I testify that the income I reported is true and accurate. I am aware that I may be asked to verify the reported income with documentation.</span>
+                <input id="" type="checkbox" required="required" aria-describedby="financial-assist-testify"/>
+                <span id="financial-assist-testify" class="financial-assist-testify">I testify that the income I reported is true and accurate. I am aware that I may be asked to verify the reported income with documentation.</span>
               </div>
               <div class="row submit-row no-gutters justify-content-center">
                 <button type="submit" class="btn btn-primary btn-gradient-red large">Submit request</button>
