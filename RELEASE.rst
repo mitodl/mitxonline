@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.63.0 (Released March 27, 2023)
+--------------
+
+- Requests additional information from the learner when they register. (#1499)
+
 Version 0.62.9 (Released March 20, 2023)
 --------------
 
