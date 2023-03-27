@@ -688,6 +688,7 @@ def test_defer_enrollment(mocker, course, keep_failed_enrollments):
         existing_enrollment.user,
         [target_run],
         keep_failed_enrollments=keep_failed_enrollments,
+        mode=existing_enrollment.enrollment_mode,
     )
     patched_deactivate_enrollments.assert_called_once_with(
         existing_enrollment,

@@ -475,6 +475,7 @@ def defer_enrollment(
         user,
         [to_run],
         keep_failed_enrollments=keep_failed_enrollments,
+        mode=from_enrollment.enrollment_mode,
     )
     from_enrollment = deactivate_run_enrollment(
         from_enrollment,
