@@ -168,6 +168,37 @@ const findStates = (country: string, countries: Array<Country>) => {
     : null
 }
 
+const renderYearOfBirthField = () => {
+  return (
+    <div>
+      <label htmlFor="user_profile.year_of_birth" className="font-weight-bold">
+        Year of Birth
+      </label>
+      <span className="required">*</span>
+      <Field
+        component="select"
+        name="user_profile.year_of_birth"
+        id="user_profile.year_of_birth"
+        className="form-control"
+        aria-describedby="user_profile.year_of_birth_error"
+        required
+      >
+        <option value="f">-----</option>
+        {reverse(range(seedYear - 120, seedYear - 13)).map((year, i) => (
+          <option key={i} value={year}>
+            {year}
+          </option>
+        ))}
+      </Field>
+      <ErrorMessage
+        name="user_profile.year_of_birth"
+        id="user_profile.year_of_birth_error"
+        component={FormError}
+      />
+    </div>
+  )
+}
+
 export const LegalAddressFields = ({
   countries,
   isNewAccount,
@@ -179,7 +210,9 @@ export const LegalAddressFields = ({
         <div className="col-auto font-weight-bold">
           First Name<span className="required">*</span>
         </div>
-        <div className="col-auto subtitle">Name that will appear on emails</div>
+        <div id="first-name-subtitle" className="col-auto subtitle">
+          Name that will appear on emails
+        </div>
       </label>
       <Field
         type="text"
@@ -187,18 +220,17 @@ export const LegalAddressFields = ({
         id="legal_address.first_name"
         className="form-control"
         autoComplete="given-name"
-        aria-describedby="legal_address.first_name_error"
+        aria-describedby="first-name-subtitle"
+        aria-label="First Name"
+        required
       />
-      <ErrorMessage
-        name="legal_address.first_name"
-        id="legal_address.first_name_error"
-        component={FormError}
-      />
+      <ErrorMessage name="legal_address.first_name" component={FormError} />
     </div>
     <div className="form-group">
       <label htmlFor="legal_address.last_name" className="font-weight-bold">
-        Last Name<span className="required">*</span>
+        Last Name
       </label>
+      <span className="required">*</span>
       <Field
         type="text"
         name="legal_address.last_name"
@@ -206,6 +238,7 @@ export const LegalAddressFields = ({
         className="form-control"
         autoComplete="family-name"
         aria-describedby="legal_address.last_name_error"
+        required
       />
       <ErrorMessage
         name="legal_address.last_name"
@@ -218,7 +251,7 @@ export const LegalAddressFields = ({
         <div className="col-auto font-weight-bold">
           Full Name<span className="required">*</span>
         </div>
-        <div className="col-auto subtitle">
+        <div id="full-name-subtitle" className="col-auto subtitle">
           Name that will appear on your certificate
         </div>
       </label>
@@ -228,9 +261,11 @@ export const LegalAddressFields = ({
         id="name"
         className="form-control"
         autoComplete="name"
-        aria-describedby="nameError"
+        aria-describedby="full-name-subtitle"
+        aria-label="Full Name"
+        required
       />
-      <ErrorMessage name="name" id="nameError" component={FormError} />
+      <ErrorMessage name="name" component={FormError} />
     </div>
     {isNewAccount ? (
       <React.Fragment>
@@ -239,7 +274,8 @@ export const LegalAddressFields = ({
             <div className="col-auto font-weight-bold">
               Public Username<span className="required">*</span>
             </div>
-            <div className="col-auto subtitle">
+            <span className="required">*</span>
+            <div id="username-subtitle" className="col-auto subtitle">
               Name that will identify you in courses
             </div>
           </label>
@@ -249,31 +285,27 @@ export const LegalAddressFields = ({
             className="form-control"
             autoComplete="username"
             id="username"
-            aria-describedby="usernameError"
+            aria-describedby="username-subtitle"
+            aria-label="Public Username"
+            required
           />
-          <ErrorMessage
-            name="username"
-            id="usernameError"
-            component={FormError}
-          />
+          <ErrorMessage name="username" component={FormError} />
         </div>
         <div className="form-group">
           <label htmlFor="password" className="font-weight-bold">
-            Password<span className="required">*</span>
+            Password
           </label>
+          <span className="required">*</span>
           <Field
             type="password"
             name="password"
             id="password"
-            aria-describedby="passwordError"
+            aria-describedby="password-subtitle"
             className="form-control"
+            required
           />
-          <ErrorMessage
-            name="password"
-            id="passwordError"
-            component={FormError}
-          />
-          <div className="label-secondary">
+          <ErrorMessage name="password" component={FormError} />
+          <div id="password-subtitle" className="label-secondary">
             Passwords must contain at least 8 characters and at least 1 number
             and 1 letter.
           </div>
@@ -282,8 +314,9 @@ export const LegalAddressFields = ({
     ) : null}
     <div className="form-group">
       <label htmlFor="legal_address.country" className="font-weight-bold">
-        Country<span className="required">*</span>
+        Country
       </label>
+      <span className="required">*</span>
       <Field
         component="select"
         name="legal_address.country"
@@ -291,6 +324,7 @@ export const LegalAddressFields = ({
         className="form-control"
         autoComplete="country"
         aria-describedby="legal_address.country_error"
+        required
       >
         <option value="">-----</option>
         {countries
@@ -311,8 +345,9 @@ export const LegalAddressFields = ({
     {findStates(values.legal_address.country, countries) ? (
       <div className="form-group">
         <label htmlFor="legal_address.state" className="font-weight-bold">
-          State<span className="required">*</span>
+          State
         </label>
+        <span className="required">*</span>
         <Field
           component="select"
           name="legal_address.state"
@@ -320,6 +355,7 @@ export const LegalAddressFields = ({
           className="form-control"
           autoComplete="state"
           aria-describedby="legal_address.state_error"
+          required
         >
           <option value="">-----</option>
           {findStates(values.legal_address.country, countries)
@@ -340,33 +376,7 @@ export const LegalAddressFields = ({
       </div>
     ) : null}
     {isNewAccount ? (
-      <div className="form-group">
-        <label
-          htmlFor="user_profile.year_of_birth"
-          className="font-weight-bold"
-        >
-          Year of Birth<span className="required">*</span>
-        </label>
-        <Field
-          component="select"
-          name="user_profile.year_of_birth"
-          id="user_profile.year_of_birth"
-          className="form-control"
-          aria-describedby="user_profile.year_of_birth_error"
-        >
-          <option value="f">-----</option>
-          {reverse(range(seedYear - 120, seedYear - 13)).map((year, i) => (
-            <option key={i} value={year}>
-              {year}
-            </option>
-          ))}
-        </Field>
-        <ErrorMessage
-          name="user_profile.year_of_birth"
-          id="user_profile.year_of_birth_error"
-          component={FormError}
-        />
-      </div>
+      <div className="form-group">{renderYearOfBirthField()}</div>
     ) : null}
   </React.Fragment>
 )
@@ -400,33 +410,7 @@ export const ProfileFields = () => (
             component={FormError}
           />
         </div>
-        <div className="col">
-          <label
-            htmlFor="user_profile.year_of_birth"
-            className="font-weight-bold"
-          >
-            Year of Birth<span className="required">*</span>
-          </label>
-          <Field
-            component="select"
-            name="user_profile.year_of_birth"
-            id="user_profile.year_of_birth"
-            className="form-control"
-            aria-describedby="user_profile.year_of_birth_error"
-          >
-            <option value="">-----</option>
-            {reverse(range(seedYear - 120, seedYear - 13)).map((year, i) => (
-              <option key={i} value={year}>
-                {year}
-              </option>
-            ))}
-          </Field>
-          <ErrorMessage
-            name="user_profile.year_of_birth"
-            id="user_profile.year_of_birth_error"
-            component={FormError}
-          />
-        </div>
+        <div className="col">{renderYearOfBirthField()}</div>
       </div>
     </div>
   </React.Fragment>
