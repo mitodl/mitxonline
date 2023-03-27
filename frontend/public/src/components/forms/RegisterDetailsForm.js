@@ -25,6 +25,9 @@ const INITIAL_VALUES = {
     last_name:  "",
     country:    "",
     state:      ""
+  },
+  user_profile: {
+    year_of_birth: ""
   }
 }
 
@@ -35,6 +38,8 @@ const RegisterDetailsForm = ({ onSubmit, countries }: Props) => (
       .concat(newAccountValidation)
       .concat(profileValidation)}
     initialValues={INITIAL_VALUES}
+    validateOnChange={false}
+    validateOnBlur={false}
     render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
       <Form>
         <LegalAddressFields
