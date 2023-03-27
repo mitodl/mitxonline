@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.63.1
+--------------
+
+- 1104: Perform validation on year of birth field during registration (#1505)
+- accessibility improvements for dashboard and drawer (#1504)
+- Removing unnecessary alt texts from images (#1503)
+
 Version 0.63.0 (Released March 27, 2023)
 --------------
 
