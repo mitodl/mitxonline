@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.1
+Version 0.63.1 (Released March 27, 2023)
 --------------
 
 - 1104: Perform validation on year of birth field during registration (#1505)
