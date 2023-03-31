@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.63.2
+--------------
+
+- Reworks extra fields form to compress things so the modal fits above the fold on smaller viewports. (#1518)
+- 1508: screen readers should not pronounce * ("star") for labels (#1515)
+
 Version 0.63.1 (Released March 27, 2023)
 --------------
 
