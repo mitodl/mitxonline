@@ -559,7 +559,7 @@ export const AddlProfileFields = ({
       <React.Fragment>
         <Field
           type="hidden"
-          name="user_profile.type_is_professional"
+          name="user_profile.addl_fields_flag"
           value={true}
         />
         <div className="form-group">
@@ -579,86 +579,104 @@ export const AddlProfileFields = ({
             component={FormError}
           />
         </div>
-        <div className="form-group">
-          <label htmlFor="user_profile.job_title" className="font-weight-bold">
-            Job Title
-          </label>
-          <Field
-            type="text"
-            name="user_profile.job_title"
-            id="user_profile.job_title"
-            aria-describedby="user_profile.job_title_error"
-            className="form-control"
-          />
-          <ErrorMessage
-            name="user_profile.job_title"
-            id="user_profile.job_title_error"
-            component={FormError}
-          />
+        <div className="row">
+          <div className="col">
+            <div className="form-group">
+              <label
+                htmlFor="user_profile.job_title"
+                className="font-weight-bold"
+              >
+                Job Title
+              </label>
+              <Field
+                type="text"
+                name="user_profile.job_title"
+                id="user_profile.job_title"
+                aria-describedby="user_profile.job_title_error"
+                className="form-control"
+              />
+              <ErrorMessage
+                name="user_profile.job_title"
+                id="user_profile.job_title_error"
+                component={FormError}
+              />
+            </div>
+          </div>
+          <div className="col">
+            <div className="form-group">
+              <label
+                htmlFor="user_profile.company_size"
+                className="font-weight-bold"
+              >
+                Company Size
+              </label>
+              <Field
+                component="select"
+                name="user_profile.company_size"
+                id="user_profile.company_size"
+                className="form-control"
+              >
+                <option value="">-----</option>
+                {EMPLOYMENT_SIZE.map(([value, label], i) => (
+                  <option key={i} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </Field>
+            </div>
+          </div>
         </div>
-        <div className="form-group">
-          <label htmlFor="user_profile.industry" className="font-weight-bold">
-            Industry
-          </label>
-          <Field
-            component="select"
-            name="user_profile.industry"
-            id="user_profile.industry"
-            className="form-control"
-          >
-            <option value="">-----</option>
-            {EMPLOYMENT_INDUSTRY.map((industry, i) => (
-              <option key={i} value={industry}>
-                {industry}
-              </option>
-            ))}
-          </Field>
+        <div className="row">
+          <div className="col">
+            <div className="form-group">
+              <label
+                htmlFor="user_profile.industry"
+                className="font-weight-bold"
+              >
+                Industry
+              </label>
+              <Field
+                component="select"
+                name="user_profile.industry"
+                id="user_profile.industry"
+                className="form-control"
+              >
+                <option value="">-----</option>
+                {EMPLOYMENT_INDUSTRY.map((industry, i) => (
+                  <option key={i} value={industry}>
+                    {industry}
+                  </option>
+                ))}
+              </Field>
+            </div>
+          </div>
+          <div className="col">
+            <div className="form-group">
+              <label
+                htmlFor="user_profile.job_function"
+                className="font-weight-bold"
+              >
+                Job Function
+              </label>
+              <Field
+                component="select"
+                name="user_profile.job_function"
+                id="user_profile.job_function"
+                className="form-control"
+              >
+                <option value="">-----</option>
+                {EMPLOYMENT_FUNCTION.map((jobFunction, i) => (
+                  <option key={i} value={jobFunction}>
+                    {jobFunction}
+                  </option>
+                ))}
+              </Field>
+            </div>
+          </div>
         </div>
-        <div className="form-group">
-          <label
-            htmlFor="user_profile.job_function"
-            className="font-weight-bold"
-          >
-            Job Function
-          </label>
-          <Field
-            component="select"
-            name="user_profile.job_function"
-            id="user_profile.job_function"
-            className="form-control"
-          >
-            <option value="">-----</option>
-            {EMPLOYMENT_FUNCTION.map((jobFunction, i) => (
-              <option key={i} value={jobFunction}>
-                {jobFunction}
-              </option>
-            ))}
-          </Field>
-        </div>
-        <div className="form-group">
-          <label
-            htmlFor="user_profile.company_size"
-            className="font-weight-bold"
-          >
-            Company Size
-          </label>
-          <Field
-            component="select"
-            name="user_profile.company_size"
-            id="user_profile.company_size"
-            className="form-control"
-          >
-            <option value="">-----</option>
-            {EMPLOYMENT_SIZE.map(([value, label], i) => (
-              <option key={i} value={value}>
-                {label}
-              </option>
-            ))}
-          </Field>
-        </div>
-        <div className="form-group">
-          <div className="row">
-            <div className="col">
+        <div className="row">
+          <div className="col">
+            <div className="form-group">
               <label
                 htmlFor="user_profile.years_experience"
                 className="font-weight-bold"
@@ -679,7 +697,9 @@ export const AddlProfileFields = ({
                 ))}
               </Field>
             </div>
-            <div className="col">
+          </div>
+          <div className="col">
+            <div className="form-group">
               <label
                 htmlFor="user_profile.leadership_level"
                 className="font-weight-bold"
