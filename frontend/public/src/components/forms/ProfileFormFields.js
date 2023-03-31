@@ -274,7 +274,6 @@ export const LegalAddressFields = ({
             <div className="col-auto font-weight-bold">
               Public Username<span className="required">*</span>
             </div>
-            <span className="required">*</span>
             <div id="username-subtitle" className="col-auto subtitle">
               Name that will identify you in courses
             </div>
