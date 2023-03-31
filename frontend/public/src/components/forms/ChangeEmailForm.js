@@ -43,9 +43,8 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => (
         <section className="email-section">
           <h4>Change Email</h4>
           <div className="form-group">
-            <label htmlFor="email">
-              Email<span className="required">*</span>
-            </label>
+            <label htmlFor="email">Email</label>
+            <span className="required">*</span>
             <Field
               name="email"
               id="email"
@@ -70,6 +69,7 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => (
               className="form-control"
               component={PasswordInput}
               aria-describedby="confirmPasswordError"
+              aria-label="Confirm Password"
             />
             <ErrorMessage
               name="confirmPassword"

@@ -31,9 +31,8 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
         <section className="email-section">
           <h4>Change Password</h4>
           <div className="form-group">
-            <label htmlFor="oldPassword">
-              Old Password<span className="required">*</span>
-            </label>
+            <label htmlFor="oldPassword">Old Password</label>
+            <span className="required">*</span>
             <Field
               name="oldPassword"
               id="oldPassword"
@@ -48,9 +47,8 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
             />
           </div>
           <div className="form-group">
-            <label htmlFor="newPassword">
-              New Password<span className="required">*</span>
-            </label>
+            <label htmlFor="newPassword">New Password</label>
+            <span className="required">*</span>
             <Field
               name="newPassword"
               id="newPassword"
@@ -65,9 +63,8 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
             />
           </div>
           <div className="form-group">
-            <label htmlFor="confirmPassword">
-              Confirm Password<span className="required">*</span>
-            </label>
+            <label htmlFor="confirmPassword">Confirm Password</label>
+            <span className="required">*</span>
             <Field
               name="confirmPassword"
               id="confirmPassword"
