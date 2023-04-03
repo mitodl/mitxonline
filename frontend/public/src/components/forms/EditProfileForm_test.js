@@ -61,7 +61,7 @@ describe("EditProfileForm", () => {
   //
   ;[
     ["legal_address.first_name", "input", "Jane", ""],
-    ["legal_address.last_name", "input", "Doe", ""],
+    ["legal_address.last_name", "input", "Doe", ""]
   ].forEach(([name, type, value, errorMessage]) => {
     it(`validates the field name=${name}, value=${JSON.stringify(
       value
