@@ -38,6 +38,8 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
       onSubmit={onSubmit}
       validationSchema={validation}
       initialValues={getInitialValues(user)}
+      validateOnChange={false}
+      validateOnBlur={false}
       render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
         <Form>
           <LegalAddressFields
