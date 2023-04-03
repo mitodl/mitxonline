@@ -38,6 +38,8 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => (
         currentEmail: user.email
       }).catch(err => Promise.reject(yupToFormErrors(err)))
     }
+    validateOnChange={false}
+    validateOnBlur={false}
     render={({ isSubmitting }) => (
       <Form>
         <section className="email-section">
@@ -50,8 +52,11 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => (
               id="email"
               className="form-control"
               component={EmailInput}
+              autoComplete="email"
+              aria-describedby="emailError"
               required
             />
+            <ErrorMessage name="email" id="emailError" component={FormError} />
           </div>
           <div className="form-group">
             <label htmlFor="confirmPassword" className="row">
@@ -67,8 +72,15 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => (
               name="confirmPassword"
               className="form-control"
               component={PasswordInput}
+              autoComplete="current-password"
+              aria-describedby="confirmPasswordError"
               aria-label="Confirm Password"
               required
+            />
+            <ErrorMessage
+              name="confirmPassword"
+              id="confirmPasswordError"
+              component={FormError}
             />
           </div>
         </section>

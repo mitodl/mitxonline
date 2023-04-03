@@ -180,6 +180,8 @@ const renderYearOfBirthField = () => {
         name="user_profile.year_of_birth"
         id="user_profile.year_of_birth"
         className="form-control"
+        autoComplete="bday-year"
+        aria-describedby="user_profile.year_of_birth_error"
         required
       >
         <option value="">-----</option>
@@ -218,6 +220,7 @@ export const LegalAddressFields = ({
         aria-label="First Name"
         required
       />
+      <ErrorMessage name="legal_address.first_name" component={FormError} />
     </div>
     <div className="form-group">
       <label htmlFor="legal_address.last_name" className="font-weight-bold">
@@ -230,7 +233,13 @@ export const LegalAddressFields = ({
         id="legal_address.last_name"
         className="form-control"
         autoComplete="family-name"
+        aria-describedby="legal_address.last_name_error"
         required
+      />
+      <ErrorMessage
+        name="legal_address.last_name"
+        id="legal_address.last_name_error"
+        component={FormError}
       />
     </div>
     <div className="form-group">
@@ -252,6 +261,7 @@ export const LegalAddressFields = ({
         aria-label="Full Name"
         required
       />
+      <ErrorMessage name="name" component={FormError} />
     </div>
     {isNewAccount ? (
       <React.Fragment>
@@ -274,6 +284,7 @@ export const LegalAddressFields = ({
             aria-label="Public Username"
             required
           />
+          <ErrorMessage name="username" component={FormError} />
         </div>
         <div className="form-group">
           <label htmlFor="password" className="font-weight-bold">
@@ -286,8 +297,10 @@ export const LegalAddressFields = ({
             id="password"
             aria-describedby="password-subtitle"
             className="form-control"
+            autoComplete="new-password"
             required
           />
+          <ErrorMessage name="password" component={FormError} />
           <div id="password-subtitle" className="label-secondary">
             Passwords must contain at least 8 characters and at least 1 number
             and 1 letter.
@@ -526,6 +539,7 @@ export const AddlProfileFields = ({
             type="text"
             name="user_profile.company"
             id="user_profile.company"
+            autoComplete="organization"
             aria-describedby="user_profile.companyError"
             className="form-control"
           />
@@ -548,6 +562,7 @@ export const AddlProfileFields = ({
                 type="text"
                 name="user_profile.job_title"
                 id="user_profile.job_title"
+                autoComplete="organization-title"
                 aria-describedby="user_profile.job_title_error"
                 className="form-control"
               />

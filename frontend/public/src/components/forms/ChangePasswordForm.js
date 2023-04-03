@@ -26,6 +26,8 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
       newPassword:     "",
       confirmPassword: ""
     }}
+    validateOnChange={false}
+    validateOnBlur={false}
     render={({ isSubmitting }) => (
       <Form>
         <section className="email-section">
@@ -38,7 +40,14 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               id="oldPassword"
               className="form-control"
               component={PasswordInput}
+              autoComplete="current-password"
+              aria-describedby="oldPasswordError"
               required
+            />
+            <ErrorMessage
+              name="oldPassword"
+              id="oldPasswordError"
+              component={FormError}
             />
           </div>
           <div className="form-group">
@@ -49,7 +58,14 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               id="newPassword"
               className="form-control"
               component={PasswordInput}
+              autoComplete="new-password"
+              aria-describedby="newPasswordError"
               required
+            />
+            <ErrorMessage
+              name="newPassword"
+              id="newPasswordError"
+              component={FormError}
             />
           </div>
           <div className="form-group">
@@ -60,7 +76,14 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               id="confirmPassword"
               className="form-control"
               component={PasswordInput}
+              autoComplete="new-password"
+              aria-describedby="confirmPasswordError"
               required
+            />
+            <ErrorMessage
+              name="confirmPassword"
+              id="confirmPasswordError"
+              component={FormError}
             />
           </div>
         </section>

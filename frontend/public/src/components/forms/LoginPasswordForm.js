@@ -23,6 +23,8 @@ const LoginPasswordForm = ({ onSubmit }: LoginPasswordFormProps) => (
     onSubmit={onSubmit}
     validationSchema={passwordValidation}
     initialValues={{ password: "" }}
+    validateOnChange={false}
+    validateOnBlur={false}
     render={({ isSubmitting }) => (
       <Form>
         <div className="form-group">
@@ -32,7 +34,14 @@ const LoginPasswordForm = ({ onSubmit }: LoginPasswordFormProps) => (
             id="password"
             className="form-control"
             component={PasswordInput}
+            autoComplete="current-password"
+            aria-describedby="passwordError"
             required
+          />
+          <ErrorMessage
+            name="password"
+            id="passwordError"
+            component={FormError}
           />
         </div>
         <div className="form-group">

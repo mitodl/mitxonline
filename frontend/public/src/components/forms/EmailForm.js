@@ -1,16 +1,10 @@
 // @flow
 import React from "react"
-import * as yup from "yup"
 
-import { Formik, Field, Form, ErrorMessage } from "formik"
+import { Formik, Field, Form } from "formik"
 
-import FormError from "./elements/FormError"
 import { EmailInput } from "./elements/inputs"
-import { emailFieldValidation } from "../../lib/validation"
 
-const emailValidation = yup.object().shape({
-  email: emailFieldValidation
-})
 
 type EmailFormProps = {
   onSubmit: Function,
@@ -24,8 +18,9 @@ export type EmailFormValues = {
 const EmailForm = ({ onSubmit, children }: EmailFormProps) => (
   <Formik
     onSubmit={onSubmit}
-    validationSchema={emailValidation}
     initialValues={{ email: "" }}
+    validateOnChange={false}
+    validateOnBlur={false}
     render={({ isSubmitting }) => (
       <Form>
         <div className="form-group">
@@ -36,6 +31,7 @@ const EmailForm = ({ onSubmit, children }: EmailFormProps) => (
             className="form-control"
             component={EmailInput}
             autoComplete="email"
+            aria-describedby="emailError"
             required
           />
         </div>
