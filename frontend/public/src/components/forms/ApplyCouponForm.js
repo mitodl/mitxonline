@@ -47,6 +47,7 @@ const ApplyCouponForm = ({ onSubmit, couponCode, discounts }: Props) => (
                 <button
                   className="btn btn-primary btn-red btn-halfsize mx-2 highlight font-weight-normal"
                   type="submit"
+                  aria-label="Apply coupon"
                 >
                   Apply
                 </button>
