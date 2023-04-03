@@ -5,7 +5,6 @@ import { Formik, Field, Form } from "formik"
 
 import { EmailInput } from "./elements/inputs"
 
-
 type EmailFormProps = {
   onSubmit: Function,
   children?: React$Element<*>
