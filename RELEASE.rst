@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.63.3 (Released April 03, 2023)
+--------------
+
+- Add aria-label to apply button (#1523)
+- validate edit profile form on submit (#1521)
+
 Version 0.63.2 (Released April 03, 2023)
 --------------
 
