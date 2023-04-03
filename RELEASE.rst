@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.3
+Version 0.63.3 (Released April 03, 2023)
 --------------
 
 - Add aria-label to apply button (#1523)
