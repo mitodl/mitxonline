@@ -183,7 +183,7 @@ const renderYearOfBirthField = () => {
         aria-describedby="user_profile.year_of_birth_error"
         required
       >
-        <option value="f">-----</option>
+        <option value="">-----</option>
         {reverse(range(seedYear - 120, seedYear - 13)).map((year, i) => (
           <option key={i} value={year}>
             {year}
