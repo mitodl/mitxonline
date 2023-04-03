@@ -297,7 +297,7 @@ mitol-django-payment-gateway==1.9.1
     # via -r requirements.in
 newrelic==6.4.1.158
     # via -r requirements.in
-oauthlib==3.2.1
+oauthlib==3.2.2
     # via
     #   django-oauth-toolkit
     #   requests-oauthlib
