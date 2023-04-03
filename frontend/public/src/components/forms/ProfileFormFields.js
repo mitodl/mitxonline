@@ -419,6 +419,7 @@ export const AddlProfileFields = ({
             name="user_profile.highest_education"
             id="user_profile.highest_education"
             className="form-control"
+            required={requireAddlFields}
           >
             <option value="">-----</option>
             {HIGHEST_EDUCATION_CHOICES.map((level, i) => (
@@ -427,11 +428,6 @@ export const AddlProfileFields = ({
               </option>
             ))}
           </Field>
-          <ErrorMessage
-            name="user_profile.highest_education"
-            id="user_profile.highest_education_error"
-            component={FormError}
-          />
         </div>
       </div>
     </div>
@@ -450,6 +446,7 @@ export const AddlProfileFields = ({
               aria-describedby="user_profile.type_is_student"
               className="form-check-input"
               defaultChecked={values.user_profile.type_is_student}
+              required={false}
             />
             <label
               className="form-check-label"
