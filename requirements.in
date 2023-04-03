@@ -48,4 +48,4 @@ social-auth-app-django==4.0.0
 user-util==0.1.5
 ulid-py
 uwsgi
-wagtail>=2.0.0,<3.0.0
+wagtail>=2.0.0,<5.0.0
