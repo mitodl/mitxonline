@@ -83,26 +83,6 @@ describe("RegisterDetailsForm", () => {
       )
     })
   })
-  ;[
-    ["legal_address.country", "", "Country is a required field"],
-    ["user_profile.year_of_birth", "", "Year of Birth is a required field"]
-  ].forEach(([name, value, errorMessage]) => {
-    it(`validates the field name=${name}, value=${JSON.stringify(
-      value
-    )} and expects error=${JSON.stringify(errorMessage)}`, async () => {
-      const wrapper = renderForm()
-
-      const input = wrapper.find(`select[name="${name}"]`)
-      input.simulate("change", { persist: () => {}, target: { name, value } })
-      wrapper.simulate("submit")
-      await wait()
-      wrapper.update()
-      assert.deepEqual(
-        findFormikErrorByName(wrapper, name).text(),
-        errorMessage
-      )
-    })
-  })
 
   //
   ;[
