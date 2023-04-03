@@ -46,8 +46,8 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
             autoComplete="email"
             component={EmailInput}
             aria-describedby="emailError"
+            required
           />
-          <ErrorMessage name="email" id="emailError" component={FormError} />
           <p className="py-2">
             By creating an account I agree to the{" "}
             <a

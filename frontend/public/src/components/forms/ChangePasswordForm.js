@@ -38,12 +38,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               id="oldPassword"
               className="form-control"
               component={PasswordInput}
-              aria-describedby="oldPasswordError"
-            />
-            <ErrorMessage
-              name="oldPassword"
-              id="oldPasswordError"
-              component={FormError}
+              required
             />
           </div>
           <div className="form-group">
@@ -54,12 +49,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               id="newPassword"
               className="form-control"
               component={PasswordInput}
-              aria-describedby="newPasswordError"
-            />
-            <ErrorMessage
-              name="newPassword"
-              id="newPasswordError"
-              component={FormError}
+              required
             />
           </div>
           <div className="form-group">
@@ -70,12 +60,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               id="confirmPassword"
               className="form-control"
               component={PasswordInput}
-              aria-describedby="confirmPasswordError"
-            />
-            <ErrorMessage
-              name="confirmPassword"
-              id="confirmPasswordError"
-              component={FormError}
+              required
             />
           </div>
         </section>

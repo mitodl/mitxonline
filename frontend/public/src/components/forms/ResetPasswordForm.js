@@ -33,12 +33,7 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
             id="newPassword"
             className="form-control"
             component={PasswordInput}
-            aria-describedby="newPasswordError"
-          />
-          <ErrorMessage
-            name="newPassword"
-            id="newPasswordError"
-            component={FormError}
+            required
           />
         </div>
         <div className="form-group">
@@ -48,12 +43,7 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
             id="confirmPassword"
             className="form-control"
             component={PasswordInput}
-            aria-describedby="confirmPasswordError"
-          />
-          <ErrorMessage
-            name="confirmPassword"
-            id="confirmPasswordError"
-            component={FormError}
+            required
           />
         </div>
         <div className="row submit-row no-gutters justify-content-end">

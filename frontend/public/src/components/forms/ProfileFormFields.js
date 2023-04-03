@@ -180,7 +180,6 @@ const renderYearOfBirthField = () => {
         name="user_profile.year_of_birth"
         id="user_profile.year_of_birth"
         className="form-control"
-        aria-describedby="user_profile.year_of_birth_error"
         required
       >
         <option value="">-----</option>
@@ -190,11 +189,6 @@ const renderYearOfBirthField = () => {
           </option>
         ))}
       </Field>
-      <ErrorMessage
-        name="user_profile.year_of_birth"
-        id="user_profile.year_of_birth_error"
-        component={FormError}
-      />
     </div>
   )
 }
@@ -224,7 +218,6 @@ export const LegalAddressFields = ({
         aria-label="First Name"
         required
       />
-      <ErrorMessage name="legal_address.first_name" component={FormError} />
     </div>
     <div className="form-group">
       <label htmlFor="legal_address.last_name" className="font-weight-bold">
@@ -237,13 +230,7 @@ export const LegalAddressFields = ({
         id="legal_address.last_name"
         className="form-control"
         autoComplete="family-name"
-        aria-describedby="legal_address.last_name_error"
         required
-      />
-      <ErrorMessage
-        name="legal_address.last_name"
-        id="legal_address.last_name_error"
-        component={FormError}
       />
     </div>
     <div className="form-group">
@@ -265,7 +252,6 @@ export const LegalAddressFields = ({
         aria-label="Full Name"
         required
       />
-      <ErrorMessage name="name" component={FormError} />
     </div>
     {isNewAccount ? (
       <React.Fragment>
@@ -288,7 +274,6 @@ export const LegalAddressFields = ({
             aria-label="Public Username"
             required
           />
-          <ErrorMessage name="username" component={FormError} />
         </div>
         <div className="form-group">
           <label htmlFor="password" className="font-weight-bold">
@@ -303,7 +288,6 @@ export const LegalAddressFields = ({
             className="form-control"
             required
           />
-          <ErrorMessage name="password" component={FormError} />
           <div id="password-subtitle" className="label-secondary">
             Passwords must contain at least 8 characters and at least 1 number
             and 1 letter.
@@ -322,7 +306,6 @@ export const LegalAddressFields = ({
         id="legal_address.country"
         className="form-control"
         autoComplete="country"
-        aria-describedby="legal_address.country_error"
         required
       >
         <option value="">-----</option>
@@ -334,12 +317,6 @@ export const LegalAddressFields = ({
           ))
           : null}
       </Field>
-
-      <ErrorMessage
-        name="legal_address.country"
-        id="legal_address.country_error"
-        component={FormError}
-      />
     </div>
     {findStates(values.legal_address.country, countries) ? (
       <div className="form-group">
@@ -353,7 +330,6 @@ export const LegalAddressFields = ({
           id="legal_address.state"
           className="form-control"
           autoComplete="state"
-          aria-describedby="legal_address.state_error"
           required
         >
           <option value="">-----</option>
@@ -367,11 +343,6 @@ export const LegalAddressFields = ({
             )
             : null}
         </Field>
-        <ErrorMessage
-          name="legal_address.state"
-          id="legal_address.state_error"
-          component={FormError}
-        />
       </div>
     ) : null}
     {isNewAccount ? (

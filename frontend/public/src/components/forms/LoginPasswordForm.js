@@ -32,12 +32,7 @@ const LoginPasswordForm = ({ onSubmit }: LoginPasswordFormProps) => (
             id="password"
             className="form-control"
             component={PasswordInput}
-            aria-describedby="passwordError"
-          />
-          <ErrorMessage
-            name="password"
-            id="passwordError"
-            component={FormError}
+            required
           />
         </div>
         <div className="form-group">
