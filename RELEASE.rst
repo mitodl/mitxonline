@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.2
+Version 0.63.2 (Released April 03, 2023)
 --------------
 
 - Reworks extra fields form to compress things so the modal fits above the fold on smaller viewports. (#1518)
