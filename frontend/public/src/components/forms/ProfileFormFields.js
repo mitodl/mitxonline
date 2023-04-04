@@ -452,7 +452,7 @@ export const AddlProfileFields = ({
       </div>
     </div>
     <div className="form-group">
-      <label htmlFor="user_profile.type_multi" className="font-weight-bold">
+      <label id="occupation-label" className="font-weight-bold">
         Are you a
       </label>
       {requireAddlFields ? <span className="required">*</span> : ""}
@@ -463,13 +463,14 @@ export const AddlProfileFields = ({
               type="checkbox"
               name="user_profile.type_is_student"
               id="user_profile.type_is_student"
-              aria-describedby="user_profile.type_is_student"
               className="form-check-input"
+              aria-labelledby="occupation-label student-label"
               defaultChecked={values.user_profile.type_is_student}
             />
             <label
               className="form-check-label"
               htmlFor="user_profile.type_is_student"
+              id="student-label"
             >
               {" "}
               Student
@@ -480,13 +481,14 @@ export const AddlProfileFields = ({
               type="checkbox"
               name="user_profile.type_is_professional"
               id="user_profile.type_is_professional"
-              aria-describedby="user_profile.type_is_professional"
               className="form-check-input"
+              aria-labelledby="occupation-label professional-label"
               defaultChecked={values.user_profile.type_is_professional}
             />
             <label
               className="form-check-label"
               htmlFor="user_profile.type_is_professional"
+              id="professional-label"
             >
               {" "}
               Professional
@@ -499,13 +501,14 @@ export const AddlProfileFields = ({
               type="checkbox"
               name="user_profile.type_is_educator"
               id="user_profile.type_is_educator"
-              aria-describedby="user_profile.type_is_educator"
               className="form-check-input"
+              aria-labelledby="occupation-label educator-label"
               defaultChecked={values.user_profile.type_is_educator}
             />
             <label
               className="form-check-label"
               htmlFor="user_profile.type_is_educator"
+              id="educator-label"
             >
               {" "}
               Educator
@@ -516,13 +519,14 @@ export const AddlProfileFields = ({
               type="checkbox"
               name="user_profile.type_is_other"
               id="user_profile.type_is_other"
-              aria-describedby="user_profile.type_is_other"
               className="form-check-input"
+              aria-labelledby="occupation-label other-label"
               defaultChecked={values.user_profile.type_is_other}
             />
             <label
               className="form-check-label"
               htmlFor="user_profile.type_is_other"
+              id="other-label"
             >
               {" "}
               Other
