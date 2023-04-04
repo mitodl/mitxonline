@@ -1,5 +1,5 @@
 """
-Retire user(s) from MIT mitX Online
+Retire user(s) from MITx Online
 """
 import hashlib
 import sys
@@ -26,7 +26,7 @@ RETIRED_EMAIL_FMT = "retired_email_{}@retired." + "{}".format(
 
 class Command(BaseCommand):
     """
-    Retire user from MIT mitX Online
+    Retire user from MITx Online
     """
 
     help = """
@@ -99,7 +99,7 @@ class Command(BaseCommand):
             if not user.is_active:
                 self.stdout.write(
                     self.style.ERROR(
-                        "User: '{user}' is already deactivated in MIT mitX Online".format(
+                        "User: '{user}' is already deactivated in MITx Online".format(
                             user=user
                         )
                     )
@@ -136,6 +136,6 @@ class Command(BaseCommand):
 
             self.stdout.write(
                 self.style.SUCCESS(
-                    "User: '{user}' is retired from MIT mitX Online".format(user=user)
+                    "User: '{user}' is retired from MITx Online".format(user=user)
                 )
             )

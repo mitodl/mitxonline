@@ -1,5 +1,5 @@
 """
-Unblock user(s) from MIT mitX Online
+Unblock user(s) from MITx Online
 """
 import sys
 from argparse import RawTextHelpFormatter
@@ -17,7 +17,7 @@ User = get_user_model()
 
 class Command(BaseCommand):
     """
-    Unblock user(s) from MIT mitX Online.
+    Unblock user(s) from MITx Online.
     """
 
     help = """
@@ -81,7 +81,7 @@ class Command(BaseCommand):
                 blocked_user.delete()
                 self.stdout.write(
                     self.style.SUCCESS(
-                        "Email {email} has been removed from the blocklist of MIT mitX Online.".format(
+                        "Email {email} has been removed from the blocklist of MITx Online.".format(
                             email=user_email
                         )
                     )

@@ -21,7 +21,7 @@
       "url": "https://github.com/heroku/heroku-buildpack-nginx"
     }
   ],
-  "description": "mitX Online",
+  "description": "MITx Online",
   "env": {
     "AUTH_CHANGE_EMAIL_TTL_IN_MINUTES": {
       "description": "Expiry time for a change email request, default is 1440 minutes(1 day)",
@@ -526,7 +526,7 @@
       "required": false
     },
     "SITE_NAME": {
-      "description": "Name of the site. e.g MIT mitX Online",
+      "description": "Name of the site. e.g MITx Online",
       "required": false
     },
     "STATUS_TOKEN": {

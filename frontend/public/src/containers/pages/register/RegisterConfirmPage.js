@@ -85,7 +85,7 @@ export class RegisterConfirmPage extends React.Component<Props> {
       postLinkText = "to register again"
       linkRoute = routes.register.begin
     } else if (state === STATE_EXISTING_ACCOUNT) {
-      preLinkText = "You already have an mitX Online account. Please"
+      preLinkText = "You already have an MITx Online account. Please"
       postLinkText = "to sign in"
       linkRoute = routes.login.begin
     } else if (state === STATE_INVALID_EMAIL) {

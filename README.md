@@ -1,5 +1,5 @@
 # mitxonline
-mitX Online
+MITx Online
 
 **SECTIONS**
 1. [Initial Setup](#initial-setup)
