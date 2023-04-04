@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.63.4
+--------------
+
+- Improvement (#1528)
+- fix: management command for deferring users with course mode (#1517)
+- Bump oauthlib from 3.2.1 to 3.2.2 (#1417)
+
 Version 0.63.3 (Released April 03, 2023)
 --------------
 
