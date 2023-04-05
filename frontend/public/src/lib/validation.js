@@ -8,10 +8,10 @@ export const passwordFieldRegex = "^(?=.*[0-9])(?=.*[a-zA-Z]).{8,}$"
 export const passwordFieldErrorMessage =
   "Password must be atleast 8 character and contain at least one letter and number."
 
-export const usernameFieldRegex = "^\\S{3,29}$"
+export const usernameFieldRegex = "^\\S{3,30}$"
 
 export const usernameFieldErrorMessage =
-  "Username must be between 3 and 29 characters."
+  "Username must be between 3 and 30 characters."
 
 export const changeEmailValidationRegex = (email: string) => {
   const escapedUserEmail = email.replace(
