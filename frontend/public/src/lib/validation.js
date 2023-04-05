@@ -13,6 +13,14 @@ export const usernameFieldRegex = "^\\S{3,29}$"
 export const usernameFieldErrorMessage =
   "Username must be between 3 and 29 characters."
 
+export const changeEmailValidationRegex = (email: string) => {
+  const escapedUserEmail = email.replace(
+    /[-[\]{}()*+!<=:?./\\^$|#\s,]/g,
+    "\\$&"
+  )
+  return `^((?!${escapedUserEmail}).)*$`
+}
+
 export const passwordField = yup.string().label("Password")
 
 export const usernameField = yup.string().label("Username")

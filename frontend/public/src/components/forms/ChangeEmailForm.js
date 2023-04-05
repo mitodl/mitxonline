@@ -7,6 +7,8 @@ import { PasswordInput, EmailInput } from "./elements/inputs"
 
 import type { User } from "../../flow/authTypes"
 
+import { changeEmailValidationRegex } from "../../lib/validation"
+
 type Props = {
   onSubmit: Function,
   user: User
@@ -39,7 +41,7 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
                 component={EmailInput}
                 autoComplete="email"
                 required
-                pattern={`^((?!${user.email}).)*$`}
+                pattern={changeEmailValidationRegex(user.email)}
                 title="Email must be different than your current one."
               />
             </div>
