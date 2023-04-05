@@ -509,11 +509,7 @@ export class EnrolledItemCard extends React.Component<
                   className="d-inline-flex unstyled dot-menu"
                   aria-label={menuTitle}
                 >
-                  <span
-                    className="material-icons"
-                    title={menuTitle}
-                    aria-hidden="true"
-                  >
+                  <span className="material-icons" title={menuTitle}>
                     more_vert
                   </span>
                 </DropdownToggle>
@@ -633,11 +629,7 @@ export class EnrolledItemCard extends React.Component<
                   className="d-inline-flex unstyled dot-menu"
                   aria-label={menuTitle}
                 >
-                  <span
-                    className="material-icons"
-                    title={menuTitle}
-                    aria-hidden="true"
-                  >
+                  <span className="material-icons" title={menuTitle}>
                     more_vert
                   </span>
                 </DropdownToggle>
