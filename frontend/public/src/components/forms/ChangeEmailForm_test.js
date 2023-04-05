@@ -4,6 +4,7 @@ import sinon from "sinon"
 import { assert } from "chai"
 import { shallow } from "enzyme"
 import { Formik } from "formik"
+import wait from "waait"
 
 import ChangeEmailForm from "./ChangeEmailForm"
 
@@ -37,25 +38,5 @@ describe("ChangeEmailForm", () => {
     assert.ok(findFormikFieldByName(form, "email").exists())
     assert.ok(findFormikFieldByName(form, "confirmPassword").exists())
     assert.ok(form.find("button[type='submit']").exists())
-  })
-
-  it("confirm password is required to change the email address", async () => {
-    const wrapper = renderForm()
-    try {
-      await wrapper.find(Formik).prop("validate")(
-        {
-          email:           "abc@example.com",
-          confirmPassword: ""
-        },
-        {
-          context: { currentEmail: "abc@example.com" }
-        }
-      )
-    } catch (errors) {
-      assert.equal(
-        errors.confirmPassword,
-        "Confirm Password is a required field"
-      )
-    }
   })
 })

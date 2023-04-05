@@ -58,28 +58,6 @@ describe("EditProfileForm", () => {
     assert.ok(form.find("button[type='submit']").exists())
   })
 
-  //
-  ;[
-    ["legal_address.first_name", "input", "Jane", ""],
-    ["legal_address.last_name", "input", "Doe", ""]
-  ].forEach(([name, type, value, errorMessage]) => {
-    it(`validates the field name=${name}, value=${JSON.stringify(
-      value
-    )} and expects error=${JSON.stringify(errorMessage)}`, async () => {
-      const wrapper = renderForm()
-
-      const input = wrapper.find(`${type}[name="${name}"]`)
-      input.simulate("change", { persist: () => {}, target: { name, value } })
-      input.simulate("blur")
-      await wait()
-      wrapper.update()
-      assert.deepEqual(
-        findFormikErrorByName(wrapper, name).text(),
-        errorMessage
-      )
-    })
-  })
-
   it("renders the form and displays the additional fields if they're set", () => {
     const wrapper = renderForm()
     const form = wrapper.find("Formik")
