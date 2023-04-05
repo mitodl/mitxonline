@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.63.5
+--------------
+
+- 123: remove use of aria-hidden and aria-live on dashboard (#1532)
+- Update references to MITx Online (#1530)
+
 Version 0.63.4 (Released April 04, 2023)
 --------------
 
