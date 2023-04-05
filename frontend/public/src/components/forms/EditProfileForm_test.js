@@ -3,13 +3,9 @@ import React from "react"
 import sinon from "sinon"
 import { assert } from "chai"
 import { mount } from "enzyme"
-import wait from "waait"
 
 import EditProfileForm from "./EditProfileForm"
-import {
-  findFormikFieldByName,
-  findFormikErrorByName
-} from "../../lib/test_utils"
+import { findFormikFieldByName } from "../../lib/test_utils"
 import { makeCountries, makeUser } from "../../factories/user"
 import * as utils from "../../lib/util"
 

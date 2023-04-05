@@ -3,8 +3,6 @@ import React from "react"
 import sinon from "sinon"
 import { assert } from "chai"
 import { shallow } from "enzyme"
-import { Formik } from "formik"
-import wait from "waait"
 
 import ChangeEmailForm from "./ChangeEmailForm"
 

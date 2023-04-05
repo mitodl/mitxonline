@@ -1,18 +1,11 @@
 // @flow
 import React from "react"
-import * as yup from "yup"
 
-import { Formik, Field, Form, ErrorMessage } from "formik"
+import { Formik, Field, Form } from "formik"
 import { Link } from "react-router-dom"
 
-import FormError from "./elements/FormError"
 import { PasswordInput } from "./elements/inputs"
-import { passwordField } from "../../lib/validation"
 import { routes } from "../../lib/urls"
-
-const passwordValidation = yup.object().shape({
-  password: passwordField
-})
 
 type LoginPasswordFormProps = {
   onSubmit: Function

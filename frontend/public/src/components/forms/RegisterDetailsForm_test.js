@@ -3,14 +3,10 @@ import React from "react"
 import sinon from "sinon"
 import { assert } from "chai"
 import { mount } from "enzyme"
-import wait from "waait"
 
 import RegisterDetailsForm from "./RegisterDetailsForm"
 
-import {
-  findFormikFieldByName,
-  findFormikErrorByName
-} from "../../lib/test_utils"
+import { findFormikFieldByName } from "../../lib/test_utils"
 import { makeCountries } from "../../factories/user"
 
 describe("RegisterDetailsForm", () => {
