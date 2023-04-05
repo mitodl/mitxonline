@@ -98,7 +98,7 @@ describe("RegisterConfirmPage", () => {
     assert.isNotNull(confirmationErrorText)
     assert.equal(
       confirmationErrorText.text().replace("<Link />", ""),
-      "You already have an mitX Online account. Please ."
+      "You already have an MITx Online account. Please ."
     )
   })
 

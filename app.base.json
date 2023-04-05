@@ -21,7 +21,7 @@
       "url": "https://github.com/heroku/heroku-buildpack-nginx"
     }
   ],
-  "description": "mitX Online",
+  "description": "MITx Online",
   "env": {
     "NEW_RELIC_APP_NAME": {
       "description": "Application identifier in New Relic."

@@ -711,7 +711,7 @@ def unenroll_edx_course_run(run_enrollment):
 
 def update_edx_user_name(user):
     """
-    Makes a request to update user's name on edx if changed in mitX Online
+    Makes a request to update user's name on edx if changed in MITx Online
 
     Args:
         user (user.models.User): the application user

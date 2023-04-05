@@ -1,5 +1,5 @@
 """
-block user(s) from MIT mitX Online
+block user(s) from MITx Online
 """
 
 import sys
@@ -14,7 +14,7 @@ from mail.exceptions import MultiEmailValidationError
 
 class Command(BaseCommand):
     """
-    block user(s) from MIT mitX Online.
+    block user(s) from MITx Online.
     """
 
     help = """

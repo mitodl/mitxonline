@@ -88,11 +88,11 @@ def block_user_email(email):
             hashed_email=hash_object.hexdigest()
         )
         if created:
-            msg = "Email {email} is added to the blocklist of MIT mitX Online.".format(
+            msg = "Email {email} is added to the blocklist of MITx Online.".format(
                 email=email
             )
         else:
-            msg = "Email {email} is already marked blocked for MIT mitX Online.".format(
+            msg = "Email {email} is already marked blocked for MITx Online.".format(
                 email=email
             )
     return msg

@@ -215,7 +215,7 @@ def test_update_email_change_request_invalid_token(user_drf_client):
 
 
 def test_update_user_name_change(mocker, user_client, user, valid_address_dict):
-    """Test that updating user's name is properly reflected in mitX Online"""
+    """Test that updating user's name is properly reflected in MITx Online"""
     new_name = fuzzy.FuzzyText(prefix="Test-").fuzz()
     mocker.patch("openedx.api.update_edx_user_name")
     payload = {
@@ -237,7 +237,7 @@ def test_update_user_name_change(mocker, user_client, user, valid_address_dict):
 
 
 def test_update_user_name_change_edx(mocker, user_client, user, valid_address_dict):
-    """Test that PATCH on user/me also calls update user's name api in edX if there is a name change in mitX Online"""
+    """Test that PATCH on user/me also calls update user's name api in edX if there is a name change in MITx Online"""
     new_name = fuzzy.FuzzyText(prefix="Test-").fuzz()
     update_edx_mock = mocker.patch("openedx.api.update_edx_user_name")
     payload = {

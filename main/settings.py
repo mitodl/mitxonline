@@ -653,8 +653,8 @@ USE_X_FORWARDED_HOST = get_bool(
 )
 SITE_NAME = get_string(
     name="SITE_NAME",
-    default="mitX Online",
-    description="Name of the site. e.g MIT mitX Online",
+    default="MITx Online",
+    description="Name of the site. e.g MITx Online",
 )
 WAGTAIL_SITE_NAME = SITE_NAME
 
