@@ -13,46 +13,36 @@ import {
   HIGHEST_EDUCATION_CHOICES
 } from "../../constants"
 import FormError from "./elements/FormError"
+
 import {
-  newPasswordFieldValidation,
-  usernameFieldValidation
+  passwordField,
+  usernameField,
+  passwordFieldRegex,
+  passwordFieldErrorMessage,
+  usernameFieldRegex,
+  usernameFieldErrorMessage
 } from "../../lib/validation"
 
-export const NAME_REGEX = /^(?![~!@&)(+:'.?/,`-]+)([^/^$#*=[\]`%_;<>{}"|]+)$/
+export const NAME_REGEX = "^(?![~!@&)(+:'.?,-]+)([^/\\^$#*=[\\]`%_;<>{}\"|]+)$"
 
 const seedYear = moment().year()
 
 // Field Error messages
 export const NAME_REGEX_FAIL_MESSAGE =
-  "Name cannot start with a special character (~!@&)(+:'.?/,`-), and cannot contain any of (/^$#*=[]`%_;<>{}|\")"
+  "Name cannot start with a special character ~!@&)(+:'.?,-, and cannot contain any of /^$#*=[]`%_;\\<>{}\"|"
+
+export const fullNameRegex = "^.{2,255}$"
+const fullNameErrorMessage = "Full name must be between 2 and 254 characters."
+
+const countryRegex = "^\\S{2,}$"
 
 export const legalAddressValidation = yup.object().shape({
-  name: yup
-    .string()
-    .label("Full Name")
-    .trim()
-    .required()
-    .max(255)
-    .min(2),
+  name:          yup.string().label("Full Name"),
   legal_address: yup.object().shape({
-    first_name: yup
-      .string()
-      .label("First Name")
-      .trim()
-      .matches(NAME_REGEX, NAME_REGEX_FAIL_MESSAGE)
-      .required(),
-    last_name: yup
-      .string()
-      .label("Last Name")
-      .trim()
-      .matches(NAME_REGEX, NAME_REGEX_FAIL_MESSAGE)
-      .required(),
-    country: yup
-      .string()
-      .label("Country")
-      .length(2)
-      .required(),
-    state: yup
+    first_name: yup.string().label("First Name"),
+    last_name:  yup.string().label("Last Name"),
+    country:    yup.string().label("Country"),
+    state:      yup
       .string()
       .label("State")
       .when("country", {
@@ -67,8 +57,8 @@ export const legalAddressValidation = yup.object().shape({
 })
 
 export const newAccountValidation = yup.object().shape({
-  password: newPasswordFieldValidation,
-  username: usernameFieldValidation
+  password: passwordField,
+  username: usernameField
 })
 
 export const profileValidation = yup.object().shape({
@@ -180,6 +170,7 @@ const renderYearOfBirthField = () => {
         name="user_profile.year_of_birth"
         id="user_profile.year_of_birth"
         className="form-control"
+        autoComplete="bday-year"
         aria-describedby="user_profile.year_of_birth_error"
         required
       >
@@ -190,11 +181,6 @@ const renderYearOfBirthField = () => {
           </option>
         ))}
       </Field>
-      <ErrorMessage
-        name="user_profile.year_of_birth"
-        id="user_profile.year_of_birth_error"
-        component={FormError}
-      />
     </div>
   )
 }
@@ -223,8 +209,9 @@ export const LegalAddressFields = ({
         aria-describedby="first-name-subtitle"
         aria-label="First Name"
         required
+        pattern={NAME_REGEX}
+        title={NAME_REGEX_FAIL_MESSAGE}
       />
-      <ErrorMessage name="legal_address.first_name" component={FormError} />
     </div>
     <div className="form-group">
       <label htmlFor="legal_address.last_name" className="font-weight-bold">
@@ -237,13 +224,9 @@ export const LegalAddressFields = ({
         id="legal_address.last_name"
         className="form-control"
         autoComplete="family-name"
-        aria-describedby="legal_address.last_name_error"
         required
-      />
-      <ErrorMessage
-        name="legal_address.last_name"
-        id="legal_address.last_name_error"
-        component={FormError}
+        pattern={NAME_REGEX}
+        title={NAME_REGEX_FAIL_MESSAGE}
       />
     </div>
     <div className="form-group">
@@ -264,8 +247,9 @@ export const LegalAddressFields = ({
         aria-describedby="full-name-subtitle"
         aria-label="Full Name"
         required
+        pattern={fullNameRegex}
+        title={fullNameErrorMessage}
       />
-      <ErrorMessage name="name" component={FormError} />
     </div>
     {isNewAccount ? (
       <React.Fragment>
@@ -287,8 +271,9 @@ export const LegalAddressFields = ({
             aria-describedby="username-subtitle"
             aria-label="Public Username"
             required
+            pattern={usernameFieldRegex}
+            title={usernameFieldErrorMessage}
           />
-          <ErrorMessage name="username" component={FormError} />
         </div>
         <div className="form-group">
           <label htmlFor="password" className="font-weight-bold">
@@ -301,9 +286,11 @@ export const LegalAddressFields = ({
             id="password"
             aria-describedby="password-subtitle"
             className="form-control"
+            autoComplete="new-password"
             required
+            pattern={passwordFieldRegex}
+            title={passwordFieldErrorMessage}
           />
-          <ErrorMessage name="password" component={FormError} />
           <div id="password-subtitle" className="label-secondary">
             Passwords must contain at least 8 characters and at least 1 number
             and 1 letter.
@@ -322,8 +309,8 @@ export const LegalAddressFields = ({
         id="legal_address.country"
         className="form-control"
         autoComplete="country"
-        aria-describedby="legal_address.country_error"
         required
+        pattern={countryRegex}
       >
         <option value="">-----</option>
         {countries
@@ -334,12 +321,6 @@ export const LegalAddressFields = ({
           ))
           : null}
       </Field>
-
-      <ErrorMessage
-        name="legal_address.country"
-        id="legal_address.country_error"
-        component={FormError}
-      />
     </div>
     {findStates(values.legal_address.country, countries) ? (
       <div className="form-group">
@@ -353,7 +334,6 @@ export const LegalAddressFields = ({
           id="legal_address.state"
           className="form-control"
           autoComplete="state"
-          aria-describedby="legal_address.state_error"
           required
         >
           <option value="">-----</option>
@@ -367,11 +347,6 @@ export const LegalAddressFields = ({
             )
             : null}
         </Field>
-        <ErrorMessage
-          name="legal_address.state"
-          id="legal_address.state_error"
-          component={FormError}
-        />
       </div>
     ) : null}
     {isNewAccount ? (
@@ -435,6 +410,7 @@ export const AddlProfileFields = ({
             name="user_profile.highest_education"
             id="user_profile.highest_education"
             className="form-control"
+            required={requireAddlFields}
           >
             <option value="">-----</option>
             {HIGHEST_EDUCATION_CHOICES.map((level, i) => (
@@ -443,11 +419,6 @@ export const AddlProfileFields = ({
               </option>
             ))}
           </Field>
-          <ErrorMessage
-            name="user_profile.highest_education"
-            id="user_profile.highest_education_error"
-            component={FormError}
-          />
         </div>
       </div>
     </div>
@@ -466,6 +437,7 @@ export const AddlProfileFields = ({
               className="form-check-input"
               aria-labelledby="occupation-label student-label"
               defaultChecked={values.user_profile.type_is_student}
+              required={false}
             />
             <label
               className="form-check-label"
@@ -559,6 +531,7 @@ export const AddlProfileFields = ({
             type="text"
             name="user_profile.company"
             id="user_profile.company"
+            autoComplete="organization"
             aria-describedby="user_profile.companyError"
             className="form-control"
           />
@@ -581,6 +554,7 @@ export const AddlProfileFields = ({
                 type="text"
                 name="user_profile.job_title"
                 id="user_profile.job_title"
+                autoComplete="organization-title"
                 aria-describedby="user_profile.job_title_error"
                 className="form-control"
               />

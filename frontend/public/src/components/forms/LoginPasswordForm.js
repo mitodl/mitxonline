@@ -1,18 +1,11 @@
 // @flow
 import React from "react"
-import * as yup from "yup"
 
-import { Formik, Field, Form, ErrorMessage } from "formik"
+import { Formik, Field, Form } from "formik"
 import { Link } from "react-router-dom"
 
-import FormError from "./elements/FormError"
 import { PasswordInput } from "./elements/inputs"
-import { passwordFieldValidation } from "../../lib/validation"
 import { routes } from "../../lib/urls"
-
-const passwordValidation = yup.object().shape({
-  password: passwordFieldValidation
-})
 
 type LoginPasswordFormProps = {
   onSubmit: Function
@@ -21,8 +14,9 @@ type LoginPasswordFormProps = {
 const LoginPasswordForm = ({ onSubmit }: LoginPasswordFormProps) => (
   <Formik
     onSubmit={onSubmit}
-    validationSchema={passwordValidation}
     initialValues={{ password: "" }}
+    validateOnChange={false}
+    validateOnBlur={false}
     render={({ isSubmitting }) => (
       <Form>
         <div className="form-group">
@@ -32,12 +26,9 @@ const LoginPasswordForm = ({ onSubmit }: LoginPasswordFormProps) => (
             id="password"
             className="form-control"
             component={PasswordInput}
+            autoComplete="current-password"
             aria-describedby="passwordError"
-          />
-          <ErrorMessage
-            name="password"
-            id="passwordError"
-            component={FormError}
+            required
           />
         </div>
         <div className="form-group">

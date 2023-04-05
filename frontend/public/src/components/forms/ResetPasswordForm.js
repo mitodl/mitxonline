@@ -5,7 +5,11 @@ import { Formik, Field, Form, ErrorMessage } from "formik"
 
 import { PasswordInput } from "./elements/inputs"
 import FormError from "./elements/FormError"
-import { resetPasswordFormValidation } from "../../lib/validation"
+import {
+  resetPasswordFormValidation,
+  passwordFieldRegex,
+  passwordFieldErrorMessage
+} from "../../lib/validation"
 
 type Props = {
   onSubmit: Function
@@ -34,6 +38,8 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
             className="form-control"
             component={PasswordInput}
             aria-describedby="newPasswordError"
+            pattern={passwordFieldRegex}
+            title={passwordFieldErrorMessage}
           />
           <ErrorMessage
             name="newPassword"
@@ -49,6 +55,8 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
             className="form-control"
             component={PasswordInput}
             aria-describedby="confirmPasswordError"
+            pattern={passwordFieldRegex}
+            title={passwordFieldErrorMessage}
           />
           <ErrorMessage
             name="confirmPassword"

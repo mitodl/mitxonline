@@ -3,9 +3,11 @@ import { assert } from "chai"
 import { ValidationError } from "yup"
 
 import {
-  changeEmailFormValidation,
   changePasswordFormValidation,
-  resetPasswordFormValidation
+  resetPasswordFormValidation,
+  passwordFieldRegex,
+  usernameFieldRegex,
+  changeEmailValidationRegex
 } from "./validation"
 
 describe("validation utils", () => {
@@ -22,10 +24,6 @@ describe("validation utils", () => {
 
     //
     ;[
-      [
-        { newPassword: "", confirmPassword: "" },
-        ["Confirm Password is a required field"]
-      ],
       [
         { newPassword: "password1", confirmPassword: "password2" },
         ["Passwords must match"]
@@ -59,43 +57,11 @@ describe("validation utils", () => {
     ;[
       [
         {
-          oldPassword:     "",
-          newPassword:     "password1",
-          confirmPassword: "password1"
-        },
-        ["Old Password is a required field"]
-      ],
-      [
-        {
-          oldPassword:     "password1",
-          newPassword:     "",
-          confirmPassword: ""
-        },
-        ["Confirm Password is a required field"]
-      ],
-      [
-        {
           oldPassword:     "password1",
           newPassword:     "password1",
           confirmPassword: "password2"
         },
         ["Passwords must match"]
-      ],
-      [
-        {
-          oldPassword:     "password1",
-          newPassword:     "pass",
-          confirmPassword: "pass"
-        },
-        ["New Password must be at least 8 characters"]
-      ],
-      [
-        {
-          oldPassword:     "password1",
-          newPassword:     "password",
-          confirmPassword: "password"
-        },
-        ["Password must contain at least one letter and number"]
       ]
     ].forEach(([inputs, errors]) => {
       it(`should throw an error with inputs=${JSON.stringify(
@@ -108,54 +74,42 @@ describe("validation utils", () => {
         assert.deepEqual(result.errors, errors)
       })
     })
-  }),
-  describe("ChangeEmailFormValidation", () => {
-    it(`should validate with different email`, async () => {
-      const inputs = {
-        email:           "test@example.com",
-        confirmPassword: "password1"
-      }
-      const result = await changeEmailFormValidation.validate(inputs, {
-        context: { currentEmail: "abc@example.com" }
-      })
+  })
 
-      assert.deepEqual(result, inputs)
-    })
-
-    //
+  describe("Validation Regex", () => {
+    const passwordRegex = new RegExp(passwordFieldRegex)
+    const usernameRegex = new RegExp(usernameFieldRegex)
     ;[
-      [
-        {
-          email:           "abc@example.com",
-          confirmPassword: "password"
-        },
-        ["Email cannot be the same. Please use a different one."]
-      ],
-      [
-        {
-          email:           "test@example.com",
-          confirmPassword: ""
-        },
-        ["Confirm Password is a required field"]
-      ],
-      [
-        {
-          email:           "test@example.com",
-          confirmPassword: "abcd"
-        },
-        ["Confirm Password must be at least 8 characters"]
-      ]
-    ].forEach(([inputs, errors]) => {
-      it(`should throw an error with inputs=${JSON.stringify(
-        inputs
-      )}`, async () => {
-        const promise = changeEmailFormValidation.validate(inputs, {
-          context: { currentEmail: "abc@example.com" }
-        })
-
-        const result = await assert.isRejected(promise, ValidationError)
-
-        assert.deepEqual(result.errors, errors)
+      ["", false],
+      ["pass", false],
+      ["passwor", false],
+      ["password123", true],
+      ["password", false]
+    ].forEach(([value, regexMatch]) => {
+      it("password regex pattern matching.", () => {
+        assert.equal(passwordRegex.test(value), regexMatch)
+      })
+    })
+    ;[
+      ["", false],
+      ["  ", false],
+      ["ab", false],
+      ["0123456789012345678901234567890", false],
+      ["ábc-dèf-123", true]
+    ].forEach(([value, regexMatch]) => {
+      it("username regex pattern matching.", () => {
+        assert.equal(usernameRegex.test(value), regexMatch)
+      })
+    })
+    ;[
+      ["test@mit.edu", "test+new@mit.edu", true],
+      ["test@mit.edu", "test@mit.edu", false]
+    ].forEach(([currentEmail, futureEmail, regexMatch]) => {
+      it("Change email address field must be different from current email address.", () => {
+        const changeEmailRegex = new RegExp(
+          changeEmailValidationRegex(currentEmail)
+        )
+        assert.equal(changeEmailRegex.test(futureEmail), regexMatch)
       })
     })
   })

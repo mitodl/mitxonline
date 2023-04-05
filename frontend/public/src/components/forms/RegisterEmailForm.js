@@ -8,11 +8,9 @@ import { Formik, Field, Form, ErrorMessage } from "formik"
 import ScaledRecaptcha from "../ScaledRecaptcha"
 import { EmailInput } from "./elements/inputs"
 import FormError from "./elements/FormError"
-import { emailFieldValidation } from "../../lib/validation"
 import { routes } from "../../lib/urls"
 
 const emailValidation = yup.object().shape({
-  email:     emailFieldValidation,
   recaptcha: SETTINGS.recaptchaKey
     ? yup.string().required("Please verify you're not a robot")
     : yup.mixed().notRequired()
@@ -46,8 +44,8 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
             autoComplete="email"
             component={EmailInput}
             aria-describedby="emailError"
+            required
           />
-          <ErrorMessage name="email" id="emailError" component={FormError} />
           <p className="py-2">
             By creating an account I agree to the{" "}
             <a

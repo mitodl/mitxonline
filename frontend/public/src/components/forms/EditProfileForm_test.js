@@ -3,13 +3,9 @@ import React from "react"
 import sinon from "sinon"
 import { assert } from "chai"
 import { mount } from "enzyme"
-import wait from "waait"
 
 import EditProfileForm from "./EditProfileForm"
-import {
-  findFormikFieldByName,
-  findFormikErrorByName
-} from "../../lib/test_utils"
+import { findFormikFieldByName } from "../../lib/test_utils"
 import { makeCountries, makeUser } from "../../factories/user"
 import * as utils from "../../lib/util"
 
@@ -56,29 +52,6 @@ describe("EditProfileForm", () => {
       findFormikFieldByName(form, "user_profile.year_of_birth").exists()
     )
     assert.ok(form.find("button[type='submit']").exists())
-  })
-
-  //
-  ;[
-    ["legal_address.first_name", "input", "Jane", ""],
-    ["legal_address.last_name", "input", "Doe", ""],
-    ["user_profile.year_of_birth", "select", "1980", ""]
-  ].forEach(([name, type, value, errorMessage]) => {
-    it(`validates the field name=${name}, value=${JSON.stringify(
-      value
-    )} and expects error=${JSON.stringify(errorMessage)}`, async () => {
-      const wrapper = renderForm()
-
-      const input = wrapper.find(`${type}[name="${name}"]`)
-      input.simulate("change", { persist: () => {}, target: { name, value } })
-      input.simulate("blur")
-      await wait()
-      wrapper.update()
-      assert.deepEqual(
-        findFormikErrorByName(wrapper, name).text(),
-        errorMessage
-      )
-    })
   })
 
   it("renders the form and displays the additional fields if they're set", () => {

@@ -5,7 +5,11 @@ import { Formik, Field, Form, ErrorMessage } from "formik"
 
 import { PasswordInput } from "./elements/inputs"
 import FormError from "./elements/FormError"
-import { changePasswordFormValidation } from "../../lib/validation"
+import {
+  passwordFieldRegex,
+  passwordFieldErrorMessage,
+  changePasswordFormValidation
+} from "../../lib/validation"
 
 type Props = {
   onSubmit: Function
@@ -26,6 +30,8 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
       newPassword:     "",
       confirmPassword: ""
     }}
+    validateOnChange={false}
+    validateOnBlur={false}
     render={({ isSubmitting }) => (
       <Form>
         <section className="email-section">
@@ -38,12 +44,8 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               id="oldPassword"
               className="form-control"
               component={PasswordInput}
-              aria-describedby="oldPasswordError"
-            />
-            <ErrorMessage
-              name="oldPassword"
-              id="oldPasswordError"
-              component={FormError}
+              autoComplete="current-password"
+              required
             />
           </div>
           <div className="form-group">
@@ -54,7 +56,11 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               id="newPassword"
               className="form-control"
               component={PasswordInput}
+              autoComplete="new-password"
               aria-describedby="newPasswordError"
+              required
+              pattern={passwordFieldRegex}
+              title={passwordFieldErrorMessage}
             />
             <ErrorMessage
               name="newPassword"
@@ -70,7 +76,11 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               id="confirmPassword"
               className="form-control"
               component={PasswordInput}
+              autoComplete="new-password"
               aria-describedby="confirmPasswordError"
+              required
+              pattern={passwordFieldRegex}
+              title={passwordFieldErrorMessage}
             />
             <ErrorMessage
               name="confirmPassword"
