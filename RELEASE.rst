@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.5
+Version 0.63.5 (Released April 05, 2023)
 --------------
 
 - 123: remove use of aria-hidden and aria-live on dashboard (#1532)
