@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.6
+Version 0.63.6 (Released April 06, 2023)
 --------------
 
 - 1522: Remove instances of ErrorMessage for required fields (#1526)
