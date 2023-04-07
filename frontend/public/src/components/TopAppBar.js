@@ -5,7 +5,6 @@ import { routes } from "../lib/urls"
 import UserMenu from "./UserMenu"
 import AnonymousMenu from "./AnonymousMenu"
 import InstituteLogo from "./InstituteLogo"
-import NotificationContainer from "./NotificationContainer"
 import type { Location } from "react-router"
 
 import type { CurrentUser } from "../flow/authTypes"
@@ -17,7 +16,6 @@ type Props = {
 
 const TopAppBar = ({ currentUser }: Props) => (
   <header className="site-header d-flex d-flex flex-column">
-    <NotificationContainer />
     <nav
       className={`order-1 sub-nav navbar navbar-expand-md link-section py-2 px-3 py-sm-3 px-sm-4 ${
         currentUser.is_authenticated ? "nowrap login" : ""

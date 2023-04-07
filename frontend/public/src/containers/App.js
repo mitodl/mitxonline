@@ -34,6 +34,8 @@ import LearnerRecordsPage from "./pages/records/LearnerRecordsPage"
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
 
+import NotificationContainer from "../components/NotificationContainer"
+
 type Props = {
   match: Match,
   location: Location,
@@ -71,6 +73,7 @@ export class App extends React.Component<Props, void> {
       <div className="app" aria-flowto="notifications-container">
         <Header currentUser={currentUser} location={location} />
         <div id="main" className="main-page-content">
+          <NotificationContainer />
           <Switch>
             <Route
               path={urljoin(match.url, String(routes.login))}
