@@ -408,4 +408,14 @@ button.btn-secondary.unstyled {
 
 .form-group {
   padding-bottom: 1rem;
+
+  label {
+    margin-bottom: 0.5rem;
+  }
+  .form-check-label {
+    margin-bottom: 0;
+  }
+}
+.form-control {
+  padding: .375rem 0.75rem;
 }
