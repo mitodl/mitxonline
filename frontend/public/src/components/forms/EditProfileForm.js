@@ -63,14 +63,16 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
               isNewAccount={false}
             />
           ) : null}
-          <div className="row submit-row no-gutters justify-content-end">
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isSubmitting}
-            >
-              Submit
-            </button>
+          <div className="row submit-row no-gutters">
+            <div className="col d-flex justify-content-end">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isSubmitting}
+              >
+                Submit
+              </button>
+            </div>
           </div>
         </Form>
       )}
