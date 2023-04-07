@@ -1,3 +1,4 @@
+/* global SETTINGS:false */
 import React from "react"
 import moment from "moment"
 import { parseDateString, formatPrettyDateTimeAmPmTz } from "../lib/util"
