@@ -58,6 +58,12 @@ $enrolled-passed-fg: #ffffff;
         text-decoration: underline;
       }
     }
+    h5 a {
+      text-decoration: none;
+      &:hover{
+        text-decoration: underline;
+      }
+    }
 
     @include media-breakpoint-up(md) {
       .row {

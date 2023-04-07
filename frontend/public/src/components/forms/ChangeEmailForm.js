@@ -47,7 +47,7 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
             </div>
             <div className="form-group">
               <label htmlFor="confirmPassword" className="row">
-                <div className="col-auto font-weight-bold">
+                <div className="col-auto fw-bold">
                   Confirm Password<span className="required">*</span>
                 </div>
                 <div className="col-auto subtitle">

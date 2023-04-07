@@ -161,7 +161,7 @@ const findStates = (country: string, countries: Array<Country>) => {
 const renderYearOfBirthField = () => {
   return (
     <div>
-      <label htmlFor="user_profile.year_of_birth" className="font-weight-bold">
+      <label htmlFor="user_profile.year_of_birth" className="fw-bold">
         Year of Birth
       </label>
       <span className="required">*</span>
@@ -193,7 +193,7 @@ export const LegalAddressFields = ({
   <React.Fragment>
     <div className="form-group">
       <label htmlFor="legal_address.first_name" className="row">
-        <div className="col-auto font-weight-bold">
+        <div className="col-auto fw-bold">
           First Name<span className="required">*</span>
         </div>
         <div id="first-name-subtitle" className="col-auto subtitle">
@@ -214,7 +214,7 @@ export const LegalAddressFields = ({
       />
     </div>
     <div className="form-group">
-      <label htmlFor="legal_address.last_name" className="font-weight-bold">
+      <label htmlFor="legal_address.last_name" className="fw-bold">
         Last Name
       </label>
       <span className="required">*</span>
@@ -231,7 +231,7 @@ export const LegalAddressFields = ({
     </div>
     <div className="form-group">
       <label htmlFor="name" className="row">
-        <div className="col-auto font-weight-bold">
+        <div className="col-auto fw-bold">
           Full Name<span className="required">*</span>
         </div>
         <div id="full-name-subtitle" className="col-auto subtitle">
@@ -255,7 +255,7 @@ export const LegalAddressFields = ({
       <React.Fragment>
         <div className="form-group">
           <label htmlFor="username" className="row">
-            <div className="col-auto font-weight-bold">
+            <div className="col-auto fw-bold">
               Public Username<span className="required">*</span>
             </div>
             <div id="username-subtitle" className="col-auto subtitle">
@@ -276,7 +276,7 @@ export const LegalAddressFields = ({
           />
         </div>
         <div className="form-group">
-          <label htmlFor="password" className="font-weight-bold">
+          <label htmlFor="password" className="fw-bold">
             Password
           </label>
           <span className="required">*</span>
@@ -299,7 +299,7 @@ export const LegalAddressFields = ({
       </React.Fragment>
     ) : null}
     <div className="form-group">
-      <label htmlFor="legal_address.country" className="font-weight-bold">
+      <label htmlFor="legal_address.country" className="fw-bold">
         Country
       </label>
       <span className="required">*</span>
@@ -324,7 +324,7 @@ export const LegalAddressFields = ({
     </div>
     {findStates(values.legal_address.country, countries) ? (
       <div className="form-group">
-        <label htmlFor="legal_address.state" className="font-weight-bold">
+        <label htmlFor="legal_address.state" className="fw-bold">
           State
         </label>
         <span className="required">*</span>
@@ -360,7 +360,7 @@ export const ProfileFields = () => (
     <div className="form-group">
       <div className="row">
         <div className="col">
-          <label htmlFor="user_profile.gender" className="font-weight-bold">
+          <label htmlFor="user_profile.gender" className="fw-bold">
             Gender
           </label>
 
@@ -400,7 +400,7 @@ export const AddlProfileFields = ({
         <div className="col">
           <label
             htmlFor="user_profile.highest_education"
-            className="font-weight-bold"
+            className="fw-bold"
           >
             Highest Level of Education
           </label>
@@ -423,7 +423,7 @@ export const AddlProfileFields = ({
       </div>
     </div>
     <div className="form-group">
-      <label id="occupation-label" className="font-weight-bold">
+      <label id="occupation-label" className="fw-bold">
         Are you a
       </label>
       {requireAddlFields ? <span className="required">*</span> : ""}
@@ -524,7 +524,7 @@ export const AddlProfileFields = ({
           value={true}
         />
         <div className="form-group">
-          <label htmlFor="user_profile.company" className="font-weight-bold">
+          <label htmlFor="user_profile.company" className="fw-bold">
             Company
           </label>
           <Field
@@ -546,7 +546,7 @@ export const AddlProfileFields = ({
             <div className="form-group">
               <label
                 htmlFor="user_profile.job_title"
-                className="font-weight-bold"
+                className="fw-bold"
               >
                 Job Title
               </label>
@@ -569,7 +569,7 @@ export const AddlProfileFields = ({
             <div className="form-group">
               <label
                 htmlFor="user_profile.company_size"
-                className="font-weight-bold"
+                className="fw-bold"
               >
                 Company Size
               </label>
@@ -594,7 +594,7 @@ export const AddlProfileFields = ({
             <div className="form-group">
               <label
                 htmlFor="user_profile.industry"
-                className="font-weight-bold"
+                className="fw-bold"
               >
                 Industry
               </label>
@@ -617,7 +617,7 @@ export const AddlProfileFields = ({
             <div className="form-group">
               <label
                 htmlFor="user_profile.job_function"
-                className="font-weight-bold"
+                className="fw-bold"
               >
                 Job Function
               </label>
@@ -642,7 +642,7 @@ export const AddlProfileFields = ({
             <div className="form-group">
               <label
                 htmlFor="user_profile.years_experience"
-                className="font-weight-bold"
+                className="fw-bold"
               >
                 Years of Work Experience
               </label>
@@ -665,7 +665,7 @@ export const AddlProfileFields = ({
             <div className="form-group">
               <label
                 htmlFor="user_profile.leadership_level"
-                className="font-weight-bold"
+                className="fw-bold"
               >
                 Leadership Level
               </label>
