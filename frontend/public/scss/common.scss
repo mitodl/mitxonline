@@ -331,6 +331,11 @@ button.btn-secondary.unstyled {
   padding: 24px 24px 32px 24px !important;
   border-width: 0 !important;
 
+  .form-group {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0;
+  }
+
   .auth-header {
     .tell-us-about-your-income {
       font-size: 22px;
