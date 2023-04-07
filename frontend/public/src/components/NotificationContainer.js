@@ -79,6 +79,7 @@ export class NotificationContainer extends React.Component<Props, State> {
               isOpen={!hiddenNotifications.has(notificationKey)}
               toggle={dismiss}
               fade={true}
+              closeClassName="btn-close-white"
             >
               <AlertBodyComponent
                 aria-live="assertive"
