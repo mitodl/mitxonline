@@ -13591,7 +13591,7 @@ __metadata:
     react-swipeable: 7.0.0
     react-test-renderer: 16.14.0
     react-zendesk: 0.1.13
-    reactstrap: 9.1.8
+    reactstrap: 9.1.6
     redux: 3.7.2
     redux-actions: 2.6.5
     redux-asserts: 0.0.10
@@ -17388,9 +17388,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"reactstrap@npm:9.1.8":
-  version: 9.1.8
-  resolution: "reactstrap@npm:9.1.8"
+"reactstrap@npm:9.1.6":
+  version: 9.1.6
+  resolution: "reactstrap@npm:9.1.6"
   dependencies:
     "@babel/runtime": ^7.12.5
     "@popperjs/core": ^2.6.0
@@ -17401,7 +17401,7 @@ __metadata:
   peerDependencies:
     react: ">=16.8.0"
     react-dom: ">=16.8.0"
-  checksum: 6cde32514e40d09255e1776309bf7bf7e1c72c93b34d8ababd70f6b390d292ebe8745481803dda27ab458f181617abf4d3afc73e3b3eff75dd013eaaa414fc91
+  checksum: 32339cf1abd8403744134a1d449e71484b057176160cc62c5c30c14d72ab0d2d7b5704321e16341908d050a53e3ab0ec0bc7c7d15824ca73e953687c02a4e063
   languageName: node
   linkType: hard
 
