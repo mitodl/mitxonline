@@ -5,6 +5,7 @@ import { pathOr } from "ramda"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { connectRequest, mutateAsync } from "redux-query"
+// $FlowFixMe
 import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 import Loader from "../components/Loader"

@@ -3,6 +3,7 @@ import React from "react"
 import { connect } from "react-redux"
 import { compose } from "redux"
 import { partial } from "ramda"
+// $FlowFixMe
 import { Alert } from "reactstrap"
 
 import { removeUserNotification } from "../actions"

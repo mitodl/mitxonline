@@ -22,6 +22,7 @@ import {
 import users, { currentUserSelector } from "../../lib/queries/users"
 import { addUserNotification } from "../../actions"
 import { ProgramEnrollmentDrawer } from "../../components/ProgramEnrollmentDrawer"
+// $FlowFixMe
 import { Modal, ModalHeader, ModalBody } from "reactstrap"
 
 import EnrolledCourseList from "../../components/EnrolledCourseList"

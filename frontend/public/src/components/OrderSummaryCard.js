@@ -1,5 +1,6 @@
 // @flow
 import React from "react"
+// $FlowFixMe
 import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"

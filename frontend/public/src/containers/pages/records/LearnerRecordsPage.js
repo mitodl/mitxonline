@@ -7,6 +7,7 @@ import { compose } from "redux"
 import { connect } from "react-redux"
 import { connectRequest, mutateAsync } from "redux-query"
 import { pathOr } from "ramda"
+// $FlowFixMe
 import { Button, Modal, ModalHeader, ModalBody } from "reactstrap"
 import { Formik, Form, Field } from "formik"
 import { isSuccessResponse } from "../../../lib/util"
