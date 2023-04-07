@@ -425,7 +425,7 @@ export class EnrolledItemCard extends React.Component<
       : "upgrade-item-description detail d-md-flex justify-content-between pb-2"
     const certificateLinksIntStyles = isProgramCard
       ? "enrollment-extra-links d-flex d-md-flex w-100 justify-content-center"
-      : "enrollment-extra-links d-flex d-md-flex col-auto pr-0 justify-content-end"
+      : "enrollment-extra-links d-flex d-md-flex col-auto pe-0 justify-content-end"
 
     const certificateLinks =
       enrollment.run.products.length > 0 &&
@@ -440,7 +440,7 @@ export class EnrolledItemCard extends React.Component<
               </p>
             </div>
             <div className={certificateLinksIntStyles}>
-              <div className="pr-4 my-auto">{financialAssistanceLink}</div>
+              <div className="pe-4 my-auto">{financialAssistanceLink}</div>
               <div className="my-auto">
                 <GetCertificateButton productId={enrollment.run.products[0].id} />
               </div>
@@ -541,7 +541,7 @@ export class EnrolledItemCard extends React.Component<
               {courseRunStatusMessageText}
               <div className="enrollment-extra-links d-flex">
                 {pageLocation ? (
-                  <a className="pr-2" href={pageLocation.page_url}>
+                  <a className="pe-2" href={pageLocation.page_url}>
                     Course details
                   </a>
                 ) : null}
@@ -561,7 +561,7 @@ export class EnrolledItemCard extends React.Component<
           </div>
         </div>
         <div className="row flex-grow-1 pt-3">
-          <div className="col pl-0 pr-0">{certificateLinks}</div>
+          <div className="col pe-0 ps-0">{certificateLinks}</div>
         </div>
       </div>
     )
@@ -651,9 +651,9 @@ export class EnrolledItemCard extends React.Component<
             <div className="detail pt-1">
               {startDateDescription === null}
               {courseRunStatusMessageText}
-              <div className="enrollment-extra-links d-flex pr-2">
+              <div className="enrollment-extra-links d-flex pe-2">
                 <a
-                  className="program-course-count pr-2"
+                  className="program-course-count pe-2"
                   rel="noopener noreferrer"
                   href="#program_enrollment_drawer"
                   aria-flowto="program_enrollment_drawer"
@@ -665,7 +665,7 @@ export class EnrolledItemCard extends React.Component<
                   {courseCount > 1 ? "s" : null}
                 </a>
                 {pageLocation ? (
-                  <a className="pr-2" href={pageLocation.page_url}>
+                  <a className="pe-2" href={pageLocation.page_url}>
                     Course details
                   </a>
                 ) : null}
@@ -685,7 +685,7 @@ export class EnrolledItemCard extends React.Component<
           </div>
         </div>
         <div className="row flex-grow-1 pt-3">
-          <div className="col pl-0 pr-0">{certificateLinks}</div>
+          <div className="col ps-0 pe-0">{certificateLinks}</div>
         </div>
       </div>
     )

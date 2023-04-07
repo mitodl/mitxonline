@@ -275,6 +275,8 @@ $enrolled-passed-fg: #ffffff;
       float: none !important;
       width: 24px;
       height: 24px;
+      background-color: transparent;
+      border-width: 0;
 
       span {
         background-image: url('/static/images/close-drawer.png');
