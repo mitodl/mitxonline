@@ -398,10 +398,7 @@ export const AddlProfileFields = ({
     <div className="form-group">
       <div className="row">
         <div className="col">
-          <label
-            htmlFor="user_profile.highest_education"
-            className="fw-bold"
-          >
+          <label htmlFor="user_profile.highest_education" className="fw-bold">
             Highest Level of Education
           </label>
           {requireAddlFields ? <span className="required">*</span> : ""}
@@ -544,10 +541,7 @@ export const AddlProfileFields = ({
         <div className="row">
           <div className="col">
             <div className="form-group">
-              <label
-                htmlFor="user_profile.job_title"
-                className="fw-bold"
-              >
+              <label htmlFor="user_profile.job_title" className="fw-bold">
                 Job Title
               </label>
               <Field
@@ -567,10 +561,7 @@ export const AddlProfileFields = ({
           </div>
           <div className="col">
             <div className="form-group">
-              <label
-                htmlFor="user_profile.company_size"
-                className="fw-bold"
-              >
+              <label htmlFor="user_profile.company_size" className="fw-bold">
                 Company Size
               </label>
               <Field
@@ -592,10 +583,7 @@ export const AddlProfileFields = ({
         <div className="row">
           <div className="col">
             <div className="form-group">
-              <label
-                htmlFor="user_profile.industry"
-                className="fw-bold"
-              >
+              <label htmlFor="user_profile.industry" className="fw-bold">
                 Industry
               </label>
               <Field
@@ -615,10 +603,7 @@ export const AddlProfileFields = ({
           </div>
           <div className="col">
             <div className="form-group">
-              <label
-                htmlFor="user_profile.job_function"
-                className="fw-bold"
-              >
+              <label htmlFor="user_profile.job_function" className="fw-bold">
                 Job Function
               </label>
               <Field
