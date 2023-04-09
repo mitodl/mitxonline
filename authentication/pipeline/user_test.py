@@ -222,6 +222,28 @@ def test_user_password_not_exists(rf):
         )
 
 
+def test_user_not_active(rf, user):
+    """Tests that an inactive user raises auth error, InvalidPasswordException"""
+    user.set_password("abc123")
+    user.is_active = False
+    user.save()
+    request = rf.post("/complete/email", {"password": "abc123", "email": user.email})
+    middleware = SessionMiddleware()
+    middleware.process_request(request)
+    request.session.save()
+    strategy = load_strategy(request)
+    backend = load_backend(strategy, "email", None)
+
+    with pytest.raises(InvalidPasswordException):
+        user_actions.validate_password(
+            strategy,
+            backend,
+            pipeline_index=0,
+            user=user,
+            flow=SocialAuthState.FLOW_LOGIN,
+        )
+
+
 @pytest.mark.parametrize(
     "backend_name,flow",
     [
@@ -275,6 +297,7 @@ def test_create_user_via_email(
     )
     assert isinstance(response["user"], User) is True
     assert response["user"].username == "custom-username"
+    assert response["user"].is_active is True
     assert response["username"] == "custom-username"
     assert response["is_new"] is True
 
@@ -427,38 +450,6 @@ def test_forbid_hijack(mocker, hijacked):
             user_actions.forbid_hijack(*args, **kwargs)
     else:
         assert user_actions.forbid_hijack(*args, **kwargs) == {}
-
-
-@pytest.mark.parametrize("is_active", [True, False])
-@pytest.mark.parametrize("is_new", [True, False])
-@pytest.mark.parametrize(
-    "is_enabled, has_inquiry, computed_result, expected",
-    [
-        # [True, True, RESULT_SUCCESS, True],  # feature enabled, result is success
-        # [True, True, RESULT_DENIED, False],  # feature enabled, result is denied
-        # [True, True, RESULT_UNKNOWN, False],  # feature enabled, result is unknown
-        [False, False, None, True],  # feature disabled
-        [True, False, None, False],  # feature enabled, no result
-    ],
-)
-def test_activate_user(
-    mocker, user, is_active, is_new, is_enabled, has_inquiry, computed_result, expected
-):  # pylint: disable=too-many-arguments
-    """Test that activate_user takes the correct action"""
-    user.is_active = is_active
-    # if has_inquiry:
-    #     ExportsInquiryLogFactory.create(user=user, computed_result=computed_result)
-    #
-    # mocker.patch(
-    #     "authentication.pipeline.user.compliance_api.is_exports_verification_enabled",
-    #     return_value=is_enabled,
-    # )
-
-    assert user_actions.activate_user(None, None, user=user, is_new=is_new) == {}
-
-    if not user.is_active:
-        # only if the user is inactive and just registered
-        assert user.is_active is expected
 
 
 @pytest.mark.parametrize("raises_error", [True, False])
