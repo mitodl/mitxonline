@@ -1,11 +1,12 @@
 // @flow
 import React from "react"
 
-import { Formik, Field, Form } from "formik"
+import { Formik, Field, Form, ErrorMessage } from "formik"
 import { Link } from "react-router-dom"
 
 import { PasswordInput } from "./elements/inputs"
 import { routes } from "../../lib/urls"
+import FormError from "./elements/FormError"
 
 type LoginPasswordFormProps = {
   onSubmit: Function
@@ -29,6 +30,11 @@ const LoginPasswordForm = ({ onSubmit }: LoginPasswordFormProps) => (
             autoComplete="current-password"
             aria-describedby="passwordError"
             required
+          />
+          <ErrorMessage
+            name="password"
+            id="passwordError"
+            component={FormError}
           />
         </div>
         <div className="form-group">

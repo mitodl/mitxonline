@@ -189,7 +189,7 @@ class UserSerializer(serializers.ModelSerializer):
     legal_address = LegalAddressSerializer(allow_null=True)
     user_profile = UserProfileSerializer(allow_null=True, required=False)
     grants = serializers.SerializerMethodField(read_only=True, required=False)
-    is_active = serializers.BooleanField(default=True)
+    is_active = serializers.BooleanField()
 
     def validate_email(self, value):
         """Empty validation function, but this is required for WriteableSerializerMethodField"""
@@ -337,7 +337,7 @@ class UserSerializer(serializers.ModelSerializer):
             "created_on",
             "updated_on",
             "grants",
-            "is_active",
+            "is_active"
         )
         read_only_fields = (
             "username",
