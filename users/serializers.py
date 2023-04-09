@@ -337,7 +337,7 @@ class UserSerializer(serializers.ModelSerializer):
             "created_on",
             "updated_on",
             "grants",
-            "is_active"
+            "is_active",
         )
         read_only_fields = (
             "username",
