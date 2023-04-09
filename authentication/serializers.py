@@ -221,11 +221,13 @@ class LoginEmailSerializer(SocialAuthSerializer):
         self._save_next(validated_data)
 
         try:
-            user=User.objects.get(
+            user = (
+                User.objects.get(
                     social_auth__uid=validated_data.get("email"),
                     social_auth__provider=EmailAuth.name,
                     is_active=True,
                 ),
+            )
             result = super()._authenticate(SocialAuthState.FLOW_LOGIN)
         except (RequireRegistrationException, User.DoesNotExist):
             result = SocialAuthState(
