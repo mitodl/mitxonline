@@ -17,7 +17,7 @@ type Props = {
 
 const TopAppBar = ({ currentUser }: Props) => (
   <header className="site-header d-flex d-flex flex-column">
-    <NotificationContainer id="notifications-container"/>
+    <NotificationContainer id="notifications-container" />
     <nav
       className={`order-1 sub-nav navbar navbar-expand-md link-section py-2 px-3 py-sm-3 px-sm-4 ${
         currentUser.is_authenticated ? "nowrap login" : ""
