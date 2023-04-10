@@ -130,7 +130,7 @@ header.site-header {
     top: 66px;
   }
 
-  @include media-breakpoint-down(xs) {
+  @include media-breakpoint-down(sm) {
     top: 50px;
   }
 }
@@ -184,6 +184,7 @@ header.site-header {
   position: relative;
   width: 24px;
   height: 24px;
+  border: none;
 
   ul {
     cursor: pointer;
@@ -215,6 +216,10 @@ header.site-header {
   .bar:nth-child(3) {
     top: 50%;
     transform: translateY(-50%) rotate(-45deg);
+  }
+
+  &:focus {
+    box-shadow: none;
   }
 
   &.collapsed {

@@ -361,14 +361,14 @@ export class ProductDetailEnrollApp extends React.Component<
             !currentUser.id ? (
                 <a
                   href={routes.login}
-                  className="btn btn-primary btn-gradient-red highlight"
+                  className="btn btn-primary btn-lg btn-gradient-red highlight"
                 >
                 Enroll now
                 </a>
               ) : run && isWithinEnrollmentPeriod(run) ? (
                 product && run.is_upgradable ? (
                   <button
-                    className="btn btn-primary btn-gradient-red highlight enroll-now"
+                    className="btn btn-primary btn-lg btn-gradient-red highlight enroll-now"
                     onClick={() => this.toggleUpgradeDialogVisibility()}
                   >
                   Enroll now
