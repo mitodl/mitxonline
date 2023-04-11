@@ -1,9 +1,10 @@
 // @flow
 import React from "react"
 
-import { Formik, Field, Form } from "formik"
+import { Formik, Field, Form, ErrorMessage } from "formik"
 
 import { EmailInput } from "./elements/inputs"
+import FormError from "./elements/FormError"
 
 type EmailFormProps = {
   onSubmit: Function,
@@ -33,6 +34,7 @@ const EmailForm = ({ onSubmit, children }: EmailFormProps) => (
             aria-describedby="emailError"
             required
           />
+          <ErrorMessage name="email" id="emailError" component={FormError} />
         </div>
         {children && <div className="form-group">{children}</div>}
         <div className="row submit-row no-gutters justify-content-end">

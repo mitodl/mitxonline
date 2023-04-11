@@ -110,6 +110,7 @@ def test_create_user_serializer(settings, valid_address_dict):
 
     assert serializer.is_valid()
     user = serializer.save()
+    assert user.is_active is True
 
 
 def test_update_email_change_request_existing_email(user):
@@ -305,6 +306,7 @@ def test_user_create_required_fields_post(valid_address_dict, settings):
     assert str(serializer.errors["username"][0]) == "This field is required."
 
 
+@pytest.mark.django_db
 def test_user_create_required_fields_not_post(valid_address_dict):
     """
     If UserSerializer is given no request in the context, or that request is not a POST,

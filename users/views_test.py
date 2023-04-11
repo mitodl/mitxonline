@@ -72,6 +72,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
             "is_superuser": False,
             "grants": [],
             "user_profile": None,
+            "is_active": False,
         }
         # patched_unused_coupon_api.assert_not_called()
     elif not is_anonymous and show_enrollment_codes:
@@ -111,6 +112,7 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
             "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
             "grants": list(user.get_all_permissions()),
+            "is_active": True,
         }
 
 

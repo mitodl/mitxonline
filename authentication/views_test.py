@@ -73,7 +73,7 @@ def assert_api_call(
         "field_errors": {},
         "redirect_url": None,
         "extra_data": {},
-        "state": None,
+        "state": "error",
         "provider": EmailAuth.name,
         "flow": None,
         "partial_token": any_instance_of(str),
@@ -408,11 +408,13 @@ class AuthStateMachine(RuleBasedStateMachine):
             },
             {
                 "flow": auth_state["flow"],
-                "redirect_url": NEXT_URL,
-                "partial_token": None,
-                "state": SocialAuthState.STATE_SUCCESS,
+                "redirect_url": None,
+                "state": SocialAuthState.STATE_ERROR,
+                "field_errors": {
+                    "password": "Unable to login with that email and password combination"
+                },
             },
-            expect_authenticated=True,
+            expect_authenticated=False,
         )
 
     @rule(
@@ -569,12 +571,12 @@ def test_login_email_error(client, mocker):
     )
     assert response.json() == {
         "errors": [],
-        "field_errors": {},
+        "field_errors": {"email": "Couldn't find your account"},
         "flow": SocialAuthState.FLOW_LOGIN,
         "provider": EmailAuth.name,
         "redirect_url": None,
         "partial_token": None,
-        "state": SocialAuthState.STATE_ERROR,
+        "state": SocialAuthState.STATE_REGISTER_REQUIRED,
         "extra_data": {},
     }
     assert response.status_code == status.HTTP_200_OK
