@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.63.7
+--------------
+
+- 1538 users are still able to log in using a retired email account/login error messages (#1539)
+
 Version 0.63.6 (Released April 06, 2023)
 --------------
 
