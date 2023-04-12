@@ -1,6 +1,5 @@
 black
 bpython
-codecov
 ddt
 django-debug-toolbar
 factory-boy==3.2.0
