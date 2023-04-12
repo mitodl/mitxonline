@@ -58,7 +58,6 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
         data-bs-toggle="dropdown"
         aria-haspopup="true"
         aria-expanded="false"
-        data-bs-toggle="dropdown"
         type="button"
         role="menu"
       >
