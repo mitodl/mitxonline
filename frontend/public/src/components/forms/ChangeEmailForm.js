@@ -47,7 +47,7 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
             </div>
             <div className="form-group">
               <label htmlFor="confirmPassword" className="row">
-                <div className="col-auto font-weight-bold">
+                <div className="col-auto fw-bold">
                   Confirm Password<span className="required">*</span>
                 </div>
                 <div className="col-auto subtitle">
@@ -67,14 +67,16 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
             </div>
           </section>
 
-          <div className="row submit-row no-gutters justify-content-end">
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isSubmitting}
-            >
-              Submit
-            </button>
+          <div className="row submit-row no-gutters">
+            <div className="col d-flex justify-content-end">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isSubmitting}
+              >
+                Submit
+              </button>
+            </div>
           </div>
         </Form>
       )}

@@ -69,14 +69,16 @@ const AddlProfileFieldsForm = ({
             isNewAccount={false}
             requireAddlFields={requireTypeFields}
           />
-          <div className="row submit-row no-gutters justify-content-end">
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isSubmitting}
-            >
-              Submit
-            </button>
+          <div className="row submit-row no-gutters">
+            <div className="col d-flex justify-content-end">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isSubmitting}
+              >
+                Submit
+              </button>
+            </div>
           </div>
         </Form>
       )}

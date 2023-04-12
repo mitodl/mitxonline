@@ -23,7 +23,7 @@
   }
 
   .btn-primary.highlight {
-    @include media-breakpoint-down(xs) {
+    @include media-breakpoint-down(sm) {
       display: block;
       width: 100%;
     }

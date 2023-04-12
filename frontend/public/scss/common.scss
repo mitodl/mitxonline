@@ -277,7 +277,6 @@ button.btn-secondary.unstyled {
 
     a, button.unstyled {
       display: block;
-      width: 100%;
       color: $black;
       font-weight: 400;
       font-size: 14px;
@@ -331,6 +330,11 @@ button.btn-secondary.unstyled {
   max-width: 425px;
   padding: 24px 24px 32px 24px !important;
   border-width: 0 !important;
+
+  .form-group {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0;
+  }
 
   .auth-header {
     .tell-us-about-your-income {
@@ -405,4 +409,18 @@ button.btn-secondary.unstyled {
       }
     }
   }
+}
+
+.form-group {
+  padding-bottom: 1rem;
+
+  label {
+    margin-bottom: 0.5rem;
+  }
+  .form-check-label {
+    margin-bottom: 0;
+  }
+}
+.form-control {
+  padding: .375rem 0.75rem;
 }

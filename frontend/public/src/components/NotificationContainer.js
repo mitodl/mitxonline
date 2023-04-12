@@ -3,6 +3,7 @@ import React from "react"
 import { connect } from "react-redux"
 import { compose } from "redux"
 import { partial } from "ramda"
+// $FlowFixMe
 import { Alert } from "reactstrap"
 
 import { removeUserNotification } from "../actions"
@@ -79,6 +80,7 @@ export class NotificationContainer extends React.Component<Props, State> {
               isOpen={!hiddenNotifications.has(notificationKey)}
               toggle={dismiss}
               fade={true}
+              closeClassName="btn-close-white"
             >
               <AlertBodyComponent
                 aria-live="assertive"

@@ -17,20 +17,7 @@
     &.alert-info, &.alert-danger, &.alert-success {
       color: white;
 
-      a.alert-link, .close {
-        color: white;
-      }
-
-      a.alert-link {
-        font-weight: inherit;
-        text-decoration: underline;
-
-        &:hover {
-          font-weight: 700;
-        }
-      }
-
-      .close {
+      .btn-close {
         opacity: 1;
       }
     }

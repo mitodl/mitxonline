@@ -5,8 +5,8 @@ import { routes } from "../lib/urls"
 import UserMenu from "./UserMenu"
 import AnonymousMenu from "./AnonymousMenu"
 import InstituteLogo from "./InstituteLogo"
-import NotificationContainer from "./NotificationContainer"
 import type { Location } from "react-router"
+import NotificationContainer from "./NotificationContainer"
 
 import type { CurrentUser } from "../flow/authTypes"
 
@@ -17,7 +17,7 @@ type Props = {
 
 const TopAppBar = ({ currentUser }: Props) => (
   <header className="site-header d-flex d-flex flex-column">
-    <NotificationContainer />
+    <NotificationContainer id="notifications-container" />
     <nav
       className={`order-1 sub-nav navbar navbar-expand-md link-section py-2 px-3 py-sm-3 px-sm-4 ${
         currentUser.is_authenticated ? "nowrap login" : ""
@@ -35,8 +35,8 @@ const TopAppBar = ({ currentUser }: Props) => (
       <button
         className="navbar-toggler nav-opener collapsed"
         type="button"
-        data-toggle="collapse"
-        data-target="#nav"
+        data-bs-toggle="collapse"
+        data-bs-target="#nav"
         aria-controls="nav"
         aria-expanded="false"
         aria-label="Toggle navigation"

@@ -53,11 +53,14 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
   return (
     <div {...(menuChildProps.container || {})}>
       <button
-        className="col-2 dropdown-toggle user-menu-button"
+        className="dropdown-toggle user-menu-button"
         id={menuChildProps.dropdownIdentifier}
         data-toggle="dropdown"
         aria-haspopup="true"
         aria-expanded="false"
+        data-bs-toggle="dropdown"
+        type="button"
+        role="menu"
       >
         {currentUser.name}
       </button>

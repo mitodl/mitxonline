@@ -64,14 +64,16 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
             component={FormError}
           />
         </div>
-        <div className="row submit-row no-gutters justify-content-end">
-          <button
-            type="submit"
-            className="btn btn-primary btn-gradient-red large"
-            disabled={isSubmitting}
-          >
-            Submit
-          </button>
+        <div className="row submit-row no-gutters">
+          <div className="col d-flex justify-content-end">
+            <button
+              type="submit"
+              className="btn btn-primary btn-gradient-red large"
+              disabled={isSubmitting}
+            >
+              Submit
+            </button>
+          </div>
         </div>
       </Form>
     )}

@@ -5,6 +5,7 @@ import { pathOr } from "ramda"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { connectRequest } from "redux-query"
+// $FlowFixMe
 import { Badge } from "reactstrap"
 
 import Loader from "../components/Loader"

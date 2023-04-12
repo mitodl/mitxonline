@@ -37,14 +37,16 @@ const EmailForm = ({ onSubmit, children }: EmailFormProps) => (
           <ErrorMessage name="email" id="emailError" component={FormError} />
         </div>
         {children && <div className="form-group">{children}</div>}
-        <div className="row submit-row no-gutters justify-content-end">
-          <button
-            type="submit"
-            className="btn btn-primary btn-gradient-red large"
-            disabled={isSubmitting}
-          >
-            Continue
-          </button>
+        <div className="row submit-row no-gutters">
+          <div className="col d-flex justify-content-end">
+            <button
+              type="submit"
+              className="btn btn-primary btn-gradient-red large"
+              disabled={isSubmitting}
+            >
+              Continue
+            </button>
+          </div>
         </div>
       </Form>
     )}

@@ -7,6 +7,7 @@ import { compose } from "redux"
 import { connect } from "react-redux"
 import { connectRequest, mutateAsync } from "redux-query"
 import { pathOr } from "ramda"
+// $FlowFixMe
 import { Button, Modal, ModalHeader, ModalBody } from "reactstrap"
 import { Formik, Form, Field } from "formik"
 import { isSuccessResponse } from "../../../lib/util"
@@ -85,7 +86,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
       <tr scope="row" key={`learner-record-course-${course.id}`}>
         <td className="d-flex">
           <span className="flex-grow-1">{course.title}</span>
-          <span className="learner-record-req-badges pr-2">
+          <span className="learner-record-req-badges pe-2">
             {course.reqtype === "Required Courses" ? (
               <span className="badge badge-danger">Core</span>
             ) : null}
@@ -117,7 +118,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
       >
         <div className="d-flex w-100 justify-content-between">
           <h5 className="mb-1">{course.title}</h5>
-          <span className="learner-record-req-badges pl-2">
+          <span className="learner-record-req-badges ps-2">
             {course.reqtype === "Required Courses" ? (
               <span className="badge badge-danger">Core</span>
             ) : null}

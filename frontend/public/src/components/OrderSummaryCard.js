@@ -1,5 +1,6 @@
 // @flow
 import React from "react"
+// $FlowFixMe
 import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
@@ -47,7 +48,7 @@ export class OrderSummaryCard extends React.Component<Props> {
           <div className="d-flex justify-content-between">
             <div className="flex-grow-1">
               Coupon applied (
-              <em className="font-weight-bold text-primary">
+              <em className="fw-bold text-primary">
                 {discounts[0].discount_code}
               </em>{" "}
               )
@@ -190,7 +191,7 @@ export class OrderSummaryCard extends React.Component<Props> {
             <div className="col-12 text-center mt-4 mb-4">
               <Button
                 type="link"
-                className="btn btn-primary btn-gradient-red highlight font-weight-bold"
+                className="btn btn-primary btn-gradient-red highlight fw-bold"
                 onClick={() => (window.location = "/checkout/to_payment")}
               >
                 Place your order
