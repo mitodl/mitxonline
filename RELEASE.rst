@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.8
+Version 0.63.8 (Released April 12, 2023)
 --------------
 
 - 715: ecommerce pressing pay jumps back to dashboard without focus on alert (2) (#1544)
