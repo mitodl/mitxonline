@@ -106,6 +106,7 @@ def create_user_via_email(
         )
 
     data["email"] = kwargs.get("email", kwargs.get("details", {}).get("email"))
+    data["is_active"] = True
     serializer = UserSerializer(data=data, context=context)
 
     if not serializer.is_valid():
@@ -115,10 +116,6 @@ def create_user_via_email(
             errors=serializer.errors.get("non_field_errors"),
             field_errors=dict_without_keys(serializer.errors, "non_field_errors"),
         )
-
-        raise e
-
-        raise e
 
         raise e
 
@@ -182,7 +179,8 @@ def validate_password(
         current_partial (Partial): the partial for the step in the pipeline
 
     Raises:
-        RequirePasswordException: if the user password is invalid
+        RequirePasswordException: if the user password is not provided
+        InvalidPasswordException: if the password does not match the user, or the user is not active.
     """
     if backend.name != EmailAuth.name or flow != SocialAuthState.FLOW_LOGIN:
         return {}
@@ -196,7 +194,7 @@ def validate_password(
 
     password = data["password"]
 
-    if not user or not user.check_password(password):
+    if not user or not user.check_password(password) or not user.is_active:
         raise InvalidPasswordException(backend, current_partial)
 
     return {}
@@ -213,35 +211,6 @@ def forbid_hijack(strategy, backend, **kwargs):  # pylint: disable=unused-argume
     # As first step in pipeline, stop a hijacking admin from going any further
     if strategy.session_get("is_hijacked_user"):
         raise AuthException("You are hijacking another user, don't try to login again")
-    return {}
-
-
-def activate_user(
-    strategy, backend, user=None, is_new=False, **kwargs
-):  # pylint: disable=unused-argument
-    """
-    Activate the user's account if they passed export controls
-
-    Args:
-        strategy (social_django.strategy.DjangoStrategy): the strategy used to authenticate
-        backend (social_core.backends.base.BaseAuth): the backend being used to authenticate
-        user (User): the current user
-    """
-    if user.is_active:
-        return {}
-
-    # export_inquiry = compliance_api.get_latest_exports_inquiry(user)
-    #
-    # # if the user has an export inquiry that is considered successful, activate them
-    # if not compliance_api.is_exports_verification_enabled() or (
-    #     export_inquiry is not None and export_inquiry.is_success
-    # ):
-    #     user.is_active = True
-    #     user.save()
-
-    user.is_active = True
-    user.save()
-
     return {}
 
 

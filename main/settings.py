@@ -28,7 +28,7 @@ from redbeat import RedBeatScheduler
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 
-VERSION = "0.63.6"
+VERSION = "0.63.7"
 
 log = logging.getLogger()
 
@@ -388,8 +388,6 @@ SOCIAL_AUTH_PIPELINE = (
     # "authentication.pipeline.compliance.verify_exports_compliance",
     # Create the record that associates the social account with the user.
     "social_core.pipeline.social_auth.associate_user",
-    # activate the user
-    "authentication.pipeline.user.activate_user",
     # create the user's edx user and auth
     "authentication.pipeline.user.create_openedx_user",
     # Populate the extra_data field in the social record with the values
