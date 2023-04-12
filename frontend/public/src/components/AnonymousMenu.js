@@ -10,8 +10,7 @@ type Props = {
 }
 
 const overlayListItemProps = {
-  "data-toggle": "collapse",
-  "data-target": "#nav"
+  "data-bs-target": "#nav"
 }
 
 const AnonymousMenu = ({ useScreenOverlay }: Props) => {

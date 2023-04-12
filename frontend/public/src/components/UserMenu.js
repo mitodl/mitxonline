@@ -21,8 +21,7 @@ const desktopUListProps = {
 }
 
 const overlayListItemProps = {
-  "data-toggle": "collapse",
-  "data-target": "#nav"
+  "data-bs-target": "#nav"
 }
 
 const desktopListItemProps = {
@@ -55,10 +54,9 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
       <button
         className="dropdown-toggle user-menu-button"
         id={menuChildProps.dropdownIdentifier}
-        data-toggle="dropdown"
+        data-bs-toggle="dropdown"
         aria-haspopup="true"
         aria-expanded="false"
-        data-bs-toggle="dropdown"
         type="button"
         role="menu"
       >
