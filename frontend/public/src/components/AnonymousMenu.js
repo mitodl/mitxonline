@@ -10,7 +10,6 @@ type Props = {
 }
 
 const overlayListItemProps = {
-  "data-bs-toggle": "collapse",
   "data-bs-target": "#nav"
 }
 
