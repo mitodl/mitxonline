@@ -274,6 +274,7 @@ export const LegalAddressFields = ({
             pattern={usernameFieldRegex}
             title={usernameFieldErrorMessage}
           />
+          <ErrorMessage name="username" component={FormError} />
         </div>
         <div className="form-group">
           <label htmlFor="password" className="font-weight-bold">
