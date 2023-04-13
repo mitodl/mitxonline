@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.9
+Version 0.63.9 (Released April 13, 2023)
 --------------
 
 - Update badges to bootstrap v5 (#1550)
