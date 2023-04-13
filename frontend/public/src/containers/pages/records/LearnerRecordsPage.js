@@ -88,10 +88,10 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
           <span className="flex-grow-1">{course.title}</span>
           <span className="learner-record-req-badges pe-2">
             {course.reqtype === "Required Courses" ? (
-              <span className="badge badge-danger">Core</span>
+              <span className="badge bg-danger">Core</span>
             ) : null}
             {course.reqtype === "Elective Courses" ? (
-              <span className="badge badge-success">Elective</span>
+              <span className="badge bg-success">Elective</span>
             ) : null}
           </span>
         </td>
@@ -100,9 +100,9 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
         <td>{course.grade ? course.grade.letter_grade : ""}</td>
         <td className="learner-record-cert-status">
           {course.certificate ? (
-            <span className="badge badge-success">Certificate Earned</span>
+            <span className="badge bg-success">Certificate Earned</span>
           ) : (
-            <span className="badge badge-secondary">Not Earned</span>
+            <span className="badge bg-secondary">Not Earned</span>
           )}
         </td>
       </tr>
@@ -120,10 +120,10 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
           <h5 className="mb-1">{course.title}</h5>
           <span className="learner-record-req-badges ps-2">
             {course.reqtype === "Required Courses" ? (
-              <span className="badge badge-danger">Core</span>
+              <span className="badge bg-danger">Core</span>
             ) : null}
             {course.reqtype === "Elective Courses" ? (
-              <span className="badge badge-success">Elective</span>
+              <span className="badge bg-success">Elective</span>
             ) : null}
           </span>
         </div>
@@ -134,9 +134,9 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
           ""
         )}
         {course.certificate ? (
-          <span className="badge badge-success">Certificate Earned</span>
+          <span className="badge bg-success">Certificate Earned</span>
         ) : (
-          <span className="badge badge-secondary">Not Earned</span>
+          <span className="badge bg-secondary">Not Earned</span>
         )}
       </div>
     )
