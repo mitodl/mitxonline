@@ -5,7 +5,8 @@ import {
   generateStartDateText,
   isFinancialAssistanceAvailable,
   learnerProgramIsCompleted,
-  extractCoursesFromNode
+  extractCoursesFromNode,
+  walkNodes
 } from "./courseApi"
 import { assert } from "chai"
 import moment from "moment"
@@ -272,6 +273,32 @@ describe("Course API", () => {
 
       assert.equal(requirements.length, 0)
       assert.equal(electives.length, 0)
+    })
+  })
+
+  describe("walkNodes", () => {
+    [
+      [
+        {
+          data: {
+            node_type:      "operator",
+            operator:       "min_number_of",
+            operator_value: "1",
+            program:        2,
+            course:         null,
+            title:          "Elective Courses"
+          },
+          id: 13
+        },
+        false
+      ],
+      [undefined, false]
+    ].forEach(([node, expResult]) => {
+      it(`returns ${String(expResult)}`, () => {
+        const learnerRecord = makeLearnerRecord(false)
+        const result = walkNodes(node, learnerRecord)
+        assert.equal(result, expResult)
+      })
     })
   })
 })
