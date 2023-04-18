@@ -190,7 +190,6 @@ export const walkNodes = (
 ) => {
   // Processes the node. if the node is an operator, roll through each child
   // node and recurse. If the node is a course, check if it's completed.
-  console.log(node)
   if (node) {
     if (node.data.node_type === NODETYPE_OPERATOR) {
       let completedCount = 0
