@@ -292,7 +292,21 @@ describe("Course API", () => {
         },
         false
       ],
-      [undefined, false]
+      [undefined, false],
+      [
+        {
+          data: {
+            node_type:      "operator",
+            operator:       "all_of",
+            operator_value: "1",
+            program:        2,
+            course:         null,
+            title:          "Required Courses"
+          },
+          id: 13
+        },
+        false
+      ]
     ].forEach(([node, expResult]) => {
       it(`returns ${String(expResult)}`, () => {
         const learnerRecord = makeLearnerRecord(false)
