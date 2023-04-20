@@ -198,12 +198,12 @@ export const walkNodes = (
         node.children.forEach(child => {
           completedCount += walkNodes(child, learnerRecord)
         })
-      }
 
-      if (node.data.operator === NODEOPER_ALL) {
-        return completedCount === node.children.length ? 1 : 0
-      } else {
-        return completedCount >= parseInt(node.data.operator_value) ? 1 : 0
+        if (node.data.operator === NODEOPER_ALL) {
+          return completedCount === node.children.length ? 1 : 0
+        } else {
+          return completedCount >= parseInt(node.data.operator_value) ? 1 : 0
+        }
       }
     } else if (node.data.node_type === NODETYPE_COURSE) {
       return isNodeCompleted(node.data, learnerRecord) ? 1 : 0
