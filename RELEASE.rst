@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.63.12
+---------------
+
+- 1295: learner menu stops functioning at a particular width range (#1561)
+
 Version 0.63.11 (Released April 20, 2023)
 ---------------
 
