@@ -9,7 +9,7 @@ header.site-header {
     justify-content: space-between;
     padding: 0;
 
-    @include media-breakpoint-down(sm) {
+    @include media-breakpoint-down(md) {
       position: static;
     }
   }
@@ -22,7 +22,7 @@ header.site-header {
 .full-screen-menu {
   display: block;
 
-  @include media-breakpoint-down(sm) {
+  @include media-breakpoint-down(md) {
     display: none;
   }
 
@@ -71,7 +71,7 @@ header.site-header {
 .mobile-menu {
   display: none;
 
-  @include media-breakpoint-down(sm) {
+  @include media-breakpoint-down(md) {
     display: block;
   }
 
@@ -100,13 +100,6 @@ header.site-header {
   display: none;
   margin: 0;
 
-  &.collapsing,
-  &.show {
-    @include media-breakpoint-down(sm) {
-      display: block;
-    }
-  }
-
   @include media-breakpoint-up(md) {
     display: block;
 
@@ -115,24 +108,24 @@ header.site-header {
     }
   }
 
-  @include media-breakpoint-down(sm) {
+  @include media-breakpoint-down(md) {
     position: absolute;
     padding-top: 70px;
     left: 0;
     right: 0;
     bottom: -10px;
-    height: auto !important;
+    height: 100%;
+    top: 50px;
     z-index: 9999;
     background: rgba(0, 0, 0, 0.91);
+
+    &.collapsing,
+    &.show {
+      display: block;
+      transition: none;
+    }
   }
 
-  @include media-breakpoint-between(sm, md) {
-    top: 66px;
-  }
-
-  @include media-breakpoint-down(sm) {
-    top: 50px;
-  }
 }
 
 .site-logo {
@@ -156,14 +149,14 @@ header.site-header {
     line-height: 24px;
     letter-spacing: 0;
 
-    @include media-breakpoint-down(sm) {
+    @include media-breakpoint-down(md) {
       font-size: 18px;
       line-height: 18px;
     }
   }
 
   .logo-link {
-    @include media-breakpoint-down(sm) {
+    @include media-breakpoint-down(md) {
       display: inline-flex;
     }
   }
@@ -173,7 +166,7 @@ header.site-header {
     height: 48px;
     margin: 0 15px;
     background: black;
-    @include media-breakpoint-down(sm) {
+    @include media-breakpoint-down(md) {
       height: 34px;
       margin: 0 8px;
     }
