@@ -298,6 +298,16 @@ class UserSerializer(serializers.ModelSerializer):
                     address_serializer.save()
 
             if user_profile_data:
+                if user_profile_data.get("highest_education") and (
+                    user_profile_data.get("type_is_student")
+                    or user_profile_data.get("type_is_professional")
+                    or user_profile_data.get("type_is_educator")
+                    or user_profile_data.get("type_is_other")
+                ):
+                    user_profile_data["addl_field_flag"] = True
+                else:
+                    user_profile_data["addl_field_flag"] = False
+
                 try:
                     user_profile_serializer = UserProfileSerializer(
                         instance.user_profile, data=user_profile_data

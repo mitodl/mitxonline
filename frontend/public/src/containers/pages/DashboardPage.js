@@ -111,7 +111,7 @@ export class DashboardPage extends React.Component<
     send the learner directly to the page.
     */
 
-    const { currentUser, updateAddlFields } = this.props
+    const { currentUser } = this.props
 
     if (
       !checkFeatureFlag("enable_addl_profile_fields") ||
@@ -126,8 +126,6 @@ export class DashboardPage extends React.Component<
       destinationUrl:             url,
       showAddlProfileFieldsModal: true
     })
-
-    updateAddlFields(currentUser)
   }
 
   async saveProfile(profileData: User, { setSubmitting }: Object) {
@@ -292,10 +290,7 @@ const updateAddlFields = (currentUser: User) => {
     name:          currentUser.name,
     email:         currentUser.email,
     legal_address: currentUser.legal_address,
-    user_profile:  {
-      ...currentUser.user_profile,
-      addl_field_flag: true
-    }
+    user_profile:  currentUser.user_profile
   }
 
   return mutateAsync(users.editProfileMutation(updatedUser))
