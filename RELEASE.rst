@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.11
+Version 0.63.11 (Released April 20, 2023)
 ---------------
 
 - Update "right" and "left" to "end" and "start" (#1559)
