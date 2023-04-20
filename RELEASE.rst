@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.63.10
+---------------
+
+- Fix program record page, no required courses (#1556)
+- 1549: Fixes program record with null nodes and no children with tests (#1554)
+
 Version 0.63.9 (Released April 13, 2023)
 --------------
 
