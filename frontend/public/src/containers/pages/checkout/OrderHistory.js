@@ -85,7 +85,7 @@ export class OrderHistory extends React.Component<Props> {
         <td>
           <a
             className="link-text"
-            aria-label={`View order details for ${orderTitle}`}
+            aria-label={`View order details for ${order.titles}`}
             onClick={() => this.renderOrderReceipt(order.id)}
             href="#"
             role="link"
