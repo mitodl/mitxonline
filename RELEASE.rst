@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.10
+Version 0.63.10 (Released April 20, 2023)
 ---------------
 
 - Fix program record page, no required courses (#1556)
