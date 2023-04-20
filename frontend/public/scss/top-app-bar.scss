@@ -9,7 +9,7 @@ header.site-header {
     justify-content: space-between;
     padding: 0;
 
-    @include media-breakpoint-down(sm) {
+    @include media-breakpoint-down(md) {
       position: static;
     }
   }
@@ -22,7 +22,7 @@ header.site-header {
 .full-screen-menu {
   display: block;
 
-  @include media-breakpoint-down(sm) {
+  @include media-breakpoint-down(md) {
     display: none;
   }
 
@@ -71,7 +71,7 @@ header.site-header {
 .mobile-menu {
   display: none;
 
-  @include media-breakpoint-down(sm) {
+  @include media-breakpoint-down(md) {
     display: block;
   }
 
@@ -148,14 +148,14 @@ header.site-header {
     line-height: 24px;
     letter-spacing: 0;
 
-    @include media-breakpoint-down(sm) {
+    @include media-breakpoint-down(md) {
       font-size: 18px;
       line-height: 18px;
     }
   }
 
   .logo-link {
-    @include media-breakpoint-down(sm) {
+    @include media-breakpoint-down(md) {
       display: inline-flex;
     }
   }
@@ -165,7 +165,7 @@ header.site-header {
     height: 48px;
     margin: 0 15px;
     background: black;
-    @include media-breakpoint-down(sm) {
+    @include media-breakpoint-down(md) {
       height: 34px;
       margin: 0 8px;
     }
