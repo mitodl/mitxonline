@@ -168,7 +168,7 @@ export class CartPage extends React.Component<Props, CartState> {
               <div className="col-12 d-flex justify-content-between">
                 <h1 className="flex-grow-1">Checkout</h1>
 
-                <p className="text-right d-md-none">
+                <p className="text-end d-md-none">
                   <a
                     href="https://mitxonline.zendesk.com/hc/en-us"
                     target="_blank"
@@ -193,12 +193,12 @@ export class CartPage extends React.Component<Props, CartState> {
                   You are about to purchase the following:
                 </h4>
               </div>
-              <div className="col-md-4 justify-content-end text-right d-flex">
+              <div className="col-md-4 justify-content-end text-end d-flex">
                 <h4 className="fw-normal">
                   {this.renderFinancialAssistanceOffer()}
                 </h4>
               </div>
-              <div className="col-md-2 justify-content-end text-right d-flex">
+              <div className="col-md-2 justify-content-end text-end d-flex">
                 <h4 className="fw-normal">
                   <a
                     href="https://mitxonline.zendesk.com/hc/en-us"

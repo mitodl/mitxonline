@@ -160,7 +160,7 @@ export class OrderHistory extends React.Component<Props> {
                 {orderHistory ? Math.ceil(orderHistory.count / 10) : 0} |{" "}
                 {orderHistory ? orderHistory.count : "0"} orders total
               </div>
-              <div className="col text-right" />
+              <div className="col text-end" />
               {this.renderPaginationPrevious()} | {this.renderPaginationNext()}
             </div>
           </div>
