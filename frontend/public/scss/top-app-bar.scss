@@ -114,14 +114,15 @@ header.site-header {
     left: 0;
     right: 0;
     bottom: -10px;
-    top: 50px;
     height: 100%;
+    top: 50px;
     z-index: 9999;
     background: rgba(0, 0, 0, 0.91);
 
     &.collapsing,
     &.show {
-        display: block;
+      display: block;
+      transition: none;
     }
   }
 
