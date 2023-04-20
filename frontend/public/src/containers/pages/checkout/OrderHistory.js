@@ -85,6 +85,7 @@ export class OrderHistory extends React.Component<Props> {
         <td>
           <a
             className="link-text"
+            aria-label={`View order details for ${orderTitle}`}
             onClick={() => this.renderOrderReceipt(order.id)}
             href="#"
             role="link"
@@ -214,7 +215,7 @@ export class OrderHistory extends React.Component<Props> {
                         <td />
                         <td />
                         <td />
-                        <td className=" col text-right">
+                        <td className="col text-right">
                           {this.renderPaginationPrevious()} |{" "}
                           {this.renderPaginationNext()}
                         </td>
