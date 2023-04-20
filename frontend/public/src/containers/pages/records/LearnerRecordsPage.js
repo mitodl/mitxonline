@@ -245,7 +245,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
             render={() => (
               <Form className="text-center">
                 <section>
-                  <label htmlFor="partnerSchool" className="text-left">
+                  <label htmlFor="partnerSchool" className="text-start">
                     Select School
                   </label>
                   <Field

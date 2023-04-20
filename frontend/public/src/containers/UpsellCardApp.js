@@ -71,7 +71,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
             <Badge color="danger">Enrolled in free course</Badge>
             <h2>Get a certificate</h2>
           </div>
-          <div className="text-right align-self-end">
+          <div className="text-end align-self-end">
             <h2>{formatLocalePrice(getFlexiblePriceForProduct(product))}</h2>
           </div>
         </div>

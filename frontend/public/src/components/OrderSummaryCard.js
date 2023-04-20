@@ -53,7 +53,7 @@ export class OrderSummaryCard extends React.Component<Props> {
               </em>{" "}
               )
             </div>
-            <div className="ml-auto text-primary text-right">
+            <div className="ml-auto text-primary text-end">
               {discountAmountText}
             </div>
           </div>
@@ -76,9 +76,7 @@ export class OrderSummaryCard extends React.Component<Props> {
             <div className="flex-grow-1">
               <Badge className="bg-danger">Refund applied</Badge>
             </div>
-            <div className="ml-auto text-primary text-right">
-              {refundAmount}
-            </div>
+            <div className="ml-auto text-primary text-end">{refundAmount}</div>
           </div>
         </div>
       </div>

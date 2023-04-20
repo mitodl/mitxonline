@@ -176,7 +176,7 @@ export class ProductDetailEnrollApp extends React.Component<
             <div className="flex-grow-1 align-self-end">
               Learn online and get a certificate
             </div>
-            <div className="text-right align-self-end">
+            <div className="text-end align-self-end">
               {formatLocalePrice(getFlexiblePriceForProduct(product))}
             </div>
           </div>

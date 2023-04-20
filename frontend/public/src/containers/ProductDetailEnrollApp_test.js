@@ -298,7 +298,7 @@ describe("ProductDetailEnrollApp", () => {
 
       assert.equal(
         inner
-          .find(".text-right")
+          .find(".text-end")
           .at(0)
           .text(),
         "$9.00"
@@ -338,7 +338,7 @@ describe("ProductDetailEnrollApp", () => {
 
       assert.equal(
         inner
-          .find(".text-right")
+          .find(".text-end")
           .at(0)
           .text()
           .at(1),
@@ -380,7 +380,7 @@ describe("ProductDetailEnrollApp", () => {
 
       assert.equal(
         inner
-          .find(".text-right")
+          .find(".text-end")
           .at(0)
           .text()
           .at(1),

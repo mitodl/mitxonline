@@ -17,7 +17,7 @@ const desktopMenuContainerProps = {
 }
 
 const desktopUListProps = {
-  className: "dropdown-menu dropdown-menu-right"
+  className: "dropdown-menu dropdown-menu-end"
 }
 
 const overlayListItemProps = {
