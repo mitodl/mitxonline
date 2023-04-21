@@ -68,7 +68,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
       <div className="card">
         <div className="row d-flex upsell-header">
           <div className="flex-grow-1 align-self-end">
-            <Badge color="danger">Enrolled in free course</Badge>
+            <Badge className="bg-danger">Enrolled in free course</Badge>
             <h2>Get a certificate</h2>
           </div>
           <div className="text-end align-self-end">
