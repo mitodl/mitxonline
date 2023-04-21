@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.63.13
+---------------
+
+- Upsell card, Set bg-danger to lighter red (#1564)
+- Order History Page table makeover (#1535)
+
 Version 0.63.12 (Released April 20, 2023)
 ---------------
 
