@@ -75,6 +75,35 @@ export class OrderHistory extends React.Component<Props> {
       parseDateString(order.created_on)
     )
     return (
+      <tr scope="row" key={`ordercard_${order.id}`}>
+        <td className="d-flex">
+          <span className="flex-grow-1">{orderTitle}</span>
+        </td>
+        <td>{orderDate}</td>
+        <td>{formatLocalePrice(parseFloat(order.total_price_paid))}</td>
+        <td>{order.reference_number}</td>
+        <td>
+          <a
+            className="link-text"
+            aria-label={`View order details for ${order.titles}`}
+            onClick={() => this.renderOrderReceipt(order.id)}
+            href="#"
+            role="link"
+          >
+            View
+          </a>
+        </td>
+      </tr>
+    )
+  }
+
+  renderMobileOrderCard(order: Object) {
+    const orderTitle =
+      order.titles.length > 0 ? order.titles.join("<br />") : <em>No Items</em>
+    const orderDate = formatPrettyDateTimeAmPmTz(
+      parseDateString(order.created_on)
+    )
+    return (
       <div
         className="row d-flex p-3 my-0 bg-light"
         key={`ordercard_${order.id}`}
@@ -132,9 +161,9 @@ export class OrderHistory extends React.Component<Props> {
   render() {
     const { orderHistory, isLoading } = this.props
     const columns = ORDER_HISTORY_COLUMN_TITLES.map((value: string) => (
-      <div key={value} className="col">
+      <th key={value} scope="col">
         <strong>{value}</strong>
-      </div>
+      </th>
     ))
     return (
       <DocumentTitle
@@ -147,21 +176,54 @@ export class OrderHistory extends React.Component<Props> {
                 <h1 className="flex-grow-1">Order History</h1>
               </div>
             </div>
-
-            <div className="row d-flex p-3 mt-4 bg-light border-bottom border-2 border-dark">
-              {columns}
-            </div>
-            {orderHistory && orderHistory.results.length > 0
-              ? orderHistory.results.map(this.renderOrderCard.bind(this))
-              : null}
-            <div className="row d-flex p-3 mb-4 bg-light border-top border-2 border-dark">
-              <div className="col">
-                Page {this.offset + 1} of{" "}
-                {orderHistory ? Math.ceil(orderHistory.count / 10) : 0} |{" "}
-                {orderHistory ? orderHistory.count : "0"} orders total
+            <div className="d-md-none">
+              <div className="row d-flex p-3 mt-4 bg-light border-bottom border-2 border-dark">
+                {ORDER_HISTORY_COLUMN_TITLES.map((value: string) => (
+                  <div key={value} className="col">
+                    <strong>{value}</strong>
+                  </div>
+                ))}
               </div>
-              <div className="col text-end" />
-              {this.renderPaginationPrevious()} | {this.renderPaginationNext()}
+              {orderHistory && orderHistory.results.length > 0
+                ? orderHistory.results.map(
+                  this.renderMobileOrderCard.bind(this)
+                )
+                : null}
+            </div>
+            <div className="d-none d-md-block">
+              <div className="row">
+                <div className="col-12 d-flex bg-light justify-content-between">
+                  <table title="Order History" className="order-history-table">
+                    <thead className="border-bottom border-2 border-dark">
+                      <tr>{columns}</tr>
+                    </thead>
+                    <tbody>
+                      {orderHistory && orderHistory.results.length > 0
+                        ? orderHistory.results.map(
+                          this.renderOrderCard.bind(this)
+                        )
+                        : null}
+                      <tr className="border-top border-2 border-dark">
+                        <td>
+                          Page {this.offset + 1} of{" "}
+                          {orderHistory
+                            ? Math.ceil(orderHistory.count / 10)
+                            : 0}{" "}
+                          | {orderHistory ? orderHistory.count : "0"} orders
+                          total
+                        </td>
+                        <td />
+                        <td />
+                        <td />
+                        <td className="col text-right">
+                          {this.renderPaginationPrevious()} |{" "}
+                          {this.renderPaginationNext()}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </Loader>
