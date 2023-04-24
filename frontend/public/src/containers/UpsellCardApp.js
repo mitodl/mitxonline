@@ -69,10 +69,10 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
         <div className="row d-flex upsell-header">
           <div className="flex-grow-1 align-self-end">
             <Badge className="bg-danger">Enrolled in free course</Badge>
-            <h2>Get a certificate</h2>
           </div>
           <div className="text-end align-self-end">
-            <h2>{formatLocalePrice(getFlexiblePriceForProduct(product))}</h2>
+            <h2 className="float-start">Get a certificate</h2>
+            <h2 className="float-end">{formatLocalePrice(getFlexiblePriceForProduct(product))}</h2>
           </div>
         </div>
         <div className="row">
