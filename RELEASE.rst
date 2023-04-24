@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.14
+Version 0.63.14 (Released April 24, 2023)
 ---------------
 
 - 1566: align price on upsell card (#1569)
