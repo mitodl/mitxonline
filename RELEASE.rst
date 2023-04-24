@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.63.14
+---------------
+
+- 1566: align price on upsell card (#1569)
+- Removes call to forcibly set addl_field_flag from frontend (#1563)
+
 Version 0.63.13 (Released April 24, 2023)
 ---------------
 
