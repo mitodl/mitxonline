@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.13
+Version 0.63.13 (Released April 24, 2023)
 ---------------
 
 - Upsell card, Set bg-danger to lighter red (#1564)
