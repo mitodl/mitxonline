@@ -379,14 +379,16 @@ def test_update_user_serializer_with_profile(
         assert isinstance(user.legal_address, LegalAddress)
 
 
-@pytest.mark.parametrize("test_incomplete_addl_fields", [True, False])
+@pytest.mark.parametrize("test_incomplete_addl_fields", [0, 1, 2])
 def test_update_user_serializer_sets_addl_field_flag(
     settings, user, valid_address_dict, user_profile_dict, test_incomplete_addl_fields
 ):
     """Tests that the UserSerializers works right with a supplied UserProfile"""
 
-    if test_incomplete_addl_fields:
+    if test_incomplete_addl_fields >= 1:
         user_profile_dict["highest_education"] = HIGHEST_EDUCATION_CHOICES[1][0]
+
+    if test_incomplete_addl_fields == 2:
         user_profile_dict["type_is_student"] = True
 
     serializer = UserSerializer(
@@ -404,7 +406,7 @@ def test_update_user_serializer_sets_addl_field_flag(
 
     user.refresh_from_db()
 
-    if test_incomplete_addl_fields:
+    if test_incomplete_addl_fields > 1:
         assert user.user_profile.addl_field_flag == True
     else:
         assert user.user_profile.addl_field_flag == False
