@@ -38,7 +38,7 @@ mitol-django-payment-gateway>=1.9.1
 mitol-django-google-sheets>=2.6.0
 mitol-django-google-sheets-refunds>=0.8.0
 newrelic
-pyOpenSSL
+pyOpenSSL>=23.1.1
 psycopg2
 pycountry==19.7.15
 redis
