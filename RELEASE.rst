@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.63.15
+---------------
+
+- chore(deps): update dependency cryptography to v39 [security] (#1421)
+
 Version 0.63.14 (Released April 24, 2023)
 ---------------
 
