@@ -107,6 +107,18 @@ def invalid_address_dict():
         first_name="Test",
         last_name="User",
         country="US",
+        state="XX",
+    )
+
+
+@pytest.fixture
+def address_no_state_dict():
+    """Yields a dict that will deserialize into a US legal address with no state"""
+    return dict(
+        first_name="Test",
+        last_name="User",
+        country="US",
+        state=None,
     )
 
 
