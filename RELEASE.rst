@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.63.16
+---------------
+
+- Updating legal address validation to check state validity only if specified (#1574)
+
 Version 0.63.15 (Released April 25, 2023)
 ---------------
 
