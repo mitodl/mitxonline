@@ -112,9 +112,13 @@ class LegalAddressSerializer(serializers.ModelSerializer):
         if not data["country"] in ["US", "CA"]:
             return data
         else:
-            if not "state" in data or (
-                data["country"] in ["US", "CA"]
-                and not pycountry.subdivisions.get(code=data["state"])
+            if (
+                "state" in data
+                and data["state"] is not None
+                and (
+                    data["country"] in ["US", "CA"]
+                    and not pycountry.subdivisions.get(code=data["state"])
+                )
             ):
                 raise serializers.ValidationError({"state": "Invalid state specified"})
 

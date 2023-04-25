@@ -10,6 +10,7 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 
 from fixtures.common import (
+    address_no_state_dict,
     intl_address_dict,
     invalid_address_dict,
     user_profile_dict,
@@ -65,6 +66,7 @@ def test_validate_required_fields(valid_address_dict, field, value, error):
         [lazy_fixture("valid_address_dict"), None],
         [lazy_fixture("intl_address_dict"), None],
         [lazy_fixture("invalid_address_dict"), "Invalid state specified"],
+        [lazy_fixture("address_no_state_dict"), None],
     ],
 )
 def test_legal_address_validate_state_field(address_type, error):
