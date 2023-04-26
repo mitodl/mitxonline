@@ -14,6 +14,10 @@ class NoEdxApiAuthError(Exception):
     """The user was expected to have an OpenEdxApiAuth object but does not"""
 
 
+class EdxApiUserUpdateError(Exception):
+    """Exception updating the edX user via API"""
+
+
 class EdxApiEnrollErrorException(Exception):
     """An edX enrollment API call resulted in an error response"""
 
