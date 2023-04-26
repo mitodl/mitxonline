@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.17
+Version 0.63.17 (Released April 26, 2023)
 ---------------
 
 - Reverts the page title on the additional details page (some debug code that slipped through) (#1576)
