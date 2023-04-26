@@ -81,7 +81,7 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
 
     return (
       <DocumentTitle
-        title={`${SETTINGS.site_name} | ${REGISTER_EXTRA_DETAILS_PAGE_TITLE} but they're in space`}
+        title={`${SETTINGS.site_name} | ${REGISTER_EXTRA_DETAILS_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page registration-page">
           <div className="auth-card card-shadow auth-form">
