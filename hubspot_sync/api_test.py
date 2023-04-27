@@ -31,6 +31,20 @@ def test_make_contact_sync_message(user):
         "firstname": user.legal_address.first_name,
         "lastname": user.legal_address.last_name,
         "name": user.name,
+        "yearofbirth": user.user_profile.year_of_birth,
+        "gender": user.user_profile.gender,
+        "company": user.user_profile.company,
+        "numemployees": user.user_profile.company_size or "",
+        "jobtitle": user.user_profile.job_title,
+        "industry": user.user_profile.industry,
+        "jobfunction": user.user_profile.job_function,
+        "yearsexperience": user.user_profile.years_experience or "",
+        "leadershiplevel": user.user_profile.leadership_level,
+        "highesteducation": user.user_profile.highest_education,
+        "typeisstudent": user.user_profile.type_is_student,
+        "typeisprofessional": user.user_profile.type_is_professional,
+        "typeiseducator": user.user_profile.type_is_educator,
+        "typeisother": user.user_profile.type_is_other,
     }
 
 

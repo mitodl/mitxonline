@@ -48,11 +48,26 @@ def make_contact_sync_message(user_id: int) -> SimplePublicObjectInput:
         "first_name": "firstname",
         "last_name": "lastname",
         "country": "country",
+        "year_of_birth": "yearofbirth",
+        "gender": "gender",
+        "company": "company",
+        "company_size": "companysize",
+        "job_title": "jobtitle",
+        "industry": "industry",
+        "job_function": "jobfunction",
+        "years_experience": "yearsexperience",
+        "leadership_level": "leadershiplevel",
+        "highest_education": "highesteducation",
+        "type_is_student": "typeisstudent",
+        "type_is_professional": "typeisprofessional",
+        "type_is_educator": "typeiseducator",
+        "type_is_other": "typeisother",
     }
 
     user = User.objects.get(id=user_id)
     properties = UserSerializer(user).data
     properties.update(properties.pop("legal_address") or {})
+    properties.update(properties.pop("user_profile") or {})
     hubspot_props = transform_object_properties(properties, contact_properties_map)
     return make_object_properties_message(hubspot_props)
 
