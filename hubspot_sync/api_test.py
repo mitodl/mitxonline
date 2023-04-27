@@ -34,7 +34,7 @@ def test_make_contact_sync_message(user):
         "yearofbirth": user.user_profile.year_of_birth,
         "gender": user.user_profile.gender,
         "company": user.user_profile.company,
-        "numemployees": user.user_profile.company_size or "",
+        "companysize": user.user_profile.company_size or "",
         "jobtitle": user.user_profile.job_title,
         "industry": user.user_profile.industry,
         "jobfunction": user.user_profile.job_function,
