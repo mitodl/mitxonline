@@ -143,73 +143,6 @@ def create_edx_user(user):
         return True
 
 
-def update_edx_user_profile(user):
-    """
-    Updates the specified user's profile in edX. This only changes a handful of
-    fields; it's mostly for syncing demographic data.
-
-    Args:
-        user(user.models.User): the user to update
-    """
-
-    # Step 1
-    with requests.Session() as req_session:
-        # Step 2
-        django_session = auth_api.create_user_session(user)
-        session_cookie = requests.cookies.create_cookie(
-            name=settings.SESSION_COOKIE_NAME,
-            domain=urlparse(settings.SITE_BASE_URL).hostname,
-            path=settings.SESSION_COOKIE_PATH,
-            value=django_session.session_key,
-        )
-        req_session.cookies.set_cookie(session_cookie)
-
-        # Step 3
-        url = edx_url(OPENEDX_SOCIAL_LOGIN_XPRO_PATH)
-        resp = req_session.get(url)
-        resp.raise_for_status()
-
-        # Step 4
-        redirect_uri = urljoin(
-            settings.SITE_BASE_URL, reverse("openedx-private-oauth-complete")
-        )
-        url = edx_url(OPENEDX_OAUTH2_AUTHORIZE_PATH)
-        params = dict(
-            client_id=settings.OPENEDX_API_CLIENT_ID,
-            scope=" ".join(OPENEDX_OAUTH2_SCOPES),
-            redirect_uri=redirect_uri,
-            response_type="code",
-        )
-        resp = req_session.get(url, params=params)
-        resp.raise_for_status()
-
-        # Step 5
-        if not resp.url.startswith(redirect_uri):
-            raise OpenEdXOAuth2Error(
-                f"Redirected to '{resp.url}', expected: '{redirect_uri}'"
-            )
-        qs = parse_qs(urlparse(resp.url).query)
-        if not qs.get(OPENEDX_OAUTH2_ACCESS_TOKEN_PARAM):
-            raise OpenEdXOAuth2Error("Did not receive access_token from Open edX")
-
-        return req_session.get(edx_url("/api/user/v1/me"))
-
-        # resp = req_session.patch(
-        #     edx_url(urljoin(OPENEDX_UPDATE_USER_PATH, user.username)),
-        #     data=dict(
-        #         email=user.email,
-        #         name=user.name,
-        #         country=user.legal_address.country if user.legal_address else None,
-        #         state=user.legal_address.us_state if user.legal_address else None,
-        #     ),
-        # )
-        # # edX responds with 200 on success, not 201
-        # if resp.status_code != status.HTTP_200_OK:
-        #     raise EdxApiUserUpdateError(
-        #         f"Error creating Open edX user. {get_error_response_summary(resp)}"
-        #     )
-
-
 @transaction.atomic
 def create_edx_auth_token(user):
     """
@@ -291,6 +224,36 @@ def create_edx_auth_token(user):
         )
 
     return auth
+
+
+def update_edx_user_profile(user):
+    """
+    Updates the specified user's profile in edX. This only changes a handful of
+    fields; it's mostly for syncing demographic data.
+
+    Args:
+        user(user.models.User): the user to update
+    """
+    auth = get_valid_edx_api_auth(user)
+    req_session = requests.Session()
+    resp = req_session.patch(
+        edx_url(urljoin(OPENEDX_UPDATE_USER_PATH, user.username)),
+        json=dict(
+            name=user.name,
+            country=user.legal_address.country if user.legal_address else None,
+            state=user.legal_address.us_state if user.legal_address else None,
+        ),
+        headers={
+            "Authorization": f"Bearer {auth.access_token}",
+            "Content-Type": "application/merge-patch+json",
+        },
+    )
+
+    # edX responds with 200 on success, not 201
+    if resp.status_code != status.HTTP_200_OK:
+        raise EdxApiUserUpdateError(
+            f"Error updating Open edX user. {get_error_response_summary(resp)}"
+        )
 
 
 def update_edx_user_email(user):
