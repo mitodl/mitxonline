@@ -242,7 +242,10 @@ describe("api", function() {
       document.cookie = "key=cookie"
       assert.equal("cookie", getCookie("key"))
     })
-
+    it("gets a cookie with use of decodeURIComponent", () => {
+      document.cookie = "key=%C2%B5"
+      assert.equal("µ", getCookie("key"))
+    })
     it("handles multiple cookies correctly", () => {
       document.cookie = "key1=cookie1"
       document.cookie = "key2=cookie2"
