@@ -199,7 +199,10 @@ class UserSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         """Empty validation function, but this is required for WriteableSerializerMethodField"""
-        if User.objects.filter(email__iexact=value.strip().lower()).exists():
+        if (
+            not self.instance
+            and User.objects.filter(email__iexact=value.strip().lower()).exists()
+        ):
             raise serializers.ValidationError(EMAIL_ERROR_MSG)
 
         return {"email": value}
