@@ -46,6 +46,8 @@ OPENEDX_USERNAME_VALIDATION_MSGS_MAP = {
     "It looks like this username is already taken": USERNAME_ALREADY_EXISTS_MSG
 }
 
+EMAIL_ERROR_MSG = "Email address already exists in the system."
+
 
 class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for profile"""
@@ -197,6 +199,12 @@ class UserSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         """Empty validation function, but this is required for WriteableSerializerMethodField"""
+        if (
+            not self.instance
+            and User.objects.filter(email__iexact=value.strip().lower()).exists()
+        ):
+            raise serializers.ValidationError(EMAIL_ERROR_MSG)
+
         return {"email": value}
 
     def validate_username(self, value):
