@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.63.20
+---------------
+
+- Throw an error if the user manages to get to the registration screen with the same email (#1586)
+
 Version 0.63.19 (Released May 01, 2023)
 ---------------
 
