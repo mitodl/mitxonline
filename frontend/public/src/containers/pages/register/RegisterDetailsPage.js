@@ -116,6 +116,17 @@ export class RegisterDetailsPage extends React.Component<Props> {
           // field errors.
           if (field_errors) {
             setErrors(field_errors)
+
+            if (field_errors["email"]) {
+              addUserNotification({
+                "registration-failed-status": {
+                  type:  ALERT_TYPE_DANGER,
+                  props: {
+                    text: field_errors["email"]
+                  }
+                }
+              })
+            }
           }
         }
       })

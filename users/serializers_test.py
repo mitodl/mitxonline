@@ -93,7 +93,8 @@ def test_update_user_serializer(settings, user, valid_address_dict):
 
 @responses.activate
 @pytest.mark.django_db
-def test_create_user_serializer(settings, valid_address_dict):
+@pytest.mark.parametrize("test_case_dup", [True, False])
+def test_create_user_serializer(settings, valid_address_dict, test_case_dup):
     """Test that a UserSerializer can be created properly"""
     responses.add(
         responses.POST,
@@ -113,6 +114,18 @@ def test_create_user_serializer(settings, valid_address_dict):
     assert serializer.is_valid()
     user = serializer.save()
     assert user.is_active is True
+
+    if test_case_dup:
+        serializer = UserSerializer(
+            data={
+                "username": "fakename",
+                "email": "FAKE@FAKE.EDU",
+                "password": "fake",
+                "legal_address": valid_address_dict,
+            }
+        )
+
+        assert not serializer.is_valid()
 
 
 def test_update_email_change_request_existing_email(user):
