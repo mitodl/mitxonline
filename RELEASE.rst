@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.63.18
+---------------
+
+- Update decode uri component from 0.2.0 to 0.2.2 (#1582)
+- chore(deps): update dependency certifi to v2022 [security] (#1271)
+- chore(deps): update dependency sqlparse to v0.4.4 [security] (#1568)
+- Update requests package (#1558)
+
 Version 0.63.17 (Released April 26, 2023)
 ---------------
 
