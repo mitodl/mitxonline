@@ -270,6 +270,15 @@ class LegalAddress(TimestampedModel):
     )  # ISO-3166-1
     state = models.CharField(max_length=255, blank=True, null=True)
 
+    @property
+    def us_state(self):
+        """Returns just the state bit, minus the 'US-' part, only for users in the US."""
+
+        if self.country == "US":
+            return self.state.split("-")[1]
+
+        return None
+
     def __str__(self):
         """Str representation for the legal address"""
         return f"Legal address for {self.user}"

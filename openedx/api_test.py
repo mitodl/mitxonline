@@ -2,7 +2,7 @@
 # pylint: disable=redefined-outer-name
 import itertools
 from datetime import timedelta
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, urljoin
 
 import factory
 import pytest
@@ -21,6 +21,7 @@ from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
     OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS,
     OPENEDX_REGISTRATION_VALIDATION_PATH,
+    OPENEDX_UPDATE_USER_PATH,
     create_edx_auth_token,
     create_edx_user,
     create_user,
@@ -36,6 +37,7 @@ from openedx.api import (
     unsubscribe_from_edx_course_emails,
     update_edx_user_email,
     update_edx_user_name,
+    update_edx_user_profile,
     validate_username_with_edx,
 )
 from openedx.constants import (
@@ -153,7 +155,7 @@ def test_create_edx_user(user, settings, application, access_token_count):
         "name": user.name,
         "provider": settings.MITX_ONLINE_OAUTH_PROVIDER,
         "access_token": created_access_token.token,
-        "country": "US",
+        "country": user.legal_address.country if user.legal_address else None,
         "honor_code": "True",
     }
     assert (

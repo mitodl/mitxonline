@@ -37,6 +37,7 @@ from openedx.exceptions import (
     EdxApiEmailSettingsErrorException,
     EdxApiEnrollErrorException,
     EdxApiRegistrationValidationException,
+    EdxApiUserUpdateError,
     NoEdxApiAuthError,
     OpenEdXOAuth2Error,
     OpenEdxUserCreateError,
@@ -54,7 +55,8 @@ User = get_user_model()
 
 OPENEDX_REGISTER_USER_PATH = "/user_api/v1/account/registration/"
 OPENEDX_REGISTRATION_VALIDATION_PATH = "/api/user/v1/validation/registration"
-OPENEDX_REQUEST_DEFAULTS = dict(country="US", honor_code=True)
+OPENEDX_UPDATE_USER_PATH = "/api/user/v1/accounts/"
+OPENEDX_REQUEST_DEFAULTS = dict(honor_code=True)
 
 OPENEDX_SOCIAL_LOGIN_XPRO_PATH = "/auth/login/mitxpro-oauth2/?auth_entry=login"
 OPENEDX_OAUTH2_AUTHORIZE_PATH = "/oauth2/authorize"
@@ -124,6 +126,8 @@ def create_edx_user(user):
                 username=user.username,
                 email=user.email,
                 name=user.name,
+                country=user.legal_address.country if user.legal_address else None,
+                state=user.legal_address.us_state if user.legal_address else None,
                 provider=settings.MITX_ONLINE_OAUTH_PROVIDER,
                 access_token=access_token.token,
                 **OPENEDX_REQUEST_DEFAULTS,
@@ -220,6 +224,36 @@ def create_edx_auth_token(user):
         )
 
     return auth
+
+
+def update_edx_user_profile(user):
+    """
+    Updates the specified user's profile in edX. This only changes a handful of
+    fields; it's mostly for syncing demographic data.
+
+    Args:
+        user(user.models.User): the user to update
+    """
+    auth = get_valid_edx_api_auth(user)
+    req_session = requests.Session()
+    resp = req_session.patch(
+        edx_url(urljoin(OPENEDX_UPDATE_USER_PATH, user.username)),
+        json=dict(
+            name=user.name,
+            country=user.legal_address.country if user.legal_address else None,
+            state=user.legal_address.us_state if user.legal_address else None,
+        ),
+        headers={
+            "Authorization": f"Bearer {auth.access_token}",
+            "Content-Type": "application/merge-patch+json",
+        },
+    )
+
+    # edX responds with 200 on success, not 201
+    if resp.status_code != status.HTTP_200_OK:
+        raise EdxApiUserUpdateError(
+            f"Error updating Open edX user. {get_error_response_summary(resp)}"
+        )
 
 
 def update_edx_user_email(user):
