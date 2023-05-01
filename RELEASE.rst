@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.18
+Version 0.63.18 (Released May 01, 2023)
 ---------------
 
 - Update decode uri component from 0.2.0 to 0.2.2 (#1582)
