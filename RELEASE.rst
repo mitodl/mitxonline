@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.63.19
+---------------
+
+- Updates fields that are sent to edX and adds profile sync (#1578)
+
 Version 0.63.18 (Released May 01, 2023)
 ---------------
 
