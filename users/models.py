@@ -274,7 +274,7 @@ class LegalAddress(TimestampedModel):
     def us_state(self):
         """Returns just the state bit, minus the 'US-' part, only for users in the US."""
 
-        if self.country == "US":
+        if self.country == "US" and self.state is not None:
             return self.state.split("-")[1]
 
         return None

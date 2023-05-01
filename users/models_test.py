@@ -153,3 +153,33 @@ def test_user_coppa(should_pass):
         user.user_profile.year_of_birth = datetime.now().year - random.randint(0, 12)
 
     assert user.is_coppa_compliant() == should_pass
+
+
+def test_legal_address_us_state():
+    """
+    Tests to make sure the us_state property is working properly.
+
+    This should be:
+    - the state code alone if the user's country is US and the state is specified
+    - None if the state is not specified or if the country is not US
+    """
+
+    user = UserFactory.create()
+    legal_address = user.legal_address
+
+    legal_address.country = "US"
+    legal_address.state = "US-MA"
+    legal_address.save()
+
+    assert legal_address.us_state == "MA"
+
+    legal_address.country = "US"
+    legal_address.state = None
+    legal_address.save()
+
+    assert legal_address.us_state == None
+
+    legal_address.country = "JP"
+    legal_address.save()
+
+    assert legal_address.us_state == None
