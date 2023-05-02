@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.20
+Version 0.63.20 (Released May 02, 2023)
 ---------------
 
 - Add AR Argentina (#1584)
