@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.63.20
+---------------
+
+- Add AR Argentina (#1584)
+- Fixes us_state to return None if there's no state; adds a test for that (#1589)
+- Throw an error if the user manages to get to the registration screen with the same email (#1586)
+
 Version 0.63.19 (Released May 01, 2023)
 ---------------
 
