@@ -122,7 +122,7 @@ django==3.2.18
     #   mitol-django-openedx
     #   mitol-django-payment-gateway
     #   wagtail
-django-anymail[mailgun]==8.4
+django-anymail[mailgun]==9.2
     # via
     #   -r requirements.in
     #   mitol-django-authentication
