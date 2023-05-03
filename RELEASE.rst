@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.63.21
+---------------
+
+- Bump redis from 3.5.3 to 4.4.4 (#1519)
+- Bump http-cache-semantics from 4.1.0 to 4.1.1 (#1407)
+
 Version 0.63.20 (Released May 02, 2023)
 ---------------
 
