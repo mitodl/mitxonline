@@ -48,6 +48,7 @@ def make_contact_sync_message(user_id: int) -> SimplePublicObjectInput:
         "first_name": "firstname",
         "last_name": "lastname",
         "country": "country",
+        "state": "state",
         "year_of_birth": "yearofbirth",
         "gender": "gender",
         "company": "company",

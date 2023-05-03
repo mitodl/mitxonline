@@ -27,6 +27,7 @@ def test_make_contact_sync_message(user):
     contact_sync_message = api.make_contact_sync_message(user.id)
     assert contact_sync_message.properties == {
         "country": user.legal_address.country,
+        "state": user.legal_address.state or "",
         "email": user.email,
         "firstname": user.legal_address.first_name,
         "lastname": user.legal_address.last_name,
