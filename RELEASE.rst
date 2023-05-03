@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.22
+Version 0.63.22 (Released May 03, 2023)
 ---------------
 
 - 1573 sync extended profile data to hubspot (#1579)
