@@ -1,4 +1,4 @@
-from wagtail.core.signals import page_published, page_unpublished, post_page_move
+from wagtail.signals import page_published, page_unpublished, post_page_move
 from cms.tasks import queue_fastly_purge_url
 from cms.models import FlexiblePricingRequestForm
 from flexiblepricing.utils import ensure_flexprice_form_fields

@@ -7,7 +7,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from mitol.common.utils.datetime import now_in_utc
 from ecommerce.factories import ProductFactory
-from wagtail.core.models import Page
+from wagtail.models import Page
 
 from cms.factories import (
     CertificatePageFactory,

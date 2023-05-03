@@ -70,7 +70,7 @@ def test_custom_detail_page_urls_handled(fully_configured_wagtail):
     CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
     resolver_match = resolve("/courses/{}/".format(FAKE_READABLE_ID))
     assert (
-        resolver_match.func.__module__ == "wagtail.core.views"
+        resolver_match.func.__module__ == "wagtail.views"
     )  # pylint: disable=protected-access
     assert resolver_match.func.__name__ == "serve"  # pylint: disable=protected-access
 
