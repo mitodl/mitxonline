@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.63.22
+---------------
+
+- 1573 sync extended profile data to hubspot (#1579)
+- chore(deps): update dependency django-anymail to v9 (#1581)
+
 Version 0.63.21 (Released May 03, 2023)
 ---------------
 
