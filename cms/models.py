@@ -22,23 +22,21 @@ from wagtail.admin.edit_handlers import (
     FieldPanel,
     InlinePanel,
     PageChooserPanel,
-    StreamFieldPanel,
 )
 from wagtail.contrib.forms.forms import FormBuilder
 from wagtail.contrib.forms.models import (
     FORM_FIELD_CHOICES,
     AbstractForm,
-    AbstractFormField,
-    AbstractFormSubmission,
+    AbstractFormField
 )
 from wagtail.contrib.routable_page.models import RoutablePageMixin, route
 from wagtail.blocks import PageChooserBlock, StreamBlock
 from wagtail.fields import RichTextField, StreamField
-from wagtail.models import Orderable, Page, Site
+from wagtail.models import Page
 from wagtail.coreutils import WAGTAIL_APPEND_SLASH
 from wagtail.embeds.embeds import get_embed
 from wagtail.embeds.exceptions import EmbedException
-from wagtail.images.edit_handlers import ImageChooserPanel
+from wagtail.images.edit_handlers import FieldPanel
 from wagtail.images.models import Image
 from wagtail.search import index
 
@@ -309,6 +307,7 @@ class CertificatePage(CourseProgramChildPage):
             max_num=5,
         ),
         help_text="You can choose upto 5 signatories.",
+        use_json_field=False
     )
 
     overrides = StreamField(
@@ -316,13 +315,14 @@ class CertificatePage(CourseProgramChildPage):
         blank=True,
         help_text="Overrides for specific runs of this Course/Program",
         validators=[validate_unique_readable_ids],
+        use_json_field=False
     )
 
     content_panels = [
         FieldPanel("product_name"),
         FieldPanel("CEUs"),
-        StreamFieldPanel("overrides"),
-        StreamFieldPanel("signatories"),
+        FieldPanel("overrides"),
+        FieldPanel("signatories"),
     ]
 
     base_form_class = CertificatePageForm
@@ -513,7 +513,7 @@ class HomePage(Page):
     )
 
     content_panels = Page.content_panels + [
-        ImageChooserPanel("hero"),
+        FieldPanel("hero"),
         FieldPanel("hero_title"),
         FieldPanel("hero_subtitle"),
         FieldPanel("product_section_title"),
@@ -702,6 +702,7 @@ class ProductPage(Page):
     price = StreamField(
         StreamBlock([("price_details", PriceBlock())], max_num=1),
         help_text="Specify the product price details.",
+        use_json_field=False,
     )
 
     prerequisites = RichTextField(
@@ -744,6 +745,7 @@ class ProductPage(Page):
         null=True,
         blank=True,
         help_text="The faculty members to display on this page",
+        use_json_field=False,
     )
 
     def save(self, clean=True, user=None, log_action=False, **kwargs):
@@ -816,13 +818,13 @@ class ProductPage(Page):
         FieldPanel("description"),
         FieldPanel("length"),
         FieldPanel("effort"),
-        StreamFieldPanel("price"),
+        FieldPanel("price"),
         FieldPanel("prerequisites"),
         FieldPanel("about"),
         FieldPanel("what_you_learn"),
-        ImageChooserPanel("feature_image"),
+        FieldPanel("feature_image"),
         FieldPanel("faculty_section_title"),
-        StreamFieldPanel("faculty_members"),
+        FieldPanel("faculty_members"),
         FieldPanel("video_url"),
     ]
 
@@ -1060,11 +1062,12 @@ class ResourcePage(Page):
         [("content", ResourceBlock())],
         blank=False,
         help_text="Enter details of content.",
+        use_json_field=False
     )
 
     content_panels = Page.content_panels + [
-        ImageChooserPanel("header_image"),
-        StreamFieldPanel("content"),
+        FieldPanel("header_image"),
+        FieldPanel("content"),
     ]
 
     def get_context(self, request, *args, **kwargs):
@@ -1409,7 +1412,7 @@ class SignatoryPage(Page):
         FieldPanel("title_1"),
         FieldPanel("title_2"),
         FieldPanel("organization"),
-        ImageChooserPanel("signature_image"),
+        FieldPanel("signature_image"),
     ]
 
     def save(self, clean=True, user=None, log_action=False, **kwargs):
