@@ -13,7 +13,6 @@ from wagtail.models import Page, Site
 
 from cms import models as cms_models
 from cms.exceptions import WagtailSpecificPageError
-from cms.models import Page
 from cms.constants import CERTIFICATE_INDEX_SLUG
 from courses.models import Course, Program
 
@@ -60,23 +59,13 @@ def get_home_page(raise_if_missing=True, check_specific=False) -> Page:
 
 def _create_resource_page(title: str) -> cms_models.ResourcePage:
     """Creates a resource page with the given title under the parent page"""
-    return cms_models.ResourcePage(
+    page = cms_models.ResourcePage(
         slug=slugify(title),
         title=title,
-        content=StreamValue(
-            "content",
-            [
-                {
-                    "type": "content",
-                    "value": {
-                        "heading": title,
-                        "detail": f"<p>Stock {title.lower()} page.</p>",
-                    },
-                }
-            ],
-            is_lazy=True,
-        ),
     )
+    page.content.heading = title
+    page.content.detail = f"<p>Stock {title.lower()} page.</p>"
+    return page
 
 
 def ensure_resource_pages() -> None:
@@ -93,6 +82,7 @@ def ensure_resource_pages() -> None:
     missing_resource_titles = set(RESOURCE_PAGE_TITLES) - existing_resource_titles
     for resource_page_title in missing_resource_titles:
         resource_page = _create_resource_page(resource_page_title)
+        print(resource_page)
         home_page.add_child(instance=resource_page)
         resource_page.save_revision().publish()
 

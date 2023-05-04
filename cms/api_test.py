@@ -101,8 +101,9 @@ def test_ensure_resource_pages(mocker):
     """
     ensure_resource_pages should create resource pages if they don't already exist
     """
+    home_page = HomePageFactory.create()
     patched_get_home_page = mocker.patch(
-        "cms.api.get_home_page", return_value=HomePageFactory.create()
+        "cms.api.get_home_page", return_value=home_page
     )
     expected_resource_pages = len(RESOURCE_PAGE_TITLES)
     resource_page_qset = Page.objects.filter(
