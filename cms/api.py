@@ -8,8 +8,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 
 from django.utils.text import slugify
-from wagtail.blocks import StreamValue
 from wagtail.models import Page, Site
+from wagtail.rich_text import RichText
 
 from cms import models as cms_models
 from cms.exceptions import WagtailSpecificPageError
@@ -63,8 +63,16 @@ def _create_resource_page(title: str) -> cms_models.ResourcePage:
         slug=slugify(title),
         title=title,
     )
-    page.content.heading = title
-    page.content.detail = f"<p>Stock {title.lower()} page.</p>"
+    page.content.append(
+        (
+            "content",
+            {
+                "heading": title,
+                "detail": RichText(f"<p>Stock {title.lower()} page.</p>"),
+            },
+        )
+    )
+
     return page
 
 
