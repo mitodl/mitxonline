@@ -27,7 +27,7 @@ from wagtail.contrib.forms.forms import FormBuilder
 from wagtail.contrib.forms.models import (
     FORM_FIELD_CHOICES,
     AbstractForm,
-    AbstractFormField
+    AbstractFormField,
 )
 from wagtail.contrib.routable_page.models import RoutablePageMixin, route
 from wagtail.blocks import PageChooserBlock, StreamBlock
@@ -307,7 +307,7 @@ class CertificatePage(CourseProgramChildPage):
             max_num=5,
         ),
         help_text="You can choose upto 5 signatories.",
-        use_json_field=False
+        use_json_field=False,
     )
 
     overrides = StreamField(
@@ -315,7 +315,7 @@ class CertificatePage(CourseProgramChildPage):
         blank=True,
         help_text="Overrides for specific runs of this Course/Program",
         validators=[validate_unique_readable_ids],
-        use_json_field=False
+        use_json_field=False,
     )
 
     content_panels = [
@@ -1062,7 +1062,7 @@ class ResourcePage(Page):
         [("content", ResourceBlock())],
         blank=False,
         help_text="Enter details of content.",
-        use_json_field=False
+        use_json_field=False,
     )
 
     content_panels = Page.content_panels + [

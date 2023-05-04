@@ -5,15 +5,16 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('flexiblepricing', '0020_alter_flexibleprice_justification'),
+        ("flexiblepricing", "0020_alter_flexibleprice_justification"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='flexiblepricingrequestsubmission',
-            name='form_data',
-            field=models.JSONField(encoder=django.core.serializers.json.DjangoJSONEncoder),
+            model_name="flexiblepricingrequestsubmission",
+            name="form_data",
+            field=models.JSONField(
+                encoder=django.core.serializers.json.DjangoJSONEncoder
+            ),
         ),
     ]
