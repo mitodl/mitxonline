@@ -5,7 +5,6 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("courses", "0024_add_record_share_model"),
         ("wagtailcore", "0066_collection_management_permissions"),
@@ -21,7 +20,7 @@ class Migration(migrations.Migration):
                 help_text="Program certificate page revision ID in MITxOnline (Used for importing program certificates)",
                 null=True,
                 on_delete=django.db.models.deletion.CASCADE,
-                to="wagtailcore.pagerevision",
+                to="wagtailcore.revision",
             ),
         ),
         migrations.AlterField(

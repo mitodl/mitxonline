@@ -7,7 +7,6 @@ import uuid
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("wagtailcore", "0066_collection_management_permissions"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -46,7 +45,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         null=True,
                         on_delete=django.db.models.deletion.CASCADE,
-                        to="wagtailcore.pagerevision",
+                        to="wagtailcore.revision",
                     ),
                 ),
                 (

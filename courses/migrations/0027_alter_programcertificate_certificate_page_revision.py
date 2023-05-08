@@ -7,7 +7,6 @@ import courses.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("wagtailcore", "0066_collection_management_permissions"),
         ("courses", "0026_alter_courseruncertificate_certificate_page_revision"),
@@ -21,7 +20,7 @@ class Migration(migrations.Migration):
                 limit_choices_to=courses.models.limit_to_certificate_pages,
                 null=True,
                 on_delete=django.db.models.deletion.CASCADE,
-                to="wagtailcore.pagerevision",
+                to="wagtailcore.revision",
             ),
         ),
     ]

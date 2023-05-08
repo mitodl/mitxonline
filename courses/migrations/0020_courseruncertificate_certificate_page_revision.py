@@ -31,9 +31,8 @@ def set_current_certificate_revision(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ("wagtailcore", "0066_collection_management_permissions"),
+        ("wagtailcore", "0078_referenceindex"),
         ("courses", "0019_add_is_self_paced_course_run"),
     ]
 
@@ -44,7 +43,7 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(
                 null=True,
                 on_delete=django.db.models.deletion.CASCADE,
-                to="wagtailcore.pagerevision",
+                to="wagtailcore.revision",
             ),
         ),
         migrations.RunPython(

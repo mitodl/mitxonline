@@ -5,7 +5,6 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("courses", "0020_courseruncertificate_certificate_page_revision"),
         ("wagtailcore", "0066_collection_management_permissions"),
@@ -30,7 +29,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         null=True,
                         on_delete=django.db.models.deletion.CASCADE,
-                        to="wagtailcore.pagerevision",
+                        to="wagtailcore.revision",
                     ),
                 ),
                 (
