@@ -36,7 +36,10 @@ def fix_certificate_index_page(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [("cms", "0025_modify_feature_image_blank"), ("wagtailcore", "0078_referenceindex")]
+    dependencies = [
+        ("cms", "0025_modify_feature_image_blank"),
+        ("wagtailcore", "0078_referenceindex"),
+    ]
 
     operations = [
         migrations.RunPython(fix_certificate_index_page, migrations.RunPython.noop)
