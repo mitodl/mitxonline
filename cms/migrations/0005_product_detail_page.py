@@ -6,7 +6,6 @@ import wagtail.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("cms", "0004_add_hero_titles_image_chooser"),
     ]

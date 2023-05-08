@@ -6,7 +6,6 @@ import wagtail.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("courses", "0001_initial"),
         ("wagtailcore", "0062_comment_models_and_pagesubscription"),

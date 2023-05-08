@@ -201,6 +201,7 @@ def now_datetime_with_tz():
 
     return datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
 
+
 def get_revision_model():
     """Return the correct class for the Wagtail version."""
     if WAGTAIL_VERSION >= (4, 0):

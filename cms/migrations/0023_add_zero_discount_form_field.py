@@ -5,7 +5,6 @@ import wagtail.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("cms", "0022_merge_20220805_1914"),
     ]

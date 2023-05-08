@@ -7,7 +7,6 @@ import wagtail.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("wagtailcore", "0062_comment_models_and_pagesubscription"),
         ("wagtailimages", "0023_add_choose_permissions"),
@@ -39,9 +38,7 @@ class Migration(migrations.Migration):
                                     [
                                         (
                                             "heading",
-                                            wagtail.blocks.CharBlock(
-                                                max_length=100
-                                            ),
+                                            wagtail.blocks.CharBlock(max_length=100),
                                         ),
                                         ("detail", wagtail.blocks.RichTextBlock()),
                                     ]

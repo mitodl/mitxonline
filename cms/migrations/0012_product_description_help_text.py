@@ -5,7 +5,6 @@ import wagtail.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("cms", "0011_product_faculty_members_optional"),
     ]

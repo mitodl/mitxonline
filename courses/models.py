@@ -1140,7 +1140,6 @@ class CourseRunGradeAudit(AuditModel):
 
 
 class PaidCourseRun(TimestampedModel):
-
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="paid_course_runs"
     )

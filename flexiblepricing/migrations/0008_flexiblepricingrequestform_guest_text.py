@@ -5,7 +5,6 @@ import wagtail.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("flexiblepricing", "0007_add_custom_flex_price_submission"),
     ]

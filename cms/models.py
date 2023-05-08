@@ -308,7 +308,7 @@ class CertificatePage(CourseProgramChildPage):
             max_num=5,
         ),
         help_text="You can choose upto 5 signatories.",
-        use_json_field=True
+        use_json_field=True,
     )
 
     overrides = StreamField(
@@ -316,7 +316,7 @@ class CertificatePage(CourseProgramChildPage):
         blank=True,
         help_text="Overrides for specific runs of this Course/Program",
         validators=[validate_unique_readable_ids],
-        use_json_field=True
+        use_json_field=True,
     )
 
     content_panels = [
@@ -703,7 +703,7 @@ class ProductPage(Page):
     price = StreamField(
         StreamBlock([("price_details", PriceBlock())], max_num=1),
         help_text="Specify the product price details.",
-        use_json_field=True
+        use_json_field=True,
     )
 
     prerequisites = RichTextField(
@@ -746,7 +746,7 @@ class ProductPage(Page):
         null=True,
         blank=True,
         help_text="The faculty members to display on this page",
-        use_json_field=True
+        use_json_field=True,
     )
 
     def save(self, clean=True, user=None, log_action=False, **kwargs):
@@ -1063,7 +1063,7 @@ class ResourcePage(Page):
         [("content", ResourceBlock())],
         blank=False,
         help_text="Enter details of content.",
-        use_json_field=True
+        use_json_field=True,
     )
 
     content_panels = Page.content_panels + [

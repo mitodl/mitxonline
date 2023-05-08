@@ -5,7 +5,6 @@ import wagtail.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("flexiblepricing", "0008_flexiblepricingrequestform_guest_text"),
     ]

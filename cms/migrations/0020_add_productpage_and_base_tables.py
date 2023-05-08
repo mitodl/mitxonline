@@ -8,7 +8,6 @@ import wagtail.images.blocks
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("courses", "0016_add_productpage_and_base_tables"),
         ("wagtailcore", "0066_collection_management_permissions"),
