@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
     dependencies = [
         ("courses", "0020_courseruncertificate_certificate_page_revision"),
-        ("wagtailcore", "0066_collection_management_permissions"),
+        ("wagtailcore", "0078_referenceindex"),
         ("micromasters_import", "0002_programtiers_pk_mapping"),
     ]
 
