@@ -235,7 +235,6 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
           aria-modal="true"
           aria-label={enrollment.program.title}
           aria-description={`${courseNumbers[0]} courses, ${courseNumbers[1]} passed`}
-          aria-hidden={!isHidden ? true : false}
         >
           <div
             className="row chrome d-flex flex-row mr-3"
