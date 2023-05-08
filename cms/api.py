@@ -8,8 +8,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 
 from django.utils.text import slugify
-from wagtail.core.blocks import StreamValue
-from wagtail.core.models import Page, Site
+from wagtail.blocks import StreamValue
+from wagtail.models import Page, Site
 
 from cms import models as cms_models
 from cms.exceptions import WagtailSpecificPageError

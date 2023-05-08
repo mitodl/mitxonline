@@ -32,10 +32,10 @@ from wagtail.contrib.forms.models import (
     AbstractFormSubmission,
 )
 from wagtail.contrib.routable_page.models import RoutablePageMixin, route
-from wagtail.core.blocks import PageChooserBlock, StreamBlock
-from wagtail.core.fields import RichTextField, StreamField
-from wagtail.core.models import Orderable, Page, Site
-from wagtail.core.utils import WAGTAIL_APPEND_SLASH
+from wagtail.blocks import PageChooserBlock, StreamBlock
+from wagtail.fields import RichTextField, StreamField
+from wagtail.models import Orderable, Page, Site
+from wagtail.coreutils import WAGTAIL_APPEND_SLASH
 from wagtail.embeds.embeds import get_embed
 from wagtail.embeds.exceptions import EmbedException
 from wagtail.images.edit_handlers import ImageChooserPanel

@@ -22,7 +22,7 @@ from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
 from treebeard.mp_tree import MP_Node
-from wagtail.core.models import PageRevision
+from wagtail.models import PageRevision
 
 from courses.constants import (
     ENROLL_CHANGE_STATUS_CHOICES,

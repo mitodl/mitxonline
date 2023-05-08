@@ -166,7 +166,6 @@ INSTALLED_APPS = (
     # WAGTAIL
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
-    "wagtail.contrib.postgres_search",
     "wagtail.embeds",
     "wagtail.sites",
     "wagtail.users",
@@ -175,7 +174,7 @@ INSTALLED_APPS = (
     "wagtail.images",
     "wagtail.search",
     "wagtail.admin",
-    "wagtail.core",
+    "wagtail",
     "modelcluster",
     "taggit",
     # django-fsm-admin
@@ -658,7 +657,7 @@ WAGTAIL_SITE_NAME = SITE_NAME
 
 WAGTAILSEARCH_BACKENDS = {
     "default": {
-        "BACKEND": "wagtail.contrib.postgres_search.backend",
+        "BACKEND": "wagtail.search.backends.database",
         "ATOMIC_REBUILD": True,
     },
 }

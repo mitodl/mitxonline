@@ -3,7 +3,7 @@
 from django.db import migrations, models
 import django.db.models.deletion
 import modelcluster.fields
-import wagtail.core.fields
+import wagtail.fields
 
 
 class Migration(migrations.Migration):
@@ -28,11 +28,11 @@ class Migration(migrations.Migration):
                         to="wagtailcore.page",
                     ),
                 ),
-                ("intro", wagtail.core.fields.RichTextField(blank=True)),
-                ("thank_you_text", wagtail.core.fields.RichTextField(blank=True)),
+                ("intro", wagtail.fields.RichTextField(blank=True)),
+                ("thank_you_text", wagtail.fields.RichTextField(blank=True)),
                 (
                     "guest_text",
-                    wagtail.core.fields.RichTextField(
+                    wagtail.fields.RichTextField(
                         blank=True,
                         help_text="What to show if the user isn't logged in.",
                         null=True,
@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "application_processing_text",
-                    wagtail.core.fields.RichTextField(
+                    wagtail.fields.RichTextField(
                         blank=True,
                         help_text="What to show if the user's request is being processed.",
                         null=True,
@@ -48,7 +48,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "application_approved_text",
-                    wagtail.core.fields.RichTextField(
+                    wagtail.fields.RichTextField(
                         blank=True,
                         help_text="What to show if the user's request has been approved.",
                         null=True,
@@ -56,7 +56,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "application_denied_text",
-                    wagtail.core.fields.RichTextField(
+                    wagtail.fields.RichTextField(
                         blank=True,
                         help_text="What to show if the user's request has been denied.",
                         null=True,

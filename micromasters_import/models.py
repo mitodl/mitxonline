@@ -1,6 +1,6 @@
 """MicroMasters import models"""
 from django.db import models
-from wagtail.core.models import PageRevision
+from wagtail.models import PageRevision
 
 
 class CourseId(models.Model):

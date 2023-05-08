@@ -4,8 +4,8 @@ import cms.blocks
 from django.db import migrations, models
 import django.db.models.deletion
 import wagtail.contrib.routable_page.models
-import wagtail.core.blocks
-import wagtail.core.fields
+import wagtail.blocks
+import wagtail.fields
 
 
 class Migration(migrations.Migration):
@@ -71,11 +71,11 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "signatories",
-                    wagtail.core.fields.StreamField(
+                    wagtail.fields.StreamField(
                         [
                             (
                                 "signatory",
-                                wagtail.core.blocks.PageChooserBlock(
+                                wagtail.blocks.PageChooserBlock(
                                     page_type=["cms.SignatoryPage"], required=True
                                 ),
                             )
@@ -85,11 +85,11 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "overrides",
-                    wagtail.core.fields.StreamField(
+                    wagtail.fields.StreamField(
                         [
                             (
                                 "course_run",
-                                wagtail.core.blocks.StructBlock(
+                                wagtail.blocks.StructBlock(
                                     [
                                         (
                                             "readable_id",
@@ -99,7 +99,7 @@ class Migration(migrations.Migration):
                                         ),
                                         (
                                             "CEUs",
-                                            wagtail.core.blocks.DecimalBlock(
+                                            wagtail.blocks.DecimalBlock(
                                                 help_text="CEUs to override for this CourseRun, for display on the certificate"
                                             ),
                                         ),

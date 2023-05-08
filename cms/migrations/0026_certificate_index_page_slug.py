@@ -3,7 +3,7 @@
 import logging
 
 from django.db import migrations
-from wagtail.core.models import Page
+from wagtail.models import Page
 from django.contrib.contenttypes.models import ContentType
 
 log = logging.getLogger(__name__)

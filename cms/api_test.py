@@ -1,7 +1,7 @@
 """Tests for CMS app API functionality"""
 import pytest
 from django.contrib.contenttypes.models import ContentType
-from wagtail.core.models import Page
+from wagtail.models import Page
 from wagtail_factories import PageFactory
 from django.core.exceptions import ValidationError
 
