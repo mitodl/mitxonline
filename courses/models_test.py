@@ -955,13 +955,13 @@ def test_certificate_choice_limits():
 
     choices = limit_to_certificate_pages()
 
-    assert "page_id__in" in choices
-    assert len(choices["page_id__in"]) == 2
+    assert "object_id__in" in choices
+    assert len(choices["object_id__in"]) == 2
 
-    assert course_certificate_page.id in choices["page_id__in"]
-    assert program_certificate_page.id in choices["page_id__in"]
+    assert course_certificate_page.id in choices["object_id__in"]
+    assert program_certificate_page.id in choices["object_id__in"]
 
-    assert len(choices["page_id__in"]) != Page.objects.count()
+    assert len(choices["object_id__in"]) != Page.objects.count()
 
 
 def test_active_products_for_expired_course_run():

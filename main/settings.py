@@ -662,6 +662,8 @@ WAGTAILSEARCH_BACKENDS = {
     },
 }
 
+WAGTAILADMIN_BASE_URL = SITE_BASE_URL
+
 MEDIA_ROOT = get_string(
     name="MEDIA_ROOT",
     default="/var/media/",

@@ -22,7 +22,7 @@ from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
 from treebeard.mp_tree import MP_Node
-from wagtail.models import PageRevision
+from main.utils import get_revision_model
 
 from courses.constants import (
     ENROLL_CHANGE_STATUS_CHOICES,
@@ -647,7 +647,7 @@ def limit_to_certificate_pages():
         "id", flat=True
     )
 
-    return {"page_id__in": available_revisions}
+    return {"object_id__in": available_revisions}
 
 
 class BaseCertificate(models.Model):
@@ -687,7 +687,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         related_name="courseruncertificates",
     )
     certificate_page_revision = models.ForeignKey(
-        PageRevision,
+        get_revision_model(),
         null=True,
         blank=True,
         on_delete=models.CASCADE,
@@ -739,13 +739,13 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         from cms.models import CertificatePage, CoursePage
 
         certpage = CertificatePage.objects.filter(
-            pk=self.certificate_page_revision.page_id,
+            pk=int(self.certificate_page_revision.object_id),
         )
 
         if not certpage.exists():
             raise ValidationError(
                 {
-                    "certificate_page_revision": f"The selected page {self.certificate_page_revision.page} is not a certificate page."
+                    "certificate_page_revision": f"The selected page {self.certificate_page_revision.content_object} is not a certificate page."
                 }
             )
 
@@ -781,7 +781,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
 
     program = models.ForeignKey(Program, null=False, on_delete=models.CASCADE)
     certificate_page_revision = models.ForeignKey(
-        PageRevision,
+        get_revision_model(),
         null=True,
         blank=True,
         on_delete=models.CASCADE,
@@ -837,13 +837,13 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         from cms.models import CertificatePage, ProgramPage
 
         certpage = CertificatePage.objects.filter(
-            pk=self.certificate_page_revision.page_id,
+            pk=int(self.certificate_page_revision.object_id),
         )
 
         if not certpage.exists():
             raise ValidationError(
                 {
-                    "certificate_page_revision": f"The selected page {self.certificate_page_revision.page} is not a certificate page."
+                    "certificate_page_revision": f"The selected page {self.certificate_page_revision.content_object} is not a certificate page."
                 }
             )
 

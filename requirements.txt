@@ -493,7 +493,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-wagtail==3.0.0
+wagtail==4.0
     # via -r requirements.in
 wcwidth==0.2.5
     # via prompt-toolkit
