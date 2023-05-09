@@ -96,7 +96,7 @@ class SocialAuthSerializer(serializers.Serializer):
                     and authentication_flow == SocialAuthState.FLOW_REGISTER
                 ):
                     email = partial.data.get("kwargs").get("details").get("email")
-                    user_exists = User.objects.filter(email=email).exists()
+                    user_exists = User.objects.filter(email__iexact=email).exists()
 
                     if user_exists:
                         return SocialAuthState(SocialAuthState.STATE_EXISTING_ACCOUNT)
@@ -221,13 +221,13 @@ class LoginEmailSerializer(SocialAuthSerializer):
         self._save_next(validated_data)
 
         try:
-            user = (
-                User.objects.get(
-                    social_auth__uid=validated_data.get("email"),
-                    social_auth__provider=EmailAuth.name,
-                    is_active=True,
-                ),
-            )
+            user = User.objects.filter(
+                social_auth__uid__iexact=validated_data.get("email"),
+                social_auth__provider=EmailAuth.name,
+                is_active=True,
+            ).first()
+            if user is None:
+                raise User.DoesNotExist()
             result = super()._authenticate(SocialAuthState.FLOW_LOGIN)
         except (RequireRegistrationException, User.DoesNotExist):
             result = SocialAuthState(
@@ -239,7 +239,7 @@ class LoginEmailSerializer(SocialAuthSerializer):
                 SocialAuthState.STATE_LOGIN_PASSWORD,
                 partial=exc.partial,
                 user=User.objects.filter(
-                    social_auth__uid=validated_data.get("email"),
+                    social_auth__uid__iexact=validated_data.get("email"),
                     social_auth__provider=EmailAuth.name,
                 ).first(),
             )
