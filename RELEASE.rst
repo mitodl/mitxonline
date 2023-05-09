@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.23
+Version 0.63.23 (Released May 09, 2023)
 ---------------
 
 - Changes the login workflow to ignore case in the email field (#1600)
