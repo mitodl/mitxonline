@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
                 help_text="Program certificate page revision ID in MITxOnline (Used for importing program certificates)",
                 null=True,
                 on_delete=django.db.models.deletion.CASCADE,
-                to="wagtailcore.revision",
+                to="wagtailcore.pagerevision",
             ),
         ),
         migrations.AlterField(

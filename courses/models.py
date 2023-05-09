@@ -22,7 +22,7 @@ from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
 from treebeard.mp_tree import MP_Node
-from main.utils import get_revision_model
+from wagtail.models import Revision
 
 from courses.constants import (
     ENROLL_CHANGE_STATUS_CHOICES,
@@ -687,7 +687,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         related_name="courseruncertificates",
     )
     certificate_page_revision = models.ForeignKey(
-        get_revision_model(),
+        Revision,
         null=True,
         blank=True,
         on_delete=models.CASCADE,
@@ -781,7 +781,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
 
     program = models.ForeignKey(Program, null=False, on_delete=models.CASCADE)
     certificate_page_revision = models.ForeignKey(
-        get_revision_model(),
+        Revision,
         null=True,
         blank=True,
         on_delete=models.CASCADE,
