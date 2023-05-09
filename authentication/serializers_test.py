@@ -4,10 +4,7 @@ from rest_framework.exceptions import ValidationError
 from social_core.backends.email import EmailAuth
 from social_core.exceptions import AuthException, InvalidEmail
 
-from authentication.serializers import (
-    LoginEmailSerializer,
-    RegisterEmailSerializer,
-)
+from authentication.serializers import LoginEmailSerializer, RegisterEmailSerializer
 from authentication.utils import SocialAuthState
 from users.factories import UserFactory, UserSocialAuthFactory
 
@@ -80,13 +77,14 @@ def test_register_email_validation(data, raises, message):
 
 
 @pytest.mark.parametrize(
-    "is_active",
+    "is_active, force_caps",
     (
-        True,
-        False,
+        [True, True],
+        [True, False],
+        [False, True],
     ),
 )
-def test_login_email_validation(mocker, is_active):
+def test_login_email_validation(mocker, is_active, force_caps):
     """Tests class-level validation of LoginEmailSerializer"""
 
     mocked_authenticate = mocker.patch(
@@ -94,6 +92,16 @@ def test_login_email_validation(mocker, is_active):
     )
 
     user = UserFactory.create(is_active=is_active)
+
+    # If force_caps, we want to make sure the flow works even if the user
+    # specifies their email using capitalization that we don't have stored. So,
+    # force the user lower and then re-force it upper for the rest of the test.
+
+    if force_caps:
+        user.email = user.email.lower()
+        user.save()
+        user.email = user.email.upper()
+
     user_social_auth = UserSocialAuthFactory.create(
         uid=user.email, provider=EmailAuth.name, user=user
     )
