@@ -39,7 +39,7 @@ class ProgramId(models.Model):
     )
 
     program_certificate_revision = models.ForeignKey(
-        get_revision_model(),
+        "wagtailcore.revision",
         null=True,
         blank=True,
         on_delete=models.CASCADE,
@@ -80,7 +80,7 @@ class CourseCertificateRevisionId(models.Model):
     )
 
     certificate_page_revision = models.ForeignKey(
-        get_revision_model(), null=True, on_delete=models.CASCADE
+        "wagtailcore.revision", null=True, on_delete=models.CASCADE
     )
 
     def __str__(self):

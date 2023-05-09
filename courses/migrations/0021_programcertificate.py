@@ -8,7 +8,7 @@ import uuid
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("wagtailcore", "0078_referenceindex"),
+        ("wagtailcore", "0066_collection_management_permissions"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ("courses", "0020_courseruncertificate_certificate_page_revision"),
     ]
