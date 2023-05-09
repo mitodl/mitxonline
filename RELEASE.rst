@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.63.23
+---------------
+
+- Changes the login workflow to ignore case in the email field (#1600)
+- Removes a stray aria-hidden attribute (#1602)
+- config: Update renovate config
+
 Version 0.63.22 (Released May 03, 2023)
 ---------------
 
