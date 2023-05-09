@@ -203,6 +203,34 @@
       "description": "The name of the timezone that should be assumed for date/time values in spreadsheets. Choose from a value in the TZ database (https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).",
       "required": false
     },
+    "MITOL_GOOGLE_SHEETS_DEFERRALS_COMPLETED_DATE_COL": {
+      "description": "The zero-based index of the enrollment change sheet column that contains the row completion date",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DEFERRALS_ERROR_COL": {
+      "description": "The zero-based index of the enrollment change sheet column that contains row processing error messages",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DEFERRALS_FIRST_ROW": {
+      "description": "The first row (as it appears in the spreadsheet) of data that our scripts should consider processing in the deferral request spreadsheet",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DEFERRALS_PLUGINS": {
+      "description": "The path to your deferral plugin, example: app.plugins.DeferralPlugin",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DEFERRALS_PROCESSOR_COL": {
+      "description": "The zero-based index of the enrollment change sheet column that contains the user that processed the row",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DEFERRALS_REQUEST_WORKSHEET_ID": {
+      "description": "ID of the worksheet within the enrollment change request spreadsheet that contains enrollment deferral requests",
+      "required": false
+    },
+    "MITOL_GOOGLE_SHEETS_DEFERRALS_SKIP_ROW_COL": {
+      "description": "The zero-based index of the enrollment change sheet column that indicates whether the row should be skipped",
+      "required": false
+    },
     "MITOL_GOOGLE_SHEETS_DRIVE_API_PROJECT_ID": {
       "description": "ID for the Google API project where the credentials were created",
       "required": false
