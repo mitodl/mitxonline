@@ -645,7 +645,7 @@ def limit_to_certificate_pages():
     available_revisions = CertificatePage.objects.filter(live=True).values_list(
         "id", flat=True
     )
-    return {"object_id__in": map(str, available_revisions)}
+    return {"object_id__in": list(map(str, available_revisions))}
 
 
 class BaseCertificate(models.Model):
