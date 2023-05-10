@@ -15,7 +15,7 @@ jobs:
           --health-retries 5
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_PASSWORD: postgres  # pragma: allowlist secret
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
@@ -48,7 +48,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.7.5"
+          python-version: "3.9.6"
 
       - id: cache
         uses: actions/cache@v3
@@ -64,7 +64,7 @@ jobs:
       # disabled for now because it's broken for some reason
       # - name: Lint
       #   run: pylint ./**/*.py
-        
+
       - name: Code Formatting (Black)
         run: black --check .
 
@@ -99,7 +99,7 @@ jobs:
           MITX_ONLINE_ADMIN_EMAIL: example@localhost
           OPENEDX_API_CLIENT_ID: fake_client_id
           OPENEDX_API_CLIENT_SECRET: fake_client_secret
-          OPENEDX_API_KEY: test-openedx-api-key
+          OPENEDX_API_KEY: test-openedx-api-key  # pragma: allowlist secret
 
       - name: Tests
         run: |
@@ -112,7 +112,7 @@ jobs:
           CELERY_TASK_ALWAYS_EAGER: 'True'
           CELERY_BROKER_URL: redis://localhost:6379/4
           CELERY_RESULT_BACKEND: redis://localhost:6379/4
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres  # pragma: allowlist secret
           ELASTICSEARCH_URL: localhost:9200
           MAILGUN_KEY: fake_mailgun_key
           MAILGUN_SENDER_DOMAIN: other.fake.site
@@ -126,7 +126,7 @@ jobs:
           OPENEDX_API_BASE_URL: http://localhost:18000
           OPENEDX_API_CLIENT_ID: fake_client_id
           OPENEDX_API_CLIENT_SECRET: fake_client_secret
-          OPENEDX_API_KEY: test-openedx-api-key
+          OPENEDX_API_KEY: test-openedx-api-key  # pragma: allowlist secret
           SECRET_KEY: local_unsafe_key
 
       - name: Upload coverage to CodeCov
