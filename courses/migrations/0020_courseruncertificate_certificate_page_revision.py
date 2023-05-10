@@ -31,6 +31,7 @@ def set_current_certificate_revision(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("wagtailcore", "0066_collection_management_permissions"),
         ("courses", "0019_add_is_self_paced_course_run"),
