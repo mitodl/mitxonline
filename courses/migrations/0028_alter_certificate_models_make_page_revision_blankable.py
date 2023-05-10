@@ -7,7 +7,6 @@ import courses.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("wagtailcore", "0066_collection_management_permissions"),
         ("courses", "0027_alter_programcertificate_certificate_page_revision"),
