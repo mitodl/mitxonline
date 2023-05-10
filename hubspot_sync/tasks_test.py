@@ -214,9 +214,15 @@ def test_batch_update_hubspot_objects_chunked_error(mocker, status, expected_err
     mock_hubspot_api.return_value.crm.objects.batch_api.update.side_effect = (
         ApiException(status=status)
     )
+    mocker.patch(
+        "hubspot_sync.tasks.api.sync_contact_with_hubspot",
+        side_effect=(ApiException(status=status)),
+    )
     with pytest.raises(expected_error):
         tasks.batch_update_hubspot_objects_chunked(
-            HubspotObjectType.CONTACTS.value, "user", []
+            HubspotObjectType.CONTACTS.value,
+            "user",
+            [(user.id, "123") for user in UserFactory.create_batch(3)],
         )
 
 
@@ -259,9 +265,15 @@ def test_batch_create_hubspot_objects_chunked_error(mocker, status, expected_err
     mock_hubspot_api.return_value.crm.objects.batch_api.create.side_effect = (
         ApiException(status=status)
     )
+    mocker.patch(
+        "hubspot_sync.tasks.api.sync_contact_with_hubspot",
+        side_effect=(ApiException(status=status)),
+    )
     with pytest.raises(expected_error):
         tasks.batch_create_hubspot_objects_chunked(
-            HubspotObjectType.CONTACTS.value, "user", []
+            HubspotObjectType.CONTACTS.value,
+            "user",
+            [user.id for user in UserFactory.create_batch(3)],
         )
 
 
