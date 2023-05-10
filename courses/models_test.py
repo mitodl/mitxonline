@@ -958,8 +958,8 @@ def test_certificate_choice_limits():
     assert "object_id__in" in choices
     assert len(choices["object_id__in"]) == 2
 
-    assert course_certificate_page.id in choices["object_id__in"]
-    assert program_certificate_page.id in choices["object_id__in"]
+    assert str(course_certificate_page.id) in choices["object_id__in"]
+    assert str(program_certificate_page.id) in choices["object_id__in"]
 
     assert len(choices["object_id__in"]) != Page.objects.count()
 
