@@ -2,8 +2,8 @@
 
 from django.db import migrations, models
 import django.db.models.deletion
-import wagtail.blocks
-import wagtail.fields
+import wagtail.core.blocks
+import wagtail.core.fields
 import wagtail.images.blocks
 
 
@@ -52,7 +52,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "description",
-                    wagtail.fields.RichTextField(
+                    wagtail.core.fields.RichTextField(
                         help_text="The description shown on the home page and product page. The recommended character limit is 1000 characters. Longer entries may not display nicely on the page."
                     ),
                 ),
@@ -75,22 +75,22 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "price",
-                    wagtail.fields.StreamField(
+                    wagtail.core.fields.StreamField(
                         [
                             (
                                 "price_details",
-                                wagtail.blocks.StructBlock(
+                                wagtail.core.blocks.StructBlock(
                                     [
                                         (
                                             "text",
-                                            wagtail.blocks.CharBlock(
+                                            wagtail.core.blocks.CharBlock(
                                                 help="Displayed over the product detail page under the price tile.",
                                                 max_length=150,
                                             ),
                                         ),
                                         (
                                             "link",
-                                            wagtail.blocks.URLBlock(
+                                            wagtail.core.blocks.URLBlock(
                                                 help="Specify the URL to redirect the user for the product's price details page.",
                                                 required=False,
                                             ),
@@ -104,7 +104,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "prerequisites",
-                    wagtail.fields.RichTextField(
+                    wagtail.core.fields.RichTextField(
                         blank=True,
                         help_text="A short description indicating prerequisites of this course.",
                         null=True,
@@ -112,7 +112,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "about",
-                    wagtail.fields.RichTextField(
+                    wagtail.core.fields.RichTextField(
                         blank=True, help_text="About this course details.", null=True
                     ),
                 ),
@@ -126,7 +126,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "what_you_learn",
-                    wagtail.fields.RichTextField(
+                    wagtail.core.fields.RichTextField(
                         blank=True,
                         help_text="What you will learn from this course.",
                         null=True,
@@ -144,15 +144,15 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "faculty_members",
-                    wagtail.fields.StreamField(
+                    wagtail.core.fields.StreamField(
                         [
                             (
                                 "faculty_member",
-                                wagtail.blocks.StructBlock(
+                                wagtail.core.blocks.StructBlock(
                                     [
                                         (
                                             "name",
-                                            wagtail.blocks.CharBlock(
+                                            wagtail.core.blocks.CharBlock(
                                                 help_text="Name of the faculty member.",
                                                 max_length=100,
                                             ),
@@ -165,7 +165,7 @@ class Migration(migrations.Migration):
                                         ),
                                         (
                                             "description",
-                                            wagtail.blocks.RichTextBlock(
+                                            wagtail.core.blocks.RichTextBlock(
                                                 help_text="A brief description about the faculty member."
                                             ),
                                         ),

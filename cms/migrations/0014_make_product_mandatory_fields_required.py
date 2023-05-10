@@ -2,8 +2,8 @@
 
 from django.db import migrations, models
 import django.db.models.deletion
-import wagtail.blocks
-import wagtail.fields
+import wagtail.core.blocks
+import wagtail.core.fields
 
 
 class Migration(migrations.Migration):
@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="coursepage",
             name="description",
-            field=wagtail.fields.RichTextField(
+            field=wagtail.core.fields.RichTextField(
                 help_text="The description shown on the home page and product page. The recommended character limit is 1000 characters. Longer entries may not display nicely on the page."
             ),
         ),
@@ -43,22 +43,22 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="coursepage",
             name="price",
-            field=wagtail.fields.StreamField(
+            field=wagtail.core.fields.StreamField(
                 [
                     (
                         "price_details",
-                        wagtail.blocks.StructBlock(
+                        wagtail.core.blocks.StructBlock(
                             [
                                 (
                                     "text",
-                                    wagtail.blocks.CharBlock(
+                                    wagtail.core.blocks.CharBlock(
                                         help="Displayed over the product detail page under the price tile.",
                                         max_length=150,
                                     ),
                                 ),
                                 (
                                     "link",
-                                    wagtail.blocks.URLBlock(
+                                    wagtail.core.blocks.URLBlock(
                                         help="Specify the URL to redirect the user for the product's price details page.",
                                         required=False,
                                     ),
