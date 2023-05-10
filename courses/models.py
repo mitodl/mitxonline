@@ -5,8 +5,7 @@ import logging
 import operator as op
 import uuid
 from decimal import ROUND_HALF_EVEN
-from decimal import Context as DecimalContext
-from decimal import Decimal, getcontext
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
@@ -646,8 +645,7 @@ def limit_to_certificate_pages():
     available_revisions = CertificatePage.objects.filter(live=True).values_list(
         "id", flat=True
     )
-
-    return {"object_id__in": available_revisions}
+    return {"object_id__in": map(str, available_revisions)}
 
 
 class BaseCertificate(models.Model):

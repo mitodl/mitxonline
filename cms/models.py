@@ -154,7 +154,7 @@ class CertificateIndexPage(RoutablePageMixin, Page):
 
         # Get a CertificatePage to serve this request
         certificate_page = (
-            certificate.certificate_page_revision.as_page_object()
+            certificate.certificate_page_revision.as_object()
             if certificate.certificate_page_revision
             else (
                 certificate.program.page.certificate_page
@@ -188,7 +188,7 @@ class CertificateIndexPage(RoutablePageMixin, Page):
 
         # Get a CertificatePage to serve this request
         certificate_page = (
-            certificate.certificate_page_revision.as_page_object()
+            certificate.certificate_page_revision.as_object()
             if certificate.certificate_page_revision
             else (
                 certificate.course_run.course.page.certificate_page
