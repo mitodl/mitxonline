@@ -357,3 +357,47 @@ def test_batch_upsert_associations_chunked(settings, mocker):
             inputs=expected_contact_associations
         ),
     )
+
+
+def test_sync_failed_contacts(mocker):
+    """sync_failed_contacts should try to sync each contact and return a list of failed contact ids"""
+    user_ids = sorted(user.id for user in UserFactory.create_batch(4))
+    mock_sync = mocker.patch(
+        "hubspot_sync.tasks.api.sync_contact_with_hubspot",
+        side_effect=[
+            mocker.Mock(),
+            ApiException(status=500, reason="err"),
+            mocker.Mock(),
+            ApiException(status=429, reason="tmr"),
+        ],
+    )
+    result = tasks.sync_failed_contacts(user_ids)
+    assert mock_sync.call_count == 4
+    assert result == [user_ids[1], user_ids[3]]
+
+
+@pytest.mark.parametrize("for_contacts", [True, False])
+@pytest.mark.parametrize("has_errors", [True, False])
+def test_handle_failed_batch_chunk(mocker, for_contacts, has_errors):
+    """handle_failed_batch_chunk should retry contacts only and log exceptions as appropriate"""
+    object_ids = [1, 2, 3, 4]
+    expected_sync_result = object_ids if has_errors or not for_contacts else []
+    hubspot_type = (
+        HubspotObjectType.CONTACTS.value
+        if for_contacts
+        else HubspotObjectType.DEALS.value
+    )
+    mock_sync_contacts = mocker.patch(
+        "hubspot_sync.tasks.sync_failed_contacts", return_value=expected_sync_result
+    )
+    mock_log = mocker.patch("hubspot_sync.tasks.log.exception")
+    tasks.handle_failed_batch_chunk(object_ids, hubspot_type)
+    assert mock_sync_contacts.call_count == (
+        1 if hubspot_type == HubspotObjectType.CONTACTS.value else 0
+    )
+    if has_errors or not for_contacts:
+        mock_log.assert_called_once_with(
+            "Exception when batch syncing Hubspot ids %s of type %s",
+            f"{expected_sync_result}",
+            hubspot_type,
+        )
