@@ -3,7 +3,6 @@
 import logging
 
 from django.db import migrations
-from wagtail.core.models import Page
 from django.contrib.contenttypes.models import ContentType
 
 log = logging.getLogger(__name__)
@@ -13,31 +12,35 @@ def fix_certificate_index_page(apps, schema_editor):
     """
     Get HomePage and Create or update Certificate Index Page. Fix slug name if already created
     """
-    from cms import models as cms_models
-    from cms.api import ensure_certificate_index
+    # NOTE: This migration was acting faulty when upgrading Wagtail to v5.  It has been commented out.
+    # from cms.api import ensure_certificate_index
 
-    home_page = Page.objects.filter(
-        content_type=ContentType.objects.get_for_model(cms_models.HomePage), live=True
-    ).first()
-    if home_page:
-        try:
-            home_page.get_specific()
-            ensure_certificate_index()
-        except cms_models.HomePage.DoesNotExist as exc:
-            log.error(
-                "Migration Error: cms.0026_certificate_index_page_slug, HomePage not found!: %s",
-                exc,
-            )
-        except Exception as exc:
-            log.error(
-                "Migration Error: cms.0026_certificate_index_page_slug, Exception: %s",
-                exc,
-            )
+    # Page = apps.get_model("wagtailcore.Page")
+    # HomePage = apps.get_model("cms.HomePage")
+
+    # home_page = Page.objects.filter(
+    #     content_type=ContentType.objects.get_for_model(HomePage), live=True
+    # ).first()
+    # if home_page:
+    #     try:
+    #         home_page.get_specific()
+    #         ensure_certificate_index()
+    #     except HomePage.DoesNotExist as exc:
+    #         log.error(
+    #             "Migration Error: cms.0026_certificate_index_page_slug, HomePage not found!: %s",
+    #             exc,
+    #         )
+    #     except Exception as exc:
+    #         log.error(
+    #             "Migration Error: cms.0026_certificate_index_page_slug, Exception: %s",
+    #             exc,
+    #         )
 
 
 class Migration(migrations.Migration):
-
-    dependencies = [("cms", "0025_modify_feature_image_blank")]
+    dependencies = [
+        ("cms", "0025_modify_feature_image_blank"),
+    ]
 
     operations = [
         migrations.RunPython(fix_certificate_index_page, migrations.RunPython.noop)

@@ -3,11 +3,10 @@
 from django.db import migrations, models
 import django.db.models.deletion
 import modelcluster.fields
-import wagtail.core.fields
+import wagtail.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("wagtailcore", "0066_collection_management_permissions"),
         ("flexiblepricing", "0004_alter_flexibleprice_status"),
@@ -49,8 +48,8 @@ class Migration(migrations.Migration):
                         blank=True, max_length=255, verbose_name="subject"
                     ),
                 ),
-                ("intro", wagtail.core.fields.RichTextField(blank=True)),
-                ("thank_you_text", wagtail.core.fields.RichTextField(blank=True)),
+                ("intro", wagtail.fields.RichTextField(blank=True)),
+                ("thank_you_text", wagtail.fields.RichTextField(blank=True)),
             ],
             options={
                 "abstract": False,

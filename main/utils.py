@@ -19,6 +19,8 @@ from main import features
 from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME
 from main.settings import TIME_ZONE
 
+from wagtail import VERSION as WAGTAIL_VERSION
+
 
 class FeatureFlag(Flag):
     """

@@ -1,7 +1,7 @@
 """Custom hooks to configure wagtail behavior"""
 from typing import List
 from wagtail.admin.api.views import PagesAdminAPIViewSet
-from wagtail.core import hooks
+from wagtail import hooks
 
 DEFAULT_ORDER = (
     "{prefix}coursepage__course__readable_id".format(prefix=""),

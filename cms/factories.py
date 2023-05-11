@@ -3,7 +3,7 @@ import factory
 import wagtail_factories
 from django.core.exceptions import ObjectDoesNotExist
 from factory import fuzzy, LazyAttribute
-from wagtail.core.models import Page
+from wagtail.models import Page
 
 from cms.models import (
     HomePage,

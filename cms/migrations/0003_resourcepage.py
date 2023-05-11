@@ -2,12 +2,11 @@
 
 from django.db import migrations, models
 import django.db.models.deletion
-import wagtail.core.blocks
-import wagtail.core.fields
+import wagtail.blocks
+import wagtail.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("wagtailcore", "0062_comment_models_and_pagesubscription"),
         ("wagtailimages", "0023_add_choose_permissions"),
@@ -31,19 +30,17 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "content",
-                    wagtail.core.fields.StreamField(
+                    wagtail.fields.StreamField(
                         [
                             (
                                 "content",
-                                wagtail.core.blocks.StructBlock(
+                                wagtail.blocks.StructBlock(
                                     [
                                         (
                                             "heading",
-                                            wagtail.core.blocks.CharBlock(
-                                                max_length=100
-                                            ),
+                                            wagtail.blocks.CharBlock(max_length=100),
                                         ),
-                                        ("detail", wagtail.core.blocks.RichTextBlock()),
+                                        ("detail", wagtail.blocks.RichTextBlock()),
                                     ]
                                 ),
                             )

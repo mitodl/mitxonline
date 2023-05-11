@@ -2,11 +2,10 @@
 
 from django.db import migrations, models
 import django.db.models.deletion
-import wagtail.core.fields
+import wagtail.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("courses", "0001_initial"),
         ("wagtailcore", "0062_comment_models_and_pagesubscription"),
@@ -33,7 +32,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "description",
-                    wagtail.core.fields.RichTextField(
+                    wagtail.fields.RichTextField(
                         blank=True,
                         help_text="The description shown on the product page",
                     ),

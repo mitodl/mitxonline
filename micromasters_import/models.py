@@ -1,6 +1,7 @@
 """MicroMasters import models"""
 from django.db import models
-from wagtail.core.models import PageRevision
+
+from wagtail.models import Revision
 
 
 class CourseId(models.Model):
@@ -39,7 +40,7 @@ class ProgramId(models.Model):
     )
 
     program_certificate_revision = models.ForeignKey(
-        PageRevision,
+        Revision,
         null=True,
         blank=True,
         on_delete=models.CASCADE,
@@ -80,8 +81,8 @@ class CourseCertificateRevisionId(models.Model):
     )
 
     certificate_page_revision = models.ForeignKey(
-        PageRevision, null=True, on_delete=models.CASCADE
+        Revision, null=True, on_delete=models.CASCADE
     )
 
     def __str__(self):
-        return f"Mapping Course - {self.course.title} to Certificate Page Revision - {self.certificate_page_revision.page.title}"
+        return f"Mapping Course - {self.course.title} to Certificate Page Revision - {self.certificate_page_revision.content_object.title}"

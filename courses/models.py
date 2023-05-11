@@ -5,8 +5,7 @@ import logging
 import operator as op
 import uuid
 from decimal import ROUND_HALF_EVEN
-from decimal import Context as DecimalContext
-from decimal import Decimal, getcontext
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
@@ -22,7 +21,7 @@ from mitol.common.utils.collections import first_matching_item
 from mitol.common.utils.datetime import now_in_utc
 from mitol.openedx.utils import get_course_number
 from treebeard.mp_tree import MP_Node
-from wagtail.core.models import PageRevision
+from wagtail.models import Revision
 
 from courses.constants import (
     ENROLL_CHANGE_STATUS_CHOICES,
@@ -646,8 +645,7 @@ def limit_to_certificate_pages():
     available_revisions = CertificatePage.objects.filter(live=True).values_list(
         "id", flat=True
     )
-
-    return {"page_id__in": available_revisions}
+    return {"object_id__in": list(map(str, available_revisions))}
 
 
 class BaseCertificate(models.Model):
@@ -687,7 +685,7 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         related_name="courseruncertificates",
     )
     certificate_page_revision = models.ForeignKey(
-        PageRevision,
+        Revision,
         null=True,
         blank=True,
         on_delete=models.CASCADE,
@@ -739,13 +737,13 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
         from cms.models import CertificatePage, CoursePage
 
         certpage = CertificatePage.objects.filter(
-            pk=self.certificate_page_revision.page_id,
+            pk=int(self.certificate_page_revision.object_id),
         )
 
         if not certpage.exists():
             raise ValidationError(
                 {
-                    "certificate_page_revision": f"The selected page {self.certificate_page_revision.page} is not a certificate page."
+                    "certificate_page_revision": f"The selected page {self.certificate_page_revision.content_object} is not a certificate page."
                 }
             )
 
@@ -781,7 +779,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
 
     program = models.ForeignKey(Program, null=False, on_delete=models.CASCADE)
     certificate_page_revision = models.ForeignKey(
-        PageRevision,
+        Revision,
         null=True,
         blank=True,
         on_delete=models.CASCADE,
@@ -837,13 +835,13 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         from cms.models import CertificatePage, ProgramPage
 
         certpage = CertificatePage.objects.filter(
-            pk=self.certificate_page_revision.page_id,
+            pk=int(self.certificate_page_revision.object_id),
         )
 
         if not certpage.exists():
             raise ValidationError(
                 {
-                    "certificate_page_revision": f"The selected page {self.certificate_page_revision.page} is not a certificate page."
+                    "certificate_page_revision": f"The selected page {self.certificate_page_revision.content_object} is not a certificate page."
                 }
             )
 
@@ -1140,7 +1138,6 @@ class CourseRunGradeAudit(AuditModel):
 
 
 class PaidCourseRun(TimestampedModel):
-
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="paid_course_runs"
     )
