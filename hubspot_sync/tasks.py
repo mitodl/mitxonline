@@ -302,7 +302,9 @@ def batch_update_hubspot_objects_chunked(
             updated_ids.extend([result.id for result in response.results])
         except ApiException as ae:
             last_error_status = ae.status
-            still_failed = handle_failed_batch_chunk(chunk, hubspot_type)
+            still_failed = handle_failed_batch_chunk(
+                [item[0] for item in chunk], hubspot_type
+            )
             if still_failed:
                 errored_chunks.append(still_failed)
         time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
