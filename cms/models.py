@@ -1285,6 +1285,14 @@ class FlexiblePricingRequestForm(AbstractForm):
 
         fp_request = self.get_previous_submission(request)
         context["prior_request"] = fp_request
+        product_page = self.get_parent_product_page()
+        product = product_page.product
+        context["product"] = (
+            product.active_products.first()
+            if product.active_products is not None
+            else None
+        )
+        context["product_page"] = product_page.url
 
         return context
 
