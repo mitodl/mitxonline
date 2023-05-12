@@ -77,7 +77,7 @@ def test_register_email_validation(data, raises, message):
 
 
 @pytest.mark.parametrize(
-    "is_active, force_caps",
+    "is_active, force_caps,",
     (
         [True, True],
         [True, False],
@@ -135,3 +135,33 @@ def test_login_email_validation(mocker, is_active, force_caps):
         assert LoginEmailSerializer(result).data["field_errors"] == {
             "email": "Couldn't find your account"
         }
+
+
+def test_login_email_validation_email_changed(mocker):
+    """Tests class-level validation of LoginEmailSerializer for a user who changed their email address."""
+    # No social auth record exists for the user after they have updated their email address
+
+    mocked_authenticate = mocker.patch(
+        "authentication.serializers.SocialAuthSerializer._authenticate"
+    )
+
+    user = UserFactory.create()
+
+    result = SocialAuthState(
+        SocialAuthState.STATE_LOGIN_PASSWORD, partial=mocker.Mock(), user=user
+    )
+    result.flow = SocialAuthState.FLOW_LOGIN
+    result.provider = EmailAuth.name
+    serializer = LoginEmailSerializer(
+        data={"flow": result.flow, "email": user.email},
+        context={
+            "backend": mocker.Mock(),
+            "strategy": mocker.Mock(),
+            "request": mocker.Mock(),
+        },
+    )
+    assert serializer.is_valid() is True, "Received errors: {}".format(
+        serializer.errors
+    )
+
+    assert len(LoginEmailSerializer(result).data["field_errors"]) == 0

@@ -222,8 +222,7 @@ class LoginEmailSerializer(SocialAuthSerializer):
 
         try:
             user = User.objects.filter(
-                social_auth__uid__iexact=validated_data.get("email"),
-                social_auth__provider=EmailAuth.name,
+                email=validated_data.get("email"),
                 is_active=True,
             ).first()
             if user is None:
