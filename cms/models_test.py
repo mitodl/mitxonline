@@ -34,7 +34,7 @@ from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
 )
-from courses.models import CourseRun, limit_to_certificate_pages
+from courses.models import Course, CourseRun, limit_to_certificate_pages
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
 from ecommerce.factories import DiscountFactory, ProductFactory
 from flexiblepricing.api import determine_courseware_flexible_price_discount
@@ -582,8 +582,13 @@ def test_get_current_finaid_with_flex_price_for_expired_course_run(mocker):
     patched_flexible_price_approved.assert_not_called()
 
 
-def test_flexible_pricing_request_form_context():
-    """Tests the flexible pricing request form context contains required information."""
+@pytest.mark.parametrize("flex_form_for_course", [True, False])
+def test_flexible_pricing_request_form_context(flex_form_for_course):
+    """
+    Tests the flexible pricing request form context contains required information.
+    The context["product"] will contain different values based on whether the
+    Flexible Pricing request is for a Course or Program.
+    """
     rf = RequestFactory()
     request = rf.get("/")
     user = UserFactory.create()
@@ -591,12 +596,19 @@ def test_flexible_pricing_request_form_context():
     course_page = CoursePageFactory()
     run = CourseRunFactory.create(course=course_page.course)
 
-    flex_form = FlexiblePricingFormFactory(
-        selected_course=course_page.course, parent=course_page
-    )
+    if flex_form_for_course:
+        parent_page = CoursePageFactory.create()
+        flex_form = FlexiblePricingFormFactory(
+            selected_course=course_page.course, parent=parent_page
+        )
+    else:
+        parent_page = ProgramPageFactory.create()
+        flex_form = FlexiblePricingFormFactory(parent=parent_page)
     product = ProductFactory.create(purchasable_object=run)
 
     context = flex_form.get_context(request=request)
-
-    assert context["product"].id == product.id
+    if isinstance(product, Course):
+        assert context["product"].id == product.id
+    else:
+        assert context["product"] == None
     assert context["product_page"] == course_page.url

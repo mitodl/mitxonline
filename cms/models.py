@@ -1289,7 +1289,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         product = product_page.product
         context["product"] = (
             product.active_products.first()
-            if product.active_products is not None
+            if isinstance(product, Course) and product.active_products is not None
             else None
         )
         context["product_page"] = product_page.url
