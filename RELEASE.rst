@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.25
+Version 0.63.25 (Released May 15, 2023)
 ---------------
 
 - Revert "1605: get certificate button on approved flexible price leads to empty cart (#1609)" (#1613)
