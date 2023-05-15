@@ -64,14 +64,20 @@
         {% endif %}{# end discount amount text #}
 
           {% if page.selected_course %}
-            <form action="/cart/add/" method="get" className="text-center">
-             <input type="hidden" name="course_id" value={{ page.selected_course.id }} />
-              <button
-              type="submit"
-              class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
-              Get Certificate
-              </button>
+            {% if product %}{# product and unexpired course run exist #}
+              <form action="/cart/add" method="get" className="text-center">
+                <input type="hidden" name="product_id" value={{ product.id }} />
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
+                  Get Certificate
+                </button>
               </form>
+            {% else %}
+              <a href="{{ product_page }}" class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
+                Course details
+              </a>
+            {% endif %}
           {% elif page.selected_program %}
             <a href="/dashboard" class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
             Go to Dashboard
