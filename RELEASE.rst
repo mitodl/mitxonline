@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.26
+Version 0.63.26 (Released May 15, 2023)
 ---------------
 
 - Fix flexible pricing page for programs (#1616)
