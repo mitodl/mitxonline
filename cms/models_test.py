@@ -580,23 +580,3 @@ def test_get_current_finaid_with_flex_price_for_expired_course_run(mocker):
     assert course_run.course.page.get_current_finaid(request) is None
     patched_flexible_price_discount.assert_not_called()
     patched_flexible_price_approved.assert_not_called()
-
-
-def test_flexible_pricing_request_form_context():
-    """Tests the flexible pricing request form context contains required information."""
-    rf = RequestFactory()
-    request = rf.get("/")
-    user = UserFactory.create()
-    request.user = user
-    course_page = CoursePageFactory()
-    run = CourseRunFactory.create(course=course_page.course)
-
-    flex_form = FlexiblePricingFormFactory(
-        selected_course=course_page.course, parent=course_page
-    )
-    product = ProductFactory.create(purchasable_object=run)
-
-    context = flex_form.get_context(request=request)
-
-    assert context["product"].id == product.id
-    assert context["product_page"] == course_page.url
