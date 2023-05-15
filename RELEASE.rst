@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.63.24
+---------------
+
+- Find user by account email not social auth email (#1610)
+- Use new hubspot_api version and try to sync contacts individually if a batched sync chunk fails (#1607)
+- 1605: get certificate button on approved flexible price leads to empty cart (#1609)
+- Update Wagtail to v5 (#1606)
+
 Version 0.63.23 (Released May 09, 2023)
 ---------------
 
