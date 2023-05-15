@@ -610,5 +610,5 @@ def test_flexible_pricing_request_form_context(flex_form_for_course):
     if isinstance(product, Course):
         assert context["product"].id == product.id
     else:
-        assert context["product"] == None
+        assert context["product"] is None
     assert context["product_page"] == course_page.url
