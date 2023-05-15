@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.63.24
+Version 0.63.24 (Released May 15, 2023)
 ---------------
 
 - Find user by account email not social auth email (#1610)
