@@ -71,6 +71,19 @@ HIGHEST_EDUCATION_CHOICES = (
     ("Other education", "Other education"),
 )
 
+OPENEDX_HIGHEST_EDUCATION_MAPPINGS = (
+    (None, None),
+    ("Doctorate", "p"),
+    ("Master's or professional degree", "m"),
+    ("Bachelor's degree", "b"),
+    ("Associate degree", "a"),
+    ("Secondary/high school", "hs"),
+    ("Junior secondary/junior high/middle school", "jhs"),
+    ("Elementary/primary school", "el"),
+    ("No formal education", "none"),
+    ("Other education", "other"),
+)
+
 
 def _post_create_user(user):
     """
@@ -346,6 +359,15 @@ class UserProfile(TimestampedModel):
         blank=True,
         help_text="The learner identifies as type Other (not professional, student, or educator)",
     )
+
+    @property
+    def level_of_education(self):
+        """Open edX uses codes for this so we need to map our values."""
+        return [
+            item[1]
+            for item in OPENEDX_HIGHEST_EDUCATION_MAPPINGS
+            if item[0] == self.highest_education
+        ][0]
 
     def __str__(self):
         """Str representation for the profile"""
