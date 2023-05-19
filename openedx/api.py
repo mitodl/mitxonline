@@ -242,6 +242,13 @@ def update_edx_user_profile(user):
             name=user.name,
             country=user.legal_address.country if user.legal_address else None,
             state=user.legal_address.us_state if user.legal_address else None,
+            gender=user.user_profile.gender if user.user_profile else None,
+            year_of_birth=user.user_profile.year_of_birth
+            if user.user_profile
+            else None,
+            level_of_education=user.user_profile.highest_education
+            if user.user_profile
+            else None,
         ),
         headers={
             "Authorization": f"Bearer {auth.access_token}",
