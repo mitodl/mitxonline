@@ -369,11 +369,6 @@ def test_batch_upsert_associations_chunked(settings, mocker):
 def test_sync_failed_contacts(mocker, mode):
     """sync_failed_contacts should try to sync each contact and return a list of failed contact ids"""
     user_ids = sorted(user.id for user in UserFactory.create_batch(4))
-    chunk = (
-        user_ids
-        if mode == "create"
-        else list(zip(user_ids, ["123", "234", "345", "678"]))
-    )
     mock_sync = mocker.patch(
         "hubspot_sync.tasks.api.sync_contact_with_hubspot",
         side_effect=[
