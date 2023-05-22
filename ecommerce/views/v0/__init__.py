@@ -53,6 +53,7 @@ from ecommerce.serializers import (
     BasketItemSerializer,
     BasketSerializer,
     BasketWithProductSerializer,
+    BulkDiscountSerializer,
     DiscountProductSerializer,
     DiscountRedemptionSerializer,
     DiscountSerializer,
@@ -271,6 +272,22 @@ class DiscountViewSet(ModelViewSet):
     pagination_class = RefinePagination
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     filterset_class = DiscountFilterSet
+
+    @action(url_name="create_batch", detail=False, methods=["post"])
+    def create_batch(self, request):
+        """
+        Create a batch of codes. This is used in the staff-dashboard.
+        POST arguments are the same as in generate_discount_code - look there
+        for details.
+        """
+        otherSeralizer = BulkDiscountSerializer(data=request.data)
+
+        if otherSeralizer.is_valid():
+            generated_codes = api.generate_discount_code(**request.data)
+
+            discounts = DiscountSerializer(generated_codes, many=True)
+
+            return Response(discounts.data, status=status.HTTP_201_CREATED)
 
 
 class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):

@@ -29,22 +29,10 @@ The payment type should be one of (`marketing`, `sales`, `financial-assistance`,
 """
 
 import csv
-import uuid
-from decimal import Decimal
 
 from django.core.management import BaseCommand
 
 from ecommerce.api import generate_discount_code
-from ecommerce.constants import (
-    ALL_DISCOUNT_TYPES,
-    ALL_PAYMENT_TYPES,
-    DISCOUNT_TYPE_PERCENT_OFF,
-    REDEMPTION_TYPE_ONE_TIME,
-    REDEMPTION_TYPE_ONE_TIME_PER_USER,
-    REDEMPTION_TYPE_UNLIMITED,
-)
-from ecommerce.models import Discount
-from main.utils import parse_supplied_date
 
 
 class Command(BaseCommand):

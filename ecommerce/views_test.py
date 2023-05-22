@@ -16,7 +16,9 @@ from courses.factories import CourseRunFactory, ProgramRunFactory
 from courses.models import PaidCourseRun
 from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
+    PAYMENT_TYPE_CUSTOMER_SUPPORT,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
+    REDEMPTION_TYPE_ONE_TIME,
 )
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
@@ -547,7 +549,6 @@ def test_checkout_result(
     order.refresh_from_db()
 
     if decision == "ACCEPT":
-
         # test if course run is recorded in PaidCourseRun for review order
         course_run = order.purchased_runs[0]
         paid_courserun_count = PaidCourseRun.objects.filter(
@@ -911,7 +912,6 @@ def test_checkout_api_result(
     order.refresh_from_db()
 
     if decision == "ACCEPT":
-
         # test if course run is recorded in PaidCourseRun for review order
         course_run = order.purchased_runs[0]
         paid_courserun_count = PaidCourseRun.objects.filter(
@@ -1019,3 +1019,33 @@ def test_start_checkout_with_zero_value(user, user_client, products):
             "run": order.lines.first().purchased_object.course.title,
         }
     )
+
+
+def test_bulk_discount_create(admin_drf_client):
+    """
+    Try to make some bulk discounts.
+    """
+
+    resp = admin_drf_client.post(
+        reverse("discounts_api-create_batch"),
+        {
+            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+            "count": 5,
+            "amount": 50,
+            "prefix": "Generated-Code-",
+            "expires": "2030-01-01",
+            "one_time": True,
+        },
+    )
+
+    assert resp.status_code == 201
+
+    discounts = Discount.objects.filter(
+        discount_code__startswith="Generated-Code-"
+    ).all()
+
+    assert len(discounts) == 5
+
+    assert discounts[0].discount_type == DISCOUNT_TYPE_PERCENT_OFF
+    assert discounts[0].amount == 50

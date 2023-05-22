@@ -12,7 +12,14 @@ from ecommerce import models
 from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
     DISCOUNT_TYPE_DOLLARS_OFF,
+    DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
+    DISCOUNT_TYPES,
+    PAYMENT_TYPES,
+    REDEMPTION_TYPE_ONE_TIME,
+    REDEMPTION_TYPE_ONE_TIME_PER_USER,
+    REDEMPTION_TYPE_UNLIMITED,
+    REDEMPTION_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
 from ecommerce.models import Basket, BasketItem, Order, Product
@@ -476,6 +483,20 @@ class DiscountProductSerializer(serializers.ModelSerializer):
             "discount",
             "product",
         ]
+
+
+class BulkDiscountSerializer(serializers.Serializer):
+    """For validating bulk discount requests."""
+
+    discount_type = serializers.ChoiceField(choices=DISCOUNT_TYPES)
+    payment_type = serializers.ChoiceField(choices=PAYMENT_TYPES)
+    amount = serializers.DecimalField(max_digits=9, decimal_places=2)
+    one_time = serializers.BooleanField(default=False)
+    one_time_per_user = serializers.BooleanField(default=False)
+    activates = serializers.DateField(required=False)
+    expires = serializers.DateField(required=False)
+    count = serializers.IntegerField(required=False)
+    prefix = serializers.CharField(max_length=63, required=False)
 
 
 class UserDiscountSerializer(serializers.ModelSerializer):
