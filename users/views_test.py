@@ -220,6 +220,7 @@ def test_update_user_name_change(mocker, user_client, user, valid_address_dict):
     """Test that updating user's name is properly reflected in MITx Online"""
     new_name = fuzzy.FuzzyText(prefix="Test-").fuzz()
     mocker.patch("openedx.api.update_edx_user_name")
+    mocker.patch("openedx.api.update_edx_user_profile")
     payload = {
         "name": new_name,
         "email": user.email,
@@ -242,6 +243,7 @@ def test_update_user_name_change_edx(mocker, user_client, user, valid_address_di
     """Test that PATCH on user/me also calls update user's name api in edX if there is a name change in MITx Online"""
     new_name = fuzzy.FuzzyText(prefix="Test-").fuzz()
     update_edx_mock = mocker.patch("openedx.api.update_edx_user_name")
+    mocker.patch("openedx.api.update_edx_user_profile")
     payload = {
         "name": new_name,
         "email": user.email,
@@ -258,8 +260,12 @@ def test_update_user_name_change_edx(mocker, user_client, user, valid_address_di
 
 
 def test_update_user_no_name_change_edx(mocker, user_client, user, valid_address_dict):
-    """Test that PATCH on user/me without name change doesn't call update user's name in edX"""
+    """
+    Test that PATCH on user/me without name change doesn't call update user's
+    name in edX, but that the profile update is called.
+    """
     update_edx_mock = mocker.patch("openedx.api.update_edx_user_name")
+    update_edx_profile_mock = mocker.patch("openedx.api.update_edx_user_profile")
     resp = user_client.patch(
         reverse("users_api-me"),
         content_type="application/json",
@@ -274,3 +280,4 @@ def test_update_user_no_name_change_edx(mocker, user_client, user, valid_address
     assert resp.status_code == status.HTTP_200_OK
     # Checks that update edx user was called not called when there is no change in user's name(Full Name)
     update_edx_mock.assert_not_called()
+    update_edx_profile_mock.assert_called()

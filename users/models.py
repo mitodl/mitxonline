@@ -363,11 +363,15 @@ class UserProfile(TimestampedModel):
     @property
     def level_of_education(self):
         """Open edX uses codes for this so we need to map our values."""
-        return [
-            item[1]
-            for item in OPENEDX_HIGHEST_EDUCATION_MAPPINGS
-            if item[0] == self.highest_education
-        ][0]
+        return (
+            [
+                item[1]
+                for item in OPENEDX_HIGHEST_EDUCATION_MAPPINGS
+                if item[0] == self.highest_education
+            ][0]
+            if self.highest_education
+            else ""
+        )
 
     def __str__(self):
         """Str representation for the profile"""
