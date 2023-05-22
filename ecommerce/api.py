@@ -1,6 +1,8 @@
 """Ecommerce APIs"""
 
 import logging
+import uuid
+from decimal import Decimal
 
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
@@ -16,9 +18,13 @@ from mitol.payment_gateway.exceptions import RefundDuplicateException
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from ecommerce.constants import (
+    ALL_DISCOUNT_TYPES,
+    ALL_PAYMENT_TYPES,
+    DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
+    REDEMPTION_TYPE_UNLIMITED,
     REFUND_SUCCESS_STATES,
     ZERO_PAYMENT_DATA,
 )
@@ -44,7 +50,7 @@ from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
 )
 from main.settings import ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
-from main.utils import redirect_with_user_message
+from main.utils import parse_supplied_date, redirect_with_user_message
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 
 log = logging.getLogger(__name__)
@@ -652,3 +658,104 @@ def check_for_duplicate_discount_redemptions():
             seen.append(redemption.redeemed_discount.id)
 
     return seen
+
+
+def generate_discount_code(**kwargs):
+    """
+    Generates a discount code (or a batch of discount codes) as specified by the
+    arguments passed.
+
+    Note that the prefix argument will not add any characters between it and the
+    UUID - if you want one (the convention is a -), you need to ensure it's
+    there in the prefix (and that counts against the limit)
+
+    Keyword Args:
+    * discount_type - one of the valid discount types
+    * payment_type - one of the valid payment types
+    * amount - the value of the discount
+    * one_time - boolean; discount can only be redeemed once
+    * one_time_per_user - boolean; discount can only be redeemed once per user
+    * activates - date to activate
+    * expires - date to expire the code
+    * count - number of codes to create (requires prefix)
+    * prefix - prefix to append to the codes (max 63 characters)
+
+    Returns:
+    * List of generated codes, with the following fields:
+      code, type, amount, expiration_date
+
+    """
+    codes_to_generate = []
+    discount_type = kwargs["discount_type"]
+    redemption_type = REDEMPTION_TYPE_UNLIMITED
+    payment_type = kwargs["payment_type"]
+    amount = Decimal(kwargs["amount"])
+
+    if kwargs["discount_type"] not in ALL_DISCOUNT_TYPES:
+        raise Exception(f"Discount type {kwargs['discount_type']} is not valid.")
+
+    if payment_type not in ALL_PAYMENT_TYPES:
+        raise Exception(f"Payment type {payment_type} is not valid.")
+
+    if kwargs["discount_type"] == DISCOUNT_TYPE_PERCENT_OFF and amount > 100:
+        raise Exception(
+            f"Discount amount {amount} not valid for discount type {DISCOUNT_TYPE_PERCENT_OFF}."
+        )
+
+    if kwargs["count"] > 1 and "prefix" not in kwargs:
+        raise Exception("You must specify a prefix to create a batch of codes.")
+
+    if kwargs["count"] > 1:
+        prefix = kwargs["prefix"]
+
+        # upped the discount code limit to 100 characters - this used to be 13 (50 - 37 for the UUID)
+        if len(prefix) > 63:
+            raise Exception(
+                f"Prefix {prefix} is {len(prefix)} - prefixes must be 63 characters or less."
+            )
+
+        for i in range(0, kwargs["count"]):
+            generated_uuid = uuid.uuid4()
+            code = f"{prefix}{generated_uuid}"
+
+            codes_to_generate.append(code)
+    else:
+        codes_to_generate = kwargs["codes"]
+
+    if "one_time" in kwargs and kwargs["one_time"]:
+        redemption_type = REDEMPTION_TYPE_ONE_TIME
+
+    if "once_per_user" in kwargs and kwargs["once_per_user"]:
+        redemption_type = REDEMPTION_TYPE_ONE_TIME_PER_USER
+
+    if "expires" in kwargs and kwargs["expires"] is not None:
+        expiration_date = parse_supplied_date(kwargs["expires"])
+    else:
+        expiration_date = None
+
+    if "activates" in kwargs and kwargs["activates"] is not None:
+        activation_date = parse_supplied_date(kwargs["activates"])
+    else:
+        activation_date = None
+
+    generated_codes = []
+
+    for code_to_generate in codes_to_generate:
+        try:
+            discount = Discount.objects.create(
+                discount_type=discount_type,
+                redemption_type=redemption_type,
+                payment_type=payment_type,
+                expiration_date=expiration_date,
+                activation_date=activation_date,
+                discount_code=code_to_generate,
+                amount=amount,
+            )
+
+            generated_codes.append(discount)
+        except:
+            raise Exception(
+                f"Discount code {code_to_generate} could not be created - maybe it already exists?"
+            )
+
+    return generated_codes

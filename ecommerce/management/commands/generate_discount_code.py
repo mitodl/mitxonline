@@ -34,6 +34,7 @@ from decimal import Decimal
 
 from django.core.management import BaseCommand
 
+from ecommerce.api import generate_discount_code
 from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
     ALL_PAYMENT_TYPES,
@@ -122,98 +123,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
-        codes_to_generate = []
-        discount_type = kwargs["discount_type"]
-        redemption_type = REDEMPTION_TYPE_UNLIMITED
-        payment_type = kwargs["payment_type"]
-        amount = Decimal(kwargs["amount"])
-
-        if kwargs["discount_type"] not in ALL_DISCOUNT_TYPES:
-            self.stderr.write(
-                self.style.ERROR(
-                    f"Discount type {kwargs['discount_type']} is not valid."
-                )
-            )
-            exit(-1)
-
-        if payment_type not in ALL_PAYMENT_TYPES:
-            self.stderr.write(
-                self.style.ERROR(f"Payment type {payment_type} is not valid.")
-            )
-            exit(-1)
-
-        if kwargs["discount_type"] == DISCOUNT_TYPE_PERCENT_OFF and amount > 100:
-            self.stderr.write(
-                self.style.ERROR(
-                    f"Discount amount {amount} not valid for discount type {DISCOUNT_TYPE_PERCENT_OFF}."
-                )
-            )
-            exit(-1)
-
-        if kwargs["count"] > 1 and "prefix" not in kwargs:
-            self.stderr.write(
-                self.style.ERROR(
-                    "You must specify a prefix to create a batch of codes."
-                )
-            )
-            exit(-1)
-
-        if kwargs["count"] > 1:
-            prefix = kwargs["prefix"]
-
-            if len(prefix) > 13:
-                self.stderr.write(
-                    self.style.ERROR(
-                        f"Prefix {prefix} is {len(prefix)} - prefixes must be 13 characters or less."
-                    )
-                )
-                exit(-1)
-
-            for i in range(0, kwargs["count"]):
-                generated_uuid = uuid.uuid4()
-                code = f"{prefix}{generated_uuid}"
-
-                codes_to_generate.append(code)
-        else:
-            codes_to_generate = kwargs["codes"]
-
-        if "one_time" in kwargs and kwargs["one_time"]:
-            redemption_type = REDEMPTION_TYPE_ONE_TIME
-
-        if "once_per_user" in kwargs and kwargs["once_per_user"]:
-            redemption_type = REDEMPTION_TYPE_ONE_TIME_PER_USER
-
-        if "expires" in kwargs and kwargs["expires"] is not None:
-            expiration_date = parse_supplied_date(kwargs["expires"])
-        else:
-            expiration_date = None
-
-        if "activates" in kwargs and kwargs["activates"] is not None:
-            activation_date = parse_supplied_date(kwargs["activates"])
-        else:
-            activation_date = None
-
-        generated_codes = []
-
-        for code_to_generate in codes_to_generate:
-            try:
-                discount = Discount.objects.create(
-                    discount_type=discount_type,
-                    redemption_type=redemption_type,
-                    payment_type=payment_type,
-                    expiration_date=expiration_date,
-                    activation_date=activation_date,
-                    discount_code=code_to_generate,
-                    amount=amount,
-                )
-
-                generated_codes.append(discount)
-            except:
-                self.stderr.write(
-                    self.style.ERROR(
-                        f"Discount code {code_to_generate} could not be created - maybe it already exists?"
-                    )
-                )
+        try:
+            generated_codes = generate_discount_code(**kwargs)
+        except Exception as e:
+            self.stderr.write(self.style.ERROR(e))
 
         with open("generated-codes.csv", mode="w") as output_file:
             writer = csv.DictWriter(
