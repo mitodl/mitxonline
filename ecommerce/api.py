@@ -541,7 +541,6 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
     for result in results:
         payload = results[result]
         if int(payload["reason_code"]) == 100:
-
             try:
                 order = PendingOrder.objects.filter(
                     state=PendingOrder.STATE.PENDING,
@@ -559,7 +558,6 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
                 )
                 error_count += 1
         else:
-
             try:
                 order = PendingOrder.objects.filter(
                     state=PendingOrder.STATE.PENDING,
@@ -750,6 +748,7 @@ def generate_discount_code(**kwargs):
                 activation_date=activation_date,
                 discount_code=code_to_generate,
                 amount=amount,
+                is_bulk=True,
             )
 
             generated_codes.append(discount)

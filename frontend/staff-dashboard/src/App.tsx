@@ -13,10 +13,11 @@ import {
 } from "components/layout";
 import LoginPage from "pages/login";
 import { DashboardPage } from "pages/dashboard";
-import { DiscountList, DiscountEdit, DiscountShow, DiscountCreate } from "pages/discounts";
+import { DiscountList, DiscountEdit, DiscountShow, DiscountCreate, BulkDiscountCreate } from "pages/discounts";
 import { FlexiblePricingList } from "./pages/flexible_pricing";
 import axios from "axios";
 import useDrfDataProvider from "hooks/useDrfDataProvider";
+import { Routes, Route } from "react-router-dom";
 
 import "styles/antd.less";
 
@@ -38,23 +39,32 @@ const _ = require("lodash");
 
 const { RouterComponent : RefineRouterComponent } = routerProvider;
 
-const RouterComponent = () => <RefineRouterComponent basename="/staff-dashboard" />;
+const customRoutes = [
+  {
+    element: <BulkDiscountCreate />,
+    path: "discounts/create_batch",
+    layout: true,
+  }
+];
+
+const RouterComponent = () => (<RefineRouterComponent basename="/staff-dashboard" />);
 
 export default function App() {
   const dataURI = DATASOURCES_CONFIG?.mitxOnline ?? "";
   const authProvider = useAuthProvider();
   const xonlineProvider = useDrfDataProvider(dataURI);
-  
+
   return (
     <Refine
       routerProvider={{
         ...routerProvider,
         RouterComponent,
+        routes: customRoutes
       }}
       notificationProvider={notificationProvider}
       dataProvider={xonlineProvider}
       authProvider={authProvider}
-      accessControlProvider={{ 
+      accessControlProvider={{
         can: async ({ action, params, resource }) => {
           let profile = localStorage.getItem("mitx-online-staff-profile");
           if (profile) {
@@ -71,7 +81,7 @@ export default function App() {
             if (resource == 'dashboard' || resource == 'flexible_pricing') {
               return Promise.resolve({ can: true });
             }
-          } 
+          }
 
           return Promise.resolve({ can: false, reason: 'Your account is not allowed to do that.' });
         }
@@ -80,7 +90,7 @@ export default function App() {
       DashboardPage={DashboardPage}
       resources={[
         // {
-        //   name: "learners", 
+        //   name: "learners",
         //   icon: <UserOutlined/>
         // },
         {

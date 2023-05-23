@@ -1049,3 +1049,4 @@ def test_bulk_discount_create(admin_drf_client):
 
     assert discounts[0].discount_type == DISCOUNT_TYPE_PERCENT_OFF
     assert discounts[0].amount == 50
+    assert discounts[0].is_bulk
