@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.64.0 (Released May 23, 2023)
+--------------
+
+- update mitol/hubspot_api app (#1624)
+- chore(deps): update dependency cachetools to v4.2.4 (#1611)
+- Bump dns-packet from 5.3.1 to 5.4.0 (#1460)
+
 Version 0.63.26 (Released May 15, 2023)
 ---------------
 
