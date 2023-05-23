@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.64.0
+Version 0.64.0 (Released May 23, 2023)
 --------------
 
 - update mitol/hubspot_api app (#1624)
