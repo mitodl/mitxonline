@@ -2,9 +2,13 @@
 import logging
 import re
 from decimal import Decimal
+from datetime import datetime
+
+import pytz
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
+from django.conf import settings
 from hubspot.crm.objects import SimplePublicObject, SimplePublicObjectInput
 from mitol.hubspot_api.api import (
     HubspotAssociationType,
@@ -469,10 +473,13 @@ def sync_contact_with_hubspot(user_id: int) -> SimplePublicObject:
     """
     body = make_contact_sync_message(user_id)
     content_type = ContentType.objects.get_for_model(User)
-
-    return upsert_object_request(
+    result = upsert_object_request(
         content_type, HubspotObjectType.CONTACTS.value, object_id=user_id, body=body
     )
+    User.objects.filter(id=user_id).update(
+        hubspot_sync_datetime=datetime.now(pytz.timezone(settings.TIME_ZONE))
+    )
+    return result
 
 
 MODEL_FUNCTION_MAPPING = {

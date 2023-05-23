@@ -55,7 +55,17 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
 
     include_created_on_in_list = True
     fieldsets = (
-        (None, {"fields": ("password", "last_login", "created_on")}),
+        (
+            None,
+            {
+                "fields": (
+                    "password",
+                    "last_login",
+                    "created_on",
+                    "hubspot_sync_datetime",
+                )
+            },
+        ),
         (_("Username"), {"fields": ("username",), "description": _username_warning}),
         (_("Personal Info"), {"fields": ("name", "email")}),
         (
@@ -83,7 +93,7 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
     list_filter = ("is_staff", "is_superuser", "is_active", "groups")
     search_fields = ("username", "name", "email")
     ordering = ("email",)
-    readonly_fields = ("last_login",)
+    readonly_fields = ("last_login", "hubspot_sync_datetime")
     inlines = [UserLegalAddressInline, UserProfileInline]
 
 

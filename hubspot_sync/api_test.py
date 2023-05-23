@@ -117,6 +117,8 @@ def test_sync_contact_with_hubspot(mock_hubspot_api):
         simple_public_object_input=api.make_contact_sync_message(user.id),
         object_type=api.HubspotObjectType.CONTACTS.value,
     )
+    user.refresh_from_db()
+    assert user.hubspot_sync_datetime is not None
 
 
 def test_sync_product_with_hubspot(mock_hubspot_api):
