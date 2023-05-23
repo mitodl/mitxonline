@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0022_backfill_userprofile_records'),
+        ("users", "0022_backfill_userprofile_records"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='user',
-            name='hubspot_sync_datetime',
+            model_name="user",
+            name="hubspot_sync_datetime",
             field=models.DateTimeField(null=True),
         ),
     ]
