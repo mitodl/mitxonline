@@ -14,11 +14,6 @@ interface IBulkDiscountFormProps {
 export const BulkDiscountForm = (props: IBulkDiscountFormProps) => {
   const { formProps } = props;
 
-  if (formProps.initialValues !== undefined) {
-    formProps.initialValues.activation_date = dayjs(formProps.initialValues.activation_date).format("YYYY-MM-DD HH:mm:ss");
-    formProps.initialValues.expiration_date = dayjs(formProps.initialValues.expiration_date).format("YYYY-MM-DD HH:mm:ss");
-  }
-
   return (<>
     <Form {...formProps} layout="vertical">
         <Form.Item label="Prefix" name="prefix">

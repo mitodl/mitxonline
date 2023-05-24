@@ -33,6 +33,7 @@ import csv
 from django.core.management import BaseCommand
 
 from ecommerce.api import generate_discount_code
+from main.utils import parse_supplied_date
 
 
 class Command(BaseCommand):

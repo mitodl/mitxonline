@@ -739,22 +739,17 @@ def generate_discount_code(**kwargs):
     generated_codes = []
 
     for code_to_generate in codes_to_generate:
-        try:
-            discount = Discount.objects.create(
-                discount_type=discount_type,
-                redemption_type=redemption_type,
-                payment_type=payment_type,
-                expiration_date=expiration_date,
-                activation_date=activation_date,
-                discount_code=code_to_generate,
-                amount=amount,
-                is_bulk=True,
-            )
+        discount = Discount.objects.create(
+            discount_type=discount_type,
+            redemption_type=redemption_type,
+            payment_type=payment_type,
+            expiration_date=expiration_date,
+            activation_date=activation_date,
+            discount_code=code_to_generate,
+            amount=amount,
+            is_bulk=True,
+        )
 
-            generated_codes.append(discount)
-        except:
-            raise Exception(
-                f"Discount code {code_to_generate} could not be created - maybe it already exists?"
-            )
+        generated_codes.append(discount)
 
     return generated_codes

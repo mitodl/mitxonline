@@ -4,6 +4,7 @@ MITxOnline ecommerce serializers
 from audioop import add
 from decimal import Decimal
 
+import pytz
 from rest_framework import serializers
 
 from cms.serializers import CoursePageSerializer
@@ -24,6 +25,7 @@ from ecommerce.constants import (
 )
 from ecommerce.models import Basket, BasketItem, Order, Product
 from flexiblepricing.api import determine_courseware_flexible_price_discount
+from main.settings import TIME_ZONE
 from users.serializers import ExtendedLegalAddressSerializer
 
 
@@ -493,8 +495,12 @@ class BulkDiscountSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=9, decimal_places=2)
     one_time = serializers.BooleanField(default=False)
     one_time_per_user = serializers.BooleanField(default=False)
-    activates = serializers.DateField(required=False)
-    expires = serializers.DateField(required=False)
+    activates = serializers.DateTimeField(
+        required=False, default_timezone=pytz.timezone(TIME_ZONE)
+    )
+    expires = serializers.DateTimeField(
+        required=False, default_timezone=pytz.timezone(TIME_ZONE)
+    )
     count = serializers.IntegerField(required=False)
     prefix = serializers.CharField(max_length=63, required=False)
 

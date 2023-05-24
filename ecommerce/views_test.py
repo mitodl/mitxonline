@@ -1034,7 +1034,7 @@ def test_bulk_discount_create(admin_drf_client):
             "count": 5,
             "amount": 50,
             "prefix": "Generated-Code-",
-            "expires": "2030-01-01",
+            "expires": "2030-01-01T00:00:00",
             "one_time": True,
         },
     )

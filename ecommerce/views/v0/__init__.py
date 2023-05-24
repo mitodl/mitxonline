@@ -21,6 +21,7 @@ from mitol.payment_gateway.api import PaymentGateway
 from rest_framework import mixins, status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import action
+from rest_framework.exceptions import ParseError
 from rest_framework.generics import ListCreateAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -280,14 +281,16 @@ class DiscountViewSet(ModelViewSet):
         POST arguments are the same as in generate_discount_code - look there
         for details.
         """
-        otherSeralizer = BulkDiscountSerializer(data=request.data)
+        otherSerializer = BulkDiscountSerializer(data=request.data)
 
-        if otherSeralizer.is_valid():
+        if otherSerializer.is_valid():
             generated_codes = api.generate_discount_code(**request.data)
 
             discounts = DiscountSerializer(generated_codes, many=True)
 
             return Response(discounts.data, status=status.HTTP_201_CREATED)
+
+        raise ParseError(f"Batch creation failed: {otherSerializer.errors}")
 
 
 class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
