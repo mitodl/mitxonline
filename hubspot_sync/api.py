@@ -2,13 +2,9 @@
 import logging
 import re
 from decimal import Decimal
-from datetime import datetime
-
-import pytz
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-from django.conf import settings
 from hubspot.crm.objects import SimplePublicObject, SimplePublicObjectInput
 from mitol.hubspot_api.api import (
     HubspotAssociationType,
@@ -26,6 +22,7 @@ from mitol.hubspot_api.api import (
     upsert_object_request,
 )
 from mitol.hubspot_api.models import HubspotObject
+from mitol.common.utils.datetime import now_in_utc
 
 from ecommerce.models import Line, Order, Product
 from users.models import User
@@ -476,9 +473,7 @@ def sync_contact_with_hubspot(user_id: int) -> SimplePublicObject:
     result = upsert_object_request(
         content_type, HubspotObjectType.CONTACTS.value, object_id=user_id, body=body
     )
-    User.objects.filter(id=user_id).update(
-        hubspot_sync_datetime=datetime.now(pytz.timezone(settings.TIME_ZONE))
-    )
+    User.objects.filter(id=user_id).update(hubspot_sync_datetime=now_in_utc())
     return result
 
 

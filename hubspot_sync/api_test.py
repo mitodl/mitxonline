@@ -8,10 +8,8 @@ from mitol.hubspot_api.models import HubspotObject
 from hubspot.crm.objects import (
     ApiException,
 )
+from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
-from django.conf import settings
-from datetime import datetime
-import pytz
 
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Product
@@ -152,7 +150,7 @@ def test_sync_contact_with_hubspot_error(mocker, mock_hubspot_api):
 def test_existing_user_sync_contact_with_hubspot_error(mocker, mock_hubspot_api):
     """Test that the user's hubspot_sync_datetime is not populated if the call to HubSpot throws an exception"""
     # Fake successful first call to HubSpot
-    current_datetime = datetime.now(pytz.timezone(settings.TIME_ZONE))
+    current_datetime = now_in_utc()
     user = UserFactory.create(hubspot_sync_datetime=current_datetime)
 
     # Failed second call to HubSpot

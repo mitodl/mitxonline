@@ -7,15 +7,15 @@ from math import ceil
 from typing import List, Tuple
 from datetime import datetime
 
-import pytz
-
 import celery
 from django.conf import settings
+from django.db.models import F
 from django.contrib.contenttypes.models import ContentType
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
 from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectInput
 from mitol.common.decorators import single_task
 from mitol.common.utils.collections import chunks
+from mitol.common.utils.datetime import now_in_utc
 from mitol.hubspot_api.api import HubspotApi, HubspotAssociationType, HubspotObjectType
 from mitol.hubspot_api.decorators import raise_429
 from mitol.hubspot_api.exceptions import TooManyRequestsException
@@ -319,7 +319,7 @@ def batch_update_hubspot_objects_chunked(
                 hubspot_id__in=updated_ids,
             ).values_list("object_id", flat=True)
             User.objects.filter(id__in=user_ids).update(
-                hubspot_sync_datetime=datetime.now(pytz.timezone(settings.TIME_ZONE))
+                hubspot_sync_datetime=now_in_utc()
             )
         time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
     if errored_chunks:
@@ -372,7 +372,7 @@ def batch_upsert_hubspot_objects(  # pylint:disable=too-many-arguments
             unsynced_objects = (
                 unsynced_objects.filter(is_active=True, email__contains="@")
                 .exclude(social_auth__isnull=True)
-                .order_by("hubspot_sync_datetime")
+                .order_by(F("hubspot_sync_datetime").asc(nulls_first=True))
             )
         unsynced_object_ids = unsynced_objects.values_list("id", flat=True)
         object_ids = unsynced_object_ids if create else synced_object_ids
