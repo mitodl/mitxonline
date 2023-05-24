@@ -80,7 +80,7 @@ export const DiscountList: React.FC = () => {
                     <List>
                         <Row justify="end" gutter={[10, 10]}>
                             <Col sm={24}>
-                                <Button style={{ "float": "right", "marginBottom": "5px" }} onClick={() => { navigation.push("/discounts/create_batch"); }}>Create Batch</Button>
+                                <Button style={{ "float": "right", "marginBottom": "5px" }} onClick={() => { navigation.push("/discounts/create_batch"); }}>Bulk Create</Button>
                             </Col>
                         </Row>
 
