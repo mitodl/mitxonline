@@ -117,6 +117,7 @@ django==3.2.18
     #   mitol-django-authentication
     #   mitol-django-common
     #   mitol-django-google-sheets
+    #   mitol-django-google-sheets-deferrals
     #   mitol-django-google-sheets-refunds
     #   mitol-django-hubspot-api
     #   mitol-django-mail
@@ -284,6 +285,7 @@ mitol-django-common==2.7.0
     #   -r requirements.in
     #   mitol-django-authentication
     #   mitol-django-google-sheets
+    #   mitol-django-google-sheets-deferrals
     #   mitol-django-google-sheets-refunds
     #   mitol-django-hubspot-api
     #   mitol-django-mail
@@ -291,7 +293,10 @@ mitol-django-common==2.7.0
 mitol-django-google-sheets==2.6.0
     # via
     #   -r requirements.in
+    #   mitol-django-google-sheets-deferrals
     #   mitol-django-google-sheets-refunds
+mitol-django-google-sheets-deferrals==2023.5.25
+    # via -r requirements.in
 mitol-django-google-sheets-refunds==0.8.0
     # via -r requirements.in
 mitol-django-hubspot-api==2023.5.22
@@ -327,6 +332,7 @@ pillow==9.3.0
     # via wagtail
 pluggy==0.13.1
     # via
+    #   mitol-django-google-sheets-deferrals
     #   mitol-django-google-sheets-refunds
     #   pytest
 premailer==3.9.0

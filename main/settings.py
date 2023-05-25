@@ -22,6 +22,7 @@ from mitol.common.envs import (
 )
 from mitol.google_sheets.settings.google_sheets import *
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *
+from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
@@ -207,6 +208,7 @@ INSTALLED_APPS = (
     "mitol.common.apps.CommonApp",
     "mitol.google_sheets.apps.GoogleSheetsApp",
     "mitol.google_sheets_refunds.apps.GoogleSheetsRefundsApp",
+    "mitol.google_sheets_deferrals.apps.GoogleSheetsDeferralsApp",
     # "mitol.digitalcredentials.apps.DigitalCredentialsApp",
     "mitol.hubspot_api",
     "mitol.mail.apps.MailApp",
@@ -843,8 +845,8 @@ CELERY_BEAT_SCHEDULE = {
             month_of_year="*",
         ),
     },
-    "process-refund-requests": {
-        "task": "sheets.tasks.process_refund_requests",
+    "process-google-sheets-requests": {
+        "task": "sheets.tasks.process_google_sheets_requests",
         "schedule": crontab(minute=CRON_PROCESS_REFUND_REQUESTS_MINUTES),
     },
     "generate-course-certificate": {
@@ -1090,6 +1092,7 @@ GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE = get_string(
 )
 
 MITOL_GOOGLE_SHEETS_REFUNDS_PLUGINS = ["sheets.plugins.RefundPlugin"]
+MITOL_GOOGLE_SHEETS_DEFERRALS_PLUGINS = ["sheets.plugins.DeferralPlugin"]
 
 
 # Fastly configuration
