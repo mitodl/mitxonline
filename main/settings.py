@@ -22,7 +22,6 @@ from mitol.common.envs import (
 )
 from mitol.google_sheets.settings.google_sheets import *
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *
-from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
@@ -864,6 +863,16 @@ CELERY_BEAT_SCHEDULE = {
             minute=0,
             hour=CRON_ORPHAN_CHECK_HOURS,
             day_of_week=CRON_ORPHAN_CHECK_DAYS,
+            day_of_month="*",
+            month_of_year="*",
+        ),
+    },
+    "sync-hubspot-user-contacts": {
+        "task": "hubspot_sync.tasks.sync_all_contacts_with_hubspot",
+        "schedule": crontab(
+            minute=0,
+            hour=0,
+            day_of_week="*",
             day_of_month="*",
             month_of_year="*",
         ),

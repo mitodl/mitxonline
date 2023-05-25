@@ -1,9 +1,14 @@
 """Tests for hubspot_sync.api"""
 import pytest
+import json
 import reversion
 from django.contrib.contenttypes.models import ContentType
 from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObjectFactory
 from mitol.hubspot_api.models import HubspotObject
+from hubspot.crm.objects import (
+    ApiException,
+)
+from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
 
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
@@ -117,6 +122,54 @@ def test_sync_contact_with_hubspot(mock_hubspot_api):
         simple_public_object_input=api.make_contact_sync_message(user.id),
         object_type=api.HubspotObjectType.CONTACTS.value,
     )
+    user.refresh_from_db()
+    assert user.hubspot_sync_datetime is not None
+
+
+def test_sync_contact_with_hubspot_error(mocker, mock_hubspot_api):
+    """Test that the user's hubspot_sync_datetime is not populated if the call to HubSpot throws an exception"""
+    user = UserFactory.create()
+    mock_create = mock_hubspot_api.return_value.crm.objects.basic_api.create
+    mock_create.side_effect = ApiException(
+        http_resp=mocker.Mock(
+            data=json.dumps(
+                {
+                    "message": "something bad happened",
+                }
+            ),
+            reason="",
+            status=400,
+        )
+    )
+    with pytest.raises(ApiException) as exc:
+        api.sync_contact_with_hubspot(user.id)
+    user.refresh_from_db()
+    assert user.hubspot_sync_datetime is None
+
+
+def test_existing_user_sync_contact_with_hubspot_error(mocker, mock_hubspot_api):
+    """Test that the user's hubspot_sync_datetime is not populated if the call to HubSpot throws an exception"""
+    # Fake successful first call to HubSpot
+    current_datetime = now_in_utc()
+    user = UserFactory.create(hubspot_sync_datetime=current_datetime)
+
+    # Failed second call to HubSpot
+    mock_create = mock_hubspot_api.return_value.crm.objects.basic_api.create
+    mock_create.side_effect = ApiException(
+        http_resp=mocker.Mock(
+            data=json.dumps(
+                {
+                    "message": "something bad happened",
+                }
+            ),
+            reason="",
+            status=400,
+        )
+    )
+    with pytest.raises(ApiException) as exc:
+        api.sync_contact_with_hubspot(user.id)
+    user.refresh_from_db()
+    assert user.hubspot_sync_datetime == current_datetime
 
 
 def test_sync_product_with_hubspot(mock_hubspot_api):

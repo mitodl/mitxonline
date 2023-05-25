@@ -5,14 +5,17 @@ import logging
 import time
 from math import ceil
 from typing import List, Tuple
+from datetime import datetime
 
 import celery
 from django.conf import settings
+from django.db.models import F
 from django.contrib.contenttypes.models import ContentType
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
 from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectInput
 from mitol.common.decorators import single_task
 from mitol.common.utils.collections import chunks
+from mitol.common.utils.datetime import now_in_utc
 from mitol.hubspot_api.api import HubspotApi, HubspotAssociationType, HubspotObjectType
 from mitol.hubspot_api.decorators import raise_429
 from mitol.hubspot_api.exceptions import TooManyRequestsException
@@ -229,13 +232,12 @@ def batch_create_hubspot_objects_chunked(
             )
             for result in response.results:
                 if ct_model_name == "user":
-                    object_id = (
-                        User.objects.filter(
-                            email__iexact=result.properties["email"], is_active=True
-                        )
-                        .first()
-                        .id
-                    )
+                    user = User.objects.filter(
+                        email__iexact=result.properties["email"], is_active=True
+                    ).first()
+                    user.hubspot_sync_datetime = datetime.now()
+                    user.save()
+                    object_id = user.id
                 else:
                     object_id = result.properties["unique_app_id"].split("-")[-1]
                 HubspotObject.objects.update_or_create(
@@ -299,7 +301,8 @@ def batch_update_hubspot_objects_chunked(
             response = HubspotApi().crm.objects.batch_api.update(
                 hubspot_type, BatchInputSimplePublicObjectInput(inputs=inputs)
             )
-            updated_ids.extend([result.id for result in response.results])
+            chunk_updated_ids = [result.id for result in response.results]
+            updated_ids.extend(chunk_updated_ids)
         except ApiException as ae:
             last_error_status = ae.status
             still_failed = handle_failed_batch_chunk(
@@ -307,6 +310,17 @@ def batch_update_hubspot_objects_chunked(
             )
             if still_failed:
                 errored_chunks.append(still_failed)
+        log.info("Updated the following HubSpot ID's %s", updated_ids)
+        percent_complete = (len(updated_ids) / len(object_ids)) * 100
+        log.info("%i%% complete updating HubSpot ID's", percent_complete)
+        if ct_model_name == "user":
+            user_ids = HubspotObject.objects.filter(
+                content_type=ContentType.objects.get_for_model(User),
+                hubspot_id__in=updated_ids,
+            ).values_list("object_id", flat=True)
+            User.objects.filter(id__in=user_ids).update(
+                hubspot_sync_datetime=now_in_utc()
+            )
         time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
     if errored_chunks:
         raise ApiException(
@@ -314,6 +328,17 @@ def batch_update_hubspot_objects_chunked(
             reason=f"Batch hubspot update failed for the following chunks: {errored_chunks}",
         )
     return updated_ids
+
+
+@app.task(bind=True)
+@single_task(10, key=task_obj_lock)
+def sync_all_contacts_with_hubspot(self):
+    hubspot_type = HubspotObjectType.CONTACTS.value
+    model_name = ContentType.objects.get_for_model(User).model
+    app_label = User._meta.app_label
+    raise self.replace(
+        batch_upsert_hubspot_objects(hubspot_type, model_name, app_label, False)
+    )
 
 
 @app.task(bind=True)
@@ -344,9 +369,11 @@ def batch_upsert_hubspot_objects(  # pylint:disable=too-many-arguments
             id__in=[id[0] for id in synced_object_ids]
         )
         if model_name == "user":
-            unsynced_objects = unsynced_objects.filter(
-                is_active=True, email__contains="@"
-            ).exclude(social_auth__isnull=True)
+            unsynced_objects = (
+                unsynced_objects.filter(is_active=True, email__contains="@")
+                .exclude(social_auth__isnull=True)
+                .order_by(F("hubspot_sync_datetime").asc(nulls_first=True))
+            )
         unsynced_object_ids = unsynced_objects.values_list("id", flat=True)
         object_ids = unsynced_object_ids if create else synced_object_ids
     elif not create:

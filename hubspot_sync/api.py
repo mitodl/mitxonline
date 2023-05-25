@@ -22,6 +22,7 @@ from mitol.hubspot_api.api import (
     upsert_object_request,
 )
 from mitol.hubspot_api.models import HubspotObject
+from mitol.common.utils.datetime import now_in_utc
 
 from ecommerce.models import Line, Order, Product
 from users.models import User
@@ -469,10 +470,11 @@ def sync_contact_with_hubspot(user_id: int) -> SimplePublicObject:
     """
     body = make_contact_sync_message(user_id)
     content_type = ContentType.objects.get_for_model(User)
-
-    return upsert_object_request(
+    result = upsert_object_request(
         content_type, HubspotObjectType.CONTACTS.value, object_id=user_id, body=body
     )
+    User.objects.filter(id=user_id).update(hubspot_sync_datetime=now_in_utc())
+    return result
 
 
 MODEL_FUNCTION_MAPPING = {

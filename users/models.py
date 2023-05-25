@@ -10,7 +10,7 @@ from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Q, DateTimeField
 from django.utils.translation import gettext_lazy as _
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
@@ -172,6 +172,8 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
     is_active = models.BooleanField(
         default=False, help_text="The user account is active"
     )
+
+    hubspot_sync_datetime = DateTimeField(null=True)
 
     objects = UserManager()
     faulty_openedx_users = FaultyOpenEdxUserManager()
