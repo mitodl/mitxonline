@@ -165,3 +165,32 @@ def test_login_email_validation_email_changed(mocker):
     )
 
     assert len(LoginEmailSerializer(result).data["field_errors"]) == 0
+
+
+def test_login_email_validation_email_different_case(mocker):
+    """Tests class-level validation of LoginEmailSerializer to handle different case of email entry."""
+
+    mocked_authenticate = mocker.patch(
+        "authentication.serializers.SocialAuthSerializer._authenticate"
+    )
+
+    user = UserFactory.create()
+
+    result = SocialAuthState(
+        SocialAuthState.STATE_LOGIN_PASSWORD, partial=mocker.Mock(), user=user
+    )
+    result.flow = SocialAuthState.FLOW_LOGIN
+    result.provider = EmailAuth.name
+    serializer = LoginEmailSerializer(
+        data={"flow": result.flow, "email": user.email.upper()},
+        context={
+            "backend": mocker.Mock(),
+            "strategy": mocker.Mock(),
+            "request": mocker.Mock(),
+        },
+    )
+    assert serializer.is_valid() is True, "Received errors: {}".format(
+        serializer.errors
+    )
+
+    assert len(LoginEmailSerializer(result).data["field_errors"]) == 0
