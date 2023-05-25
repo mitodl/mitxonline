@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.64.1
+Version 0.64.1 (Released May 25, 2023)
 --------------
 
 - 1627: improve hubspot sync script to handle large numbers of users (#1628)
