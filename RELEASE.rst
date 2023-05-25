@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.64.2
+--------------
+
+- Adding google sheets deferrals library (#1604)
+
 Version 0.64.1 (Released May 25, 2023)
 --------------
 
