@@ -628,7 +628,7 @@ class PendingOrder(FulfillableOrder, Order):
 
     @classmethod
     @transaction.atomic()
-    def create_from_product(cls, product: Product, user: User, discount: Discount):
+    def create_from_product(cls, product: Product, user: User, discount: Discount=None):
         """
         Creates a new pending order from a product
 
@@ -648,11 +648,12 @@ class PendingOrder(FulfillableOrder, Order):
 
         # apply all the discounts to the order first
         # this is needed to compute the discounted prices of each line
-        order.discounts.create(
-            redemption_date=now,
-            redeemed_by=user,
-            redeemed_discount=discount,
-        )
+        if discount:
+            order.discounts.create(
+                redemption_date=now,
+                redeemed_by=user,
+                redeemed_discount=discount,
+            )
 
         product_version = Version.objects.get_for_object(product).first()
 

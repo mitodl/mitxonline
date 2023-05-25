@@ -38,6 +38,7 @@ from courses.serializers import (
     ProgramSerializer,
     UserProgramEnrollmentDetailSerializer,
 )
+from ecommerce.models import Product, PendingOrder
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
 from main import features
@@ -59,6 +60,7 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEmailSettingsException,
 )
+from django.contrib.contenttypes.models import ContentType
 
 log = logging.getLogger(__name__)
 
@@ -149,6 +151,8 @@ def create_enrollment_view(request):
     resp, user, run = _validate_enrollment_post_request(request)
     if resp is not None:
         return resp
+    
+    print("in view")
     _, edx_request_success = create_run_enrollments(
         user=user,
         runs=[run],
@@ -171,6 +175,19 @@ def create_enrollment_view(request):
             "type": USER_MSG_TYPE_ENROLLED,
             "run": run.title,
         }
+        
+        print("we doin' this")
+                # Create PendingOrder here
+        product = Product.objects.filter(
+            object_id=run.id,
+            content_type=ContentType.objects.get_for_model(CourseRun),
+        ).first()
+        if product is None:
+            log.exception(
+                "No product found for that course with courseware_id %s", run
+            )
+        else:
+            order = PendingOrder.create_from_product(product, user)
     else:
         resp = respond(request.headers["Referer"])
         cookie_value = {
