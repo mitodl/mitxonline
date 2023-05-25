@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.64.1
+--------------
+
+- 1627: improve hubspot sync script to handle large numbers of users (#1628)
+- Expands edX profile sync, adding gender, year of birth, and level of education fields
+- Bump cookiejar from 2.1.3 to 2.1.4 (#1373)
+
 Version 0.64.0 (Released May 23, 2023)
 --------------
 
