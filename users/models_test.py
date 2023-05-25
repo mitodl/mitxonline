@@ -15,7 +15,12 @@ from django.db import transaction
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from openedx.factories import OpenEdxApiAuthFactory, OpenEdxUserFactory
 from users.factories import LegalAddressFactory, UserFactory
-from users.models import LegalAddress, User
+from users.models import (
+    HIGHEST_EDUCATION_CHOICES,
+    OPENEDX_HIGHEST_EDUCATION_MAPPINGS,
+    LegalAddress,
+    User,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -183,3 +188,22 @@ def test_legal_address_us_state():
     legal_address.save()
 
     assert legal_address.us_state == None
+
+
+def test_user_profile_edx_education():
+    user = UserFactory.create()
+
+    user.user_profile.highest_education = HIGHEST_EDUCATION_CHOICES[
+        random.randrange(1, len(HIGHEST_EDUCATION_CHOICES))
+    ][0]
+    user.save()
+
+    test_openedx_flag = [
+        item[1]
+        for item in OPENEDX_HIGHEST_EDUCATION_MAPPINGS
+        if item[0] == user.user_profile.highest_education
+    ][0]
+
+    assert user.user_profile.highest_education is not None
+    assert user.user_profile.level_of_education is not None
+    assert user.user_profile.level_of_education == test_openedx_flag

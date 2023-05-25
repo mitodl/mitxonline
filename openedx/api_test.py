@@ -156,6 +156,10 @@ def test_create_edx_user(user, settings, application, access_token_count):
         "provider": settings.MITX_ONLINE_OAUTH_PROVIDER,
         "access_token": created_access_token.token,
         "country": user.legal_address.country if user.legal_address else None,
+        "year_of_birth": str(user.user_profile.year_of_birth)
+        if user.user_profile
+        else None,
+        "gender": user.user_profile.gender if user.user_profile else None,
         "honor_code": "True",
     }
     assert (

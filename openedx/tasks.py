@@ -60,3 +60,12 @@ def change_edx_user_name_async(user_id):
     """
     user = User.objects.get(id=user_id)
     api.update_edx_user_name(user)
+
+
+@app.task(acks_late=True)
+def update_edx_user_profile(user_id):
+    """
+    Task to update the edX user profile. This doesn't change the name or email.
+    """
+    user = User.objects.get(id=user_id)
+    api.update_edx_user_profile(user)
