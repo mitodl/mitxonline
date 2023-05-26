@@ -22,7 +22,7 @@ x-extra-hosts:
   &default-extra-hosts
   - "edx.odl.local:${OPENEDX_IP:-172.22.0.1}"
   - "host.docker.internal:host-gateway"
-  - "local.overhang.io:${OPENEDX_IP:-172.22.0.1}"
+  - "local.overhang.io:host-gateway"
 
 services:
   db:
@@ -69,7 +69,7 @@ services:
     links:
       - db
       - redis
-      # these are links instead of `depends_on` 
+      # these are links instead of `depends_on`
       # because if we just want a shell for `web` we don't want to run these
       - watch
       - refine
@@ -80,7 +80,7 @@ services:
 
   watch:
     image: node:17.8
-    working_dir: /app 
+    working_dir: /app
     command: ./scripts/run-watch-dev.sh
     ports:
       - "8012:8012"
@@ -164,9 +164,9 @@ services:
 
   varnish:
     image: varnish:fresh
-    links: 
+    links:
       - nginx
-    ports: 
+    ports:
       - "8013:80"
     volumes:
       - ./config/default.vcl:/etc/varnish/default.vcl:ro
