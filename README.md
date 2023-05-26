@@ -12,6 +12,8 @@ Run through those steps **including the addition of `/etc/hosts` aliases and the
 
 ### Configure mitxonline and Open edX
 
+**Open edX Tutor** can be used with MITx Online instead of the traditional devstack release. See [Local Open edX Tutor and MITx Online Deployment](docs/source/configuration/tutor.rst) for details.
+
 See [MITx Online Quick Start](docs/source/configuration/quickstart.rst) and [Configure Open edX](docs/source/configuration/open_edx.rst)
 
 ### Configuring the CMS
@@ -23,13 +25,9 @@ to be usable. You can apply all of those changes by running a management command
 docker-compose run --rm web ./manage.py configure_wagtail
 ```
 
-### Configuring Refine Admin
-
-See [Configure Refine Admin](docs/source/configuration/refine_admin.rst)
-
 # Running, testing, and administering the app
 
-Running, testing, and administering this app follows the same patterns as our other web apps. 
+Running, testing, and administering this app follows the same patterns as our other web apps.
 
 *Note: for js tests, run the commands in `frontend/public`, or run via `yarn workspaces foreach run <command>` from the root.
 
