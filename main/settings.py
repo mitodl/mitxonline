@@ -869,16 +869,6 @@ CELERY_BEAT_SCHEDULE = {
             month_of_year="*",
         ),
     },
-    "sync-hubspot-user-contacts": {
-        "task": "hubspot_sync.tasks.sync_all_contacts_with_hubspot",
-        "schedule": crontab(
-            minute=0,
-            hour=0,
-            day_of_week="*",
-            day_of_month="*",
-            month_of_year="*",
-        ),
-    },
 }
 
 # Hijack
