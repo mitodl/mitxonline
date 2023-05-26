@@ -76,9 +76,9 @@ export class OrderHistory extends React.Component<Props> {
     )
     return (
       <tr scope="row" key={`ordercard_${order.id}`}>
-        <td className="d-flex">
+        <th className="d-flex">
           <span className="flex-grow-1">{orderTitle}</span>
-        </td>
+        </th>
         <td>{orderDate}</td>
         <td>{formatLocalePrice(parseFloat(order.total_price_paid))}</td>
         <td>{order.reference_number}</td>
