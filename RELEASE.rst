@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.65.0
+Version 0.65.0 (Released May 30, 2023)
 --------------
 
 - update google-sheets-deferrals (#1637)
