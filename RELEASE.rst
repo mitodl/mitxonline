@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.65.0
+--------------
+
+- update google-sheets-deferrals (#1637)
+- Incorporates changes to make MITxOnline work with Tutor (#1376)
+- Add row header to order history table (#1636)
+- Remove scheduled cron task (#1635)
+- Working (#1632)
+- Adding google sheets deferrals library (#1604)
+
 Version 0.64.1 (Released May 25, 2023)
 --------------
 
