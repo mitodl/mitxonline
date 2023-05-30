@@ -14,7 +14,7 @@ from openedx.api import get_edx_api_service_client
 
 
 class Command(BaseCommand):
-    """creates local enrollments for specific runs from edX """
+    """creates local enrollments for specific runs from edX"""
 
     help = "Creates local enrollments for specific runs from edX"
 
@@ -53,7 +53,10 @@ class Command(BaseCommand):
                 try:
                     user = User.objects.filter(username=edx_enrollment.user).first()
                     if user:
-                        enrollment, created = CourseRunEnrollment.all_objects.get_or_create(
+                        (
+                            enrollment,
+                            created,
+                        ) = CourseRunEnrollment.all_objects.get_or_create(
                             user=user,
                             run=run,
                             defaults=dict(
@@ -61,7 +64,7 @@ class Command(BaseCommand):
                                 change_status=None,
                                 edx_emails_subscription=False,
                                 edx_enrolled=True,
-                                enrollment_mode=edx_enrollment.mode
+                                enrollment_mode=edx_enrollment.mode,
                             ),
                         )
                         if created:
