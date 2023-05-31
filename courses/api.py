@@ -478,7 +478,7 @@ def defer_enrollment(
             keep_failed_enrollments=keep_failed_enrollments,
             mode=from_enrollment.enrollment_mode,
         )
-        if not enroll_success:
+        if not enroll_success and not keep_failed_enrollments:
             raise Exception(
                 "Api call to enroll on edX was not successful for course run '{}'".format(
                     to_run
@@ -489,7 +489,7 @@ def defer_enrollment(
             ENROLL_CHANGE_STATUS_DEFERRED,
             keep_failed_enrollments=keep_failed_enrollments,
         )
-        if not from_enrollment.edx_enrolled:
+        if from_enrollment is None:
             raise Exception(
                 "Api call to deactivate enrollment on edX "
                 "was not successful for course run '{}'".format(from_courseware_id)
