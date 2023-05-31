@@ -39,6 +39,18 @@ export interface IDiscount {
     payment_type: string;
     activation_date: Date;
     expiration_date: Date;
+    is_bulk: boolean;
+}
+
+export interface IBulkDiscount {
+    prefix: string;
+    amount: string;
+    discount_type: string;
+    redemption_type: string;
+    max_redemptions: number;
+    payment_type: string;
+    activates: Date;
+    expires: Date;
 }
 
 export interface IDiscountRedemption {

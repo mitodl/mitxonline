@@ -243,7 +243,7 @@ class Discount(TimestampedModel):
     redemption_type = models.CharField(choices=REDEMPTION_TYPES, max_length=30)
     payment_type = models.CharField(null=True, choices=PAYMENT_TYPES, max_length=30)
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
-    discount_code = models.CharField(max_length=50)
+    discount_code = models.CharField(max_length=100)
     activation_date = models.DateTimeField(
         null=True,
         blank=True,
@@ -254,6 +254,7 @@ class Discount(TimestampedModel):
         blank=True,
         help_text="If set, this discount code will not be redeemable after this date.",
     )
+    is_bulk = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.amount} {self.discount_type} {self.redemption_type} - {self.discount_code}"

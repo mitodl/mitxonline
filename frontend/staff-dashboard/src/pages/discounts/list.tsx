@@ -10,8 +10,9 @@ import {
     Row,
     Col,
     Card,
+    Button,
 } from "@pankod/refine-antd";
-import { CrudFilters, HttpError, useInvalidate } from "@pankod/refine-core";
+import { CrudFilters, HttpError, useInvalidate, useNavigation } from "@pankod/refine-core";
 
 import { DiscountFilterForm } from "components/discounts/filter_form";
 
@@ -19,6 +20,7 @@ import { IDiscount, IDiscountFilters } from "interfaces";
 
 export const DiscountList: React.FC = () => {
     const invalidate = useInvalidate()
+    const navigation = useNavigation()
     const {tableQueryResult, tableProps, searchFormProps} = useTable<
         IDiscount,
         HttpError,
@@ -76,6 +78,12 @@ export const DiscountList: React.FC = () => {
             <Row gutter={[10, 10]}>
                 <Col sm={24}>
                     <List>
+                        <Row justify="end" gutter={[10, 10]}>
+                            <Col sm={24}>
+                                <Button style={{ "float": "right", "marginBottom": "5px" }} onClick={() => { navigation.push("/discounts/create_batch"); }}>Bulk Create</Button>
+                            </Col>
+                        </Row>
+
                         <Table {...tableProps} rowKey="id">
                             <Table.Column
                                 dataIndex="discount_code"
@@ -139,7 +147,7 @@ export const DiscountList: React.FC = () => {
                             />
                         </Table>
                     </List>
-                </Col>
+                    </Col>
             </Row>
         </div>
     );
