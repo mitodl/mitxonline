@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.65.1
+Version 0.65.1 (Released May 31, 2023)
 --------------
 
 - Adds bulk code generation to staff-dashboard (#1631)
