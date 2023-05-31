@@ -480,7 +480,9 @@ def defer_enrollment(
         )
         if not enroll_success:
             raise Exception(
-                "Api call to enroll on edX was not successful for course run '{}'".format(to_run)
+                "Api call to enroll on edX was not successful for course run '{}'".format(
+                    to_run
+                )
             )
         from_enrollment = deactivate_run_enrollment(
             from_enrollment,
