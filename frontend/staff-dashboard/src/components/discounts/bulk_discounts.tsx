@@ -16,13 +16,24 @@ export const BulkDiscountForm = (props: IBulkDiscountFormProps) => {
 
   return (<>
     <Form {...formProps} layout="vertical">
-        <Form.Item label="Prefix" name="prefix">
+        <Form.Item label="Prefix" name="prefix" rules={[{required: true, message: "Please enter a prefix."}]}>
             <Input />
         </Form.Item>
-        <Form.Item label="Codes to Create" name="count">
+        <Form.Item label="Codes to Create" name="count" rules={[{
+            required: true,
+            validator: async (rule, value) => {
+                if (!value || value.length === 0) {
+                    return Promise.reject("Please specify the number of codes to create.");
+                }
+
+                if (parseInt(value) < 2) {
+                    return Promise.reject("Minimum two codes required.");
+                }
+            }
+            }]}>
             <InputNumber precision={0} />
         </Form.Item>
-        <Form.Item label="Redemption Type" name="redemption_type">
+        <Form.Item label="Redemption Type" name="redemption_type" rules={[{required: true, message: "Select a redemption type."}]}>
             <Select options={[
                 { label: 'Unlimited', value: 'unlimited' },
                 { label: 'One-Time', value: 'one-time' },
@@ -36,17 +47,17 @@ export const BulkDiscountForm = (props: IBulkDiscountFormProps) => {
             </Form.Item>
         ) : null}
         </Form.Item>
-        <Form.Item label="Discount Type" name="discount_type">
+        <Form.Item label="Discount Type" name="discount_type" rules={[{required: true, message: "Select a discount type."}]}>
             <Select options={[
                 { label: 'Percent Off', value: 'percent-off' },
                 { label: 'Dollars Off', value: 'dollars-off' },
                 { label: 'Fixed Price', value: 'fixed-price' },
             ]}></Select>
         </Form.Item>
-        <Form.Item label="Amount" name="amount">
+        <Form.Item label="Amount" name="amount" rules={[{required: true, message: "Please enter an amount."}]}>
             <InputNumber precision={2} />
         </Form.Item>
-        <Form.Item label="Payment Type" name="payment_type">
+        <Form.Item label="Payment Type" name="payment_type" rules={[{required: true, message: "Select a payment type."}]}>
             <Select options={[
                 { label: 'marketing', value: 'marketing' },
                 { label: 'sales', value: 'sales' },
@@ -56,10 +67,12 @@ export const BulkDiscountForm = (props: IBulkDiscountFormProps) => {
                 { label: 'legacy', value: 'legacy' }
             ]}></Select>
         </Form.Item>
+
+        <p>Specify both date and time if you wish to specify an activation or expiry date.</p>
+
         <Form.Item label="Activation Date" name="activates">
             <Input type="datetime-local" />
         </Form.Item>
-
         <Form.Item label="Expiration Date" name="expires">
             <Input type="datetime-local" />
         </Form.Item>
