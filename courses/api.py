@@ -391,7 +391,7 @@ def deactivate_run_enrollment(
     line = Line.objects.get(
         purchased_object_id=run_enrollment.run.id,
         purchased_content_type=content_type,
-        order__state__in=[Order.STATE.FULFILLED, Order.STATE.PENDING]
+        order__state__in=[Order.STATE.FULFILLED, Order.STATE.PENDING],
     )
     sync_line_item_with_hubspot(line.id)
     return run_enrollment

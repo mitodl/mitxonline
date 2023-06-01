@@ -151,8 +151,6 @@ def create_enrollment_view(request):
     resp, user, run = _validate_enrollment_post_request(request)
     if resp is not None:
         return resp
-    
-    print("in view")
     _, edx_request_success = create_run_enrollments(
         user=user,
         runs=[run],
@@ -182,9 +180,7 @@ def create_enrollment_view(request):
             content_type=ContentType.objects.get_for_model(CourseRun),
         ).first()
         if product is None:
-            log.exception(
-                "No product found for that course with courseware_id %s", run
-            )
+            log.exception("No product found for that course with courseware_id %s", run)
         else:
             order = PendingOrder.create_from_product(product, user)
     else:
