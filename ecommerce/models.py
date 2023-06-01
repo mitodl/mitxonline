@@ -583,6 +583,23 @@ class PendingOrder(FulfillableOrder, Order):
     def _get_or_create(
         self, products: List[Product], user: User, discounts: List[Discount] = None
     ):
+        """
+        Returns an existing PendingOrder if one already exists with the same:
+        Line purchased_object_id, purchased_content_type_id, and product_version,
+        as well as the same purchaser.  If a PendingOrder matching that criteria
+        does not exist, a new one is created.  The associated Line objects are either
+        retrieved if they exist for an existing PendingOrder, otherwise new Line objects
+        are created.
+
+        Args:
+            products (List[Product]):  A list of Products associated with the PendingOrder.
+            user (User):  The user expected to be associated with the PendingOrder.
+            discounts (List[Discounts]):  A list of Discounts to apply to each Line assocaited
+                with the order.
+
+        Returns:
+            PendingOrder: the retrieved or created PendingOrder.
+        """
         # Get the details from each Product.
         product_versions, product_object_ids, product_content_types = [], [], []
         for product in products:
@@ -591,7 +608,7 @@ class PendingOrder(FulfillableOrder, Order):
             product_content_types.append(product.content_type_id)
 
         # Get or create a PendingOrder
-        order, created = Order.objects.select_for_update().get_or_create(
+        order, _ = Order.objects.select_for_update().get_or_create(
             lines__purchased_object_id__in=product_object_ids,
             lines__purchased_content_type_id__in=product_content_types,
             lines__product_version__in=product_versions,
@@ -616,7 +633,7 @@ class PendingOrder(FulfillableOrder, Order):
         # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
         total = 0
         for i, product in enumerate(products):
-            line, created = order.lines.get_or_create(
+            line, _ = order.lines.get_or_create(
                 order=order,
                 purchased_object_id=product.object_id,
                 purchased_content_type_id=product.content_type_id,

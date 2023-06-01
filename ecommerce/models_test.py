@@ -1,5 +1,5 @@
 import random
-from decimal import Decimal, getcontext
+from decimal import Decimal
 
 import pytest
 import reversion
@@ -7,22 +7,14 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from mitol.common.utils import now_in_utc
 
-from ecommerce import api
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
 )
-from ecommerce.discounts import (
-    DiscountType,
-    DollarsOffDiscount,
-    FixedPriceDiscount,
-    PercentDiscount,
-)
 from ecommerce.factories import (
     BasketFactory,
     BasketItemFactory,
-    DiscountFactory,
     OneTimeDiscountFactory,
     OneTimePerUserDiscountFactory,
     OrderFactory,
@@ -39,11 +31,8 @@ from ecommerce.models import (
     Order,
     PendingOrder,
     Product,
-    RefundedOrder,
     Transaction,
-    UserDiscount,
 )
-from ecommerce.views_test import user
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -409,3 +398,42 @@ def test_discount_product_calculation(
         assert discounted_amount == Decimal(
             product.price - (product.price * Decimal(unlimited_discount.amount / 100))
         ).quantize(Decimal("0.01"))
+
+
+def test_pending_order_is_reused(basket):
+    """
+    Test that creating a second PendingOrder's with the same associated Product is
+    not possible, the existing PendingOrder is reused.
+    """
+
+    with reversion.create_revision():
+        products = ProductFactory.create_batch(2)
+
+    basket_item = BasketItem(product=products[1], basket=basket, quantity=2)
+    basket_item.save()
+    order = PendingOrder.create_from_basket(basket)
+    order.save()
+    assert PendingOrder.objects.all().count() == 1
+    order = PendingOrder.create_from_basket(basket)
+    order.save()
+    assert PendingOrder.objects.all().count() == 1
+
+
+def test_new_pending_order_is_created_if_product_is_different():
+    """
+    Test that creating a second PendingOrder with a different associated Product
+    results in the creation of a new PendingOrder instead of reusing the existing
+    PendingOrder.
+    """
+    with reversion.create_revision():
+        products = ProductFactory.create_batch(2)
+
+    user = UserFactory.create()
+    order = PendingOrder.create_from_product(product=products[0], user=user)
+    order.save()
+    assert order.lines.count() == 1
+
+    order = PendingOrder.create_from_product(product=products[1], user=user)
+    order.save()
+    assert order.lines.count() == 1
+    assert PendingOrder.objects.all().count() == 2
