@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.65.2
+--------------
+
+- Updates the email address on the frontend to use the value from settings. (#1645)
+- fix format issue
+- add management command to create local enrollments from edx
+
 Version 0.65.1 (Released May 31, 2023)
 --------------
 
