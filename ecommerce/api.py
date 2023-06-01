@@ -35,7 +35,6 @@ from ecommerce.models import (
 )
 from ecommerce.tasks import perform_downgrade_from_order
 from flexiblepricing.api import determine_courseware_flexible_price_discount
-from hubspot_sync.task_helpers import sync_hubspot_deal
 from main.constants import (
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_DISCOUNT_INVALID,

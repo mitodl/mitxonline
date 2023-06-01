@@ -4,6 +4,7 @@ Management command to configure custom Hubspot properties for Contacts, Deals, P
 import sys
 
 from django.core.management import BaseCommand
+from courses.constants import ALL_ENROLL_CHANGE_STATUSES
 from mitol.hubspot_api.api import (
     delete_object_property,
     delete_property_group,
@@ -19,6 +20,7 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
 )
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 from users.models import (
     GENDER_CHOICES,
@@ -558,6 +560,62 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
                 "fieldType": "text",
                 "hasUniqueValue": True,
                 "hidden": True,
+            },
+            {
+                "name": "enrollment_mode",
+                "label": "Enrollment Mode",
+                "description": "The enrollment mode the user is currently enrolled into the product as.",
+                "groupName": "lineiteminformation",
+                "type": "enumeration",
+                "fieldType": "select",
+                "options": [
+                    {
+                        "value": EDX_ENROLLMENT_AUDIT_MODE,
+                        "label": EDX_ENROLLMENT_AUDIT_MODE,
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": EDX_ENROLLMENT_VERIFIED_MODE,
+                        "label": EDX_ENROLLMENT_VERIFIED_MODE,
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                ],
+            },
+            {
+                "name": "change_status",
+                "label": "Change Status",
+                "description": "Any change in enrollment status.",
+                "groupName": "lineiteminformation",
+                "type": "enumeration",
+                "fieldType": "select",
+                "options": [
+                    {
+                        "value": ALL_ENROLL_CHANGE_STATUSES[0],
+                        "label": ALL_ENROLL_CHANGE_STATUSES[0],
+                        "displayOrder": 0,
+                        "hidden": False,
+                    },
+                    {
+                        "value": ALL_ENROLL_CHANGE_STATUSES[1],
+                        "label": ALL_ENROLL_CHANGE_STATUSES[1],
+                        "displayOrder": 1,
+                        "hidden": False,
+                    },
+                    {
+                        "value": ALL_ENROLL_CHANGE_STATUSES[2],
+                        "label": ALL_ENROLL_CHANGE_STATUSES[2],
+                        "displayOrder": 2,
+                        "hidden": False,
+                    },
+                    {
+                        "value": ALL_ENROLL_CHANGE_STATUSES[3],
+                        "label": ALL_ENROLL_CHANGE_STATUSES[3],
+                        "displayOrder": 3,
+                        "hidden": False,
+                    },
+                ],
             },
         ],
     },

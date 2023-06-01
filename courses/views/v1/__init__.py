@@ -175,9 +175,8 @@ def create_enrollment_view(request):
             "type": USER_MSG_TYPE_ENROLLED,
             "run": run.title,
         }
-        
-        print("we doin' this")
-                # Create PendingOrder here
+
+        # Create PendingOrder here
         product = Product.objects.filter(
             object_id=run.id,
             content_type=ContentType.objects.get_for_model(CourseRun),
