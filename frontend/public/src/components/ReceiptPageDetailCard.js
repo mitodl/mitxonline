@@ -1,4 +1,5 @@
 // @flow
+/* global SETTINGS: false */
 import React from "react"
 import {
   parseDateString,
@@ -56,7 +57,9 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                 Cambridge, MA 02139 USA
                 <br />
                 Support:{" "}
-                <a href="mailto:support@mitxonline.mit.edu">support@mit.edu</a>
+                <a href={`mailto:${SETTINGS.support_email}`}>
+                  {SETTINGS.support_email}
+                </a>
                 <br />
                 <a
                   target="_blank"
