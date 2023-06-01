@@ -182,7 +182,7 @@ def create_enrollment_view(request):
         if product is None:
             log.exception("No product found for that course with courseware_id %s", run)
         else:
-            order = PendingOrder.create_from_product(product, user)
+            PendingOrder.create_from_product(product, user)
     else:
         resp = respond(request.headers["Referer"])
         cookie_value = {

@@ -96,10 +96,14 @@ def test_unenroll_enrollment(patches):
     assert enrollment.edx_enrolled is False
 
 
-def test_unenroll_enrollment_without_edx():
+def test_unenroll_enrollment_without_edx(mocker):
     """
     Test that user unenrolled from the course properly without edx
     """
+    get_line = mocker.patch("ecommerce.models.Line.objects.get")
+    sync_line_item_with_hubspot = mocker.patch(
+        "hubspot_sync.api.sync_line_item_with_hubspot"
+    )
     enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
     assert enrollment.change_status is None
     assert enrollment.active is True
@@ -127,5 +131,5 @@ def test_unenroll_enrollment_without_edx():
     assert enrollment.active is False
     # Enrollment will remain edx_enrolled
     assert enrollment.edx_enrolled is True
-    assert patches.send_unenrollment_email.call_count == 2
-    assert patches.get_line.call_count == 2
+    sync_line_item_with_hubspot.assert_called_once()
+    get_line.assert_called_once()

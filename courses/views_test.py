@@ -9,6 +9,7 @@ from django.db.models import Count, Q
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
+from ecommerce.factories import ProductFactory
 from rest_framework import status
 
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
@@ -26,6 +27,7 @@ from courses.serializers import (
     CourseSerializer,
     ProgramSerializer,
 )
+from ecommerce.models import Product, PendingOrder
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from main import features
 from main.constants import (
@@ -469,6 +471,7 @@ def test_create_enrollments(mocker, user_client, api_request):
         return_value=(None, True),
     )
     run = CourseRunFactory.create()
+    product = ProductFactory.create(purchasable_object=run)
     resp = user_client.post(
         reverse("create-enrollment-via-form"),
         data={"run": str(run.id), "isapi": "true"}
@@ -488,7 +491,7 @@ def test_create_enrollments(mocker, user_client, api_request):
                 "run": run.title,
             }
         )
-
+    assert PendingOrder.objects.all().count() == 1
     patched_create_enrollments.assert_called_once()
 
 

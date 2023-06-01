@@ -7,13 +7,12 @@ from decimal import Decimal
 
 import pytest
 from django.contrib.contenttypes.models import ContentType
-from django.urls import reverse
 from mitol.common.utils import now_in_utc
 from mitol.hubspot_api.api import format_app_id
 from mitol.hubspot_api.models import HubspotObject
-from rest_framework import status
+from courses.models import CourseRunEnrollment
 
-from courses.factories import CourseRunFactory
+from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -60,8 +59,11 @@ def test_serialize_product(text_id, expected):
 def test_serialize_line(hubspot_order):
     """Test that LineSerializer produces the correct serialized data"""
     line = hubspot_order.lines.first()
-    serialized_data = LineSerializer(instance=line).data
     product = Product.objects.get(id=line.product_version.object_id)
+    course_run_enrollment = CourseRunEnrollmentFactory(
+        run=product.purchasable_object, user=hubspot_order.purchaser
+    )
+    serialized_data = LineSerializer(instance=line).data
     assert serialized_data == {
         "hs_product_id": HubspotObject.objects.get(
             content_type=ContentType.objects.get_for_model(Product),
@@ -73,6 +75,8 @@ def test_serialize_line(hubspot_order):
         "name": format_product_name(product),
         "price": "200.00",
         "unique_app_id": format_app_id(line.id),
+        "enrollment_mode": course_run_enrollment.enrollment_mode,
+        "change_status": course_run_enrollment.change_status,
     }
 
 
