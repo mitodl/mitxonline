@@ -334,7 +334,7 @@ def test_create_run_enrollments(
         assert edx_request_success is True
         assert len(successful_enrollments) == num_runs
         enrollments = CourseRunEnrollment.objects.order_by("run__id").all()
-        for (run, enrollment) in zip(runs, enrollments):
+        for run, enrollment in zip(runs, enrollments):
             assert enrollment.change_status is None
             assert enrollment.active is True
             assert enrollment.edx_enrolled is True
@@ -536,7 +536,7 @@ def test_create_program_enrollments(user):
     assert len(successful_enrollments) == num_programs
     enrollments = ProgramEnrollment.objects.order_by("program__id").all()
     assert len(enrollments) == len(programs)
-    for (program, enrollment) in zip(programs, enrollments):
+    for program, enrollment in zip(programs, enrollments):
         assert enrollment.change_status is None
         assert enrollment.active is True
         assert enrollment.program == program
@@ -574,11 +574,17 @@ class TestDeactivateEnrollments:
         send_unenrollment_email = mocker.patch(
             "courses.api.mail_api.send_course_run_unenrollment_email"
         )
+        get_line = mocker.patch("ecommerce.models.Line.objects.get")
+        sync_line_item_with_hubspot = mocker.patch(
+            "hubspot_sync.api.sync_line_item_with_hubspot"
+        )
         log_exception = mocker.patch("courses.api.log.exception")
         return SimpleNamespace(
             edx_unenroll=edx_unenroll,
             send_unenrollment_email=send_unenrollment_email,
             log_exception=log_exception,
+            get_line=get_line,
+            sync_line_item_with_hubspot=sync_line_item_with_hubspot,
         )
 
     def test_deactivate_run_enrollment(self, patches):
@@ -593,6 +599,8 @@ class TestDeactivateEnrollments:
         )
         patches.edx_unenroll.assert_called_once_with(enrollment)
         patches.send_unenrollment_email.assert_called_once_with(enrollment)
+        patches.get_line.assert_called_once()
+        patches.sync_line_item_with_hubspot.assert_called_once()
         enrollment.refresh_from_db()
         assert enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
         assert enrollment.active is False
@@ -613,6 +621,12 @@ class TestDeactivateEnrollments:
             change_status=ENROLL_CHANGE_STATUS_REFUNDED,
             keep_failed_enrollments=keep_failed_enrollments,
         )
+        if not keep_failed_enrollments:
+            patches.get_line.assert_not_called()
+            patches.sync_line_item_with_hubspot.assert_not_called()
+        else:
+            patches.get_line.assert_called_once()
+            patches.sync_line_item_with_hubspot.assert_called_once()
         patches.edx_unenroll.assert_called_once_with(enrollment)
         patches.send_unenrollment_email.assert_not_called()
         patches.log_exception.assert_called_once()
@@ -648,6 +662,10 @@ class TestDeactivateEnrollments:
         }
         assert patches.edx_unenroll.call_count == len(course_run_enrollments)
         assert patches.send_unenrollment_email.call_count == len(course_run_enrollments)
+        assert patches.get_line.call_count == len(course_run_enrollments)
+        assert patches.sync_line_item_with_hubspot.call_count == len(
+            course_run_enrollments
+        )
         for run_enrollment in course_run_enrollments:
             run_enrollment.refresh_from_db()
             assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED

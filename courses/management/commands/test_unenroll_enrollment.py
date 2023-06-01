@@ -20,9 +20,15 @@ pytestmark = [pytest.mark.django_db]
 def patches(mocker):  # pylint: disable=missing-docstring
     edx_unenroll = mocker.patch("courses.api.unenroll_edx_course_run")
     log_exception = mocker.patch("courses.api.log.exception")
+    get_line = mocker.patch("ecommerce.models.Line.objects.get")
+    sync_line_item_with_hubspot = mocker.patch(
+        "hubspot_sync.api.sync_line_item_with_hubspot"
+    )
     return SimpleNamespace(
         edx_unenroll=edx_unenroll,
         log_exception=log_exception,
+        get_line=get_line,
+        sync_line_item_with_hubspot=sync_line_item_with_hubspot,
     )
 
 
@@ -82,6 +88,8 @@ def test_unenroll_enrollment(patches):
         user=enrollment.user.username,
     )
     patches.edx_unenroll.assert_called_once_with(enrollment)
+    patches.get_line.assert_called_once()
+    patches.sync_line_item_with_hubspot.assert_called_once()
     enrollment.refresh_from_db()
     assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
     assert enrollment.active is False
@@ -119,3 +127,5 @@ def test_unenroll_enrollment_without_edx():
     assert enrollment.active is False
     # Enrollment will remain edx_enrolled
     assert enrollment.edx_enrolled is True
+    assert patches.send_unenrollment_email.call_count == 2
+    assert patches.get_line.call_count == 2

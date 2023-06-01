@@ -388,12 +388,12 @@ def deactivate_run_enrollment(
     content_type = ContentType.objects.filter(
         app_label="courses", model="courserun"
     ).first()
-    line = Line.objects.get(
+    line_id = Line.objects.get(
         purchased_object_id=run_enrollment.run.id,
         purchased_content_type=content_type,
         order__state__in=[Order.STATE.FULFILLED, Order.STATE.PENDING],
-    )
-    sync_line_item_with_hubspot(line.id)
+    ).id
+    sync_line_item_with_hubspot(line_id)
     return run_enrollment
 
 
