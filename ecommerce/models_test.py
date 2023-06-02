@@ -407,16 +407,18 @@ def test_pending_order_is_reused(basket):
     """
 
     with reversion.create_revision():
-        products = ProductFactory.create_batch(2)
+        product = ProductFactory.create()
 
-    basket_item = BasketItem(product=products[1], basket=basket, quantity=2)
+    basket_item = BasketItem(product=product, basket=basket, quantity=1)
     basket_item.save()
     order = PendingOrder.create_from_basket(basket)
     order.save()
-    assert PendingOrder.objects.all().count() == 1
+    assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
     order = PendingOrder.create_from_basket(basket)
     order.save()
-    assert PendingOrder.objects.all().count() == 1
+    # Verify that the existing PendingOrder is reused and a duplicate is not created.
+    # This is to ensure that we also reuse the HubSpot Deal associated with Orders.
+    assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
 
 
 def test_new_pending_order_is_created_if_product_is_different():
@@ -436,4 +438,4 @@ def test_new_pending_order_is_created_if_product_is_different():
     order = PendingOrder.create_from_product(product=products[1], user=user)
     order.save()
     assert order.lines.count() == 1
-    assert PendingOrder.objects.all().count() == 2
+    assert Order.objects.filter(state=Order.STATE.PENDING).count() == 2

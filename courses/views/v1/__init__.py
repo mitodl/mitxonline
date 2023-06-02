@@ -13,6 +13,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+from reversion.models import Version
 
 from courses.api import (
     create_run_enrollments,
@@ -38,7 +39,7 @@ from courses.serializers import (
     ProgramSerializer,
     UserProgramEnrollmentDetailSerializer,
 )
-from ecommerce.models import Product, PendingOrder
+from ecommerce.models import FulfilledOrder, Order, Product, PendingOrder
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
 from main import features
@@ -174,7 +175,9 @@ def create_enrollment_view(request):
             "run": run.title,
         }
 
-        # Create PendingOrder here
+        # Check for an existing fulfilled order prior, otherwise get or create a PendingOrder.
+        # This can occur if the user has a verified enrollment that is not synced with Edx,
+        # and then attempts to enroll in the course again.
         product = Product.objects.filter(
             object_id=run.id,
             content_type=ContentType.objects.get_for_model(CourseRun),
@@ -182,7 +185,19 @@ def create_enrollment_view(request):
         if product is None:
             log.exception("No product found for that course with courseware_id %s", run)
         else:
-            PendingOrder.create_from_product(product, user)
+            product_version = Version.objects.get_for_object(product).first()
+            product_object_id = product.object_id
+            product_content_type = product.content_type_id
+            existing_fulfilled_order = FulfilledOrder.objects.filter(
+                state=Order.STATE.FULFILLED,
+                purchaser=user,
+                lines__purchased_object_id=product_object_id,
+                lines__purchased_content_type_id=product_content_type,
+                lines__product_version=product_version,
+            )
+            if not existing_fulfilled_order:
+                # Create PendingOrder
+                PendingOrder.create_from_product(product, user)
     else:
         resp = respond(request.headers["Referer"])
         cookie_value = {
