@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.65.2
+Version 0.65.2 (Released June 05, 2023)
 --------------
 
 - Updates the email address on the frontend to use the value from settings. (#1645)
