@@ -11,6 +11,7 @@ from edx_api.course_detail import CourseDetail, CourseDetails, CourseMode, Cours
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
+from django.contrib.contenttypes.models import ContentType
 
 from courses.api import (
     check_program_for_orphans,
@@ -53,6 +54,7 @@ from courses.models import (
     ProgramEnrollment,
     ProgramRequirement,
 )
+from ecommerce.models import Order
 from main.test_utils import MockHttpError
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -599,7 +601,13 @@ class TestDeactivateEnrollments:
         )
         patches.edx_unenroll.assert_called_once_with(enrollment)
         patches.send_unenrollment_email.assert_called_once_with(enrollment)
-        patches.get_line.assert_called_once()
+        content_type = ContentType.objects.get(app_label="courses", model="courserun")
+        patches.get_line.assert_called_once_with(
+            purchased_object_id=enrollment.run.id,
+            purchased_content_type=content_type,
+            order__state__in=[Order.STATE.FULFILLED, Order.STATE.PENDING],
+            order__purchaser=enrollment.user,
+        )
         patches.sync_line_item_with_hubspot.assert_called_once()
         enrollment.refresh_from_db()
         assert enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
