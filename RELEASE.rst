@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.65.3
+--------------
+
+- Adds normalization for edX profile fields (#1650)
+- Make deferral functionality atomic and clarify errors (#1641)
+
 Version 0.65.2 (Released June 05, 2023)
 --------------
 
