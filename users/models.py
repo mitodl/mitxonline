@@ -10,7 +10,7 @@ from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Count, Q, DateTimeField
+from django.db.models import Count, DateTimeField, Q
 from django.utils.translation import gettext_lazy as _
 from mitol.common.models import TimestampedModel
 from mitol.common.utils import now_in_utc
@@ -32,6 +32,81 @@ GENDER_CHOICES = (
     (NONBINARY, "Non-binary/non-conforming"),
     (OTHER, "Other/Prefer Not to Say"),
 )
+
+# For edx_gender_choices and edx_state_choices, we don't display this data to
+# the learner - it's just for limiting what we send to edX, so these are simple
+# lookups. These should be checked occasionally to make sure they reflect what's
+# in edX.
+
+# edX gender choices are different than ours
+# As of 5-Jun-2023: https://github.com/openedx/edx-platform/blob/c7fc04968f37b252a427e42848c00e30335b15e4/common/djangoapps/student/models/user.py#L456-L461
+EDX_GENDER_CHOICES = [
+    "m",
+    "f",
+    "o",
+]
+EDX_DEFAULT_GENDER_CHOICE = "o"
+
+# edX states are different from what's in ISO3166
+# As of 5-Jun-2023: https://github.com/openedx/edx-platform/blob/c7fc04968f37b252a427e42848c00e30335b15e4/common/djangoapps/student/models/user.py#LL491C5-L546C6
+EDX_STATE_CHOICES = [
+    "AL",
+    "AK",
+    "AZ",
+    "AR",
+    "AA",
+    "AE",
+    "AP",
+    "CA",
+    "CO",
+    "CT",
+    "DE",
+    "DC",
+    "FL",
+    "GA",
+    "HI",
+    "ID",
+    "IL",
+    "IN",
+    "IA",
+    "KS",
+    "KY",
+    "LA",
+    "ME",
+    "MD",
+    "MA",
+    "MI",
+    "MN",
+    "MS",
+    "MO",
+    "MT",
+    "NE",
+    "NV",
+    "NH",
+    "NJ",
+    "NM",
+    "NY",
+    "NC",
+    "ND",
+    "OH",
+    "OK",
+    "OR",
+    "PA",
+    "RI",
+    "SC",
+    "SD",
+    "TN",
+    "TX",
+    "UT",
+    "VT",
+    "VA",
+    "WA",
+    "WV",
+    "WI",
+    "WY",
+]
+EDX_DEFAULT_STATE_CHOICE = None
+
 
 COMPANY_SIZE_CHOICES = (
     (None, "----"),
@@ -290,9 +365,23 @@ class LegalAddress(TimestampedModel):
         """Returns just the state bit, minus the 'US-' part, only for users in the US."""
 
         if self.country == "US" and self.state is not None:
-            return self.state.split("-")[1]
+            state = self.state.split("-")[1]
+
+            if state in EDX_STATE_CHOICES:
+                return state
+            else:
+                return EDX_DEFAULT_STATE_CHOICE
 
         return None
+
+    @property
+    def edx_us_state(self):
+        """Validates the us_state against the list from edx."""
+
+        if self.us_state is not None and self.state in EDX_STATE_CHOICES:
+            return self.state
+        else:
+            return EDX_DEFAULT_STATE_CHOICE
 
     def __str__(self):
         """Str representation for the legal address"""
@@ -374,6 +463,16 @@ class UserProfile(TimestampedModel):
             if self.highest_education
             else ""
         )
+
+    @property
+    def edx_gender(self):
+        """Validate the gender selection against edx values."""
+        if self.gender is not None and self.gender in EDX_GENDER_CHOICES:
+            return self.gender
+        elif self.gender is not None:
+            return EDX_DEFAULT_GENDER_CHOICE
+
+        return None
 
     def __str__(self):
         """Str representation for the profile"""

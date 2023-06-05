@@ -248,8 +248,8 @@ def update_edx_user_profile(user):
         json=dict(
             name=user.name,
             country=user.legal_address.country if user.legal_address else None,
-            state=user.legal_address.us_state if user.legal_address else None,
-            gender=user.user_profile.gender if user.user_profile else None,
+            state=user.legal_address.edx_us_state if user.legal_address else None,
+            gender=user.user_profile.edx_gender if user.user_profile else None,
             year_of_birth=user.user_profile.year_of_birth
             if user.user_profile
             else None,
