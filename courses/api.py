@@ -471,17 +471,29 @@ def defer_enrollment(
                 from_enrollment.run.course.title, to_run.course.title
             )
         )
-    to_enrollments, _ = create_run_enrollments(
-        user,
-        [to_run],
-        keep_failed_enrollments=keep_failed_enrollments,
-        mode=from_enrollment.enrollment_mode,
-    )
-    from_enrollment = deactivate_run_enrollment(
-        from_enrollment,
-        ENROLL_CHANGE_STATUS_DEFERRED,
-        keep_failed_enrollments=keep_failed_enrollments,
-    )
+    with transaction.atomic():
+        to_enrollments, enroll_success = create_run_enrollments(
+            user,
+            [to_run],
+            keep_failed_enrollments=keep_failed_enrollments,
+            mode=from_enrollment.enrollment_mode,
+        )
+        if not enroll_success and not keep_failed_enrollments:
+            raise Exception(
+                "Api call to enroll on edX was not successful for course run '{}'".format(
+                    to_run
+                )
+            )
+        from_enrollment = deactivate_run_enrollment(
+            from_enrollment,
+            ENROLL_CHANGE_STATUS_DEFERRED,
+            keep_failed_enrollments=keep_failed_enrollments,
+        )
+        if from_enrollment is None:
+            raise Exception(
+                "Api call to deactivate enrollment on edX "
+                "was not successful for course run '{}'".format(from_courseware_id)
+            )
     return from_enrollment, first_or_none(to_enrollments)
 
 

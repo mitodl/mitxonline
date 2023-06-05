@@ -12,7 +12,6 @@ from courses.factories import (
 )
 from courses.management.utils import EnrollmentChangeCommand
 from main.test_utils import MockHttpError
-from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE
 from openedx.exceptions import EdxApiEnrollErrorException, UnknownEdxApiEnrollException
 from users.factories import UserFactory
 

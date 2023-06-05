@@ -70,6 +70,8 @@ class Command(EnrollmentChangeCommand):
             raise CommandError(message)
         except ValidationError as exc:
             raise CommandError("Invalid enrollment deferral - {}".format(exc))
+        except Exception as exc:
+            raise CommandError("{}".format(exc))
         else:
             if not to_enrollment:
                 raise CommandError(
