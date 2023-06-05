@@ -512,7 +512,7 @@ export class EnrolledItemCard extends React.Component<
                     more_vert
                   </span>
                 </DropdownToggle>
-                <DropdownMenu right>
+                <DropdownMenu end>
                   <span id={`unenrollButtonWrapper-${enrollment.id}`}>
                     <DropdownItem
                       className="unstyled d-block"
@@ -611,8 +611,6 @@ export class EnrolledItemCard extends React.Component<
                   <a
                     rel="noopener noreferrer"
                     href="#program_enrollment_drawer"
-                    aria-flowto="program_enrollment_drawer"
-                    aria-haspopup="dialog"
                     onClick={() => this.toggleProgramInfo()}
                   >
                     {title}
@@ -632,7 +630,7 @@ export class EnrolledItemCard extends React.Component<
                     more_vert
                   </span>
                 </DropdownToggle>
-                <DropdownMenu right>
+                <DropdownMenu end>
                   <span id={`unenrollButtonWrapper-${enrollment.id}`}>
                     <DropdownItem
                       className="unstyled d-block"
@@ -655,8 +653,6 @@ export class EnrolledItemCard extends React.Component<
                   className="program-course-count pe-2"
                   rel="noopener noreferrer"
                   href="#program_enrollment_drawer"
-                  aria-flowto="program_enrollment_drawer"
-                  aria-haspopup="dialog"
                   aria-label="Program's courses"
                   onClick={() => this.toggleProgramInfo()}
                 >

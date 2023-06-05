@@ -206,6 +206,11 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
 
     if (isHidden) {
       this.restrictFocusToDialog()
+      document.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") {
+          closeDrawer()
+        }
+      })
     }
 
     const backgroundClass = isHidden
@@ -233,7 +238,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
           role="dialog"
           tabIndex="-1"
           aria-modal="true"
-          aria-label={enrollment.program.title}
+          aria-labeledby="dialog-title"
           aria-description={`${courseNumbers[0]} courses, ${courseNumbers[1]} passed`}
         >
           <div
