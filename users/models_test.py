@@ -207,3 +207,28 @@ def test_user_profile_edx_education():
     assert user.user_profile.highest_education is not None
     assert user.user_profile.level_of_education is not None
     assert user.user_profile.level_of_education == test_openedx_flag
+
+
+@pytest.mark.parametrize("should_exist", [True, False])
+def test_user_profile_edx_properties(should_exist):
+    user = UserFactory.create()
+
+    user.legal_address.country = "US"
+
+    if should_exist:
+        user.user_profile.gender = "f"
+        user.legal_address.state = "US-MA"
+    else:
+        user.user_profile.gender = "nb"
+        user.user_profile.state = "US-AS"
+
+    assert (
+        user.user_profile.edx_gender == "f"
+        if should_exist
+        else user.user_profile.edx_gender == "o"
+    )
+    assert (
+        user.legal_address.edx_us_state == "MA"
+        if should_exist
+        else user.legal_address.edx_us_state is None
+    )

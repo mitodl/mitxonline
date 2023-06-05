@@ -378,8 +378,8 @@ class LegalAddress(TimestampedModel):
     def edx_us_state(self):
         """Validates the us_state against the list from edx."""
 
-        if self.us_state is not None and self.state in EDX_STATE_CHOICES:
-            return self.state
+        if self.us_state is not None and self.us_state in EDX_STATE_CHOICES:
+            return self.us_state
         else:
             return EDX_DEFAULT_STATE_CHOICE
 
