@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.65.3
+Version 0.65.3 (Released June 06, 2023)
 --------------
 
 - Adds normalization for edX profile fields (#1650)
