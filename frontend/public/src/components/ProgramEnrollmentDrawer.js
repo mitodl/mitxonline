@@ -256,7 +256,9 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
           </div>
           <div className="row chrome">
             <p>
-              <span id="program-overview">Program overview: {this.renderProgramOverview()}</span>
+              <span id="program-overview">
+                Program overview: {this.renderProgramOverview()}
+              </span>
               <br />
               <a
                 href={`/records/${enrollment.program.id}/`}
