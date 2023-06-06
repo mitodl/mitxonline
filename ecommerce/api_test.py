@@ -11,6 +11,7 @@ import reversion
 from CyberSource.rest import ApiException
 from django.conf import settings
 from django.urls import reverse
+from factory import Faker, fuzzy
 from mitol.payment_gateway.api import ProcessorResponse
 from reversion.models import Version
 
@@ -60,6 +61,32 @@ def fulfilled_transaction(fulfilled_order):
         "transaction_id": "1234",
         "req_amount": payment_amount,
         "req_currency": "USD",
+    }
+
+    return TransactionFactory.create(
+        transaction_id="1234",
+        transaction_type=TRANSACTION_TYPE_PAYMENT,
+        data=fulfilled_sample,
+        order=fulfilled_order,
+    )
+
+
+@pytest.fixture()
+def fulfilled_paypal_transaction(fulfilled_order):
+    """Fixture to creating a fulfilled transaction"""
+    payment_amount = 10.00
+    fulfilled_sample = {
+        "transaction_id": "1234",
+        "req_amount": payment_amount,
+        "req_currency": "USD",
+        "paypal_token": "EC-" + str(fuzzy.FuzzyText(length=17)),
+        "paypal_payer_id": str(fuzzy.FuzzyText(length=13)),
+        "paypal_fee_amount": payment_amount,
+        "paypal_payer_status": "unverified",
+        "paypal_address_status": "Confirmed",
+        "paypal_customer_email": str(Faker("ascii_email")),
+        "paypal_payment_status": "Completed",
+        "paypal_pending_reason": "order",
     }
 
     return TransactionFactory.create(
@@ -352,6 +379,14 @@ def test_order_refund_failure_no_exception(mocker, fulfilled_transaction):
     )
     # Unenrollment task should not run when API fails
     assert not downgrade_task_mock.called
+
+
+def test_paypal_refunds(fulfilled_paypal_transaction):
+    """PayPal transactions should fail before they get to the payment gateway."""
+
+    with pytest.raises(Exception) as exc:
+        refund_order(order_id=fulfilled_paypal_transaction.order.id)
+        assert "PayPal" in exc
 
 
 def test_unenrollment_unenrolls_learner(mocker, user):

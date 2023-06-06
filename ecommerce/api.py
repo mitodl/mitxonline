@@ -422,6 +422,12 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
 
         transaction_dict = order_recent_transaction.data
 
+        # Check for a PayPal payment - if there's one, we can't process it
+        if "paypal_token" in transaction_dict:
+            raise Exception(
+                f"PayPal: Order {order.reference_number} contains a PayPal transaction. Please contact Finance to refund this order."
+            )
+
         # The refund amount can be different then the payment amount, so we override
         # that before PaymentGateway processing.
         # e.g. While refunding order from Django Admin we can select custom amount.
