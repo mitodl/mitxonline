@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.65.4
+--------------
+
+- Fix hook bug in sheets refunds (#1657)
+
 Version 0.65.3 (Released June 06, 2023)
 --------------
 
