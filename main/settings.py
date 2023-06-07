@@ -1081,8 +1081,8 @@ GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE = get_string(
     description="The value of the meta tag used by Google to verify the owner of a domain (used for enabling push notifications)",
 )
 
-MITOL_GOOGLE_SHEETS_REFUNDS_PLUGINS = ["sheets.plugins.RefundPlugin"]
-MITOL_GOOGLE_SHEETS_DEFERRALS_PLUGINS = ["sheets.plugins.DeferralPlugin"]
+MITOL_GOOGLE_SHEETS_REFUNDS_PLUGINS = ["sheets.refunds_plugin.RefundPlugin"]
+MITOL_GOOGLE_SHEETS_DEFERRALS_PLUGINS = ["sheets.deferrals_plugin.DeferralPlugin"]
 
 
 # Fastly configuration
