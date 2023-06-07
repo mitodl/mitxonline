@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.65.5
+Version 0.65.5 (Released June 07, 2023)
 --------------
 
 - 703: navigation drawer component not screen reader accessible round 2 (#1653)
