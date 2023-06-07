@@ -206,6 +206,11 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
 
     if (isHidden) {
       this.restrictFocusToDialog()
+      document.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") {
+          closeDrawer()
+        }
+      })
     }
 
     const backgroundClass = isHidden
@@ -223,8 +228,6 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
         ? this.renderFlatCourseCards()
         : this.renderCourseCards()
 
-    const courseNumbers = this.getNumberOfCoursesInProgram()
-
     return (
       <div className={backgroundClass}>
         <div
@@ -233,8 +236,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
           role="dialog"
           tabIndex="-1"
           aria-modal="true"
-          aria-label={enrollment.program.title}
-          aria-description={`${courseNumbers[0]} courses, ${courseNumbers[1]} passed`}
+          aria-describedby="program-overview"
         >
           <div
             className="row chrome d-flex flex-row mr-3"
@@ -254,7 +256,9 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
           </div>
           <div className="row chrome">
             <p>
-              Program overview: {this.renderProgramOverview()}
+              <span id="program-overview">
+                Program overview: {this.renderProgramOverview()}
+              </span>
               <br />
               <a
                 href={`/records/${enrollment.program.id}/`}
