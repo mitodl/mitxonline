@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.65.6
+Version 0.65.6 (Released June 07, 2023)
 --------------
 
 - Updating refund_order API to check for PayPal (#1655)
