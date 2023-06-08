@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.65.7
+--------------
+
+- 904: tracking audit enrollments for mitx online courses in hubspot (#1644)
+
 Version 0.65.6 (Released June 07, 2023)
 --------------
 
