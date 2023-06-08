@@ -365,7 +365,7 @@ def deactivate_run_enrollment(
         CourseRunEnrollment: The deactivated enrollment
     """
     from ecommerce.models import Line, Order
-    from hubspot_sync.api import sync_line_item_with_hubspot
+    from hubspot_sync.task_helpers import sync_hubspot_line_by_line_id
 
     try:
         unenroll_edx_course_run(run_enrollment)
@@ -385,6 +385,8 @@ def deactivate_run_enrollment(
         run_enrollment.edx_enrolled = False
         run_enrollment.edx_emails_subscription = False
     run_enrollment.deactivate_and_save(change_status, no_user=True)
+
+    # Find an associated Line and update HubSpot.
     content_type = ContentType.objects.get(app_label="courses", model="courserun")
     line = Line.objects.filter(
         purchased_object_id=run_enrollment.run.id,
@@ -393,8 +395,8 @@ def deactivate_run_enrollment(
         order__purchaser=run_enrollment.user,
     )
     if line:
-        line_id = line.id
-        sync_line_item_with_hubspot(line_id)
+        line_id = line.first().id
+        sync_hubspot_line_by_line_id(line_id)
     return run_enrollment
 
 

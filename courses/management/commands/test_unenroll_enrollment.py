@@ -11,8 +11,9 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
 )
 from courses.management.commands import unenroll_enrollment
+from ecommerce.models import Order
 from users.factories import UserFactory
-from ecommerce.factories import LineFactory, ProductFactory
+from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 import reversion
 from reversion.models import Version
 
@@ -23,21 +24,13 @@ pytestmark = [pytest.mark.django_db]
 def patches(mocker):  # pylint: disable=missing-docstring
     edx_unenroll = mocker.patch("courses.api.unenroll_edx_course_run")
     log_exception = mocker.patch("courses.api.log.exception")
-    with reversion.create_revision():
-        product = ProductFactory.create()
-    version = Version.objects.get_for_object(product).first()
-    line = LineFactory.create(
-        purchased_object=product.purchasable_object, product_version=version
-    )
-    get_line = mocker.patch("ecommerce.models.Line.objects.filter", return_value=line)
-    sync_line_item_with_hubspot = mocker.patch(
-        "hubspot_sync.api.sync_line_item_with_hubspot"
+    sync_hubspot_line_by_line_id = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_line_by_line_id"
     )
     return SimpleNamespace(
         edx_unenroll=edx_unenroll,
         log_exception=log_exception,
-        get_line=get_line,
-        sync_line_item_with_hubspot=sync_line_item_with_hubspot,
+        sync_hubspot_line_by_line_id=sync_hubspot_line_by_line_id,
     )
 
 
@@ -89,6 +82,13 @@ def test_unenroll_enrollment(patches):
     Test that user unenrolled from the course properly
     """
     enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=enrollment.run)
+    version = Version.objects.get_for_object(product).first()
+    order = OrderFactory.create(state=Order.STATE.PENDING, purchaser=enrollment.user)
+    LineFactory.create(
+        order=order, purchased_object=enrollment.run, product_version=version
+    )
     assert enrollment.change_status is None
     assert enrollment.active is True
     assert enrollment.edx_enrolled is True
@@ -97,8 +97,7 @@ def test_unenroll_enrollment(patches):
         user=enrollment.user.username,
     )
     patches.edx_unenroll.assert_called_once_with(enrollment)
-    patches.get_line.assert_called_once()
-    patches.sync_line_item_with_hubspot.assert_called_once()
+    patches.sync_hubspot_line_by_line_id.assert_called_once()
     enrollment.refresh_from_db()
     assert enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED
     assert enrollment.active is False
@@ -109,17 +108,17 @@ def test_unenroll_enrollment_without_edx(mocker):
     """
     Test that user unenrolled from the course properly without edx
     """
-    with reversion.create_revision():
-        product = ProductFactory.create()
-    version = Version.objects.get_for_object(product).first()
-    line = LineFactory.create(
-        purchased_object=product.purchasable_object, product_version=version
-    )
-    get_line = mocker.patch("ecommerce.models.Line.objects.filter", return_value=line)
-    sync_line_item_with_hubspot = mocker.patch(
-        "hubspot_sync.api.sync_line_item_with_hubspot"
-    )
     enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=enrollment.run)
+    version = Version.objects.get_for_object(product).first()
+    order = OrderFactory.create(state=Order.STATE.PENDING, purchaser=enrollment.user)
+    LineFactory.create(
+        order=order, purchased_object=enrollment.run, product_version=version
+    )
+    sync_hubspot_line_by_line_id = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_line_by_line_id"
+    )
     assert enrollment.change_status is None
     assert enrollment.active is True
     assert enrollment.edx_enrolled is True
@@ -146,5 +145,4 @@ def test_unenroll_enrollment_without_edx(mocker):
     assert enrollment.active is False
     # Enrollment will remain edx_enrolled
     assert enrollment.edx_enrolled is True
-    sync_line_item_with_hubspot.assert_called_once()
-    get_line.assert_called_once()
+    sync_hubspot_line_by_line_id.assert_called_once()

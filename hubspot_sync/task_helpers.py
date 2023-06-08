@@ -43,6 +43,23 @@ def sync_hubspot_deal(order):
             )
 
 
+def sync_hubspot_line_by_line_id(line_id: int):
+    """
+    Trigger celery task to sync a Line to Hubspot.
+    Use a delay of 10 seconds to make sure state is updated first.
+
+    Args:
+        line_id (int): The ID of the Line to sync with HubSpot
+    """
+    if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN and line_id is not None:
+        try:
+            tasks.sync_line_with_hubspot.apply_async(args=(line_id,), countdown=10)
+        except:
+            log.exception(
+                "Exception calling sync_line_with_hubspot for line ID %d", line_id
+            )
+
+
 def sync_hubspot_product(product):
     """
     Trigger celery task to sync a Product to Hubspot
