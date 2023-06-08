@@ -55,6 +55,7 @@ from courses.models import (
     ProgramRequirement,
 )
 from ecommerce.models import Order
+from ecommerce.factories import LineFactory, ProductFactory
 from main.test_utils import MockHttpError
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -66,6 +67,8 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
+import reversion
+from reversion.models import Version
 
 pytestmark = pytest.mark.django_db
 
@@ -576,7 +579,15 @@ class TestDeactivateEnrollments:
         send_unenrollment_email = mocker.patch(
             "courses.api.mail_api.send_course_run_unenrollment_email"
         )
-        get_line = mocker.patch("ecommerce.models.Line.objects.get")
+        with reversion.create_revision():
+            product = ProductFactory.create()
+        version = Version.objects.get_for_object(product).first()
+        line = LineFactory.create(
+            purchased_object=product.purchasable_object, product_version=version
+        )
+        get_line = mocker.patch(
+            "ecommerce.models.Line.objects.filter", return_value=line
+        )
         sync_line_item_with_hubspot = mocker.patch(
             "hubspot_sync.api.sync_line_item_with_hubspot"
         )
@@ -679,6 +690,23 @@ class TestDeactivateEnrollments:
             assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
             assert run_enrollment.active is False
             assert run_enrollment.edx_emails_subscription is False
+
+    def test_deactivate_run_enrollment_line_does_not_exist(
+        self,
+        patches,
+    ):
+        """
+        If the enrollment does not have an associated Line object, don't call sync_line_item_with_hubspot()
+        """
+        enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
+        patches.get_line.return_value = None
+
+        deactivate_run_enrollment(
+            enrollment,
+            change_status=ENROLL_CHANGE_STATUS_REFUNDED,
+        )
+        patches.get_line.assert_called_once()
+        patches.sync_line_item_with_hubspot.assert_not_called()
 
 
 @pytest.mark.parametrize("keep_failed_enrollments", [True, False])

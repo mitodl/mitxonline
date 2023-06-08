@@ -124,6 +124,8 @@ class TransactionFactory(DjangoModelFactory):
 
 class LineFactory(DjangoModelFactory):
     quantity = 1
+    order = SubFactory(OrderFactory)
+    purchased_object=SubFactory(CourseRunFactory)
 
     class Meta:
         model = models.Line
