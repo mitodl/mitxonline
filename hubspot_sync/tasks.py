@@ -191,6 +191,28 @@ def sync_deal_with_hubspot(order_id: int) -> str:
 
 @app.task(
     acks_late=True,
+    autoretry_for=(TooManyRequestsException, BlockingIOError),
+    max_retries=3,
+    retry_backoff=60,
+    retry_jitter=True,
+)
+@raise_429
+@single_task(10, key=task_obj_lock)
+def sync_line_with_hubspot(line_id: int) -> str:
+    """
+    Sync a Line with a hubspot line
+
+    Args:
+        line_id(int): The Line id
+
+    Returns:
+        str: The hubspot id for the line
+    """
+    return api.sync_line_item_with_hubspot(line_id).id
+
+
+@app.task(
+    acks_late=True,
     autoretry_for=(TooManyRequestsException,),
     max_retries=3,
     retry_backoff=60,
