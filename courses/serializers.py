@@ -16,16 +16,13 @@ from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
-from courses.utils import get_program_certificate_by_enrollment
 from ecommerce.models import Product
 from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
 from main.serializers import StrictFieldsSerializer
-from main.settings import AUTH_USER_MODEL
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
-from users.serializers import UserSerializer
 
 logger = logging.getLogger(__name__)
 

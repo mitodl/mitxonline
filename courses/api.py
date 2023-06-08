@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from django.db.models.query import QuerySet
+from django.contrib.contenttypes.models import ContentType
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
@@ -363,6 +364,9 @@ def deactivate_run_enrollment(
     Returns:
         CourseRunEnrollment: The deactivated enrollment
     """
+    from ecommerce.models import Line, Order
+    from hubspot_sync.api import sync_line_item_with_hubspot
+
     try:
         unenroll_edx_course_run(run_enrollment)
     except Exception:  # pylint: disable=broad-except
@@ -381,6 +385,14 @@ def deactivate_run_enrollment(
         run_enrollment.edx_enrolled = False
         run_enrollment.edx_emails_subscription = False
     run_enrollment.deactivate_and_save(change_status, no_user=True)
+    content_type = ContentType.objects.get(app_label="courses", model="courserun")
+    line_id = Line.objects.get(
+        purchased_object_id=run_enrollment.run.id,
+        purchased_content_type=content_type,
+        order__state__in=[Order.STATE.FULFILLED, Order.STATE.PENDING],
+        order__purchaser=run_enrollment.user,
+    ).id
+    sync_line_item_with_hubspot(line_id)
     return run_enrollment
 
 

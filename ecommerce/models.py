@@ -1,4 +1,5 @@
 import logging
+from typing import List
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -580,6 +581,75 @@ class FulfillableOrder:
 class PendingOrder(FulfillableOrder, Order):
     """An order that is pending payment"""
 
+    def _get_or_create(
+        self, products: List[Product], user: User, discounts: List[Discount] = None
+    ):
+        """
+        Returns an existing PendingOrder if one already exists with the same:
+        Line purchased_object_id, purchased_content_type_id, and product_version,
+        as well as the same purchaser.  If a PendingOrder matching that criteria
+        does not exist, a new one is created.  The associated Line objects are either
+        retrieved if they exist for an existing PendingOrder, otherwise new Line objects
+        are created.
+
+        Args:
+            products (List[Product]):  A list of Products associated with the PendingOrder.
+            user (User):  The user expected to be associated with the PendingOrder.
+            discounts (List[Discounts]):  A list of Discounts to apply to each Line assocaited
+                with the order.
+
+        Returns:
+            PendingOrder: the retrieved or created PendingOrder.
+        """
+        # Get the details from each Product.
+        product_versions, product_object_ids, product_content_types = [], [], []
+        for product in products:
+            product_versions.append(Version.objects.get_for_object(product).first())
+            product_object_ids.append(product.object_id)
+            product_content_types.append(product.content_type_id)
+
+        # Get or create a PendingOrder
+        order, _ = Order.objects.select_for_update().get_or_create(
+            lines__purchased_object_id__in=product_object_ids,
+            lines__purchased_content_type_id__in=product_content_types,
+            lines__product_version__in=product_versions,
+            state=Order.STATE.PENDING,
+            purchaser=user,
+            defaults=dict(
+                total_price_paid=0,
+            ),
+        )
+
+        # Apply any discounts to the PendingOrder
+        if discounts:
+            now = now_in_utc()
+            for discount in discounts:
+                if discount:
+                    order.discounts.create(
+                        redemption_date=now,
+                        redeemed_by=user,
+                        redeemed_discount=discount,
+                    )
+
+        # Create or get Line for each product.  Calculate the Order total based on Lines and discount.
+        total = 0
+        for i, product in enumerate(products):
+            line, _ = order.lines.get_or_create(
+                order=order,
+                purchased_object_id=product.object_id,
+                purchased_content_type_id=product.content_type_id,
+                defaults=dict(
+                    product_version=product_versions[i],
+                    quantity=1,
+                ),
+            )
+            total += line.discounted_price
+
+        order.total_price_paid = total
+
+        order.save()
+        return order
+
     @classmethod
     @transaction.atomic()
     def create_from_basket(cls, basket: Basket):
@@ -592,44 +662,20 @@ class PendingOrder(FulfillableOrder, Order):
         Returns:
             PendingOrder: the created pending order
         """
-        order = cls.objects.select_for_update().create(
-            total_price_paid=0, purchaser=basket.user
-        )
-        total = 0
-        now = now_in_utc()
-
-        # apply all the discounts to the order first
-        # this is needed to compute the discounted prices of each line
-        for basket_discount in basket.discounts.all():
-            order.discounts.create(
-                redemption_date=now,
-                redeemed_by=basket_discount.redeemed_by,
-                redeemed_discount=basket_discount.redeemed_discount,
-            )
-
-        for product in basket.get_products():
-            product_version = Version.objects.get_for_object(product).first()
-
-            line, created = order.lines.get_or_create(
-                order=order,
-                purchased_object_id=product.object_id,
-                purchased_content_type_id=product.content_type_id,
-                defaults=dict(
-                    product_version=product_version,
-                    quantity=1,
-                ),
-            )
-            if created:
-                total += line.discounted_price
-
-        order.total_price_paid = total
-        order.save()
+        products = basket.get_products()
+        discounts = [
+            basket_discount.redeemed_discount
+            for basket_discount in basket.discounts.all()
+        ]
+        order = cls._get_or_create(cls, products, basket.user, discounts)
 
         return order
 
     @classmethod
     @transaction.atomic()
-    def create_from_product(cls, product: Product, user: User, discount: Discount):
+    def create_from_product(
+        cls, product: Product, user: User, discount: Discount = None
+    ):
         """
         Creates a new pending order from a product
 
@@ -641,36 +687,8 @@ class PendingOrder(FulfillableOrder, Order):
         Returns:
             PendingOrder: the created pending order
         """
-        order = cls.objects.select_for_update().create(
-            total_price_paid=0, purchaser=user
-        )
-        total = 0
-        now = now_in_utc()
 
-        # apply all the discounts to the order first
-        # this is needed to compute the discounted prices of each line
-        order.discounts.create(
-            redemption_date=now,
-            redeemed_by=user,
-            redeemed_discount=discount,
-        )
-
-        product_version = Version.objects.get_for_object(product).first()
-
-        line, created = order.lines.get_or_create(
-            order=order,
-            purchased_object_id=product.object_id,
-            purchased_content_type_id=product.content_type_id,
-            defaults=dict(
-                product_version=product_version,
-                quantity=1,
-            ),
-        )
-        if created:
-            total += line.discounted_price
-
-        order.total_price_paid = total
-        order.save()
+        order = cls._get_or_create(cls, [product], user, [discount])
 
         return order
 

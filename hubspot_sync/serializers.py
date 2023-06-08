@@ -2,6 +2,7 @@
 from decimal import Decimal
 
 from django.conf import settings
+from courses.models import CourseRunEnrollment
 from mitol.hubspot_api.api import format_app_id
 from rest_framework import serializers
 
@@ -11,6 +12,7 @@ from ecommerce.discounts import resolve_product_version
 from ecommerce.models import Product
 from hubspot_sync.api import format_product_name, get_hubspot_id_for_object
 from main.utils import format_decimal
+from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 
 """
 Map order state to hubspot ids for pipeline stages
@@ -41,8 +43,11 @@ class LineSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     product_id = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
+    enrollment_mode = serializers.SerializerMethodField()
+    change_status = serializers.SerializerMethodField()
 
     _product = None
+    _enrollment = None
 
     def _get_product(self, instance):
         """Retrieve the line product just once"""
@@ -56,6 +61,20 @@ class LineSerializer(serializers.ModelSerializer):
             else:
                 self._product = version.object
         return self._product
+
+    def _get_enrollment(self, instance):
+        self._enrollment = CourseRunEnrollment.all_objects.get(
+            run=instance.purchased_object, user=instance.order.purchaser
+        )
+        return self._enrollment
+
+    def get_enrollment_mode(self, instance):
+        enrollment = self._get_enrollment(instance)
+        return enrollment.enrollment_mode
+
+    def get_change_status(self, instance):
+        enrollment = self._get_enrollment(instance)
+        return enrollment.change_status
 
     def get_unique_app_id(self, instance):
         """Get the app_id for the object"""
@@ -98,6 +117,8 @@ class LineSerializer(serializers.ModelSerializer):
             "status",
             "product_id",
             "price",
+            "enrollment_mode",
+            "change_status",
         )
         model = models.Line
 

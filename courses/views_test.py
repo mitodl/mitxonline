@@ -9,7 +9,10 @@ from django.db.models import Count, Q
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
+from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from rest_framework import status
+import reversion
+from reversion.models import Version
 
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
@@ -26,6 +29,7 @@ from courses.serializers import (
     CourseSerializer,
     ProgramSerializer,
 )
+from ecommerce.models import Order, PendingOrder
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from main import features
 from main.constants import (
@@ -459,7 +463,8 @@ def test_user_enrollment_delete_other_fail(mocker, settings, user_drf_client, us
 
 
 @pytest.mark.parametrize("api_request", [True, False])
-def test_create_enrollments(mocker, user_client, api_request):
+@pytest.mark.parametrize("product_exists", [True, False])
+def test_create_enrollments(mocker, user_client, api_request, product_exists):
     """
     Create enrollment view should create an enrollment and include a user message in the response cookies.
     Unless api_request is set to True, in which case we should get a string back.
@@ -468,7 +473,13 @@ def test_create_enrollments(mocker, user_client, api_request):
         "courses.views.v1.create_run_enrollments",
         return_value=(None, True),
     )
+    mock_fulfilled_order_filter = mocker.patch(
+        "ecommerce.models.FulfilledOrder.objects.filter", return_value=None
+    )
     run = CourseRunFactory.create()
+    if product_exists:
+        with reversion.create_revision():
+            product = ProductFactory.create(purchasable_object=run)
     resp = user_client.post(
         reverse("create-enrollment-via-form"),
         data={"run": str(run.id), "isapi": "true"}
@@ -478,6 +489,10 @@ def test_create_enrollments(mocker, user_client, api_request):
 
     if api_request:
         assert "Ok" in str(resp.content)
+        if product_exists:
+            assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
+        else:
+            assert Order.objects.filter(state=Order.STATE.PENDING).count() == 0
     else:
         assert resp.status_code == status.HTTP_302_FOUND
         assert resp.url == reverse("user-dashboard")
@@ -488,7 +503,6 @@ def test_create_enrollments(mocker, user_client, api_request):
                 "run": run.title,
             }
         )
-
     patched_create_enrollments.assert_called_once()
 
 
@@ -640,3 +654,37 @@ def test_program_enrollments(
             assert program_detail["enrollments"][0]["id"] == course_run_enrollment.id
         else:
             assert len(program_detail["enrollments"]) == 0
+
+
+@pytest.mark.parametrize("fulfilled_order_exists", [True, False])
+def test_create_enrollments_with_existing_fulfilled_order(
+    mocker, user_client, user, fulfilled_order_exists
+):
+    """
+    Create enrollment view should not create a new PendingOrder if a FulFilledOrder containing the same Line's
+    and related to the user already exists.  This can occur when a user pays for a verified enrollment, but the
+    verified enrollment mode is no synced with Edx, and then the user attempts to enroll into the course a second
+    time.
+    """
+    patched_create_enrollments = mocker.patch(
+        "courses.views.v1.create_run_enrollments",
+        return_value=(None, True),
+    )
+    run = CourseRunFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=run)
+    if fulfilled_order_exists:
+        order = OrderFactory.create(state=Order.STATE.FULFILLED, purchaser=user)
+        version = Version.objects.get_for_object(product).first()
+        LineFactory.create(order=order, purchased_object=run, product_version=version)
+    resp = user_client.post(
+        reverse("create-enrollment-via-form"),
+        data={"run": str(run.id), "isapi": "true"},
+    )
+
+    assert "Ok" in str(resp.content)
+    if fulfilled_order_exists:
+        assert Order.objects.filter(state=Order.STATE.PENDING).count() == 0
+    else:
+        assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
+    patched_create_enrollments.assert_called_once()

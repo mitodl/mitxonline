@@ -1,6 +1,7 @@
 """Tests for hubspot_sync.api"""
 import pytest
 import json
+from courses.constants import ALL_ENROLL_CHANGE_STATUSES
 import reversion
 from django.contrib.contenttypes.models import ContentType
 from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObjectFactory
@@ -22,6 +23,13 @@ from hubspot_sync.serializers import (
     ProductSerializer,
 )
 from users.factories import UserFactory
+from courses.factories import (
+    CourseRunEnrollmentFactory,
+)
+from openedx.constants import (
+    EDX_ENROLLMENT_AUDIT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+)
 
 pytestmark = [pytest.mark.django_db]
 
@@ -76,11 +84,27 @@ def test_make_deal_sync_message(hubspot_order):
 
 
 @pytest.mark.django_db
-def test_make_line_item_sync_message(hubspot_order):
+@pytest.mark.parametrize(
+    "enrollment_mode", [EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE]
+)
+@pytest.mark.parametrize("change_status", ALL_ENROLL_CHANGE_STATUSES)
+def test_make_line_item_sync_message(
+    mocker, hubspot_order, enrollment_mode, change_status
+):
     """Test make_line_item_sync_message serializes an order line and returns a properly formatted sync message"""
     line = hubspot_order.lines.first()
+    course_run_enrollment = CourseRunEnrollmentFactory.create(
+        user=line.order.purchaser,
+        enrollment_mode=enrollment_mode,
+        change_status=change_status,
+    )
+    mock_course_run_enrollment_query = mocker.patch(
+        "courses.models.CourseRunEnrollment.all_objects.get",
+        return_value=course_run_enrollment,
+    )
     serialized_line = LineSerializer(line).data
     line_item_sync_message = api.make_line_item_sync_message(line.id)
+    mock_course_run_enrollment_query.assert_called()
 
     assert line_item_sync_message.properties == {
         "name": serialized_line["name"],
@@ -90,7 +114,11 @@ def test_make_line_item_sync_message(hubspot_order):
         "price": serialized_line["price"],
         "quantity": serialized_line["quantity"],
         "unique_app_id": serialized_line["unique_app_id"],
+        "enrollment_mode": serialized_line["enrollment_mode"],
+        "change_status": serialized_line["change_status"],
     }
+    assert serialized_line["enrollment_mode"] == course_run_enrollment.enrollment_mode
+    assert serialized_line["change_status"] == course_run_enrollment.change_status
 
 
 @pytest.mark.django_db
@@ -210,9 +238,16 @@ def test_sync_deal_with_hubspot(mocker, mock_hubspot_api, hubspot_order):
     )
 
 
-def test_sync_line_item_with_hubspot(mock_hubspot_api, hubspot_order, hubspot_order_id):
+def test_sync_line_item_with_hubspot(
+    mocker, mock_hubspot_api, hubspot_order, hubspot_order_id
+):
     """Test that the hubspot CRM API is called properly for a line_item sync"""
     line = hubspot_order.lines.first()
+    course_run_enrollment = CourseRunEnrollmentFactory.create(user=line.order.purchaser)
+    mock_course_run_enrollment_query = mocker.patch(
+        "courses.models.CourseRunEnrollment.all_objects.get",
+        return_value=course_run_enrollment,
+    )
     api.sync_line_item_with_hubspot(line.id)
     assert (
         api.HubspotObject.objects.get(
@@ -220,6 +255,7 @@ def test_sync_line_item_with_hubspot(mock_hubspot_api, hubspot_order, hubspot_or
         ).hubspot_id
         == FAKE_HUBSPOT_ID
     )
+    mock_course_run_enrollment_query.assert_called()
     mock_hubspot_api.return_value.crm.objects.associations_api.create.assert_called_once_with(
         api.HubspotObjectType.LINES.value,
         FAKE_HUBSPOT_ID,

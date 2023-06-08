@@ -66,7 +66,9 @@ def hubspot_order():
         product = factories.ProductFactory.create(price=Decimal(200.00))
 
     factories.LineFactory.create(
-        order=order, product_version=Version.objects.get_for_object(product).first()
+        order=order,
+        product_version=Version.objects.get_for_object(product).first(),
+        purchased_object=product.purchasable_object,
     )
 
     HubspotObjectFactory.create(
