@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.65.7
+--------------
+
+- Handle HubSpot exceptions when unenrolling from a course (#1667)
+- Handle un-enrollment prior to audit enrollment Order creation feature (#1663)
+- 904: tracking audit enrollments for mitx online courses in hubspot (#1644)
+
 Version 0.65.6 (Released June 07, 2023)
 --------------
 
