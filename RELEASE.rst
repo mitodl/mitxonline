@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.65.7
+Version 0.65.7 (Released June 08, 2023)
 --------------
 
 - Handle HubSpot exceptions when unenrolling from a course (#1667)
