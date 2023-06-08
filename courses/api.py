@@ -396,14 +396,7 @@ def deactivate_run_enrollment(
     )
     if line:
         line_id = line.first().id
-        try:
-            sync_hubspot_line_by_line_id(line_id)
-        except Exception:
-            log.exception(
-                "Failed to sync Line '%s' for user '%s' with HubSpot",
-                line_id,
-                run_enrollment.user.email,
-            )
+        sync_hubspot_line_by_line_id(line_id)
     return run_enrollment
 
 
