@@ -386,13 +386,15 @@ def deactivate_run_enrollment(
         run_enrollment.edx_emails_subscription = False
     run_enrollment.deactivate_and_save(change_status, no_user=True)
     content_type = ContentType.objects.get(app_label="courses", model="courserun")
-    line_id = Line.objects.get(
+    line = Line.objects.filter(
         purchased_object_id=run_enrollment.run.id,
         purchased_content_type=content_type,
         order__state__in=[Order.STATE.FULFILLED, Order.STATE.PENDING],
         order__purchaser=run_enrollment.user,
-    ).id
-    sync_line_item_with_hubspot(line_id)
+    )
+    if line:
+        line_id = line.id
+        sync_line_item_with_hubspot(line_id)
     return run_enrollment
 
 
