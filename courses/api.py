@@ -393,8 +393,15 @@ def deactivate_run_enrollment(
         order__purchaser=run_enrollment.user,
     )
     if line:
-        line_id = line.id
-        sync_line_item_with_hubspot(line_id)
+        line_id = line.first().id
+        try:
+            sync_line_item_with_hubspot(line_id)
+        except Exception:
+            log.exception(
+                "Failed to sync Line '%s' for user '%s' with HubSpot",
+                line_id,
+                run_enrollment.user.email,
+            )
     return run_enrollment
 
 

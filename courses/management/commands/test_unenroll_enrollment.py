@@ -29,7 +29,7 @@ def patches(mocker):  # pylint: disable=missing-docstring
     line = LineFactory.create(
         purchased_object=product.purchasable_object, product_version=version
     )
-    get_line = mocker.patch("ecommerce.models.Line.objects.filter", return_value=line)
+    get_line = mocker.patch("ecommerce.models.Line.objects.filter", return_value=[line])
     sync_line_item_with_hubspot = mocker.patch(
         "hubspot_sync.api.sync_line_item_with_hubspot"
     )
@@ -115,7 +115,7 @@ def test_unenroll_enrollment_without_edx(mocker):
     line = LineFactory.create(
         purchased_object=product.purchasable_object, product_version=version
     )
-    get_line = mocker.patch("ecommerce.models.Line.objects.filter", return_value=line)
+    get_line = mocker.patch("ecommerce.models.Line.objects.filter", return_value=[line])
     sync_line_item_with_hubspot = mocker.patch(
         "hubspot_sync.api.sync_line_item_with_hubspot"
     )
