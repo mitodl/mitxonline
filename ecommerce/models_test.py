@@ -1,5 +1,6 @@
 import random
-from decimal import Decimal
+from datetime import timedelta
+from decimal import Decimal, getcontext
 
 import pytest
 import reversion
@@ -439,3 +440,28 @@ def test_new_pending_order_is_created_if_product_is_different():
     order.save()
     assert order.lines.count() == 1
     assert Order.objects.filter(state=Order.STATE.PENDING).count() == 2
+def test_discount_expires_in_past(unlimited_discount):
+    test_discount = unlimited_discount
+
+    test_discount.save()
+
+    test_discount.expiration_date = now_in_utc() - timedelta(days=2)
+
+    with pytest.raises(Exception) as e:
+        test_discount.save()
+
+        assert "is in the past" in str(e)
+
+
+def test_discount_expires_before_activation(unlimited_discount):
+    test_discount = unlimited_discount
+
+    test_discount.save()
+
+    test_discount.expiration_date = now_in_utc() + timedelta(days=2)
+    test_discount.activation_date = now_in_utc() + timedelta(days=3)
+
+    with pytest.raises(Exception) as e:
+        test_discount.save()
+
+        assert "is before activation date" in str(e)

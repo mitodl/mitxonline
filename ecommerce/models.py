@@ -260,6 +260,24 @@ class Discount(TimestampedModel):
     def __str__(self):
         return f"{self.amount} {self.discount_type} {self.redemption_type} - {self.discount_code}"
 
+    def save(self, *args, **kwargs):
+        if self.expiration_date is not None and self.expiration_date < datetime.now(
+            pytz.timezone(TIME_ZONE)
+        ):
+            raise self.FieldError(
+                f"Expiration date {self.expiration_date} is in the past."
+            )
+
+        if (
+            self.expiration_date is not None
+            and self.activation_date < self.expiration_date
+        ):
+            raise self.FieldError(
+                f"Expiration date {self.expiration_date} is before the activation date {self.activation_date}."
+            )
+
+        super().save(*args, **kwargs)
+
     @cached_property
     def is_redeemed(self):
         return DiscountRedemption.objects.filter(redeemed_discount=self).exists()
