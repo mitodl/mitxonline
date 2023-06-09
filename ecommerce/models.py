@@ -270,6 +270,7 @@ class Discount(TimestampedModel):
 
         if (
             self.expiration_date is not None
+            and self.activation_date is not None
             and self.activation_date < self.expiration_date
         ):
             raise self.FieldError(

@@ -452,6 +452,9 @@ def test_discount_expires_in_past(unlimited_discount):
 
         assert "is in the past" in str(e)
 
+    test_discount.expiration_date = None
+    test_discount.save()
+
 
 def test_discount_expires_before_activation(unlimited_discount):
     test_discount = unlimited_discount
@@ -465,3 +468,9 @@ def test_discount_expires_before_activation(unlimited_discount):
         test_discount.save()
 
         assert "is before activation date" in str(e)
+
+    test_discount.activation_date = None
+    test_discount.save()
+
+    test_discount.expiration_date = None
+    test_discount.save()
