@@ -220,8 +220,6 @@ faker==8.8.2
     # via factory-boy
 filetype==1.2.0
     # via willow
-freezegun==1.2.2
-    # via -r requirements.in
 google-api-python-client==1.7.11
     # via
     #   mitol-django-google-sheets
@@ -390,7 +388,6 @@ python-dateutil==2.8.2
     #   celery-redbeat
     #   edx-api-client
     #   faker
-    #   freezegun
     #   hubspot-api-client
 python3-openid==3.2.0
     # via social-auth-core
