@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.65.8
+--------------
+
+- Adding date checks to Discount model (#1672)
+
 Version 0.65.7 (Released June 08, 2023)
 --------------
 
