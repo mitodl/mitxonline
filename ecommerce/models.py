@@ -265,7 +265,7 @@ class Discount(TimestampedModel):
             pytz.timezone(TIME_ZONE)
         ):
             raise ValidationError(
-                f"Expiration date {self.expiration_date} is in the past."
+                f"Expiration date {self.expiration_date} must be in the future."
             )
 
         if (
@@ -274,7 +274,7 @@ class Discount(TimestampedModel):
             and self.activation_date > self.expiration_date
         ):
             raise ValidationError(
-                f"Expiration date {self.expiration_date} is before the activation date {self.activation_date}."
+                f"Expiration date {self.expiration_date} must be before the activation date {self.activation_date}."
             )
 
         return True
