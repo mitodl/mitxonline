@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
+from django.core.exceptions import FieldError, ValidationError
 from django.db import models, transaction
 from django.utils.functional import cached_property
 from django_fsm import FSMField, transition
@@ -264,16 +264,14 @@ class Discount(TimestampedModel):
         if self.expiration_date is not None and self.expiration_date < datetime.now(
             pytz.timezone(TIME_ZONE)
         ):
-            raise self.FieldError(
-                f"Expiration date {self.expiration_date} is in the past."
-            )
+            raise FieldError(f"Expiration date {self.expiration_date} is in the past.")
 
         if (
             self.expiration_date is not None
             and self.activation_date is not None
-            and self.activation_date < self.expiration_date
+            and self.activation_date > self.expiration_date
         ):
-            raise self.FieldError(
+            raise FieldError(
                 f"Expiration date {self.expiration_date} is before the activation date {self.activation_date}."
             )
 

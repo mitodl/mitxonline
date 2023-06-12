@@ -3,6 +3,7 @@ import random
 import uuid
 from datetime import datetime, timedelta
 
+import freezegun
 import pytest
 import pytz
 import reversion
@@ -412,8 +413,12 @@ def test_redeem_time_limited_discount(
             datetime.now(pytz.timezone(TIME_ZONE)) + check_delta + check_delta
         )
 
-    discount.save()
-    discount.refresh_from_db()
+    mocked_date_delta = timedelta(days=90)
+    mocked_date_for_saving = datetime.now(pytz.timezone(TIME_ZONE)) - mocked_date_delta
+
+    with freezegun.freeze_time(mocked_date_for_saving):
+        discount.save()
+        discount.refresh_from_db()
 
     resp = user_drf_client.post(
         reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
@@ -468,6 +473,7 @@ def test_start_checkout_with_invalid_discounts(user, user_client, products, disc
     checkout view, which should return an error.
     """
     check_delta = timedelta(days=30)
+    more_check_delta = timedelta(days=120)
 
     test_redeem_discount(user, user_client, products, discounts, False, False)
 
@@ -476,8 +482,12 @@ def test_start_checkout_with_invalid_discounts(user, user_client, products, disc
             datetime.now(pytz.timezone(TIME_ZONE)) - check_delta - check_delta
         )
         discount.expiration_date = datetime.now(pytz.timezone(TIME_ZONE)) - check_delta
-        discount.save()
-        discount.refresh_from_db()
+
+        with freezegun.freeze_time(
+            datetime.now(pytz.timezone(TIME_ZONE)) - more_check_delta
+        ):
+            discount.save()
+            discount.refresh_from_db()
 
     resp = user_client.get(reverse("checkout_interstitial_page"))
 
