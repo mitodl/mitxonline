@@ -5,7 +5,7 @@ django-debug-toolbar
 factory-boy==3.2.0
 faker
 flaky
-freezegun==0.3.14
+freezegun~=1.2
 hypothesis==4.23.9
 ipdb
 isort
