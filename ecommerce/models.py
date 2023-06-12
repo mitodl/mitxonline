@@ -274,7 +274,7 @@ class Discount(TimestampedModel):
             and self.activation_date > self.expiration_date
         ):
             raise ValidationError(
-                f"Expiration date {self.expiration_date} must be before the activation date {self.activation_date}."
+                f"Expiration date {self.expiration_date} must be after the activation date {self.activation_date}."
             )
 
         return True
