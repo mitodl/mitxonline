@@ -440,6 +440,8 @@ def test_new_pending_order_is_created_if_product_is_different():
     order.save()
     assert order.lines.count() == 1
     assert Order.objects.filter(state=Order.STATE.PENDING).count() == 2
+
+
 def test_discount_expires_in_past(unlimited_discount):
     test_discount = unlimited_discount
 

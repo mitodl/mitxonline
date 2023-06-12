@@ -1,8 +1,8 @@
 import logging
-from typing import List
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import List
 
 import pytz
 import reversion
