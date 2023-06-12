@@ -1,8 +1,8 @@
 import logging
-from typing import List
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import List
 
 import pytz
 import reversion
@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
+from django.core.exceptions import FieldError, ValidationError
 from django.db import models, transaction
 from django.utils.functional import cached_property
 from django_fsm import FSMField, transition
@@ -259,6 +259,33 @@ class Discount(TimestampedModel):
 
     def __str__(self):
         return f"{self.amount} {self.discount_type} {self.redemption_type} - {self.discount_code}"
+
+    def check_date_validity(self):
+        if self.expiration_date is not None and self.expiration_date < datetime.now(
+            pytz.timezone(TIME_ZONE)
+        ):
+            raise ValidationError(
+                f"Expiration date {self.expiration_date} must be in the future."
+            )
+
+        if (
+            self.expiration_date is not None
+            and self.activation_date is not None
+            and self.activation_date > self.expiration_date
+        ):
+            raise ValidationError(
+                f"Expiration date {self.expiration_date} must be after the activation date {self.activation_date}."
+            )
+
+        return True
+
+    def save(self, *args, **kwargs):
+        if self.check_date_validity():
+            super().save(*args, **kwargs)
+
+    def clean(self, *args, **kwargs):
+        self.check_date_validity()
+        super().clean(*args, **kwargs)
 
     @cached_property
     def is_redeemed(self):
