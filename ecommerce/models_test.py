@@ -488,6 +488,7 @@ def test_pending_order_is_reused_if_multiple_exist(basket):
     # creating a third.
     assert Order.objects.filter(state=Order.STATE.PENDING).count() == 2
 
+
 def test_discount_expires_in_past(unlimited_discount):
     test_discount = unlimited_discount
 
@@ -522,4 +523,3 @@ def test_discount_expires_before_activation(unlimited_discount):
 
     test_discount.expiration_date = None
     test_discount.save()
-
