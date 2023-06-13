@@ -1,5 +1,6 @@
 import random
-from decimal import Decimal
+from datetime import timedelta
+from decimal import Decimal, getcontext
 
 import pytest
 import reversion
@@ -486,3 +487,39 @@ def test_pending_order_is_reused_if_multiple_exist(basket):
     # Verify that one of the existing PendingOrder's is reused insteading of
     # creating a third.
     assert Order.objects.filter(state=Order.STATE.PENDING).count() == 2
+
+def test_discount_expires_in_past(unlimited_discount):
+    test_discount = unlimited_discount
+
+    test_discount.save()
+
+    test_discount.expiration_date = now_in_utc() - timedelta(days=2)
+
+    with pytest.raises(Exception) as e:
+        test_discount.save()
+
+        assert "is in the past" in str(e)
+
+    test_discount.expiration_date = None
+    test_discount.save()
+
+
+def test_discount_expires_before_activation(unlimited_discount):
+    test_discount = unlimited_discount
+
+    test_discount.save()
+
+    test_discount.expiration_date = now_in_utc() + timedelta(days=2)
+    test_discount.activation_date = now_in_utc() + timedelta(days=3)
+
+    with pytest.raises(Exception) as e:
+        test_discount.save()
+
+        assert "is before activation date" in str(e)
+
+    test_discount.activation_date = None
+    test_discount.save()
+
+    test_discount.expiration_date = None
+    test_discount.save()
+

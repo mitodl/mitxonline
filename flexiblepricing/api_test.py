@@ -1,18 +1,21 @@
 """Flexible price api tests"""
 import json
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
+
 import ddt
+import freezegun
 import pytest
+import pytz
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
-import pytz
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
-from mitol.common.utils.datetime import now_in_utc
 from django.utils.text import slugify
 from factory import fuzzy
+from mitol.common.utils.datetime import now_in_utc
 
-from main.settings import TIME_ZONE
+from cms.factories import ProgramPageFactory
+from cms.models import FlexiblePricingRequestForm
 from courses.factories import (
     CourseFactory,
     CourseRunFactory,
@@ -20,11 +23,10 @@ from courses.factories import (
     ProgramRunFactory,
 )
 from courses.models import Program
-from cms.factories import ProgramPageFactory
-from cms.models import FlexiblePricingRequestForm
 from ecommerce.factories import ProductFactory
 from flexiblepricing.api import (
     IncomeThreshold,
+    create_default_flexible_pricing_page,
     determine_auto_approval,
     determine_courseware_flexible_price_discount,
     determine_income_usd,
@@ -33,7 +35,6 @@ from flexiblepricing.api import (
     is_courseware_flexible_price_approved,
     parse_country_income_thresholds,
     update_currency_exchange_rate,
-    create_default_flexible_pricing_page,
 )
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.exceptions import CountryIncomeThresholdException
@@ -44,6 +45,7 @@ from flexiblepricing.models import (
     FlexiblePrice,
     FlexiblePriceTier,
 )
+from main.settings import TIME_ZONE
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -508,8 +510,11 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
         discount.expiration_date = (
             datetime.now(pytz.timezone(TIME_ZONE)) - expired_delta
         )
-        discount.save()
-        discount.refresh_from_db()
+        with freezegun.freeze_time(
+            datetime.now(pytz.timezone(TIME_ZONE)) - expired_delta * 3
+        ):
+            discount.save()
+            discount.refresh_from_db()
 
         assert (
             discount.activation_date is not None
