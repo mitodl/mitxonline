@@ -636,16 +636,23 @@ class PendingOrder(FulfillableOrder, Order):
             product_content_types.append(product.content_type_id)
 
         # Get or create a PendingOrder
-        order, _ = Order.objects.select_for_update().get_or_create(
+        orders = Order.objects.select_for_update().filter(
             lines__purchased_object_id__in=product_object_ids,
             lines__purchased_content_type_id__in=product_content_types,
             lines__product_version__in=product_versions,
             state=Order.STATE.PENDING,
             purchaser=user,
-            defaults=dict(
-                total_price_paid=0,
-            ),
         )
+        # Previously, multiple PendingOrders could be created for a single user
+        # for the same product, if multiple exist, grab the first.
+        if orders:
+            order = orders.first()
+        else:
+            order = Order.objects.create(
+                state=Order.STATE.PENDING,
+                purchaser=user,
+                total_price_paid=0,
+            )
 
         # Apply any discounts to the PendingOrder
         if discounts:

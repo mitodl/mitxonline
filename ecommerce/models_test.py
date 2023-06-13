@@ -29,12 +29,14 @@ from ecommerce.models import (
     BasketItem,
     DiscountRedemption,
     FulfilledOrder,
+    Line,
     Order,
     PendingOrder,
     Product,
     Transaction,
 )
 from users.factories import UserFactory
+from reversion.models import Version
 
 pytestmark = [pytest.mark.django_db]
 
@@ -442,6 +444,50 @@ def test_new_pending_order_is_created_if_product_is_different():
     assert Order.objects.filter(state=Order.STATE.PENDING).count() == 2
 
 
+def test_pending_order_is_reused_if_multiple_exist(basket):
+    """
+    Test that an existing PendingOrder is reused even if there are
+    multiple existing PendingOrders which match the current PendingOrder.
+    """
+
+    with reversion.create_revision():
+        product = ProductFactory.create()
+    product_version = Version.objects.get_for_object(product).first()
+
+    # Create 2 PendingOrders
+    order1 = Order.objects.create(
+        state=Order.STATE.PENDING,
+        purchaser=basket.user,
+        total_price_paid=0,
+    )
+    Line.objects.create(
+        order=order1,
+        purchased_object_id=product.object_id,
+        purchased_content_type_id=product.content_type_id,
+        product_version=product_version,
+        quantity=1,
+    )
+    order2 = Order.objects.create(
+        state=Order.STATE.PENDING,
+        purchaser=basket.user,
+        total_price_paid=0,
+    )
+    Line.objects.create(
+        order=order2,
+        purchased_object_id=product.object_id,
+        purchased_content_type_id=product.content_type_id,
+        product_version=product_version,
+        quantity=1,
+    )
+
+    basket_item = BasketItem(product=product, basket=basket, quantity=1)
+    basket_item.save()
+    order = PendingOrder.create_from_basket(basket)
+    order.save()
+    # Verify that one of the existing PendingOrder's is reused insteading of
+    # creating a third.
+    assert Order.objects.filter(state=Order.STATE.PENDING).count() == 2
+
 def test_discount_expires_in_past(unlimited_discount):
     test_discount = unlimited_discount
 
@@ -476,3 +522,4 @@ def test_discount_expires_before_activation(unlimited_discount):
 
     test_discount.expiration_date = None
     test_discount.save()
+
