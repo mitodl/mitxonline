@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.65.10
+---------------
+
+- Update google-sheets-refunds/deferrals (#1676)
+
 Version 0.65.9 (Released June 13, 2023)
 --------------
 
