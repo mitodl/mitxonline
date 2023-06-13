@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.65.9
+--------------
+
+- Format the merge of PR 1670 (#1677)
+- Handle enrollment for users with multi pendorder (#1670)
+- Delete PR Template
+
 Version 0.65.8 (Released June 12, 2023)
 --------------
 
