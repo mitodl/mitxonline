@@ -295,9 +295,9 @@ mitol-django-google-sheets==2.6.0
     #   -r requirements.in
     #   mitol-django-google-sheets-deferrals
     #   mitol-django-google-sheets-refunds
-mitol-django-google-sheets-deferrals==2023.5.30
+mitol-django-google-sheets-deferrals==2023.6.9
     # via -r requirements.in
-mitol-django-google-sheets-refunds==0.8.0
+mitol-django-google-sheets-refunds==2023.6.9
     # via -r requirements.in
 mitol-django-hubspot-api==2023.5.22
     # via -r requirements.in
