@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.65.9
+Version 0.65.9 (Released June 13, 2023)
 --------------
 
 - Format the merge of PR 1670 (#1677)
