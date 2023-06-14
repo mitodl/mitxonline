@@ -1,11 +1,11 @@
 from argparse import RawTextHelpFormatter
 
+import reversion
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand, CommandError
 
 from courses.models import CourseRun, Program
 from ecommerce.models import Product
-import reversion
 
 
 class Command(BaseCommand):
@@ -76,7 +76,7 @@ class Command(BaseCommand):
                 f"Could not find program with readable_id - {self.PROGRAM_READABLE_ID}"
             )
 
-        course_ids = program.courses.values_list("id", flat=True)
+        course_ids = [course.id for course in program.courses]
         course_runs = CourseRun.objects.select_related("course").filter(
             course_id__in=course_ids
         )

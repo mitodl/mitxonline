@@ -121,7 +121,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     @property
     def num_courses(self):
         """Gets the number of courses in this program"""
-        return self.courses.count()
+        return len(self.courses)
 
     @property
     def is_catalog_visible(self):
@@ -853,7 +853,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         Start date: earliest course run start date
         End date: latest course run end date
         """
-        course_ids = self.program.courses.all().values_list("id", flat=True)
+        course_ids = [course.id for course in self.program.courses]
         dates = CourseRunCertificate.objects.filter(
             user_id=self.user_id, course_run__course_id__in=course_ids
         ).aggregate(
