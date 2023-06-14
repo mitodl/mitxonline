@@ -372,6 +372,31 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             )
         )
 
+    @cached_property
+    def programs(self):
+        """
+        Returns a list of Programs which have this Course (self) as a requirement.
+
+        Returns:
+            list: List of Programs this Course is a requirement or elective for.
+        """
+        programs_containing_course = []
+
+        def _program_root_contains_course(node):
+            found = False
+            if node.is_course and node.course == self:
+                return True
+            else:
+                for child in node.get_children():
+                    found = _program_root_contains_course(child)
+            return found
+
+        for program_root_node in ProgramRequirement.get_root_nodes():
+            if _program_root_contains_course(program_root_node):
+                programs_containing_course.append(program_root_node.program)
+
+        return programs_containing_course
+
     def is_country_blocked(self, user):
         """
         Check if the user is from a blocked country for this course
@@ -401,31 +426,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             run__course=self
         ).values_list("run__id", flat=True)
         return [run for run in self.unexpired_runs if run.id not in enrolled_runs]
-
-    @property
-    def requirement_type(self):
-        """
-        Returns which branch of the requirements tree this course falls under.
-        This looks only at the requirements tree of the program that the course
-        is in - if the course has been added to another program's requirements
-        tree, this won't consider that.
-
-        Returns:
-            None, "Elective Courses", or "Required Courses".
-        """
-        return None
-        # if not self.program or not self.in_programs.count():
-        #     return None
-
-        # # This will cause an error if the course has been added to its program's
-        # # requirement tree more than once - but in this case it probably should
-        # # cause an error, so it can be fixed.
-
-        # mpnode = self.in_programs.filter(program=self.program).get()
-
-        # for branch_root in mpnode.get_root().get_children().all():
-        #     if mpnode.is_descendant_of(branch_root):
-        #         return branch_root.title
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
