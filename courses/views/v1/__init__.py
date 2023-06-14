@@ -3,6 +3,7 @@ import logging
 from typing import Optional, Tuple, Union
 
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
@@ -39,9 +40,9 @@ from courses.serializers import (
     ProgramSerializer,
     UserProgramEnrollmentDetailSerializer,
 )
-from ecommerce.models import FulfilledOrder, Order, Product, PendingOrder
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
+from ecommerce.models import FulfilledOrder, Order, PendingOrder, Product
 from main import features
 from main.constants import (
     USER_MSG_COOKIE_MAX_AGE,
@@ -61,7 +62,6 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEmailSettingsException,
 )
-from django.contrib.contenttypes.models import ContentType
 
 log = logging.getLogger(__name__)
 
@@ -305,7 +305,6 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         courseruns = (
             CourseRunEnrollment.objects.filter(user=request.user)
             .select_related("run__course__page")
-            .select_related("run__course__program")
             .all()
         )
 
@@ -320,22 +319,18 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         )
 
         for enrollment in courseruns:
-            if (
-                enrollment.run.course.program is not None
-                and enrollment.run.course.program.id not in unenrollments
-            ):
-                if enrollment.run.course.program.id in program_list:
-                    program_list[enrollment.run.course.program.id][
-                        "enrollments"
-                    ].append(enrollment)
-                else:
-                    program_list[enrollment.run.course.program.id] = {
-                        "enrollments": [enrollment],
-                        "program": enrollment.run.course.program,
-                        "certificate": get_program_certificate_by_enrollment(
-                            enrollment
-                        ),
-                    }
+            for program in enrollment.run.course.programs:
+                if program.id not in unenrollments:
+                    if program.id in program_list:
+                        program_list[program.id]["enrollments"].append(enrollment)
+                    else:
+                        program_list[program.id] = {
+                            "enrollments": [enrollment],
+                            "program": program,
+                            "certificate": get_program_certificate_by_enrollment(
+                                enrollment, program
+                            ),
+                        }
 
         non_course_programs = (
             ProgramEnrollment.objects.filter(user=request.user)
