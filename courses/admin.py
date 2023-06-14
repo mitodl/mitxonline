@@ -102,7 +102,6 @@ class CourseRunAdmin(TimestampedModelAdmin):
     list_display = (
         "id",
         "title",
-        "get_course_program_title",
         "courseware_id",
         "run_tag",
         "start_date",
@@ -117,11 +116,6 @@ class CourseRunAdmin(TimestampedModelAdmin):
         models.CharField: {"widget": TextInput(attrs={"size": "80"})},
         models.TextField: {"widget": TextInput(attrs={"size": "100"})},
     }
-
-    @display(description="Program Title")
-    def get_course_program_title(self, obj):
-        """Returns the course run's program"""
-        return obj.course.program.title if obj.course.program else None
 
 
 class ProgramEnrollmentAdmin(AuditableModelAdmin):
