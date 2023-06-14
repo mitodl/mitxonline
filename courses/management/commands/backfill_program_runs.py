@@ -48,7 +48,7 @@ class Command(BaseCommand):
             dict: A dictionary mapping a run suffix to a two-item tuple containing the overall
                 start and end dates for the course runs matching that suffix.
         """
-        course_ids = program.courses.values_list("id", flat=True)
+        course_ids = [course.id for course in program.courses]
         num_program_courses = len(course_ids)
         all_program_runs = (
             CourseRun.objects.filter(course_id__in=course_ids)

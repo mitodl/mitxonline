@@ -8,11 +8,11 @@ from traceback import format_exc
 from typing import List, Optional
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from django.db.models.query import QuerySet
-from django.contrib.contenttypes.models import ContentType
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
@@ -185,7 +185,7 @@ def get_user_enrollments(user):
 
     program_courses = itertools.chain(
         *(
-            program_enrollment.program.courses.all()
+            program_enrollment.program.courses
             for program_enrollment in program_enrollments
         )
     )
@@ -872,66 +872,6 @@ def override_user_grade(user, override_grade, courseware_id, should_force_pass=F
     return course_run_grade
 
 
-def check_program_for_orphans(program: Program, report_error: bool = True) -> List:
-    """
-    Checks a program for orphans.
-
-    Orphans in a program include courses that don't appear in the requirements
-    tree. Additionally, there's a short-circuit here that will trigger if the
-    requirements tree is empty/nonexistant (which is also an error case).
-
-    If the triggers are pulled, this will log an error message if the
-    report_error flag is set to True (which is the default; the intent is to
-    allow you to quiet the reporting if you're looking for orphans to adopt them
-    into the tree).
-
-    Args:
-        program (Program): the program to search through
-        report_error (bool): flag; should the check log an error if there are orphans (default True)
-    Returns:
-        List of Course: the courses that aren't in the requirements tree
-    """
-
-    # program.requirements_root is a @cached_property; for this use case, then,
-    # we always want to pull the root from the database directly.
-    reqroot = program.get_requirements_root()
-
-    if reqroot is None:
-        if report_error:
-            log.error(
-                f"Program {program.title} ({program.readable_id}) has no requirements tree at all"
-            )
-        return program.courses.all()
-
-    if (
-        reqroot.get_descendants()
-        .filter(node_type=ProgramRequirementNodeType.COURSE.value)
-        .count()
-        == 0
-    ):
-        if report_error:
-            log.error(
-                f"Program {program.title} ({program.readable_id}) has an empty requirements tree (no courses)"
-            )
-        return program.courses.all()
-
-    course_ids = [
-        node.course.id
-        for node in reqroot.get_descendants()
-        .filter(node_type=ProgramRequirementNodeType.COURSE.value)
-        .all()
-    ]
-
-    all_orphans = program.courses.exclude(id__in=course_ids).all()
-
-    if len(all_orphans) > 0 and report_error:
-        log.error(
-            f"Program {program.title} ({program.readable_id}) has {len(all_orphans)} orphaned courses"
-        )
-
-    return all_orphans
-
-
 def has_earned_program_cert(user, program):
     """
     Checks if a user has earned all the course certificates required
@@ -945,12 +885,14 @@ def has_earned_program_cert(user, program):
         bool: True if a user has earned all the course certificates required
               for a given program else False
     """
+    program_course_ids = [course.id for course in program.courses]
+
     passed_courses = Course.objects.filter(
-        in_programs__program=program,
+        id__in=program_course_ids,
         courseruns__courseruncertificates__user=user,
         courseruns__courseruncertificates__is_revoked=False,
     )
-    root = ProgramRequirement.get_root_nodes().get(program=program)
+    root = program.requirement_root
 
     def _has_earned(node):
         if node.is_root or node.is_all_of_operator:
