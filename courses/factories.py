@@ -55,7 +55,6 @@ class ProgramRunFactory(DjangoModelFactory):
 class CourseFactory(DjangoModelFactory):
     """Factory for Courses"""
 
-    program = factory.SubFactory(ProgramFactory, page=None)
     title = fuzzy.FuzzyText(prefix="Course ")
     readable_id = factory.Sequence("course-{0}".format)
     live = True

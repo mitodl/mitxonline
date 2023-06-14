@@ -423,7 +423,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """
         programs_containing_course = []
 
-        def _program_root_contains_course(node):
+        def _program_root_contains_course(node: MP_Node):
             found = False
             if node.is_course and node.course == self:
                 return True
