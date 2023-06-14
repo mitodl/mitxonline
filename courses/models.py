@@ -4,8 +4,7 @@ Course models
 import logging
 import operator as op
 import uuid
-from decimal import ROUND_HALF_EVEN
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
@@ -222,6 +221,48 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             ProgramRequirement.add_root(
                 program=self, node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value
             )
+
+    def _req_course_walk(self, node, heap):
+        courses = []
+
+        if node.node_type == ProgramRequirementNodeType.COURSE:
+            return [(node.course, node.get_parent().title)]
+
+        for child in node.get_children().all():
+            courses.extend(self._req_course_walk(child, heap))
+
+        courses.extend(heap)
+        return courses
+
+    @cached_property
+    def courses(self):
+        """
+        Returns the courses associated with this program via the requirements
+        tree. This returns a flat list, not a QuerySet.
+
+        Returns:
+        - list of Course: courses that are either requirements or electives
+        """
+
+        return self._req_course_walk(self.requirements_root, [])
+
+    @cached_property
+    def required_courses(self):
+        """
+        Returns just the courses under the "Required Courses" node.
+        """
+        return [
+            course for (course, type) in self.courses() if type == "Required Courses"
+        ]
+
+    @cached_property
+    def elective_courses(self):
+        """
+        Returns just the courses under the "Required Courses" node.
+        """
+        return [
+            course for (course, type) in self.courses() if type == "Elective Courses"
+        ]
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
