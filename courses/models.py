@@ -278,9 +278,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
 
     objects = CourseQuerySet.as_manager()
-    program = models.ForeignKey(
-        Program, on_delete=models.CASCADE, null=True, blank=True, related_name="courses"
-    )
     title = models.CharField(max_length=255)
     readable_id = models.CharField(
         max_length=255, unique=True, validators=[validate_url_path_field]
@@ -297,9 +294,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         object_id_field="courseware_object_id",
         content_type_field="courseware_content_type",
     )
-
-    class Meta:
-        ordering = ("program", "title")
 
     @property
     def course_number(self):
@@ -419,18 +413,19 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             None, "Elective Courses", or "Required Courses".
         """
-        if not self.program or not self.in_programs.count():
-            return None
+        return None
+        # if not self.program or not self.in_programs.count():
+        #     return None
 
-        # This will cause an error if the course has been added to its program's
-        # requirement tree more than once - but in this case it probably should
-        # cause an error, so it can be fixed.
+        # # This will cause an error if the course has been added to its program's
+        # # requirement tree more than once - but in this case it probably should
+        # # cause an error, so it can be fixed.
 
-        mpnode = self.in_programs.filter(program=self.program).get()
+        # mpnode = self.in_programs.filter(program=self.program).get()
 
-        for branch_root in mpnode.get_root().get_children().all():
-            if mpnode.is_descendant_of(branch_root):
-                return branch_root.title
+        # for branch_root in mpnode.get_root().get_children().all():
+        #     if mpnode.is_descendant_of(branch_root):
+        #         return branch_root.title
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"

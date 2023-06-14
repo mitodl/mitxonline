@@ -60,10 +60,8 @@ class CourseAdmin(admin.ModelAdmin):
         "id",
         "title",
         "readable_id",
-        "program",
     )
-    list_filter = ["live", "program", "topics"]
-    raw_id_fields = ("program",)
+    list_filter = ["live", "topics"]
 
     formfield_overrides = {
         models.CharField: {"widget": TextInput(attrs={"size": "80"})}
