@@ -241,6 +241,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         tree. This returns a flat list, not a QuerySet.
 
         Returns:
+        TODO: This should probably indicate that it returns a tuple.
         - list of Course: courses that are either requirements or electives
         """
 
@@ -1024,7 +1025,8 @@ class CourseRunEnrollment(EnrollmentModel):
         Returns:
             queryset of CourseRunEnrollment: Course run enrollments associated with a user/program
         """
-        return cls.objects.filter(user=user, run__course__program=program)
+        program_courses = [course[0] for course in program.courses]
+        return cls.objects.filter(user=user, run__course__in=program_courses)
 
     def deactivate_and_save(self, change_status, no_user=False):
         """

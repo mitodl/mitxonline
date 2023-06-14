@@ -147,17 +147,13 @@ def get_user_enrollments(user):
         []
     )  # just the programs we don't have distinct ProgramEnrollments for
 
-    for program in [
-        cre.run.course.program
-        for cre in course_run_enrollments
-        if cre.run.course.program is not None
-    ]:
-        if program not in all_course_run_programs:
-            all_course_run_programs.append(program)
+    for cre in course_run_enrollments:
+        if cre.run.course.programs:
+            all_course_run_programs += cre.run.course.programs
+    all_course_run_programs = set(all_course_run_programs)
 
     program_enrollments = (
-        ProgramEnrollment.objects.prefetch_related("program__courses")
-        .select_related("user")
+        ProgramEnrollment.objects
         .filter(user=user)
         .all()
     )
@@ -189,7 +185,7 @@ def get_user_enrollments(user):
             for program_enrollment in program_enrollments
         )
     )
-    program_course_ids = set(course.id for course in program_courses)
+    program_course_ids = set(course[0].id for course in program_courses)
     non_program_run_enrollments, program_run_enrollments = partition(
         course_run_enrollments,
         lambda course_run_enrollment: (
@@ -280,11 +276,6 @@ def create_run_enrollments(
                     enrollment_mode=mode,
                 ),
             )
-
-            if run.course.program is not None:
-                related_program = ProgramEnrollment.objects.get_or_create(
-                    user=user, program=run.course.program
-                )
 
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
@@ -885,14 +876,14 @@ def has_earned_program_cert(user, program):
         bool: True if a user has earned all the course certificates required
               for a given program else False
     """
-    program_course_ids = [course.id for course in program.courses]
+    program_course_ids = [course[0].id for course in program.courses]
 
     passed_courses = Course.objects.filter(
         id__in=program_course_ids,
         courseruns__courseruncertificates__user=user,
         courseruns__courseruncertificates__is_revoked=False,
     )
-    root = program.requirement_root
+    root = program.requirements_root
 
     def _has_earned(node):
         if node.is_root or node.is_all_of_operator:

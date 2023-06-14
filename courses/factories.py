@@ -64,9 +64,6 @@ class CourseFactory(DjangoModelFactory):
     class Meta:
         model = Course
 
-    class Params:
-        no_program = factory.Trait(program=None)
-
 
 class CourseRunFactory(DjangoModelFactory):
     """Factory for CourseRuns"""

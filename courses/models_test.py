@@ -24,6 +24,7 @@ from courses.factories import (
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
+    ProgramRequirementFactory,
 )
 from courses.models import (
     Course,
@@ -41,9 +42,9 @@ pytestmark = [pytest.mark.django_db]
 @pytest.fixture
 def program_with_requirements():
     program = ProgramFactory.create()
-    required_courses = CourseFactory.create_batch(3, program=program)
-    elective_courses = CourseFactory.create_batch(3, program=program)
-    mut_exclusive_courses = CourseFactory.create_batch(3, program=program)
+    required_courses = CourseFactory.create_batch(3)
+    elective_courses = CourseFactory.create_batch(3)
+    mut_exclusive_courses = CourseFactory.create_batch(3)
 
     root_node = program.requirements_root
 

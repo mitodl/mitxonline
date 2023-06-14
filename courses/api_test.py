@@ -1,5 +1,4 @@
 """Courses API tests"""
-import logging
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -11,10 +10,8 @@ from edx_api.course_detail import CourseDetail, CourseDetails, CourseMode, Cours
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
-from django.contrib.contenttypes.models import ContentType
 
 from courses.api import (
-    check_program_for_orphans,
     create_program_enrollments,
     create_run_enrollments,
     deactivate_program_enrollment,
@@ -53,8 +50,10 @@ from courses.models import (
     ProgramCertificate,
     ProgramEnrollment,
     ProgramRequirement,
+    ProgramRequirementNodeType,
 )
-from ecommerce.models import Line, Order
+from courses.models_test import program_with_requirements
+from ecommerce.models import Order
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from main.test_utils import MockHttpError
 from openedx.constants import (
@@ -113,6 +112,20 @@ def passed_grade_with_enrollment(user):
 def courses_api_logs(mocker):
     """Logger fixture for tasks"""
     return mocker.patch("courses.api.log")
+
+
+@pytest.fixture()
+def program_with_empty_requirements():
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    return program
 
 
 @pytest.mark.parametrize("is_enrolled", [True, False])
@@ -202,7 +215,7 @@ def test_get_user_relevant_course_run_ignore_enrolled(user, dates, course):
     assert returned_run == course_runs[0]
 
 
-def test_get_user_enrollments(user):
+def test_get_user_enrollments(user, program_with_empty_requirements):
     """Test that get_user_enrollments returns an object with a user's program and course enrollments"""
     past_date = now_in_utc() - timedelta(days=1)
     past_start_dates = [
@@ -210,22 +223,31 @@ def test_get_user_enrollments(user):
         now_in_utc() - timedelta(days=3),
         now_in_utc() - timedelta(days=4),
     ]
-    program = ProgramFactory.create()
-    past_program = ProgramFactory.create()
+    program_course_runs = CourseRunFactory.create_batch(3)
+    for course_run in program_course_runs:
+        program_with_empty_requirements.add_requirement(course_run.course)
 
-    program_course_runs = CourseRunFactory.create_batch(3, course__program=program)
+    past_program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(past_program)
+    root_node = past_program.requirements_root
+    required_courses_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
     past_program_course_runs = CourseRunFactory.create_batch(
         3,
         start_date=factory.Iterator(past_start_dates),
         end_date=past_date,
-        course__program=past_program,
     )
-    non_program_course_runs = CourseRunFactory.create_batch(2, course__program=None)
+    for course_run in past_program_course_runs:
+        past_program.add_requirement(course_run.course)
+
+    non_program_course_runs = CourseRunFactory.create_batch(2)
     past_non_program_course_runs = CourseRunFactory.create_batch(
         2,
         start_date=factory.Iterator(past_start_dates),
         end_date=past_date,
-        course__program=None,
     )
     all_course_runs = (
         program_course_runs
@@ -236,7 +258,9 @@ def test_get_user_enrollments(user):
     course_run_enrollments = CourseRunEnrollmentFactory.create_batch(
         len(all_course_runs), run=factory.Iterator(all_course_runs), user=user
     )
-    program_enrollment = ProgramEnrollmentFactory.create(program=program, user=user)
+    program_enrollment = ProgramEnrollmentFactory.create(
+        program=program_with_empty_requirements, user=user
+    )
     past_program_enrollment = ProgramEnrollmentFactory.create(
         program=past_program, user=user
     )
@@ -279,7 +303,15 @@ def test_get_user_enrollments(user):
     # Create a separate Course and Program and then just enroll in the course
     # The program ought to still show up as an enrollment
     separate_program = ProgramFactory.create()
-    separate_courserun = CourseRunFactory.create(course__program=separate_program)
+    ProgramRequirementFactory.add_root(separate_program)
+    root_node = separate_program.requirements_root
+    required_courses_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    separate_courserun = CourseRunFactory.create()
+    separate_program.add_requirement(separate_courserun.course)
     separate_courserun_enrollment = CourseRunEnrollmentFactory.create(
         run=separate_courserun, user=user
     )
@@ -348,10 +380,6 @@ def test_create_run_enrollments(
             assert enrollment.enrollment_mode == enrollment_mode
             patched_send_enrollment_email.assert_any_call(enrollment)
 
-            assert ProgramEnrollment.objects.filter(
-                user=user, program=runs[0].course.program
-            ).exists()
-
 
 @pytest.mark.parametrize("is_active", [True, False])
 def test_create_run_enrollments_upgrade(mocker, user, is_active):
@@ -367,6 +395,16 @@ def test_create_run_enrollments_upgrade(mocker, user, is_active):
         active=is_active,
         edx_enrolled=True,
     )
+    program = test_enrollment.run.course.program
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    required_courses_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    program.add_requirement(test_enrollment.run.course)
     patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
     patched_send_enrollment_email = mocker.patch(
         "courses.api.mail_api.send_course_run_enrollment_email"
@@ -388,7 +426,7 @@ def test_create_run_enrollments_upgrade(mocker, user, is_active):
     test_enrollment.refresh_from_db()
     assert test_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     assert ProgramEnrollment.objects.filter(
-        user=user, program=test_enrollment.run.course.program
+        user=user, program=test_enrollment.run.course.programs[0]
     ).exists()
 
 
@@ -427,10 +465,6 @@ def test_create_run_enrollments_api_fail(mocker, user, exception_cls):
     assert len(successful_enrollments) == 1
     assert edx_request_success is False
 
-    assert ProgramEnrollment.objects.filter(
-        user=user, program=run.course.program
-    ).exists()
-
 
 @pytest.mark.parametrize("keep_failed_enrollments", [True, False])
 @pytest.mark.parametrize(
@@ -441,13 +475,16 @@ def test_create_run_enrollments_api_fail(mocker, user, exception_cls):
     ],
 )
 def test_create_run_enrollments_enroll_api_fail(
-    mocker, user, keep_failed_enrollments, exception_cls, inner_exception
+    mocker,
+    user,
+    keep_failed_enrollments,
+    exception_cls,
+    inner_exception,
+    program_with_empty_requirements,
 ):
     """
     create_run_enrollments should log a message and still create local enrollment records when an enrollment exception
     is raised if a flag is set to true
-
-    In addition, a ProgramEnrollment should also exist.
     """
     num_runs = 3
     runs = CourseRunFactory.create_batch(num_runs)
@@ -477,14 +514,6 @@ def test_create_run_enrollments_enroll_api_fail(
     expected_enrollments = 0 if not keep_failed_enrollments else num_runs
     assert len(successful_enrollments) == expected_enrollments
     assert edx_request_success is False
-
-    for run in runs:
-        assert (
-            ProgramEnrollment.objects.filter(
-                user=user, program=run.course.program
-            ).exists()
-            == keep_failed_enrollments
-        )
 
 
 def test_create_run_enrollments_creation_fail(mocker, user):
@@ -651,13 +680,18 @@ class TestDeactivateEnrollments:
         enrollment.refresh_from_db()
         assert enrollment.active is not keep_failed_enrollments
 
-    def test_deactivate_program_enrollment(self, user, patches):
+    def test_deactivate_program_enrollment(
+        self, user, patches, program_with_empty_requirements
+    ):
         """
         deactivate_program_enrollment set the local program enrollment record to inactive as well as all
         associated course run enrollments
         """
-        program_enrollment = ProgramEnrollmentFactory.create(user=user)
-        course = CourseFactory.create(program=program_enrollment.program)
+        program_enrollment = ProgramEnrollmentFactory.create(
+            user=user, program=program_with_empty_requirements
+        )
+        course = CourseFactory.create()
+        program_with_empty_requirements.add_requirement(course)
         course_run_enrollments = CourseRunEnrollmentFactory.create_batch(
             3,
             user=user,
@@ -1287,55 +1321,6 @@ def test_create_run_enrollments_upgrade(mocker, user):
     assert successful_enrollments[0].edx_enrolled == False
 
 
-@pytest.mark.parametrize(
-    "has_empty_tree, has_orphans",
-    [
-        (True, False),
-        (True, True),
-        (False, True),
-        (False, False),
-    ],
-)
-def test_check_program_for_orphans(caplog, has_empty_tree, has_orphans):
-    program = ProgramFactory.create()
-
-    caplog.set_level(logging.ERROR, logger="courses.api")
-
-    for i in range(4):
-        course = CourseFactory.create(program=program)
-        if not has_empty_tree:
-            if i % 2:
-                program.add_requirement(course)
-            else:
-                program.add_elective(course)
-
-    program.save()
-
-    if has_orphans:
-        orphaned_course = CourseFactory.create(program=program)
-
-    program.refresh_from_db()
-
-    if has_empty_tree:
-        assert len(check_program_for_orphans(program)) == program.courses.count()
-        assert (
-            "no requirements tree" in caplog.text or "empty requirements" in caplog.text
-        )
-
-        # just to make sure, forcefully clear *any* ProgramRequirements and check again
-        ProgramRequirement.objects.filter(program_id=program.id).delete()
-        assert len(check_program_for_orphans(program)) == program.courses.count()
-        assert "no requirements tree" in caplog.text
-
-    if has_orphans and not has_empty_tree:
-        assert orphaned_course in program.courses.all()
-        assert orphaned_course in check_program_for_orphans(program)
-        assert "orphaned courses" in caplog.text
-
-    if not has_orphans and not has_empty_tree:
-        assert len(check_program_for_orphans(program)) == 0
-
-
 def test_generate_program_certificate_failure_missing_certificates(
     user, program_with_requirements
 ):
@@ -1343,12 +1328,14 @@ def test_generate_program_certificate_failure_missing_certificates(
     Test that generate_program_certificate return (None, False) and not create program certificate
     if there is not any course_run certificate for the given course.
     """
-    course = CourseFactory.create(program=program_with_requirements)
+    course = CourseFactory.create()
     CourseRunFactory.create_batch(3, course=course)
-    ProgramRequirementFactory.add_root(program_with_requirements)
-    program_with_requirements.add_requirement(course)
+    ProgramRequirementFactory.add_root(program_with_requirements.program)
+    program_with_requirements.program.add_requirement(course)
 
-    result = generate_program_certificate(user=user, program=program_with_requirements)
+    result = generate_program_certificate(
+        user=user, program=program_with_requirements.program
+    )
     assert result == (None, False)
     assert len(ProgramCertificate.objects.all()) == 0
 
@@ -1360,33 +1347,34 @@ def test_generate_program_certificate_failure_not_all_passed(
     Test that generate_program_certificate return (None, False) and not create program certificate
     if there is not any course_run certificate for the given course.
     """
-    courses = CourseFactory.create_batch(3, program=program_with_requirements)
+    courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     CourseRunCertificateFactory.create_batch(
         2, user=user, course_run=factory.Iterator(course_runs)
     )
-    program_with_requirements.add_requirement(courses[0])
-    program_with_requirements.add_requirement(courses[1])
-    program_with_requirements.add_requirement(courses[2])
+    program = program_with_requirements.program
+    program.add_requirement(courses[0])
+    program.add_requirement(courses[1])
+    program.add_requirement(courses[2])
 
-    result = generate_program_certificate(user=user, program=program_with_requirements)
+    result = generate_program_certificate(user=user, program=program)
     assert result == (None, False)
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_generate_program_certificate_success(user, program_with_requirements):
+def test_generate_program_certificate_success(user, program_with_empty_requirements):
     """
     Test that generate_program_certificate generate a program certificate
     """
-    course = CourseFactory.create(program=program_with_requirements)
-    program_with_requirements.add_requirement(course)
+    course = CourseFactory.create()
+    program_with_empty_requirements.add_requirement(course)
     course_run = CourseRunFactory.create(course=course)
     CourseRunGradeFactory.create(course_run=course_run, user=user, passed=True, grade=1)
 
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
 
     certificate, created = generate_program_certificate(
-        user=user, program=program_with_requirements
+        user=user, program=program_with_empty_requirements
     )
     assert created is True
     assert isinstance(certificate, ProgramCertificate)
@@ -1398,17 +1386,18 @@ def test_force_generate_program_certificate_success(user, program_with_requireme
     Test that force creating a program certificate with generate_program_certificate generates
     a program certificate without matching program certificate requirements.
     """
-    courses = CourseFactory.create_batch(3, program=program_with_requirements)
+    courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     CourseRunCertificateFactory.create_batch(
         2, user=user, course_run=factory.Iterator(course_runs)
     )
-    program_with_requirements.add_requirement(courses[0])
-    program_with_requirements.add_requirement(courses[1])
-    program_with_requirements.add_requirement(courses[2])
+    program = program_with_requirements.program
+    program.add_requirement(courses[0])
+    program.add_requirement(courses[1])
+    program.add_requirement(courses[2])
 
     certificate, created = generate_program_certificate(
-        user=user, program=program_with_requirements, force_create=True
+        user=user, program=program, force_create=True
     )
     assert created is True
     assert isinstance(certificate, ProgramCertificate)
