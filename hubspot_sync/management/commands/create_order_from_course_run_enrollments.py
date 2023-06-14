@@ -6,7 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
 
 from courses.models import CourseRun, CourseRunEnrollment
-from ecommerce.models import FulfilledOrder, Order, PendingOrder, Product
+from ecommerce.models import Order, PendingOrder, Product
 from reversion.models import Version
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 
@@ -33,8 +33,8 @@ class Command(BaseCommand):
                 product_version = Version.objects.get_for_object(product).first()
                 product_object_id = product.object_id
                 product_content_type = product.content_type_id
-                existing_fulfilled_order = FulfilledOrder.objects.filter(
-                    state=Order.STATE.FULFILLED,
+                existing_fulfilled_order = Order.objects.filter(
+                    state__in=[Order.STATE.FULFILLED, Order.STATE.PENDING],
                     purchaser=course_run_enrollment.user,
                     lines__purchased_object_id=product_object_id,
                     lines__purchased_content_type_id=product_content_type,
