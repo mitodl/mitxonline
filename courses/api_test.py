@@ -5,11 +5,13 @@ from unittest.mock import Mock
 
 import factory
 import pytest
+import reversion
 from django.core.exceptions import ValidationError
 from edx_api.course_detail import CourseDetail, CourseDetails, CourseMode, CourseModes
 from mitol.common.utils.datetime import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
+from reversion.models import Version
 
 from courses.api import (
     create_program_enrollments,
@@ -42,6 +44,7 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
     ProgramRequirementFactory,
+    program_with_requirements,
 )
 
 # pylint: disable=redefined-outer-name
@@ -52,9 +55,8 @@ from courses.models import (
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
-from courses.models_test import program_with_requirements
-from ecommerce.models import Order
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
+from ecommerce.models import Order
 from main.test_utils import MockHttpError
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -66,8 +68,6 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
-import reversion
-from reversion.models import Version
 
 pytestmark = pytest.mark.django_db
 

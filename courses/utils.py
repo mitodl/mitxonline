@@ -46,7 +46,7 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
         # No need to include a certificate if there is no corresponding wagtail page
         # to support the render
         if (
-            hasattr(program, "page")
+            not hasattr(program, "page")
             or not program.page
             or not program.page.certificate_page
         ):
