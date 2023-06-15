@@ -286,8 +286,9 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     def get_courses(self, instance):
         """Serializer for courses"""
+        courses = [course[0].id for course in instance.courses]
         return CourseSerializer(
-            instance.courses.filter(live=True)
+            models.Course.objects.filter(live=True, id__in=courses)
             .select_related("page")
             .order_by("id", "courseruns__start_date")
             .distinct("id"),
@@ -302,8 +303,9 @@ class ProgramSerializer(serializers.ModelSerializer):
         Returns:
             datetime: The starting date
         """
+        courses_in_program = [course[0] for course in instance.courses]
         return (
-            models.CourseRun.objects.filter(course__program=instance, live=True)
+            models.CourseRun.objects.filter(course__in=courses_in_program, live=True)
             .order_by("start_date")
             .values_list("start_date", flat=True)
             .first()
@@ -316,8 +318,9 @@ class ProgramSerializer(serializers.ModelSerializer):
         Returns:
             datetime: The ending date
         """
+        courses_in_program = [course[0] for course in instance.courses]
         return (
-            models.CourseRun.objects.filter(course__program=instance, live=True)
+            models.CourseRun.objects.filter(course__in=courses_in_program, live=True)
             .order_by("end_date")
             .values_list("end_date", flat=True)
             .last()
@@ -327,8 +330,9 @@ class ProgramSerializer(serializers.ModelSerializer):
         """
         enrollment_start is first date where enrollment starts for any live course run
         """
+        courses_in_program = [course[0] for course in instance.courses]
         return (
-            models.CourseRun.objects.filter(course__program=instance, live=True)
+            models.CourseRun.objects.filter(course__in=courses_in_program, live=True)
             .order_by("enrollment_start")
             .values_list("enrollment_start", flat=True)
             .first()
@@ -336,8 +340,9 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     def get_topics(self, instance):
         """List all topics in all courses in the program"""
+        courses_in_program = [course[0] for course in instance.courses]
         topics = (
-            models.CourseTopic.objects.filter(course__program=instance)
+            models.CourseTopic.objects.filter(course__in=courses_in_program)
             .values("name")
             .distinct("name")
         )
