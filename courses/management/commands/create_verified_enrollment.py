@@ -152,7 +152,6 @@ class Command(BaseCommand):
             fulfill_completed_order(
                 order, payment_data=ZERO_PAYMENT_DATA, already_enrolled=True
             )
-            sync_hubspot_deal(order)
 
         self.stdout.write(
             self.style.SUCCESS(

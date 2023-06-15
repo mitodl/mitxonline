@@ -139,7 +139,6 @@ def generate_checkout_payload(request):
                     },
                 ),
             }
-    sync_hubspot_deal(order)
 
     callback_uri = request.build_absolute_uri(reverse("checkout-result-callback"))
 
@@ -307,7 +306,6 @@ def process_cybersource_payment_response(request, order):
         log.debug("Transaction declined: {msg}".format(msg=processor_response.message))
         order.decline()
         order.save()
-        sync_hubspot_deal(order)
         return_message = order.state
     elif processor_response.state == ProcessorResponse.STATE_ERROR:
         # Error - something went wrong with the request
@@ -318,7 +316,6 @@ def process_cybersource_payment_response(request, order):
         )
         order.error()
         order.save()
-        sync_hubspot_deal(order)
         return_message = order.state
     elif processor_response.state in [
         ProcessorResponse.STATE_CANCELLED,
@@ -336,7 +333,6 @@ def process_cybersource_payment_response(request, order):
         )
         order.cancel()
         order.save()
-        sync_hubspot_deal(order)
         return_message = order.state
 
     elif (
@@ -365,9 +361,9 @@ def process_cybersource_payment_response(request, order):
         )
         order.cancel()
         order.save()
-        sync_hubspot_deal(order)
         return_message = order.state
 
+    sync_hubspot_deal(order)
     return return_message
 
 
