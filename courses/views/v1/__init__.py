@@ -195,12 +195,13 @@ def create_enrollment_view(request):
                 lines__purchased_object_id=product_object_id,
                 lines__purchased_content_type_id=product_content_type,
                 lines__product_version=product_version,
-            ).first()
+            )
             if not order:
                 # Create PendingOrder
                 order = PendingOrder.create_from_product(product, user)
-
-            sync_hubspot_deal(order)
+                sync_hubspot_deal(order)
+            else:
+                sync_hubspot_deal(order.first())
     else:
         resp = respond(request.headers["Referer"])
         cookie_value = {
