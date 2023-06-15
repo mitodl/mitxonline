@@ -1,12 +1,10 @@
 """Tests for course models"""
 from datetime import timedelta
-from types import SimpleNamespace
 
 import factory
 import pytest
 from django.core.exceptions import ValidationError
 from mitol.common.utils.datetime import now_in_utc
-from ecommerce.factories import ProductFactory
 from wagtail.models import Page
 
 from cms.factories import (
@@ -25,6 +23,7 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
     ProgramRequirementFactory,
+    program_with_requirements,
 )
 from courses.models import (
     Course,
@@ -33,64 +32,11 @@ from courses.models import (
     ProgramRequirementNodeType,
     limit_to_certificate_pages,
 )
+from ecommerce.factories import ProductFactory
 from main.test_utils import format_as_iso8601
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
-
-
-@pytest.fixture
-def program_with_requirements():
-    program = ProgramFactory.create()
-    required_courses = CourseFactory.create_batch(3)
-    elective_courses = CourseFactory.create_batch(3)
-    mut_exclusive_courses = CourseFactory.create_batch(3)
-
-    root_node = program.requirements_root
-
-    required_courses_node = root_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.ALL_OF,
-        title="Required Courses",
-    )
-    for course in required_courses:
-        required_courses_node.add_child(
-            node_type=ProgramRequirementNodeType.COURSE, course=course
-        )
-
-    # at least two must be taken
-    elective_courses_node = root_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-        operator_value=2,
-        title="Elective Courses",
-    )
-    for course in elective_courses:
-        elective_courses_node.add_child(
-            node_type=ProgramRequirementNodeType.COURSE, course=course
-        )
-
-    # 3rd elective option is at least one of these courses
-    mut_exclusive_courses_node = elective_courses_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-        operator_value=1,
-    )
-    for course in mut_exclusive_courses:
-        mut_exclusive_courses_node.add_child(
-            node_type=ProgramRequirementNodeType.COURSE, course=course
-        )
-
-    return SimpleNamespace(
-        program=program,
-        root_node=root_node,
-        required_courses=required_courses,
-        required_courses_node=required_courses_node,
-        elective_courses=elective_courses,
-        elective_courses_node=elective_courses_node,
-        mut_exclusive_courses=mut_exclusive_courses,
-        mut_exclusive_courses_node=mut_exclusive_courses_node,
-    )
 
 
 def test_program_num_courses():
