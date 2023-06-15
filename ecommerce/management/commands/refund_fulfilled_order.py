@@ -23,6 +23,7 @@ from django.db.models import Q
 from courses.api import deactivate_run_enrollment
 from courses.models import CourseRunEnrollment
 from ecommerce.models import Order
+from hubspot_sync.task_helpers import sync_hubspot_deal
 from openedx.api import enroll_in_edx_course_runs
 
 
@@ -63,6 +64,7 @@ class Command(BaseCommand):
 
         order.state = Order.STATE.REFUNDED
         order.save()
+        sync_hubspot_deal(order)
 
         run_enrollments = (
             CourseRunEnrollment.objects.filter(user=order.purchaser)

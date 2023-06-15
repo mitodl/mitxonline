@@ -7,6 +7,7 @@ from django.core.management import BaseCommand
 
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Order, PendingOrder, Product
+from hubspot_sync.task_helpers import sync_hubspot_deal
 from reversion.models import Version
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 

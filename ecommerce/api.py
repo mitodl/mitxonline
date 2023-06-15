@@ -8,6 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, Validat
 from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
+from hubspot_sync.task_helpers import sync_hubspot_deal
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
@@ -138,6 +139,7 @@ def generate_checkout_payload(request):
                     },
                 ),
             }
+    sync_hubspot_deal(order)
 
     callback_uri = request.build_absolute_uri(reverse("checkout-result-callback"))
 
@@ -241,6 +243,7 @@ def apply_user_discounts(request):
 def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=False):
     order.fulfill(payment_data, already_enrolled=already_enrolled)
     order.save()
+    sync_hubspot_deal(order)
 
     if basket and basket.compare_to_order(order):
         basket.delete()
@@ -304,6 +307,7 @@ def process_cybersource_payment_response(request, order):
         log.debug("Transaction declined: {msg}".format(msg=processor_response.message))
         order.decline()
         order.save()
+        sync_hubspot_deal(order)
         return_message = order.state
     elif processor_response.state == ProcessorResponse.STATE_ERROR:
         # Error - something went wrong with the request
@@ -314,6 +318,7 @@ def process_cybersource_payment_response(request, order):
         )
         order.error()
         order.save()
+        sync_hubspot_deal(order)
         return_message = order.state
     elif processor_response.state in [
         ProcessorResponse.STATE_CANCELLED,
@@ -331,6 +336,7 @@ def process_cybersource_payment_response(request, order):
         )
         order.cancel()
         order.save()
+        sync_hubspot_deal(order)
         return_message = order.state
 
     elif (
@@ -359,6 +365,7 @@ def process_cybersource_payment_response(request, order):
         )
         order.cancel()
         order.save()
+        sync_hubspot_deal(order)
         return_message = order.state
 
     return return_message
@@ -554,6 +561,7 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
 
                 order.fulfill(payload)
                 order.save()
+                sync_hubspot_deal(order)
                 fulfilled_count += 1
 
                 log.info(f"Fulfilled order {order.reference_number}.")
@@ -577,6 +585,7 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
                     reason=f"Cancelled due to processor code {payload['reason_code']}",
                 )
                 order.save()
+                sync_hubspot_deal(order)
                 cancel_count += 1
 
                 log.info(f"Cancelled order {order.reference_number}.")
