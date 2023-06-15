@@ -19,7 +19,7 @@ from courses.factories import (
     CourseRunGradeFactory,
     ProgramFactory,
 )
-from courses.models import CourseTopic, ProgramRequirement, ProgramRequirementNodeType
+from courses.models import Course, CourseTopic, ProgramRequirement, ProgramRequirementNodeType
 from courses.serializers import (
     BaseCourseSerializer,
     BaseProgramSerializer,
@@ -37,6 +37,7 @@ from ecommerce.serializers import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
+from courses.models_test import program_with_empty_requirements
 
 pytestmark = [pytest.mark.django_db]
 
@@ -57,17 +58,14 @@ def test_base_program_serializer():
     "remove_tree",
     [True, False],
 )
-def test_serialize_program(mock_context, remove_tree):
+def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):
     """Test Program serialization"""
-    program = ProgramFactory.create()
     run1 = CourseRunFactory.create(
-        course__program=program,
         course__page=None,
         start_date=now() + timedelta(hours=1),
     )
     course1 = run1.course
     run2 = CourseRunFactory.create(
-        course__program=program,
         course__page=None,
         start_date=now() + timedelta(hours=2),
     )
@@ -91,33 +89,25 @@ def test_serialize_program(mock_context, remove_tree):
     course1.topics.set([topics[0], topics[1]])
     course2.topics.set([topics[1], topics[2]])
 
-    if remove_tree:
-        program.get_requirements_root().delete()
-        program.refresh_from_db()
+    if not remove_tree:
+        program_with_empty_requirements.add_requirement(course1)
+        program_with_empty_requirements.add_requirement(course2)
 
-    data = ProgramSerializer(instance=program, context=mock_context).data
+    program_with_empty_requirements.refresh_from_db()
+    data = ProgramSerializer(instance=program_with_empty_requirements, context=mock_context).data
 
     formatted_reqs = {"required": [], "electives": []}
 
     if not remove_tree:
-        req_root = program.get_requirements_root()
-
-        for node in req_root.get_children():
-            if node.operator == ProgramRequirement.Operator.ALL_OF:
-                formatted_reqs["required"] = [
-                    req.course.id for req in node.get_children()
-                ]
-            else:
-                formatted_reqs["electives"] = [
-                    req.course.id for req in node.get_children()
-                ]
+        formatted_reqs["required"] = [course.id for course in program_with_empty_requirements.required_courses]
+        formatted_reqs["electives"] = [course.id for course in program_with_empty_requirements.elective_courses]
 
     assert_drf_json_equal(
         data,
         {
-            "title": program.title,
-            "readable_id": program.readable_id,
-            "id": program.id,
+            "title": program_with_empty_requirements.title,
+            "readable_id": program_with_empty_requirements.readable_id,
+            "id": program_with_empty_requirements.id,
             "courses": [
                 CourseSerializer(instance=course, context={**mock_context}).data
                 for course in [course1, course2]
@@ -134,7 +124,7 @@ def test_serialize_program(mock_context, remove_tree):
             "topics": [{"name": topic.name} for topic in topics],
             "requirements": formatted_reqs if not remove_tree else [],
             "req_tree": ProgramRequirementTreeSerializer(
-                program.get_requirements_root()
+                program_with_empty_requirements.requirements_root
             ).data
             if not remove_tree
             else [],
@@ -164,9 +154,7 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
     if all_runs:
         mock_context["all_runs"] = True
     user = mock_context["request"].user
-    course_run = CourseRunFactory.create(
-        course__no_program=True, course__page=None, live=True
-    )
+    course_run = CourseRunFactory.create(course__page=None, live=True)
     course = course_run.course
     topic = "a course topic"
     course.topics.set([CourseTopic.objects.create(name=topic)])
@@ -484,31 +472,19 @@ def test_program_requirement_deletion():
     assert list(ProgramRequirement.get_tree(parent=root2)) == expected
 
 
-def test_learner_record_serializer(mock_context):
+def test_learner_record_serializer(mock_context, program_with_empty_requirements):
     """Verify that saving the requirements for one program doesn't affect other programs"""
 
-    program = ProgramFactory.create()
-    courses = CourseFactory.create_batch(3, program=program)
-    root = program.requirements_root
+    program = program_with_empty_requirements
+    courses = CourseFactory.create_batch(3)
 
     user = mock_context["request"].user
 
-    # build the same basic tree structure for both
-    required = root.add_child(
-        program=program,
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        title="Required",
-        operator=ProgramRequirement.Operator.ALL_OF,
-    )
     course_runs = []
     grades = []
     grade_multiplier_to_test_ordering = 1
     for course in courses:
-        required.add_child(
-            program=program,
-            node_type=ProgramRequirementNodeType.COURSE,
-            course=course,
-        )
+        program.add_requirement(course)
         course_run = CourseRunFactory.create(course=course)
         course_run_enrollment = CourseRunEnrollmentFactory.create(
             run=course_run, user=user
@@ -587,10 +563,10 @@ def test_learner_record_serializer(mock_context):
                     "data": {
                         "course": None,
                         "node_type": "operator",
-                        "operator": "all_of",
+                        "operator": ProgramRequirement.Operator.ALL_OF,
                         "operator_value": None,
                         "program": program.id,
-                        "title": "Required",
+                        "title": "Required Courses",
                     },
                     "id": program.get_requirements_root().get_children().first().id,
                 }
@@ -603,7 +579,7 @@ def test_learner_record_serializer(mock_context):
                 "program": program.id,
                 "title": "",
             },
-            "id": root.id,
+            "id": program.requirements_root.id,
         }
     ]
     user_info_payload = {
@@ -622,9 +598,9 @@ def test_learner_record_serializer(mock_context):
         },
         "id": courses[0].id,
         "readable_id": courses[0].readable_id,
-        "reqtype": "Required",
+        "reqtype": "Required Courses",
         "title": courses[0].title,
     }
     assert user_info_payload == serialized_data["user"]
     assert program_requirements_payload == serialized_data["program"]["requirements"]
-    assert course_0_payload in serialized_data["program"]["courses"]
+    assert course_0_payload == serialized_data["program"]["courses"][0]

@@ -93,6 +93,20 @@ def program_with_requirements():
     )
 
 
+@pytest.fixture()
+def program_with_empty_requirements():
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    return program
+
+
 def test_program_num_courses():
     """
     Program should return number of courses associated with it

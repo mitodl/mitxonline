@@ -286,9 +286,9 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     def get_courses(self, instance):
         """Serializer for courses"""
-        courses = [course[0].id for course in instance.courses]
+        course_ids = [course[0].id for course in instance.courses]
         return CourseSerializer(
-            models.Course.objects.filter(live=True, id__in=courses)
+            models.Course.objects.filter(live=True, id__in=course_ids)
             .select_related("page")
             .order_by("id", "courseruns__start_date")
             .distinct("id"),
@@ -701,13 +701,12 @@ class LearnerRecordSerializer(serializers.BaseSerializer):
             raise ValidationError("Valid user object not found")
 
         courses = []
-
-        for course in instance.courses.all():
+        for course, requirement_type in instance.courses:
             fmt_course = {
                 "title": course.title,
                 "id": course.id,
                 "readable_id": course.readable_id,
-                "reqtype": course.requirement_type,
+                "reqtype": requirement_type,
                 "grade": None,
                 "certificate": None,
             }
