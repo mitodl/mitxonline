@@ -425,13 +425,14 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         programs_containing_course = []
 
         def _program_root_contains_course(node: MP_Node):
-            found = False
-            if node.is_course and node.course == self:
-                return True
-            else:
+            if node.is_course:
+                if node.course == self:
+                    return True
+            elif node.get_children():
                 for child in node.get_children():
-                    found = _program_root_contains_course(child)
-            return found
+                    return _program_root_contains_course(child)
+            else:
+                return False
 
         for program_root_node in ProgramRequirement.get_root_nodes():
             if _program_root_contains_course(program_root_node):
