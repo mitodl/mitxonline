@@ -24,7 +24,6 @@ from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE, ZERO_PAYMENT_DATA
 from ecommerce.discounts import DiscountType
 from ecommerce.models import Discount, PendingOrder, Product
-from hubspot_sync.task_helpers import sync_hubspot_deal
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.api import fetch_user
 
