@@ -28,12 +28,12 @@ from cms.models import (
     ProgramPage,
     SignatoryPage,
 )
-from courses.api_test import program_with_empty_requirements
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
+    program_with_empty_requirements,
 )
 from courses.models import Course, CourseRun, limit_to_certificate_pages
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE

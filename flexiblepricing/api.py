@@ -320,7 +320,6 @@ def is_courseware_flexible_price_approved(course_run, user):
 
 @transaction.atomic()
 def update_currency_exchange_rate(rates, currency_descriptions):
-
     """
     Updates all CurrencyExchangeRate objects based on the latest rates.
     Args:
@@ -370,12 +369,16 @@ def create_default_flexible_pricing_page(
     This won't check for an existing form, and it won't publish the form so
     it initially won't have any form fields in it.
 
+    Update 16-Jun-2023 jkachel: If the course belongs to multiple programs, this
+    will use the first one in the list unless "program" is specified as a kwarg.
+
     Args:
     - object (Course or Program): The courseware object to work with
     - forceCourse (boolean): Force the creation of a flexible price form for a course (ignored if a Program is specified)
     Keyword Args:
     - title (str): Force a specific title.
     - slug (str): Force a specific slug.
+    - program (Program): The program to use for the course.
     Returns:
     - FlexiblePricingRequestForm; the form page
     Raises:
@@ -383,14 +386,18 @@ def create_default_flexible_pricing_page(
     """
     from cms.models import FlexiblePricingRequestForm
 
-    if (
-        isinstance(object, Program)
-        or (isinstance(object, Course) and forceCourse)
-        or (isinstance(object, Course) and object.program is None)
+    if isinstance(object, Program):
+        courseware = object
+    elif (isinstance(object, Course) and forceCourse) or (
+        isinstance(object, Course) and len(object.programs) == 0
     ):
         courseware = object
     else:
-        courseware = object.program
+        courseware = (
+            object.programs[0]
+            if not ("program" in kwargs and isinstance(kwargs["program"], Program))
+            else kwargs["program"]
+        )
 
     if courseware.page is None:
         raise Exception(f"No page for courseware object {courseware}, can't continue.")

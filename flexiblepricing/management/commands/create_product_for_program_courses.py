@@ -76,7 +76,7 @@ class Command(BaseCommand):
                 f"Could not find program with readable_id - {self.PROGRAM_READABLE_ID}"
             )
 
-        course_ids = [course.id for course in program.courses]
+        course_ids = [course.id for (course, type) in program.courses]
         course_runs = CourseRun.objects.select_related("course").filter(
             course_id__in=course_ids
         )
