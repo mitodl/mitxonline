@@ -2,19 +2,22 @@
 
 import factory
 import pytest
-from courses.management.commands import manage_program_certificates
-from courses.models import ProgramCertificate
 from django.core.management.base import CommandError
-from users.factories import UserFactory
+
 from courses.factories import (
     CourseFactory,
+    CourseRunCertificateFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
-    CourseRunCertificateFactory,
-    ProgramFactory,
     ProgramCertificateFactory,
+    ProgramFactory,
     ProgramRequirementFactory,
+    program_with_empty_requirements,
+    program_with_requirements,
 )
+from courses.management.commands import manage_program_certificates
+from courses.models import ProgramCertificate
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -114,22 +117,24 @@ def test_program_certificate_management_revoke_unrevoke_success(user, revoke, un
     assert certificate.is_revoked is (False if unrevoke else True)
 
 
-def test_program_certificate_management_create(user, program_with_requirements):
+def test_program_certificate_management_create(user, program_with_empty_requirements):
     """
     Test that create operation for program certificate management command
     creates the program certificate for a user
     """
-    course = CourseFactory.create(program=program_with_requirements)
-    program_with_requirements.add_requirement(course)
+    course = CourseFactory.create()
+    program_with_empty_requirements.add_requirement(course)
     course_run = CourseRunFactory.create(course=course)
     CourseRunGradeFactory.create(course_run=course_run, user=user, passed=True, grade=1)
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
     manage_program_certificates.Command().handle(
-        create=True, program=program_with_requirements.readable_id, user=user.username
+        create=True,
+        program=program_with_empty_requirements.readable_id,
+        user=user.username,
     )
 
     generated_certificates = ProgramCertificate.objects.filter(
-        user=user, program=program_with_requirements
+        user=user, program=program_with_empty_requirements
     )
 
     assert generated_certificates.count() == 1
@@ -140,7 +145,7 @@ def test_program_certificate_management_force_create(user, program_with_requirem
     Test that create operation for program certificate management command
     forcefully creates the certificate for a user
     """
-    courses = CourseFactory.create_batch(3, program=program_with_requirements)
+    courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     CourseRunGradeFactory.create_batch(
         2, course_run=factory.Iterator(course_runs), user=user, passed=False, grade=0
@@ -148,18 +153,18 @@ def test_program_certificate_management_force_create(user, program_with_requirem
     CourseRunCertificateFactory.create_batch(
         2, user=user, course_run=factory.Iterator(course_runs)
     )
-    program_with_requirements.add_requirement(courses[0])
-    program_with_requirements.add_requirement(courses[1])
-    program_with_requirements.add_requirement(courses[2])
+    program_with_requirements.program.add_requirement(courses[0])
+    program_with_requirements.program.add_requirement(courses[1])
+    program_with_requirements.program.add_requirement(courses[2])
     manage_program_certificates.Command().handle(
         create=True,
-        program=program_with_requirements.readable_id,
+        program=program_with_requirements.program.readable_id,
         user=user.username,
         force=True,
     )
 
     generated_certificates = ProgramCertificate.objects.filter(
-        user=user, program=program_with_requirements
+        user=user, program=program_with_requirements.program
     )
 
     assert generated_certificates.count() == 1

@@ -44,6 +44,7 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
     ProgramRequirementFactory,
+    program_with_empty_requirements,
     program_with_requirements,
 )
 
@@ -1390,13 +1391,19 @@ def test_force_generate_program_certificate_success(user, program_with_requireme
     assert len(ProgramCertificate.objects.all()) == 1
 
 
-def test_generate_program_certificate_already_exist(user, program):
+def test_generate_program_certificate_already_exist(
+    user, program_with_empty_requirements
+):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
     if program certificate already exist.
     """
-    program_certificate = ProgramCertificateFactory.create(program=program, user=user)
-    result = generate_program_certificate(user=user, program=program)
+    program_certificate = ProgramCertificateFactory.create(
+        program=program_with_empty_requirements, user=user
+    )
+    result = generate_program_certificate(
+        user=user, program=program_with_empty_requirements
+    )
     assert result == (program_certificate, False)
     assert len(ProgramCertificate.objects.all()) == 1
 
