@@ -251,18 +251,19 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def required_courses(self):
         """
         Returns just the courses under the "Required Courses" node.
+        TODO: Required Courses and Elective Courses should be set as a constant somewhere.
         """
         return [
-            course for (course, type) in self.courses() if type == "Required Courses"
+            course for (course, type) in self.courses if type == "Required Courses"
         ]
 
     @cached_property
     def elective_courses(self):
         """
-        Returns just the courses under the "Required Courses" node.
+        Returns just the courses under the "Elective Courses" node.
         """
         return [
-            course for (course, type) in self.courses() if type == "Elective Courses"
+            course for (course, type) in self.courses if type == "Elective Courses"
         ]
 
     def __str__(self):
