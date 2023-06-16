@@ -56,7 +56,7 @@ class CoursePageSerializer(serializers.ModelSerializer):
                     return f"{program_page.get_url()}{financial_assistance_page.slug}/"
 
             financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
-                selected_program=instance.product.program
+                selected_program=instance.product.programs[0]
             ).first()
 
         if financial_assistance_page is None:
