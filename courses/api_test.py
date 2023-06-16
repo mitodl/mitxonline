@@ -114,20 +114,6 @@ def courses_api_logs(mocker):
     return mocker.patch("courses.api.log")
 
 
-@pytest.fixture()
-def program_with_empty_requirements():
-    program = ProgramFactory.create()
-    ProgramRequirementFactory.add_root(program)
-    root_node = program.requirements_root
-
-    root_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.ALL_OF,
-        title="Required Courses",
-    )
-    return program
-
-
 @pytest.mark.parametrize("is_enrolled", [True, False])
 def test_get_user_relevant_course_run(client, user, dates, course, is_enrolled):
     """

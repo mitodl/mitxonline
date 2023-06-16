@@ -18,6 +18,7 @@ from courses.factories import (
     CourseRunFactory,
     CourseRunGradeFactory,
     ProgramFactory,
+    program_with_empty_requirements,
 )
 from courses.models import Course, CourseTopic, ProgramRequirement, ProgramRequirementNodeType
 from courses.serializers import (
@@ -37,7 +38,6 @@ from ecommerce.serializers import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
-from courses.models_test import program_with_empty_requirements
 
 pytestmark = [pytest.mark.django_db]
 
@@ -108,10 +108,10 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
             "title": program_with_empty_requirements.title,
             "readable_id": program_with_empty_requirements.readable_id,
             "id": program_with_empty_requirements.id,
-            "courses": [
-                CourseSerializer(instance=course, context={**mock_context}).data
-                for course in [course1, course2]
-            ],
+            "courses": 
+                [CourseSerializer(instance=course, context={**mock_context}).data
+                for course in [course1, course2]] if not remove_tree else []
+            ,
             "start_date": drf_datetime(
                 sorted(runs, key=lambda run: run.start_date)[0].start_date
             ),
@@ -125,9 +125,7 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
             "requirements": formatted_reqs if not remove_tree else [],
             "req_tree": ProgramRequirementTreeSerializer(
                 program_with_empty_requirements.requirements_root
-            ).data
-            if not remove_tree
-            else [],
+            ).data if not remove_tree else [],
         },
     )
 
