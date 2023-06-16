@@ -1,7 +1,7 @@
 """Tests for Wagtail models"""
 import json
-from urllib.parse import quote_plus
 from datetime import timedelta
+from urllib.parse import quote_plus
 
 import factory
 import pytest
@@ -258,7 +258,7 @@ def test_flex_pricing_form_display(mocker, is_authed, has_submission):
             flexprice = FlexiblePrice.objects.create(
                 user=request_user,
                 cms_submission=submission,
-                courseware_object=course_page.course.program,
+                courseware_object=flex_form.selected_course,
             )
 
     response = generate_flexible_pricing_response(request_user, flex_form)
@@ -301,7 +301,7 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
         user=request_user,
         cms_submission=submission,
         status=submission_status,
-        courseware_object=course_page.course.program,
+        courseware_object=course_page.course,
     )
 
     response = generate_flexible_pricing_response(request_user, flex_form)
@@ -347,6 +347,8 @@ def test_flex_pricing_form_courseware_object():
     """
     Tests to make sure the correct courseware objects are returned when hitting
     the get_parent_courseware method.
+
+    TODO: associated program update
     """
 
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)

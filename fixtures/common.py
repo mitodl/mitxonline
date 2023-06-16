@@ -75,12 +75,6 @@ def mock_context(mocker, user):
     return {"request": mocker.Mock(user=user)}
 
 
-@pytest.fixture()
-def program():
-    """Program object fixture"""
-    return ProgramFactory.create()
-
-
 @pytest.fixture
 def valid_address_dict():
     """Yields a dict that will deserialize into a valid legal address"""

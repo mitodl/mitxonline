@@ -1,26 +1,26 @@
 """Flexible price apis"""
 import csv
-from collections import namedtuple
 import logging
+from collections import namedtuple
 from datetime import datetime
-import pytz
 from typing import Union
 
+import pytz
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
-from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-from django.contrib.auth.models import AnonymousUser
+from django.utils.text import slugify
 
-from main.settings import TIME_ZONE
-from main.constants import DISALLOWED_CURRENCY_TYPES
+from courses.models import Course, CourseRun, Program, ProgramRun
 from flexiblepricing.constants import (
-    INCOME_THRESHOLD_FIELDS,
     COUNTRY,
-    INCOME,
     DEFAULT_INCOME_THRESHOLD,
-    FlexiblePriceStatus,
     FINAID_FORM_TEXTS,
+    INCOME,
+    INCOME_THRESHOLD_FIELDS,
+    FlexiblePriceStatus,
 )
 from flexiblepricing.exceptions import (
     CountryIncomeThresholdException,
@@ -29,14 +29,11 @@ from flexiblepricing.exceptions import (
 from flexiblepricing.models import (
     CountryIncomeThreshold,
     CurrencyExchangeRate,
-    FlexiblePriceTier,
     FlexiblePrice,
+    FlexiblePriceTier,
 )
-
-from courses.models import CourseRun, Course, ProgramRun, Program
-
-from django.utils.text import slugify
-
+from main.constants import DISALLOWED_CURRENCY_TYPES
+from main.settings import TIME_ZONE
 
 IncomeThreshold = namedtuple("IncomeThreshold", ["country", "income"])
 log = logging.getLogger(__name__)
@@ -111,12 +108,16 @@ def get_ordered_eligible_coursewares(courseware):
     """
     Returns the courseware(s) eligible for a flexible pricing tier in order
     (program first, then course)
+
+    TODO: associated program update
     """
     if isinstance(courseware, CourseRun):
         # recurse using the course run's course ;-)
         return get_ordered_eligible_coursewares(courseware.course)
-    if isinstance(courseware, (Course, ProgramRun)) and courseware.program is not None:
-        return [courseware.program, courseware]
+    if isinstance(courseware, Course) and len(courseware.programs) > 0:
+        return courseware.programs + [courseware]
+    if isinstance(courseware, ProgramRun) and courseware.program is not None:
+        return [courseware.program]
     return [courseware]
 
 
