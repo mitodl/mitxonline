@@ -22,6 +22,7 @@ from courses.factories import (
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
+    ProgramRequirementFactory,
     program_with_requirements,
 )
 from courses.models import (
@@ -952,3 +953,38 @@ def test_related_programs():
     assert len(programs[3].related_programs) == 1
 
     assert related_program == second_related_program
+
+def test_program_minimum_elective_courses_requirement():
+    """Tests to make sure the related programs functionality in the model works."""
+    minimum_elective_required = 5
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=minimum_elective_required,
+        title="Elective Courses",
+    )
+
+    assert program.minimum_elective_courses_requirement == minimum_elective_required
+
+def test_program_minimum_elective_courses_requirement_no_elective_node():
+    """Tests to make sure the related programs functionality in the model works."""
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+
+    assert program.minimum_elective_courses_requirement is None
