@@ -46,3 +46,4 @@ class Command(BaseCommand):
                     PendingOrder.create_from_product(
                         product, course_run_enrollment.user
                     )
+        self.stdout.write("'sync_db_to_hubspot --deals create' should be run next. \n")
