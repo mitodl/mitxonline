@@ -21,9 +21,7 @@ from courses.factories import (
     program_with_empty_requirements,
 )
 from courses.models import (
-    Course,
     CourseTopic,
-    Program,
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
