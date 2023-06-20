@@ -27,6 +27,7 @@ from courses.models import (
     ProgramEnrollment,
     ProgramEnrollmentAudit,
     ProgramRun,
+    RelatedProgram,
 )
 from main.admin import AuditableModelAdmin
 from main.utils import get_field_names
@@ -474,6 +475,14 @@ class LearnerProgramRecordShareAdmin(TimestampedModelAdmin):
     search_fields = ["share_uuid"]
 
 
+class RelatedProgramAdmin(admin.ModelAdmin):
+    """Admin for Program"""
+
+    model = RelatedProgram
+    list_display = ("id", "first_program", "second_program")
+    list_filter = ["first_program", "second_program"]
+
+
 admin.site.register(Program, ProgramAdmin)
 admin.site.register(ProgramRun, ProgramRunAdmin)
 admin.site.register(Course, CourseAdmin)
@@ -491,3 +500,4 @@ admin.site.register(CourseRunCertificate, CourseRunCertificateAdmin)
 admin.site.register(ProgramCertificate, ProgramCertificateAdmin)
 admin.site.register(PartnerSchool, PartnerSchoolAdmin)
 admin.site.register(LearnerProgramRecordShare, LearnerProgramRecordShareAdmin)
+admin.site.register(RelatedProgram, RelatedProgramAdmin)
