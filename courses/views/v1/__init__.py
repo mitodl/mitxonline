@@ -8,6 +8,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
+from hubspot_sync.task_helpers import sync_hubspot_deal
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -188,16 +189,19 @@ def create_enrollment_view(request):
             product_version = Version.objects.get_for_object(product).first()
             product_object_id = product.object_id
             product_content_type = product.content_type_id
-            existing_fulfilled_order = FulfilledOrder.objects.filter(
+            order = FulfilledOrder.objects.filter(
                 state=Order.STATE.FULFILLED,
                 purchaser=user,
                 lines__purchased_object_id=product_object_id,
                 lines__purchased_content_type_id=product_content_type,
                 lines__product_version=product_version,
             )
-            if not existing_fulfilled_order:
+            if not order:
                 # Create PendingOrder
-                PendingOrder.create_from_product(product, user)
+                order = PendingOrder.create_from_product(product, user)
+                sync_hubspot_deal(order)
+            else:
+                sync_hubspot_deal(order.first())
     else:
         resp = respond(request.headers["Referer"])
         cookie_value = {

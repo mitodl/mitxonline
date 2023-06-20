@@ -302,7 +302,7 @@ def test_product_multiple_active_for_single_purchasable_object():
         pass
 
 
-def test_order_update_reference_number(mocked_hubspot_deal_sync, user):
+def test_order_update_reference_number(user):
     """Test when order is created/updated, reference_number is updated in db"""
     order = Order(purchaser=user, total_price_paid=10)
     order.save()
@@ -316,7 +316,6 @@ def test_order_update_reference_number(mocked_hubspot_deal_sync, user):
     assert (
         existing_order.reference_number == existing_order._generate_reference_number()
     )
-    assert mocked_hubspot_deal_sync.call_count == 2
 
 
 def test_duplicated_product_lines_validation(basket):

@@ -8,6 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, Validat
 from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
+from hubspot_sync.task_helpers import sync_hubspot_deal
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
@@ -241,6 +242,7 @@ def apply_user_discounts(request):
 def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=False):
     order.fulfill(payment_data, already_enrolled=already_enrolled)
     order.save()
+    sync_hubspot_deal(order)
 
     if basket and basket.compare_to_order(order):
         basket.delete()
@@ -361,6 +363,7 @@ def process_cybersource_payment_response(request, order):
         order.save()
         return_message = order.state
 
+    sync_hubspot_deal(order)
     return return_message
 
 
@@ -554,6 +557,7 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
 
                 order.fulfill(payload)
                 order.save()
+                sync_hubspot_deal(order)
                 fulfilled_count += 1
 
                 log.info(f"Fulfilled order {order.reference_number}.")
@@ -577,6 +581,7 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
                     reason=f"Cancelled due to processor code {payload['reason_code']}",
                 )
                 order.save()
+                sync_hubspot_deal(order)
                 cancel_count += 1
 
                 log.info(f"Cancelled order {order.reference_number}.")
