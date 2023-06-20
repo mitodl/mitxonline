@@ -273,6 +273,10 @@ def create_run_enrollments(
                 ),
             )
 
+            # TODO: create test for requirement: https://github.com/mitodl/mitxonline/issues/1681#issuecomment-1593073003
+            for program in run.course.programs:
+                ProgramEnrollment.objects.get_or_create(user=user, program=program)
+
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
                 enrollment.edx_enrolled = edx_request_success
