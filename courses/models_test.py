@@ -932,3 +932,23 @@ def test_active_products_for_expired_course_run():
     ProductFactory.create(purchasable_object=course_run)
 
     assert course_run.course.active_products is None
+
+
+def test_related_programs():
+    """Tests to make sure the related programs functionality in the model works."""
+    programs = ProgramFactory.create_batch(4)
+
+    programs[1].add_related_program(programs[0])
+
+    assert len(programs[0].related_programs) == 1
+    assert len(programs[1].related_programs) == 1
+
+    assert len(programs[2].related_programs) == 0
+
+    related_program = programs[3].add_related_program(programs[2])
+    second_related_program = programs[2].add_related_program(programs[3])
+
+    assert len(programs[2].related_programs) == 1
+    assert len(programs[3].related_programs) == 1
+
+    assert related_program == second_related_program
