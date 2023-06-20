@@ -23,6 +23,7 @@ from courses.api import (
     generate_program_certificate,
     get_user_enrollments,
     get_user_relevant_course_run,
+    has_earned_program_cert,
     manage_course_run_certificate_access,
     manage_program_certificate_access,
     override_user_grade,
@@ -369,10 +370,12 @@ def test_create_run_enrollments(
 
 
 @pytest.mark.parametrize("is_active", [True, False])
-def test_create_run_enrollments_upgrade(mocker, user, is_active):
+def test_create_run_enrollments_upgrade(
+    mocker, user, is_active, program_with_empty_requirements
+):
     """
     create_run_enrollments should call the edX API to create/update enrollments, and set the enrollment mode properly
-    in case od upgrade e.g a user moving from Audit to Verified mode
+    in the event of an upgrade e.g a user moving from Audit to Verified mode
 
     In addition, tests to make sure there's a ProgramEnrollment for the course.
     """
@@ -382,16 +385,7 @@ def test_create_run_enrollments_upgrade(mocker, user, is_active):
         active=is_active,
         edx_enrolled=True,
     )
-    program = test_enrollment.run.course.program
-    ProgramRequirementFactory.add_root(program)
-    root_node = program.requirements_root
-
-    required_courses_node = root_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.ALL_OF,
-        title="Required Courses",
-    )
-    program.add_requirement(test_enrollment.run.course)
+    program_with_empty_requirements.add_requirement(test_enrollment.run.course)
     patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
     patched_send_enrollment_email = mocker.patch(
         "courses.api.mail_api.send_course_run_enrollment_email"
@@ -406,6 +400,7 @@ def test_create_run_enrollments_upgrade(mocker, user, is_active):
         [test_enrollment.run],
         mode=EDX_ENROLLMENT_VERIFIED_MODE,
         force_enrollment=False,
+        regen_auth_tokens=False,
     )
 
     patched_send_enrollment_email.assert_called_once()
@@ -413,7 +408,7 @@ def test_create_run_enrollments_upgrade(mocker, user, is_active):
     test_enrollment.refresh_from_db()
     assert test_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     assert ProgramEnrollment.objects.filter(
-        user=user, program=test_enrollment.run.course.programs[0]
+        user=user, program=program_with_empty_requirements
     ).exists()
 
 
@@ -1251,7 +1246,7 @@ def test_override_user_grade(grade, should_force_pass, is_passed):
     assert test_grade.set_by_admin is True
 
 
-def test_create_run_enrollments_upgrade(mocker, user):
+def test_create_run_enrollments_upgrade_edx_request_failure(mocker, user):
     """
     create_run_enrollments should call the edX API to create/update enrollments, and set the enrollment mode properly
     on mitxonline.  If the edx API call to update the course_mode from audit -> verified fails, then edx_request_success
@@ -1363,6 +1358,8 @@ def test_generate_program_certificate_success(user, program_with_empty_requireme
     certificate, created = generate_program_certificate(
         user=user, program=program_with_empty_requirements
     )
+    test = has_earned_program_cert(user, program_with_empty_requirements)
+    assert test == 1
     assert created is True
     assert isinstance(certificate, ProgramCertificate)
     assert len(ProgramCertificate.objects.all()) == 1
