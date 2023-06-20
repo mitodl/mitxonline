@@ -152,9 +152,11 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         - QuerySet: RelatedPrograms that are related to this program, in either the first or second position
         """
 
-        return RelatedProgram.objects.filter(
+        the_jam = RelatedProgram.objects.filter(
             Q(first_program=self) | Q(second_program=self)
         )
+
+        return the_jam
 
     @property
     def related_programs(self):
@@ -173,6 +175,30 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 program_list.append(related_program.second_program)
             else:
                 program_list.append(related_program.first_program)
+
+        return program_list
+
+    def add_related_program(self, program):
+        """
+        Adds a related program record for the specified program. If there's
+        already a related program, then this will return the existing relation.
+
+        Args:
+        - Program: the program to add a relation for
+        Returns:
+        - RelatedProgram; the relation
+        """
+
+        related_program_existence_qs = self.related_programs_qs.filter(
+            Q(first_program=program) | Q(second_program=program)
+        )
+
+        if not related_program_existence_qs.exists():
+            return RelatedProgram.objects.create(
+                first_program=self, second_program=program
+            )
+
+        return related_program_existence_qs.get()
 
     @cached_property
     def requirements_root(self):
