@@ -361,20 +361,10 @@ class ProgramSerializer(serializers.ModelSerializer):
         return ids
 
     def get_requirements(self, instance):
-        formatted_reqs = {"required": [], "electives": []}
-
-        req_root = instance.get_requirements_root()
-
-        if req_root is None:
-            return []
-
-        for node in req_root.get_children():
-            if node.operator == models.ProgramRequirement.Operator.ALL_OF:
-                formatted_reqs["required"] = self._get_nested_requirements(node)
-            else:
-                formatted_reqs["electives"] = self._get_nested_requirements(node)
-
-        return formatted_reqs
+        return {
+            "required": [course.id for course in instance.required_courses],
+            "electives": [course.id for course in instance.elective_courses],
+        }
 
     def get_req_tree(self, instance):
         req_root = instance.get_requirements_root()
