@@ -1474,11 +1474,8 @@ def test_generate_program_certificate_success_minimum_electives_not_met(user):
         user=user, course_run=elective_course1_course_run
     )
 
-    certificate, created = generate_program_certificate(
-        user=user, program=program_with_empty_requirements
-    )
-    assert created is True
-    assert isinstance(certificate, ProgramCertificate)
+    certificate, created = generate_program_certificate(user=user, program=program)
+    assert created is False
     assert len(ProgramCertificate.objects.all()) == 0
 
 
