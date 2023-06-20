@@ -22,7 +22,6 @@ from courses.factories import (
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
-    ProgramRequirementFactory,
     program_with_requirements,
 )
 from courses.models import (
