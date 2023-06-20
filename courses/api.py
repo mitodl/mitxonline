@@ -152,11 +152,7 @@ def get_user_enrollments(user):
             all_course_run_programs += cre.run.course.programs
     all_course_run_programs = set(all_course_run_programs)
 
-    program_enrollments = (
-        ProgramEnrollment.objects
-        .filter(user=user)
-        .all()
-    )
+    program_enrollments = ProgramEnrollment.objects.filter(user=user).all()
 
     for program in all_course_run_programs:
         found = False
