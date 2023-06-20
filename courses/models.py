@@ -126,8 +126,8 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     @property
     def is_catalog_visible(self):
         """Returns True if this program should be shown on in the catalog"""
-        # NOTE: This is implemented with courses.all() to allow for prefetch_related optimization.
-        return any(course.is_catalog_visible for course in self.courses.all())
+        just_courses = [course[0] for course in self.courses]
+        return any(course.is_catalog_visible for course in just_courses)
 
     @property
     def first_unexpired_run(self):
@@ -241,8 +241,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         tree. This returns a flat list, not a QuerySet.
 
         Returns:
-        TODO: This should probably indicate that it returns a tuple.
-        - list of Course: courses that are either requirements or electives
+        - list of (Course, string): courses that are either requirements or electives, plus the requirement type
         """
 
         return self._req_course_walk(self.requirements_root, [])
@@ -251,19 +250,18 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def required_courses(self):
         """
         Returns just the courses under the "Required Courses" node.
-        TODO: Required Courses and Elective Courses should be set as a constant somewhere.
         """
         return [
-            course for (course, type) in self.courses if type == "Required Courses"
+            course for (course, type) in self.courses() if type == "Required Courses"
         ]
 
     @cached_property
     def elective_courses(self):
         """
-        Returns just the courses under the "Elective Courses" node.
+        Returns just the courses under the "Required Courses" node.
         """
         return [
-            course for (course, type) in self.courses if type == "Elective Courses"
+            course for (course, type) in self.courses() if type == "Elective Courses"
         ]
 
     def __str__(self):

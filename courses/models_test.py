@@ -28,6 +28,7 @@ from courses.factories import (
 from courses.models import (
     Course,
     CourseRunEnrollment,
+    Program,
     ProgramRequirement,
     ProgramRequirementNodeType,
     limit_to_certificate_pages,
@@ -44,12 +45,19 @@ def test_program_num_courses():
     Program should return number of courses associated with it
     """
     program = ProgramFactory.create()
+    course1 = CourseFactory.create()
+    course2 = CourseFactory.create()
+
     assert program.num_courses == 0
 
-    CourseFactory.create(program=program)
+    program.add_requirement(course1)
+    # the cached property should work, so this will be wrong here
+    assert program.num_courses == 0
+    program = Program.objects.get(pk=program.id)
     assert program.num_courses == 1
 
-    CourseFactory.create(program=program)
+    program.add_requirement(course2)
+    program = Program.objects.get(pk=program.id)
     assert program.num_courses == 2
 
 
@@ -59,9 +67,10 @@ def test_program_is_catalog_visible():
     date in the future
     """
     program = ProgramFactory.create()
-    runs = CourseRunFactory.create_batch(
-        2, course__program=program, past_start=True, past_enrollment_end=True
-    )
+    runs = CourseRunFactory.create_batch(2, past_start=True, past_enrollment_end=True)
+    for run in runs:
+        program.add_requirement(run.course)
+
     assert program.is_catalog_visible is False
 
     now = now_in_utc()
