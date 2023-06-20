@@ -854,7 +854,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         Start date: earliest course run start date
         End date: latest course run end date
         """
-        course_ids = [course.id for course in self.program.courses]
+        course_ids = [course[0].id for course in self.program.courses]
         dates = CourseRunCertificate.objects.filter(
             user_id=self.user_id, course_run__course_id__in=course_ids
         ).aggregate(

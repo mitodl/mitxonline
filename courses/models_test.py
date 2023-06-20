@@ -292,7 +292,7 @@ def test_program_first_unexpired_run():
     )
 
     # create another course and course run in program
-    another_course = CourseFactory.create(program=program)
+    another_course = CourseFactory.create()
     second_run = CourseRunFactory.create(
         start_date=now + timedelta(days=50),
         course=another_course,
@@ -410,7 +410,7 @@ def test_readable_id_valid(readable_id_value):
     program = ProgramFactory.build(readable_id=readable_id_value)
     program.save()
     assert program.id is not None
-    course = CourseFactory.build(program=None, readable_id=readable_id_value)
+    course = CourseFactory.build(readable_id=readable_id_value)
     course.save()
     assert course.id is not None
 
@@ -435,7 +435,7 @@ def test_readable_id_invalid(readable_id_value):
     program = ProgramFactory.build(readable_id=readable_id_value)
     with pytest.raises(ValidationError):
         program.save()
-    course = CourseFactory.build(program=None, readable_id=readable_id_value)
+    course = CourseFactory.build(readable_id=readable_id_value)
     with pytest.raises(ValidationError):
         course.save()
 
@@ -450,8 +450,14 @@ def test_get_program_run_enrollments(user):
     course_run_enrollments = CourseRunEnrollmentFactory.create_batch(
         2,
         user=user,
-        run__course__program=factory.Iterator([program, program, programs[1]]),
     )
+
+    for idx, cre in enumerate(course_run_enrollments):
+        if idx == 2:
+            programs[1].add_requirement(cre.run.course)
+        else:
+            programs[0].add_requirement(cre.run.course)
+
     expected_run_enrollments = set(course_run_enrollments[0:2])
     assert (
         set(CourseRunEnrollment.get_program_run_enrollments(user, program))
@@ -547,14 +553,14 @@ def test_program_certificate_start_end_dates_and_page_revision(user):
     end_date = now + timedelta(days=100)
     program = ProgramFactory.create()
 
-    early_course_run = CourseRunFactory.create(
-        course__program=program, start_date=start_date, end_date=end_date
-    )
+    early_course_run = CourseRunFactory.create(start_date=start_date, end_date=end_date)
     later_course_run = CourseRunFactory.create(
-        course__program=program,
         start_date=start_date + timedelta(days=1),
         end_date=end_date + timedelta(days=1),
     )
+
+    program.add_requirement(early_course_run.course)
+    program.add_requirement(later_course_run.course)
 
     # Need the course run certificates to be there in order for the start_end_dates
     # to return valid values
@@ -773,7 +779,7 @@ def test_program_add_requirement():
     duplicate nodes. It should create the root node if there isn't one already.
     """
     program = ProgramFactory.create()
-    course = CourseFactory.create(program=program)
+    course = CourseFactory.create()
 
     def add_and_check():
         program.add_requirement(course)
@@ -830,7 +836,7 @@ def test_program_add_elective():
     create duplicate nodes. It should create the root node if there isn't one already.
     """
     program = ProgramFactory.create()
-    course = CourseFactory.create(program=program)
+    course = CourseFactory.create()
 
     def add_and_check():
         program.add_elective(course)
