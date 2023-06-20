@@ -954,6 +954,7 @@ def test_related_programs():
 
     assert related_program == second_related_program
 
+
 def test_program_minimum_elective_courses_requirement():
     """Tests to make sure the related programs functionality in the model works."""
     minimum_elective_required = 5
@@ -974,6 +975,7 @@ def test_program_minimum_elective_courses_requirement():
     )
 
     assert program.minimum_elective_courses_requirement == minimum_elective_required
+
 
 def test_program_minimum_elective_courses_requirement_no_elective_node():
     """Tests to make sure the related programs functionality in the model works."""

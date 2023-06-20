@@ -862,8 +862,7 @@ def override_user_grade(user, override_grade, courseware_id, should_force_pass=F
     return course_run_grade
 
 
-#  TODO: Create a test for this
-def has_earned_program_cert(user, program):
+def _has_earned_program_cert(user, program):
     """
     Checks if a user has earned all the course certificates required
     for a given program.
@@ -924,7 +923,7 @@ def generate_program_certificate(user, program, force_create=False):
         )
         return existing_cert_queryset.first(), False
 
-    if not force_create and not has_earned_program_cert(user, program):
+    if not force_create and not _has_earned_program_cert(user, program):
         return None, False
 
     program_cert = ProgramCertificate.objects.create(user=user, program=program)

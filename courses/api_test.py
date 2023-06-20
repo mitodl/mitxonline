@@ -23,7 +23,6 @@ from courses.api import (
     generate_program_certificate,
     get_user_enrollments,
     get_user_relevant_course_run,
-    has_earned_program_cert,
     manage_course_run_certificate_access,
     manage_program_certificate_access,
     override_user_grade,
@@ -1391,9 +1390,11 @@ def test_generate_program_certificate_failure_not_all_passed(
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_generate_program_certificate_success(user, program_with_empty_requirements):
+def test_generate_program_certificate_success_single_requirement_course(
+    user, program_with_empty_requirements
+):
     """
-    Test that generate_program_certificate generate a program certificate
+    Test that generate_program_certificate generates a program certificate for a Program with a single required Course.
     """
     course = CourseFactory.create()
     program_with_empty_requirements.add_requirement(course)
@@ -1405,11 +1406,80 @@ def test_generate_program_certificate_success(user, program_with_empty_requireme
     certificate, created = generate_program_certificate(
         user=user, program=program_with_empty_requirements
     )
-    test = has_earned_program_cert(user, program_with_empty_requirements)
-    assert test == 1
     assert created is True
     assert isinstance(certificate, ProgramCertificate)
     assert len(ProgramCertificate.objects.all()) == 1
+
+
+def test_generate_program_certificate_success_multiple_required_courses(
+    user, program_with_empty_requirements
+):
+    """
+    Test that generate_program_certificate generate a program certificate
+    """
+    courses = CourseFactory.create_batch(3)
+    for course in courses:
+        program_with_empty_requirements.add_requirement(course)
+    course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+    CourseRunCertificateFactory.create_batch(
+        3, user=user, course_run=factory.Iterator(course_runs)
+    )
+
+    certificate, created = generate_program_certificate(
+        user=user, program=program_with_empty_requirements
+    )
+    assert created is True
+    assert isinstance(certificate, ProgramCertificate)
+    assert len(ProgramCertificate.objects.all()) == 1
+
+
+def test_generate_program_certificate_success_minimum_electives_not_met(user):
+    """
+    Test that generate_program_certificate generate a program certificate
+    """
+    courses = CourseFactory.create_batch(3)
+
+    # Create Program with 2 minimum elective courses.
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=2,
+        title="Elective Courses",
+    )
+    required_course1 = courses[0]
+    elective_course1 = courses[1]
+    elective_course2 = courses[2]
+    program.add_requirement(required_course1)
+    program.add_elective(elective_course1)
+    program.add_elective(elective_course2)
+
+    required_course1_course_run = CourseRunFactory.create(course=required_course1)
+    elective_course1_course_run = CourseRunFactory.create(course=elective_course1)
+    elective_course2_course_run = CourseRunFactory.create(course=elective_course2)
+
+    # User has a certificate for required_course1 and elective_course1 only. No certificate for elective_course2.
+    CourseRunCertificateFactory.create(
+        user=user, course_run=required_course1_course_run
+    )
+    CourseRunCertificateFactory.create(
+        user=user, course_run=elective_course1_course_run
+    )
+
+    certificate, created = generate_program_certificate(
+        user=user, program=program_with_empty_requirements
+    )
+    assert created is True
+    assert isinstance(certificate, ProgramCertificate)
+    assert len(ProgramCertificate.objects.all()) == 0
 
 
 def test_force_generate_program_certificate_success(user, program_with_requirements):

@@ -327,7 +327,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns the (int) value defined for the minimum number of elective courses required to be completed by the Program
 
         Returns:
-            int: Minimum number of elective courses required to be completed by the Program.  
+            int: Minimum number of elective courses required to be completed by the Program.
                 Returns None, if no value is defined or elective node is absent.
         """
         operator_nodes = self.requirements_root.get_children()
