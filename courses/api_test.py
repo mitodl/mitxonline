@@ -412,6 +412,53 @@ def test_create_run_enrollments_upgrade(
     ).exists()
 
 
+def test_create_run_enrollments_multiple_programs(
+    mocker, user, program_with_empty_requirements
+):
+    """
+    create_run_enrollments should enroll the user into any Programs which have the CourseRun's Course defined as a requirement or elective.
+
+    In addition, tests to make sure there's a ProgramEnrollment for the course.
+    """
+    test_enrollment = CourseRunEnrollmentFactory.create(
+        user=user,
+        change_status=ENROLL_CHANGE_STATUS_REFUNDED,
+        active=True,
+        edx_enrolled=True,
+    )
+    program_with_empty_requirements.add_requirement(test_enrollment.run.course)
+    program2 = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program2)
+    root_node = program2.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+        title="Elective Courses",
+    )
+    program2.add_requirement(test_enrollment.run.course)
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    patched_send_enrollment_email = mocker.patch(
+        "courses.api.mail_api.send_course_run_enrollment_email"
+    )
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    create_run_enrollments(
+        user, runs=[test_enrollment.run], mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    assert ProgramEnrollment.objects.filter(
+        user=user, program=program_with_empty_requirements
+    ).exists()
+    assert ProgramEnrollment.objects.filter(user=user, program=program2).exists()
+
+
 @pytest.mark.parametrize(
     "exception_cls", [NoEdxApiAuthError, HTTPError, RequestsConnectionError]
 )

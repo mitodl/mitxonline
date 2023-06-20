@@ -273,6 +273,9 @@ def create_run_enrollments(
                 ),
             )
 
+            for program in run.course.programs:
+                ProgramEnrollment.objects.get_or_create(user=user, program=program)
+
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
                 enrollment.edx_enrolled = edx_request_success
