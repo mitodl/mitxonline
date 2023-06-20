@@ -2,15 +2,17 @@
 Tests for signals
 """
 from unittest.mock import patch
-import pytest
-from courses.factories import (
-    CourseRunFactory,
-    CourseRunCertificateFactory,
-    UserFactory,
-    CourseFactory,
-    ProgramRequirementFactory,
-)
 
+import pytest
+
+from courses.factories import (
+    CourseFactory,
+    CourseRunCertificateFactory,
+    CourseRunFactory,
+    ProgramFactory,
+    ProgramRequirementFactory,
+    UserFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -25,16 +27,12 @@ def test_create_course_certificate(generate_program_cert_mock, mock_on_commit):
     """
     user = UserFactory.create()
     course_run = CourseRunFactory.create()
-    ProgramRequirementFactory.add_root(course_run.course.program)
-    course_run.course.program.add_requirement(course_run.course)
+    program = ProgramFactory.create()
+    program.add_requirement(course_run.course)
     cert = CourseRunCertificateFactory.create(user=user, course_run=course_run)
-    generate_program_cert_mock.assert_called_once_with(
-        user, [cert.course_run.course.program]
-    )
+    generate_program_cert_mock.assert_called_once_with(user, [program])
     cert.save()
-    generate_program_cert_mock.assert_called_once_with(
-        user, [cert.course_run.course.program]
-    )
+    generate_program_cert_mock.assert_called_once_with(user, [program])
 
 
 # pylint: disable=unused-argument
@@ -48,7 +46,7 @@ def test_generate_program_certificate_not_called(
     is not associated with program.
     """
     user = UserFactory.create()
-    course = CourseFactory.create(program=None)
+    course = CourseFactory.create()
     course_run = CourseRunFactory.create(course=course)
     cert = CourseRunCertificateFactory.create(user=user, course_run=course_run)
     cert.save()

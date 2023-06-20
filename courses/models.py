@@ -416,7 +416,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     @cached_property
     def programs(self):
         """
-        Returns a list of Programs which have this Course (self) as a requirement.
+        Returns a list of Programs which have this Course (self) as a dependency.
 
         Returns:
             list: List of Programs this Course is a requirement or elective for.

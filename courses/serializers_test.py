@@ -23,6 +23,7 @@ from courses.factories import (
 from courses.models import (
     Course,
     CourseTopic,
+    Program,
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
@@ -59,11 +60,7 @@ def test_base_program_serializer():
     }
 
 
-@pytest.mark.parametrize(
-    "remove_tree",
-    [True, False],
-)
-def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):
+def test_serialize_program(mock_context, program_with_empty_requirements):
     """Test Program serialization"""
     run1 = CourseRunFactory.create(
         course__page=None,
