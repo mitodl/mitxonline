@@ -321,9 +321,15 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."
 
-    # TODO: Create tests for this.
     @cached_property
     def minimum_elective_courses_requirement(self):
+        """
+        Returns the (int) value defined for the minimum number of elective courses required to be completed by the Program
+
+        Returns:
+            int: Minimum number of elective courses required to be completed by the Program.  
+                Returns None, if no value is defined or elective node is absent.
+        """
         operator_nodes = self.requirements_root.get_children()
         for operator_node in operator_nodes:
             if operator_node.is_min_number_of_operator:
