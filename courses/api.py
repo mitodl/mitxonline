@@ -859,6 +859,7 @@ def override_user_grade(user, override_grade, courseware_id, should_force_pass=F
     return course_run_grade
 
 
+#  TODO: Create a test for this
 def has_earned_program_cert(user, program):
     """
     Checks if a user has earned all the course certificates required
@@ -879,22 +880,19 @@ def has_earned_program_cert(user, program):
         courseruns__courseruncertificates__user=user,
         courseruns__courseruncertificates__is_revoked=False,
     )
-    root = program.requirements_root
 
-    def _has_earned(node):
-        if node.is_root or node.is_all_of_operator:
-            # has passed all of the child requirements
-            return all(_has_earned(child) for child in node.get_children())
-        elif node.is_min_number_of_operator:
-            # has passed a minimum of the child requirements
-            return len(list(filter(_has_earned, node.get_children()))) >= int(
-                node.operator_value
-            )
-        elif node.is_course:
-            # has passed the reference course
-            return node.course in passed_courses
-
-    return _has_earned(root)
+    passed_all_requirements = all(
+        required_course in passed_courses
+        for required_course in program.required_courses
+    )
+    if program.elective_courses:
+        met_elective_requirement = (
+            len(list(set(passed_courses).intersection(program.elective_courses)))
+            >= program.minimum_elective_courses_requirement
+        )
+        return passed_all_requirements and met_elective_requirement
+    else:
+        return passed_all_requirements
 
 
 def generate_program_certificate(user, program, force_create=False):

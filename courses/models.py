@@ -282,22 +282,29 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         """
         Returns just the courses under the "Required Courses" node.
         """
-        return [
-            course for (course, type) in self.courses if type == "Required Courses"
-        ]
+        return [course for (course, type) in self.courses if type == "Required Courses"]
 
     @cached_property
     def elective_courses(self):
         """
         Returns just the courses under the "Required Courses" node.
         """
-        return [
-            course for (course, type) in self.courses if type == "Elective Courses"
-        ]
+        return [course for (course, type) in self.courses if type == "Elective Courses"]
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."
+
+    # TODO: Create tests for this.
+    @cached_property
+    def minimum_elective_courses_requirement(self):
+        operator_nodes = self.requirements_root.get_children()
+        for operator_node in operator_nodes:
+            if operator_node.is_min_number_of_operator:
+                # has passed a minimum of the child requirements
+                return int(operator_node.operator_value)
+
+        return None
 
 
 class RelatedProgram(TimestampedModel, ValidateOnSaveMixin):
