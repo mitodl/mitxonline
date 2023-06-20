@@ -143,6 +143,37 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         """Gets the readable_id"""
         return self.readable_id
 
+    @property
+    def related_programs_qs(self):
+        """
+        Returns a list of programs related to this one. Returns a QuerySet.
+
+        Returns:
+        - QuerySet: RelatedPrograms that are related to this program, in either the first or second position
+        """
+
+        return RelatedProgram.objects.filter(
+            Q(first_program=self) | Q(second_program=self)
+        )
+
+    @property
+    def related_programs(self):
+        """
+        Returns a list of programs related to this one. Returns a flat list,
+        not a QuerySet.
+
+        Returns:
+        - List(Program): programs that are related to this program, in either the first or second position
+        """
+
+        program_list = []
+
+        for related_program in self.related_programs_qs.all():
+            if related_program.first_program == self:
+                program_list.append(related_program.second_program)
+            else:
+                program_list.append(related_program.first_program)
+
     @cached_property
     def requirements_root(self):
         return self.get_requirements_root()
@@ -267,6 +298,27 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."
+
+
+class RelatedProgram(TimestampedModel, ValidateOnSaveMixin):
+    """
+    Keeps track of which programs are related for financial assistance reasons.
+
+    For financial assistance, a learner may apply for aid for a specific
+    program. If the program has RelatedPrograms, the financial assistance
+    request should apply to all of them (so, an approval for DEDP Internal
+    Development also grants aid in DEDP Public Policy).
+    """
+
+    first_program = models.ForeignKey(
+        Program, on_delete=models.CASCADE, related_name="+"
+    )
+    second_program = models.ForeignKey(
+        Program, on_delete=models.CASCADE, related_name="+"
+    )
+
+    def __str__(self):
+        return f"Related Programs {self.first_program.readable_id}<-->{self.second_program.readable_id}"
 
 
 class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
