@@ -282,14 +282,18 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         """
         Returns just the courses under the "Required Courses" node.
         """
-        return [course for (course, type) in self.courses if type == "Required Courses"]
+        return [
+            course for (course, type) in self.courses if type == "Required Courses"
+        ]
 
     @cached_property
     def elective_courses(self):
         """
         Returns just the courses under the "Required Courses" node.
         """
-        return [course for (course, type) in self.courses if type == "Elective Courses"]
+        return [
+            course for (course, type) in self.courses if type == "Elective Courses"
+        ]
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"

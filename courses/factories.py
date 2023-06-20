@@ -233,7 +233,8 @@ class LearnerProgramRecordShareFactory(DjangoModelFactory):
 
     class Meta:
         model = LearnerProgramRecordShare
-        
+
+
 @pytest.fixture()
 def program_with_empty_requirements():
     program = ProgramFactory.create()
@@ -244,6 +245,12 @@ def program_with_empty_requirements():
         node_type=ProgramRequirementNodeType.OPERATOR,
         operator=ProgramRequirement.Operator.ALL_OF,
         title="Required Courses",
+    )
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+        title="Elective Courses",
     )
     return program
 

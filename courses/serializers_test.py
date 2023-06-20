@@ -21,9 +21,7 @@ from courses.factories import (
     program_with_empty_requirements,
 )
 from courses.models import (
-    Course,
     CourseTopic,
-    Program,
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
@@ -60,7 +58,11 @@ def test_base_program_serializer():
     }
 
 
-def test_serialize_program(mock_context, program_with_empty_requirements):
+@pytest.mark.parametrize(
+    "remove_tree",
+    [True, False],
+)
+def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):
     """Test Program serialization"""
     run1 = CourseRunFactory.create(
         course__page=None,
@@ -91,24 +93,21 @@ def test_serialize_program(mock_context, program_with_empty_requirements):
     course1.topics.set([topics[0], topics[1]])
     course2.topics.set([topics[1], topics[2]])
 
-    program_with_empty_requirements.add_requirement(course1)
-    program_with_empty_requirements.add_requirement(course2)
-    program_with_empty_requirements = Program.objects.get(
-        pk=program_with_empty_requirements.id
-    )
+    formatted_reqs = {"required": [], "electives": []}
+
+    if not remove_tree:
+        program_with_empty_requirements.add_requirement(course1)
+        program_with_empty_requirements.add_requirement(course2)
+        formatted_reqs["required"] = [
+            course.id for course in program_with_empty_requirements.required_courses
+        ]
+        formatted_reqs["electives"] = [
+            course.id for course in program_with_empty_requirements.elective_courses
+        ]
 
     data = ProgramSerializer(
         instance=program_with_empty_requirements, context=mock_context
     ).data
-
-    formatted_reqs = {"required": [], "electives": []}
-
-    formatted_reqs["required"] = [
-        course.id for course in program_with_empty_requirements.required_courses
-    ]
-    formatted_reqs["electives"] = [
-        course.id for course in program_with_empty_requirements.elective_courses
-    ]
 
     assert_drf_json_equal(
         data,
@@ -119,17 +118,27 @@ def test_serialize_program(mock_context, program_with_empty_requirements):
             "courses": [
                 CourseSerializer(instance=course, context={**mock_context}).data
                 for course in [course1, course2]
-            ],
+            ]
+            if not remove_tree
+            else [],
             "start_date": drf_datetime(
                 sorted(runs, key=lambda run: run.start_date)[0].start_date
-            ),
+            )
+            if not remove_tree
+            else None,
             "end_date": drf_datetime(
                 sorted(runs, key=lambda run: run.end_date)[-1].end_date
-            ),
+            )
+            if not remove_tree
+            else None,
             "enrollment_start": drf_datetime(
                 sorted(runs, key=lambda run: run.enrollment_start)[0].enrollment_start
-            ),
-            "topics": [{"name": topic.name} for topic in topics],
+            )
+            if not remove_tree
+            else None,
+            "topics": [{"name": topic.name} for topic in topics]
+            if not remove_tree
+            else [],
             "requirements": formatted_reqs,
             "req_tree": ProgramRequirementTreeSerializer(
                 program_with_empty_requirements.requirements_root
@@ -569,13 +578,24 @@ def test_learner_record_serializer(mock_context, program_with_empty_requirements
                     "data": {
                         "course": None,
                         "node_type": "operator",
-                        "operator": ProgramRequirement.Operator.ALL_OF,
+                        "operator": ProgramRequirement.Operator.ALL_OF.value,
                         "operator_value": None,
                         "program": program.id,
                         "title": "Required Courses",
                     },
                     "id": program.get_requirements_root().get_children().first().id,
-                }
+                },
+                {
+                    "data": {
+                        "course": None,
+                        "node_type": "operator",
+                        "operator": ProgramRequirement.Operator.MIN_NUMBER_OF.value,
+                        "operator_value": "1",
+                        "program": program.id,
+                        "title": "Elective Courses",
+                    },
+                    "id": program.get_requirements_root().get_children().last().id,
+                },
             ],
             "data": {
                 "course": None,
