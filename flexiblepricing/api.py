@@ -115,9 +115,18 @@ def get_ordered_eligible_coursewares(courseware):
         # recurse using the course run's course ;-)
         return get_ordered_eligible_coursewares(courseware.course)
     if isinstance(courseware, Course) and len(courseware.programs) > 0:
-        return courseware.programs + [courseware]
+        program_relations = []
+
+        for program in courseware.programs:
+            program_relations += [
+                program_tuple[0] for program_tuple in program.related_programs
+            ]
+
+        return courseware.programs + [courseware] + program_relations
     if isinstance(courseware, ProgramRun) and courseware.program is not None:
-        return [courseware.program]
+        return [courseware.program] + [
+            program_tuple[0] for program_tuple in courseware.program.related_programs
+        ]
     return [courseware]
 
 

@@ -291,7 +291,7 @@ class FlexiblePriceBaseTestCase(TestCase):
 
 
 @ddt.ddt
-class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
+class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
     """
     Tests for financialaid api backend
     """

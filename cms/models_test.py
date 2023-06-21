@@ -386,10 +386,19 @@ def test_flex_pricing_form_courseware_object(program_with_empty_requirements):
     assert flex_form.selected_course == secondary_course
     assert flex_form.selected_program == program
 
+    # adding a second program - should still return the first program
 
-@pytest.mark.parametrize("test_course_first", [True, False])
+    second_program = ProgramFactory.create()
+    second_program.add_requirement(secondary_course)
+
+    assert flex_form.get_parent_courseware() == program
+    assert flex_form.selected_course == secondary_course
+    assert flex_form.selected_program == program
+
+
+@pytest.mark.parametrize("test_scenario", ["course", "two_programs", "one_program"])
 def test_flex_pricing_single_submission(
-    mocker, test_course_first, program_with_empty_requirements
+    mocker, test_scenario, program_with_empty_requirements
 ):
     """
     Tests multiple submissions for the same course/program.
@@ -398,6 +407,8 @@ def test_flex_pricing_single_submission(
     check for a submission for that course or the program the course belongs to.
     If it's associated with a program, it should check for submissions in the
     program. A submission for a course in the program should exist for the program.
+    If it's associated with a program that has related programs, it should check
+    for submissions in the related programs too.
     """
     program = program_with_empty_requirements
     course = CourseFactory.create()
@@ -405,12 +416,23 @@ def test_flex_pricing_single_submission(
 
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
 
-    if test_course_first:
+    if test_scenario == "course":
         first_sub_form = FlexiblePricingFormFactory(
             parent=course_page, selected_course=course
         )
         second_sub_form = FlexiblePricingFormFactory(
             parent=course_page, selected_program=program
+        )
+    elif test_scenario == "two_programs":
+        second_program = ProgramFactory.create()
+        second_program.add_requirement(course)
+        second_program.add_related_program(program)
+
+        first_sub_form = FlexiblePricingFormFactory(
+            parent=course_page, selected_program=program
+        )
+        second_sub_form = FlexiblePricingFormFactory(
+            parent=course_page, selected_program=second_program
         )
     else:
         second_sub_form = FlexiblePricingFormFactory(

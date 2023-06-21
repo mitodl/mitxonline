@@ -1246,8 +1246,11 @@ class FlexiblePricingRequestForm(AbstractForm):
 
         Updated 15-Jun-2023 jkachel: We will now look for submissions in any of
         the programs that the course belongs to.
+        Updated 21-Jun-2023 jkachel: We will now look for submissions in any of
+        the related programs of the programs that the course belongs to. (This
+        will probably overlap with the above.)
 
-        TODO: associated program update
+        TODO: this logic will break when we have Program pages
 
         Returns:
             FlexiblePrice, or None if not found.
@@ -1265,17 +1268,32 @@ class FlexiblePricingRequestForm(AbstractForm):
             isinstance(parent_courseware, Course)
             and len(parent_courseware.programs) > 0
         ):
+            valid_submission_program_ids = []
+
+            for program in parent_courseware.programs:
+                valid_submission_program_ids.append(program.id)
+                valid_submission_program_ids += [
+                    related_program.id for related_program in program.related_programs
+                ]
+
             sub_qset = sub_qset.filter(
                 models.Q(
                     courseware_object_id=parent_courseware.id,
                     courseware_content_type=course_ct,
                 )
                 | models.Q(
-                    courseware_object_id__in=[
-                        program.id for program in parent_courseware.programs
-                    ],
+                    courseware_object_id__in=valid_submission_program_ids,
                     courseware_content_type=program_ct,
                 )
+            )
+        elif isinstance(parent_courseware, Program):
+            sub_qset = sub_qset.filter(
+                courseware_object_id__in=[parent_courseware.id]
+                + [
+                    related_program.id
+                    for related_program in parent_courseware.related_programs
+                ],
+                courseware_content_type=program_ct,
             )
         else:
             sub_qset = sub_qset.filter(
