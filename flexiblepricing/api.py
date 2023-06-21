@@ -118,9 +118,7 @@ def get_ordered_eligible_coursewares(courseware):
         program_relations = []
 
         for program in courseware.programs:
-            program_relations += [
-                program_tuple[0] for program_tuple in program.related_programs
-            ]
+            program_relations += program.related_programs
 
         return courseware.programs + [courseware] + program_relations
     if isinstance(courseware, ProgramRun) and courseware.program is not None:
