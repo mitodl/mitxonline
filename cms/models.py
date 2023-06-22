@@ -938,7 +938,7 @@ class CoursePage(ProductPage):
         relevant_runs = list(
             get_user_relevant_course_run_qset(
                 course=self.product, user=request.user
-            ).values("courseware_id", "start_date")
+            )
         )
         is_enrolled = (
             False
