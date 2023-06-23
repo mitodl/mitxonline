@@ -28,6 +28,9 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
           course.readable_id
         ) {
           found = enrollment.enrollments[i]
+          if (enrollment.enrollments[i].certificate !== null) {
+            break
+          }
         }
       }
     }
