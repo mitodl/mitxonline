@@ -108,8 +108,6 @@ def get_ordered_eligible_coursewares(courseware):
     """
     Returns the courseware(s) eligible for a flexible pricing tier in order
     (program first, then course)
-
-    TODO: associated program update
     """
     if isinstance(courseware, CourseRun):
         # recurse using the course run's course ;-)

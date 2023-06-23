@@ -129,7 +129,7 @@ class Command(BaseCommand):
                 )
                 return False
         elif kwargs["program"] is not None and kwargs["run_tag"] is not None:
-            for course in program.courses:
+            for course, title in program.courses:
                 if course.courseruns.filter(run_tag=kwargs["run_tag"]).count() == 0:
                     try:
                         edx_course = edx_course_detail.get_detail(

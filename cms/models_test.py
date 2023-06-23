@@ -348,8 +348,6 @@ def test_flex_pricing_form_courseware_object(program_with_empty_requirements):
     """
     Tests to make sure the correct courseware objects are returned when hitting
     the get_parent_courseware method.
-
-    TODO: associated program update
     """
 
     first_course = CourseFactory.create(readable_id=FAKE_READABLE_ID, page=None)

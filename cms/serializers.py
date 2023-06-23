@@ -38,7 +38,6 @@ class CoursePageSerializer(serializers.ModelSerializer):
         Returns URL of the Financial Assistance Form.
         """
         financial_assistance_page = None
-        # TODO: associated program update
         if instance.product.programs:
             program_page = ProgramPage.objects.filter(
                 program_id__in=[program.id for program in instance.product.programs]

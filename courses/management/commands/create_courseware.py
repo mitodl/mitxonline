@@ -202,7 +202,7 @@ class Command(BaseCommand):
                 )
             )
 
-            if "related" in kwargs and len(kwargs["related"]) > 0:
+            if kwargs["related"] is not None and len(kwargs["related"]) > 0:
                 for readable_id in kwargs["related"]:
                     try:
                         related_program = Program.objects.filter(
@@ -245,7 +245,6 @@ class Command(BaseCommand):
                     ).first()
 
             new_course = Course.objects.create(
-                program=program,
                 title=kwargs["title"],
                 readable_id=kwargs["courseware_id"],
                 live=kwargs["live"],
@@ -253,7 +252,7 @@ class Command(BaseCommand):
 
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Created course {new_course.id}: {new_course.title} ({new_course.readable_id}) in program {new_course.program}"
+                    f"Created course {new_course.id}: {new_course.title} ({new_course.readable_id})"
                 )
             )
 

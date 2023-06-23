@@ -1208,8 +1208,6 @@ class FlexiblePricingRequestForm(AbstractForm):
         Updated 15-Jun: if we're considering a Course, and that course belongs
         to a Program, this will now return the first Program it belongs to.
 
-        TODO: associated program update
-
         Returns:
             Course, Program, or None if not found
         """
