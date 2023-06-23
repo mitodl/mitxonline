@@ -576,12 +576,7 @@ export class EnrolledItemCard extends React.Component<
     const pageLocation = null
     const courseRunStatusMessageText = null
     const menuTitle = `Program information for ${enrollment.program.title}`
-    const courseCount =
-      enrollment.program.requirements &&
-      enrollment.program.requirements.required
-        ? enrollment.program.requirements.electives.length +
-          enrollment.program.requirements.required.length
-        : enrollment.program.courses.length
+    const courseCount = enrollment.program.courses.length
     const hasPassed = enrollment.certificate ? true : false
 
     return (
