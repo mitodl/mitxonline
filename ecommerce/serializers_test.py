@@ -60,7 +60,8 @@ def test_product_course_serializer(mock_context):
     Tests serialization of a product that has an associated course.
     """
     program = ProgramFactory.create()
-    run = CourseRunFactory.create(course__program=program)
+    run = CourseRunFactory.create()
+    program.add_requirement(run.course)
     product = ProductFactory.create(purchasable_object=run)
     product_serialized = ProductSerializer(instance=product).data
     run_serialized = CourseRunProductPurchasableObjectSerializer(instance=run).data
@@ -114,7 +115,8 @@ def test_product_flexible_price_serializer(mock_context):
     Tests serialization of a product that has an associated flexible price for the user.
     """
     program = ProgramFactory.create()
-    run = CourseRunFactory.create(course__program=program)
+    run = CourseRunFactory.create()
+    program.add_requirement(run.course)
     product = ProductFactory.create(purchasable_object=run)
     flexible_price = FlexiblePriceFactory.create(
         courseware_object=run.course,

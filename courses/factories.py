@@ -1,6 +1,9 @@
 """Factories for creating course data in tests"""
+from types import SimpleNamespace
+
 import factory
 import faker
+import pytest
 import pytz
 from factory import SubFactory, fuzzy
 from factory.django import DjangoModelFactory
@@ -55,7 +58,6 @@ class ProgramRunFactory(DjangoModelFactory):
 class CourseFactory(DjangoModelFactory):
     """Factory for Courses"""
 
-    program = factory.SubFactory(ProgramFactory, page=None)
     title = fuzzy.FuzzyText(prefix="Course ")
     readable_id = factory.Sequence("course-{0}".format)
     live = True
@@ -64,9 +66,6 @@ class CourseFactory(DjangoModelFactory):
 
     class Meta:
         model = Course
-
-    class Params:
-        no_program = factory.Trait(program=None)
 
 
 class CourseRunFactory(DjangoModelFactory):
@@ -234,3 +233,77 @@ class LearnerProgramRecordShareFactory(DjangoModelFactory):
 
     class Meta:
         model = LearnerProgramRecordShare
+
+
+@pytest.fixture()
+def program_with_empty_requirements():
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+        title="Elective Courses",
+    )
+    return program
+
+
+@pytest.fixture
+def program_with_requirements():
+    program = ProgramFactory.create()
+    required_courses = CourseFactory.create_batch(3)
+    elective_courses = CourseFactory.create_batch(3)
+    mut_exclusive_courses = CourseFactory.create_batch(3)
+
+    root_node = program.requirements_root
+
+    required_courses_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    for course in required_courses:
+        required_courses_node.add_child(
+            node_type=ProgramRequirementNodeType.COURSE, course=course
+        )
+
+    # at least two must be taken
+    elective_courses_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=2,
+        title="Elective Courses",
+    )
+    for course in elective_courses:
+        elective_courses_node.add_child(
+            node_type=ProgramRequirementNodeType.COURSE, course=course
+        )
+
+    # 3rd elective option is at least one of these courses
+    mut_exclusive_courses_node = elective_courses_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+    )
+    for course in mut_exclusive_courses:
+        mut_exclusive_courses_node.add_child(
+            node_type=ProgramRequirementNodeType.COURSE, course=course
+        )
+
+    return SimpleNamespace(
+        program=program,
+        root_node=root_node,
+        required_courses=required_courses,
+        required_courses_node=required_courses_node,
+        elective_courses=elective_courses,
+        elective_courses_node=elective_courses_node,
+        mut_exclusive_courses=mut_exclusive_courses,
+        mut_exclusive_courses_node=mut_exclusive_courses_node,
+    )

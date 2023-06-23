@@ -20,9 +20,15 @@ from courses.factories import (
     CourseFactory,
     CourseRunFactory,
     ProgramFactory,
+    ProgramRequirementFactory,
     ProgramRunFactory,
 )
-from courses.models import Program
+from courses.models import (
+    Course,
+    Program,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
+)
 from ecommerce.factories import ProductFactory
 from flexiblepricing.api import (
     IncomeThreshold,
@@ -160,7 +166,17 @@ def create_courseware(create_tiers=True, past=False):
     """
     end_date = None
     program = ProgramFactory.create(live=True)
-    course = CourseFactory.create(program=program)
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+
+    course = CourseFactory.create()
+    program.add_requirement(course)
 
     if past:
         end_date = now_in_utc() - timedelta(days=100)
@@ -275,7 +291,7 @@ class FlexiblePriceBaseTestCase(TestCase):
 
 
 @ddt.ddt
-class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
+class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
     """
     Tests for financialaid api backend
     """
@@ -326,11 +342,14 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
             determine_tier_courseware(self.course, income)
             == self.program_tiers[expected_tier_key]
         )
-        self.course.program = None
-        self.course.save()
-        self.program.delete()
+        self.program.requirements_root.get_descendants().filter(
+            course=self.course
+        ).delete()
+
+        reload_course = Course.objects.get(pk=self.course.id)
+
         assert (
-            determine_tier_courseware(self.course, income)
+            determine_tier_courseware(reload_course, income)
             == self.course_tiers[expected_tier_key]
         )
 
@@ -353,7 +372,10 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
         has been created and income supplied is too low.
         """
         program = ProgramFactory.create()
-        course = CourseFactory.create(program=program)
+
+        course = CourseFactory.create()
+        program.add_requirement(course)
+
         with self.assertRaises(ImproperlyConfigured):
             determine_tier_courseware(course, 0)
 
@@ -639,6 +661,8 @@ class FlexiblePricAPITests(FlexiblePriceBaseTestCase):
         ("program", False, True, True),
         ("courseprogram", False, True, True),
         ("courseprogram", True, False, False),
+        ("coursemultipleprogram", False, False, False),
+        ("coursemultipleprogram", True, False, False),
     ],
 )
 def test_create_finaid_form(courseware_type, force_course, gen_slug, gen_title):
@@ -647,14 +671,20 @@ def test_create_finaid_form(courseware_type, force_course, gen_slug, gen_title):
     """
 
     if courseware_type == "course":
-        courseware = CourseFactory.create(program=None)
+        courseware = CourseFactory.create()
         page = courseware.page
     elif courseware_type == "program":
         page = ProgramPageFactory.create()
         courseware = page.program
     else:
         program_page = ProgramPageFactory.create()
-        courseware = CourseFactory.create(program=program_page.program)
+        courseware = CourseFactory.create()
+        program_page.program.add_requirement(courseware)
+
+        if courseware_type == "coursemultipleprogram":
+            second_program = ProgramPageFactory.create()
+            second_program.program.add_requirement(courseware)
+
         if force_course:
             page = courseware.page
         else:
@@ -679,11 +709,15 @@ def test_create_finaid_form(courseware_type, force_course, gen_slug, gen_title):
 
     assert generated_page.get_parent() == page
 
-    if courseware_type == "course" or (
-        courseware_type == "courseprogram" and force_course
+    if (
+        courseware_type == "course"
+        or (courseware_type == "courseprogram" and force_course)
+        or (courseware_type == "coursemultipleprogram" and force_course)
     ):
         assert generated_page.selected_course == courseware
-    elif courseware_type == "courseprogram" and not force_course:
-        assert generated_page.selected_program == courseware.program
+    elif (
+        courseware_type == "courseprogram" or courseware_type == "coursemultipleprogram"
+    ) and not force_course:
+        assert generated_page.selected_program == courseware.programs[0]
     else:
         assert generated_page.selected_program == courseware

@@ -27,6 +27,7 @@ from courses.models import (
     ProgramEnrollment,
     ProgramEnrollmentAudit,
     ProgramRun,
+    RelatedProgram,
 )
 from main.admin import AuditableModelAdmin
 from main.utils import get_field_names
@@ -60,10 +61,8 @@ class CourseAdmin(admin.ModelAdmin):
         "id",
         "title",
         "readable_id",
-        "program",
     )
-    list_filter = ["live", "program", "topics"]
-    raw_id_fields = ("program",)
+    list_filter = ["live", "topics"]
 
     formfield_overrides = {
         models.CharField: {"widget": TextInput(attrs={"size": "80"})}
@@ -104,7 +103,6 @@ class CourseRunAdmin(TimestampedModelAdmin):
     list_display = (
         "id",
         "title",
-        "get_course_program_title",
         "courseware_id",
         "run_tag",
         "start_date",
@@ -119,11 +117,6 @@ class CourseRunAdmin(TimestampedModelAdmin):
         models.CharField: {"widget": TextInput(attrs={"size": "80"})},
         models.TextField: {"widget": TextInput(attrs={"size": "100"})},
     }
-
-    @display(description="Program Title")
-    def get_course_program_title(self, obj):
-        """Returns the course run's program"""
-        return obj.course.program.title if obj.course.program else None
 
 
 class ProgramEnrollmentAdmin(AuditableModelAdmin):
@@ -482,6 +475,14 @@ class LearnerProgramRecordShareAdmin(TimestampedModelAdmin):
     search_fields = ["share_uuid"]
 
 
+class RelatedProgramAdmin(admin.ModelAdmin):
+    """Admin for Program"""
+
+    model = RelatedProgram
+    list_display = ("id", "first_program", "second_program")
+    list_filter = ["first_program", "second_program"]
+
+
 admin.site.register(Program, ProgramAdmin)
 admin.site.register(ProgramRun, ProgramRunAdmin)
 admin.site.register(Course, CourseAdmin)
@@ -499,3 +500,4 @@ admin.site.register(CourseRunCertificate, CourseRunCertificateAdmin)
 admin.site.register(ProgramCertificate, ProgramCertificateAdmin)
 admin.site.register(PartnerSchool, PartnerSchoolAdmin)
 admin.site.register(LearnerProgramRecordShare, LearnerProgramRecordShareAdmin)
+admin.site.register(RelatedProgram, RelatedProgramAdmin)

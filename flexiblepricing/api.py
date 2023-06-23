@@ -1,26 +1,26 @@
 """Flexible price apis"""
 import csv
-from collections import namedtuple
 import logging
+from collections import namedtuple
 from datetime import datetime
-import pytz
 from typing import Union
 
+import pytz
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
-from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-from django.contrib.auth.models import AnonymousUser
+from django.utils.text import slugify
 
-from main.settings import TIME_ZONE
-from main.constants import DISALLOWED_CURRENCY_TYPES
+from courses.models import Course, CourseRun, Program, ProgramRun
 from flexiblepricing.constants import (
-    INCOME_THRESHOLD_FIELDS,
     COUNTRY,
-    INCOME,
     DEFAULT_INCOME_THRESHOLD,
-    FlexiblePriceStatus,
     FINAID_FORM_TEXTS,
+    INCOME,
+    INCOME_THRESHOLD_FIELDS,
+    FlexiblePriceStatus,
 )
 from flexiblepricing.exceptions import (
     CountryIncomeThresholdException,
@@ -29,14 +29,11 @@ from flexiblepricing.exceptions import (
 from flexiblepricing.models import (
     CountryIncomeThreshold,
     CurrencyExchangeRate,
-    FlexiblePriceTier,
     FlexiblePrice,
+    FlexiblePriceTier,
 )
-
-from courses.models import CourseRun, Course, ProgramRun, Program
-
-from django.utils.text import slugify
-
+from main.constants import DISALLOWED_CURRENCY_TYPES
+from main.settings import TIME_ZONE
 
 IncomeThreshold = namedtuple("IncomeThreshold", ["country", "income"])
 log = logging.getLogger(__name__)
@@ -115,8 +112,17 @@ def get_ordered_eligible_coursewares(courseware):
     if isinstance(courseware, CourseRun):
         # recurse using the course run's course ;-)
         return get_ordered_eligible_coursewares(courseware.course)
-    if isinstance(courseware, (Course, ProgramRun)) and courseware.program is not None:
-        return [courseware.program, courseware]
+    if isinstance(courseware, Course) and len(courseware.programs) > 0:
+        program_relations = []
+
+        for program in courseware.programs:
+            program_relations += program.related_programs
+
+        return courseware.programs + [courseware] + program_relations
+    if isinstance(courseware, ProgramRun) and courseware.program is not None:
+        return [courseware.program] + [
+            program_tuple[0] for program_tuple in courseware.program.related_programs
+        ]
     return [courseware]
 
 
@@ -319,7 +325,6 @@ def is_courseware_flexible_price_approved(course_run, user):
 
 @transaction.atomic()
 def update_currency_exchange_rate(rates, currency_descriptions):
-
     """
     Updates all CurrencyExchangeRate objects based on the latest rates.
     Args:
@@ -369,12 +374,16 @@ def create_default_flexible_pricing_page(
     This won't check for an existing form, and it won't publish the form so
     it initially won't have any form fields in it.
 
+    Update 16-Jun-2023 jkachel: If the course belongs to multiple programs, this
+    will use the first one in the list unless "program" is specified as a kwarg.
+
     Args:
     - object (Course or Program): The courseware object to work with
     - forceCourse (boolean): Force the creation of a flexible price form for a course (ignored if a Program is specified)
     Keyword Args:
     - title (str): Force a specific title.
     - slug (str): Force a specific slug.
+    - program (Program): The program to use for the course.
     Returns:
     - FlexiblePricingRequestForm; the form page
     Raises:
@@ -382,14 +391,18 @@ def create_default_flexible_pricing_page(
     """
     from cms.models import FlexiblePricingRequestForm
 
-    if (
-        isinstance(object, Program)
-        or (isinstance(object, Course) and forceCourse)
-        or (isinstance(object, Course) and object.program is None)
+    if isinstance(object, Program):
+        courseware = object
+    elif (isinstance(object, Course) and forceCourse) or (
+        isinstance(object, Course) and len(object.programs) == 0
     ):
         courseware = object
     else:
-        courseware = object.program
+        courseware = (
+            object.programs[0]
+            if not ("program" in kwargs and isinstance(kwargs["program"], Program))
+            else kwargs["program"]
+        )
 
     if courseware.page is None:
         raise Exception(f"No page for courseware object {courseware}, can't continue.")

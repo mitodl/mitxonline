@@ -1,6 +1,7 @@
 """Tests for CMS app API functionality"""
 import pytest
 from django.contrib.contenttypes.models import ContentType
+from courses.models import ProgramRequirement, ProgramRequirementNodeType
 from wagtail.models import Page
 from wagtail_factories import PageFactory
 from django.core.exceptions import ValidationError
@@ -27,7 +28,7 @@ from cms.models import (
     ProgramPage,
 )
 
-from courses.factories import CourseFactory
+from courses.factories import CourseFactory, ProgramFactory, ProgramRequirementFactory
 
 
 @pytest.mark.django_db
@@ -251,6 +252,8 @@ def test_create_courseware_page():
     ensure_program_product_index()
 
     course = CourseFactory.create(page=None)
+    program = ProgramFactory.create(page=None)
+    program.add_requirement(course)
 
     resulting_page = create_default_courseware_page(course)
 
@@ -260,10 +263,10 @@ def test_create_courseware_page():
     with pytest.raises(ValidationError):
         resulting_page = create_default_courseware_page(course)
 
-    resulting_page = create_default_courseware_page(course.program)
+    resulting_page = create_default_courseware_page(course.programs[0])
 
     assert isinstance(resulting_page, ProgramPage)
-    assert resulting_page.title == course.program.title
+    assert resulting_page.title == course.programs[0].title
 
     with pytest.raises(ValidationError):
-        resulting_page = create_default_courseware_page(course.program)
+        resulting_page = create_default_courseware_page(course.programs[0])

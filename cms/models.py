@@ -18,12 +18,8 @@ from django.urls import reverse
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from modelcluster.fields import ParentalKey
-from wagtail.admin.panels import (
-    FieldPanel,
-    InlinePanel,
-    PageChooserPanel,
-    FieldPanel,
-)
+from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel
+from wagtail.blocks import PageChooserBlock, StreamBlock
 from wagtail.contrib.forms.forms import FormBuilder
 from wagtail.contrib.forms.models import (
     FORM_FIELD_CHOICES,
@@ -32,13 +28,12 @@ from wagtail.contrib.forms.models import (
     AbstractFormSubmission,
 )
 from wagtail.contrib.routable_page.models import RoutablePageMixin, route
-from wagtail.blocks import PageChooserBlock, StreamBlock
-from wagtail.fields import RichTextField, StreamField
-from wagtail.models import Orderable, Page, Site
 from wagtail.coreutils import WAGTAIL_APPEND_SLASH
 from wagtail.embeds.embeds import get_embed
 from wagtail.embeds.exceptions import EmbedException
+from wagtail.fields import RichTextField, StreamField
 from wagtail.images.models import Image
+from wagtail.models import Orderable, Page, Site
 from wagtail.search import index
 
 from cms.blocks import (
@@ -1210,6 +1205,9 @@ class FlexiblePricingRequestForm(AbstractForm):
         (At this point, there aren't Product pages so if it hits step 3 it will
         return a Course if there's one to be returned.)
 
+        Updated 15-Jun: if we're considering a Course, and that course belongs
+        to a Program, this will now return the first Program it belongs to.
+
         Returns:
             Course, Program, or None if not found
         """
@@ -1223,8 +1221,8 @@ class FlexiblePricingRequestForm(AbstractForm):
         elif self.selected_program is not None:
             return self.selected_program
         elif self.selected_course is not None:
-            if self.selected_course.program is not None:
-                return self.selected_course.program
+            if len(self.selected_course.programs) > 0:
+                return self.selected_course.programs[0]
 
             return self.selected_course
         elif isinstance(self.get_parent_product_page(), ProgramPage):
@@ -1233,8 +1231,8 @@ class FlexiblePricingRequestForm(AbstractForm):
             parent_page_course = self.get_parent_product_page().course
             return (
                 parent_page_course
-                if parent_page_course.program is None
-                else parent_page_course.program
+                if len(parent_page_course.programs) == 0
+                else parent_page_course.programs[0]
             )
 
     def get_previous_submission(self, request):
@@ -1243,6 +1241,14 @@ class FlexiblePricingRequestForm(AbstractForm):
         is associated with. If the object is a Course that has an attached
         Program, this returns the first FlexiblePrice that's for either the
         Course or the Program.
+
+        Updated 15-Jun-2023 jkachel: We will now look for submissions in any of
+        the programs that the course belongs to.
+        Updated 21-Jun-2023 jkachel: We will now look for submissions in any of
+        the related programs of the programs that the course belongs to. (This
+        will probably overlap with the above.)
+
+        TODO: this logic will break when we have Program pages
 
         Returns:
             FlexiblePrice, or None if not found.
@@ -1258,17 +1264,34 @@ class FlexiblePricingRequestForm(AbstractForm):
 
         if (
             isinstance(parent_courseware, Course)
-            and parent_courseware.program is not None
+            and len(parent_courseware.programs) > 0
         ):
+            valid_submission_program_ids = []
+
+            for program in parent_courseware.programs:
+                valid_submission_program_ids.append(program.id)
+                valid_submission_program_ids += [
+                    related_program.id for related_program in program.related_programs
+                ]
+
             sub_qset = sub_qset.filter(
                 models.Q(
                     courseware_object_id=parent_courseware.id,
                     courseware_content_type=course_ct,
                 )
                 | models.Q(
-                    courseware_object_id=parent_courseware.program.id,
+                    courseware_object_id__in=valid_submission_program_ids,
                     courseware_content_type=program_ct,
                 )
+            )
+        elif isinstance(parent_courseware, Program):
+            sub_qset = sub_qset.filter(
+                courseware_object_id__in=[parent_courseware.id]
+                + [
+                    related_program.id
+                    for related_program in parent_courseware.related_programs
+                ],
+                courseware_content_type=program_ct,
             )
         else:
             sub_qset = sub_qset.filter(

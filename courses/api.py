@@ -8,11 +8,11 @@ from traceback import format_exc
 from typing import List, Optional
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from django.db.models.query import QuerySet
-from django.contrib.contenttypes.models import ContentType
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
@@ -147,20 +147,12 @@ def get_user_enrollments(user):
         []
     )  # just the programs we don't have distinct ProgramEnrollments for
 
-    for program in [
-        cre.run.course.program
-        for cre in course_run_enrollments
-        if cre.run.course.program is not None
-    ]:
-        if program not in all_course_run_programs:
-            all_course_run_programs.append(program)
+    for cre in course_run_enrollments:
+        if cre.run.course.programs:
+            all_course_run_programs += cre.run.course.programs
+    all_course_run_programs = set(all_course_run_programs)
 
-    program_enrollments = (
-        ProgramEnrollment.objects.prefetch_related("program__courses")
-        .select_related("user")
-        .filter(user=user)
-        .all()
-    )
+    program_enrollments = ProgramEnrollment.objects.filter(user=user).all()
 
     for program in all_course_run_programs:
         found = False
@@ -185,11 +177,11 @@ def get_user_enrollments(user):
 
     program_courses = itertools.chain(
         *(
-            program_enrollment.program.courses.all()
+            program_enrollment.program.courses
             for program_enrollment in program_enrollments
         )
     )
-    program_course_ids = set(course.id for course in program_courses)
+    program_course_ids = set(course[0].id for course in program_courses)
     non_program_run_enrollments, program_run_enrollments = partition(
         course_run_enrollments,
         lambda course_run_enrollment: (
@@ -281,10 +273,8 @@ def create_run_enrollments(
                 ),
             )
 
-            if run.course.program is not None:
-                related_program = ProgramEnrollment.objects.get_or_create(
-                    user=user, program=run.course.program
-                )
+            for program in run.course.programs:
+                ProgramEnrollment.objects.get_or_create(user=user, program=program)
 
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
@@ -872,67 +862,7 @@ def override_user_grade(user, override_grade, courseware_id, should_force_pass=F
     return course_run_grade
 
 
-def check_program_for_orphans(program: Program, report_error: bool = True) -> List:
-    """
-    Checks a program for orphans.
-
-    Orphans in a program include courses that don't appear in the requirements
-    tree. Additionally, there's a short-circuit here that will trigger if the
-    requirements tree is empty/nonexistant (which is also an error case).
-
-    If the triggers are pulled, this will log an error message if the
-    report_error flag is set to True (which is the default; the intent is to
-    allow you to quiet the reporting if you're looking for orphans to adopt them
-    into the tree).
-
-    Args:
-        program (Program): the program to search through
-        report_error (bool): flag; should the check log an error if there are orphans (default True)
-    Returns:
-        List of Course: the courses that aren't in the requirements tree
-    """
-
-    # program.requirements_root is a @cached_property; for this use case, then,
-    # we always want to pull the root from the database directly.
-    reqroot = program.get_requirements_root()
-
-    if reqroot is None:
-        if report_error:
-            log.error(
-                f"Program {program.title} ({program.readable_id}) has no requirements tree at all"
-            )
-        return program.courses.all()
-
-    if (
-        reqroot.get_descendants()
-        .filter(node_type=ProgramRequirementNodeType.COURSE.value)
-        .count()
-        == 0
-    ):
-        if report_error:
-            log.error(
-                f"Program {program.title} ({program.readable_id}) has an empty requirements tree (no courses)"
-            )
-        return program.courses.all()
-
-    course_ids = [
-        node.course.id
-        for node in reqroot.get_descendants()
-        .filter(node_type=ProgramRequirementNodeType.COURSE.value)
-        .all()
-    ]
-
-    all_orphans = program.courses.exclude(id__in=course_ids).all()
-
-    if len(all_orphans) > 0 and report_error:
-        log.error(
-            f"Program {program.title} ({program.readable_id}) has {len(all_orphans)} orphaned courses"
-        )
-
-    return all_orphans
-
-
-def has_earned_program_cert(user, program):
+def _has_earned_program_cert(user, program):
     """
     Checks if a user has earned all the course certificates required
     for a given program.
@@ -945,27 +875,26 @@ def has_earned_program_cert(user, program):
         bool: True if a user has earned all the course certificates required
               for a given program else False
     """
+    program_course_ids = [course[0].id for course in program.courses]
+
     passed_courses = Course.objects.filter(
-        in_programs__program=program,
+        id__in=program_course_ids,
         courseruns__courseruncertificates__user=user,
         courseruns__courseruncertificates__is_revoked=False,
     )
-    root = ProgramRequirement.get_root_nodes().get(program=program)
 
-    def _has_earned(node):
-        if node.is_root or node.is_all_of_operator:
-            # has passed all of the child requirements
-            return all(_has_earned(child) for child in node.get_children())
-        elif node.is_min_number_of_operator:
-            # has passed a minimum of the child requirements
-            return len(list(filter(_has_earned, node.get_children()))) >= int(
-                node.operator_value
-            )
-        elif node.is_course:
-            # has passed the reference course
-            return node.course in passed_courses
-
-    return _has_earned(root)
+    passed_all_requirements = all(
+        required_course in passed_courses
+        for required_course in program.required_courses
+    )
+    if program.elective_courses:
+        met_elective_requirement = (
+            len(list(set(passed_courses).intersection(program.elective_courses)))
+            >= program.minimum_elective_courses_requirement
+        )
+        return passed_all_requirements and met_elective_requirement
+    else:
+        return passed_all_requirements
 
 
 def generate_program_certificate(user, program, force_create=False):
@@ -994,7 +923,7 @@ def generate_program_certificate(user, program, force_create=False):
         )
         return existing_cert_queryset.first(), False
 
-    if not force_create and not has_earned_program_cert(user, program):
+    if not force_create and not _has_earned_program_cert(user, program):
         return None, False
 
     program_cert = ProgramCertificate.objects.create(user=user, program=program)

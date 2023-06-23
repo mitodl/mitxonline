@@ -393,6 +393,12 @@ class Discount(TimestampedModel):
                 Decimal("0.01")
             )
 
+    @property
+    def is_full_discount(self):
+        return (
+            self.discount_type == DISCOUNT_TYPE_PERCENT_OFF and self.amount == 100
+        ) or (self.discount_type == DISCOUNT_TYPE_FIXED_PRICE and self.amount == 0)
+
 
 class DiscountProduct(TimestampedModel):
     discount = models.ForeignKey(

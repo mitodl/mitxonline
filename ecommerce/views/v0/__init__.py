@@ -157,7 +157,7 @@ class ProductViewSet(ReadOnlyModelViewSet):
             .filter(
                 Q(programruns__isnull=True)
                 | Q(valid_runs=0)
-                | Q(courses__in=unenrollable_course_ids)
+                | Q(all_requirements__course__in=unenrollable_course_ids)
             )
             .values_list("id", flat=True)
             .distinct()

@@ -1,12 +1,10 @@
 """Tests for course models"""
 from datetime import timedelta
-from types import SimpleNamespace
 
 import factory
 import pytest
 from django.core.exceptions import ValidationError
 from mitol.common.utils.datetime import now_in_utc
-from ecommerce.factories import ProductFactory
 from wagtail.models import Page
 
 from cms.factories import (
@@ -24,72 +22,22 @@ from courses.factories import (
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
     ProgramFactory,
+    ProgramRequirementFactory,
+    program_with_requirements,
 )
 from courses.models import (
     Course,
     CourseRunEnrollment,
+    Program,
     ProgramRequirement,
     ProgramRequirementNodeType,
     limit_to_certificate_pages,
 )
+from ecommerce.factories import ProductFactory
 from main.test_utils import format_as_iso8601
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
-
-
-@pytest.fixture
-def program_with_requirements():
-    program = ProgramFactory.create()
-    required_courses = CourseFactory.create_batch(3, program=program)
-    elective_courses = CourseFactory.create_batch(3, program=program)
-    mut_exclusive_courses = CourseFactory.create_batch(3, program=program)
-
-    root_node = program.requirements_root
-
-    required_courses_node = root_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.ALL_OF,
-        title="Required Courses",
-    )
-    for course in required_courses:
-        required_courses_node.add_child(
-            node_type=ProgramRequirementNodeType.COURSE, course=course
-        )
-
-    # at least two must be taken
-    elective_courses_node = root_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-        operator_value=2,
-        title="Elective Courses",
-    )
-    for course in elective_courses:
-        elective_courses_node.add_child(
-            node_type=ProgramRequirementNodeType.COURSE, course=course
-        )
-
-    # 3rd elective option is at least one of these courses
-    mut_exclusive_courses_node = elective_courses_node.add_child(
-        node_type=ProgramRequirementNodeType.OPERATOR,
-        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-        operator_value=1,
-    )
-    for course in mut_exclusive_courses:
-        mut_exclusive_courses_node.add_child(
-            node_type=ProgramRequirementNodeType.COURSE, course=course
-        )
-
-    return SimpleNamespace(
-        program=program,
-        root_node=root_node,
-        required_courses=required_courses,
-        required_courses_node=required_courses_node,
-        elective_courses=elective_courses,
-        elective_courses_node=elective_courses_node,
-        mut_exclusive_courses=mut_exclusive_courses,
-        mut_exclusive_courses_node=mut_exclusive_courses_node,
-    )
 
 
 def test_program_num_courses():
@@ -97,12 +45,19 @@ def test_program_num_courses():
     Program should return number of courses associated with it
     """
     program = ProgramFactory.create()
+    course1 = CourseFactory.create()
+    course2 = CourseFactory.create()
+
     assert program.num_courses == 0
 
-    CourseFactory.create(program=program)
+    program.add_requirement(course1)
+    # the cached property should work, so this will be wrong here
+    assert program.num_courses == 0
+    program = Program.objects.get(pk=program.id)
     assert program.num_courses == 1
 
-    CourseFactory.create(program=program)
+    program.add_requirement(course2)
+    program = Program.objects.get(pk=program.id)
     assert program.num_courses == 2
 
 
@@ -112,9 +67,10 @@ def test_program_is_catalog_visible():
     date in the future
     """
     program = ProgramFactory.create()
-    runs = CourseRunFactory.create_batch(
-        2, course__program=program, past_start=True, past_enrollment_end=True
-    )
+    runs = CourseRunFactory.create_batch(2, past_start=True, past_enrollment_end=True)
+    for run in runs:
+        program.add_requirement(run.course)
+
     assert program.is_catalog_visible is False
 
     now = now_in_utc()
@@ -336,7 +292,7 @@ def test_program_first_unexpired_run():
     )
 
     # create another course and course run in program
-    another_course = CourseFactory.create(program=program)
+    another_course = CourseFactory.create()
     second_run = CourseRunFactory.create(
         start_date=now + timedelta(days=50),
         course=another_course,
@@ -454,7 +410,7 @@ def test_readable_id_valid(readable_id_value):
     program = ProgramFactory.build(readable_id=readable_id_value)
     program.save()
     assert program.id is not None
-    course = CourseFactory.build(program=None, readable_id=readable_id_value)
+    course = CourseFactory.build(readable_id=readable_id_value)
     course.save()
     assert course.id is not None
 
@@ -479,7 +435,7 @@ def test_readable_id_invalid(readable_id_value):
     program = ProgramFactory.build(readable_id=readable_id_value)
     with pytest.raises(ValidationError):
         program.save()
-    course = CourseFactory.build(program=None, readable_id=readable_id_value)
+    course = CourseFactory.build(readable_id=readable_id_value)
     with pytest.raises(ValidationError):
         course.save()
 
@@ -494,8 +450,14 @@ def test_get_program_run_enrollments(user):
     course_run_enrollments = CourseRunEnrollmentFactory.create_batch(
         2,
         user=user,
-        run__course__program=factory.Iterator([program, program, programs[1]]),
     )
+
+    for idx, cre in enumerate(course_run_enrollments):
+        if idx == 2:
+            programs[1].add_requirement(cre.run.course)
+        else:
+            programs[0].add_requirement(cre.run.course)
+
     expected_run_enrollments = set(course_run_enrollments[0:2])
     assert (
         set(CourseRunEnrollment.get_program_run_enrollments(user, program))
@@ -591,14 +553,14 @@ def test_program_certificate_start_end_dates_and_page_revision(user):
     end_date = now + timedelta(days=100)
     program = ProgramFactory.create()
 
-    early_course_run = CourseRunFactory.create(
-        course__program=program, start_date=start_date, end_date=end_date
-    )
+    early_course_run = CourseRunFactory.create(start_date=start_date, end_date=end_date)
     later_course_run = CourseRunFactory.create(
-        course__program=program,
         start_date=start_date + timedelta(days=1),
         end_date=end_date + timedelta(days=1),
     )
+
+    program.add_requirement(early_course_run.course)
+    program.add_requirement(later_course_run.course)
 
     # Need the course run certificates to be there in order for the start_end_dates
     # to return valid values
@@ -817,7 +779,7 @@ def test_program_add_requirement():
     duplicate nodes. It should create the root node if there isn't one already.
     """
     program = ProgramFactory.create()
-    course = CourseFactory.create(program=program)
+    course = CourseFactory.create()
 
     def add_and_check():
         program.add_requirement(course)
@@ -874,7 +836,7 @@ def test_program_add_elective():
     create duplicate nodes. It should create the root node if there isn't one already.
     """
     program = ProgramFactory.create()
-    course = CourseFactory.create(program=program)
+    course = CourseFactory.create()
 
     def add_and_check():
         program.add_elective(course)
@@ -971,3 +933,60 @@ def test_active_products_for_expired_course_run():
     ProductFactory.create(purchasable_object=course_run)
 
     assert course_run.course.active_products is None
+
+
+def test_related_programs():
+    """Tests to make sure the related programs functionality in the model works."""
+    programs = ProgramFactory.create_batch(4)
+
+    programs[1].add_related_program(programs[0])
+
+    assert len(programs[0].related_programs) == 1
+    assert len(programs[1].related_programs) == 1
+
+    assert len(programs[2].related_programs) == 0
+
+    related_program = programs[3].add_related_program(programs[2])
+    second_related_program = programs[2].add_related_program(programs[3])
+
+    assert len(programs[2].related_programs) == 1
+    assert len(programs[3].related_programs) == 1
+
+    assert related_program == second_related_program
+
+
+def test_program_minimum_elective_courses_requirement():
+    """Tests to make sure the related programs functionality in the model works."""
+    minimum_elective_required = 5
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=minimum_elective_required,
+        title="Elective Courses",
+    )
+
+    assert program.minimum_elective_courses_requirement == minimum_elective_required
+
+
+def test_program_minimum_elective_courses_requirement_no_elective_node():
+    """Tests to make sure the related programs functionality in the model works."""
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+
+    assert program.minimum_elective_courses_requirement is None

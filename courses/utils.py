@@ -1,12 +1,10 @@
 """Utilities for courses"""
 
 import logging
-from requests.exceptions import HTTPError
-from courses.models import (
-    CourseRunEnrollment,
-    ProgramCertificate,
-)
 
+from requests.exceptions import HTTPError
+
+from courses.models import CourseRunEnrollment, ProgramCertificate
 
 log = logging.getLogger(__name__)
 
@@ -28,22 +26,32 @@ def is_grade_valid(override_grade: float):
     return 0.0 <= override_grade <= 1.0
 
 
-def get_program_certificate_by_enrollment(enrollment):
+def get_program_certificate_by_enrollment(enrollment, program=None):
     """
-    Resolve a certificate for this enrollment if it exists
+    Resolve a certificate for this enrollment and program if it exists
+
+    This requires a program to be passed along with a CourseRunEnrollment, or
+    we won't be able to tell which of the course's programs to look for
+    certificates for.
+
+    Args:
+    - enrollment: CourseRunEnrollment or ProgramEnrollment, the courseware ID to look for program certificates for
+    - program: Program or None, the program to consider in the case of a CourseRunEnrollment
+
+    Returns:
+    - ProgramCertificate or None
     """
     user_id = enrollment.user_id
     if isinstance(enrollment, CourseRunEnrollment):
         # No need to include a certificate if there is no corresponding wagtail page
         # to support the render
         if (
-            not enrollment.run.course.program
-            or not hasattr(enrollment.run.course.program, "page")
-            or not enrollment.run.course.program.page
-            or not enrollment.run.course.program.page.certificate_page
+            not hasattr(program, "page")
+            or not program.page
+            or not program.page.certificate_page
         ):
             return None
-        program_id = enrollment.run.course.program.id
+        program_id = program.id
     else:
         # No need to include a certificate if there is no corresponding wagtail page
         # to support the render

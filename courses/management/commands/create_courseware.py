@@ -141,6 +141,14 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
+            "--related",
+            type=str,
+            nargs="?",
+            action="append",
+            help="(Program only) Create program relation for the specified program's readable ID. (Add as many as necessary.)",
+        )
+
+        parser.add_argument(
             "--required",
             help="(Course only) Make the course a requirement of the program.",
             action="store_true",
@@ -193,6 +201,30 @@ class Command(BaseCommand):
                     f"Created program {new_program.id}: {new_program.title} ({new_program.readable_id})."
                 )
             )
+
+            if kwargs["related"] is not None and len(kwargs["related"]) > 0:
+                for readable_id in kwargs["related"]:
+                    try:
+                        related_program = Program.objects.filter(
+                            readable_id=readable_id
+                        ).get()
+                        new_program.add_related_program(related_program)
+
+                        self.stdout.write(
+                            self.style.SUCCESS(f"Added relationship for {readable_id}.")
+                        )
+                    except Exception as e:
+                        self.stderr.write(
+                            self.style.ERROR(
+                                f"Can't add relationship for {readable_id}: program not found."
+                            )
+                        )
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Added {len(new_program.related_programs)} program relationships."
+                )
+            )
         elif kwargs["type"] == "course":
             if Course.objects.filter(readable_id=kwargs["courseware_id"]).exists():
                 self.stderr.write(
@@ -213,7 +245,6 @@ class Command(BaseCommand):
                     ).first()
 
             new_course = Course.objects.create(
-                program=program,
                 title=kwargs["title"],
                 readable_id=kwargs["courseware_id"],
                 live=kwargs["live"],
@@ -221,7 +252,7 @@ class Command(BaseCommand):
 
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Created course {new_course.id}: {new_course.title} ({new_course.readable_id}) in program {new_course.program}"
+                    f"Created course {new_course.id}: {new_course.title} ({new_course.readable_id})"
                 )
             )
 

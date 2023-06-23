@@ -4,7 +4,7 @@ import pytest
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import call_command
 
-from courses.factories import CourseRunFactory, CourseFactory, ProgramFactory
+from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
 from courses.models import CourseRun
 from ecommerce.models import Product
 
@@ -31,7 +31,8 @@ def test_create_product_for_program_courses_command(program, price, active):
     )
     generated_program = ProgramFactory(readable_id=program)
     generated_program.refresh_from_db()
-    course = CourseFactory(program=generated_program)
+    course = CourseFactory()
+    generated_program.add_requirement(course)
     CourseRunFactory.create(course=course)
     run_ids = CourseRun.objects.filter(course=course).values_list("id", flat=True)
 

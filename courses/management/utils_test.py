@@ -59,9 +59,7 @@ def test_create_run_enrollment_edx_failure(
     now = now_in_utc()
     user = UserFactory()
     existing_enrollment = CourseRunEnrollmentFactory(user=user)
-    non_program_run = CourseRunFactory.create(
-        course__no_program=True, start_date=(now + timedelta(days=1))
-    )
+    non_program_run = CourseRunFactory.create(start_date=(now + timedelta(days=1)))
     expected_enrollment = CourseRunEnrollmentFactory(user=user, run=non_program_run)
 
     patched_edx_enroll = mocker.patch(

@@ -21,8 +21,8 @@ from mitol.common.envs import (
     import_settings_modules,
 )
 from mitol.google_sheets.settings.google_sheets import *
-from mitol.google_sheets_refunds.settings.google_sheets_refunds import *
 from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *
+from mitol.google_sheets_refunds.settings.google_sheets_refunds import *
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
@@ -855,16 +855,6 @@ CELERY_BEAT_SCHEDULE = {
             minute=0,
             hour=CRON_COURSE_CERTIFICATES_HOURS,
             day_of_week=CRON_COURSE_CERTIFICATES_DAYS,
-            day_of_month="*",
-            month_of_year="*",
-        ),
-    },
-    "check-for-program-orphans": {
-        "task": "courses.tasks.check_for_program_orphans",
-        "schedule": crontab(
-            minute=0,
-            hour=CRON_ORPHAN_CHECK_HOURS,
-            day_of_week=CRON_ORPHAN_CHECK_DAYS,
             day_of_month="*",
             month_of_year="*",
         ),

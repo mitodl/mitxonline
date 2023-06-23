@@ -4,8 +4,7 @@ Course models
 import logging
 import operator as op
 import uuid
-from decimal import ROUND_HALF_EVEN
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
@@ -122,13 +121,13 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     @property
     def num_courses(self):
         """Gets the number of courses in this program"""
-        return self.courses.count()
+        return len(self.courses)
 
     @property
     def is_catalog_visible(self):
         """Returns True if this program should be shown on in the catalog"""
-        # NOTE: This is implemented with courses.all() to allow for prefetch_related optimization.
-        return any(course.is_catalog_visible for course in self.courses.all())
+        just_courses = [course[0] for course in self.courses]
+        return any(course.is_catalog_visible for course in just_courses)
 
     @property
     def first_unexpired_run(self):
@@ -143,6 +142,63 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def text_id(self):
         """Gets the readable_id"""
         return self.readable_id
+
+    @property
+    def related_programs_qs(self):
+        """
+        Returns a list of programs related to this one. Returns a QuerySet.
+
+        Returns:
+        - QuerySet: RelatedPrograms that are related to this program, in either the first or second position
+        """
+
+        the_jam = RelatedProgram.objects.filter(
+            Q(first_program=self) | Q(second_program=self)
+        )
+
+        return the_jam
+
+    @property
+    def related_programs(self):
+        """
+        Returns a list of programs related to this one. Returns a flat list,
+        not a QuerySet.
+
+        Returns:
+        - List(Program): programs that are related to this program, in either the first or second position
+        """
+
+        program_list = []
+
+        for related_program in self.related_programs_qs.all():
+            if related_program.first_program == self:
+                program_list.append(related_program.second_program)
+            else:
+                program_list.append(related_program.first_program)
+
+        return program_list
+
+    def add_related_program(self, program):
+        """
+        Adds a related program record for the specified program. If there's
+        already a related program, then this will return the existing relation.
+
+        Args:
+        - Program: the program to add a relation for
+        Returns:
+        - RelatedProgram; the relation
+        """
+
+        related_program_existence_qs = self.related_programs_qs.filter(
+            Q(first_program=program) | Q(second_program=program)
+        )
+
+        if not related_program_existence_qs.exists():
+            return RelatedProgram.objects.create(
+                first_program=self, second_program=program
+            )
+
+        return related_program_existence_qs.get()
 
     @cached_property
     def requirements_root(self):
@@ -223,9 +279,85 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 program=self, node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value
             )
 
+    def _req_course_walk(self, node, heap):
+        courses = []
+
+        if node.node_type == ProgramRequirementNodeType.COURSE:
+            return [(node.course, node.get_parent().title)]
+
+        for child in node.get_children().all():
+            courses.extend(self._req_course_walk(child, heap))
+
+        courses.extend(heap)
+        return courses
+
+    @cached_property
+    def courses(self):
+        """
+        Returns the courses associated with this program via the requirements
+        tree. This returns a flat list, not a QuerySet.
+
+        Returns:
+        - list of tuple (Course, string): courses that are either requirements or electives, plus the requirement type
+        """
+
+        return self._req_course_walk(self.requirements_root, [])
+
+    @cached_property
+    def required_courses(self):
+        """
+        Returns just the courses under the "Required Courses" node.
+        """
+        return [course for (course, type) in self.courses if type == "Required Courses"]
+
+    @cached_property
+    def elective_courses(self):
+        """
+        Returns just the courses under the "Required Courses" node.
+        """
+        return [course for (course, type) in self.courses if type == "Elective Courses"]
+
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."
+
+    @cached_property
+    def minimum_elective_courses_requirement(self):
+        """
+        Returns the (int) value defined for the minimum number of elective courses required to be completed by the Program
+
+        Returns:
+            int: Minimum number of elective courses required to be completed by the Program.
+                Returns None, if no value is defined or elective node is absent.
+        """
+        operator_nodes = self.requirements_root.get_children()
+        for operator_node in operator_nodes:
+            if operator_node.is_min_number_of_operator:
+                # has passed a minimum of the child requirements
+                return int(operator_node.operator_value)
+
+        return None
+
+
+class RelatedProgram(TimestampedModel, ValidateOnSaveMixin):
+    """
+    Keeps track of which programs are related for financial assistance reasons.
+
+    For financial assistance, a learner may apply for aid for a specific
+    program. If the program has RelatedPrograms, the financial assistance
+    request should apply to all of them (so, an approval for DEDP Internal
+    Development also grants aid in DEDP Public Policy).
+    """
+
+    first_program = models.ForeignKey(
+        Program, on_delete=models.CASCADE, related_name="+"
+    )
+    second_program = models.ForeignKey(
+        Program, on_delete=models.CASCADE, related_name="+"
+    )
+
+    def __str__(self):
+        return f"Related Programs {self.first_program.readable_id}<-->{self.second_program.readable_id}"
 
 
 class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
@@ -278,9 +410,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
 
     objects = CourseQuerySet.as_manager()
-    program = models.ForeignKey(
-        Program, on_delete=models.CASCADE, null=True, blank=True, related_name="courses"
-    )
     title = models.CharField(max_length=255)
     readable_id = models.CharField(
         max_length=255, unique=True, validators=[validate_url_path_field]
@@ -297,9 +426,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         object_id_field="courseware_object_id",
         content_type_field="courseware_content_type",
     )
-
-    class Meta:
-        ordering = ("program", "title")
 
     @property
     def course_number(self):
@@ -378,6 +504,31 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             )
         )
 
+    @cached_property
+    def programs(self):
+        """
+        Returns a list of Programs which have this Course (self) as a dependency.
+
+        Returns:
+            list: List of Programs this Course is a requirement or elective for.
+        """
+        programs_containing_course = []
+
+        def _program_root_contains_course(node: MP_Node):
+            if node.is_course and node.course == self:
+                return True
+            elif node.get_children():
+                for child in node.get_children():
+                    if _program_root_contains_course(child):
+                        return True
+            return False
+
+        for program_root_node in ProgramRequirement.get_root_nodes():
+            if _program_root_contains_course(program_root_node):
+                programs_containing_course.append(program_root_node.program)
+
+        return programs_containing_course
+
     def is_country_blocked(self, user):
         """
         Check if the user is from a blocked country for this course
@@ -407,30 +558,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             run__course=self
         ).values_list("run__id", flat=True)
         return [run for run in self.unexpired_runs if run.id not in enrolled_runs]
-
-    @property
-    def requirement_type(self):
-        """
-        Returns which branch of the requirements tree this course falls under.
-        This looks only at the requirements tree of the program that the course
-        is in - if the course has been added to another program's requirements
-        tree, this won't consider that.
-
-        Returns:
-            None, "Elective Courses", or "Required Courses".
-        """
-        if not self.program or not self.in_programs.count():
-            return None
-
-        # This will cause an error if the course has been added to its program's
-        # requirement tree more than once - but in this case it probably should
-        # cause an error, so it can be fixed.
-
-        mpnode = self.in_programs.filter(program=self.program).get()
-
-        for branch_root in mpnode.get_root().get_children().all():
-            if mpnode.is_descendant_of(branch_root):
-                return branch_root.title
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
@@ -817,7 +944,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         Start date: earliest course run start date
         End date: latest course run end date
         """
-        course_ids = self.program.courses.all().values_list("id", flat=True)
+        course_ids = [course[0].id for course in self.program.courses]
         dates = CourseRunCertificate.objects.filter(
             user_id=self.user_id, course_run__course_id__in=course_ids
         ).aggregate(
@@ -988,7 +1115,8 @@ class CourseRunEnrollment(EnrollmentModel):
         Returns:
             queryset of CourseRunEnrollment: Course run enrollments associated with a user/program
         """
-        return cls.objects.filter(user=user, run__course__program=program)
+        program_courses = [course[0] for course in program.courses]
+        return cls.objects.filter(user=user, run__course__in=program_courses)
 
     def deactivate_and_save(self, change_status, no_user=False):
         """

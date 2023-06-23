@@ -1,7 +1,7 @@
 """Tests for Wagtail models"""
 import json
-from urllib.parse import quote_plus
 from datetime import timedelta
+from urllib.parse import quote_plus
 
 import factory
 import pytest
@@ -33,6 +33,7 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
+    program_with_empty_requirements,
 )
 from courses.models import Course, CourseRun, limit_to_certificate_pages
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
@@ -258,7 +259,7 @@ def test_flex_pricing_form_display(mocker, is_authed, has_submission):
             flexprice = FlexiblePrice.objects.create(
                 user=request_user,
                 cms_submission=submission,
-                courseware_object=course_page.course.program,
+                courseware_object=flex_form.selected_course,
             )
 
     response = generate_flexible_pricing_response(request_user, flex_form)
@@ -301,7 +302,7 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
         user=request_user,
         cms_submission=submission,
         status=submission_status,
-        courseware_object=course_page.course.program,
+        courseware_object=course_page.course,
     )
 
     response = generate_flexible_pricing_response(request_user, flex_form)
@@ -343,21 +344,23 @@ def test_flex_pricing_parent_resources(course_or_program):
     )
 
 
-def test_flex_pricing_form_courseware_object():
+def test_flex_pricing_form_courseware_object(program_with_empty_requirements):
     """
     Tests to make sure the correct courseware objects are returned when hitting
     the get_parent_courseware method.
     """
 
-    course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
+    first_course = CourseFactory.create(readable_id=FAKE_READABLE_ID, page=None)
+    course_page = CoursePageFactory.create(course=first_course)
     flex_form = FlexiblePricingFormFactory()
 
-    program = ProgramFactory.create()
-    secondary_course = CourseFactory.create(program=program)
+    program = program_with_empty_requirements
+    secondary_course = CourseFactory.create()
+    program.add_requirement(secondary_course)
 
     # no set courseware object, so get it from the parent page
 
-    assert flex_form.get_parent_courseware() == course_page.course.program
+    assert flex_form.get_parent_courseware() == first_course
     assert flex_form.selected_course is None
     assert flex_form.selected_program is None
 
@@ -381,9 +384,20 @@ def test_flex_pricing_form_courseware_object():
     assert flex_form.selected_course == secondary_course
     assert flex_form.selected_program == program
 
+    # adding a second program - should still return the first program
 
-@pytest.mark.parametrize("test_course_first", [True, False])
-def test_flex_pricing_single_submission(mocker, test_course_first):
+    second_program = ProgramFactory.create()
+    second_program.add_requirement(secondary_course)
+
+    assert flex_form.get_parent_courseware() == program
+    assert flex_form.selected_course == secondary_course
+    assert flex_form.selected_program == program
+
+
+@pytest.mark.parametrize("test_scenario", ["course", "two_programs", "one_program"])
+def test_flex_pricing_single_submission(
+    mocker, test_scenario, program_with_empty_requirements
+):
     """
     Tests multiple submissions for the same course/program.
 
@@ -391,18 +405,32 @@ def test_flex_pricing_single_submission(mocker, test_course_first):
     check for a submission for that course or the program the course belongs to.
     If it's associated with a program, it should check for submissions in the
     program. A submission for a course in the program should exist for the program.
+    If it's associated with a program that has related programs, it should check
+    for submissions in the related programs too.
     """
-    program = ProgramFactory.create()
-    course = CourseFactory.create(program=program)
+    program = program_with_empty_requirements
+    course = CourseFactory.create()
+    program.add_requirement(course)
 
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
 
-    if test_course_first:
+    if test_scenario == "course":
         first_sub_form = FlexiblePricingFormFactory(
             parent=course_page, selected_course=course
         )
         second_sub_form = FlexiblePricingFormFactory(
             parent=course_page, selected_program=program
+        )
+    elif test_scenario == "two_programs":
+        second_program = ProgramFactory.create()
+        second_program.add_requirement(course)
+        second_program.add_related_program(program)
+
+        first_sub_form = FlexiblePricingFormFactory(
+            parent=course_page, selected_program=program
+        )
+        second_sub_form = FlexiblePricingFormFactory(
+            parent=course_page, selected_program=second_program
         )
     else:
         second_sub_form = FlexiblePricingFormFactory(
@@ -439,22 +467,29 @@ def test_flex_pricing_single_submission(mocker, test_course_first):
     assert "Application Processing" in response.rendered_content
 
 
-def test_flex_pricing_form_state_display_no_discount_tier(mocker):
+def test_flex_pricing_form_state_display_no_discount_tier(
+    mocker, program_with_empty_requirements
+):
     """
     Tests the status display when the user is assigned to the no-discount tier.
     """
 
+    program = program_with_empty_requirements
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
+    program.add_requirement(course_page.course)
+    course_page.refresh_from_db()
+    program.refresh_from_db()
+
     flex_form = FlexiblePricingFormFactory(
         selected_course=course_page.course,
         application_approved_no_discount_text="No Discount Text",
         application_approved_text="Application Approved",
     )
     tier = FlexiblePriceTierFactory(
-        courseware_object=course_page.course.program, discount__amount=0
+        courseware_object=course_page.course.programs[0], discount__amount=0
     )
     other_tier = FlexiblePriceTierFactory(
-        courseware_object=course_page.course.program,
+        courseware_object=course_page.course.programs[0],
         discount__amount=50,
         discount__discount_type=DISCOUNT_TYPE_FIXED_PRICE,
     )
@@ -467,7 +502,7 @@ def test_flex_pricing_form_state_display_no_discount_tier(mocker):
         user=request_user,
         cms_submission=submission,
         status=FlexiblePriceStatus.APPROVED,
-        courseware_object=course_page.course.program,
+        courseware_object=course_page.course.programs[0],
         tier=tier,
     )
 

@@ -5,13 +5,12 @@ Tests for course views
 import operator as op
 
 import pytest
+import reversion
 from django.db.models import Count, Q
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
-from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from rest_framework import status
-import reversion
 from reversion.models import Version
 
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
@@ -21,6 +20,7 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
+    program_with_empty_requirements,
 )
 from courses.models import CourseRun, ProgramEnrollment
 from courses.serializers import (
@@ -29,8 +29,9 @@ from courses.serializers import (
     CourseSerializer,
     ProgramSerializer,
 )
-from ecommerce.models import Order, PendingOrder
 from courses.views.v1 import UserEnrollmentsApiViewSet
+from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
+from ecommerce.models import Order, PendingOrder
 from main import features
 from main.constants import (
     USER_MSG_COOKIE_NAME,
@@ -275,12 +276,17 @@ def test_programs_not_live(client, live):
 
 
 @pytest.mark.parametrize("live", [True, False])
-def test_courses_not_live_in_programs_api(client, live):
+def test_courses_not_live_in_programs_api(
+    client, live, program_with_empty_requirements
+):
     """Courses should be filtered out of the programs API if not live"""
     if live:
-        course = CourseFactory.create(live=live, program__live=True, page=None)
+        course = CourseFactory.create(live=live, page=None)
     else:
-        course = CourseFactory.create(live=live, program__live=True)
+        course = CourseFactory.create(live=live)
+
+    program_with_empty_requirements.add_requirement(course)
+
     resp = client.get(reverse("programs_api-list"))
     assert resp.status_code == status.HTTP_200_OK
     assert_drf_json_equal(
@@ -634,7 +640,8 @@ def test_program_enrollments(
             enrollment.save()
             enrollments.append(enrollment)
 
-    course = CourseFactory.create(program=programs[1])
+    course = CourseFactory.create()
+    programs[1].add_requirement(course)
     course_run = CourseRunFactory.create(course=course)
     course_run_enrollment = CourseRunEnrollmentFactory.create(run=course_run, user=user)
 

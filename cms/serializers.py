@@ -38,9 +38,9 @@ class CoursePageSerializer(serializers.ModelSerializer):
         Returns URL of the Financial Assistance Form.
         """
         financial_assistance_page = None
-        if instance.product.program:
+        if instance.product.programs:
             program_page = ProgramPage.objects.filter(
-                program_id=instance.product.program
+                program_id__in=[program.id for program in instance.product.programs]
             ).first()
 
             # for courses in program, financial assistance form from program should take precedence if exist
@@ -55,7 +55,7 @@ class CoursePageSerializer(serializers.ModelSerializer):
                     return f"{program_page.get_url()}{financial_assistance_page.slug}/"
 
             financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
-                selected_program=instance.product.program
+                selected_program=instance.product.programs[0]
             ).first()
 
         if financial_assistance_page is None:
