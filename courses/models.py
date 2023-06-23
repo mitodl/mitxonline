@@ -298,7 +298,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         tree. This returns a flat list, not a QuerySet.
 
         Returns:
-        - list of (Course, string): courses that are either requirements or electives, plus the requirement type
+        - list of tuple (Course, string): courses that are either requirements or electives, plus the requirement type
         """
 
         return self._req_course_walk(self.requirements_root, [])
