@@ -48,7 +48,7 @@ class Command(BaseCommand):
             dict: A dictionary mapping a run suffix to a two-item tuple containing the overall
                 start and end dates for the course runs matching that suffix.
         """
-        course_ids = [course.id for course in program.courses]
+        course_ids = [course[0].id for course in program.courses]
         num_program_courses = len(course_ids)
         all_program_runs = (
             CourseRun.objects.filter(course_id__in=course_ids)
@@ -121,7 +121,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         """Handle command execution"""
-        programs = Program.objects.prefetch_related("programruns", "courses")
+        programs = Program.objects.prefetch_related("programruns")
         if options["program"]:
             programs = programs.filter(readable_id=options["program"])
 
