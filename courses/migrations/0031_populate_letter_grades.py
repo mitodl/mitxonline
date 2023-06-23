@@ -12,9 +12,9 @@ def populate_letter_grade(apps, schema_editor):
     CourseRunGrade = apps.get_model("courses", "CourseRunGrade")
     grades = CourseRunGrade.objects.filter(
         passed=True,
-        letter_grade__contains='Pass',
-        course_run__course__program__title__startswith='Data',
-        course_run__end_date__lt=datetime.datetime(2022, 9, 1, tzinfo=pytz.UTC)
+        letter_grade__contains="Pass",
+        course_run__course__program__title__startswith="Data",
+        course_run__end_date__lt=datetime.datetime(2022, 9, 1, tzinfo=pytz.UTC),
     )
     for grade in grades:
         grade.letter_grade = convert_to_letter(grade.grade)
@@ -24,11 +24,9 @@ def populate_letter_grade(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('courses', '0030_remove_course_position_in_program'),
+        ("courses", "0030_remove_course_position_in_program"),
     ]
 
     operations = [
-        migrations.RunPython(
-            populate_letter_grade, migrations.RunPython.noop
-        ),
+        migrations.RunPython(populate_letter_grade, migrations.RunPython.noop),
     ]
