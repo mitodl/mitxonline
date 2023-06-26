@@ -389,6 +389,23 @@ def test_paypal_refunds(fulfilled_paypal_transaction):
         assert "PayPal" in exc
 
 
+def test_unknown_refund_response(mocker, fulfilled_transaction):
+    """If we get a weird response, this should fail gracefully."""
+    error_return = {
+        "state": "Something weird here! Definitely not a regular response!",
+        "message": "This is an error message.",
+    }
+
+    mocker.patch(
+        "mitol.payment_gateway.api.PaymentGateway.start_refund",
+        returns=error_return,
+    )
+
+    with pytest.raises(Exception) as exc:
+        refund_order(order_id=fulfilled_paypal_transaction.order.id)
+        assert "returned an error" in exc
+
+
 def test_unenrollment_unenrolls_learner(mocker, user):
     """
     Test that unenroll_learner_from_order unenrolls the learner from an order
