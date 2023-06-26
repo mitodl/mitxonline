@@ -14,7 +14,7 @@ def populate_letter_grade(apps, schema_editor):
         passed=True,
         letter_grade__contains="Pass",
         course_run__course__program__title__startswith="Data",
-        course_run__end_date__lt=datetime.datetime(2022, 9, 1, tzinfo=pytz.UTC),
+        course_run__start_date__lt=datetime.datetime(2022, 9, 1, tzinfo=pytz.UTC),
     )
     for grade in grades:
         grade.letter_grade = convert_to_letter(grade.grade)
