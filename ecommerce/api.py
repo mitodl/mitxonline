@@ -398,69 +398,68 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
     refund_reason = kwargs.get("refund_reason", "")
     unenroll = kwargs.get("unenroll", False)
 
-    with transaction.atomic():
-        if reference_number is not None:
-            order = FulfilledOrder.objects.select_for_update().get(
-                reference_number=reference_number
-            )
-        elif order_id is not None:
-            order = FulfilledOrder.objects.select_for_update().get(pk=order_id)
-        else:
-            log.error(
-                "Either order_id or reference_number is required to fetch the Order."
-            )
-            return False
-        if order.state != Order.STATE.FULFILLED:
-            log.debug("Order with order_id %s is not in fulfilled state.", order.id)
-            return False
 
-        order_recent_transaction = order.transactions.first()
+    if reference_number is not None:
+        order = FulfilledOrder.objects.select_for_update().get(
+            reference_number=reference_number
+        )
+    elif order_id is not None:
+        order = FulfilledOrder.objects.select_for_update().get(pk=order_id)
+    else:
+        log.error(
+            "Either order_id or reference_number is required to fetch the Order."
+        )
+        return False
+    if order.state != Order.STATE.FULFILLED:
+        log.debug("Order with order_id %s is not in fulfilled state.", order.id)
+        return False
 
-        if not order_recent_transaction:
-            log.error(
-                "There is no associated transaction against order_id %s", order.id
-            )
-            return False
+    order_recent_transaction = order.transactions.first()
 
-        transaction_dict = order_recent_transaction.data
+    if not order_recent_transaction:
+        log.error(
+            "There is no associated transaction against order_id %s", order.id
+        )
+        return False
 
-        # Check for a PayPal payment - if there's one, we can't process it
-        if "paypal_token" in transaction_dict:
-            raise Exception(
-                f"PayPal: Order {order.reference_number} contains a PayPal transaction. Please contact Finance to refund this order."
-            )
+    transaction_dict = order_recent_transaction.data
 
-        # The refund amount can be different then the payment amount, so we override
-        # that before PaymentGateway processing.
-        # e.g. While refunding order from Django Admin we can select custom amount.
-        if refund_amount:
-            transaction_dict["req_amount"] = refund_amount
-
-        refund_gateway_request = PaymentGateway.create_refund_request(
-            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, transaction_dict
+    # Check for a PayPal payment - if there's one, we can't process it
+    if "paypal_token" in transaction_dict:
+        raise Exception(
+            f"PayPal: Order {order.reference_number} contains a PayPal transaction. Please contact Finance to refund this order."
         )
 
-        response = PaymentGateway.start_refund(
-            ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
-            refund_gateway_request,
-        )
+    # The refund amount can be different then the payment amount, so we override
+    # that before PaymentGateway processing.
+    # e.g. While refunding order from Django Admin we can select custom amount.
+    if refund_amount:
+        transaction_dict["req_amount"] = refund_amount
 
-        if response.state in REFUND_SUCCESS_STATES:
-            # Record refund transaction with PaymentGateway's refund response
-            order.refund(
-                api_response_data=response.response_data,
-                amount=transaction_dict["req_amount"],
-                reason=refund_reason,
-            )
-        else:
-            log.error(
-                "There was an error with the Refund API request %s",
-                response.message,
-            )
-            # PaymentGateway didn't raise an exception and instead gave a Response but the response status was not
-            # success so we manually rollback the transaction in this case.
-            transaction.rollback()
-            raise Exception(f"Payment gateway returned an error: {response.message}")
+    refund_gateway_request = PaymentGateway.create_refund_request(
+        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, transaction_dict
+    )
+
+    response = PaymentGateway.start_refund(
+        ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+        refund_gateway_request,
+    )
+
+    if response.state in REFUND_SUCCESS_STATES:
+        # Record refund transaction with PaymentGateway's refund response
+        order.refund(
+            api_response_data=response.response_data,
+            amount=transaction_dict["req_amount"],
+            reason=refund_reason,
+        )
+    else:
+        log.error(
+            "There was an error with the Refund API request %s",
+            response.message,
+        )
+        # PaymentGateway didn't raise an exception and instead gave a Response but the response status was not
+        # success so we manually rollback the transaction in this case.
+        raise Exception(f"Payment gateway returned an error: {response.message}")
 
     # If unenroll requested, perform unenrollment after successful refund
     if unenroll:
