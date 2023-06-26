@@ -4,16 +4,22 @@ import datetime
 import pytz
 from django.db import migrations
 
+from courses.models import Program
 from courses.utils import convert_to_letter
 
 
 def populate_letter_grade(apps, schema_editor):
     """Populate the certificate_available_date from course run's end_date"""
     CourseRunGrade = apps.get_model("courses", "CourseRunGrade")
+
+    dedp_program = Program.objects.filter(readable_id="program-v1:MITx+DEDP").get()
+
+    dedp_course_ids = [course[0].id for course in dedp_program.courses]
+
     grades = CourseRunGrade.objects.filter(
         passed=True,
         letter_grade__contains="Pass",
-        course_run__course__program__title__startswith="Data",
+        course_run__course_id__in=dedp_course_ids,
         course_run__start_date__lt=datetime.datetime(2022, 9, 1, tzinfo=pytz.UTC),
     )
     for grade in grades:
@@ -24,7 +30,7 @@ def populate_letter_grade(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("courses", "0030_remove_course_position_in_program"),
+        ("courses", "0032_add_related_programs_table"),
     ]
 
     operations = [
