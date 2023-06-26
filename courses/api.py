@@ -899,19 +899,6 @@ def _has_earned_program_cert(user, program):
 
     return _has_earned(root)
 
-    # passed_all_requirements = all(
-    #     required_course in passed_courses
-    #     for required_course in program.required_courses
-    # )
-    # if program.elective_courses:
-    #     met_elective_requirement = (
-    #         len(list(set(passed_courses).intersection(program.elective_courses)))
-    #         >= program.minimum_elective_courses_requirement
-    #     )
-    #     return passed_all_requirements and met_elective_requirement
-    # else:
-    #     return passed_all_requirements
-
 
 def generate_program_certificate(user, program, force_create=False):
     """
