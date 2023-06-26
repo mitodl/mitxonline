@@ -1390,44 +1390,54 @@ def test_generate_program_certificate_failure_not_all_passed(
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_generate_program_certificate_success_single_requirement_course(
-    user, program_with_empty_requirements
-):
+def test_generate_program_certificate_success_single_requirement_course(user):
     """
     Test that generate_program_certificate generates a program certificate for a Program with a single required Course.
     """
     course = CourseFactory.create()
-    program_with_empty_requirements.add_requirement(course)
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    program.add_requirement(course)
     course_run = CourseRunFactory.create(course=course)
     CourseRunGradeFactory.create(course_run=course_run, user=user, passed=True, grade=1)
 
     CourseRunCertificateFactory.create(user=user, course_run=course_run)
 
-    certificate, created = generate_program_certificate(
-        user=user, program=program_with_empty_requirements
-    )
+    certificate, created = generate_program_certificate(user=user, program=program)
     assert created is True
     assert isinstance(certificate, ProgramCertificate)
     assert len(ProgramCertificate.objects.all()) == 1
 
 
-def test_generate_program_certificate_success_multiple_required_courses(
-    user, program_with_empty_requirements
-):
+def test_generate_program_certificate_success_multiple_required_courses(user):
     """
     Test that generate_program_certificate generate a program certificate
     """
     courses = CourseFactory.create_batch(3)
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
     for course in courses:
-        program_with_empty_requirements.add_requirement(course)
+        program.add_requirement(course)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     CourseRunCertificateFactory.create_batch(
         3, user=user, course_run=factory.Iterator(course_runs)
     )
 
-    certificate, created = generate_program_certificate(
-        user=user, program=program_with_empty_requirements
-    )
+    certificate, created = generate_program_certificate(user=user, program=program)
     assert created is True
     assert isinstance(certificate, ProgramCertificate)
     assert len(ProgramCertificate.objects.all()) == 1
@@ -1541,3 +1551,58 @@ def test_program_certificates_access():
     )
     test_certificate.refresh_from_db()
     assert test_certificate.is_revoked is False
+
+
+def test_generate_program_certificate_failure_not_all_passed_nested_elective_stipulation(
+    user,
+):
+    """
+    Test that generate_program_certificate returns (None, False) and does not create a program certificate
+    if the learner has not met the elective requirements due to a nested operator.
+    """
+    courses = CourseFactory.create_batch(3)
+    course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
+
+    # Create Program
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+
+    root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+
+    # Add main electives requirement.
+    elective_courses_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=2,
+        title="Elective Courses",
+    )
+
+    # Add stipulation to electives.
+    # Only 1 course belonging to this subset is counted towards the Program's elective requirement.
+    mut_exclusive_courses_node = elective_courses_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=1,
+    )
+    # Add 2 courses within the stipulation.
+    mut_exclusive_courses_node.add_child(
+        node_type=ProgramRequirementNodeType.COURSE, course=courses[1]
+    )
+    mut_exclusive_courses_node.add_child(
+        node_type=ProgramRequirementNodeType.COURSE, course=courses[2]
+    )
+
+    # Create certificates for both courses within the stipulation.
+    CourseRunCertificateFactory.create(user=user, course_run=course_runs[1])
+    CourseRunCertificateFactory.create(user=user, course_run=course_runs[2])
+
+    # Only one of the two certificates for courses in the elective stipulation should contribute towards
+    # the Program's elective requirements.
+    result = generate_program_certificate(user=user, program=program)
+    assert result == (None, False)
+    assert len(ProgramCertificate.objects.all()) == 0
