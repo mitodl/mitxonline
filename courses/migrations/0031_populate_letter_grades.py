@@ -18,7 +18,7 @@ def populate_letter_grade(apps, schema_editor):
     )
     for grade in grades:
         grade.letter_grade = convert_to_letter(grade.grade)
-        grade.save_and_log()
+        grade.save()
 
 
 class Migration(migrations.Migration):
