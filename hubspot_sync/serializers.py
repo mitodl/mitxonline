@@ -63,18 +63,21 @@ class LineSerializer(serializers.ModelSerializer):
         return self._product
 
     def _get_enrollment(self, instance):
-        self._enrollment = CourseRunEnrollment.all_objects.get(
+        """Returns the CourseRunEnrollment associated with the Order, if one exists, else None"""
+        self._enrollment = CourseRunEnrollment.all_objects.filter(
             run=instance.purchased_object, user=instance.order.purchaser
-        )
+        ).first()
         return self._enrollment
 
     def get_enrollment_mode(self, instance):
+        """Returns the CourseRunEnrollment's mode associated with the Order, if a CourseRunEnrollment exists, else None"""
         enrollment = self._get_enrollment(instance)
-        return enrollment.enrollment_mode
+        return enrollment.enrollment_mode if enrollment is not None else None
 
     def get_change_status(self, instance):
+        """Returns the CourseRunEnrollment's change_status associated with the Order, if a CourseRunEnrollment exists, else None"""
         enrollment = self._get_enrollment(instance)
-        return enrollment.change_status
+        return enrollment.change_status if enrollment is not None else None
 
     def get_unique_app_id(self, instance):
         """Get the app_id for the object"""
