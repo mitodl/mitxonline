@@ -5,6 +5,7 @@ from typing import Optional, Tuple, Union
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
@@ -30,6 +31,8 @@ from courses.models import (
     PartnerSchool,
     Program,
     ProgramEnrollment,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
 )
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
@@ -308,27 +311,23 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         program_enrollments = (
             ProgramEnrollment.objects.select_related("program", "program__page")
             .filter(user=request.user)
+            .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
             .all()
         )
 
         program_list = []
 
         for enrollment in program_enrollments:
-            if enrollment.change_status == ENROLL_CHANGE_STATUS_UNENROLLED:
-                continue
-
-            courseruns = (
+            course_enrollments = (
                 CourseRunEnrollment.objects.filter(user=request.user)
-                .select_related("run__course__page")
-                .filter(
-                    run__course__in=[course[0] for course in enrollment.program.courses]
-                )
+                .filter(run__course__in_programs__program=enrollment.program)
+                .select_related("run__course", "run__course__page")
                 .all()
             )
 
             program_list.append(
                 {
-                    "enrollments": courseruns,
+                    "enrollments": course_enrollments,
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
                 }
