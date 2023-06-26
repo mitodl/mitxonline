@@ -154,7 +154,7 @@ def program_requirements_schema():
                                     "dependencies": {
                                         "node_type": ProgramRequirementNodeType.COURSE.value
                                     },
-                                    "enum_titles": [course.title for course in courses],
+                                    "enum_titles": [f"{course.readable_id} | {course.title}" for course in courses],
                                 },
                             },
                         },
