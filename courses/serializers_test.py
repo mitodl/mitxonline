@@ -20,11 +20,7 @@ from courses.factories import (
     ProgramFactory,
     program_with_empty_requirements,
 )
-from courses.models import (
-    CourseTopic,
-    ProgramRequirement,
-    ProgramRequirementNodeType,
-)
+from courses.models import CourseTopic, ProgramRequirement, ProgramRequirementNodeType
 from courses.serializers import (
     BaseCourseSerializer,
     BaseProgramSerializer,
@@ -119,24 +115,6 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
                 CourseSerializer(instance=course, context={**mock_context}).data
                 for course in [course1, course2]
             ]
-            if not remove_tree
-            else [],
-            "start_date": drf_datetime(
-                sorted(runs, key=lambda run: run.start_date)[0].start_date
-            )
-            if not remove_tree
-            else None,
-            "end_date": drf_datetime(
-                sorted(runs, key=lambda run: run.end_date)[-1].end_date
-            )
-            if not remove_tree
-            else None,
-            "enrollment_start": drf_datetime(
-                sorted(runs, key=lambda run: run.enrollment_start)[0].enrollment_start
-            )
-            if not remove_tree
-            else None,
-            "topics": [{"name": topic.name} for topic in topics]
             if not remove_tree
             else [],
             "requirements": formatted_reqs,
