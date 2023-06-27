@@ -67,18 +67,3 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
         return ProgramCertificate.objects.get(user_id=user_id, program_id=program_id)
     except ProgramCertificate.DoesNotExist:
         return None
-
-
-def convert_to_letter(grade):
-    """Convert a decimal number to letter grade"""
-    grade = round(grade, 1)
-    if grade >= 0.825:
-        return "A"
-    elif grade >= 0.65:
-        return "B"
-    elif grade >= 0.55:
-        return "C"
-    elif grade >= 0.50:
-        return "D"
-    else:
-        return "F"

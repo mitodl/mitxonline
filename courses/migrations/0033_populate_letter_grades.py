@@ -5,7 +5,21 @@ import pytz
 from django.db import migrations
 
 from courses.models import Program
-from courses.utils import convert_to_letter
+
+
+def convert_to_letter(grade):
+    """Convert a decimal number to letter grade"""
+    grade = round(grade, 1)
+    if grade >= 0.825:
+        return "A"
+    elif grade >= 0.65:
+        return "B"
+    elif grade >= 0.55:
+        return "C"
+    elif grade >= 0.50:
+        return "D"
+    else:
+        return "F"
 
 
 def populate_letter_grade(apps, schema_editor):
@@ -27,11 +41,11 @@ def populate_letter_grade(apps, schema_editor):
     )
     for grade in grades:
         grade.letter_grade = convert_to_letter(grade.grade)
+        grade.set_by_admin = True
         grade.save()
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("courses", "0032_add_related_programs_table"),
     ]
