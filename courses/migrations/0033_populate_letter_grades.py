@@ -9,12 +9,15 @@ from courses.utils import convert_to_letter
 
 
 def populate_letter_grade(apps, schema_editor):
-    """Populate the certificate_available_date from course run's end_date"""
+    """Populate the letter grade with A/B/C/D for the DEDP courses prior to 3T2022"""
     CourseRunGrade = apps.get_model("courses", "CourseRunGrade")
 
-    dedp_program = Program.objects.filter(readable_id="program-v1:MITx+DEDP").get()
+    dedp_program = Program.objects.filter(readable_id="program-v1:MITx+DEDP").first()
 
-    dedp_course_ids = [course[0].id for course in dedp_program.courses]
+    if dedp_program is not None:
+        dedp_course_ids = [course[0].id for course in dedp_program.courses]
+    else:
+        dedp_course_ids = []
 
     grades = CourseRunGrade.objects.filter(
         passed=True,
