@@ -25,7 +25,7 @@ def backfill_enrollments_from_certificates(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("courses", "0030_remove_course_position_in_program"),
+        ("courses", "0033_populate_letter_grades"),
     ]
 
     operations = [
