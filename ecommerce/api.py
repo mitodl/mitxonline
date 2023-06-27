@@ -398,7 +398,6 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
     refund_reason = kwargs.get("refund_reason", "")
     unenroll = kwargs.get("unenroll", False)
 
-
     if reference_number is not None:
         order = FulfilledOrder.objects.select_for_update().get(
             reference_number=reference_number
@@ -406,9 +405,7 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
     elif order_id is not None:
         order = FulfilledOrder.objects.select_for_update().get(pk=order_id)
     else:
-        log.error(
-            "Either order_id or reference_number is required to fetch the Order."
-        )
+        log.error("Either order_id or reference_number is required to fetch the Order.")
         return False
     if order.state != Order.STATE.FULFILLED:
         log.debug("Order with order_id %s is not in fulfilled state.", order.id)
@@ -417,9 +414,7 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
     order_recent_transaction = order.transactions.first()
 
     if not order_recent_transaction:
-        log.error(
-            "There is no associated transaction against order_id %s", order.id
-        )
+        log.error("There is no associated transaction against order_id %s", order.id)
         return False
 
     transaction_dict = order_recent_transaction.data
