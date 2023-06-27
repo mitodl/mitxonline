@@ -286,10 +286,8 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     def get_courses(self, instance):
         """Serializer for courses"""
-        course_ids = [course[0].id for course in instance.courses]
         return CourseSerializer(
-            models.Course.objects.filter(live=True, id__in=course_ids)
-            .select_related("page")
+            models.Course.objects.filter(live=True, in_programs__program=instance)
             .order_by("id", "courseruns__start_date")
             .distinct("id"),
             many=True,
@@ -385,6 +383,56 @@ class ProgramSerializer(serializers.ModelSerializer):
             "end_date",
             "enrollment_start",
             "topics",
+            "requirements",
+            "req_tree",
+        ]
+
+
+class SimpleProgramSerializer(serializers.ModelSerializer):
+    """This is for the UserProgramEnrollmentDetailSerializer"""
+
+    courses = serializers.SerializerMethodField()
+    requirements = serializers.SerializerMethodField()
+    req_tree = serializers.SerializerMethodField()
+
+    def get_courses(self, instance):
+        return CourseSerializer(
+            [course[0] for course in instance.courses],
+            many=True,
+            context={"include_page_fields": True},
+        ).data
+
+    def get_requirements(self, instance):
+        return {
+            "required": [course.id for course in instance.required_courses],
+            "electives": [course.id for course in instance.elective_courses],
+        }
+
+    def get_req_tree(self, instance):
+        req_root = instance.get_requirements_root()
+
+        if req_root is None:
+            return []
+
+        return ProgramRequirementTreeSerializer(instance=req_root).data
+
+    class Meta:
+        model = models.Program
+        fields = [
+            "title",
+            "readable_id",
+            "id",
+            "courses",
+            "num_courses",
+            "requirements",
+            "req_tree",
+        ]
+        read_only_fields = [
+            "title",
+            "readable_id",
+            "id",
+            "courses",
+            "num_courses",
             "requirements",
             "req_tree",
         ]
@@ -510,7 +558,7 @@ class ProgramCertificateSerializer(serializers.ModelSerializer):
 
 
 class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
-    program = ProgramSerializer()
+    program = SimpleProgramSerializer()
     enrollments = CourseRunEnrollmentSerializer(many=True)
     certificate = serializers.SerializerMethodField(read_only=True)
 
