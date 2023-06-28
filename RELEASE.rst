@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.66.2
+--------------
+
+- 1702: line serializer cannot handle orders with no current enrollment (#1703)
+- 1691: program certificate generation does not adhere to nested program electives (#1707)
+
 Version 0.66.1 (Released June 28, 2023)
 --------------
 
