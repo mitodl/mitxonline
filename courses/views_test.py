@@ -621,24 +621,17 @@ def test_update_user_enrollment_failure(
     patched_log_exception.assert_called_once()
 
 
-@pytest.mark.parametrize("test_implicit_enrollments", [True, False])
-def test_program_enrollments(
-    user_drf_client, user, programs, test_implicit_enrollments
-):
+def test_program_enrollments(user_drf_client, user, programs):
     """
     Tests the program enrollments API, which should show the user's enrollment
-    in programs with the course runs that apply. If test_implicit_enrollments is
-    False, then this will make explicit enrollments in the programs. If it is
-    True, it won't and there will just be a CourseRunEnrollment for a course
-    that has been added to one of the programs.
+    in programs with the course runs that apply.
     """
 
-    if not test_implicit_enrollments:
-        enrollments = []
-        for program in programs:
-            enrollment = ProgramEnrollment(user=user, program=program)
-            enrollment.save()
-            enrollments.append(enrollment)
+    enrollments = []
+    for program in programs:
+        enrollment = ProgramEnrollment(user=user, program=program)
+        enrollment.save()
+        enrollments.append(enrollment)
 
     course = CourseFactory.create()
     programs[1].add_requirement(course)
@@ -651,10 +644,7 @@ def test_program_enrollments(
 
     resp_data = resp.json()
 
-    if test_implicit_enrollments:
-        assert len(resp_data) == 1
-    else:
-        assert len(resp_data) == len(programs)
+    assert len(resp_data) == len(programs)
 
     for program_detail in resp_data:
         if program_detail["program"]["id"] == programs[1].id:

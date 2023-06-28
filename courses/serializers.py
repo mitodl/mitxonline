@@ -277,24 +277,64 @@ class ProgramSerializer(serializers.ModelSerializer):
     """Program model serializer"""
 
     courses = serializers.SerializerMethodField()
-    start_date = serializers.SerializerMethodField()
-    end_date = serializers.SerializerMethodField()
-    enrollment_start = serializers.SerializerMethodField()
-    topics = serializers.SerializerMethodField()
     requirements = serializers.SerializerMethodField()
     req_tree = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         """Serializer for courses"""
-        course_ids = [course[0].id for course in instance.courses]
         return CourseSerializer(
-            models.Course.objects.filter(live=True, id__in=course_ids)
-            .select_related("page")
+            models.Course.objects.filter(live=True, in_programs__program=instance)
             .order_by("id", "courseruns__start_date")
             .distinct("id"),
             many=True,
             context={"include_page_fields": True},
         ).data
+
+    def _get_nested_requirements(self, node):
+        ids = []
+
+        if node.get_children():
+            for child in node.get_children():
+                if child.node_type == models.ProgramRequirementNodeType.OPERATOR:
+                    ids += self._get_nested_requirements(child)
+                elif child.course.id is not None:
+                    ids.append(child.course.id)
+
+        return ids
+
+    def get_requirements(self, instance):
+        return {
+            "required": [course.id for course in instance.required_courses],
+            "electives": [course.id for course in instance.elective_courses],
+        }
+
+    def get_req_tree(self, instance):
+        req_root = instance.get_requirements_root()
+
+        if req_root is None:
+            return []
+
+        return ProgramRequirementTreeSerializer(instance=req_root).data
+
+    class Meta:
+        model = models.Program
+        fields = [
+            "title",
+            "readable_id",
+            "id",
+            "courses",
+            "requirements",
+            "req_tree",
+        ]
+
+
+class FullProgramSerializer(ProgramSerializer):
+    """Adds more data to the ProgramSerializer."""
+
+    start_date = serializers.SerializerMethodField()
+    end_date = serializers.SerializerMethodField()
+    enrollment_start = serializers.SerializerMethodField()
+    topics = serializers.SerializerMethodField()
 
     def get_start_date(self, instance):
         """
@@ -348,43 +388,13 @@ class ProgramSerializer(serializers.ModelSerializer):
         )
         return list(topics)
 
-    def _get_nested_requirements(self, node):
-        ids = []
-
-        if node.get_children():
-            for child in node.get_children():
-                if child.node_type == models.ProgramRequirementNodeType.OPERATOR:
-                    ids += self._get_nested_requirements(child)
-                elif child.course.id is not None:
-                    ids.append(child.course.id)
-
-        return ids
-
-    def get_requirements(self, instance):
-        return {
-            "required": [course.id for course in instance.required_courses],
-            "electives": [course.id for course in instance.elective_courses],
-        }
-
-    def get_req_tree(self, instance):
-        req_root = instance.get_requirements_root()
-
-        if req_root is None:
-            return []
-
-        return ProgramRequirementTreeSerializer(instance=req_root).data
-
-    class Meta:
-        model = models.Program
-        fields = [
+    class Meta(ProgramSerializer.Meta):
+        fields = ProgramSerializer.Meta.fields + [
             "title",
             "readable_id",
             "id",
             "courses",
-            "start_date",
-            "end_date",
-            "enrollment_start",
-            "topics",
+            "num_courses",
             "requirements",
             "req_tree",
         ]

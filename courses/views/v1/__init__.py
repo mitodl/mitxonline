@@ -5,11 +5,11 @@ from typing import Optional, Tuple, Union
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
-from hubspot_sync.task_helpers import sync_hubspot_deal
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -31,6 +31,8 @@ from courses.models import (
     PartnerSchool,
     Program,
     ProgramEnrollment,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
 )
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
@@ -44,6 +46,7 @@ from courses.serializers import (
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
 from ecommerce.models import FulfilledOrder, Order, PendingOrder, Product
+from hubspot_sync.task_helpers import sync_hubspot_deal
 from main import features
 from main.constants import (
     USER_MSG_COOKIE_MAX_AGE,
@@ -305,50 +308,26 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         user.
         """
 
-        courseruns = (
-            CourseRunEnrollment.objects.filter(user=request.user)
-            .select_related("run__course__page")
+        program_enrollments = (
+            ProgramEnrollment.objects.select_related("program", "program__page")
+            .filter(user=request.user)
+            .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
             .all()
         )
 
-        program_list = {}
+        program_list = []
 
-        unenrollments = (
-            ProgramEnrollment.objects.filter(
-                user=request.user, change_status=ENROLL_CHANGE_STATUS_UNENROLLED
+        for enrollment in program_enrollments:
+            course_enrollments = (
+                CourseRunEnrollment.objects.filter(user=request.user)
+                .filter(run__course__in_programs__program=enrollment.program)
+                .select_related("run__course", "run__course__page")
+                .all()
             )
-            .values_list("program_id", flat=True)
-            .all()
-        )
 
-        for enrollment in courseruns:
-            for program in enrollment.run.course.programs:
-                if program.id not in unenrollments:
-                    if program.id in program_list:
-                        program_list[program.id]["enrollments"].append(enrollment)
-                    else:
-                        program_list[program.id] = {
-                            "enrollments": [enrollment],
-                            "program": program,
-                            "certificate": get_program_certificate_by_enrollment(
-                                enrollment, program
-                            ),
-                        }
-
-        non_course_programs = (
-            ProgramEnrollment.objects.filter(user=request.user)
-            .exclude(program_id__in=program_list.keys())
-            .exclude(change_status=ENROLL_CHANGE_STATUS_UNENROLLED)
-            .select_related("program")
-            .all()
-        )
-
-        program_list = list(program_list.values())
-
-        for enrollment in non_course_programs:
             program_list.append(
                 {
-                    "enrollments": [],
+                    "enrollments": course_enrollments,
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
                 }
