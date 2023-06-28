@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.66.1
+Version 0.66.1 (Released June 28, 2023)
 --------------
 
 - Merging migrations from #1708 and #1704 (#1709)
