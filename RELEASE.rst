@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.66.2
+Version 0.66.2 (Released June 28, 2023)
 --------------
 
 - 1702: line serializer cannot handle orders with no current enrollment (#1703)
