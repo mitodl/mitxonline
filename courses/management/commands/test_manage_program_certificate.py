@@ -122,11 +122,13 @@ def test_program_certificate_management_create(user, program_with_empty_requirem
     Test that create operation for program certificate management command
     creates the program certificate for a user
     """
-    course = CourseFactory.create()
-    program_with_empty_requirements.add_requirement(course)
-    course_run = CourseRunFactory.create(course=course)
-    CourseRunGradeFactory.create(course_run=course_run, user=user, passed=True, grade=1)
-    CourseRunCertificateFactory.create(user=user, course_run=course_run)
+    courses = CourseFactory.create_batch(2)
+    program_with_empty_requirements.add_requirement(courses[0])
+    program_with_empty_requirements.add_elective(courses[1])
+    course_runs = CourseRunFactory.create_batch(2, course=factory.Iterator(courses))
+    CourseRunCertificateFactory.create_batch(
+        2, user=user, course_run=factory.Iterator(course_runs)
+    )
     manage_program_certificates.Command().handle(
         create=True,
         program=program_with_empty_requirements.readable_id,
