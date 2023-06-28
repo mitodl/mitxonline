@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.66.1
+--------------
+
+- Merging migrations from #1708 and #1704 (#1709)
+- Optimize program enrollments API (#1708)
+- fix courses migration conflict (#1704)
+- Convert grade into letter for program records (#1651)
+- update migration to use apps.get_model
+- fix format
+- Add course readable ID to courses in program requirement admin UI
+- fix bug on renderCourseInfoCard, add migration to backfill certificate enrollments
+
 Version 0.66.0 (Released June 28, 2023)
 --------------
 
