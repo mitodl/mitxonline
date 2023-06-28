@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.66.0
+Version 0.66.0 (Released June 28, 2023)
 --------------
 
 - Fixes the course count on cards in My Programs (#1690)
