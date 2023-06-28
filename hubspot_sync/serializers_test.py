@@ -80,6 +80,27 @@ def test_serialize_line(hubspot_order):
     }
 
 
+def test_serialize_line_no_corresponding_enrollment(hubspot_order):
+    """Test that LineSerializer produces the correct serialized data when a user does not have a CourseRunEnrollment record that corresponds with the Order"""
+    line = hubspot_order.lines.first()
+    product = Product.objects.get(id=line.product_version.object_id)
+    serialized_data = LineSerializer(instance=line).data
+    assert serialized_data == {
+        "hs_product_id": HubspotObject.objects.get(
+            content_type=ContentType.objects.get_for_model(Product),
+            object_id=product.id,
+        ).hubspot_id,
+        "quantity": line.quantity,
+        "status": line.order.state,
+        "product_id": product.purchasable_object.readable_id,
+        "name": format_product_name(product),
+        "price": "200.00",
+        "unique_app_id": format_app_id(line.id),
+        "enrollment_mode": None,
+        "change_status": None,
+    }
+
+
 @pytest.mark.parametrize("status", [Order.STATE.FULFILLED, Order.STATE.PENDING])
 def test_serialize_order(settings, hubspot_order, status):
     """Test that OrderToDealSerializer produces the correct serialized data"""

@@ -97,14 +97,10 @@ def test_make_line_item_sync_message(
         user=line.order.purchaser,
         enrollment_mode=enrollment_mode,
         change_status=change_status,
-    )
-    mock_course_run_enrollment_query = mocker.patch(
-        "courses.models.CourseRunEnrollment.all_objects.get",
-        return_value=course_run_enrollment,
+        run=line.purchased_object,
     )
     serialized_line = LineSerializer(line).data
     line_item_sync_message = api.make_line_item_sync_message(line.id)
-    mock_course_run_enrollment_query.assert_called()
 
     assert line_item_sync_message.properties == {
         "name": serialized_line["name"],
@@ -244,10 +240,6 @@ def test_sync_line_item_with_hubspot(
     """Test that the hubspot CRM API is called properly for a line_item sync"""
     line = hubspot_order.lines.first()
     course_run_enrollment = CourseRunEnrollmentFactory.create(user=line.order.purchaser)
-    mock_course_run_enrollment_query = mocker.patch(
-        "courses.models.CourseRunEnrollment.all_objects.get",
-        return_value=course_run_enrollment,
-    )
     api.sync_line_item_with_hubspot(line.id)
     assert (
         api.HubspotObject.objects.get(
@@ -255,7 +247,6 @@ def test_sync_line_item_with_hubspot(
         ).hubspot_id
         == FAKE_HUBSPOT_ID
     )
-    mock_course_run_enrollment_query.assert_called()
     mock_hubspot_api.return_value.crm.objects.associations_api.create.assert_called_once_with(
         api.HubspotObjectType.LINES.value,
         FAKE_HUBSPOT_ID,
