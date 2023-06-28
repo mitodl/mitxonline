@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.66.0 (Released June 28, 2023)
+--------------
+
+- Fixes the course count on cards in My Programs (#1690)
+- Remove program field from course model (#1685)
+- 1664: management command to create Order from enrollment (#1674)
+
 Version 0.65.10 (Released June 13, 2023)
 ---------------
 
