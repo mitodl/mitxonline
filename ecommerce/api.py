@@ -399,11 +399,11 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
     unenroll = kwargs.get("unenroll", False)
 
     if reference_number is not None:
-        order = FulfilledOrder.objects.select_for_update().get(
+        order = FulfilledOrder.objects.get(
             reference_number=reference_number
         )
     elif order_id is not None:
-        order = FulfilledOrder.objects.select_for_update().get(pk=order_id)
+        order = FulfilledOrder.objects.get(pk=order_id)
     else:
         log.error("Either order_id or reference_number is required to fetch the Order.")
         return False
