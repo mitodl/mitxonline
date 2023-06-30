@@ -651,6 +651,10 @@ class PendingOrder(FulfillableOrder, Order):
         # for the same product, if multiple exist, grab the first.
         if orders:
             order = orders.first()
+
+            for old_discount in order.discounts.all():
+                old_discount.delete()
+
         else:
             order = Order.objects.create(
                 state=Order.STATE.PENDING,
