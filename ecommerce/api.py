@@ -397,23 +397,26 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
     refund_amount = kwargs.get("refund_amount")
     refund_reason = kwargs.get("refund_reason", "")
     unenroll = kwargs.get("unenroll", False)
-
+    message = ""
     if reference_number is not None:
         order = FulfilledOrder.objects.get(reference_number=reference_number)
     elif order_id is not None:
         order = FulfilledOrder.objects.get(pk=order_id)
     else:
-        log.error("Either order_id or reference_number is required to fetch the Order.")
-        return False
+        message = "Either order_id or reference_number is required to fetch the Order."
+        log.error(message)
+        return False, message
     if order.state != Order.STATE.FULFILLED:
-        log.debug("Order with order_id %s is not in fulfilled state.", order.id)
-        return False
+        message = "Order with order_id %s is not in fulfilled state.".format(order.id)
+        log.error(message)
+        return False, message
 
     order_recent_transaction = order.transactions.first()
 
     if not order_recent_transaction:
-        log.error("There is no associated transaction against order_id %s", order.id)
-        return False
+        message = "There is no associated transaction against order_id %s".format(order.id)
+        log.error(message)
+        return False, message
 
     transaction_dict = order_recent_transaction.data
 
@@ -458,7 +461,7 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
     if unenroll:
         perform_downgrade_from_order.delay(order.id)
 
-    return True
+    return True, message
 
 
 def downgrade_learner_from_order(order_id):
