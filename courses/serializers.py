@@ -11,8 +11,8 @@ from django.templatetags.static import static
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from cms.models import CoursePage
-from cms.serializers import CoursePageSerializer
+from cms.models import CoursePage, ProgramPage
+from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses import models
 from courses.api import create_run_enrollments
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
@@ -279,6 +279,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     courses = serializers.SerializerMethodField()
     requirements = serializers.SerializerMethodField()
     req_tree = serializers.SerializerMethodField()
+    page = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         """Serializer for courses"""
@@ -316,6 +317,15 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return ProgramRequirementTreeSerializer(instance=req_root).data
 
+    def get_page(self, instance):
+        return (
+            ProgramPageSerializer(
+                instance=ProgramPage.objects.filter(program=instance).get()
+            ).data
+            if ProgramPage.objects.filter(program=instance).exists()
+            else None
+        )
+
     class Meta:
         model = models.Program
         fields = [
@@ -325,6 +335,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "courses",
             "requirements",
             "req_tree",
+            "page",
         ]
 
 

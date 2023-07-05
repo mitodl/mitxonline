@@ -252,7 +252,11 @@ export const makeProgram = (): Program => ({
   id:          genProgramId.next().value,
   title:       casual.text,
   readable_id: casual.word,
-  courses:     [makeCourseDetailWithRuns()]
+  courses:     [makeCourseDetailWithRuns()],
+  page:        {
+    financial_assistance_form_url: casual.url,
+    feature_image_src:             casual.url
+  }
 })
 
 export const makeProgramWithReqTree = (): Program => {
