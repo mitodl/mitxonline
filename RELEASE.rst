@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.67.0
+Version 0.67.0 (Released July 05, 2023)
 --------------
 
 - add migration to fix letter grade set by 0033
