@@ -2,10 +2,17 @@
 import logging
 import re
 from decimal import Decimal
+import time
+from typing import List
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-from hubspot.crm.objects import SimplePublicObject, SimplePublicObjectInput
+from hubspot.crm.objects import (
+    SimplePublicObject,
+    SimplePublicObjectInput,
+    ApiException,
+)
+from main import settings
 from mitol.hubspot_api.api import (
     HubspotAssociationType,
     HubspotObjectType,
@@ -30,13 +37,13 @@ from users.models import User
 log = logging.getLogger(__name__)
 
 
-def make_contact_sync_message(user_id: int) -> SimplePublicObjectInput:
+def make_contact_sync_message(user: User) -> SimplePublicObjectInput:
     """
     Create the body of a sync message for a contact. This will flatten the contained LegalAddress and Profile
     serialized data into one larger serializable dict
 
     Args:
-        user_id (int): User id
+        user (User): User object.
 
     Returns:
         SimplePublicObjectInput: input object for upserting User data to Hubspot
@@ -66,7 +73,6 @@ def make_contact_sync_message(user_id: int) -> SimplePublicObjectInput:
         "type_is_other": "typeisother",
     }
 
-    user = User.objects.get(id=user_id)
     properties = UserSerializer(user).data
     properties.update(properties.pop("legal_address") or {})
     properties.update(properties.pop("user_profile") or {})
@@ -74,7 +80,7 @@ def make_contact_sync_message(user_id: int) -> SimplePublicObjectInput:
     return make_object_properties_message(hubspot_props)
 
 
-def make_deal_sync_message(order_id: int) -> SimplePublicObjectInput:
+def make_deal_sync_message(order_ids: List[int]) -> SimplePublicObjectInput:
     """
     Create a hubspot sync input object for an Order.
 
@@ -458,23 +464,37 @@ def sync_product_with_hubspot(product_id: int) -> SimplePublicObject:
     )
 
 
-def sync_contact_with_hubspot(user_id: int) -> SimplePublicObject:
+def sync_contact_with_hubspot(users: List[User]):
     """
-    Sync a user with a hubspot_sync contact
+    Sync a list of User objects with their hubspot_sync contacts.
 
     Args:
-        user_id(int): The User id
+        users List[User]: List of User objects.
 
     Returns:
-        SimplePublicObject: The hubspot contact object
+        List[int]: list of User ids that had an unsuccessful upsert in HubSpot.
+
+    Raises:
+        ApiException: Raised if HubSpot upsert request fails.
     """
-    body = make_contact_sync_message(user_id)
     content_type = ContentType.objects.get_for_model(User)
-    result = upsert_object_request(
-        content_type, HubspotObjectType.CONTACTS.value, object_id=user_id, body=body
-    )
-    User.objects.filter(id=user_id).update(hubspot_sync_datetime=now_in_utc())
-    return result
+    failed_users_ids = []
+    for user in users:
+        body = make_contact_sync_message(user)
+        try:
+            upsert_object_request(
+                content_type,
+                HubspotObjectType.CONTACTS.value,
+                object_id=user.id,
+                body=body,
+            )
+        except ApiException:
+            failed_users_ids.append(user.id)
+        time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
+
+        user.update(hubspot_sync_datetime=now_in_utc())
+
+    return failed_users_ids
 
 
 MODEL_FUNCTION_MAPPING = {

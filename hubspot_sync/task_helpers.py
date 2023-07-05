@@ -19,7 +19,7 @@ def sync_hubspot_user(user):
     """
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         try:
-            tasks.sync_contact_with_hubspot.delay(user.id)
+            tasks.sync_contact_with_hubspot.delay(user)
         except:
             log.exception(
                 "Exception calling sync_contact_with_hubspot for user %s", user.username

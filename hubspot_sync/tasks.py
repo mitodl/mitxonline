@@ -79,7 +79,7 @@ def batched_chunks(
     return chunks(batch_ids, chunk_size=max_chunk_size)
 
 
-def sync_failed_contacts(chunk: list[int]) -> list[int]:
+def sync_failed_contacts(chunk: List[int]) -> List[int]:
     """
     Consecutively try individual contact syncs for a failed batch sync
     Args:
@@ -88,13 +88,8 @@ def sync_failed_contacts(chunk: list[int]) -> list[int]:
     Returns:
         list of contact ids that still failed
     """
-    failed_ids = []
-    for user_id in chunk:
-        try:
-            api.sync_contact_with_hubspot(user_id)
-            time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
-        except ApiException:
-            failed_ids.append(user_id)
+    users = list(User.objects.filter(id__in=chunk))
+    failed_ids = api.sync_contact_with_hubspot(users)
     return failed_ids
 
 
@@ -132,17 +127,17 @@ def handle_failed_batch_chunk(chunk: list[int], hubspot_type: str) -> list[int]:
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
-def sync_contact_with_hubspot(user_id: int) -> str:
+def sync_contact_with_hubspot(user: User) -> str:
     """
-    Sync a user with a hubspot contact
+    Sync a User with a hubspot contact
 
     Args:
-        user_id(int): The User id
+        user(User): The User object.
 
     Returns:
         str: The hubspot id for the contact
     """
-    return api.sync_contact_with_hubspot(user_id).id
+    return api.sync_contact_with_hubspot([user]).id
 
 
 @app.task(
