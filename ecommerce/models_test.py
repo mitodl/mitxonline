@@ -451,6 +451,8 @@ def test_pending_order_is_reused_but_discounts_cleared(basket, unlimited_discoun
 
     order = PendingOrder.create_from_basket(basket)
     order.save()
+    order.refresh_from_db()
+
     # Verify that the existing PendingOrder is reused and a duplicate is not created.
     # This is to ensure that we also reuse the HubSpot Deal associated with Orders.
     # Also ensure the discounts aren't reattached to the order
