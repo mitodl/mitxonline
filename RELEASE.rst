@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.67.1
+Version 0.67.1 (Released July 05, 2023)
 --------------
 
 - Clears discounts when reusing an existing PendingOrder (#1721)
