@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.67.0 (Released July 05, 2023)
+--------------
+
+- add migration to fix letter grade set by 0033
+- update letter_grade for MM grade, add missing enrollment import script
+- Refund Order: remove atomicity and rollback (#1706)
+
 Version 0.66.2 (Released June 28, 2023)
 --------------
 
