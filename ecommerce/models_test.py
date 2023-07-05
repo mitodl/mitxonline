@@ -7,6 +7,7 @@ import reversion
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from mitol.common.utils import now_in_utc
+from reversion.models import Version
 
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -36,7 +37,6 @@ from ecommerce.models import (
     Transaction,
 )
 from users.factories import UserFactory
-from reversion.models import Version
 
 pytestmark = [pytest.mark.django_db]
 
@@ -421,6 +421,43 @@ def test_pending_order_is_reused(basket):
     # Verify that the existing PendingOrder is reused and a duplicate is not created.
     # This is to ensure that we also reuse the HubSpot Deal associated with Orders.
     assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
+
+
+def test_pending_order_is_reused_but_discounts_cleared(basket, unlimited_discount):
+    """
+    If a pending order is reused and had discounts, then we want those discounts
+    to clear.
+    """
+
+    with reversion.create_revision():
+        product = ProductFactory.create()
+
+    basket_item = BasketItem(product=product, basket=basket, quantity=1)
+    basket_item.save()
+    order = PendingOrder.create_from_basket(basket)
+    order.save()
+    assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
+
+    redemption = DiscountRedemption(
+        redeemed_discount=unlimited_discount,
+        redemption_date=now_in_utc(),
+        redeemed_order=order,
+        redeemed_by=order.purchaser,
+    )
+    redemption.save()
+
+    order.refresh_from_db()
+    assert order.discounts.count() == 1
+
+    order = PendingOrder.create_from_basket(basket)
+    order.save()
+    order.refresh_from_db()
+
+    # Verify that the existing PendingOrder is reused and a duplicate is not created.
+    # This is to ensure that we also reuse the HubSpot Deal associated with Orders.
+    # Also ensure the discounts aren't reattached to the order
+    assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
+    assert order.discounts.count() == 0
 
 
 def test_new_pending_order_is_created_if_product_is_different():
