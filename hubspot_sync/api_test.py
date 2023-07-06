@@ -37,7 +37,7 @@ pytestmark = [pytest.mark.django_db]
 @pytest.mark.django_db
 def test_make_contact_sync_message(user):
     """Test make_contact_sync_message serializes a user and returns a properly formatted sync message"""
-    contact_sync_message = api.make_contact_sync_message(user.id)
+    contact_sync_message = api.make_contact_sync_message_from_user(user)
     assert contact_sync_message.properties == {
         "country": user.legal_address.country,
         "state": user.legal_address.state or "",
@@ -65,7 +65,7 @@ def test_make_contact_sync_message(user):
 @pytest.mark.django_db
 def test_make_deal_sync_message(hubspot_order):
     """Test make_deal_sync_message serializes an order and returns a properly formatted sync message"""
-    deal_sync_message = api.make_deal_sync_message(hubspot_order.id)
+    deal_sync_message = api.make_deal_sync_message_from_order(hubspot_order)
     serialized_order = OrderToDealSerializer(hubspot_order).data
 
     assert deal_sync_message.properties == {
@@ -100,7 +100,7 @@ def test_make_line_item_sync_message(
         run=line.purchased_object,
     )
     serialized_line = LineSerializer(line).data
-    line_item_sync_message = api.make_line_item_sync_message(line.id)
+    line_item_sync_message = api.make_line_item_sync_message_from_line(line)
 
     assert line_item_sync_message.properties == {
         "name": serialized_line["name"],
@@ -122,7 +122,7 @@ def test_make_product_sync_message():
     """Test make_product_sync_message serializes a product and returns a properly formatted sync message"""
     product = ProductFactory()
     serialized_product = ProductSerializer(product).data
-    product_sync_message = api.make_product_sync_message(product.id)
+    product_sync_message = api.make_product_sync_message_from_product(product)
 
     assert product_sync_message.properties == {
         "name": serialized_product["name"],
@@ -143,7 +143,7 @@ def test_sync_contact_with_hubspot(mock_hubspot_api):
         == FAKE_HUBSPOT_ID
     )
     mock_hubspot_api.return_value.crm.objects.basic_api.create.assert_called_once_with(
-        simple_public_object_input=api.make_contact_sync_message(user.id),
+        simple_public_object_input=api.make_contact_sync_message_from_user(user),
         object_type=api.HubspotObjectType.CONTACTS.value,
     )
     user.refresh_from_db()
@@ -165,8 +165,7 @@ def test_sync_contact_with_hubspot_error(mocker, mock_hubspot_api):
             status=400,
         )
     )
-    with pytest.raises(ApiException) as exc:
-        api.sync_contact_with_hubspot(user)
+    assert api.sync_contact_with_hubspot(user) is False
     user.refresh_from_db()
     assert user.hubspot_sync_datetime is None
 
@@ -190,8 +189,7 @@ def test_existing_user_sync_contact_with_hubspot_error(mocker, mock_hubspot_api)
             status=400,
         )
     )
-    with pytest.raises(ApiException) as exc:
-        api.sync_contact_with_hubspot(user)
+    assert api.sync_contact_with_hubspot(user) is False
     user.refresh_from_db()
     assert user.hubspot_sync_datetime == current_datetime
 
@@ -199,7 +197,7 @@ def test_existing_user_sync_contact_with_hubspot_error(mocker, mock_hubspot_api)
 def test_sync_product_with_hubspot(mock_hubspot_api):
     """Test that the hubspot CRM API is called properly for a product sync"""
     product = ProductFactory.create()
-    api.sync_product_with_hubspot(product.id)
+    api.sync_product_with_hubspot(product)
     assert (
         api.HubspotObject.objects.get(
             object_id=product.id, content_type__model="product"
@@ -207,7 +205,7 @@ def test_sync_product_with_hubspot(mock_hubspot_api):
         == FAKE_HUBSPOT_ID
     )
     mock_hubspot_api.return_value.crm.objects.basic_api.create.assert_called_once_with(
-        simple_public_object_input=api.make_product_sync_message(product.id),
+        simple_public_object_input=api.make_product_sync_message_from_product(product),
         object_type=api.HubspotObjectType.PRODUCTS.value,
     )
 
@@ -217,14 +215,14 @@ def test_sync_deal_with_hubspot(mocker, mock_hubspot_api, hubspot_order):
     mock_sync_line = mocker.patch(
         "hubspot_sync.api.sync_line_item_with_hubspot", autospec=True
     )
-    api.sync_deal_with_hubspot(hubspot_order.id)
+    api.sync_deal_with_hubspot(hubspot_order)
 
     mock_hubspot_api.return_value.crm.objects.basic_api.create.assert_called_once_with(
-        simple_public_object_input=api.make_deal_sync_message(hubspot_order.id),
+        simple_public_object_input=api.make_deal_sync_message_from_order(hubspot_order),
         object_type=api.HubspotObjectType.DEALS.value,
     )
 
-    mock_sync_line.assert_any_call(hubspot_order.lines.first().id)
+    mock_sync_line.assert_any_call(hubspot_order.lines.first())
 
     assert (
         api.HubspotObject.objects.get(
@@ -240,7 +238,7 @@ def test_sync_line_item_with_hubspot(
     """Test that the hubspot CRM API is called properly for a line_item sync"""
     line = hubspot_order.lines.first()
     course_run_enrollment = CourseRunEnrollmentFactory.create(user=line.order.purchaser)
-    api.sync_line_item_with_hubspot(line.id)
+    api.sync_line_item_with_hubspot(line)
     assert (
         api.HubspotObject.objects.get(
             object_id=line.id, content_type__model="line"

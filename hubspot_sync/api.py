@@ -597,7 +597,7 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
     )
 
     for line in order.lines.all():
-        sync_line_item_with_hubspot(line.id)
+        sync_line_item_with_hubspot(line)
     return result
 
 
@@ -645,7 +645,8 @@ def sync_contact_with_hubspot(user: User):
         return False
     time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
 
-    user.update(hubspot_sync_datetime=now_in_utc())
+    user.hubspot_sync_datetime=now_in_utc()
+    user.save()
 
     return True
 
