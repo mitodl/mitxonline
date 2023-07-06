@@ -161,19 +161,20 @@ def test_cybersource_refund_no_fulfilled_order(order_state):
     the given order_id"""
 
     unfulfilled_order = OrderFactory.create(state=order_state)
-    refund_response = refund_order(order_id=unfulfilled_order.id)
+    refund_response, message = refund_order(order_id=unfulfilled_order.id)
     assert f"Order with order_id {unfulfilled_order.id} is not in fulfilled state."
     assert refund_response is False
+    assert "is not in fulfilled state." in message
 
 
 def test_cybersource_refund_no_order_id():
     """Test that refund_order returns logs properly and False when there is no Fulfilled order against
     the given order_id"""
 
-    refund_response = refund_order()
+    refund_response, message = refund_order()
     assert f"Either order_id or reference_number is required to fetch the Order."
     assert refund_response is False
-
+    assert "Either order_id or reference_number" in message
 
 def test_cybersource_order_no_transaction(fulfilled_order):
     """
@@ -182,9 +183,10 @@ def test_cybersource_order_no_transaction(fulfilled_order):
     """
 
     fulfilled_order = OrderFactory.create(state=Order.STATE.FULFILLED)
-    refund_response = refund_order(order_id=fulfilled_order.id)
+    refund_response, message = refund_order(order_id=fulfilled_order.id)
     assert f"There is no associated transaction against order_id {fulfilled_order.id}."
     assert refund_response is False
+    assert "There is no associated transaction" in message
 
 
 @pytest.mark.parametrize(
@@ -220,13 +222,13 @@ def test_order_refund_success(mocker, order_state, unenroll, fulfilled_transacti
 
     if order_state == ProcessorResponse.STATE_DUPLICATE:
         with pytest.raises(Exception) as e:
-            refund_success = refund_order(
+            refund_success, _ = refund_order(
                 order_id=fulfilled_transaction.order.id, unenroll=unenroll
             )
 
         return
     else:
-        refund_success = refund_order(
+        refund_success, _ = refund_order(
             order_id=fulfilled_transaction.order.id, unenroll=unenroll
         )
 
@@ -288,7 +290,7 @@ def test_order_refund_success_with_ref_num(mocker, unenroll, fulfilled_transacti
         "mitol.payment_gateway.api.PaymentGateway.start_refund",
         return_value=sample_response,
     )
-    refund_success = refund_order(
+    refund_success, message = refund_order(
         reference_number=fulfilled_transaction.order.reference_number, unenroll=unenroll
     )
     # There should be two transaction objects (One for payment and other for refund)
@@ -307,6 +309,7 @@ def test_order_refund_success_with_ref_num(mocker, unenroll, fulfilled_transacti
         == 1
     )
     assert refund_success is True
+    assert message is ""
 
     # Unenrollment task should only run if unenrollment was requested
     if unenroll:
@@ -338,7 +341,7 @@ def test_order_refund_failure(mocker, fulfilled_transaction):
     )
 
     with pytest.raises(ApiException):
-        refund_response = refund_order(order_id=fulfilled_transaction.order.id)
+        refund_response, message = refund_order(order_id=fulfilled_transaction.order.id)
         assert refund_response is False
     assert (
         Transaction.objects.filter(
