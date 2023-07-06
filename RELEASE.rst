@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.67.2
+--------------
+
+- Add unverify option to google sheets plugin (#1717)
+
 Version 0.67.1 (Released July 05, 2023)
 --------------
 
