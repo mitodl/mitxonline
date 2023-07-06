@@ -5,7 +5,7 @@ from typing import Optional, Tuple, Union
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
@@ -309,7 +309,18 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         """
 
         program_enrollments = (
-            ProgramEnrollment.objects.select_related("program", "program__page")
+            ProgramEnrollment.objects.select_related(
+                "program",
+                "program__page",
+            )
+            .prefetch_related(
+                Prefetch(
+                    "program__all_requirements__course",
+                    queryset=ProgramRequirement.objects.filter(
+                        node_type=ProgramRequirementNodeType.COURSE
+                    ),
+                )
+            )
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
             .all()
@@ -318,16 +329,21 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         program_list = []
 
         for enrollment in program_enrollments:
-            course_enrollments = (
-                CourseRunEnrollment.objects.filter(user=request.user)
-                .filter(run__course__in_programs__program=enrollment.program)
-                .select_related("run__course", "run__course__page")
-                .all()
-            )
+            courses = [
+                requirement.course
+                for requirement in enrollment.program.all_requirements.only(
+                    "course"
+                ).all()
+            ]
 
             program_list.append(
                 {
-                    "enrollments": course_enrollments,
+                    "enrollments": CourseRunEnrollment.objects.filter(
+                        user=request.user, run__course__in=courses
+                    )
+                    .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+                    .select_related("run__course__page")
+                    .all(),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
                 }
