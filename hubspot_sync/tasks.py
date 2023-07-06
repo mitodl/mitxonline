@@ -134,7 +134,7 @@ def handle_failed_batch_chunk(chunk: List[int], hubspot_type: str) -> List[int]:
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
-def sync_contact_with_hubspot(user: User) -> str:
+def sync_contact_with_hubspot(user_id: int) -> str:
     """
     Sync a User with a hubspot contact
 
@@ -144,6 +144,7 @@ def sync_contact_with_hubspot(user: User) -> str:
     Returns:
         str: The hubspot id for the contact
     """
+    user = User.objects.get(id=user_id)
     return api.sync_contact_with_hubspot(user).id
 
 
@@ -156,7 +157,7 @@ def sync_contact_with_hubspot(user: User) -> str:
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
-def sync_product_with_hubspot(product: Product) -> str:
+def sync_product_with_hubspot(product_id: int) -> str:
     """
     Sync a MITxOnline Product with a hubspot product
 
@@ -166,6 +167,7 @@ def sync_product_with_hubspot(product: Product) -> str:
     Returns:
         str: The hubspot id for the product
     """
+    product = Product.objects.get(id=product_id)
     return api.sync_product_with_hubspot(product).id
 
 
@@ -178,7 +180,7 @@ def sync_product_with_hubspot(product: Product) -> str:
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
-def sync_deal_with_hubspot(order: Order) -> str:
+def sync_deal_with_hubspot(order_id: int) -> str:
     """
     Sync an Order with a hubspot deal
 
@@ -188,6 +190,7 @@ def sync_deal_with_hubspot(order: Order) -> str:
     Returns:
         str: The hubspot id for the deal
     """
+    order = Order.objects.get(id=order_id)
     return api.sync_deal_with_hubspot(order).id
 
 

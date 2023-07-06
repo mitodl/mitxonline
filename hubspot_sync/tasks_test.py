@@ -46,9 +46,15 @@ def test_task_functions(mocker, task_func):
     mock_api_call = mocker.patch(
         f"hubspot_sync.tasks.api.{task_func}", return_value=mock_result
     )
-    mock_object_id = 101
-    assert getattr(tasks, task_func)(mock_object_id) == mock_result.id
-    mock_api_call.assert_called_once_with(mock_object_id)
+    if task_func == "sync_contact_with_hubspot":
+        mock_object = UserFactory.create()
+    elif task_func == "sync_product_with_hubspot":
+        mock_object = ProductFactory.create()
+    else:
+        mock_object = OrderFactory.create()
+
+    assert getattr(tasks, task_func)(mock_object.id) == mock_result.id
+    mock_api_call.assert_called_once_with(mock_object)
 
 
 @pytest.mark.parametrize("task_func", SYNC_FUNCTIONS)
@@ -60,8 +66,14 @@ def test_task_functions_error(mocker, task_func, status, expected_error):
     mocker.patch(
         f"hubspot_sync.tasks.api.{task_func}", side_effect=expected_error(status=status)
     )
+    if task_func == "sync_contact_with_hubspot":
+        mock_object_id = UserFactory.create().id
+    elif task_func == "sync_product_with_hubspot":
+        mock_object_id = ProductFactory.create().id
+    else:
+        mock_object_id = OrderFactory.create().id
     with pytest.raises(expected_error):
-        getattr(tasks, task_func)(101)
+        getattr(tasks, task_func)(mock_object_id)
 
 
 @pytest.mark.parametrize("create", [True, False])
