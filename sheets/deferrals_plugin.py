@@ -19,6 +19,7 @@ class DeferralPlugin:
             user,
             from_courseware_id,
             to_courseware_id,
+            force=True
         )
         if deferral_api_success:
             return DeferralResult(ResultType.PROCESSED)

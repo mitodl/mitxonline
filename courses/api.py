@@ -464,7 +464,7 @@ def defer_enrollment(
         raise ValidationError(
             "Cannot defer to the same course run (run: {})".format(to_run.courseware_id)
         )
-    if not to_run.is_not_beyond_enrollment:
+    if not force and not to_run.is_not_beyond_enrollment:
         raise ValidationError(
             "Cannot defer to a course run that is outside of its enrollment period (run: {}).".format(
                 to_run.courseware_id
