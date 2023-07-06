@@ -26,7 +26,7 @@ def test_sync_hubspot_deal(mocker, mock_exception_log, hubspot_order, raise_exc)
         side_effect=(ConnectionError if raise_exc else None),
     )
     sync_hubspot_deal(hubspot_order)
-    mock_sync.assert_called_once_with(args=(hubspot_order.id,), countdown=10)
+    mock_sync.assert_called_once_with(args=(hubspot_order), countdown=10)
     if raise_exc:
         mock_exception_log.assert_called_once_with(
             "Exception calling sync_deal_with_hubspot for order %d", hubspot_order.id
@@ -43,7 +43,7 @@ def test_sync_hubspot_user(mocker, mock_exception_log, user, raise_exc):
         side_effect=(ConnectionError if raise_exc else None),
     )
     sync_hubspot_user(user)
-    mock_sync.assert_called_once_with(user.id)
+    mock_sync.assert_called_once_with(user)
     if raise_exc:
         mock_exception_log.assert_called_once_with(
             "Exception calling sync_contact_with_hubspot for user %s", user.username
@@ -61,7 +61,7 @@ def test_sync_hubspot_product(mocker, mock_exception_log, raise_exc):
     )
     product = ProductFactory.build()
     sync_hubspot_product(product)
-    mock_sync.assert_called_once_with(product.id)
+    mock_sync.assert_called_once_with(product)
     if raise_exc:
         mock_exception_log.assert_called_once_with(
             "Exception calling sync_product_with_hubspot for product %d", product.id
