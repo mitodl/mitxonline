@@ -15,12 +15,10 @@ class DeferralPlugin:
         from_courseware_id = deferral_request_row.from_courseware_id
         to_courseware_id = deferral_request_row.to_courseware_id
 
-        deferral_api_success = defer_enrollment(
+        defer_enrollment(
             user,
             from_courseware_id,
             to_courseware_id,
+            force=True,
         )
-        if deferral_api_success:
-            return DeferralResult(ResultType.PROCESSED)
-
-        return DeferralResult(ResultType.FAILED)
+        return DeferralResult(ResultType.PROCESSED)
