@@ -127,6 +127,15 @@ def make_contact_sync_message_from_user(user: User) -> SimplePublicObjectInput:
 def make_deal_create_message_list_from_order_ids(
     order_ids: List[int],
 ) -> SimplePublicObjectInput:
+    """
+    Create the body of a sync message for a list of Order IDs.
+
+    Args:
+        order_ids (List[int]): List of Order ids.
+
+    Returns:
+        List[SimplePublicObjectInput]: List of input objects for upserting Order data to Hubspot
+    """
     orders = Order.objects.fetch(id__in=order_ids)
     message_list = []
     for order in orders:
@@ -138,10 +147,10 @@ def make_deal_update_message_list_from_order_ids(
     chunk: List[tuple[int, str]]
 ) -> List[dict]:
     """
-    Create the body of a HubSpot deal batch update message from a dictionary..
+    Create the body of a HubSpot deal batch update message from a dictionary.
 
     Args:
-        chunk_dictionary (List[tuple(int, str)]): List of tuples of (Order ID, HubSpot Object ID).
+        chunk (List[tuple(int, str)]): List of tuples of (Order ID, HubSpot Object ID).
 
     Returns:
         List[dict]: List of dictionaries containing Order properties.
@@ -179,6 +188,15 @@ def make_deal_sync_message_from_order(order: Order) -> SimplePublicObjectInput:
 def make_line_item_create_messages_list_from_line_ids(
     line_ids: List[int],
 ) -> SimplePublicObjectInput:
+    """
+    Create the body of a sync message for a list of Line IDs.
+
+    Args:
+        line_ids (List[int]): List of Line ids.
+
+    Returns:
+        List[SimplePublicObjectInput]: List of input objects for upserting Line data to Hubspot
+    """
     lines = Line.objects.fetch(id__in=line_ids)
     message_list = []
     for line in lines:
@@ -235,7 +253,7 @@ def make_product_create_message_list_from_product_ids(
     Create a hubspot sync input object for a product.
 
     Args:
-        product_ids (List[int]): List of product ids..
+        product_ids (List[int]): List of product ids.
 
     Returns:
         List[SimplePublicObjectInput]: List of input objects for upserting Product data to Hubspot.
@@ -645,7 +663,7 @@ def sync_contact_with_hubspot(user: User):
         return False
     time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
 
-    user.hubspot_sync_datetime=now_in_utc()
+    user.hubspot_sync_datetime = now_in_utc()
     user.save()
 
     return True
