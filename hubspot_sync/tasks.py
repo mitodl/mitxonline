@@ -89,12 +89,18 @@ def sync_failed_contacts(chunk: List[int]) -> List[int]:
     Returns:
         list of contact ids that still failed
     """
+    failed_ids = []
     users = list(User.objects.filter(id__in=chunk))
-    failed_ids = api.sync_contact_with_hubspot(users)
+    for user in users:
+        try:
+            api.sync_contact_with_hubspot(user)
+            time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
+        except ApiException:
+            failed_ids.append(user.id)
     return failed_ids
 
 
-def handle_failed_batch_chunk(chunk: list[int], hubspot_type: str) -> list[int]:
+def handle_failed_batch_chunk(chunk: List[int], hubspot_type: str) -> List[int]:
     """
     Try reprocessing a chunk of contacts individually, in case conflicting emails are the problem
 
@@ -311,6 +317,9 @@ def batch_update_hubspot_objects_chunked(
                         email__iexact=result.properties["email"], is_active=True
                     ).update(hubspot_sync_datetime=now_in_utc())
             updated_ids.extend(chunk_updated_ids)
+            log.info("Updated the following HubSpot ID's %s", chunk_updated_ids)
+            percent_complete = (len(updated_ids) / len(object_ids)) * 100
+            log.info("%i%% complete updating HubSpot ID's", percent_complete)
         except ApiException as ae:
             last_error_status = ae.status
             still_failed = handle_failed_batch_chunk(
@@ -318,9 +327,6 @@ def batch_update_hubspot_objects_chunked(
             )
             if still_failed:
                 errored_chunks.append(still_failed)
-        log.info("Updated the following HubSpot ID's %s", chunk_updated_ids)
-        percent_complete = (len(updated_ids) / len(object_ids)) * 100
-        log.info("%i%% complete updating HubSpot ID's", percent_complete)
         time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
     if errored_chunks:
         raise ApiException(

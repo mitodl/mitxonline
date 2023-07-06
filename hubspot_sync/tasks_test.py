@@ -3,9 +3,12 @@ Tests for hubspot_sync tasks
 """
 # pylint: disable=redefined-outer-name
 from decimal import Decimal
-from math import ceil
 
 import pytest
+from hubspot_sync.api import (
+    make_contact_create_message_list_from_user_ids,
+    make_contact_update_message_list_from_user_ids,
+)
 import reversion
 from django.contrib.contenttypes.models import ContentType
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
@@ -17,9 +20,8 @@ from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-from ecommerce.models import Order, Product
+from ecommerce.models import Product
 from hubspot_sync import tasks
-from hubspot_sync.api import make_contact_sync_message
 from hubspot_sync.tasks import (
     batch_upsert_associations,
     batch_upsert_associations_chunked,
@@ -180,7 +182,12 @@ def test_batch_update_hubspot_objects_chunked(mocker, id_count):
     mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
     mock_hubspot_api.return_value.crm.objects.batch_api.update.return_value = (
         mocker.Mock(
-            results=[SimplePublicObjectFactory(id=mock_id[1]) for mock_id in mock_ids]
+            results=[
+                SimplePublicObjectFactory(
+                    id=mock_id[1], properties={"email": "fake_email@email.com"}
+                )
+                for mock_id in mock_ids
+            ]
         )
     )
     expected_batches = 1 if id_count == 5 else 2
@@ -194,13 +201,9 @@ def test_batch_update_hubspot_objects_chunked(mocker, id_count):
     mock_hubspot_api.return_value.crm.objects.batch_api.update.assert_any_call(
         HubspotObjectType.CONTACTS.value,
         BatchInputSimplePublicObjectInput(
-            inputs=[
-                {
-                    "id": mock_id[1],
-                    "properties": make_contact_sync_message(mock_id[0]).properties,
-                }
-                for mock_id in mock_ids[0 : min(id_count, 10)]
-            ]
+            inputs=make_contact_update_message_list_from_user_ids(
+                mock_ids[0 : min(id_count, 10)]
+            )
         ),
     )
 
@@ -218,15 +221,16 @@ def test_batch_update_hubspot_objects_chunked_error(mocker, status, expected_err
         "hubspot_sync.tasks.api.sync_contact_with_hubspot",
         side_effect=(ApiException(status=status)),
     )
-    chunk = [(user.id, "123") for user in UserFactory.create_batch(3)]
+    users = UserFactory.create_batch(3)
+    chunk = [(user.id, "123") for user in users]
     with pytest.raises(expected_error):
         tasks.batch_update_hubspot_objects_chunked(
             HubspotObjectType.CONTACTS.value,
             "user",
             chunk,
         )
-    for item in chunk:
-        mock_sync_contacts.assert_any_call(item[0])
+    for user in users:
+        mock_sync_contacts.assert_any_call(user)
 
 
 @pytest.mark.parametrize("id_count", [5, 15])
@@ -251,10 +255,9 @@ def test_batch_create_hubspot_objects_chunked(mocker, id_count):
     mock_hubspot_api.return_value.crm.objects.batch_api.create.assert_any_call(
         HubspotObjectType.CONTACTS.value,
         BatchInputSimplePublicObjectInput(
-            inputs=[
-                make_contact_sync_message(mock_id)
-                for mock_id in mock_ids[0 : min(id_count, 10)]
-            ]
+            inputs=make_contact_create_message_list_from_user_ids(
+                mock_ids[0 : min(id_count, 10)]
+            )
         ),
     )
 
@@ -272,15 +275,16 @@ def test_batch_create_hubspot_objects_chunked_error(mocker, status, expected_err
         "hubspot_sync.tasks.api.sync_contact_with_hubspot",
         side_effect=(ApiException(status=status)),
     )
-    chunk = sorted([user.id for user in UserFactory.create_batch(3)])
+    users = UserFactory.create_batch(3)
+    chunk = sorted([user.id for user in users])
     with pytest.raises(expected_error):
         tasks.batch_create_hubspot_objects_chunked(
             HubspotObjectType.CONTACTS.value,
             "user",
             chunk,
         )
-    for item in chunk:
-        mock_sync_contact.assert_any_call(item)
+    for user in users:
+        mock_sync_contact.assert_any_call(user)
 
 
 def test_batch_upsert_associations(settings, mocker, mocked_celery):

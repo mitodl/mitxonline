@@ -58,7 +58,7 @@ def make_contact_create_message_list_from_user_ids(
 
 
 def make_contact_update_message_list_from_user_ids(
-    chunk: List[Tuple[int, str]]
+    chunk: List[tuple[int, str]]
 ) -> List[dict]:
     """
     Create the body of a HubSpot contact batch update message from a dictionary..
@@ -72,8 +72,8 @@ def make_contact_update_message_list_from_user_ids(
     chunk_dictionary = dict(chunk)
     users = User.objects.filter(id__in=chunk_dictionary.keys())
     request_input = []
-    for user_id, hubspot_id in chunk_dictionary:
-        user = users.filter(id=user_id)
+    for user_id, hubspot_id in chunk_dictionary.items():
+        user = users.filter(id=user_id).first()
         request_input.append(
             {
                 "id": hubspot_id,
@@ -135,7 +135,7 @@ def make_deal_create_message_list_from_order_ids(
 
 
 def make_deal_update_message_list_from_order_ids(
-    chunk: List[Tuple[int, str]]
+    chunk: List[tuple[int, str]]
 ) -> List[dict]:
     """
     Create the body of a HubSpot deal batch update message from a dictionary..
@@ -149,7 +149,7 @@ def make_deal_update_message_list_from_order_ids(
     chunk_dictionary = dict(chunk)
     orders = Order.objects.filter(id__in=chunk_dictionary.keys())
     request_input = []
-    for order_id, hubspot_id in chunk_dictionary:
+    for order_id, hubspot_id in chunk_dictionary.items():
         order = orders.filter(id=order_id)
         request_input.append(
             {
@@ -187,7 +187,7 @@ def make_line_item_create_messages_list_from_line_ids(
 
 
 def make_line_item_update_message_list_from_line_ids(
-    chunk: List[Tuple[int, str]]
+    chunk: List[tuple[int, str]]
 ) -> List[dict]:
     """
     Create the body of a HubSpot line batch update message from a dictionary.
@@ -201,7 +201,7 @@ def make_line_item_update_message_list_from_line_ids(
     chunk_dictionary = dict(chunk)
     lines = Line.objects.filter(id__in=chunk_dictionary.keys())
     request_input = []
-    for line_id, hubspot_id in chunk_dictionary:
+    for line_id, hubspot_id in chunk_dictionary.items():
         line = lines.filter(id=line_id)
         request_input.append(
             {
@@ -248,7 +248,7 @@ def make_product_create_message_list_from_product_ids(
 
 
 def make_product_update_message_list_from_product_ids(
-    chunk: List[Tuple[int, str]]
+    chunk: List[tuple[int, str]]
 ) -> List[dict]:
     """
     Create the body of a HubSpot product batch update message from a dictionary.
@@ -262,7 +262,7 @@ def make_product_update_message_list_from_product_ids(
     chunk_dictionary = dict(chunk)
     products = Product.objects.filter(id__in=chunk_dictionary.keys())
     request_input = []
-    for product_id, hubspot_id in chunk_dictionary:
+    for product_id, hubspot_id in chunk_dictionary.items():
         product = products.filter(id=product_id)
         request_input.append(
             {
