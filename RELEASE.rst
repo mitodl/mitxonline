@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.67.3
+--------------
+
+- Adds support for featured images in programs (#1724)
+
 Version 0.67.2 (Released July 06, 2023)
 --------------
 
