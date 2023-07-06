@@ -407,14 +407,14 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
         log.error(message)
         return False, message
     if order.state != Order.STATE.FULFILLED:
-        message = "Order with order_id %s is not in fulfilled state.".format(order.id)
+        message = f"Order with order_id {order.id} is not in fulfilled state."
         log.error(message)
         return False, message
 
     order_recent_transaction = order.transactions.first()
 
     if not order_recent_transaction:
-        message = "There is no associated transaction against order_id %s".format(order.id)
+        message = f"There is no associated transaction against order_id {order.id}"
         log.error(message)
         return False, message
 
