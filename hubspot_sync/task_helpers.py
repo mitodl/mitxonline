@@ -36,7 +36,7 @@ def sync_hubspot_deal(order):
     """
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN and order.lines.first() is not None:
         try:
-            tasks.sync_deal_with_hubspot.apply_async(args=(order.id,), countdown=10)
+            tasks.sync_deal_with_hubspot.apply_async(args=(order,), countdown=10)
         except:
             log.exception(
                 "Exception calling sync_deal_with_hubspot for order %d", order.id
@@ -69,7 +69,7 @@ def sync_hubspot_product(product):
     """
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         try:
-            tasks.sync_product_with_hubspot.delay(product.id)
+            tasks.sync_product_with_hubspot.delay(product)
         except:
             log.exception(
                 "Exception calling sync_product_with_hubspot for product %d", product.id

@@ -135,7 +135,7 @@ def test_make_product_sync_message():
 def test_sync_contact_with_hubspot(mock_hubspot_api):
     """Test that the hubspot CRM API is called properly for a contact sync"""
     user = UserFactory.create()
-    api.sync_contact_with_hubspot(user.id)
+    api.sync_contact_with_hubspot(user)
     assert (
         api.HubspotObject.objects.get(
             object_id=user.id, content_type__model="user"
@@ -166,7 +166,7 @@ def test_sync_contact_with_hubspot_error(mocker, mock_hubspot_api):
         )
     )
     with pytest.raises(ApiException) as exc:
-        api.sync_contact_with_hubspot(user.id)
+        api.sync_contact_with_hubspot(user)
     user.refresh_from_db()
     assert user.hubspot_sync_datetime is None
 
@@ -191,7 +191,7 @@ def test_existing_user_sync_contact_with_hubspot_error(mocker, mock_hubspot_api)
         )
     )
     with pytest.raises(ApiException) as exc:
-        api.sync_contact_with_hubspot(user.id)
+        api.sync_contact_with_hubspot(user)
     user.refresh_from_db()
     assert user.hubspot_sync_datetime == current_datetime
 

@@ -5,7 +5,6 @@ import logging
 import time
 from math import ceil
 from typing import List, Tuple
-from datetime import datetime
 
 import celery
 from django.conf import settings
@@ -21,9 +20,11 @@ from mitol.hubspot_api.decorators import raise_429
 from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.models import HubspotObject
 
-from ecommerce.models import Order
+from ecommerce.models import Order, Product
 from hubspot_sync import api
-from hubspot_sync.api import get_hubspot_id_for_object
+from hubspot_sync.api import (
+    get_hubspot_id_for_object,
+)
 from main.celery import app
 from users.models import User
 
@@ -60,7 +61,7 @@ def max_concurrent_chunk_size(obj_count: int) -> int:
     return ceil(obj_count / settings.HUBSPOT_MAX_CONCURRENT_TASKS)
 
 
-def batched_chunks(
+def _batched_chunks(
     hubspot_type: str, batch_ids: List[int or (int, str)]
 ) -> List[List[int or str]]:
     """
@@ -68,7 +69,7 @@ def batched_chunks(
 
     Args:
         hubspot_type(str): The type of hubspot object (deal, contact, etc)
-        batch_ids(list): The list of object ids/emails to process
+        batch_ids(list): The list of object ids to process
 
     Returns:
         list(list): List of chunked ids
@@ -137,7 +138,7 @@ def sync_contact_with_hubspot(user: User) -> str:
     Returns:
         str: The hubspot id for the contact
     """
-    return api.sync_contact_with_hubspot([user]).id
+    return api.sync_contact_with_hubspot(user).id
 
 
 @app.task(
@@ -149,17 +150,17 @@ def sync_contact_with_hubspot(user: User) -> str:
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
-def sync_product_with_hubspot(product_id: int) -> str:
+def sync_product_with_hubspot(product: Product) -> str:
     """
     Sync a MITxOnline Product with a hubspot product
 
     Args:
-        product_id(int): The Product id
+        product(Product): The Product object.
 
     Returns:
         str: The hubspot id for the product
     """
-    return api.sync_product_with_hubspot(product_id).id
+    return api.sync_product_with_hubspot(product).id
 
 
 @app.task(
@@ -171,17 +172,17 @@ def sync_product_with_hubspot(product_id: int) -> str:
 )
 @raise_429
 @single_task(10, key=task_obj_lock)
-def sync_deal_with_hubspot(order_id: int) -> str:
+def sync_deal_with_hubspot(order: Order) -> str:
     """
     Sync an Order with a hubspot deal
 
     Args:
-        order_id(int): The Order id
+        order(Order): The Order object.
 
     Returns:
         str: The hubspot id for the deal
     """
-    return api.sync_deal_with_hubspot(order_id).id
+    return api.sync_deal_with_hubspot(order).id
 
 
 @app.task(
@@ -232,8 +233,7 @@ def batch_create_hubspot_objects_chunked(
     content_type = ContentType.objects.exclude(app_label="auth").get(
         model=ct_model_name
     )
-    # Chunk again, by max allowed for object type (10 for contacts, 100 for all else)
-    chunked_ids = batched_chunks(hubspot_type, object_ids)
+    chunked_ids = _batched_chunks(hubspot_type, object_ids)
     errored_chunks = []
     last_error_status = None
     for chunk in chunked_ids:
@@ -241,19 +241,14 @@ def batch_create_hubspot_objects_chunked(
             response = HubspotApi().crm.objects.batch_api.create(
                 hubspot_type,
                 BatchInputSimplePublicObjectInput(
-                    inputs=[
-                        api.MODEL_FUNCTION_MAPPING[ct_model_name](obj_id)
-                        for obj_id in chunk
-                    ]
+                    inputs=api.MODEL_CREATE_FUNCTION_MAPPING[ct_model_name](chunk)
                 ),
             )
             for result in response.results:
                 if ct_model_name == "user":
                     user = User.objects.filter(
                         email__iexact=result.properties["email"], is_active=True
-                    ).first()
-                    user.hubspot_sync_datetime = datetime.now()
-                    user.save()
+                    ).update(hubspot_sync_datetime=now_in_utc())
                     object_id = user.id
                 else:
                     object_id = result.properties["unique_app_id"].split("-")[-1]
@@ -300,25 +295,21 @@ def batch_update_hubspot_objects_chunked(
           list(str): list of processed hubspot ids
     """
     updated_ids = []
-    # Chunk again, by max allowed for object type (10 for contacts, 100 for all else)
-    chunked_ids = batched_chunks(hubspot_type, object_ids)
+    chunked_ids = _batched_chunks(hubspot_type, object_ids)
     errored_chunks = []
     last_error_status = None
     for chunk in chunked_ids:
-        inputs = [
-            {
-                "id": obj_id[1],
-                "properties": api.MODEL_FUNCTION_MAPPING[ct_model_name](
-                    obj_id[0]
-                ).properties,
-            }
-            for obj_id in chunk
-        ]
+        inputs = api.MODEL_UPDATE_FUNCTION_MAPPING[ct_model_name](chunk)
         try:
             response = HubspotApi().crm.objects.batch_api.update(
                 hubspot_type, BatchInputSimplePublicObjectInput(inputs=inputs)
             )
             chunk_updated_ids = [result.id for result in response.results]
+            for result in response.results:
+                if ct_model_name == "user":
+                    User.objects.filter(
+                        email__iexact=result.properties["email"], is_active=True
+                    ).update(hubspot_sync_datetime=now_in_utc())
             updated_ids.extend(chunk_updated_ids)
         except ApiException as ae:
             last_error_status = ae.status
@@ -327,17 +318,9 @@ def batch_update_hubspot_objects_chunked(
             )
             if still_failed:
                 errored_chunks.append(still_failed)
-        log.info("Updated the following HubSpot ID's %s", updated_ids)
+        log.info("Updated the following HubSpot ID's %s", chunk_updated_ids)
         percent_complete = (len(updated_ids) / len(object_ids)) * 100
         log.info("%i%% complete updating HubSpot ID's", percent_complete)
-        if ct_model_name == "user":
-            user_ids = HubspotObject.objects.filter(
-                content_type=ContentType.objects.get_for_model(User),
-                hubspot_id__in=updated_ids,
-            ).values_list("object_id", flat=True)
-            User.objects.filter(id__in=user_ids).update(
-                hubspot_sync_datetime=now_in_utc()
-            )
         time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
     if errored_chunks:
         raise ApiException(
