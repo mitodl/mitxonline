@@ -12,6 +12,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.utils.timezone import now
 
 from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
+from cms.serializers import ProgramPageSerializer
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -121,6 +122,7 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
             "req_tree": ProgramRequirementTreeSerializer(
                 program_with_empty_requirements.requirements_root
             ).data,
+            "page": ProgramPageSerializer(program_with_empty_requirements.page).data,
         },
     )
 

@@ -587,7 +587,7 @@ export class EnrolledItemCard extends React.Component<
         <div className="row flex-grow-1">
           <div className="col-12 col-md-auto px-0 px-md-3">
             <div className="img-container">
-              <img src="/static/images/mit-dome.png" alt="" />
+              <img src={enrollment.program.page.feature_image_src} alt="" />
             </div>
           </div>
 
