@@ -242,7 +242,6 @@ def make_line_item_sync_message_from_line(line: Line) -> SimplePublicObjectInput
     """
     from hubspot_sync.serializers import LineSerializer
 
-    print(line)
     properties = LineSerializer(line).data
     return make_object_properties_message(properties)
 
@@ -596,7 +595,6 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
     Returns:
         SimplePublicObject: The hubspot deal object
     """
-    print("in sync_deal_with_hubspot")
     body = make_deal_sync_message_from_order(order)
     content_type = ContentType.objects.get_for_model(Order)
 
@@ -607,7 +605,6 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
     result = upsert_object_request(
         content_type, HubspotObjectType.DEALS.value, object_id=order.id, body=body
     )
-    print("before association")
     # Create association between deal and contact
     associate_objects_request(
         HubspotObjectType.DEALS.value,
@@ -616,7 +613,6 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
         get_hubspot_id_for_object(order.purchaser),
         HubspotAssociationType.DEAL_CONTACT.value,
     )
-    print("after association")
 
     for line in order.lines.all():
         sync_line_item_with_hubspot(line)
