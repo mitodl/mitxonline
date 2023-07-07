@@ -25,6 +25,9 @@ from hubspot_sync import tasks
 from hubspot_sync.tasks import (
     batch_upsert_associations,
     batch_upsert_associations_chunked,
+    sync_contact_with_hubspot,
+    sync_deal_with_hubspot,
+    sync_product_with_hubspot,
 )
 from users.factories import UserFactory, UserSocialAuthFactory
 from users.models import User
@@ -39,21 +42,42 @@ SYNC_FUNCTIONS = [
 ]
 
 
-@pytest.mark.parametrize("task_func", SYNC_FUNCTIONS)
-def test_task_functions(mocker, task_func):
+def test_task_sync_contact_with_hubspot(mocker):
     """These task functions should call the api function of the same name and return a hubspot id"""
-    mock_result = SimplePublicObjectFactory()
-    mock_api_call = mocker.patch(
-        f"hubspot_sync.tasks.api.{task_func}", return_value=mock_result
-    )
-    if task_func == "sync_contact_with_hubspot":
-        mock_object = UserFactory.create()
-    elif task_func == "sync_product_with_hubspot":
-        mock_object = ProductFactory.create()
-    else:
-        mock_object = OrderFactory.create()
+    mock_object = UserFactory.create()
+    mock_result = True
 
-    assert getattr(tasks, task_func)(mock_object.id) == mock_result.id
+    mock_api_call = mocker.patch(
+        f"hubspot_sync.tasks.api.sync_contact_with_hubspot", return_value=mock_result
+    )
+
+    assert sync_contact_with_hubspot(mock_object.id) == mock_result
+    mock_api_call.assert_called_once_with(mock_object)
+
+
+def test_task_sync_product_with_hubspot(mocker):
+    """These task functions should call the api function of the same name and return a hubspot id"""
+    mock_object = ProductFactory.create()
+    mock_result = SimplePublicObjectFactory()
+
+    mock_api_call = mocker.patch(
+        f"hubspot_sync.tasks.api.sync_product_with_hubspot", return_value=mock_result
+    )
+
+    assert sync_product_with_hubspot(mock_object.id) == mock_result.id
+    mock_api_call.assert_called_once_with(mock_object)
+
+
+def test_task_sync_deal_with_hubspot(mocker):
+    """These task functions should call the api function of the same name and return a hubspot id"""
+    mock_object = OrderFactory.create()
+    mock_result = SimplePublicObjectFactory()
+
+    mock_api_call = mocker.patch(
+        f"hubspot_sync.tasks.api.sync_deal_with_hubspot", return_value=mock_result
+    )
+
+    assert sync_deal_with_hubspot(mock_object.id) == mock_result.id
     mock_api_call.assert_called_once_with(mock_object)
 
 
