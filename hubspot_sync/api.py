@@ -136,7 +136,7 @@ def make_deal_create_message_list_from_order_ids(
     Returns:
         List[SimplePublicObjectInput]: List of input objects for upserting Order data to Hubspot
     """
-    orders = Order.objects.fetch(id__in=order_ids)
+    orders = Order.objects.filter(id__in=order_ids)
     message_list = []
     for order in orders:
         message_list.append(make_deal_sync_message_from_order(order))
@@ -159,7 +159,7 @@ def make_deal_update_message_list_from_order_ids(
     orders = Order.objects.filter(id__in=chunk_dictionary.keys())
     request_input = []
     for order_id, hubspot_id in chunk_dictionary.items():
-        order = orders.filter(id=order_id)
+        order = orders.filter(id=order_id).first()
         request_input.append(
             {
                 "id": hubspot_id,
@@ -197,7 +197,7 @@ def make_line_item_create_messages_list_from_line_ids(
     Returns:
         List[SimplePublicObjectInput]: List of input objects for upserting Line data to Hubspot
     """
-    lines = Line.objects.fetch(id__in=line_ids)
+    lines = Line.objects.filter(id__in=line_ids)
     message_list = []
     for line in lines:
         message_list.append(make_line_item_sync_message_from_line(line))
@@ -220,7 +220,7 @@ def make_line_item_update_message_list_from_line_ids(
     lines = Line.objects.filter(id__in=chunk_dictionary.keys())
     request_input = []
     for line_id, hubspot_id in chunk_dictionary.items():
-        line = lines.filter(id=line_id)
+        line = lines.filter(id=line_id).first()
         request_input.append(
             {
                 "id": hubspot_id,
@@ -242,6 +242,7 @@ def make_line_item_sync_message_from_line(line: Line) -> SimplePublicObjectInput
     """
     from hubspot_sync.serializers import LineSerializer
 
+    print(line)
     properties = LineSerializer(line).data
     return make_object_properties_message(properties)
 
@@ -281,7 +282,7 @@ def make_product_update_message_list_from_product_ids(
     products = Product.objects.filter(id__in=chunk_dictionary.keys())
     request_input = []
     for product_id, hubspot_id in chunk_dictionary.items():
-        product = products.filter(id=product_id)
+        product = products.filter(id=product_id).first()
         request_input.append(
             {
                 "id": hubspot_id,
@@ -595,6 +596,7 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
     Returns:
         SimplePublicObject: The hubspot deal object
     """
+    print("in sync_deal_with_hubspot")
     body = make_deal_sync_message_from_order(order)
     content_type = ContentType.objects.get_for_model(Order)
 
@@ -605,6 +607,7 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
     result = upsert_object_request(
         content_type, HubspotObjectType.DEALS.value, object_id=order.id, body=body
     )
+    print("before association")
     # Create association between deal and contact
     associate_objects_request(
         HubspotObjectType.DEALS.value,
@@ -613,6 +616,7 @@ def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
         get_hubspot_id_for_object(order.purchaser),
         HubspotAssociationType.DEAL_CONTACT.value,
     )
+    print("after association")
 
     for line in order.lines.all():
         sync_line_item_with_hubspot(line)

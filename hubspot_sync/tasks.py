@@ -20,7 +20,7 @@ from mitol.hubspot_api.decorators import raise_429
 from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.models import HubspotObject
 
-from ecommerce.models import Order, Product
+from ecommerce.models import Line, Order, Product
 from hubspot_sync import api
 from hubspot_sync.api import (
     get_hubspot_id_for_object,
@@ -142,10 +142,10 @@ def sync_contact_with_hubspot(user_id: int) -> str:
         user(User): The User object.
 
     Returns:
-        str: The hubspot id for the contact
+        bool: True if the HubSpot contact was successfully updated, otherwise False.
     """
     user = User.objects.get(id=user_id)
-    return api.sync_contact_with_hubspot(user).id
+    return api.sync_contact_with_hubspot(user)
 
 
 @app.task(
@@ -213,7 +213,8 @@ def sync_line_with_hubspot(line_id: int) -> str:
     Returns:
         str: The hubspot id for the line
     """
-    return api.sync_line_item_with_hubspot(line_id).id
+    line = Line.objects.get(id=line_id)
+    return api.sync_line_item_with_hubspot(line).id
 
 
 @app.task(
