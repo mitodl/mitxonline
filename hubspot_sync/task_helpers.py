@@ -2,7 +2,7 @@
 import logging
 
 from django.conf import settings
-from ecommerce.models import Line, Order, Product
+from ecommerce.models import Order, Product
 
 from hubspot_sync import tasks
 from users.models import User

@@ -3,7 +3,7 @@ import logging
 import re
 from decimal import Decimal
 import time
-from typing import List, Tuple
+from typing import List
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
