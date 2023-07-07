@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.67.4
+--------------
+
+- Refund Order should return propper error message (#1726)
+
 Version 0.67.3 (Released July 06, 2023)
 --------------
 
