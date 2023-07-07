@@ -41,7 +41,7 @@ def make_contact_create_message_list_from_user_ids(
     user_ids: List[int],
 ) -> List[SimplePublicObjectInput]:
     """
-    Create the body of a sync message for a list of User IDs.
+    Create the body of a HubSpot create message for a list of User IDs.
 
     Args:
         user_ids (List[int]): List of user ids.
@@ -61,7 +61,7 @@ def make_contact_update_message_list_from_user_ids(
     chunk: List[tuple[int, str]]
 ) -> List[dict]:
     """
-    Create the body of a HubSpot contact batch update message from a dictionary..
+    Create the body of a HubSpot contact update message from a dictionary..
 
     Args:
         chunk_dictionary (List[tuple(int, str)]): List of tuples of (User ID, HubSpot Object ID).
@@ -85,7 +85,7 @@ def make_contact_update_message_list_from_user_ids(
 
 def make_contact_sync_message_from_user(user: User) -> SimplePublicObjectInput:
     """
-    Create the body of a sync message for a contact. This will flatten the contained LegalAddress and Profile
+    Create the body of a HubSpot sync message for a contact. This will flatten the contained LegalAddress and Profile
     serialized data into one larger serializable dict
 
     Args:
@@ -128,7 +128,7 @@ def make_deal_create_message_list_from_order_ids(
     order_ids: List[int],
 ) -> SimplePublicObjectInput:
     """
-    Create the body of a sync message for a list of Order IDs.
+    Create the body of a HubSpot Deal create message for a list of Order IDs.
 
     Args:
         order_ids (List[int]): List of Order ids.
@@ -147,7 +147,7 @@ def make_deal_update_message_list_from_order_ids(
     chunk: List[tuple[int, str]]
 ) -> List[dict]:
     """
-    Create the body of a HubSpot deal batch update message from a dictionary.
+    Create the body of a HubSpot Deal batch update message from a dictionary.
 
     Args:
         chunk (List[tuple(int, str)]): List of tuples of (Order ID, HubSpot Object ID).
@@ -171,7 +171,7 @@ def make_deal_update_message_list_from_order_ids(
 
 def make_deal_sync_message_from_order(order: Order) -> SimplePublicObjectInput:
     """
-    Create a hubspot sync input object for an Order.
+    Create a hubspot sync message for an Order.
 
     Args:
         order (Order): Order object.
@@ -189,7 +189,7 @@ def make_line_item_create_messages_list_from_line_ids(
     line_ids: List[int],
 ) -> SimplePublicObjectInput:
     """
-    Create the body of a sync message for a list of Line IDs.
+    Create the body of a HubSpot Line create message for a list of Line IDs.
 
     Args:
         line_ids (List[int]): List of Line ids.
@@ -208,7 +208,7 @@ def make_line_item_update_message_list_from_line_ids(
     chunk: List[tuple[int, str]]
 ) -> List[dict]:
     """
-    Create the body of a HubSpot line batch update message from a dictionary.
+    Create the body of a HubSpot Line batch update message from a dictionary.
 
     Args:
         chunk_dictionary (List[tuple(int, str)]): List of tuples of (Line ID, HubSpot Object ID).
@@ -251,13 +251,13 @@ def make_product_create_message_list_from_product_ids(
     product_ids: List[int],
 ) -> SimplePublicObjectInput:
     """
-    Create a hubspot sync input object for a product.
+    Create the body of a HubSpot Product create message for a list of Product IDs.
 
     Args:
         product_ids (List[int]): List of product ids.
 
     Returns:
-        List[SimplePublicObjectInput]: List of input objects for upserting Product data to Hubspot.
+        List[SimplePublicObjectInput]: List of input objects for createing Product data to Hubspot.
     """
     message_list = []
     products = Product.objects.filter(id__in=product_ids)
@@ -270,7 +270,7 @@ def make_product_update_message_list_from_product_ids(
     chunk: List[tuple[int, str]]
 ) -> List[dict]:
     """
-    Create the body of a HubSpot product batch update message from a dictionary.
+    Create the body of a HubSpot Product batch update message from a dictionary.
 
     Args:
         chunk_dictionary (List[tuple(int, str)]): List of tuples of (Product ID, HubSpot Object ID).
@@ -296,7 +296,7 @@ def make_product_update_message_list_from_product_ids(
 
 def make_product_sync_message_from_product(product: Product) -> SimplePublicObjectInput:
     """
-    Create a hubspot sync input object for a product.
+    Create a hubspot sync input object for a Product.
 
     Args:
         product (Product): Product object.
@@ -312,7 +312,7 @@ def make_product_sync_message_from_product(product: Product) -> SimplePublicObje
 
 def format_product_name(product: Product) -> str:
     """
-    Get the product name as it should appear in Hubspot
+    Get the Product name as it should appear in Hubspot
 
     Args:
         product(Product): The product to return a name for
