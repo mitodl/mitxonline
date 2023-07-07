@@ -64,7 +64,7 @@ def make_contact_update_message_list_from_user_ids(
     Create the body of a HubSpot contact update message from a dictionary..
 
     Args:
-        chunk_dictionary (List[tuple(int, str)]): List of tuples of (User ID, HubSpot Object ID).
+        chunk (List[tuple(int, str)]): List of tuples of (User ID, HubSpot Object ID).
 
     Returns:
         List[dict]: List of dictionaries containing User properties.
@@ -211,7 +211,7 @@ def make_line_item_update_message_list_from_line_ids(
     Create the body of a HubSpot Line batch update message from a dictionary.
 
     Args:
-        chunk_dictionary (List[tuple(int, str)]): List of tuples of (Line ID, HubSpot Object ID).
+        chunk (List[tuple(int, str)]): List of tuples of (Line ID, HubSpot Object ID).
 
     Returns:
         List[dict]: List of dictionaries containing Line properties.
@@ -273,7 +273,7 @@ def make_product_update_message_list_from_product_ids(
     Create the body of a HubSpot Product batch update message from a dictionary.
 
     Args:
-        chunk_dictionary (List[tuple(int, str)]): List of tuples of (Product ID, HubSpot Object ID).
+        chunk (List[tuple(int, str)]): List of tuples of (Product ID, HubSpot Object ID).
 
     Returns:
         List[dict]: List of dictionaries containing Product properties.
