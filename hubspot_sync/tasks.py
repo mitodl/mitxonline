@@ -167,8 +167,7 @@ def sync_product_with_hubspot(product_id: int) -> str:
     Returns:
         str: The hubspot id for the product
     """
-    product = Product.objects.get(id=product_id)
-    return api.sync_product_with_hubspot(product).id
+    return api.sync_product_with_hubspot(Product.objects.get(id=product_id)).id
 
 
 @app.task(
@@ -185,13 +184,12 @@ def sync_deal_with_hubspot(order_id: int) -> str:
     Sync an Order with a hubspot deal
 
     Args:
-        order(Order): The Order object.
+        order_id(int): The Order ID.
 
     Returns:
         str: The hubspot id for the deal
     """
-    order = Order.objects.get(id=order_id)
-    return api.sync_deal_with_hubspot(order).id
+    return api.sync_deal_with_hubspot(Order.objects.get(id=order_id)).id
 
 
 @app.task(
@@ -213,8 +211,7 @@ def sync_line_with_hubspot(line_id: int) -> str:
     Returns:
         str: The hubspot id for the line
     """
-    line = Line.objects.get(id=line_id)
-    return api.sync_line_item_with_hubspot(line).id
+    return api.sync_line_item_with_hubspot(Line.objects.get(id=line_id)).id
 
 
 @app.task(
