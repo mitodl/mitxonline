@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import connection, reset_queries
 from django.templatetags.static import static
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -183,7 +184,7 @@ class CourseSerializer(BaseCourseSerializer):
                 else instance.unexpired_runs
             )
         return [
-            CourseRunSerializer(instance=run, context=self.context).data
+            BaseCourseRunSerializer(instance=run, context=self.context).data
             for run in active_runs
             if run.live
         ]
@@ -230,9 +231,7 @@ class CourseRunDetailSerializer(serializers.ModelSerializer):
 
     def get_page(self, instance):
         try:
-            return CoursePageSerializer(
-                instance=CoursePage.objects.filter(course=instance.course).get()
-            ).data
+            return CoursePageSerializer(instance=instance.course.page).data
         except ObjectDoesNotExist:
             return None
 
@@ -282,25 +281,14 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     def get_courses(self, instance):
         """Serializer for courses"""
-        return CourseSerializer(
-            models.Course.objects.filter(live=True, in_programs__program=instance)
-            .order_by("id", "courseruns__start_date")
-            .distinct("id"),
+        reset_queries()
+        cs_data = CourseSerializer(
+            [course[0] for course in instance.courses],
             many=True,
             context={"include_page_fields": True},
         ).data
-
-    def _get_nested_requirements(self, node):
-        ids = []
-
-        if node.get_children():
-            for child in node.get_children():
-                if child.node_type == models.ProgramRequirementNodeType.OPERATOR:
-                    ids += self._get_nested_requirements(child)
-                elif child.course.id is not None:
-                    ids.append(child.course.id)
-
-        return ids
+        logging.debug(f"get_courses spawned {len(connection.queries)} queries")
+        return cs_data
 
     def get_requirements(self, instance):
         return {
@@ -416,31 +404,13 @@ class CourseRunGradeSerializer(serializers.ModelSerializer):
         fields = ["grade", "letter_grade", "passed", "set_by_admin", "grade_percent"]
 
 
-class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
-    """CourseRunEnrollment model serializer"""
-
-    run = CourseRunDetailSerializer(read_only=True)
-    run_id = serializers.IntegerField(write_only=True)
+class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
     certificate = serializers.SerializerMethodField(read_only=True)
     enrollment_mode = serializers.ChoiceField(
         (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
     )
     approved_flexible_price_exists = serializers.SerializerMethodField()
     grades = serializers.SerializerMethodField(read_only=True)
-
-    def create(self, validated_data):
-        user = self.context["user"]
-        run_id = validated_data["run_id"]
-        try:
-            run = models.CourseRun.objects.get(id=run_id)
-        except models.CourseRun.DoesNotExist:
-            raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
-        successful_enrollments, edx_request_success = create_run_enrollments(
-            user,
-            [run],
-            keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
-        )
-        return successful_enrollments
 
     def get_certificate(self, enrollment):
         """
@@ -502,12 +472,43 @@ class CourseRunEnrollmentSerializer(serializers.ModelSerializer):
         fields = [
             "run",
             "id",
-            "run_id",
             "edx_emails_subscription",
             "certificate",
             "enrollment_mode",
             "approved_flexible_price_exists",
             "grades",
+        ]
+
+
+class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
+    """CourseRunEnrollment model serializer"""
+
+    run = CourseRunDetailSerializer(read_only=True)
+    run_id = serializers.IntegerField(write_only=True)
+    certificate = serializers.SerializerMethodField(read_only=True)
+    enrollment_mode = serializers.ChoiceField(
+        (EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE), read_only=True
+    )
+    approved_flexible_price_exists = serializers.SerializerMethodField()
+    grades = serializers.SerializerMethodField(read_only=True)
+
+    def create(self, validated_data):
+        user = self.context["user"]
+        run_id = validated_data["run_id"]
+        try:
+            run = models.CourseRun.objects.get(id=run_id)
+        except models.CourseRun.DoesNotExist:
+            raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
+        successful_enrollments, edx_request_success = create_run_enrollments(
+            user,
+            [run],
+            keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
+        )
+        return successful_enrollments
+
+    class Meta(BaseCourseRunEnrollmentSerializer.Meta):
+        fields = BaseCourseRunEnrollmentSerializer.Meta.fields + [
+            "run_id",
         ]
 
 
@@ -521,7 +522,7 @@ class ProgramCertificateSerializer(serializers.ModelSerializer):
 
 class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
     program = ProgramSerializer()
-    enrollments = CourseRunEnrollmentSerializer(many=True)
+    enrollments = BaseCourseRunEnrollmentSerializer(many=True)
     certificate = serializers.SerializerMethodField(read_only=True)
 
     def get_certificate(self, user_program_enrollment):

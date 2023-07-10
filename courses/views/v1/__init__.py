@@ -313,14 +313,6 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
                 "program",
                 "program__page",
             )
-            .prefetch_related(
-                Prefetch(
-                    "program__all_requirements__course",
-                    queryset=ProgramRequirement.objects.filter(
-                        node_type=ProgramRequirementNodeType.COURSE
-                    ),
-                )
-            )
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
             .all()
@@ -329,12 +321,7 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         program_list = []
 
         for enrollment in program_enrollments:
-            courses = [
-                requirement.course
-                for requirement in enrollment.program.all_requirements.only(
-                    "course"
-                ).all()
-            ]
+            courses = [course[0] for course in enrollment.program.courses]
 
             program_list.append(
                 {

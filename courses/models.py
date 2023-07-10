@@ -113,12 +113,12 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     )
     live = models.BooleanField(default=False)
 
-    @property
+    @cached_property
     def page(self):
         """Gets the associated ProgramPage"""
         return getattr(self, "programpage", None)
 
-    @property
+    @cached_property
     def num_courses(self):
         """Gets the number of courses in this program"""
         return len(self.courses)
@@ -237,6 +237,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                     operator=node_type,
                     title="Elective Courses",
                     operator_value=min_courses,
+                    elective_flag=True,
                 )
             else:
                 node = self.get_requirements_root().add_child(
@@ -291,7 +292,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         courses.extend(heap)
         return courses
 
-    @cached_property
+    @property
     def courses(self):
         """
         Returns the courses associated with this program via the requirements
@@ -301,7 +302,33 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         - list of tuple (Course, string): courses that are either requirements or electives, plus the requirement type
         """
 
-        return self._req_course_walk(self.requirements_root, [])
+        heap = []
+        main_ops = ProgramRequirement.objects.filter(program=self, depth=2).all()
+
+        for op in main_ops:
+            reqs = (
+                ProgramRequirement.objects.filter(
+                    program__id=self.id,
+                    path__startswith=op.path,
+                    node_type=ProgramRequirementNodeType.COURSE,
+                )
+                .select_related("course", "course__page")
+                .all()
+            )
+
+            heap.extend(
+                [
+                    (
+                        req.course,
+                        "Required Courses"
+                        if not op.elective_flag
+                        else "Elective Courses",
+                    )
+                    for req in reqs
+                ]
+            )
+
+        return heap
 
     @cached_property
     def required_courses(self):
@@ -435,12 +462,12 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """
         return self.readable_id.split("+")[-1]
 
-    @property
+    @cached_property
     def page(self):
         """Gets the associated CoursePage"""
         return getattr(self, "coursepage", None)
 
-    @property
+    @cached_property
     def active_products(self):
         """
         Gets active products for the first unexpired courserun for this course
@@ -512,22 +539,21 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         Returns:
             list: List of Programs this Course is a requirement or elective for.
         """
-        programs_containing_course = []
+        programs_containing_course = (
+            ProgramRequirement.objects.filter(
+                node_type=ProgramRequirementNodeType.COURSE, course=self
+            )
+            .distinct("program_id")
+            .order_by("program_id")
+            .values_list("program_id", flat=True)
+        )
 
-        def _program_root_contains_course(node: MP_Node):
-            if node.is_course and node.course == self:
-                return True
-            elif node.get_children():
-                for child in node.get_children():
-                    if _program_root_contains_course(child):
-                        return True
-            return False
-
-        for program_root_node in ProgramRequirement.get_root_nodes():
-            if _program_root_contains_course(program_root_node):
-                programs_containing_course.append(program_root_node.program)
-
-        return programs_containing_course
+        return [
+            program
+            for program in Program.objects.filter(
+                pk__in=[id for id in programs_containing_course]
+            ).all()
+        ]
 
     def is_country_blocked(self, user):
         """
@@ -1383,6 +1409,7 @@ class ProgramRequirement(MP_Node):
     )
 
     title = models.TextField(null=True, blank=True, default="")
+    elective_flag = models.BooleanField(null=True, blank=True, default=False)
 
     @property
     def is_all_of_operator(self):
