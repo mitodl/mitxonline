@@ -319,7 +319,7 @@ def test_batch_create_hubspot_objects_chunked_error(mocker, status, expected_err
         side_effect=(ApiException(status=status)),
     )
     users = UserFactory.create_batch(3)
-    chunk = sorted([user.id for user in users])
+    chunk = [user.id for user in users]
     with pytest.raises(expected_error):
         tasks.batch_create_hubspot_objects_chunked(
             HubspotObjectType.CONTACTS.value,
@@ -414,7 +414,7 @@ def test_batch_upsert_associations_chunked(mocker):
 
 def test_sync_failed_contacts(mocker):
     """sync_failed_contacts should try to sync each contact and return a list of failed contact ids"""
-    user_ids = sorted(user.id for user in UserFactory.create_batch(4))
+    user_ids = [user.id for user in UserFactory.create_batch(4)]
     mock_sync = mocker.patch(
         "hubspot_sync.tasks.api.sync_contact_with_hubspot",
         side_effect=[

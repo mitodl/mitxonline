@@ -165,7 +165,8 @@ def test_sync_contact_with_hubspot_error(mocker, mock_hubspot_api):
             status=400,
         )
     )
-    assert api.sync_contact_with_hubspot(user) is False
+    with pytest.raises(ApiException) as exc:
+        api.sync_contact_with_hubspot(user)
     user.refresh_from_db()
     assert user.hubspot_sync_datetime is None
 
@@ -189,7 +190,8 @@ def test_existing_user_sync_contact_with_hubspot_error(mocker, mock_hubspot_api)
             status=400,
         )
     )
-    assert api.sync_contact_with_hubspot(user) is False
+    with pytest.raises(ApiException) as exc:
+        api.sync_contact_with_hubspot(user)
     user.refresh_from_db()
     assert user.hubspot_sync_datetime == current_datetime
 

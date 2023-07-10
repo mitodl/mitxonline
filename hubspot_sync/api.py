@@ -627,7 +627,7 @@ def sync_product_with_hubspot(product: Product) -> SimplePublicObject:
         product(Product): The Product object.
 
     Returns:
-        SimplePublicObject: The hubspot product object
+        SimplePublicObject: The hubspot product object.
     """
     body = make_product_sync_message_from_product(product)
     content_type = ContentType.objects.get_for_model(Product)
@@ -645,28 +645,23 @@ def sync_contact_with_hubspot(user: User):
         user User: User object.
 
     Returns:
-        bool: True if the contact upsert to HubSpot was successful, otherwise False.
+        SimplePublicObject: The hubspot contact object.
 
     Raises:
         ApiException: Raised if HubSpot upsert request fails.
     """
     content_type = ContentType.objects.get_for_model(User)
     body = make_contact_sync_message_from_user(user)
-    try:
-        upsert_object_request(
-            content_type,
-            HubspotObjectType.CONTACTS.value,
-            object_id=user.id,
-            body=body,
-        )
-    except ApiException:
-        return False
-    time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
-
+    result = upsert_object_request(
+        content_type,
+        HubspotObjectType.CONTACTS.value,
+        object_id=user.id,
+        body=body,
+    )
     user.hubspot_sync_datetime = now_in_utc()
     user.save()
 
-    return True
+    return result
 
 
 MODEL_CREATE_FUNCTION_MAPPING = {

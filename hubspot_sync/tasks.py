@@ -139,13 +139,12 @@ def sync_contact_with_hubspot(user_id: int) -> str:
     Sync a User with a hubspot contact
 
     Args:
-        user(User): The User object.
+        user_id(int): The User ID.
 
     Returns:
         bool: True if the HubSpot contact was successfully updated, otherwise False.
     """
-    user = User.objects.get(id=user_id)
-    return api.sync_contact_with_hubspot(user)
+    return api.sync_contact_with_hubspot(User.objects.get(id=user_id))
 
 
 @app.task(
@@ -162,7 +161,7 @@ def sync_product_with_hubspot(product_id: int) -> str:
     Sync a MITxOnline Product with a hubspot product
 
     Args:
-        product(Product): The Product object.
+        product_id(int): The Product ID.
 
     Returns:
         str: The hubspot id for the product
