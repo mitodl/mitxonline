@@ -278,7 +278,8 @@ def test_batch_create_hubspot_objects_chunked(mocker, id_count):
     mock_hubspot_api.return_value.crm.objects.batch_api.create.return_value = (
         mocker.Mock(
             results=[
-                SimplePublicObjectFactory(id=user.id, properties={"email": user.email}) for user in contacts
+                SimplePublicObjectFactory(id=user.id, properties={"email": user.email})
+                for user in contacts
             ]
         )
     )
