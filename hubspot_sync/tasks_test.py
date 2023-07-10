@@ -275,9 +275,12 @@ def test_batch_create_hubspot_objects_chunked(mocker, id_count):
     contacts = UserFactory.create_batch(id_count)
     mock_ids = sorted([contact.id for contact in contacts])
     mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
-    mock_hubspot_api.return_value.crm.objects.batch_api.update.return_value = (
+    mock_hubspot_api.return_value.crm.objects.batch_api.create.return_value = (
         mocker.Mock(
-            results=[SimplePublicObjectFactory(id=mock_id) for mock_id in mock_ids]
+            results=[
+                SimplePublicObjectFactory(id=user.id, properties={"email": user.email})
+                for user in contacts
+            ]
         )
     )
     expected_batches = 1 if id_count == 5 else 2
@@ -296,6 +299,10 @@ def test_batch_create_hubspot_objects_chunked(mocker, id_count):
             )
         ),
     )
+
+    for user in contacts:
+        user.refresh_from_db()
+        assert user.hubspot_sync_datetime is not None
 
 
 @pytest.mark.parametrize(
@@ -345,7 +352,7 @@ def test_batch_upsert_associations(settings, mocker, mocked_celery):
     mock_assoc_chunked.s.assert_any_call([order_ids[4]])
 
 
-def test_batch_upsert_associations_chunked(settings, mocker):
+def test_batch_upsert_associations_chunked(mocker):
     """
     batch_upsert_associations_chunked should make expected API calls
     """
@@ -405,8 +412,7 @@ def test_batch_upsert_associations_chunked(settings, mocker):
     )
 
 
-@pytest.mark.parametrize("mode", ["update", "create"])
-def test_sync_failed_contacts(mocker, mode):
+def test_sync_failed_contacts(mocker):
     """sync_failed_contacts should try to sync each contact and return a list of failed contact ids"""
     user_ids = sorted(user.id for user in UserFactory.create_batch(4))
     mock_sync = mocker.patch(
