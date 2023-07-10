@@ -46,7 +46,11 @@ from openedx.api import (
     get_edx_grades_with_users,
     unenroll_edx_course_run,
 )
-from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import (
+    EDX_DEFAULT_ENROLLMENT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+    EDX_ENROLLMENT_AUDIT_MODE,
+)
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
     NoEdxApiAuthError,
@@ -452,6 +456,22 @@ def defer_enrollment(
     from_enrollment = CourseRunEnrollment.all_objects.get(
         user=user, run__courseware_id=from_courseware_id
     )
+    to_run = (
+        CourseRun.objects.get(courseware_id=to_courseware_id)
+        if to_courseware_id
+        else None
+    )
+
+    if to_run is None:
+        downgraded_enrollments, _ = create_run_enrollments(
+            user=user,
+            runs=[from_enrollment.run],
+            keep_failed_enrollments=True,
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
+            force_enrollment=True,
+        )
+        return downgraded_enrollments, None
+
     if not force and not from_enrollment.active:
         raise ValidationError(
             "Cannot defer from inactive enrollment (id: {}, run: {}, user: {}). "
@@ -459,7 +479,6 @@ def defer_enrollment(
                 from_enrollment.id, from_enrollment.run.courseware_id, user.email
             )
         )
-    to_run = CourseRun.objects.get(courseware_id=to_courseware_id)
     if from_enrollment.run == to_run:
         raise ValidationError(
             "Cannot defer to the same course run (run: {})".format(to_run.courseware_id)

@@ -335,7 +335,7 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
                 refund_amount = refund_form.cleaned_data.get("refund_amount")
 
                 # Call the refund CyberSource API with provided reason and amount
-                refund_api_success = refund_order(
+                refund_api_success, _ = refund_order(
                     order_id=order.id,
                     refund_amount=refund_amount,
                     refund_reason=refund_reason,

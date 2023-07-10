@@ -73,12 +73,13 @@ export type Program = {
   courses: Array<CourseDetailWithRuns>,
   requirements: ?ProgramEnrollments,
   req_tree: Array<ProgramRequirement>,
+  page: ?Page,
 }
 
 export type ProgramEnrollment = {
   program: Program,
   enrollments: Array<RunEnrollment>,
-  certificate: ?Certificate
+  certificate: ?Certificate,
 }
 
 export type PartnerSchool = {

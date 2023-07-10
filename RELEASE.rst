@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.67.3 (Released July 06, 2023)
+--------------
+
+- Adds support for featured images in programs (#1724)
+
+Version 0.67.2 (Released July 06, 2023)
+--------------
+
+- Add unverify option to google sheets plugin (#1717)
+
 Version 0.67.1 (Released July 05, 2023)
 --------------
 
