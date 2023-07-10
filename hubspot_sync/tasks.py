@@ -258,7 +258,9 @@ def batch_create_hubspot_objects_chunked(
                 if ct_model_name == "user":
                     user = User.objects.filter(
                         email__iexact=result.properties["email"], is_active=True
-                    ).update(hubspot_sync_datetime=now_in_utc())
+                    ).first()
+                    user.hubspot_sync_datetime = now_in_utc()
+                    user.save()
                     object_id = user.id
                 else:
                     object_id = result.properties["unique_app_id"].split("-")[-1]
