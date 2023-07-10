@@ -273,7 +273,7 @@ def test_batch_update_hubspot_objects_chunked_error(mocker, status, expected_err
 def test_batch_create_hubspot_objects_chunked(mocker, id_count):
     """batch_create_hubspot_objects_chunked should make expected api calls and args"""
     contacts = UserFactory.create_batch(id_count)
-    mock_ids = sorted([contact.id for contact in contacts])
+    mock_ids = [contact.id for contact in contacts]
     mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
     mock_hubspot_api.return_value.crm.objects.batch_api.create.return_value = (
         mocker.Mock(
@@ -312,11 +312,11 @@ def test_batch_create_hubspot_objects_chunked_error(mocker, status, expected_err
     """batch_create_hubspot_objects_chunked raise expected exception"""
     mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
     mock_hubspot_api.return_value.crm.objects.batch_api.create.side_effect = (
-        ApiException(status=status)
+        expected_error(status=status)
     )
     mock_sync_contact = mocker.patch(
         "hubspot_sync.tasks.api.sync_contact_with_hubspot",
-        side_effect=(ApiException(status=status)),
+        side_effect=(expected_error(status=status)),
     )
     users = UserFactory.create_batch(3)
     chunk = [user.id for user in users]
@@ -328,6 +328,7 @@ def test_batch_create_hubspot_objects_chunked_error(mocker, status, expected_err
         )
     for user in users:
         mock_sync_contact.assert_any_call(user)
+        assert user.hubspot_sync_datetime is None
 
 
 def test_batch_upsert_associations(settings, mocker, mocked_celery):

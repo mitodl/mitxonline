@@ -649,6 +649,7 @@ def sync_contact_with_hubspot(user: User):
 
     Raises:
         ApiException: Raised if HubSpot upsert request fails.
+        TooManyRequestsException: Too many requests against HubSpot's API.
     """
     content_type = ContentType.objects.get_for_model(User)
     body = make_contact_sync_message_from_user(user)
