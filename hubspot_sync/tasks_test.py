@@ -273,13 +273,12 @@ def test_batch_update_hubspot_objects_chunked_error(mocker, status, expected_err
 def test_batch_create_hubspot_objects_chunked(mocker, id_count):
     """batch_create_hubspot_objects_chunked should make expected api calls and args"""
     contacts = UserFactory.create_batch(id_count)
-    mock_ids = [contact.id for contact in contacts]
+    mock_ids = sorted(user.id for user in contacts)
     mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
     mock_hubspot_api.return_value.crm.objects.batch_api.create.return_value = (
         mocker.Mock(
             results=[
-                SimplePublicObjectFactory(id=user.id, properties={"email": user.email})
-                for user in contacts
+                SimplePublicObjectFactory(id=user.id, properties={"email": user.email}) for user in contacts
             ]
         )
     )
