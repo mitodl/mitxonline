@@ -4,10 +4,10 @@ Google Sheets
 This is an explanation of integration with Google Sheets libraries for an 
 automated processing of change of enrollment requests.
 
-##Refunds
+## Refunds
 To learn more on how to set it up follow [this doc](https://github.com/mitodl/ol-django/tree/main/src/mitol/google_sheets_refunds#readme).
 
-###Functionality and Usage
+### Functionality and Usage
 In the MITx Online Google Sheet folder there is a sheet called "MITx Online Production - Change of Enrollment Requests". This
 sheet contains a tab "Refund Form Responses", it is getting filled by the "Refund Request" form submissions. This form also resides
 within the same folder.
@@ -30,9 +30,9 @@ When a row is processed:
 
 If the procedure has output a cybersource error then manual resolution is required.
 
-##Deferrals
+## Deferrals
 
-###Functionality and usage
+### Functionality and usage
 Within the "MITx Online Production - Change of Enrollment Requests" you can find a "Deferral Request" form. There
 are two things you can do with this:
 1) Downgrade (aka 'unverify') learner's enrollment for a course run.
@@ -45,4 +45,4 @@ The second procedure attempts:
 1) to enroll the learner in a 'verified' track for the "To Course"
 2) to unenroll the learner from the "From Course"
 
-If 
+If any of the api calls fail then the operation is reverted.
