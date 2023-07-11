@@ -11,10 +11,10 @@ class RefundPlugin:
         self, refund_request_row: RefundRequestRow
     ) -> RefundResult:
 
-        refund_api_success = refund_order(
+        refund_success, message = refund_order(
             reference_number=refund_request_row.order_ref_num, unenroll=True
         )
-        if refund_api_success:
+        if refund_success:
             return RefundResult(ResultType.PROCESSED)
 
-        return RefundResult(ResultType.FAILED)
+        return RefundResult(ResultType.FAILED, message)

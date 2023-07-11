@@ -1,6 +1,33 @@
 Release Notes
 =============
 
+Version 0.67.4 (Released July 10, 2023)
+--------------
+
+- Refund Order should return propper error message (#1726)
+
+Version 0.67.3 (Released July 06, 2023)
+--------------
+
+- Adds support for featured images in programs (#1724)
+
+Version 0.67.2 (Released July 06, 2023)
+--------------
+
+- Add unverify option to google sheets plugin (#1717)
+
+Version 0.67.1 (Released July 05, 2023)
+--------------
+
+- Clears discounts when reusing an existing PendingOrder (#1721)
+
+Version 0.67.0 (Released July 05, 2023)
+--------------
+
+- add migration to fix letter grade set by 0033
+- update letter_grade for MM grade, add missing enrollment import script
+- Refund Order: remove atomicity and rollback (#1706)
+
 Version 0.66.2 (Released June 28, 2023)
 --------------
 
