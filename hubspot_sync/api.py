@@ -49,7 +49,7 @@ def make_contact_create_message_list_from_user_ids(
     Returns:
         List[SimplePublicObjectInput]: List of input objects for upserting User data to Hubspot
     """
-    users = list(User.objects.filter(id__in=user_ids))
+    users = list(User.objects.filter(id__in=user_ids).order_by("id"))
     message_list = []
     for user in users:
         message_list.append(make_contact_sync_message_from_user(user))
