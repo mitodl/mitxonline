@@ -5,7 +5,6 @@ import logging
 import time
 from math import ceil
 from typing import List, Tuple
-from datetime import datetime
 
 import celery
 from django.conf import settings
@@ -21,9 +20,11 @@ from mitol.hubspot_api.decorators import raise_429
 from mitol.hubspot_api.exceptions import TooManyRequestsException
 from mitol.hubspot_api.models import HubspotObject
 
-from ecommerce.models import Order
+from ecommerce.models import Line, Order, Product
 from hubspot_sync import api
-from hubspot_sync.api import get_hubspot_id_for_object
+from hubspot_sync.api import (
+    get_hubspot_id_for_object,
+)
 from main.celery import app
 from users.models import User
 
@@ -60,7 +61,7 @@ def max_concurrent_chunk_size(obj_count: int) -> int:
     return ceil(obj_count / settings.HUBSPOT_MAX_CONCURRENT_TASKS)
 
 
-def batched_chunks(
+def _batched_chunks(
     hubspot_type: str, batch_ids: List[int or (int, str)]
 ) -> List[List[int or str]]:
     """
@@ -68,7 +69,7 @@ def batched_chunks(
 
     Args:
         hubspot_type(str): The type of hubspot object (deal, contact, etc)
-        batch_ids(list): The list of object ids/emails to process
+        batch_ids(list): The list of object ids to process
 
     Returns:
         list(list): List of chunked ids
@@ -79,7 +80,7 @@ def batched_chunks(
     return chunks(batch_ids, chunk_size=max_chunk_size)
 
 
-def sync_failed_contacts(chunk: list[int]) -> list[int]:
+def sync_failed_contacts(chunk: List[int]) -> List[int]:
     """
     Consecutively try individual contact syncs for a failed batch sync
     Args:
@@ -89,16 +90,17 @@ def sync_failed_contacts(chunk: list[int]) -> list[int]:
         list of contact ids that still failed
     """
     failed_ids = []
-    for user_id in chunk:
+    users = list(User.objects.filter(id__in=chunk))
+    for user in users:
         try:
-            api.sync_contact_with_hubspot(user_id)
+            api.sync_contact_with_hubspot(user)
             time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
         except ApiException:
-            failed_ids.append(user_id)
+            failed_ids.append(user.id)
     return failed_ids
 
 
-def handle_failed_batch_chunk(chunk: list[int], hubspot_type: str) -> list[int]:
+def handle_failed_batch_chunk(chunk: List[int], hubspot_type: str) -> List[int]:
     """
     Try reprocessing a chunk of contacts individually, in case conflicting emails are the problem
 
@@ -134,15 +136,15 @@ def handle_failed_batch_chunk(chunk: list[int], hubspot_type: str) -> list[int]:
 @single_task(10, key=task_obj_lock)
 def sync_contact_with_hubspot(user_id: int) -> str:
     """
-    Sync a user with a hubspot contact
+    Sync a User with a hubspot contact
 
     Args:
-        user_id(int): The User id
+        user_id(int): The User ID.
 
     Returns:
-        str: The hubspot id for the contact
+        str: The HubSpot ID for the User.
     """
-    return api.sync_contact_with_hubspot(user_id).id
+    return api.sync_contact_with_hubspot(User.objects.get(id=user_id)).id
 
 
 @app.task(
@@ -159,12 +161,12 @@ def sync_product_with_hubspot(product_id: int) -> str:
     Sync a MITxOnline Product with a hubspot product
 
     Args:
-        product_id(int): The Product id
+        product_id(int): The Product ID.
 
     Returns:
         str: The hubspot id for the product
     """
-    return api.sync_product_with_hubspot(product_id).id
+    return api.sync_product_with_hubspot(Product.objects.get(id=product_id)).id
 
 
 @app.task(
@@ -181,12 +183,12 @@ def sync_deal_with_hubspot(order_id: int) -> str:
     Sync an Order with a hubspot deal
 
     Args:
-        order_id(int): The Order id
+        order_id(int): The Order ID.
 
     Returns:
         str: The hubspot id for the deal
     """
-    return api.sync_deal_with_hubspot(order_id).id
+    return api.sync_deal_with_hubspot(Order.objects.get(id=order_id)).id
 
 
 @app.task(
@@ -208,7 +210,7 @@ def sync_line_with_hubspot(line_id: int) -> str:
     Returns:
         str: The hubspot id for the line
     """
-    return api.sync_line_item_with_hubspot(line_id).id
+    return api.sync_line_item_with_hubspot(Line.objects.get(id=line_id)).id
 
 
 @app.task(
@@ -237,8 +239,7 @@ def batch_create_hubspot_objects_chunked(
     content_type = ContentType.objects.exclude(app_label="auth").get(
         model=ct_model_name
     )
-    # Chunk again, by max allowed for object type (10 for contacts, 100 for all else)
-    chunked_ids = batched_chunks(hubspot_type, object_ids)
+    chunked_ids = _batched_chunks(hubspot_type, object_ids)
     errored_chunks = []
     last_error_status = None
     for chunk in chunked_ids:
@@ -246,10 +247,7 @@ def batch_create_hubspot_objects_chunked(
             response = HubspotApi().crm.objects.batch_api.create(
                 hubspot_type,
                 BatchInputSimplePublicObjectInput(
-                    inputs=[
-                        api.MODEL_FUNCTION_MAPPING[ct_model_name](obj_id)
-                        for obj_id in chunk
-                    ]
+                    inputs=api.MODEL_CREATE_FUNCTION_MAPPING[ct_model_name](chunk)
                 ),
             )
             for result in response.results:
@@ -257,7 +255,7 @@ def batch_create_hubspot_objects_chunked(
                     user = User.objects.filter(
                         email__iexact=result.properties["email"], is_active=True
                     ).first()
-                    user.hubspot_sync_datetime = datetime.now()
+                    user.hubspot_sync_datetime = now_in_utc()
                     user.save()
                     object_id = user.id
                 else:
@@ -305,26 +303,25 @@ def batch_update_hubspot_objects_chunked(
           list(str): list of processed hubspot ids
     """
     updated_ids = []
-    # Chunk again, by max allowed for object type (10 for contacts, 100 for all else)
-    chunked_ids = batched_chunks(hubspot_type, object_ids)
+    chunked_ids = _batched_chunks(hubspot_type, object_ids)
     errored_chunks = []
     last_error_status = None
     for chunk in chunked_ids:
-        inputs = [
-            {
-                "id": obj_id[1],
-                "properties": api.MODEL_FUNCTION_MAPPING[ct_model_name](
-                    obj_id[0]
-                ).properties,
-            }
-            for obj_id in chunk
-        ]
+        inputs = api.MODEL_UPDATE_FUNCTION_MAPPING[ct_model_name](chunk)
         try:
             response = HubspotApi().crm.objects.batch_api.update(
                 hubspot_type, BatchInputSimplePublicObjectInput(inputs=inputs)
             )
             chunk_updated_ids = [result.id for result in response.results]
+            for result in response.results:
+                if ct_model_name == "user":
+                    User.objects.filter(
+                        email__iexact=result.properties["email"], is_active=True
+                    ).update(hubspot_sync_datetime=now_in_utc())
             updated_ids.extend(chunk_updated_ids)
+            log.info("Updated the following HubSpot ID's %s", chunk_updated_ids)
+            percent_complete = (len(updated_ids) / len(object_ids)) * 100
+            log.info("%i%% complete updating HubSpot ID's", percent_complete)
         except ApiException as ae:
             last_error_status = ae.status
             still_failed = handle_failed_batch_chunk(
@@ -332,17 +329,6 @@ def batch_update_hubspot_objects_chunked(
             )
             if still_failed:
                 errored_chunks.append(still_failed)
-        log.info("Updated the following HubSpot ID's %s", updated_ids)
-        percent_complete = (len(updated_ids) / len(object_ids)) * 100
-        log.info("%i%% complete updating HubSpot ID's", percent_complete)
-        if ct_model_name == "user":
-            user_ids = HubspotObject.objects.filter(
-                content_type=ContentType.objects.get_for_model(User),
-                hubspot_id__in=updated_ids,
-            ).values_list("object_id", flat=True)
-            User.objects.filter(id__in=user_ids).update(
-                hubspot_sync_datetime=now_in_utc()
-            )
         time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
     if errored_chunks:
         raise ApiException(

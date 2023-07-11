@@ -2,10 +2,17 @@
 import logging
 import re
 from decimal import Decimal
+import time
+from typing import List
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-from hubspot.crm.objects import SimplePublicObject, SimplePublicObjectInput
+from hubspot.crm.objects import (
+    SimplePublicObject,
+    SimplePublicObjectInput,
+    ApiException,
+)
+from main import settings
 from mitol.hubspot_api.api import (
     HubspotAssociationType,
     HubspotObjectType,
@@ -30,16 +37,63 @@ from users.models import User
 log = logging.getLogger(__name__)
 
 
-def make_contact_sync_message(user_id: int) -> SimplePublicObjectInput:
+def make_contact_create_message_list_from_user_ids(
+    user_ids: List[int],
+) -> List[SimplePublicObjectInput]:
     """
-    Create the body of a sync message for a contact. This will flatten the contained LegalAddress and Profile
+    Create the body of a HubSpot create message for a list of User IDs.
+
+    Args:
+        user_ids (List[int]): List of user ids.
+
+    Returns:
+        List[SimplePublicObjectInput]: List of input objects for upserting User data to Hubspot
+    """
+    users = list(
+        User.objects.filter(id__in=user_ids).order_by("id")
+    )  # Sorted to support unit test.
+    message_list = []
+    for user in users:
+        message_list.append(make_contact_sync_message_from_user(user))
+
+    return message_list
+
+
+def make_contact_update_message_list_from_user_ids(
+    chunk: List[tuple[int, str]]
+) -> List[dict]:
+    """
+    Create the body of a HubSpot contact update message from a dictionary..
+
+    Args:
+        chunk (List[tuple(int, str)]): List of tuples of (User ID, HubSpot Object ID).
+
+    Returns:
+        List[dict]: List of dictionaries containing User properties.
+    """
+    chunk_dictionary = dict(chunk)
+    users = User.objects.filter(id__in=chunk_dictionary.keys())
+    request_input = []
+    for user_id, hubspot_id in chunk_dictionary.items():
+        user = users.filter(id=user_id).first()
+        request_input.append(
+            {
+                "id": hubspot_id,
+                "properties": make_contact_sync_message_from_user(user).properties,
+            }
+        )
+    return request_input
+
+
+def make_contact_sync_message_from_user(user: User) -> SimplePublicObjectInput:
+    """
+    Create the body of a HubSpot sync message for a contact. This will flatten the contained LegalAddress and Profile
     serialized data into one larger serializable dict
 
     Args:
-        user_id (int): User id
-
+        user (User): User object.
     Returns:
-        SimplePublicObjectInput: input object for upserting User data to Hubspot
+        SimplePublicObjectInput: Input object for upserting User data to Hubspot
     """
     from users.serializers import UserSerializer
 
@@ -65,8 +119,6 @@ def make_contact_sync_message(user_id: int) -> SimplePublicObjectInput:
         "type_is_educator": "typeiseducator",
         "type_is_other": "typeisother",
     }
-
-    user = User.objects.get(id=user_id)
     properties = UserSerializer(user).data
     properties.update(properties.pop("legal_address") or {})
     properties.update(properties.pop("user_profile") or {})
@@ -74,60 +126,194 @@ def make_contact_sync_message(user_id: int) -> SimplePublicObjectInput:
     return make_object_properties_message(hubspot_props)
 
 
-def make_deal_sync_message(order_id: int) -> SimplePublicObjectInput:
+def make_deal_create_message_list_from_order_ids(
+    order_ids: List[int],
+) -> SimplePublicObjectInput:
     """
-    Create a hubspot sync input object for an Order.
+    Create the body of a HubSpot Deal create message for a list of Order IDs.
 
     Args:
-        order_id (int): Order id
+        order_ids (List[int]): List of Order ids.
+
+    Returns:
+        List[SimplePublicObjectInput]: List of input objects for upserting Order data to Hubspot
+    """
+    orders = Order.objects.filter(id__in=order_ids)
+    message_list = []
+    for order in orders:
+        message_list.append(make_deal_sync_message_from_order(order))
+    return message_list
+
+
+def make_deal_update_message_list_from_order_ids(
+    chunk: List[tuple[int, str]]
+) -> List[dict]:
+    """
+    Create the body of a HubSpot Deal batch update message from a dictionary.
+
+    Args:
+        chunk (List[tuple(int, str)]): List of tuples of (Order ID, HubSpot Object ID).
+
+    Returns:
+        List[dict]: List of dictionaries containing Order properties.
+    """
+    chunk_dictionary = dict(chunk)
+    orders = Order.objects.filter(id__in=chunk_dictionary.keys())
+    request_input = []
+    for order_id, hubspot_id in chunk_dictionary.items():
+        order = orders.filter(id=order_id).first()
+        request_input.append(
+            {
+                "id": hubspot_id,
+                "properties": make_deal_sync_message_from_order(order).properties,
+            }
+        )
+    return request_input
+
+
+def make_deal_sync_message_from_order(order: Order) -> SimplePublicObjectInput:
+    """
+    Create a hubspot sync message for an Order.
+
+    Args:
+        order (Order): Order object.
 
     Returns:
         SimplePublicObjectInput: input object for upserting Order data to Hubspot
     """
     from hubspot_sync.serializers import OrderToDealSerializer
 
-    order = Order.objects.get(id=order_id)
     properties = OrderToDealSerializer(order).data
     return make_object_properties_message(properties)
 
 
-def make_line_item_sync_message(line_id: int) -> SimplePublicObjectInput:
+def make_line_item_create_messages_list_from_line_ids(
+    line_ids: List[int],
+) -> SimplePublicObjectInput:
+    """
+    Create the body of a HubSpot Line create message for a list of Line IDs.
+
+    Args:
+        line_ids (List[int]): List of Line ids.
+
+    Returns:
+        List[SimplePublicObjectInput]: List of input objects for upserting Line data to Hubspot
+    """
+    lines = Line.objects.filter(id__in=line_ids)
+    message_list = []
+    for line in lines:
+        message_list.append(make_line_item_sync_message_from_line(line))
+    return message_list
+
+
+def make_line_item_update_message_list_from_line_ids(
+    chunk: List[tuple[int, str]]
+) -> List[dict]:
+    """
+    Create the body of a HubSpot Line batch update message from a dictionary.
+
+    Args:
+        chunk (List[tuple(int, str)]): List of tuples of (Line ID, HubSpot Object ID).
+
+    Returns:
+        List[dict]: List of dictionaries containing Line properties.
+    """
+    chunk_dictionary = dict(chunk)
+    lines = Line.objects.filter(id__in=chunk_dictionary.keys())
+    request_input = []
+    for line_id, hubspot_id in chunk_dictionary.items():
+        line = lines.filter(id=line_id).first()
+        request_input.append(
+            {
+                "id": hubspot_id,
+                "properties": make_line_item_sync_message_from_line(line).properties,
+            }
+        )
+    return request_input
+
+
+def make_line_item_sync_message_from_line(line: Line) -> SimplePublicObjectInput:
     """
     Create a hubspot sync input object for a Line.
 
     Args:
-        line_id (int): Line id
+        line (Line): Line object.
 
     Returns:
         SimplePublicObjectInput: input object for upserting Line data to Hubspot
     """
     from hubspot_sync.serializers import LineSerializer
 
-    line = Line.objects.get(id=line_id)
     properties = LineSerializer(line).data
     return make_object_properties_message(properties)
 
 
-def make_product_sync_message(product_id: int) -> SimplePublicObjectInput:
+def make_product_create_message_list_from_product_ids(
+    product_ids: List[int],
+) -> SimplePublicObjectInput:
     """
-    Create a hubspot sync input object for a product.
+    Create the body of a HubSpot Product create message for a list of Product IDs.
 
     Args:
-        product_id (int): Product id
+        product_ids (List[int]): List of product ids.
+
+    Returns:
+        List[SimplePublicObjectInput]: List of input objects for createing Product data to Hubspot.
+    """
+    message_list = []
+    products = Product.objects.filter(id__in=product_ids)
+    for product in products:
+        message_list.append(make_product_sync_message_from_product(product))
+    return message_list
+
+
+def make_product_update_message_list_from_product_ids(
+    chunk: List[tuple[int, str]]
+) -> List[dict]:
+    """
+    Create the body of a HubSpot Product batch update message from a dictionary.
+
+    Args:
+        chunk (List[tuple(int, str)]): List of tuples of (Product ID, HubSpot Object ID).
+
+    Returns:
+        List[dict]: List of dictionaries containing Product properties.
+    """
+    chunk_dictionary = dict(chunk)
+    products = Product.objects.filter(id__in=chunk_dictionary.keys())
+    request_input = []
+    for product_id, hubspot_id in chunk_dictionary.items():
+        product = products.filter(id=product_id).first()
+        request_input.append(
+            {
+                "id": hubspot_id,
+                "properties": make_product_sync_message_from_product(
+                    product
+                ).properties,
+            }
+        )
+    return request_input
+
+
+def make_product_sync_message_from_product(product: Product) -> SimplePublicObjectInput:
+    """
+    Create a hubspot sync input object for a Product.
+
+    Args:
+        product (Product): Product object.
 
     Returns:
         SimplePublicObjectInput: input object for upserting Product data to Hubspot
     """
     from hubspot_sync.serializers import ProductSerializer
 
-    product = Product.objects.get(id=product_id)
     properties = ProductSerializer(product).data
     return make_object_properties_message(properties)
 
 
 def format_product_name(product: Product) -> str:
     """
-    Get the product name as it should appear in Hubspot
+    Get the Product name as it should appear in Hubspot
 
     Args:
         product(Product): The product to return a name for
@@ -370,18 +556,17 @@ def get_hubspot_id_for_object(
         )
 
 
-def sync_line_item_with_hubspot(line_id: int) -> SimplePublicObject:
+def sync_line_item_with_hubspot(line: Line) -> SimplePublicObject:
     """
     Sync a Line with a hubspot line item
 
     Args:
-        line_id(int): The Line id
+        line(Line): The Line object.
 
     Returns:
         SimplePublicObject: The hubspot line_item object
     """
-    line = Line.objects.get(id=line_id)
-    body = make_line_item_sync_message(line_id)
+    body = make_line_item_sync_message_from_line(line)
     content_type = ContentType.objects.get_for_model(Line)
 
     # Check if a matching hubspot object has been or can be synced
@@ -389,7 +574,7 @@ def sync_line_item_with_hubspot(line_id: int) -> SimplePublicObject:
 
     # Create or update the line items
     result = upsert_object_request(
-        content_type, HubspotObjectType.LINES.value, object_id=line_id, body=body
+        content_type, HubspotObjectType.LINES.value, object_id=line.id, body=body
     )
     # Associate the parent deal with the line item
     associate_objects_request(
@@ -402,18 +587,17 @@ def sync_line_item_with_hubspot(line_id: int) -> SimplePublicObject:
     return result
 
 
-def sync_deal_with_hubspot(order_id: int) -> SimplePublicObject:
+def sync_deal_with_hubspot(order: Order) -> SimplePublicObject:
     """
     Sync an Order with a hubspot deal
 
     Args:
-        order_id(int): The Order id
+        order (Order): The Order object.
 
     Returns:
         SimplePublicObject: The hubspot deal object
     """
-    order = Order.objects.get(id=order_id)
-    body = make_deal_sync_message(order_id)
+    body = make_deal_sync_message_from_order(order)
     content_type = ContentType.objects.get_for_model(Order)
 
     # Check if a matching hubspot object has been or can be synced
@@ -421,7 +605,7 @@ def sync_deal_with_hubspot(order_id: int) -> SimplePublicObject:
 
     # Create or update the order aka deal
     result = upsert_object_request(
-        content_type, HubspotObjectType.DEALS.value, object_id=order_id, body=body
+        content_type, HubspotObjectType.DEALS.value, object_id=order.id, body=body
     )
     # Create association between deal and contact
     associate_objects_request(
@@ -433,53 +617,66 @@ def sync_deal_with_hubspot(order_id: int) -> SimplePublicObject:
     )
 
     for line in order.lines.all():
-        sync_line_item_with_hubspot(line.id)
+        sync_line_item_with_hubspot(line)
     return result
 
 
-def sync_product_with_hubspot(product_id: int) -> SimplePublicObject:
+def sync_product_with_hubspot(product: Product) -> SimplePublicObject:
     """
     Sync a Product with a hubspot product
 
     Args:
-        product_id(int): The Product id
+        product(Product): The Product object.
 
     Returns:
-        SimplePublicObject: The hubspot product object
+        SimplePublicObject: The hubspot product object.
     """
-    body = make_product_sync_message(product_id)
+    body = make_product_sync_message_from_product(product)
     content_type = ContentType.objects.get_for_model(Product)
 
-    # Check if a matching hubspot object has been or can be synced
-    get_hubspot_id_for_object(Product.objects.get(id=product_id))
-
     return upsert_object_request(
-        content_type, HubspotObjectType.PRODUCTS.value, object_id=product_id, body=body
+        content_type, HubspotObjectType.PRODUCTS.value, object_id=product.id, body=body
     )
 
 
-def sync_contact_with_hubspot(user_id: int) -> SimplePublicObject:
+def sync_contact_with_hubspot(user: User):
     """
-    Sync a user with a hubspot_sync contact
+    Sync a user with a hubspot_sync contact.
 
     Args:
-        user_id(int): The User id
+        user User: User object.
 
     Returns:
-        SimplePublicObject: The hubspot contact object
+        SimplePublicObject: The hubspot contact object.
+
+    Raises:
+        ApiException: Raised if HubSpot upsert request fails.
+        TooManyRequestsException: Too many requests against HubSpot's API.
     """
-    body = make_contact_sync_message(user_id)
     content_type = ContentType.objects.get_for_model(User)
+    body = make_contact_sync_message_from_user(user)
     result = upsert_object_request(
-        content_type, HubspotObjectType.CONTACTS.value, object_id=user_id, body=body
+        content_type,
+        HubspotObjectType.CONTACTS.value,
+        object_id=user.id,
+        body=body,
     )
-    User.objects.filter(id=user_id).update(hubspot_sync_datetime=now_in_utc())
+    user.hubspot_sync_datetime = now_in_utc()
+    user.save()
+
     return result
 
 
-MODEL_FUNCTION_MAPPING = {
-    "user": make_contact_sync_message,
-    "order": make_deal_sync_message,
-    "line": make_line_item_sync_message,
-    "product": make_product_sync_message,
+MODEL_CREATE_FUNCTION_MAPPING = {
+    "user": make_contact_create_message_list_from_user_ids,
+    "order": make_deal_create_message_list_from_order_ids,
+    "line": make_line_item_create_messages_list_from_line_ids,
+    "product": make_product_create_message_list_from_product_ids,
+}
+
+MODEL_UPDATE_FUNCTION_MAPPING = {
+    "user": make_contact_update_message_list_from_user_ids,
+    "order": make_deal_update_message_list_from_order_ids,
+    "line": make_line_item_update_message_list_from_line_ids,
+    "product": make_product_update_message_list_from_product_ids,
 }

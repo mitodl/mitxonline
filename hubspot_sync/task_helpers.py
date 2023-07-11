@@ -2,15 +2,17 @@
 import logging
 
 from django.conf import settings
+from ecommerce.models import Order, Product
 
 from hubspot_sync import tasks
+from users.models import User
 
 # pylint:disable-bare-except
 
 log = logging.getLogger(__name__)
 
 
-def sync_hubspot_user(user):
+def sync_hubspot_user(user: User):
     """
     Trigger celery task to sync a User to Hubspot
 
@@ -26,7 +28,7 @@ def sync_hubspot_user(user):
             )
 
 
-def sync_hubspot_deal(order):
+def sync_hubspot_deal(order: Order):
     """
     Trigger celery task to sync an order to Hubspot if it has lines.
     Use a delay of 10 seconds to make sure state is updated first.
@@ -60,7 +62,7 @@ def sync_hubspot_line_by_line_id(line_id: int):
             )
 
 
-def sync_hubspot_product(product):
+def sync_hubspot_product(product: Product):
     """
     Trigger celery task to sync a Product to Hubspot
 
