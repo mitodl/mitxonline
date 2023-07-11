@@ -5,7 +5,7 @@ from typing import Optional, Tuple, Union
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from requests import ConnectionError as RequestsConnectionError
