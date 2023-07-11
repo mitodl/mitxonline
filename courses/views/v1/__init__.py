@@ -309,7 +309,10 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         """
 
         program_enrollments = (
-            ProgramEnrollment.objects.select_related("program", "program__page")
+            ProgramEnrollment.objects.select_related(
+                "program",
+                "program__page",
+            )
             .filter(user=request.user)
             .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
             .all()
@@ -318,16 +321,16 @@ class UserProgramEnrollmentsViewSet(viewsets.ViewSet):
         program_list = []
 
         for enrollment in program_enrollments:
-            course_enrollments = (
-                CourseRunEnrollment.objects.filter(user=request.user)
-                .filter(run__course__in_programs__program=enrollment.program)
-                .select_related("run__course", "run__course__page")
-                .all()
-            )
+            courses = [course[0] for course in enrollment.program.courses]
 
             program_list.append(
                 {
-                    "enrollments": course_enrollments,
+                    "enrollments": CourseRunEnrollment.objects.filter(
+                        user=request.user, run__course__in=courses
+                    )
+                    .filter(~Q(change_status=ENROLL_CHANGE_STATUS_UNENROLLED))
+                    .select_related("run__course__page")
+                    .all(),
                     "program": enrollment.program,
                     "certificate": get_program_certificate_by_enrollment(enrollment),
                 }
