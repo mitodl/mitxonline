@@ -272,7 +272,7 @@ def test_batch_update_hubspot_objects_chunked_error(mocker, status, expected_err
 @pytest.mark.parametrize("id_count", [5, 15])
 def test_batch_create_hubspot_objects_chunked(mocker, id_count):
     """batch_create_hubspot_objects_chunked should make expected api calls and args"""
-    contacts = UserFactory.create_batch(id_count)
+    contacts = sorted(UserFactory.create_batch(id_count), key = lambda user: user.id)
     mock_ids = [user.id for user in contacts]
     mock_hubspot_api = mocker.patch("hubspot_sync.tasks.HubspotApi")
     mock_hubspot_api.return_value.crm.objects.batch_api.create.return_value = (
@@ -291,6 +291,7 @@ def test_batch_create_hubspot_objects_chunked(mocker, id_count):
         mock_hubspot_api.return_value.crm.objects.batch_api.create.call_count
         == expected_batches
     )
+
     mock_hubspot_api.return_value.crm.objects.batch_api.create.assert_any_call(
         HubspotObjectType.CONTACTS.value,
         BatchInputSimplePublicObjectInput(
