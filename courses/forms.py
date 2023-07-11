@@ -149,7 +149,11 @@ def program_requirements_schema():
                                 "type": "boolean",
                                 "title": "Contains Electives",
                                 "default": False,
-                                "options": {},
+                                "options": {
+                                    "dependencies": {
+                                        "node_type": ProgramRequirementNodeType.OPERATOR.value,
+                                    },
+                                },
                             },
                             # course fields
                             "course": {

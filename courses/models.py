@@ -280,18 +280,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 program=self, node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value
             )
 
-    def _req_course_walk(self, node, heap):
-        courses = []
-
-        if node.node_type == ProgramRequirementNodeType.COURSE:
-            return [(node.course, node.get_parent().title)]
-
-        for child in node.get_children().all():
-            courses.extend(self._req_course_walk(child, heap))
-
-        courses.extend(heap)
-        return courses
-
     @property
     def courses(self):
         """
