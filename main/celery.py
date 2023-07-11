@@ -15,3 +15,4 @@ app = Celery("mitx_online")
 # pickle the object when using Windows.
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
+app.conf.task_routes = {"hubspot_sync.tasks.*": {"queue": "hubspot_sync"}}

@@ -111,7 +111,7 @@ services:
     command: >
       /bin/bash -c '
       sleep 3;
-      celery -A main.celery:app worker -B -l ${MITX_ONLINE_LOG_LEVEL:-INFO}'
+      celery -A main.celery:app worker -Q hubspot_sync,celery -B -l ${MITX_ONLINE_LOG_LEVEL:-INFO}'
     links:
       - db
       - redis
