@@ -251,6 +251,7 @@ def program_with_empty_requirements():
         operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
         operator_value=1,
         title="Elective Courses",
+        elective_flag=True,
     )
     return program
 
@@ -280,6 +281,7 @@ def program_with_requirements():
         operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
         operator_value=2,
         title="Elective Courses",
+        elective_flag=True,
     )
     for course in elective_courses:
         elective_courses_node.add_child(

@@ -585,6 +585,7 @@ def test_program_requirements(program_with_requirements):
         "operator_value": None,
         "title": "",
         "program": program_with_requirements.program.id,
+        "elective_flag": False,
     }
 
     assert program_with_requirements.root_node.dump_bulk() == [
@@ -625,6 +626,7 @@ def test_program_requirements(program_with_requirements):
                         "operator_value": "2",
                         "title": "Elective Courses",
                         "node_type": ProgramRequirementNodeType.OPERATOR.value,
+                        "elective_flag": True,
                     },
                     "id": program_with_requirements.elective_courses_node.id,
                     "children": [

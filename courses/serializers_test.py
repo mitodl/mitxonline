@@ -509,6 +509,7 @@ def test_learner_record_serializer(mock_context, program_with_empty_requirements
                                 "operator_value": None,
                                 "program": program.id,
                                 "title": "",
+                                "elective_flag": False,
                             },
                             "id": program.get_requirements_root()
                             .get_children()
@@ -526,6 +527,7 @@ def test_learner_record_serializer(mock_context, program_with_empty_requirements
                                 "operator_value": None,
                                 "program": program.id,
                                 "title": "",
+                                "elective_flag": False,
                             },
                             "id": program.get_requirements_root()
                             .get_children()
@@ -543,6 +545,7 @@ def test_learner_record_serializer(mock_context, program_with_empty_requirements
                                 "operator_value": None,
                                 "program": program.id,
                                 "title": "",
+                                "elective_flag": False,
                             },
                             "id": program.get_requirements_root()
                             .get_children()
@@ -560,6 +563,7 @@ def test_learner_record_serializer(mock_context, program_with_empty_requirements
                         "operator_value": None,
                         "program": program.id,
                         "title": "Required Courses",
+                        "elective_flag": False,
                     },
                     "id": program.get_requirements_root().get_children().first().id,
                 },
@@ -571,6 +575,7 @@ def test_learner_record_serializer(mock_context, program_with_empty_requirements
                         "operator_value": "1",
                         "program": program.id,
                         "title": "Elective Courses",
+                        "elective_flag": True,
                     },
                     "id": program.get_requirements_root().get_children().last().id,
                 },
@@ -582,6 +587,7 @@ def test_learner_record_serializer(mock_context, program_with_empty_requirements
                 "operator_value": None,
                 "program": program.id,
                 "title": "",
+                "elective_flag": False,
             },
             "id": program.requirements_root.id,
         }

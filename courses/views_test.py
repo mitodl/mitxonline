@@ -290,7 +290,10 @@ def test_courses_not_live_in_programs_api(
     resp = client.get(reverse("programs_api-list"))
     assert resp.status_code == status.HTTP_200_OK
     assert_drf_json_equal(
-        resp.json()[0]["courses"], [CourseSerializer(course).data] if live else []
+        resp.json()[0]["courses"],
+        [CourseSerializer(course, context={"include_page_fields": True}).data]
+        if live
+        else [],
     )
 
 

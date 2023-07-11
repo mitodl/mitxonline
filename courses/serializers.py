@@ -7,7 +7,6 @@ from urllib.parse import urljoin
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import connection, reset_queries
 from django.templatetags.static import static
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -184,7 +183,7 @@ class CourseSerializer(BaseCourseSerializer):
                 else instance.unexpired_runs
             )
         return [
-            BaseCourseRunSerializer(instance=run, context=self.context).data
+            CourseRunSerializer(instance=run, context=self.context).data
             for run in active_runs
             if run.live
         ]
@@ -281,14 +280,11 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     def get_courses(self, instance):
         """Serializer for courses"""
-        reset_queries()
-        cs_data = CourseSerializer(
-            [course[0] for course in instance.courses],
+        return CourseSerializer(
+            [course[0] for course in instance.courses if course[0].live],
             many=True,
             context={"include_page_fields": True},
         ).data
-        logging.debug(f"get_courses spawned {len(connection.queries)} queries")
-        return cs_data
 
     def get_requirements(self, instance):
         return {
@@ -522,7 +518,7 @@ class ProgramCertificateSerializer(serializers.ModelSerializer):
 
 class UserProgramEnrollmentDetailSerializer(serializers.Serializer):
     program = ProgramSerializer()
-    enrollments = BaseCourseRunEnrollmentSerializer(many=True)
+    enrollments = CourseRunEnrollmentSerializer(many=True)
     certificate = serializers.SerializerMethodField(read_only=True)
 
     def get_certificate(self, user_program_enrollment):
