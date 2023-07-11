@@ -641,7 +641,7 @@ def sync_product_with_hubspot(product: Product) -> SimplePublicObject:
 
 def sync_contact_with_hubspot(user: User):
     """
-    Sync a list of User objects with their hubspot_sync contacts.
+    Sync a user with a hubspot_sync contact.
 
     Args:
         user User: User object.

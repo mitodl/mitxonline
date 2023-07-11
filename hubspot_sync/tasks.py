@@ -142,9 +142,9 @@ def sync_contact_with_hubspot(user_id: int) -> str:
         user_id(int): The User ID.
 
     Returns:
-        bool: True if the HubSpot contact was successfully updated, otherwise False.
+        str: The HubSpot ID for the User.
     """
-    return api.sync_contact_with_hubspot(User.objects.get(id=user_id))
+    return api.sync_contact_with_hubspot(User.objects.get(id=user_id)).id
 
 
 @app.task(

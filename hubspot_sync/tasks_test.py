@@ -45,13 +45,13 @@ SYNC_FUNCTIONS = [
 def test_task_sync_contact_with_hubspot(mocker):
     """These task functions should call the api function of the same name and return a hubspot id"""
     mock_object = UserFactory.create()
-    mock_result = True
+    mock_result = SimplePublicObjectFactory()
 
     mock_api_call = mocker.patch(
         f"hubspot_sync.tasks.api.sync_contact_with_hubspot", return_value=mock_result
     )
 
-    assert sync_contact_with_hubspot(mock_object.id) == mock_result
+    assert sync_contact_with_hubspot(mock_object.id) == mock_result.id
     mock_api_call.assert_called_once_with(mock_object)
 
 
