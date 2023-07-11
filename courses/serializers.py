@@ -543,6 +543,7 @@ class ProgramRequirementDataSerializer(StrictFieldsSerializer):
     title = serializers.CharField(allow_null=True, default=None)
     operator = serializers.CharField(allow_null=True, default=None)
     operator_value = serializers.CharField(allow_null=True, default=None)
+    elective_flag = serializers.BooleanField(allow_null=True, default=False)
 
 
 class ProgramRequirementSerializer(StrictFieldsSerializer):

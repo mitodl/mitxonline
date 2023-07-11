@@ -145,6 +145,12 @@ def program_requirements_schema():
                                     },
                                 },
                             },
+                            "elective_flag": {
+                                "type": "boolean",
+                                "title": "Contains Electives",
+                                "default": False,
+                                "options": {},
+                            },
                             # course fields
                             "course": {
                                 "type": "number",
@@ -200,6 +206,7 @@ class ProgramAdminForm(ModelForm):
                         "title": "Elective Courses",
                         "operator": ProgramRequirement.Operator.MIN_NUMBER_OF.value,
                         "operator_value": 1,
+                        "elective_flag": True,
                     },
                     "children": [],
                 },
