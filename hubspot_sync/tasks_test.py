@@ -294,7 +294,9 @@ def test_batch_create_hubspot_objects_chunked(mocker, id_count):
     mock_hubspot_api.return_value.crm.objects.batch_api.create.assert_any_call(
         HubspotObjectType.CONTACTS.value,
         BatchInputSimplePublicObjectInput(
-            inputs=make_contact_create_message_list_from_user_ids(mock_ids[0 : min(id_count, 10)])
+            inputs=make_contact_create_message_list_from_user_ids(
+                mock_ids[0 : min(id_count, 10)]
+            )
         ),
     )
 
