@@ -10,9 +10,13 @@ from mitol.common.utils import now_in_utc
 
 from courses.models import (
     CourseRunCertificate,
-    Program, CourseRun,
+    Program,
+    CourseRun,
 )
-from courses.api import generate_multiple_programs_certificate, generate_course_run_certificates_for_course
+from courses.api import (
+    generate_multiple_programs_certificate,
+    generate_course_run_certificates_for_course,
+)
 from main import settings
 
 
@@ -52,7 +56,10 @@ def handle_update_course_run(
     """
     if not created:
         now = now_in_utc()
-        if instance.certificate_available_date and instance.certificate_available_date <= now:
+        if (
+            instance.certificate_available_date
+            and instance.certificate_available_date <= now
+        ):
             transaction.on_commit(
                 lambda: generate_course_run_certificates_for_course(instance)
             )
