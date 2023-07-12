@@ -33,6 +33,7 @@ from courses.api import (
 from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_REFUNDED,
+    ENROLL_CHANGE_STATUS_UNENROLLED,
 )
 from courses.factories import (
     CourseFactory,
@@ -1606,3 +1607,30 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     result = generate_program_certificate(user=user, program=program)
     assert result == (None, False)
     assert len(ProgramCertificate.objects.all()) == 0
+
+
+def test_program_enrollment_unenrollment_re_enrollment(
+    mocker, user, program_with_empty_requirements
+):
+    """
+    create_run_enrollments should always enroll a learner into a program even
+    if the learner has previously unenrolled from the program.
+    """
+
+    # Create a program_enrollment that mocks what exists after a learner unenrolls from
+    # a program.
+    ProgramEnrollmentFactory(
+        user=user,
+        program=program_with_empty_requirements,
+        change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
+    )
+    course_run = CourseRunFactory.create()
+    program_with_empty_requirements.add_requirement(course_run.course)
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    create_run_enrollments(user, runs=[course_run], mode=EDX_ENROLLMENT_VERIFIED_MODE)
+    assert ProgramEnrollment.objects.filter(
+        user=user, program=program_with_empty_requirements, change_status=None
+    ).exists()
