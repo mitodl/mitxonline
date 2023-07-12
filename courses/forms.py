@@ -231,10 +231,11 @@ class ProgramAdminForm(ModelForm):
 
         return [_serialize(node) for node in data]
 
-    def save(self, commit=True):
+    def save(self, commit=False):
         """Save requirements"""
-        program = super().save(commit=commit)
+        program = super().save(commit=False)
         transaction.on_commit(self.save_requirements)
+        program.save_m2m()
         return program
 
     def save_requirements(self):
