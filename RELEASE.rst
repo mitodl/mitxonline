@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.67.5
+--------------
+
+- Update procfile - add hubspot task queue to normal worker dyno
+- Refactors serializers/views for speed in enrollment APIs, adds flag to designate requirements as electives or not (#1736)
+- 1718: improve hubspot bulk update database queries (#1731)
+- Add hubspot_sync celery task queue specifically for hubspot related tasks (#1733)
+
 Version 0.67.4 (Released July 10, 2023)
 --------------
 
