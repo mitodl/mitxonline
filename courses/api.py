@@ -766,7 +766,8 @@ def get_certificate_grade_eligible_runs(now):
 
 def generate_course_run_certificates():
     """
-    Hits the edX grades API for eligible course runs and generates the certificates and grades for users for course runs
+    Finds all course runs that are eligible for certificate generation.
+    Hits the edX grades API for eligible course runs, syncs grades and generates certificates.
     """
     now = now_in_utc()
     course_runs = get_certificate_grade_eligible_runs(now)
@@ -776,48 +777,58 @@ def generate_course_run_certificates():
         return
 
     for run in course_runs:
-        edx_grade_user_iter = exception_logging_generator(
-            get_edx_grades_with_users(run)
+        generate_course_run_certificates_for_course(run)
+
+
+def generate_course_run_certificates_for_course(run):
+    """
+    For given course run syncs grades and
+    if certificate_available_date is in the past, also generates certificates.
+    """
+    edx_grade_user_iter = exception_logging_generator(
+        get_edx_grades_with_users(run)
+    )
+    created_grades_count, updated_grades_count, generated_certificates_count = (
+        0,
+        0,
+        0,
+    )
+    for edx_grade, user in edx_grade_user_iter:
+        course_run_grade, created, updated = ensure_course_run_grade(
+            user=user, course_run=run, edx_grade=edx_grade, should_update=True
         )
-        created_grades_count, updated_grades_count, generated_certificates_count = (
-            0,
-            0,
-            0,
-        )
-        for edx_grade, user in edx_grade_user_iter:
-            course_run_grade, created, updated = ensure_course_run_grade(
-                user=user, course_run=run, edx_grade=edx_grade, should_update=True
+
+        if created:
+            created_grades_count += 1
+        elif updated:
+            updated_grades_count += 1
+
+        # Check certificate generation eligibility
+        #   1. For self_paced course runs we generate certificates right away irrespective
+        #   of certificate_available_date
+        #   2. For others course runs we generate the certificates if the certificate_available_date of course run
+        #   has passed
+        now = now_in_utc()
+        if run.is_self_paced or (
+            run.certificate_available_date and run.certificate_available_date <= now
+        ):
+            _, created, deleted = process_course_run_grade_certificate(
+                course_run_grade=course_run_grade
             )
 
-            if created:
-                created_grades_count += 1
-            elif updated:
-                updated_grades_count += 1
-
-            # Check certificate generation eligibility
-            #   1. For self_paced course runs we generate certificates right away irrespective
-            #   of certificate_available_date
-            #   2. For others course runs we generate the certificates if the certificate_available_date of course run
-            #   has passed
-            if run.is_self_paced or (
-                run.certificate_available_date and run.certificate_available_date <= now
-            ):
-                _, created, deleted = process_course_run_grade_certificate(
-                    course_run_grade=course_run_grade
+            if deleted:
+                log.warning(
+                    "Certificate deleted for user %s and course_run %s", user, run
                 )
+            elif created:
+                log.warning(
+                    "Certificate created for user %s and course_run %s", user, run
+                )
+                generated_certificates_count += 1
 
-                if deleted:
-                    log.warning(
-                        "Certificate deleted for user %s and course_run %s", user, run
-                    )
-                elif created:
-                    log.warning(
-                        "Certificate created for user %s and course_run %s", user, run
-                    )
-                    generated_certificates_count += 1
-        log.info(
-            f"Finished processing course run {run}: created grades for {created_grades_count} users, updated grades for {updated_grades_count} users, generated certificates for {generated_certificates_count} users"
-        )
+    log.info(
+        f"Finished processing course run {run}: created grades for {created_grades_count} users, updated grades for {updated_grades_count} users, generated certificates for {generated_certificates_count} users"
+    )
 
 
 def manage_course_run_certificate_access(user, courseware_id, revoke_state):
