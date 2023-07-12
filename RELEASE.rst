@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.67.5
+Version 0.67.5 (Released July 12, 2023)
 --------------
 
 - Update procfile - add hubspot task queue to normal worker dyno
