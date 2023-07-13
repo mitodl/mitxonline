@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.67.6
+Version 0.67.6 (Released July 13, 2023)
 --------------
 
 - Updates the discount redemption cleanup code to be more resilient (#1748)
