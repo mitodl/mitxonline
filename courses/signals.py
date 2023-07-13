@@ -1,7 +1,6 @@
 """
 Signals for mitxonline course certificates
 """
-from datetime import timedelta
 
 from django.db import transaction
 from django.db.models.signals import post_save
@@ -17,7 +16,6 @@ from courses.api import (
     generate_multiple_programs_certificate,
     generate_course_run_certificates_for_course,
 )
-from main import settings
 
 
 @receiver(

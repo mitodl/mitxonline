@@ -784,6 +784,9 @@ def generate_course_run_certificates_for_course(run):
     """
     For given course run syncs grades and
     if certificate_available_date is in the past, also generates certificates.
+
+    Args:
+        run (models.CourseRun): a course run instance.
     """
     edx_grade_user_iter = exception_logging_generator(get_edx_grades_with_users(run))
     created_grades_count, updated_grades_count, generated_certificates_count = (
