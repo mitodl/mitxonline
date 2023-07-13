@@ -423,7 +423,12 @@ def test_pending_order_is_reused(basket):
     assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
 
 
-def test_pending_order_is_reused_but_discounts_cleared(basket, unlimited_discount):
+@pytest.mark.parametrize(
+    "apply_discount", ["to_order", "to_basket", "to_second_basket"]
+)
+def test_pending_order_is_reused_but_discounts_cleared(
+    basket, unlimited_discount, apply_discount
+):
     """
     If a pending order is reused and had discounts, then we want those discounts
     to clear.
@@ -434,20 +439,46 @@ def test_pending_order_is_reused_but_discounts_cleared(basket, unlimited_discoun
 
     basket_item = BasketItem(product=product, basket=basket, quantity=1)
     basket_item.save()
+
+    if apply_discount == "to_basket":
+        basket_discount = BasketDiscount(
+            redemption_date=now_in_utc(),
+            redeemed_by=basket.user,
+            redeemed_discount=unlimited_discount,
+            redeemed_basket=basket,
+        )
+        basket_discount.save()
+        basket.refresh_from_db()
+
     order = PendingOrder.create_from_basket(basket)
     order.save()
     assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
 
-    redemption = DiscountRedemption(
-        redeemed_discount=unlimited_discount,
-        redemption_date=now_in_utc(),
-        redeemed_order=order,
-        redeemed_by=order.purchaser,
-    )
-    redemption.save()
+    if apply_discount == "to_order":
+        redemption = DiscountRedemption(
+            redeemed_discount=unlimited_discount,
+            redemption_date=now_in_utc(),
+            redeemed_order=order,
+            redeemed_by=order.purchaser,
+        )
+        redemption.save()
 
     order.refresh_from_db()
-    assert order.discounts.count() == 1
+    if apply_discount != "to_second_basket":
+        assert order.discounts.count() == 1
+    else:
+        assert order.discounts.count() == 0
+
+    if apply_discount == "to_second_basket":
+        a_different_discount = UnlimitedUseDiscountFactory.create()
+
+        basket_discount = BasketDiscount(
+            redemption_date=now_in_utc(),
+            redeemed_by=basket.user,
+            redeemed_discount=a_different_discount,
+            redeemed_basket=basket,
+        )
+        basket_discount.save()
 
     order = PendingOrder.create_from_basket(basket)
     order.save()
@@ -455,9 +486,20 @@ def test_pending_order_is_reused_but_discounts_cleared(basket, unlimited_discoun
 
     # Verify that the existing PendingOrder is reused and a duplicate is not created.
     # This is to ensure that we also reuse the HubSpot Deal associated with Orders.
-    # Also ensure the discounts aren't reattached to the order
+    # Also ensure the discounts aren't reattached to the order if we just attached
+    # the discount to the order - if it's in the basket, it should be reattached, but we should only get one
     assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
-    assert order.discounts.count() == 0
+    if apply_discount == "to_order":
+        assert order.discounts.count() == 0
+    else:
+        order.discounts.count() == 1
+
+        # A different discount gets attached if there's a second basket so make
+        # sure the right one is there
+        if apply_discount == "to_second_basket":
+            assert order.discounts.first().redeemed_discount == a_different_discount
+        else:
+            assert order.discounts.first().redeemed_discount == unlimited_discount
 
 
 def test_new_pending_order_is_created_if_product_is_different():

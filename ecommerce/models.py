@@ -655,10 +655,6 @@ class PendingOrder(FulfillableOrder, Order):
         # for the same product, if multiple exist, grab the first.
         if orders:
             order = orders.first()
-
-            for old_discount in order.discounts.all():
-                old_discount.delete()
-
         else:
             order = Order.objects.create(
                 state=Order.STATE.PENDING,
@@ -694,6 +690,17 @@ class PendingOrder(FulfillableOrder, Order):
         order.total_price_paid = total
 
         order.save()
+
+        # Clear discounts except for the most recent one
+        # If there aren't any discounts in the basket, clear them all
+        for idx, old_discount in enumerate(
+            order.discounts.order_by("-created_on").all()
+        ):
+            if discounts and idx == 0:
+                continue
+
+            old_discount.delete()
+
         return order
 
     @classmethod
