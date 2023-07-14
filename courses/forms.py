@@ -234,28 +234,67 @@ class ProgramAdminForm(ModelForm):
         return [_serialize(node) for node in data]
 
     def clean(self):
+        def _verify_elective_operator(operator):
+            """
+            Verifies that a Program's elective operator contains
+            a defined Value field.
+
+            Args:
+                operator (dict):
+                {
+                    'children': [],
+                    'id': None,
+                    'data': {
+                        'node_type': 'operator',
+                        'title': 'Only 1 of',
+                        'operator': 'min_number_of',
+                        'operator_value': '1',
+                        'elective_flag': False
+                    }
+                }
+
+            Raises:
+                ValidationError: operator_value does not exist.
+                ValidationError: operator_value does exist but is empty.
+                ValidationError: operator_value is not equal to or less than the total number of child courses.
+            """
+            if (
+                operator["data"]["operator"]
+                == ProgramRequirement.Operator.MIN_NUMBER_OF.value
+            ):
+                if "operator_value" not in operator["data"]:
+                    raise ValidationError(
+                        '"Minimum # of" operator must have Value equal to 1 or more.'
+                    )
+                if operator["data"]["operator_value"] == "":
+                    raise ValidationError(
+                        '"Minimum # of" operator must have Value equal to 1 or more.'
+                    )
+
+                # Check all of the child nodes to count the total number of elective courses
+                # and find if an elective stipulation exists.
+                total_child_courses = 0
+                for child in operator["children"]:
+                    if child["data"]["node_type"] == "operator":
+                        _verify_elective_operator(child)
+                    else:
+                        # Assume the child must be a course.
+                        total_child_courses += 1
+
+                if total_child_courses < int(operator["data"]["operator_value"]):
+                    raise ValidationError(
+                        '"Minimum # of" operator must have Value equal to or less than the number of elective courses in the section.'
+                    )
+            if operator["data"]["title"] == "":
+                raise ValidationError("Operator must have a Title.")
+
         if "requirements" in self.cleaned_data:
             for operator in self.cleaned_data["requirements"]:
                 if (
                     operator["data"]["operator"]
                     == ProgramRequirement.Operator.MIN_NUMBER_OF.value
                 ):
-                    if "operator_value" not in operator["data"]:
-                        raise ValidationError(
-                            '"Minimum # of" operator must have Value equal to 1 or more.'
-                        )
-                    if operator["data"]["operator_value"] == "":
-                        raise ValidationError(
-                            '"Minimum # of" operator must have Value equal to 1 or more.'
-                        )
-                    if len(operator["children"]) < int(
-                        operator["data"]["operator_value"]
-                    ):
-                        raise ValidationError(
-                            '"Minimum # of" operator must have Value equal to or less than the number of elective courses in the section.'
-                        )
-                if operator["data"]["title"] == "":
-                    raise ValidationError("Section must have a Title.")
+                    _verify_elective_operator(operator)
 
     def save(self, commit=True):
         """Save requirements"""
