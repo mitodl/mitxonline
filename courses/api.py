@@ -239,6 +239,23 @@ def create_run_enrollments(
     def send_enrollment_emails():
         subscribe_edx_course_emails.delay(enrollment.id)
 
+    def _enroll_learner_into_associated_programs():
+        """
+        Enrolls the learner into all programs for which the course they are enrolling into
+        is associated as a requirement or elective.  If a program enrollment already exists
+        then the change_status of that program_enrollment is checked to ensure it equals None.
+        """
+        for program in run.course.programs:
+            program_enrollment, _ = ProgramEnrollment.objects.get_or_create(
+                user=user,
+                program=program,
+                defaults=dict(
+                    change_status=None,
+                ),
+            )
+            if program_enrollment.change_status is not None:
+                program_enrollment.reactivate_and_save()
+
     try:
         enroll_in_edx_course_runs(
             user,
@@ -277,8 +294,7 @@ def create_run_enrollments(
                 ),
             )
 
-            for program in run.course.programs:
-                ProgramEnrollment.objects.get_or_create(user=user, program=program)
+            _enroll_learner_into_associated_programs()
 
             if not created:
                 enrollment_mode_changed = mode != enrollment.enrollment_mode
