@@ -272,7 +272,7 @@ class ProgramAdminForm(ModelForm):
                     )
 
                 # Check all of the child nodes to count the total number of elective courses
-                # and find if an elective stipulation exists.
+                # and validate any elective stipulations.
                 total_child_courses = 0
                 for child in operator["children"]:
                     if child["data"]["node_type"] == "operator":
