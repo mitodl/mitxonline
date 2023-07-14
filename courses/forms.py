@@ -257,11 +257,10 @@ class ProgramAdminForm(ModelForm):
                 if operator["data"]["title"] == "":
                     raise ValidationError("Section must have a Title.")
 
-    def save(self, commit=False):
+    def save(self, commit=True):
         """Save requirements"""
-        program = super().save(commit=False)
+        program = super().save(commit=commit)
         transaction.on_commit(self._save_requirements)
-        self.save_m2m()
         return program
 
     def _save_requirements(self):
