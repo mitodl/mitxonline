@@ -616,3 +616,11 @@ def test_learner_record_serializer(mock_context, program_with_empty_requirements
     assert user_info_payload == serialized_data["user"]
     assert program_requirements_payload == serialized_data["program"]["requirements"]
     assert course_0_payload == serialized_data["program"]["courses"][0]
+
+
+def test_program_serializer_returns_default_image():
+    """If the program has no page, we should still get a featured_image_url."""
+
+    program = ProgramFactory.create(page=None)
+
+    assert "feature_image_src" in ProgramSerializer(program).data["page"]

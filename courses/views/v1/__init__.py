@@ -31,8 +31,6 @@ from courses.models import (
     PartnerSchool,
     Program,
     ProgramEnrollment,
-    ProgramRequirement,
-    ProgramRequirementNodeType,
 )
 from courses.serializers import (
     CourseRunEnrollmentSerializer,

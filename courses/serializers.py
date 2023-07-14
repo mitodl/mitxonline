@@ -302,13 +302,12 @@ class ProgramSerializer(serializers.ModelSerializer):
         return ProgramRequirementTreeSerializer(instance=req_root).data
 
     def get_page(self, instance):
-        return (
-            ProgramPageSerializer(
+        if ProgramPage.objects.filter(program=instance).exists():
+            return ProgramPageSerializer(
                 instance=ProgramPage.objects.filter(program=instance).get()
             ).data
-            if ProgramPage.objects.filter(program=instance).exists()
-            else None
-        )
+        else:
+            return {"feature_image_src": _get_thumbnail_url(None)}
 
     class Meta:
         model = models.Program
