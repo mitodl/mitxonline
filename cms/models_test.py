@@ -126,7 +126,7 @@ def test_course_page_context(
     else:
         finaid_price = None
         product = None
-    relevant_runs = list(CourseRun.objects.values("courseware_id", "start_date"))
+    relevant_runs = list(CourseRun.objects.all())
     course_page = CoursePageFactory.create(**course_page_kwargs)
     if enrolled:
         CourseRunEnrollmentFactory.create(user=staff_user, run=run)
