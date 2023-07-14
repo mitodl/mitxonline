@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.forms import ModelForm
+from django.forms import ModelForm, ValidationError
 from django.forms.fields import JSONField
 from webpack_loader import utils as webpack_loader_utils
 
@@ -200,7 +200,9 @@ class ProgramAdminForm(ModelForm):
                     "data": {
                         "node_type": ProgramRequirementNodeType.OPERATOR.value,
                         "title": "Required Courses",
+                        "operator_value": None,
                         "operator": ProgramRequirement.Operator.ALL_OF.value,
+                        "elective_flag": False,
                     },
                     "children": [],
                 },
@@ -231,14 +233,38 @@ class ProgramAdminForm(ModelForm):
 
         return [_serialize(node) for node in data]
 
+    def clean(self):
+        if "requirements" in self.cleaned_data:
+            for operator in self.cleaned_data["requirements"]:
+                if (
+                    operator["data"]["operator"]
+                    == ProgramRequirement.Operator.MIN_NUMBER_OF.value
+                ):
+                    if "operator_value" not in operator["data"]:
+                        raise ValidationError(
+                            '"Minimum # of" operator must have Value equal to 1 or more.'
+                        )
+                    if operator["data"]["operator_value"] == "":
+                        raise ValidationError(
+                            '"Minimum # of" operator must have Value equal to 1 or more.'
+                        )
+                    if len(operator["children"]) < int(
+                        operator["data"]["operator_value"]
+                    ):
+                        raise ValidationError(
+                            '"Minimum # of" operator must have Value equal to or less than the number of elective courses in the section.'
+                        )
+                if operator["data"]["title"] == "":
+                    raise ValidationError("Section must have a Title.")
+
     def save(self, commit=False):
         """Save requirements"""
         program = super().save(commit=False)
-        transaction.on_commit(self.save_requirements)
-        program.save_m2m()
+        transaction.on_commit(self._save_requirements)
+        self.save_m2m()
         return program
 
-    def save_requirements(self):
+    def _save_requirements(self):
         """
         Save related program requirements.
         """
