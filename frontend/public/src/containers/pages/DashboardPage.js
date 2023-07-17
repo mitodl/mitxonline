@@ -88,6 +88,7 @@ export class DashboardPage extends React.Component<
 
     if (
       programDrawerEnrollments !== null &&
+      programDrawerEnrollments.program &&
       programDrawerEnrollments.program.id === enrollment.program.id
     ) {
       this.setState({
@@ -265,17 +266,15 @@ export class DashboardPage extends React.Component<
               {this.renderCurrentTab()}
             </div>
 
-            {!isLoading ? (
-              <ProgramEnrollmentDrawer
-                isHidden={this.state.programDrawerVisibility}
-                enrollment={this.state.programDrawerEnrollments}
-                showDrawer={() =>
-                  this.setState({ programDrawerVisibility: false })
-                }
-                redirectToCourseHomepage={this.redirectToCourseHomepage}
-                onUnenroll={forceRequest}
-              ></ProgramEnrollmentDrawer>
-            ) : null}
+            <ProgramEnrollmentDrawer
+              isHidden={this.state.programDrawerVisibility}
+              enrollment={this.state.programDrawerEnrollments}
+              showDrawer={() =>
+                this.setState({ programDrawerVisibility: false })
+              }
+              redirectToCourseHomepage={this.redirectToCourseHomepage}
+              onUnenroll={forceRequest}
+            ></ProgramEnrollmentDrawer>
 
             {this.renderAddlProfileFieldsModal()}
           </Loader>

@@ -9,7 +9,7 @@ import type { ProgramEnrollment, Program } from "../flow/courseTypes"
 type EnrolledProgramListProps = {
   enrollments: ProgramEnrollment[],
   toggleDrawer: Function,
-  onUnenroll: Function | undefined,
+  onUnenroll: Function | null,
   onUpdateDrawerEnrollment: Function | null
 }
 
