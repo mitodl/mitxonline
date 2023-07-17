@@ -60,7 +60,9 @@ type EnrolledItemCardProps = {
   isLoading: boolean,
   toggleProgramDrawer: Function | null,
   isProgramCard: boolean,
-  redirectToCourseHomepage: Function
+  redirectToCourseHomepage: Function,
+  onUnenroll: Function | undefined,
+  onUpdateDrawerEnrollment: Function | undefined
 }
 
 type EnrolledItemCardState = {
@@ -124,7 +126,7 @@ export class EnrolledItemCard extends React.Component<
   }
 
   async onRunUnenrollment(enrollment: RunEnrollment) {
-    const { deactivateEnrollment, addUserNotification } = this.props
+    const { deactivateEnrollment, addUserNotification, onUnenroll } = this.props
 
     this.toggleRunUnenrollmentModalVisibility()
 
@@ -135,6 +137,9 @@ export class EnrolledItemCard extends React.Component<
       if (isSuccessResponse(resp)) {
         messageType = ALERT_TYPE_SUCCESS
         userMessage = `You have been successfully unenrolled from ${enrollment.run.title}.`
+        if (onUnenroll !== undefined) {
+          onUnenroll()
+        }
       } else {
         messageType = ALERT_TYPE_DANGER
         userMessage = `Something went wrong with your request to unenroll. Please contact support at ${SETTINGS.support_email}.`
@@ -155,7 +160,11 @@ export class EnrolledItemCard extends React.Component<
   }
 
   async onProgramUnenrollment(program: Program) {
-    const { deactivateProgramEnrollment, addUserNotification } = this.props
+    const {
+      deactivateProgramEnrollment,
+      addUserNotification,
+      onUnenroll
+    } = this.props
 
     this.toggleProgramUnenrollmentModalVisibility()
 
@@ -166,6 +175,9 @@ export class EnrolledItemCard extends React.Component<
       if (isSuccessResponse(resp)) {
         messageType = ALERT_TYPE_SUCCESS
         userMessage = `You have been successfully unenrolled from ${program.title}.`
+        if (onUnenroll !== undefined) {
+          onUnenroll()
+        }
       } else {
         throw new Error("program unenrollment failed")
       }
@@ -495,6 +507,12 @@ export class EnrolledItemCard extends React.Component<
                       Enrolled in certificate track
                     </span>
                   ) : null}
+                  {startDateDescription !== null &&
+                  startDateDescription.active ? (
+                      <span className="badge badge-in-progress mr-2">
+                      In Progress
+                      </span>
+                    ) : null}
                 </div>
 
                 <h2 className="my-0 mr-3">{title}</h2>
@@ -564,6 +582,16 @@ export class EnrolledItemCard extends React.Component<
         </div>
       </div>
     )
+  }
+
+  componentDidUpdate(prevProps: EnrolledItemCardProps) {
+    const { onUpdateDrawerEnrollment } = this.props
+
+    if (this.props.enrollment !== prevProps.enrollment) {
+      if (onUpdateDrawerEnrollment !== undefined) {
+        onUpdateDrawerEnrollment(this.props.enrollment)
+      }
+    }
   }
 
   renderProgramEnrollment() {

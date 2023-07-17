@@ -8,18 +8,22 @@ import type { ProgramEnrollment, Program } from "../flow/courseTypes"
 
 type EnrolledProgramListProps = {
   enrollments: ProgramEnrollment[],
-  toggleDrawer: Function
+  toggleDrawer: Function,
+  onUnenroll: Function | undefined,
+  onUpdateDrawerEnrollment: Function | undefined
 }
 
 export class EnrolledProgramList extends React.Component<EnrolledProgramListProps> {
   renderEnrolledProgramCard(enrollment: Program) {
-    const { toggleDrawer } = this.props
+    const { toggleDrawer, onUnenroll, onUpdateDrawerEnrollment } = this.props
 
     return (
       <EnrolledItemCard
         key={`program-item-${enrollment.program.id}`}
         enrollment={enrollment}
         toggleProgramDrawer={toggleDrawer}
+        onUnenroll={onUnenroll}
+        onUpdateDrawerEnrollment={onUpdateDrawerEnrollment}
       ></EnrolledItemCard>
     )
   }
@@ -29,9 +33,7 @@ export class EnrolledProgramList extends React.Component<EnrolledProgramListProp
 
     return enrollments && enrollments.length > 0 ? (
       enrollments.map<ProgramEnrollment>(enrollment =>
-        enrollment.enrollments.length > 0
-          ? this.renderEnrolledProgramCard(enrollment)
-          : null
+        this.renderEnrolledProgramCard(enrollment)
       )
     ) : (
       <div className="card no-enrollments p-3 p-md-5 rounded-0">

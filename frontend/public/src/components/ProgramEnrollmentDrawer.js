@@ -13,11 +13,12 @@ interface ProgramEnrollmentDrawerProps {
   showDrawer: Function,
   isHidden: boolean,
   redirectToCourseHomepage: Function,
+  onUnenroll: Function | undefined,
 }
 
 export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDrawerProps> {
   renderCourseInfoCard(course: CourseDetailWithRuns) {
-    const { enrollment } = this.props
+    const { enrollment, onUnenroll } = this.props
 
     let found = undefined
 
@@ -49,6 +50,7 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
         enrollment={found}
         isProgramCard={true}
         redirectToCourseHomepage={this.redirectToCourseHomepage}
+        onUnenroll={onUnenroll}
       ></EnrolledItemCard>
     )
   }
