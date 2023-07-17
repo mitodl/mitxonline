@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.68.0
+Version 0.68.0 (Released July 17, 2023)
 --------------
 
 - ProgramSerializer should now return default image if there's no program page (#1750)
