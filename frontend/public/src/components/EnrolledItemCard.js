@@ -61,8 +61,8 @@ type EnrolledItemCardProps = {
   toggleProgramDrawer: Function | null,
   isProgramCard: boolean,
   redirectToCourseHomepage: Function,
-  onUnenroll: Function | undefined,
-  onUpdateDrawerEnrollment: Function | undefined
+  onUnenroll: Function | null,
+  onUpdateDrawerEnrollment: Function | null
 }
 
 type EnrolledItemCardState = {

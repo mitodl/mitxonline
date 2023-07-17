@@ -13,7 +13,7 @@ interface ProgramEnrollmentDrawerProps {
   showDrawer: Function,
   isHidden: boolean,
   redirectToCourseHomepage: Function,
-  onUnenroll: Function | undefined,
+  onUnenroll: Function | null,
 }
 
 export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDrawerProps> {

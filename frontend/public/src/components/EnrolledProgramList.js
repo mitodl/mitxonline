@@ -10,7 +10,7 @@ type EnrolledProgramListProps = {
   enrollments: ProgramEnrollment[],
   toggleDrawer: Function,
   onUnenroll: Function | undefined,
-  onUpdateDrawerEnrollment: Function | undefined
+  onUpdateDrawerEnrollment: Function | null
 }
 
 export class EnrolledProgramList extends React.Component<EnrolledProgramListProps> {

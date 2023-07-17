@@ -48,7 +48,7 @@ type DashboardPageProps = {
   updateAddlFields: (currentUser: User) => Promise<any>,
   addUserNotification: Function,
   closeDrawer: Function,
-  forceRequest: Function | undefined
+  forceRequest: Function | null
 }
 
 const DashboardTab = {
