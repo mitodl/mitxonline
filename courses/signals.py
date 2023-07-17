@@ -53,11 +53,6 @@ def handle_update_course_run(
     When a CourseRun model is updated, sync course run grades and generate missing certificates
     """
     if not created:
-        now = now_in_utc()
-        if (
-            instance.certificate_available_date
-            and instance.certificate_available_date <= now
-        ):
-            transaction.on_commit(
-                lambda: generate_course_run_certificates_for_course(instance)
-            )
+        transaction.on_commit(
+            lambda: generate_course_run_certificates_for_course(instance)
+        )
