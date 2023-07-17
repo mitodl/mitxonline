@@ -20,11 +20,13 @@ def populate_letter_grade(apps, schema_editor):
     """Fix the letter grade for the DEDP courses for 3T2022 semester
     that was set by 0033_populate_letter_grades"""
     CourseRunGrade = apps.get_model("courses", "CourseRunGrade")
-    course_run_ids = ['course-v1:MITxT+14.100x+3T2022',
-                      'course-v1:MITxT+14.750x+3T2022',
-                      'course-v1:MITxT+JPAL102x+3T2022',
-                      'course-v1:MITxT+14.73x+3T2022',
-                      'course-v1:MITxT+14.310x+3T2022']
+    course_run_ids = [
+        "course-v1:MITxT+14.100x+3T2022",
+        "course-v1:MITxT+14.750x+3T2022",
+        "course-v1:MITxT+JPAL102x+3T2022",
+        "course-v1:MITxT+14.73x+3T2022",
+        "course-v1:MITxT+14.310x+3T2022",
+    ]
 
     grades = CourseRunGrade.objects.filter(
         passed=True,
@@ -39,7 +41,7 @@ def populate_letter_grade(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('courses', '0037_update_programrequirements_add_elective_flag'),
+        ("courses", "0037_update_programrequirements_add_elective_flag"),
     ]
 
     operations = [
