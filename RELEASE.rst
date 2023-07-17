@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.69.0
+--------------
+
+- Populate letter grades for 3T2022 (#1754)
+- add migration to delete duplicate discount redemption
+
 Version 0.68.0 (Released July 17, 2023)
 --------------
 
