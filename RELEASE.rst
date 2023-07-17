@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.68.0
+--------------
+
+- ProgramSerializer should now return default image if there's no program page (#1750)
+- 1740: Re-enroll learner into program (#1746)
+- feat: remove link and add description for unenrollable runs in more dates (#1684)
+
 Version 0.67.6 (Released July 13, 2023)
 --------------
 
