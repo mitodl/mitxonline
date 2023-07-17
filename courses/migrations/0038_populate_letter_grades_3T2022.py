@@ -17,8 +17,7 @@ def convert_to_letter(grade):
 
 
 def populate_letter_grade(apps, schema_editor):
-    """Fix the letter grade for the DEDP courses for 3T2022 semester
-    that was set by 0033_populate_letter_grades"""
+    """Populate letter grades for DEDP courses for 3T2022 semester"""
     CourseRunGrade = apps.get_model("courses", "CourseRunGrade")
     course_run_ids = [
         "course-v1:MITxT+14.100x+3T2022",
@@ -35,6 +34,7 @@ def populate_letter_grade(apps, schema_editor):
     )
     for grade in grades:
         grade.letter_grade = convert_to_letter(grade.grade)
+        grade.set_by_admin = True
         grade.save()
 
 
