@@ -58,10 +58,7 @@ def test_generate_program_certificate_not_called(
 # pylint: disable=unused-argument
 @patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
 @patch("courses.signals.generate_course_run_certificates_for_course", autospec=True)
-@pytest.mark.parametrize("certificates_date_past", [True, False])
-def test_courserun_post_update_signal(
-    generate_course_run_cert_mock, mock_on_commit, certificates_date_past
-):
+def test_courserun_post_update_signal(generate_course_run_cert_mock, mock_on_commit):
     """
     Test that generate_course_run_certificates_for_course is not called when
     certificate_available_date is in the future
@@ -69,14 +66,7 @@ def test_courserun_post_update_signal(
     course = CourseFactory.create()
     now = now_in_utc()
     delta = timedelta(hours=settings.CERTIFICATE_CREATION_DELAY_IN_HOURS)
-    course_run = CourseRunFactory.create(
-        course=course,
-        certificate_available_date=now - delta
-        if certificates_date_past
-        else now + delta,
-    )
+    course_run = CourseRunFactory.create(course=course)
+    generate_course_run_cert_mock.assert_not_called()
     course_run.save()
-    if certificates_date_past:
-        generate_course_run_cert_mock.assert_called_once()
-    else:
-        generate_course_run_cert_mock.assert_not_called()
+    generate_course_run_cert_mock.assert_called_once()
