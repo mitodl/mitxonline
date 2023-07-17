@@ -783,7 +783,7 @@ def generate_course_run_certificates():
 def generate_course_run_certificates_for_course(run):
     """
     For given course run syncs grades and
-    if certificate_available_date is in the past, also generates certificates.
+    if certificate_available_date is in the past or course id self paced, also generates certificates.
 
     Args:
         run (models.CourseRun): a course run instance.
