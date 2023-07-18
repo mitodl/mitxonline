@@ -21,6 +21,7 @@ describe("EnrolledProgramList", () => {
         <EnrolledProgramList
           enrollments={userEnrollments}
           toggleDrawer={toggleProgramDrawer}
+          onUnenroll={null}
         ></EnrolledProgramList>
       )
   })
