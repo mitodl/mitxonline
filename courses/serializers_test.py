@@ -39,6 +39,7 @@ from ecommerce.serializers import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE
 
 pytestmark = [pytest.mark.django_db]
 
@@ -467,7 +468,12 @@ def test_program_requirement_deletion():
     assert list(ProgramRequirement.get_tree(parent=root2)) == expected
 
 
-def test_learner_record_serializer(mock_context, program_with_empty_requirements):
+@pytest.mark.parametrize(
+    "enrollment_mode", [EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE]
+)
+def test_learner_record_serializer(
+    mock_context, program_with_empty_requirements, enrollment_mode
+):
     """Verify that saving the requirements for one program doesn't affect other programs"""
 
     program = program_with_empty_requirements
@@ -482,7 +488,9 @@ def test_learner_record_serializer(mock_context, program_with_empty_requirements
         program.add_requirement(course)
         course_run = CourseRunFactory.create(course=course)
         course_run_enrollment = CourseRunEnrollmentFactory.create(
-            run=course_run, user=user
+            run=course_run,
+            user=user,
+            enrollment_mode=enrollment_mode,
         )
         course_runs.append(course_run)
 
@@ -613,6 +621,8 @@ def test_learner_record_serializer(mock_context, program_with_empty_requirements
         "reqtype": "Required Courses",
         "title": courses[0].title,
     }
+    if enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE:
+        course_0_payload["grade"] = None
     assert user_info_payload == serialized_data["user"]
     assert program_requirements_payload == serialized_data["program"]["requirements"]
     assert course_0_payload == serialized_data["program"]["courses"][0]
