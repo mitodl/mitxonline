@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.69.0
+Version 0.69.0 (Released July 18, 2023)
 --------------
 
 - Populate letter grades for 3T2022 (#1754)
