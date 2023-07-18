@@ -58,7 +58,7 @@ const DashboardTab = {
 
 type DashboardPageState = {
   programDrawerVisibility: boolean,
-  programDrawerEnrollments: ?ProgramEnrollment,
+  programDrawerEnrollments: ProgramEnrollment|null,
   currentTab: string,
   showAddlProfileFieldsModal: boolean,
   destinationUrl: string
