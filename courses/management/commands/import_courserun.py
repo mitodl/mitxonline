@@ -181,21 +181,6 @@ class Command(BaseCommand):
                         )
                     )
 
-                    if kwargs["make_elective"]:
-                        program.add_elective(course)
-                        self.stdout.write(
-                            self.style.SUCCESS(
-                                f"Added course {course_readable_id} to program {program.readable_id} as an elective"
-                            )
-                        )
-                    else:
-                        program.add_requirement(course)
-                        self.stdout.write(
-                            self.style.SUCCESS(
-                                f"Added course {course_readable_id} to program {program.readable_id} as required course"
-                            )
-                        )
-
                 new_run = CourseRun.objects.create(
                     course=course,
                     run_tag=courserun_tag,
