@@ -244,8 +244,8 @@ class ProgramAdminForm(ModelForm):
         Raises:
             ValidationError: operator_value does not exist.
             ValidationError: operator_value does exist but is empty.
-            ValidationError: operator_value is not equal to or less than the total number of courses
-                which can apply towards the program certificate..
+            ValidationError: operator_value is not equal to or less than the number of courses
+                which can apply towards the program certificate.
         """
 
         def _validate_elective_value(operator):
@@ -322,15 +322,15 @@ class ProgramAdminForm(ModelForm):
                     total_child_courses = 0
                     for child in operator["children"]:
                         if child["data"]["node_type"] == "operator":
-                            # The value of the nested elective stipulation defines the number of courses
-                            # within that nested stipulation which are allowed to apply towards a program's
-                            # elective requirement.
                             _validate_operator_title(child)
                             if (
                                 operator["data"]["operator"]
                                 == ProgramRequirement.Operator.MIN_NUMBER_OF.value
                             ):
                                 _validate_elective_value(child)
+                                # The value of the nested elective stipulation defines the number of courses
+                                # within that nested stipulation which are allowed to apply towards a program's
+                                # elective requirement.
                                 total_child_courses += int(
                                     child["data"]["operator_value"]
                                 )
