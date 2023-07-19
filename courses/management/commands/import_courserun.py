@@ -55,6 +55,12 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
+            "--make-elective",
+            action="store_true",
+            help="If the course has to be created, add it to the program as an elective. Otherwise, it will be a requirement.",
+        )
+
+        parser.add_argument(
             "--run-tag",
             type=str,
             nargs="?",
@@ -162,7 +168,6 @@ class Command(BaseCommand):
                 (course, created) = Course.objects.get_or_create(
                     readable_id=course_readable_id,
                     defaults={
-                        "program": program,
                         "title": edx_course.name,
                         "readable_id": course_readable_id,
                         "live": kwargs["live"],
@@ -175,6 +180,21 @@ class Command(BaseCommand):
                             f"Created course for {course_readable_id}: {course}"
                         )
                     )
+
+                    if kwargs["make_elective"]:
+                        program.add_elective(course)
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                f"Added course {course_readable_id} to program {program.readable_id} as an elective"
+                            )
+                        )
+                    else:
+                        program.add_requirement(course)
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                f"Added course {course_readable_id} to program {program.readable_id} as required course"
+                            )
+                        )
 
                 new_run = CourseRun.objects.create(
                     course=course,
