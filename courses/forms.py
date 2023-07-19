@@ -248,7 +248,7 @@ class ProgramAdminForm(ModelForm):
                 which can apply towards the program certificate.
         """
 
-        def _validate_elective_value(operator):
+        def _validate_elective_value_presence(operator):
             """
             Verifies that a Program's elective operator contains
             a defined Value field.
@@ -306,6 +306,27 @@ class ProgramAdminForm(ModelForm):
             if operator["data"]["title"] == "":
                 raise ValidationError("Operator must have a Title.")
 
+        def _validate_elective_value_and_child_courses(
+            elective_operator_value: int, number_of_applicable_courses_in_operator: int
+        ):
+            """Validate that the elective operations Value is equal to or less
+                    than the total number of course certificates which count
+                    towards satisfying the elective.
+
+            Args:
+                elective_operator_value (int): The Value field of the elective operator.
+                number_of_applicable_courses_in_operator (int): The calculated total number of course
+                    certificates which count towards satisfying the elective.
+
+            Raises:
+                ValidationError: The elective operator's Value is larger than the total number of course
+                    certificates which count towards satisfying the elective.
+            """
+            if elective_operator_value > number_of_applicable_courses_in_operator:
+                raise ValidationError(
+                    '"Minimum # of" operator must have Value equal to or less than the number of elective courses which can apply towards the program certificate.'
+                )
+
         if "requirements" in self.cleaned_data:
             for operator in self.cleaned_data["requirements"]:
                 # Ensure Title is defined for every operator.
@@ -315,7 +336,7 @@ class ProgramAdminForm(ModelForm):
                     operator["data"]["operator"]
                     == ProgramRequirement.Operator.MIN_NUMBER_OF.value
                 ):
-                    _validate_elective_value(operator)
+                    _validate_elective_value_presence(operator)
 
                     # Ensure the total number of courses that are allowed to apply towards the program
                     # certificate is equal to or less than the Value field for the elective.
@@ -327,7 +348,14 @@ class ProgramAdminForm(ModelForm):
                                 operator["data"]["operator"]
                                 == ProgramRequirement.Operator.MIN_NUMBER_OF.value
                             ):
-                                _validate_elective_value(child)
+                                _validate_elective_value_presence(child)
+                                # Make sure the nested elective stipulation's value is equal to or less than the number
+                                # of child courses associated with it.  We can assume that all children of the nested
+                                # elective stipulation are courses and not operators.
+                                _validate_elective_value_and_child_courses(
+                                    int(child["data"]["operator_value"]),
+                                    len(child["children"]),
+                                )
                                 # The value of the nested elective stipulation defines the number of courses
                                 # within that nested stipulation which are allowed to apply towards a program's
                                 # elective requirement.
@@ -338,12 +366,10 @@ class ProgramAdminForm(ModelForm):
                             # Assume the child must be a course.
                             total_child_courses += 1
 
-                        if total_child_courses < int(
-                            operator["data"]["operator_value"]
-                        ):
-                            raise ValidationError(
-                                '"Minimum # of" operator must have Value equal to or less than the number of elective courses which can apply towards the program certificate.'
-                            )
+                    # Validate the main elective operator using child courses and nested stipulation values.
+                    _validate_elective_value_and_child_courses(
+                        int(operator["data"]["operator_value"]), total_child_courses
+                    )
 
     def save(self, commit=True):
         """Save requirements"""
