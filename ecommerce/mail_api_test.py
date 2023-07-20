@@ -69,7 +69,9 @@ def test_mail_api_receipt_generation(
     assert str(lines[0].unit_price) in rendered_template.body
 
 
-def test_mail_api_refund_email_generation(settings, mocker, user, products, user_client):
+def test_mail_api_refund_email_generation(
+    settings, mocker, user, products, user_client
+):
     """
     Tests email generation for the refund message. Generates a fulfilled order,
     then attemps to refund it after mocking the mail sender.
