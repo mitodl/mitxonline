@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.69.1
+Version 0.69.1 (Released July 20, 2023)
 --------------
 
 - 1758: Django Admin course validation for Program nested elective operators (#1759)
