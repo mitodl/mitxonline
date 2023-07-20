@@ -16,7 +16,7 @@ def products():
 
 
 def test_delayed_order_receipt_sends_email(
-    mocker, user, products, user_client, django_capture_on_commit_callbacks
+    settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):
     """
     Tests that the Order model is properly calling the send email receipt task
@@ -24,7 +24,7 @@ def test_delayed_order_receipt_sends_email(
     function should create a basket and process the order through to the point
     where the Order model itself will send the receipt email.
     """
-
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     mock_send_ecommerce_order_receipt = mocker.patch(
         "ecommerce.mail_api.send_ecommerce_order_receipt"
     )
@@ -35,14 +35,16 @@ def test_delayed_order_receipt_sends_email(
     mock_send_ecommerce_order_receipt.assert_called()
 
 
-def test_delayed_order_refund_sends_email(mocker, user, products, user_client):
+def test_delayed_order_refund_sends_email(
+    settings, mocker, user, products, user_client
+):
     """
     Tests that the Order model is properly calling the order refund email task
     rather than calling the mail_api version directly. The create_order_receipt
     function creates a fulfilled order, then we refund it and make sure the
     right task got called.
     """
-
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     mock_send_refund_email = mocker.patch(
         "ecommerce.mail_api.send_ecommerce_refund_message"
     )
