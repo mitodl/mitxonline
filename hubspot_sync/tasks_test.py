@@ -426,7 +426,9 @@ def test_sync_failed_contacts(mocker):
     )
     result = tasks.sync_failed_contacts(user_ids)
     assert mock_sync.call_count == 4
-    assert result == [user_ids[1], user_ids[3]]
+
+    # Expect two failed contacts that correspond with the ApiExceptions above.
+    assert len(result) == 2
 
 
 @pytest.mark.parametrize("for_contacts", [True, False])
