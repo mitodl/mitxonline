@@ -436,13 +436,12 @@ def test_enroll_in_edx_course_runs(settings, mocker, user):
     mock_client.enrollments.create_student_enrollment.assert_any_call(
         course_runs[0].courseware_id,
         mode=EDX_DEFAULT_ENROLLMENT_MODE,
-        username=None,
+        username=user.username,
     )
     mock_client.enrollments.create_student_enrollment.assert_any_call(
         course_runs[1].courseware_id,
         mode=EDX_DEFAULT_ENROLLMENT_MODE,
-        username=None,
-        force_enrollment=False,
+        username=user.username,
     )
     assert enroll_results == enroll_return_values
 
