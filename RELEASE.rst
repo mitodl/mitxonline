@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.69.1
+--------------
+
+- 1758: Django Admin course validation for Program nested elective operators (#1759)
+- Sheets functionality and usage description (#1735)
+- 1694: added stipulations to program electives causes 500 error in Django admin (#1751)
+- No audit grades in program records (#1747)
+
 Version 0.69.0 (Released July 18, 2023)
 --------------
 
