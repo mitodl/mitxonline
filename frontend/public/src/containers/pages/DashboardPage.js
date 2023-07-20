@@ -158,18 +158,22 @@ export class DashboardPage extends React.Component<
     const { enrollments, programEnrollments, forceRequest } = this.props
 
     if (this.state.currentTab === DashboardTab.programs) {
-      return (
-        <div>
-          <h1 className="hide-element">Programs</h1>
-          <EnrolledProgramList
-            key={"enrolled-programs"}
-            enrollments={programEnrollments}
-            toggleDrawer={this.toggleDrawer.bind(this)}
-            onUpdateDrawerEnrollment={this.updateDrawerEnrollments.bind(this)}
-            onUnenroll={forceRequest}
-          ></EnrolledProgramList>
-        </div>
-      )
+      if (programEnrollments.length === 0) {
+        this.setState({ currentTab: DashboardTab.courses })
+      } else {
+        return (
+          <div>
+            <h1 className="hide-element">Programs</h1>
+            <EnrolledProgramList
+              key={"enrolled-programs"}
+              enrollments={programEnrollments}
+              toggleDrawer={this.toggleDrawer.bind(this)}
+              onUpdateDrawerEnrollment={this.updateDrawerEnrollments.bind(this)}
+              onUnenroll={forceRequest}
+            ></EnrolledProgramList>
+          </div>
+        )
+      }
     }
 
     return (
