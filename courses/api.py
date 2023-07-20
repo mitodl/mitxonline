@@ -52,8 +52,8 @@ from openedx.api import (
 )
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
-    EDX_ENROLLMENT_VERIFIED_MODE,
     EDX_ENROLLMENT_AUDIT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
 )
 from openedx.exceptions import (
     EdxApiEnrollErrorException,
@@ -219,7 +219,6 @@ def create_run_enrollments(
     *,
     keep_failed_enrollments=False,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
-    force_enrollment=False,
 ):
     """
     Creates local records of a user's enrollment in course runs, and attempts to enroll them
@@ -230,8 +229,7 @@ def create_run_enrollments(
         runs (iterable of CourseRun): The course runs to enroll in
         keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
             in the database even if the enrollment fails in edX.
-        force_enrollment (bool): If True, Enforces Enrollment after the enrollment end date
-                                    has been passed or upgrade_deadline is ended
+        mode (str): The course mode
 
     Returns:
         (list of CourseRunEnrollment, bool): A list of enrollment objects that were successfully
@@ -265,8 +263,6 @@ def create_run_enrollments(
             user,
             runs,
             mode=mode,
-            force_enrollment=force_enrollment,
-            regen_auth_tokens=False,
         )
     except (
         UnknownEdxApiEnrollException,
@@ -488,7 +484,6 @@ def defer_enrollment(
             runs=[from_enrollment.run],
             keep_failed_enrollments=True,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
-            force_enrollment=True,
         )
         return downgraded_enrollments, None
 
