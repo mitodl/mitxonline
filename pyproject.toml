@@ -81,6 +81,7 @@ user-util = "^0.1.5"
 ulid-py = "^1.1.0"
 uwsgi = "^2.0.19"
 wagtail = "^5.0"
+hypothesis = "4.23.9"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -92,7 +93,6 @@ factory-boy = "^3.2.0"
 faker = "^8.8.2"
 flaky = "^3.7.0"
 freezegun = "^1.2"
-hypothesis = "^4.23.9"
 ipdb = "^0.13.13"
 isort = "^5.12.0"
 nplusone = "^1.0.0"
