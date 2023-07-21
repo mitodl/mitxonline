@@ -1272,10 +1272,10 @@ def test_course_run_certificates_access():
 @pytest.mark.parametrize(
     "grade, letter_grade, should_force_pass, is_passed",
     [
-        (0.0, 'F', True, False),
-        (0.1, 'F', True, True),
-        (0.5, 'C', False, False),
-        (0.5, 'C', True, True),
+        (0.0, "F", True, False),
+        (0.1, "F", True, True),
+        (0.5, "C", False, False),
+        (0.5, "C", True, True),
     ],
 )
 def test_override_user_grade(grade, letter_grade, should_force_pass, is_passed):
