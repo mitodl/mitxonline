@@ -55,12 +55,6 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
-            "--make-elective",
-            action="store_true",
-            help="If the course has to be created, add it to the program as an elective. Otherwise, it will be a requirement.",
-        )
-
-        parser.add_argument(
             "--run-tag",
             type=str,
             nargs="?",
