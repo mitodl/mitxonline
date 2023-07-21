@@ -73,6 +73,12 @@ class Command(BaseCommand):
             required=False,
         )
         parser.add_argument(
+            "--letter_grade",
+            type=float,
+            help="Override a grade with a corresponding letter grade. Range: A-F",
+            required=False,
+        )
+        parser.add_argument(
             "--revoke", dest="revoke", action="store_true", required=False
         )
         parser.add_argument(
@@ -92,6 +98,7 @@ class Command(BaseCommand):
         create = options.get("create")
         run = options.get("run")
         override_grade = options.get("grade")
+        letter_grade = options.get("letter_grade")
 
         if not (revoke or unrevoke) and not create:
             raise CommandError(
@@ -142,6 +149,11 @@ class Command(BaseCommand):
 
             if override_grade and not is_grade_valid(override_grade):
                 raise CommandError("Invalid value for grade. Allowed range: 0.0 - 1.0.")
+
+            if override_grade and not letter_grade:
+                raise CommandError(
+                    "Override grade needs a letter grade, allowed range: A-F"
+                )
 
             if override_grade and not user:
                 raise CommandError(
