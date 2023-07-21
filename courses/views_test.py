@@ -31,7 +31,7 @@ from courses.serializers import (
 )
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-from ecommerce.models import Order, PendingOrder
+from ecommerce.models import Order
 from main import features
 from main.constants import (
     USER_MSG_COOKIE_NAME,
@@ -122,9 +122,9 @@ def test_get_courses(user_drf_client, courses, mock_context, is_anonymous):
     resp = user_drf_client.get(reverse("courses_api-list"))
     courses_data = resp.json()
     assert len(courses_data) == len(courses)
-    for course, course_data in zip(courses, courses_data):
+    for course in courses:
         assert (
-            course_data == CourseSerializer(instance=course, context=mock_context).data
+            CourseSerializer(instance=course, context=mock_context).data in courses_data
         )
 
 
