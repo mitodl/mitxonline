@@ -162,7 +162,6 @@ class Command(BaseCommand):
                 (course, created) = Course.objects.get_or_create(
                     readable_id=course_readable_id,
                     defaults={
-                        "program": program,
                         "title": edx_course.name,
                         "readable_id": course_readable_id,
                         "live": kwargs["live"],
