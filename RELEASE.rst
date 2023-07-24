@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.69.2
+Version 0.69.2 (Released July 24, 2023)
 --------------
 
 - Updates import_course a bit for program requirements (#1760)
