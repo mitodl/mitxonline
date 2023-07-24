@@ -13,7 +13,8 @@ Check the usages of this command below:
 ./manage.py manage_certificates —-create -—run=<course_run_courseware_id> -—user=<username or email>
 
 3. Override grade for a user and generate certificate. (For single user, will force create the certificate for the user)
-./manage.py manage_certificates -—create  -—run=<course_run_courseware_id> —-user=<username or email> -—grade=<a float value between 0.0-1.0>
+./manage.py manage_certificates -—create  -—run=<course_run_courseware_id> —-user=<username or email>
+-—grade=<a float value between 0.0-1.0> --letter-grade=<a letter A-F>
 
 **Revoke/Un-revoke Certificates**
 
@@ -73,8 +74,8 @@ class Command(BaseCommand):
             required=False,
         )
         parser.add_argument(
-            "--letter_grade",
-            type=float,
+            "--letter-grade",
+            type=str,
             help="Override a grade with a corresponding letter grade. Range: A-F",
             required=False,
         )
@@ -184,6 +185,7 @@ class Command(BaseCommand):
                     override_user_grade(
                         user=user,
                         override_grade=override_grade,
+                        letter_grade=letter_grade,
                         courseware_id=run,
                         should_force_pass=True,
                     )

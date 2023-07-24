@@ -28,7 +28,7 @@ def is_grade_valid(override_grade: float):
 
 
 def is_letter_grade_valid(letter_grade: str):
-    return False if re.match("^[A-F]$", letter_grade) is None else True
+    return re.match("^[A-F]$", letter_grade) is not None
 
 
 def get_program_certificate_by_enrollment(enrollment, program=None):
