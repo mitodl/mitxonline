@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.69.2
+--------------
+
+- Updates import_course a bit for program requirements (#1760)
+- 1764: Ignore ordering in tests where it doesn't matter (#1765)
+
 Version 0.69.1 (Released July 20, 2023)
 --------------
 
