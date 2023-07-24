@@ -22,10 +22,12 @@ ENV  \
   # poetry:
   POETRY_VERSION=1.5.1 \
   POETRY_VIRTUALENVS_CREATE=false \
-  POETRY_CACHE_DIR='/tmp/cache/poetry'
+  POETRY_CACHE_DIR='/tmp/cache/poetry' \
+  POETRY_HOME='/usr/local/bin/poetry'
 
 # Install poetry
-RUN pip install "poetry==$POETRY_VERSION"
+RUN curl -sSL https://install.python-poetry.org | POETRY_VERSION=${POETRY_VERSION} python3 -
+ENV PATH="$PATH:$POETRY_HOME/venv/bin"
 
 # Install project packages
 COPY pyproject.toml /app
