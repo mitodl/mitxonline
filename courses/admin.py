@@ -38,9 +38,9 @@ class ProgramAdmin(admin.ModelAdmin):
 
     model = Program
     form = ProgramAdminForm
-    search_fields = ["title", "readable_id"]
-    list_display = ("id", "title", "readable_id")
-    list_filter = ["live"]
+    search_fields = ["title", "readable_id", "type_label"]
+    list_display = ("id", "title", "readable_id", "type_label")
+    list_filter = ["live", "type_label"]
 
 
 class ProgramRunAdmin(admin.ModelAdmin):

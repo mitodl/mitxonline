@@ -112,6 +112,12 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
     live = models.BooleanField(default=False)
+    type_label = models.CharField(
+        max_length=255,
+        blank=True,
+        default="Series",
+        help_text="Type/group the program belongs to (i.e. MicroMasters™, Series, etc.)",
+    )
 
     @cached_property
     def page(self):
