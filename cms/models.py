@@ -46,6 +46,7 @@ from cms.blocks import (
 from cms.constants import (
     CERTIFICATE_INDEX_SLUG,
     COURSE_INDEX_SLUG,
+    INSTRUCTOR_INDEX_SLUG,
     PROGRAM_INDEX_SLUG,
     SIGNATORY_INDEX_SLUG,
 )
@@ -1546,4 +1547,4 @@ class InstructorIndexPage(InstructorObjectIndexPage):
     as consequently add /signatories/ to the signatory page urls
     """
 
-    slug = SIGNATORY_INDEX_SLUG
+    slug = INSTRUCTOR_INDEX_SLUG
