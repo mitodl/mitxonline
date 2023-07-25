@@ -718,19 +718,21 @@ class LearnerRecordSerializer(serializers.BaseSerializer):
                 "grade": None,
                 "certificate": None,
             }
-            verified_enrollment_course_runs_list = (
-                models.CourseRunEnrollment.objects.filter(
+            runs_ids = models.CourseRunCertificate.objects.filter(
+                user=user, course_run__course=course, is_revoked=False
+            ).values_list("course_run__id", flat=True)
+
+            if not runs_ids:
+                # if there are no certificates then show only verified enrollment grades
+                runs_ids = models.CourseRunEnrollment.objects.filter(
                     user=user,
                     run__course=course,
                     enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
                     change_status=None,
                 ).values_list("run__id", flat=True)
-            )
 
             grade = (
-                models.CourseRunGrade.objects.filter(
-                    user=user, course_run__in=verified_enrollment_course_runs_list
-                )
+                models.CourseRunGrade.objects.filter(user=user, course_run__in=runs_ids)
                 .order_by("-grade")
                 .first()
             )
