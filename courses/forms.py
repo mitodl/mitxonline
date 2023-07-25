@@ -408,6 +408,7 @@ class ProgramAdminForm(ModelForm):
             "readable_id",
             "live",
             "requirements",
+            "program_type",
         ]
 
     class Media:

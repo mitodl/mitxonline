@@ -4,8 +4,6 @@ import datetime
 import pytz
 from django.db import migrations
 
-from courses.models import Program
-
 
 def convert_to_letter(grade):
     """Convert a decimal number to letter grade"""
@@ -25,6 +23,7 @@ def convert_to_letter(grade):
 def populate_letter_grade(apps, schema_editor):
     """Populate the letter grade with A/B/C/D for the DEDP courses prior to 3T2022"""
     CourseRunGrade = apps.get_model("courses", "CourseRunGrade")
+    Program = apps.get_model("courses", "Program")
 
     dedp_program = Program.objects.filter(readable_id="program-v1:MITx+DEDP").first()
 
@@ -48,7 +47,6 @@ def populate_letter_grade(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("courses", "0032_add_related_programs_table"),
-        ("courses", "0032_program_program_type"),
     ]
 
     operations = [

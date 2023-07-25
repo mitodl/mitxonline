@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0031_remove_field_program_from_course"),
+        ("courses", "0038_populate_letter_grades_3T2022"),
     ]
 
     operations = [
