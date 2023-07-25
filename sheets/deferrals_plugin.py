@@ -23,7 +23,7 @@ class DeferralPlugin:
         )
         if to_courseware_id and not to_enrollment:
             message = "Failed to create/update the target enrollment ({})".format(
-                    to_courseware_id
-                )
+                to_courseware_id
+            )
             return DeferralResult(ResultType.FAILED, message)
         return DeferralResult(ResultType.PROCESSED)
