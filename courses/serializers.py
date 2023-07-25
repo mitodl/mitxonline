@@ -16,7 +16,6 @@ from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses import models
 from courses.api import create_run_enrollments
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
-from courses.models import CourseRunCertificate
 from ecommerce.models import Product
 from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
@@ -719,7 +718,7 @@ class LearnerRecordSerializer(serializers.BaseSerializer):
                 "grade": None,
                 "certificate": None,
             }
-            runs_ids = CourseRunCertificate.objects.filter(
+            runs_ids = models.CourseRunCertificate.objects.filter(
                 user=user, course_run__course=course, is_revoked=False
             ).values_list("course_run__id", flat=True)
 
