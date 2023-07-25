@@ -48,6 +48,7 @@ def populate_letter_grade(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("courses", "0032_add_related_programs_table"),
+        ("courses", "0032_program_program_type"),
     ]
 
     operations = [
