@@ -24,16 +24,18 @@ export class CatalogPage extends React.Component<Props> {
               <li className="department-link">Milk</li>
             </ul>
           </div>
-          <div id="tabs">
-            <div className={this.state.tabSelected === "courses" ? "selected-tab" : "unselected-tab"}>
-              <button onClick={() => this.changeSelectedTab("courses")}>Courses</button>
+          <div id="tab-count-row">
+            <div id="tabs">
+              <div className={this.state.tabSelected === "courses" ? "selected-tab" : "unselected-tab"}>
+                <button onClick={() => this.changeSelectedTab("courses")}>Courses</button>
+              </div>
+              <div className={this.state.tabSelected === "programs" ? "selected-tab" : "unselected-tab"}>
+                <button onClick={() => this.changeSelectedTab("programs")}>Programs</button>
+              </div>
             </div>
-            <div className={this.state.tabSelected === "programs" ? "selected-tab" : "unselected-tab"}>
-              <button onClick={() => this.changeSelectedTab("programs")}>Programs</button>
+            <div id="catalog-page-item-count">
+              18 courses
             </div>
-          </div>
-          <div id="catalog-page-item-count">
-            18 courses
           </div>
         </div>
       </div>
