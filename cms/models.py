@@ -1742,4 +1742,4 @@ class InstructorIndexPage(InstructorObjectIndexPage):
     as consequently add /signatories/ to the signatory page urls
     """
 
-    slug = SIGNATORY_INDEX_SLUG
+    slug = INSTRUCTOR_INDEX_SLUG
