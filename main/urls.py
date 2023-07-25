@@ -76,6 +76,7 @@ urlpatterns = [
     re_path(r"^orders/history/.*", index, name="order-history"),
     re_path(r"^orders/receipt/.*", index, name="order-receipt"),
     re_path(r"^records/.*", index, name="learner-records"),
+    re_path(r"^catalog/", index, name="catalog"),
     # Wagtail
     re_path(
         r"^cms/login", cms_signin_redirect_to_site_signin, name="wagtailadmin_login"
