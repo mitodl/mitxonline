@@ -512,19 +512,29 @@ def defer_enrollment(
                 from_enrollment.run.course.title, to_run.course.title
             )
         )
-    with transaction.atomic():
-        to_enrollments, enroll_success = create_run_enrollments(
-            user,
-            [to_run],
-            keep_failed_enrollments=keep_failed_enrollments,
-            mode=from_enrollment.enrollment_mode,
-        )
-        if not enroll_success and not keep_failed_enrollments:
-            raise Exception(
-                "Api call to enroll on edX was not successful for course run '{}'".format(
-                    to_run
-                )
+    already_unenrolled_from = (
+        from_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
+    )
+    if already_unenrolled_from:
+        # check if user was already enrolled in verified track
+        to_enrollments = CourseRunEnrollment.objects.filter(
+            user=user, run=to_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        ).first()
+        return from_enrollment, to_enrollments
+
+    to_enrollments, enroll_success = create_run_enrollments(
+        user,
+        [to_run],
+        keep_failed_enrollments=keep_failed_enrollments,
+        mode=from_enrollment.enrollment_mode,
+    )
+    if not enroll_success and not keep_failed_enrollments:
+        raise Exception(
+            "Api call to enroll on edX was not successful for course run '{}'".format(
+                to_run
             )
+        )
+    if not already_unenrolled_from:
         from_enrollment = deactivate_run_enrollment(
             from_enrollment,
             ENROLL_CHANGE_STATUS_DEFERRED,
