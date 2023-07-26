@@ -53,10 +53,11 @@ export class CatalogPage extends React.Component<Props> {
 
   /**
    * Renders a single course catalog card.
+   * @param {EnrollmentFlaggedCourseRun} courseRun The course run instance used to populate the card.
    */
   renderCourseCatalogCard(courseRun: EnrollmentFlaggedCourseRun) {
     return (
-      <div className="col catalog-item">
+      <div className="col catalog-item" key={courseRun.id}>
         {
           courseRun.page &&
           courseRun.page.feature_image_src && (
@@ -77,10 +78,11 @@ export class CatalogPage extends React.Component<Props> {
 
   /**
    * Renders a single program catalog card.
+   * @param {Program} program The program instance used to populate the card.
    */
   renderProgramCatalogCard(program: Program) {
     return (
-      <div className="col catalog-item">
+      <div className="col catalog-item" key={program.id}>
         <div className="program-image-and-badge">
           {
             program.page &&
@@ -102,23 +104,25 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Dynamically renders each row in the catalog.  Each row contains 3 course or program cards.
+   * Dynamically renders all rows of cards in the catalog.  Each row contains 3 course or program cards.
+   * @param {Array<EnrollmentFlaggedCourseRun | Program>} itemsInCatalog The items associated with the currently selected catalog page.
+   * @param {Function} renderCatalogCardFunction The card render function that will be used for each item on the current catalog page.
    */
   renderCatalogRows(itemsInCatalog: Array<EnrollmentFlaggedCourseRun | Program>, renderCatalogCardFunction: Function) {
-    const itemsInEachRow = Math.min(itemsInCatalog.length, 3)
-    const catalogItems = []
-    for (let i = 0; i < itemsInCatalog.length; i += itemsInEachRow) {
-      const itemsInRow = itemsInCatalog.slice(i, i + itemsInEachRow)
-      catalogItems.push(
-        <div className="row" id="catalog-grid">
+    const numberOfItemsInEachRow = Math.min(itemsInCatalog.length, 3)
+    const catalogRows = []
+    for (let i = 0; i < itemsInCatalog.length; i += numberOfItemsInEachRow) {
+      const itemsInRow = itemsInCatalog.slice(i, i + numberOfItemsInEachRow)
+      catalogRows.push(
+        <div className="row" id="catalog-grid" key={i}>
           {itemsInRow.map(x => renderCatalogCardFunction(x))}
         </div>
       )
     }
-    return catalogItems
+    return catalogRows
   }
   /**
-   * Returns the entire catalog of course or program cards.
+   * Renders the entire catalog of course or program cards based on the catalog tab selected.
    */
 
   renderCatalog() {
