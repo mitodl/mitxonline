@@ -6,6 +6,12 @@ import {
   courseRunsQueryKey
 } from "../../lib/queries/courseRuns"
 
+import {
+  programsSelector,
+  programsQuery,
+  programsQueryKey
+} from "../../lib/queries/programs"
+
 import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
 import { connect } from "react-redux"
@@ -14,14 +20,16 @@ import { pathOr } from "ramda"
 
 
 type Props = {
-  isLoading: ?boolean,
+  courseRunsIsLoading: ?boolean,
+  programsIsLoading: ?boolean,
   courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
+  programs: ?Array<Program>,
 }
-
 
 export class CatalogPage extends React.Component<Props> {
   state = {
-    tabSelected: "courses"
+    tabSelected:          "courses",
+    numberOfCatalogItems: 0
   }
 
   changeSelectedTab = (btn: string) => {
@@ -30,7 +38,7 @@ export class CatalogPage extends React.Component<Props> {
 
   renderCourseCatalogCard(courseRun: EnrollmentFlaggedCourseRun) {
     return (
-      <div className="catalog-item">
+      <div className="col catalog-item">
         {
           courseRun.page &&
           courseRun.page.feature_image_src && (
@@ -49,16 +57,55 @@ export class CatalogPage extends React.Component<Props> {
     )
   }
 
+  renderProgramCatalogCard(program: Program) {
+    return (
+      <div className="col catalog-item">
+        <div className="program-image-and-badge">
+          {
+            program.page &&
+            program.page.feature_image_src && (
+              <img src={program.page.feature_image_src} alt="" />
+            )
+          }
+          <div className="program-type-badge">
+            {/* Need to swap this out once James PR is merged. */}
+            Micromasters
+          </div>
+        </div>
+        <div className="catalog-item-description">
+          <div className="item-title">
+            {program.title}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  renderCatalogRow(itemsInRow: Array<EnrollmentFlaggedCourseRun | Program>, renderCatalogCardFunction: Function) {
+    return itemsInRow.map(x => renderCatalogCardFunction(x))
+  }
+
   renderCatalogItems() {
-    const { courseRuns, isLoading} = this.props
-    let catalogItems = []
-    console.log(isLoading)
-    console.log(courseRuns)
-    if (!isLoading) {
-      if (this.state.tabSelected === "courses") {
-        console.log("in")
-        catalogItems = courseRuns.map(x => this.renderCourseCatalogCard(x))
-        console.log(catalogItems)
+    const { courseRuns, programs, courseRunsIsLoading, programsIsLoading} = this.props
+    const catalogItems = []
+    if (this.state.tabSelected === "courses" && !courseRunsIsLoading) {
+      const itemsInEachRow = Math.min(courseRuns.length, 3)
+      console.log(itemsInEachRow)
+      for (let i = 0; i < courseRuns.length; i + itemsInEachRow) {
+        catalogItems.push(
+          <div className="row" id="catalog-grid">
+            {this.renderCatalogRow(courseRuns.slice(i - 1, i + itemsInEachRow), this.renderCourseCatalogCard)}
+          </div>
+        )
+      }
+    } else if (this.state.tabSelected === "programs" && !programsIsLoading) {
+      const itemsInEachRow = Math.min(programs.length, 3)
+      for (let i = 0; i < programs.length; i + itemsInEachRow) {
+        catalogItems.push(
+          <div className="row" id="catalog-grid">
+            {this.renderCatalogRow(programs.slice(i - 1, i + itemsInEachRow), this.renderProgramCatalogCard)}
+          </div>
+        )
       }
     }
 
@@ -90,12 +137,11 @@ export class CatalogPage extends React.Component<Props> {
                 </div>
               </div>
               <div className="col" id="catalog-page-item-count">
-                18 courses
+                {/* Could add logic to display only "course" if only 1 course is showing. */}
+                {this.renderCatalogItems().length} {this.state.tabSelected}
               </div>
             </div>
-            <div className="row" id="catalog-grid">
-              {this.renderCatalogItems()}
-            </div>
+            {this.renderCatalogItems()}
           </div>
         </div>
       </div>
@@ -105,11 +151,14 @@ export class CatalogPage extends React.Component<Props> {
 
 const mapPropsToConfig = () => [
   courseRunsQuery(),
+  programsQuery(),
 ]
 
 const mapStateToProps = createStructuredSelector({
-  courseRuns:  courseRunsSelector,
-  isLoading:   pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
+  courseRuns:            courseRunsSelector,
+  programs:              programsSelector,
+  courseRunsIsLoading:   pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
+  programsIsLoading:     pathOr(true, ["queries", programsQueryKey, "isPending"]),
 })
 
 export default compose(
