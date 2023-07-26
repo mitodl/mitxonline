@@ -66,7 +66,7 @@ export class CatalogPage extends React.Component<Props> {
         }
         <div className="catalog-item-description">
           <div className="start-date-description">
-            Start Anytime
+            { courseRun.is_self_paced ? "Start Anytime" : courseRun.start_date}
           </div>
           <div className="item-title">
             {courseRun.title}
@@ -121,10 +121,10 @@ export class CatalogPage extends React.Component<Props> {
     }
     return catalogRows
   }
+
   /**
    * Renders the entire catalog of course or program cards based on the catalog tab selected.
    */
-
   renderCatalog() {
     const { courseRuns, programs, courseRunsIsLoading, programsIsLoading} = this.props
     if (this.state.tabSelected === "courses" && !courseRunsIsLoading) {
