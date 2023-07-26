@@ -406,6 +406,7 @@ class ProgramAdminForm(ModelForm):
         fields = [
             "title",
             "readable_id",
+            "program_type",
             "live",
             "requirements",
         ]

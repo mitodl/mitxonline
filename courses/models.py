@@ -112,6 +112,12 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
     live = models.BooleanField(default=False)
+    program_type = models.CharField(
+        max_length=255,
+        default="Series",
+        blank=True,
+        null=True,
+    )
 
     @cached_property
     def page(self):
