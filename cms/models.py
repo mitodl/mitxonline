@@ -473,6 +473,112 @@ class FlexiblePricingFormBuilder(FormBuilder):
         return ChoiceField(**options)
 
 
+class InstructorPage(Page):
+    """
+    Detail page for instructors.
+    """
+
+    instructor_name = models.CharField(
+        max_length=255,
+        default="",
+        help_text="The name of the instructor.",
+    )
+
+    instructor_title = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="The instructor's title (academic or otherwise).",
+    )
+
+    instructor_bio_short = RichTextField(
+        null=True,
+        blank=True,
+        help_text="A short biography of the instructor. This will be shown in cards.",
+    )
+
+    instructor_bio_long = RichTextField(
+        null=True, blank=True, help_text="A longer biography of the instructor."
+    )
+
+    feature_image = models.ForeignKey(
+        Image,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Image that will be used where the instructor is featured or linked. (The recommended dimensions for the image are 375x244)",
+    )
+
+    content_panels = Page.content_panels + [
+        FieldPanel("instructor_name"),
+        FieldPanel("instructor_title"),
+        FieldPanel("instructor_bio_short"),
+        FieldPanel("instructor_bio_long"),
+        FieldPanel("feature_image"),
+    ]
+
+
+class InstructorObjectIndexPage(Page):
+    """
+    A placeholder class to group signatory object pages as children.
+    This class logically acts as no more than a "folder" to organize
+    pages and add parent slug segment to the page url.
+    """
+
+    class Meta:
+        abstract = True
+
+    parent_page_types = ["HomePage"]
+    subpage_types = ["InstructorPage"]
+
+    @classmethod
+    def can_create_at(cls, parent):
+        """
+        You can only create one of these pages under the home page.
+        The parent is limited via the `parent_page_type` list.
+        """
+        return (
+            super().can_create_at(parent)
+            and not parent.get_children().type(cls).exists()
+        )
+
+    def serve(self, request, *args, **kwargs):
+        """
+        For index pages we raise a 404 because these pages do not have a template
+        of their own and we do not expect a page to available at their slug.
+        """
+        raise Http404
+
+
+class InstructorIndexPage(InstructorObjectIndexPage):
+    """
+    A placeholder page to group all the signatories under it as well
+    as consequently add /signatories/ to the signatory page urls
+    """
+
+    slug = INSTRUCTOR_INDEX_SLUG
+
+
+class InstructorPageLink(models.Model):
+    page = ParentalKey(
+        Page, on_delete=models.CASCADE, related_name="linked_instructors"
+    )
+
+    linked_instructor_page = models.ForeignKey(
+        InstructorPage,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    order = models.SmallIntegerField(default=1, null=True, blank=True)
+
+    panels = [
+        PageChooserPanel("linked_instructor_page", "cms.InstructorPage"),
+    ]
+
+
 class HomePage(Page):
     """
     Site home page
@@ -821,9 +927,9 @@ class ProductPage(Page):
         FieldPanel("about"),
         FieldPanel("what_you_learn"),
         FieldPanel("feature_image"),
+        InlinePanel("linked_instructors", label="Faculty Members"),
         FieldPanel("faculty_section_title"),
         FieldPanel("faculty_members"),
-        InlinePanel("linked_faculty_members", label="Faculty Members"),
         FieldPanel("video_url"),
     ]
 
@@ -870,6 +976,16 @@ class ProductPage(Page):
         If they're not logged in, this should return None.
         """
         raise NotImplementedError
+    
+
+    def get_context(self, request, *args, **kwargs):
+        instructors = [member.linked_instructor_page for member in self.linked_instructors.order_by('order').all()]
+
+        return {
+            **super().get_context(request),
+            **get_base_context(request),
+            "instructors": instructors
+        }
 
 
 class CoursePage(ProductPage):
@@ -1463,107 +1579,3 @@ class SignatoryPage(Page):
         """
         raise Http404
 
-
-class InstructorPage(Page):
-    """
-    Detail page for instructors.
-    """
-
-    instructor_name = models.CharField(
-        max_length=255,
-        default="",
-        help_text="The name of the instructor.",
-    )
-
-    instructor_title = models.CharField(
-        max_length=255,
-        null=True,
-        blank=True,
-        help_text="The instructor's title (academic or otherwise).",
-    )
-
-    instructor_bio_short = RichTextField(
-        null=True,
-        blank=True,
-        help_text="A short biography of the instructor. This will be shown in cards.",
-    )
-
-    instructor_bio_long = RichTextField(
-        null=True, blank=True, help_text="A longer biography of the instructor."
-    )
-
-    feature_image = models.ForeignKey(
-        Image,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-        help_text="Image that will be used where the instructor is featured or linked. (The recommended dimensions for the image are 375x244)",
-    )
-
-    content_panels = Page.content_panels + [
-        FieldPanel("instructor_name"),
-        FieldPanel("instructor_title"),
-        FieldPanel("instructor_bio_short"),
-        FieldPanel("instructor_bio_long"),
-        FieldPanel("feature_image"),
-    ]
-
-
-class InstructorObjectIndexPage(Page):
-    """
-    A placeholder class to group signatory object pages as children.
-    This class logically acts as no more than a "folder" to organize
-    pages and add parent slug segment to the page url.
-    """
-
-    class Meta:
-        abstract = True
-
-    parent_page_types = ["HomePage"]
-    subpage_types = ["InstructorPage"]
-
-    @classmethod
-    def can_create_at(cls, parent):
-        """
-        You can only create one of these pages under the home page.
-        The parent is limited via the `parent_page_type` list.
-        """
-        return (
-            super().can_create_at(parent)
-            and not parent.get_children().type(cls).exists()
-        )
-
-    def serve(self, request, *args, **kwargs):
-        """
-        For index pages we raise a 404 because these pages do not have a template
-        of their own and we do not expect a page to available at their slug.
-        """
-        raise Http404
-
-
-class InstructorIndexPage(InstructorObjectIndexPage):
-    """
-    A placeholder page to group all the signatories under it as well
-    as consequently add /signatories/ to the signatory page urls
-    """
-
-    slug = INSTRUCTOR_INDEX_SLUG
-
-
-class InstructorPageLink(models.Model):
-    page = ParentalKey(
-        ProductPage, on_delete=models.CASCADE, related_name="linked_faculty_members"
-    )
-
-    faculty_member_page = models.ForeignKey(
-        "wagtailcore.Page",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-    )
-
-    panels = [
-        PageChooserPanel("faculty_member_page", "cms.InstructorPage"),
-    ]
