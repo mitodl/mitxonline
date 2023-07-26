@@ -320,7 +320,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "requirements",
             "req_tree",
             "page",
-            "program_type"
+            "program_type",
         ]
 
 
