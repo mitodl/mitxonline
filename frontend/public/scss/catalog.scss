@@ -18,6 +18,11 @@
         padding-left: 0;
         margin-right: 60px;
 
+        a {
+            width: inherit;
+            text-decoration: none;
+        }
+
         .catalog-item {
             display: flex;
             width: 312px;

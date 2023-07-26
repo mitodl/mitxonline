@@ -57,22 +57,24 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderCourseCatalogCard(courseRun: EnrollmentFlaggedCourseRun) {
     return (
-      <div className="col catalog-item" key={courseRun.id}>
-        {
-          courseRun.page &&
-          courseRun.page.feature_image_src && (
-            <img src={courseRun.page.feature_image_src} alt="" />
-          )
-        }
-        <div className="catalog-item-description">
-          <div className="start-date-description">
-            { courseRun.is_self_paced ? "Start Anytime" : courseRun.start_date}
-          </div>
-          <div className="item-title">
-            {courseRun.title}
+      <a href={courseRun.page.page_url} key={courseRun.id}>
+        <div className="col catalog-item">
+          {
+            courseRun.page &&
+            courseRun.page.feature_image_src && (
+              <img src={courseRun.page.feature_image_src} alt="" />
+            )
+          }
+          <div className="catalog-item-description">
+            <div className="start-date-description">
+              { courseRun.is_self_paced ? "Start Anytime" : courseRun.start_date}
+            </div>
+            <div className="item-title">
+              {courseRun.title}
+            </div>
           </div>
         </div>
-      </div>
+      </a>
     )
   }
 
@@ -82,24 +84,26 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderProgramCatalogCard(program: Program) {
     return (
-      <div className="col catalog-item" key={program.id}>
-        <div className="program-image-and-badge">
-          {
-            program.page &&
-            program.page.feature_image_src && (
-              <img src={program.page.feature_image_src} alt="" />
-            )
-          }
-          <div className="program-type-badge">
-            {program.program_type}
+      <a href={program.page.page_url} key={program.id}>
+        <div className="col catalog-item">
+          <div className="program-image-and-badge">
+            {
+              program.page &&
+              program.page.feature_image_src && (
+                <img src={program.page.feature_image_src} alt="" />
+              )
+            }
+            <div className="program-type-badge">
+              {program.program_type}
+            </div>
+          </div>
+          <div className="catalog-item-description">
+            <div className="item-title">
+              {program.title}
+            </div>
           </div>
         </div>
-        <div className="catalog-item-description">
-          <div className="item-title">
-            {program.title}
-          </div>
-        </div>
-      </div>
+      </a>
     )
   }
 
