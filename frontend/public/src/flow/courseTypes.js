@@ -70,6 +70,7 @@ export type Program = {
   id: number,
   title: string,
   readable_id: string,
+  program_type: string,
   courses: Array<CourseDetailWithRuns>,
   requirements: ?ProgramEnrollments,
   req_tree: Array<ProgramRequirement>,

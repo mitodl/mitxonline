@@ -28,13 +28,25 @@ type Props = {
 
 export class CatalogPage extends React.Component<Props> {
   state = {
-    tabSelected:          "courses",
-    numberOfCatalogItems: 0
+    tabSelected: "courses",
   }
 
   changeSelectedTab = (btn: string) => {
     this.setState({ tabSelected: btn })
   };
+
+  renderNumberOfCatalogItems() {
+    const { courseRuns, programs, courseRunsIsLoading, programsIsLoading} = this.props
+    if (this.state.tabSelected === "courses" && !courseRunsIsLoading) {
+      return (
+        courseRuns.length
+      )
+    } else if (this.state.tabSelected === "programs" && !programsIsLoading) {
+      return (
+        programs.length
+      )
+    }
+  }
 
   renderCourseCatalogCard(courseRun: EnrollmentFlaggedCourseRun) {
     return (
@@ -68,8 +80,7 @@ export class CatalogPage extends React.Component<Props> {
             )
           }
           <div className="program-type-badge">
-            {/* Need to swap this out once James PR is merged. */}
-            Micromasters
+            {program.program_type}
           </div>
         </div>
         <div className="catalog-item-description">
@@ -90,20 +101,19 @@ export class CatalogPage extends React.Component<Props> {
     const catalogItems = []
     if (this.state.tabSelected === "courses" && !courseRunsIsLoading) {
       const itemsInEachRow = Math.min(courseRuns.length, 3)
-      console.log(itemsInEachRow)
-      for (let i = 0; i < courseRuns.length; i + itemsInEachRow) {
+      for (let i = 0; i < courseRuns.length; i += itemsInEachRow) {
         catalogItems.push(
           <div className="row" id="catalog-grid">
-            {this.renderCatalogRow(courseRuns.slice(i - 1, i + itemsInEachRow), this.renderCourseCatalogCard)}
+            {this.renderCatalogRow(courseRuns.slice(i, i + itemsInEachRow), this.renderCourseCatalogCard)}
           </div>
         )
       }
     } else if (this.state.tabSelected === "programs" && !programsIsLoading) {
       const itemsInEachRow = Math.min(programs.length, 3)
-      for (let i = 0; i < programs.length; i + itemsInEachRow) {
+      for (let i = 0; i < programs.length; i += itemsInEachRow) {
         catalogItems.push(
           <div className="row" id="catalog-grid">
-            {this.renderCatalogRow(programs.slice(i - 1, i + itemsInEachRow), this.renderProgramCatalogCard)}
+            {this.renderCatalogRow(programs.slice(i, i + itemsInEachRow), this.renderProgramCatalogCard)}
           </div>
         )
       }
@@ -138,7 +148,7 @@ export class CatalogPage extends React.Component<Props> {
               </div>
               <div className="col" id="catalog-page-item-count">
                 {/* Could add logic to display only "course" if only 1 course is showing. */}
-                {this.renderCatalogItems().length} {this.state.tabSelected}
+                {this.renderNumberOfCatalogItems()} {this.state.tabSelected}
               </div>
             </div>
             {this.renderCatalogItems()}
