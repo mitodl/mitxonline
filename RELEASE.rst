@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.70.0
+Version 0.70.0 (Released July 26, 2023)
 --------------
 
 - Program records: show verified grades or grades with certificate (#1775)
