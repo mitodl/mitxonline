@@ -35,6 +35,9 @@ export class CatalogPage extends React.Component<Props> {
     this.setState({ tabSelected: btn })
   };
 
+  /**
+   * Returns the number of courseRuns or programs based on the selected catalog tab.
+   */
   renderNumberOfCatalogItems() {
     const { courseRuns, programs, courseRunsIsLoading, programsIsLoading} = this.props
     if (this.state.tabSelected === "courses" && !courseRunsIsLoading) {
@@ -48,6 +51,9 @@ export class CatalogPage extends React.Component<Props> {
     }
   }
 
+  /**
+   * Renders a single course catalog card.
+   */
   renderCourseCatalogCard(courseRun: EnrollmentFlaggedCourseRun) {
     return (
       <div className="col catalog-item">
@@ -69,6 +75,9 @@ export class CatalogPage extends React.Component<Props> {
     )
   }
 
+  /**
+   * Renders a single program catalog card.
+   */
   renderProgramCatalogCard(program: Program) {
     return (
       <div className="col catalog-item">
@@ -92,34 +101,33 @@ export class CatalogPage extends React.Component<Props> {
     )
   }
 
-  renderCatalogRow(itemsInRow: Array<EnrollmentFlaggedCourseRun | Program>, renderCatalogCardFunction: Function) {
-    return itemsInRow.map(x => renderCatalogCardFunction(x))
-  }
-
-  renderCatalogItems() {
-    const { courseRuns, programs, courseRunsIsLoading, programsIsLoading} = this.props
+  /**
+   * Dynamically renders each row in the catalog.  Each row contains 3 course or program cards.
+   */
+  renderCatalogRows(itemsInCatalog: Array<EnrollmentFlaggedCourseRun | Program>, renderCatalogCardFunction: Function) {
+    const itemsInEachRow = Math.min(itemsInCatalog.length, 3)
     const catalogItems = []
-    if (this.state.tabSelected === "courses" && !courseRunsIsLoading) {
-      const itemsInEachRow = Math.min(courseRuns.length, 3)
-      for (let i = 0; i < courseRuns.length; i += itemsInEachRow) {
-        catalogItems.push(
-          <div className="row" id="catalog-grid">
-            {this.renderCatalogRow(courseRuns.slice(i, i + itemsInEachRow), this.renderCourseCatalogCard)}
-          </div>
-        )
-      }
-    } else if (this.state.tabSelected === "programs" && !programsIsLoading) {
-      const itemsInEachRow = Math.min(programs.length, 3)
-      for (let i = 0; i < programs.length; i += itemsInEachRow) {
-        catalogItems.push(
-          <div className="row" id="catalog-grid">
-            {this.renderCatalogRow(programs.slice(i, i + itemsInEachRow), this.renderProgramCatalogCard)}
-          </div>
-        )
-      }
+    for (let i = 0; i < itemsInCatalog.length; i += itemsInEachRow) {
+      const itemsInRow = itemsInCatalog.slice(i, i + itemsInEachRow)
+      catalogItems.push(
+        <div className="row" id="catalog-grid">
+          {itemsInRow.map(x => renderCatalogCardFunction(x))}
+        </div>
+      )
     }
-
     return catalogItems
+  }
+  /**
+   * Returns the entire catalog of course or program cards.
+   */
+
+  renderCatalog() {
+    const { courseRuns, programs, courseRunsIsLoading, programsIsLoading} = this.props
+    if (this.state.tabSelected === "courses" && !courseRunsIsLoading) {
+      return this.renderCatalogRows(courseRuns, this.renderCourseCatalogCard)
+    } else if (this.state.tabSelected === "programs" && !programsIsLoading) {
+      return this.renderCatalogRows(programs, this.renderProgramCatalogCard)
+    }
   }
 
   render() {
@@ -151,7 +159,7 @@ export class CatalogPage extends React.Component<Props> {
                 {this.renderNumberOfCatalogItems()} {this.state.tabSelected}
               </div>
             </div>
-            {this.renderCatalogItems()}
+            {this.renderCatalog()}
           </div>
         </div>
       </div>
