@@ -107,7 +107,7 @@ class Command(BaseCommand):
                 "discount": {
                     "discount_code": f"{discount_abbrev}-fa-tier1-{current_year}",
                     "discount_type": "dollars-off" if not course else "percent-off",
-                    "amount": 750 if not course else 0.75,
+                    "amount": 750 if not course else 75,
                 },
             },
             {
@@ -115,7 +115,7 @@ class Command(BaseCommand):
                 "discount": {
                     "discount_code": f"{discount_abbrev}-fa-tier2-{current_year}",
                     "discount_type": "dollars-off" if not course else "percent-off",
-                    "amount": 650 if not course else 0.50,
+                    "amount": 650 if not course else 50,
                 },
             },
             {
@@ -123,7 +123,7 @@ class Command(BaseCommand):
                 "discount": {
                     "discount_code": f"{discount_abbrev}-fa-tier3-{current_year}",
                     "discount_type": "dollars-off" if not course else "percent-off",
-                    "amount": 500 if not course else 0.25,
+                    "amount": 500 if not course else 25,
                 },
             },
             {
@@ -153,7 +153,7 @@ class Command(BaseCommand):
                 csvreader = csv.DictReader(
                     tierfile, fieldnames=("threshold", "type", "value")
                 )
-                for (idx, row) in enumerate(csvreader):
+                for idx, row in enumerate(csvreader):
                     self.stdout.write(
                         f"Read tier: threshold {row['threshold']}, discount type {row['type']}, value {row['value']}"
                     )
