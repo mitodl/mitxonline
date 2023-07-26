@@ -4,6 +4,13 @@
 #course-catalog-navigation {
     display: flex;
 
+    .container {
+        margin-right: 0;
+        margin-left: 0;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
     #tab-row {
         margin-left: 0;
         height: 70px;
@@ -16,11 +23,26 @@
         margin-top: 20px;
         margin-left: 24px;
         padding-left: 0;
-        margin-right: 60px;
+        margin-right: 10px;
 
         a {
             width: inherit;
             text-decoration: none;
+            padding-left: inherit;
+            padding-right: inherit;
+        }
+        
+        .course-item {
+            display: flex;
+            width: 312px;
+            flex-direction: column;
+            align-items: center;
+            border-radius: 5px;
+            border: 1px solid var(--background-grey, #F0F5F7);
+            background: #FFF;
+    
+            /* Dropshadow */
+            box-shadow: 0px 2px 3px 0px rgba(18, 38, 49, 0.15);
         }
 
         .catalog-item {
@@ -167,12 +189,15 @@
 
     #department-sidebar {
         width: 312px;
+        height: fit-content;
         padding: 15px;
         margin-top: 30px;
         margin-left: 60px;
         align-items: flex-start;
         border-radius: 5px;
         background: #FFF;
+        position: sticky;
+        top: 100px;
     
         /* Dropshadow */
         box-shadow: 0px 2px 3px 0px rgba(18, 38, 49, 0.15);
@@ -214,6 +239,8 @@
     align-items: flex-start;
     background: var(--blue-dark, #03152D);
     box-shadow: 0px 15px 25px 0px rgba(3, 21, 45, 0.25);
+    position: sticky;
+    top: 0;
     h1 {
         overflow: hidden;
         color: #FFF;
@@ -230,23 +257,5 @@
         flex: 1 0 0;
         align-self: stretch;
         margin-bottom: 0;
-    }
-}
-#catalog-grid {
-    display: grid;
-    align-items: flex-start;
-    gap: 24px;
-
-    .course-item {
-        display: flex;
-        width: 312px;
-        flex-direction: column;
-        align-items: center;
-        border-radius: 5px;
-        border: 1px solid var(--background-grey, #F0F5F7);
-        background: #FFF;
-
-        /* Dropshadow */
-        box-shadow: 0px 2px 3px 0px rgba(18, 38, 49, 0.15);
     }
 }
