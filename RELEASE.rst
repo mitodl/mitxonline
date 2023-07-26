@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.70.1
+--------------
+
+- Fixing amounts for the default tiers for the configure_tiers command (#1782)
+- Add program_type field to database (#1778)
+
 Version 0.70.0 (Released July 26, 2023)
 --------------
 
