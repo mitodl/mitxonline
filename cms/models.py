@@ -939,6 +939,7 @@ class ProductPage(Page):
         InlinePanel("linked_instructors", label="Faculty Members"),
         FieldPanel("faculty_section_title"),
         FieldPanel("faculty_members"),
+        InlinePanel("linked_faculty_members", label="Faculty Members"),
         FieldPanel("video_url"),
     ]
 
@@ -1676,3 +1677,21 @@ class InstructorIndexPage(InstructorObjectIndexPage):
     """
 
     slug = INSTRUCTOR_INDEX_SLUG
+
+
+class InstructorPageLink(models.Model):
+    page = ParentalKey(
+        ProductPage, on_delete=models.CASCADE, related_name="linked_faculty_members"
+    )
+
+    faculty_member_page = models.ForeignKey(
+        "wagtailcore.Page",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
+    panels = [
+        PageChooserPanel("faculty_member_page", "cms.InstructorPage"),
+    ]
