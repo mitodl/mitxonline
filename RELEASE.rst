@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.70.1
+Version 0.70.1 (Released July 26, 2023)
 --------------
 
 - Fixing amounts for the default tiers for the configure_tiers command (#1782)
