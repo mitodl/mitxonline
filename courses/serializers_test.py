@@ -124,6 +124,7 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
                 program_with_empty_requirements.requirements_root
             ).data,
             "page": ProgramPageSerializer(program_with_empty_requirements.page).data,
+            "program_type": "Series",
         },
     )
 
@@ -260,6 +261,7 @@ def test_serialize_course_run():
             "products": [],
             "page": None,
             "approved_flexible_price_exists": False,
+            "is_self_paced": False,
         },
     )
 
