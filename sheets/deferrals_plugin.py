@@ -15,10 +15,15 @@ class DeferralPlugin:
         from_courseware_id = deferral_request_row.from_courseware_id
         to_courseware_id = deferral_request_row.to_courseware_id
 
-        defer_enrollment(
+        from_enrollment, to_enrollment = defer_enrollment(
             user,
             from_courseware_id,
             to_courseware_id,
             force=True,
         )
+        if to_courseware_id and not to_enrollment:
+            message = "Failed to create/update the target enrollment ({})".format(
+                to_courseware_id
+            )
+            return DeferralResult(ResultType.FAILED, message)
         return DeferralResult(ResultType.PROCESSED)
