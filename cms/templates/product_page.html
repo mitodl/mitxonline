@@ -143,21 +143,94 @@
     </div>
 {% else %}
     <div id="main" class="product-page">
-      <section class="hero-block">
-        <div class="container">
-          <div class="content-row">
-            <div class="content-col">
-              <div class="text">
-                <h1>{{ page.title }}</h1>
-                {# Description field contents are already rendered wrapped in a <p> tag #}
+      <div class="container">
+        <div class="row d-flex flex-row">
+          <div class="col flex-grow-1">
+            <div class="text">
+              <h1>{{ page.title }}</h1>
+              {# Description field contents are already rendered wrapped in a <p> tag #}
+              
+              <section name="course-description">
                 {{ page.description | richtext }}
-                {% if page.course %}
-                <input id="courseId" type="hidden" value="{{page.course.readable_id}}" />
-                <div id="productDetailEnrollment"></div>
+              </section>
+
+              <nav id="tab-bar">
+                <ul class="nav">
+                  <li class="nav-item">About</li>
+                  <li class="nav-item">What you'll learn</li>
+                  <li class="nav-item">Instructors</li>
+                </ul>
+              </nav>
+
+              <div class="text-holder">
+                {% if page.about %}
+                <div class="content-data">
+                  {{ page.about |richtext }}
+                </div>
+                {% endif %}
+                {% if page.what_you_learn %}
+                <div class="content-data">
+                  <h2>What you’ll learn</h2>
+                  {{ page.what_you_learn |richtext }}
+                </div>
+                {% endif %}
+                {% if page.prerequisites %}
+                  <div class="content-data">
+                    <h2>Prerequisites</h2>
+                    {{ page.prerequisites |richtext }}
+                  </div>
                 {% endif %}
               </div>
+    
+              {% if instructors or page.faculty_members %}
+              <section class="faculty-section">
+                <div class="container">
+                  <h2>{{ page.faculty_section_title }}</h2>
+                  <ul class="faculty-members card-listing">
+                    {% if instructors %}
+                    {% for member in instructors %}
+                      <li>
+                        <div class="member-card highlight-card">
+                          <img src="{% feature_img_src member.feature_image %}" alt="">
+                          <div class="member-info">
+                            <h3 class="name">{{ member.instructor_name }}</h3>
+                            {% if member.instructor_title %}<h4 class="title">{{ member.instructor_title }}</h4>{% endif %}
+                            <div class="description">{{ member.instructor_bio_short|safe }}</div>
+                          </div>
+                        </div>
+                      </li>
+                    {% endfor %}
+                    {% endif %}
+        
+                    {% if page.faculty_members %}
+                    {% for member in page.faculty_members %}
+                      <li>
+                        <div class="member-card highlight-card">
+                          <img src="{% wagtail_img_src member.value.image %}" alt="{{ member.name }}">
+                          <div class="member-info">
+                            <h3 class="name">{{ member.value.name }}</h3>
+                            <div class="description">{{ member.value.description }}</div>
+                          </div>
+                        </div>
+                      </li>
+                    {% endfor %}
+                    {% endif %}
+                  </ul>
+                </div>
+              </section>
+              {% endif %}
+              <section class="ofac-message">
+                <div class="container">
+                  <p><em>Who can take this course?</em></p>
+        
+                  <p>Because of U.S. Office of Foreign Assets Control (OFAC) restrictions and other U.S. federal regulations, learners residing in one or more of the following countries or regions will not be able to register for this course: Iran, Cuba, Syria, North Korea and the Crimea, Donetsk People's Republic and Luhansk People's Republic regions of Ukraine.</p>
+                </div>
+              </section>
+        
             </div>
-            <div class="content-col hero-media">
+          </div>
+          <div class="col m-2 p-2 sticky-top border align-items-center justify-items-top d-flex flex-column" style="max-width: 380px">
+            <div class="hero-media">
               {% if page.video_url %}
               <video-js
                 class="vjs-default-skin vjs-big-play-centered"
@@ -167,86 +240,89 @@
               >
               </video-js>
               {% else %}
-              <img src="{% feature_img_src page.feature_image %}" alt="">
+              <img style="max-width: 350px;" src="{% feature_img_src page.feature_image %}" alt="">
               {% endif %}
             </div>
-          </div>
-        </div>
-      </section>
-      <section class="info-block">
-        <div class="container">
-          <div class="stats-row">
-            {% if start_date %}
-            <div class="stat-col">
-              <div class="title">start date</div>
-              <div class="date-links-text text" id="start_date">
-                <strong>{{ start_date|date:"F j, Y" }}</strong>
+
+            {% if page.course %}
+            <input id="courseId" type="hidden" value="{{page.course.readable_id}}" />
+            <div id="productDetailEnrollment"></div>
+            {% endif %}
+
+            <div class="stats-row">
+              {% if start_date %}
+              <div class="stat-col">
+                <div class="title">start date</div>
+                <div class="date-links-text text" id="start_date">
+                  <strong>{{ start_date|date:"F j, Y" }}</strong>
+                </div>
+                {% if course_runs|length > 1 %}
+                  <strong class="more-dates">
+                    <button class="dates-tooltip" id="datesPopover" data-bs-trigger="click" data-bs-toggle="popover" data-bs-placement="auto" title="More dates available" data-bs-html="true"
+                      data-bs-content="
+                        <div>
+                          <p>Click below to enroll in one of these dates</p>
+                        </div>
+                        {% for course_run in course_runs %}
+                            <div>
+                              {% if course_run.is_not_beyond_enrollment %}
+                                <button class='date-link' id='{{ course_run.courseware_id }}' >Start Date {{ course_run.start_date|date:'F j, Y' }}</button>
+                              {% else %}
+                                <p class='date-link-disabled' id='{{ course_run.courseware_id }}' >{{ course_run.start_date|date:'F j, Y' }}(enrollment opens {{ course_run.enrollment_start|date:'F j, Y' }})</p>
+                              {% endif %}
+                            </div>
+                        {% endfor %}
+                      ">
+                      More Dates
+                    </button>
+                  </strong>
+                {% endif %}
               </div>
-              {% if course_runs|length > 1 %}
-                <strong class="more-dates">
-                  <button class="dates-tooltip" id="datesPopover" data-bs-trigger="click" data-bs-toggle="popover" data-bs-placement="auto" title="More dates available" data-bs-html="true"
-                    data-bs-content="
-                      <div>
-                        <p>Click below to enroll in one of these dates</p>
-                      </div>
-                      {% for course_run in course_runs %}
-                          <div>
-                            {% if course_run.is_not_beyond_enrollment %}
-                              <button class='date-link' id='{{ course_run.courseware_id }}' >Start Date {{ course_run.start_date|date:'F j, Y' }}</button>
-                            {% else %}
-                              <p class='date-link-disabled' id='{{ course_run.courseware_id }}' >{{ course_run.start_date|date:'F j, Y' }}(enrollment opens {{ course_run.enrollment_start|date:'F j, Y' }})</p>
-                            {% endif %}
-                          </div>
-                      {% endfor %}
-                    ">
-                    More Dates
-                  </button>
-                </strong>
+              {% endif %}
+              {% if page.length %}
+              <div class="stat-col small">
+                <div class="title">length</div>
+                <div class="text">
+                  <strong>{{ page.length }}</strong>
+                </div>
+              </div>
+              {% endif %}
+              {% if page.effort %}
+              <div class="stat-col">
+                <div class="title">effort</div>
+                <div class="text">
+                  <strong>{{ page.effort }}</strong>
+                </div>
+              </div>
+              {% endif %}
+              {% if finaid_price %}
+              <div class="stat-col small">
+                <div class="title">price</div>
+                <div class="text">
+                  <strong>
+                    <a target="_blank" href="{% url 'checkout-product' %}?product_id={{product.id}}">
+                      ${{finaid_price.1}}
+                    </a>
+                  </strong>
+                </div>
+              </div>
+              {% endif %}
+              {% if not finaid_price and page.price %}
+              <div class="stat-col small">
+                <div class="title">price</div>
+                <div class="text">
+                  <strong>
+                    {% if page.price.0.value.link %}
+                      <a target="_blank" href={{page.price.0.value.link}}>{{page.price.0.value.text}}</a>
+                    {% else %}
+                    {{page.price.0.value.text}}
+                    {% endif %}
+                  </strong>
+                </div>
+              </div>
               {% endif %}
             </div>
-            {% endif %}
-            {% if page.length %}
-            <div class="stat-col small">
-              <div class="title">length</div>
-              <div class="text">
-                <strong>{{ page.length }}</strong>
-              </div>
-            </div>
-            {% endif %}
-            {% if page.effort %}
-            <div class="stat-col">
-              <div class="title">effort</div>
-              <div class="text">
-                <strong>{{ page.effort }}</strong>
-              </div>
-            </div>
-            {% endif %}
-            {% if finaid_price %}
-            <div class="stat-col small">
-              <div class="title">price</div>
-              <div class="text">
-                <strong>
-                  <a target="_blank" href="{% url 'checkout-product' %}?product_id={{product.id}}">
-                    ${{finaid_price.1}}
-                  </a>
-                </strong>
-              </div>
-            </div>
-            {% endif %}
-            {% if not finaid_price and page.price %}
-            <div class="stat-col small">
-              <div class="title">price</div>
-              <div class="text">
-                <strong>
-                  {% if page.price.0.value.link %}
-                    <a target="_blank" href={{page.price.0.value.link}}>{{page.price.0.value.text}}</a>
-                  {% else %}
-                  {{page.price.0.value.text}}
-                  {% endif %}
-                </strong>
-              </div>
-            </div>
-            {% endif %}
+  
           </div>
         </div>
       </section>
