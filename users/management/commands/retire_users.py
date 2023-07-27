@@ -13,6 +13,7 @@ from user_util import user_util
 
 from authentication.utils import block_user_email
 from main import settings
+from openedx.api import bulk_retire_edx_users
 from users.api import fetch_users
 from users.models import BlockList
 
@@ -105,6 +106,25 @@ class Command(BaseCommand):
                     )
                 )
                 continue
+
+            resp = bulk_retire_edx_users(user.username)
+            if user.username not in resp["successful_user_retirements"]:
+                self.stderr.write(
+                    self.style.ERROR(
+                        "Could not initiate retirement request on edX for user {user}".format(
+                            user=user
+                        )
+                    )
+                )
+                sys.exit(1)
+            else:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        "Retirement request initiated on edX for User: '{user}'".format(
+                            user=user
+                        )
+                    )
+                )
 
             user.is_active = False
 

@@ -515,6 +515,31 @@ def get_edx_api_service_client():
     return edx_client
 
 
+def get_edx_retirement_service_client():
+    """
+    Generates a JWT access token for the retirement service worker and returns the edX api client.
+    """
+    data = {
+        "grant_type": "client_credentials",
+        "client_id": settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID,
+        "client_secret": settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET,
+        "token_type": "jwt",
+    }
+    resp = requests.post(edx_url(OPENEDX_OAUTH2_ACCESS_TOKEN_PATH), data=data)
+    resp.raise_for_status()
+    access_token = resp.json()["access_token"]
+
+    edx_client = EdxApi(
+        {
+            "access_token": access_token,
+        },
+        settings.OPENEDX_API_BASE_URL,
+        timeout=settings.EDX_API_CLIENT_TIMEOUT,
+    )
+
+    return edx_client
+
+
 def get_edx_api_course_detail_client():
     """
     Gets an edx api client instance for use with the grades api
@@ -879,3 +904,19 @@ def validate_username_with_edx(username):
         raise EdxApiRegistrationValidationException(username, resp)
     result = resp.json()
     return result["validation_decisions"]["username"]
+
+
+def bulk_retire_edx_users(usernames):
+    """
+    Bulk retires edX users.
+
+    This method calls edX bulk enrollment API to initiate the user retirement on edX.
+    Users will be moved to the pending retirement state and then retirement will be carried out by our
+    tubular concourse pipeline.
+
+    Args:
+        usernames (str): Comma separated usernames
+    """
+    edx_client = get_edx_retirement_service_client()
+    response = edx_client.bulk_user_retirement.retire_users({"usernames": usernames})
+    return response
