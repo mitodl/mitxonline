@@ -521,7 +521,7 @@ class InstructorPage(Page):
 
 class InstructorObjectIndexPage(Page):
     """
-    A placeholder class to group signatory object pages as children.
+    A placeholder class to group instructor object pages as children.
     This class logically acts as no more than a "folder" to organize
     pages and add parent slug segment to the page url.
     """
@@ -553,8 +553,8 @@ class InstructorObjectIndexPage(Page):
 
 class InstructorIndexPage(InstructorObjectIndexPage):
     """
-    A placeholder page to group all the signatories under it as well
-    as consequently add /signatories/ to the signatory page urls
+    A placeholder page to group all the instructors under it as well
+    as consequently add /instructors/ to the instructor page urls
     """
 
     slug = INSTRUCTOR_INDEX_SLUG
@@ -976,15 +976,17 @@ class ProductPage(Page):
         If they're not logged in, this should return None.
         """
         raise NotImplementedError
-    
 
     def get_context(self, request, *args, **kwargs):
-        instructors = [member.linked_instructor_page for member in self.linked_instructors.order_by('order').all()]
+        instructors = [
+            member.linked_instructor_page
+            for member in self.linked_instructors.order_by("order").all()
+        ]
 
         return {
             **super().get_context(request),
             **get_base_context(request),
-            "instructors": instructors
+            "instructors": instructors,
         }
 
 
@@ -1578,4 +1580,3 @@ class SignatoryPage(Page):
         designed to be viewed on their own so we raise a 404 if someone tries to access their slug.
         """
         raise Http404
-
