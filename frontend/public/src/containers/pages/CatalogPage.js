@@ -1,4 +1,5 @@
 import React from "react"
+import { CSSTransition, TransitionGroup } from "react-transition-group";
 
 import {
   courseRunsSelector,
@@ -179,7 +180,19 @@ export class CatalogPage extends React.Component<Props> {
                 {this.renderNumberOfCatalogItems()} {this.state.tabSelected}
               </div>
             </div>
-            {this.renderCatalog()}
+            <div className="catalog-animation">
+              <TransitionGroup>
+                <CSSTransition
+                  key={this.state.tabSelected}
+                  timeout={1000}
+                  classNames="messageout"
+                >
+                  <div>
+                    {this.renderCatalog()}
+                  </div>
+                </CSSTransition>
+              </TransitionGroup>
+            </div>
           </div>
         </div>
       </div>
