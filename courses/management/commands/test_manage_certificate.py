@@ -61,11 +61,33 @@ def test_certificate_override_grade_no_user():
     course_run = CourseRunFactory.create()
     with pytest.raises(CommandError) as command_error:
         manage_certificates.Command().handle(
-            create=True, run=course_run.courseware_id, grade=0.5, user=None
+            create=True,
+            run=course_run.courseware_id,
+            grade=0.5,
+            letter_grade="C",
+            user=None,
         )
     assert (
         str(command_error.value)
         == "Override grade needs a user (The grade override operation is not supported for multiple users)."
+    )
+
+
+def test_certificate_override_grade_no_letter_grade():
+    """Test that overriding grade without a letter grade is not supported"""
+
+    course_run = CourseRunFactory.create()
+    with pytest.raises(CommandError) as command_error:
+        manage_certificates.Command().handle(
+            create=True,
+            run=course_run.courseware_id,
+            grade=0.5,
+            letter_grade=None,
+            user="username",
+        )
+    assert (
+        str(command_error.value)
+        == "Override grade needs a letter grade, allowed range: A-F"
     )
 
 

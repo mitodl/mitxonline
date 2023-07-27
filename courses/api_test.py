@@ -1270,26 +1270,28 @@ def test_course_run_certificates_access():
 
 
 @pytest.mark.parametrize(
-    "grade, should_force_pass, is_passed",
+    "grade, letter_grade, should_force_pass, is_passed",
     [
-        (0.0, True, False),
-        (0.1, True, True),
-        (0.5, False, False),
-        (0.5, True, True),
+        (0.0, "F", True, False),
+        (0.1, "F", True, True),
+        (0.5, "C", False, False),
+        (0.5, "C", True, True),
     ],
 )
-def test_override_user_grade(grade, should_force_pass, is_passed):
+def test_override_user_grade(grade, letter_grade, should_force_pass, is_passed):
     """Test the override grade overrides the user grade properly"""
     test_grade = CourseRunGradeFactory.create()
     override_user_grade(
         user=test_grade.user,
         override_grade=grade,
+        letter_grade=letter_grade,
         courseware_id=test_grade.course_run.courseware_id,
         should_force_pass=should_force_pass,
     )
     test_grade.refresh_from_db()
     assert test_grade.grade == grade
     assert test_grade.passed is is_passed
+    assert test_grade.letter_grade is letter_grade
     assert test_grade.set_by_admin is True
 
 

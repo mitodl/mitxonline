@@ -13,7 +13,8 @@ Check the usages of this command below:
 ./manage.py manage_certificates —-create -—run=<course_run_courseware_id> -—user=<username or email>
 
 3. Override grade for a user and generate certificate. (For single user, will force create the certificate for the user)
-./manage.py manage_certificates -—create  -—run=<course_run_courseware_id> —-user=<username or email> -—grade=<a float value between 0.0-1.0>
+./manage.py manage_certificates -—create  -—run=<course_run_courseware_id> —-user=<username or email>
+-—grade=<a float value between 0.0-1.0> --letter-grade=<a letter A-F>
 
 **Revoke/Un-revoke Certificates**
 
@@ -73,6 +74,12 @@ class Command(BaseCommand):
             required=False,
         )
         parser.add_argument(
+            "--letter-grade",
+            type=str,
+            help="Override a grade with a corresponding letter grade. Range: A-F",
+            required=False,
+        )
+        parser.add_argument(
             "--revoke", dest="revoke", action="store_true", required=False
         )
         parser.add_argument(
@@ -92,6 +99,7 @@ class Command(BaseCommand):
         create = options.get("create")
         run = options.get("run")
         override_grade = options.get("grade")
+        letter_grade = options.get("letter_grade")
 
         if not (revoke or unrevoke) and not create:
             raise CommandError(
@@ -143,6 +151,11 @@ class Command(BaseCommand):
             if override_grade and not is_grade_valid(override_grade):
                 raise CommandError("Invalid value for grade. Allowed range: 0.0 - 1.0.")
 
+            if override_grade and not letter_grade:
+                raise CommandError(
+                    "Override grade needs a letter grade, allowed range: A-F"
+                )
+
             if override_grade and not user:
                 raise CommandError(
                     "Override grade needs a user (The grade override operation is not supported for multiple users)."
@@ -172,6 +185,7 @@ class Command(BaseCommand):
                     override_user_grade(
                         user=user,
                         override_grade=override_grade,
+                        letter_grade=letter_grade,
                         courseware_id=run,
                         should_force_pass=True,
                     )

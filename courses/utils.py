@@ -1,6 +1,7 @@
 """Utilities for courses"""
 
 import logging
+import re
 
 from requests.exceptions import HTTPError
 
@@ -24,6 +25,10 @@ def exception_logging_generator(generator):
 
 def is_grade_valid(override_grade: float):
     return 0.0 <= override_grade <= 1.0
+
+
+def is_letter_grade_valid(letter_grade: str):
+    return re.match("^[A-F]$", letter_grade) is not None
 
 
 def get_program_certificate_by_enrollment(enrollment, program=None):

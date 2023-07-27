@@ -38,7 +38,11 @@ from courses.models import (
     ProgramRequirementNodeType,
 )
 from courses.tasks import subscribe_edx_course_emails
-from courses.utils import exception_logging_generator, is_grade_valid
+from courses.utils import (
+    exception_logging_generator,
+    is_grade_valid,
+    is_letter_grade_valid,
+)
 from openedx.api import (
     enroll_in_edx_course_runs,
     get_edx_api_course_detail_client,
@@ -868,13 +872,16 @@ def manage_course_run_certificate_access(user, courseware_id, revoke_state):
     return True
 
 
-def override_user_grade(user, override_grade, courseware_id, should_force_pass=False):
+def override_user_grade(
+    user, override_grade, letter_grade, courseware_id, should_force_pass=False
+):
     """Override grade for a user
 
     Args:
         user (User): a Django user.
         courseware_id (str): A string representing the course run's courseware_id.
         override_grade (float): A float value for the grade override between (0.0 and 1.0) - 0.0 would mean passed=False
+        letter_grade (str): A string representing a letter grade for the course run.
         should_force_pass (bool): A flag representing if user should mark as passed forcefully (In this case we don't know
         the grading policy based in edX so we manually take a value for forcing the passed status)
     Returns:
@@ -884,13 +891,16 @@ def override_user_grade(user, override_grade, courseware_id, should_force_pass=F
     if not is_grade_valid(override_grade):
         raise ValidationError("Invalid value for grade. Allowed range: 0.0 - 1.0")
 
+    if not is_letter_grade_valid(letter_grade):
+        raise ValidationError("Invalid letter grade string. Allowed values: A-F")
+
     with transaction.atomic():
         course_run_grade = CourseRunGrade.objects.select_for_update().get(
             user=user, course_run__courseware_id=courseware_id
         )
         course_run_grade.grade = override_grade
         course_run_grade.passed = bool(override_grade) if should_force_pass else False
-        course_run_grade.letter_grade = None
+        course_run_grade.letter_grade = letter_grade
         course_run_grade.set_by_admin = True
         course_run_grade.save_and_log(None)
 
