@@ -114,7 +114,7 @@ class Command(BaseCommand):
 
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"Created new page for {new_instructor.instructor_name}"
+                        f"Created new page for {new_instructor.instructor_name} - title {new_instructor.title}"
                     )
                 )
 
