@@ -18,6 +18,7 @@ from cms.factories import (
     CertificatePageFactory,
     CoursePageFactory,
     FlexiblePricingFormFactory,
+    InstructorPageFactory,
     ProgramPageFactory,
     ResourcePageFactory,
 )
@@ -25,6 +26,7 @@ from cms.models import (
     CertificatePage,
     CoursePage,
     FlexiblePricingRequestSubmission,
+    InstructorPageLink,
     ProgramPage,
     SignatoryPage,
 )
@@ -77,12 +79,20 @@ def test_custom_detail_page_urls_handled(fully_configured_wagtail):
 
 
 @pytest.mark.parametrize(
-    "is_authenticated,has_relevant_run,enrolled,exp_sign_in_url,exp_is_enrolled,has_finaid",
+    "is_authenticated,has_relevant_run,enrolled,exp_sign_in_url,exp_is_enrolled,has_finaid,has_instructor",
     [
-        [True, True, True, False, True, True],
-        [True, True, True, False, True, False],
-        [False, False, False, True, False, False],
-        [False, True, True, True, False, False],
+        [True, True, True, False, True, True, True],
+        [True, True, True, False, True, False, False],
+        [
+            False,
+            False,
+            False,
+            True,
+            False,
+            False,
+            True,
+        ],
+        [False, True, True, True, False, False, False],
     ],
 )
 def test_course_page_context(
@@ -94,6 +104,7 @@ def test_course_page_context(
     exp_sign_in_url,
     exp_is_enrolled,
     has_finaid,
+    has_instructor,
 ):
     """CoursePage.get_context should return expected values"""
     rf = RequestFactory()
@@ -131,6 +142,13 @@ def test_course_page_context(
     if enrolled:
         CourseRunEnrollmentFactory.create(user=staff_user, run=run)
 
+    if has_instructor:
+        instructor_page = InstructorPageFactory.create()
+        InstructorPageLink.objects.create(
+            page=course_page, linked_instructor_page=instructor_page
+        )
+        course_page.refresh_from_db()
+
     context = course_page.get_context(request=request)
     assert context == {
         "self": course_page,
@@ -146,7 +164,12 @@ def test_course_page_context(
         "can_access_edx_course": is_authenticated and has_relevant_run,
         "finaid_price": finaid_price,
         "product": product,
-        "instructors": [],
+        "instructors": []
+        if not has_instructor
+        else [
+            member.linked_instructor_page
+            for member in course_page.linked_instructors.order_by("order").all()
+        ],
     }
 
     context = course_page.get_context(request=request)

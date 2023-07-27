@@ -2,18 +2,20 @@
 import factory
 import wagtail_factories
 from django.core.exceptions import ObjectDoesNotExist
-from factory import fuzzy, LazyAttribute
+from factory import LazyAttribute, fuzzy
 from wagtail.models import Page
 
 from cms.models import (
-    HomePage,
-    CoursePage,
-    ResourcePage,
-    CourseIndexPage,
-    FlexiblePricingRequestForm,
-    ProgramPage,
-    ProgramIndexPage,
     CertificatePage,
+    CourseIndexPage,
+    CoursePage,
+    FlexiblePricingRequestForm,
+    HomePage,
+    InstructorIndexPage,
+    InstructorPage,
+    ProgramIndexPage,
+    ProgramPage,
+    ResourcePage,
     SignatoryPage,
 )
 from courses.factories import CourseFactory, ProgramFactory
@@ -145,3 +147,26 @@ class CertificatePageFactory(wagtail_factories.PageFactory):
 
     class Meta:
         model = CertificatePage
+
+
+class InstructorIndexPageFactory(wagtail_factories.PageFactory):
+    title = "Instructors"
+    parent = LazyAttribute(
+        lambda _: HomePage.objects.first() or HomePageFactory.create()
+    )
+
+    class Meta:
+        model = InstructorIndexPage
+
+
+class InstructorPageFactory(wagtail_factories.PageFactory):
+    feature_image = factory.SubFactory(wagtail_factories.ImageFactory)
+    parent = LazyAttribute(
+        lambda _: InstructorIndexPage.objects.first()
+        or InstructorIndexPageFactory.create()
+    )
+    title = factory.Faker("name")
+    instructor_name = factory.Faker("name")
+
+    class Meta:
+        model = InstructorPage
