@@ -146,6 +146,7 @@ def test_course_page_context(
         "can_access_edx_course": is_authenticated and has_relevant_run,
         "finaid_price": finaid_price,
         "product": product,
+        "instructors": [],
     }
 
     context = course_page.get_context(request=request)
