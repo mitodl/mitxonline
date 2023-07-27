@@ -87,7 +87,9 @@ class Command(BaseCommand):
                     self.stdout.write(
                         f"Found {existingcount} records for {block['name']}"
                     )
-                    block["name"] += f" ({(existingcount + 1)})"
+                    block["title"] = f"{block['name']} ({(existingcount + 1)})"
+                else:
+                    block["title"] = block["name"]
 
                 try:
                     featured_image = Image.objects.get(pk=block["image"])
@@ -95,12 +97,12 @@ class Command(BaseCommand):
                     featured_image = None
 
                 page_framework = {
-                    "title": block["name"],
+                    "title": block["title"],
                     "instructor_name": block["name"],
                     "instructor_bio_short": block["description"],
                     "instructor_bio_long": block["description"],
                     "live": False,
-                    "slug": slugify(block["name"]),
+                    "slug": slugify(block["title"]),
                     "feature_image": featured_image,
                     "depth": instructor_page_root.depth + 1,  # this is probably safe
                 }
