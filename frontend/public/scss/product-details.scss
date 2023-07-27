@@ -29,6 +29,29 @@
     }
   }
 
+  section.course-description {
+    line-height: 250%;
+    color: #646669;
+  }
+
+  #tab-bar {
+    background-color: #edf2f4;
+    padding: 15px 19px;
+    margin: 2em 0;
+
+    ul li.nav-item {
+      padding: 0;
+      padding-right: 40px;
+      color: #35607a;
+      font-weight: bold;
+
+      a {
+        color: #35607a;
+        text-decoration: none;
+      }
+    }
+  }
+
   .hero-block {
     font-size: 20px;
     line-height: 2rem;
