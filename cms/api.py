@@ -1,22 +1,20 @@
 """API functionality for the CMS app"""
 import logging
 from typing import Tuple, Union
-from urllib.parse import urljoin, urlencode
+from urllib.parse import urlencode, urljoin
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-
 from django.utils.text import slugify
 from wagtail.models import Page, Site
 from wagtail.rich_text import RichText
 
 from cms import models as cms_models
+from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
 from cms.exceptions import WagtailSpecificPageError
 from cms.models import Page
-from cms.constants import CERTIFICATE_INDEX_SLUG
 from courses.models import Course, Program
-
 
 log = logging.getLogger(__name__)
 DEFAULT_HOMEPAGE_PROPS = dict(
@@ -212,6 +210,30 @@ def ensure_certificate_index() -> cms_models.CertificateIndexPage:
     return certificate_index
 
 
+def ensure_instructors_index() -> cms_models.InstructorIndexPage:
+    """
+    Ensures that an index page has been created for instructorns.
+    """
+    home_page = get_home_page()
+    instructor_index = cms_models.InstructorIndexPage.objects.first()
+
+    if instructor_index and instructor_index.slug != INSTRUCTOR_INDEX_SLUG:
+        instructor_index.slug = INSTRUCTOR_INDEX_SLUG
+        instructor_index.save()
+
+    if not instructor_index:
+        instructor_index_content_type, _ = ContentType.objects.get_or_create(
+            app_label="cms", model="instructorindexpage"
+        )
+        instructor_index = cms_models.InstructorIndexPage(
+            title="Instructors",
+            content_type_id=instructor_index_content_type.id,
+            slug=INSTRUCTOR_INDEX_SLUG,
+        )
+        home_page.add_child(instance=instructor_index)
+    return instructor_index
+
+
 def get_wagtail_img_src(image_obj) -> str:
     """Returns the image source URL for a Wagtail Image object"""
     return (
@@ -246,7 +268,7 @@ def create_default_courseware_page(
     Raises:
     - Exception
     """
-    from cms.models import CoursePage, ProgramPage, CourseIndexPage, ProgramIndexPage
+    from cms.models import CourseIndexPage, CoursePage, ProgramIndexPage, ProgramPage
 
     page_framework = {
         "title": courseware.title,

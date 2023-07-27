@@ -48,7 +48,7 @@ class Command(BaseCommand):
         except Exception:
             hp = HomePage.objects.first()
             # if it errors here then we're all lost
-            instructor_page_root = InstructorIndexPage()
+            instructor_page_root = InstructorIndexPage(title="Instructors")
             hp.add_child(instance=instructor_page_root)
             hp.save()
             instructor_page_root.refresh_from_db()
