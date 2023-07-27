@@ -16,6 +16,33 @@
         height: 70px;
     }
 
+    .catalog-animation {
+        /* starting ENTER animation */
+        .messageout-enter {
+            position: absolute;
+            opacity: 0.01;
+        }
+        
+        /* ending ENTER animation */
+        .messageout-enter-active {
+            opacity: 1;
+            transition: opacity 300ms ease-in;
+        }
+        
+        /* starting EXIT animation */
+        .messageout-exit {
+            position: absolute;
+            opacity: 1;
+        }
+
+        /* ending ENTER animation */
+        .messageout-exit-active {
+            opacity: 0;
+            transition: opacity 300ms ease-in;
+        }
+
+    }
+
     #catalog-grid {
         display: flex;
         align-items: flex-start;
