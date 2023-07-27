@@ -31,7 +31,7 @@ def populate_letter_grade(apps, schema_editor):
         passed=True,
         course_run__course__readable_id__in=course_ids,
         letter_grade=None,
-        set_by_admin=True
+        set_by_admin=True,
     )
     for grade in grades:
         grade.letter_grade = convert_to_letter(grade.grade)
@@ -41,7 +41,7 @@ def populate_letter_grade(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('courses', '0039_program_program_type'),
+        ("courses", "0039_program_program_type"),
     ]
 
     operations = [
