@@ -1051,15 +1051,17 @@ class ProductPage(VideoPlayerConfigMixin):
         If they're not logged in, this should return None.
         """
         raise NotImplementedError
-    
 
     def get_context(self, request, *args, **kwargs):
-        instructors = [member.linked_instructor_page for member in self.linked_instructors.order_by('order').all()]
+        instructors = [
+            member.linked_instructor_page
+            for member in self.linked_instructors.order_by("order").all()
+        ]
 
         return {
             **super().get_context(request),
             **get_base_context(request),
-            "instructors": instructors
+            "instructors": instructors,
         }
 
     def get_context(self, request, *args, **kwargs):
@@ -1666,4 +1668,3 @@ class SignatoryPage(Page):
         designed to be viewed on their own so we raise a 404 if someone tries to access their slug.
         """
         raise Http404
-
