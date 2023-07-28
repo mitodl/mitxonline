@@ -122,7 +122,6 @@ export class ProductDetailEnrollApp extends React.Component<
         : this.getCurrentCourseRun()
 
     if (!upgradeEnrollmentDialogVisibility) {
-      console.log(`creating enrollment for ${run.id}`)
       createEnrollment(run)
     } else {
       window.location = "/dashboard/"

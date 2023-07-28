@@ -47,7 +47,8 @@ type DashboardPageProps = {
   ) => Promise<any>,
   updateAddlFields: (currentUser: User) => Promise<any>,
   addUserNotification: Function,
-  closeDrawer: Function
+  closeDrawer: Function,
+  forceRequest: Function | null
 }
 
 const DashboardTab = {
@@ -57,7 +58,7 @@ const DashboardTab = {
 
 type DashboardPageState = {
   programDrawerVisibility: boolean,
-  programDrawerEnrollments: ?(any[]),
+  programDrawerEnrollments: ProgramEnrollment | null,
   currentTab: string,
   showAddlProfileFieldsModal: boolean,
   destinationUrl: string
@@ -80,6 +81,20 @@ export class DashboardPage extends React.Component<
       programDrawerEnrollments: enrollment,
       programDrawerVisibility:  !this.state.programDrawerVisibility
     })
+  }
+
+  updateDrawerEnrollments(enrollment: any) {
+    const { programDrawerEnrollments } = this.state
+
+    if (
+      programDrawerEnrollments !== null &&
+      programDrawerEnrollments.program &&
+      programDrawerEnrollments.program.id === enrollment.program.id
+    ) {
+      this.setState({
+        programDrawerEnrollments: enrollment
+      })
+    }
   }
 
   toggleTab(tab: string) {
@@ -140,19 +155,25 @@ export class DashboardPage extends React.Component<
   }
 
   renderCurrentTab() {
-    const { enrollments, programEnrollments } = this.props
+    const { enrollments, programEnrollments, forceRequest } = this.props
 
     if (this.state.currentTab === DashboardTab.programs) {
-      return (
-        <div>
-          <h1 className="hide-element">Programs</h1>
-          <EnrolledProgramList
-            key={"enrolled-programs"}
-            enrollments={programEnrollments}
-            toggleDrawer={this.toggleDrawer.bind(this)}
-          ></EnrolledProgramList>
-        </div>
-      )
+      if (programEnrollments.length === 0) {
+        this.setState({ currentTab: DashboardTab.courses })
+      } else {
+        return (
+          <div>
+            <h1 className="hide-element">Programs</h1>
+            <EnrolledProgramList
+              key={"enrolled-programs"}
+              enrollments={programEnrollments}
+              toggleDrawer={this.toggleDrawer.bind(this)}
+              onUpdateDrawerEnrollment={this.updateDrawerEnrollments.bind(this)}
+              onUnenroll={forceRequest}
+            ></EnrolledProgramList>
+          </div>
+        )
+      }
     }
 
     return (
@@ -162,6 +183,7 @@ export class DashboardPage extends React.Component<
           key={"enrolled-courses"}
           enrollments={enrollments}
           redirectToCourseHomepage={this.redirectToCourseHomepage.bind(this)}
+          onUnenroll={forceRequest}
         ></EnrolledCourseList>
       </div>
     )
@@ -206,7 +228,7 @@ export class DashboardPage extends React.Component<
   }
 
   render() {
-    const { isLoading, programEnrollments } = this.props
+    const { isLoading, programEnrollments, forceRequest } = this.props
 
     const myCourseClasses = `dash-tab${
       this.state.currentTab === DashboardTab.courses ? " active" : ""
@@ -255,6 +277,7 @@ export class DashboardPage extends React.Component<
                 this.setState({ programDrawerVisibility: false })
               }
               redirectToCourseHomepage={this.redirectToCourseHomepage}
+              onUnenroll={forceRequest}
             ></ProgramEnrollmentDrawer>
 
             {this.renderAddlProfileFieldsModal()}
