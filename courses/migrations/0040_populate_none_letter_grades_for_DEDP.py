@@ -22,6 +22,7 @@ def populate_letter_grade(apps, schema_editor):
     course_ids = [
         "course-v1:MITxT+14.100x",
         "course-v1:MITxT+14.750x",
+        "course-v1:MITxT+14.740x",
         "course-v1:MITxT+JPAL102x",
         "course-v1:MITxT+14.73x",
         "course-v1:MITxT+14.310x",
