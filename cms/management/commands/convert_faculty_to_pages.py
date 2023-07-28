@@ -37,7 +37,9 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
-            "--live", action="store_true", help="Make the page live. (Defaults to not.)"
+            "--publish",
+            action="store_true",
+            help="Make the page published. (Defaults to draft.)",
         )
 
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
@@ -101,7 +103,7 @@ class Command(BaseCommand):
                     "instructor_name": block["name"],
                     "instructor_bio_short": block["description"],
                     "instructor_bio_long": block["description"],
-                    "live": False,
+                    "live": kwargs["publish"],
                     "slug": slugify(block["title"]),
                     "feature_image": featured_image,
                     "depth": instructor_page_root.depth + 1,  # this is probably safe

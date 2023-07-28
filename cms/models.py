@@ -478,6 +478,8 @@ class InstructorPage(Page):
     Detail page for instructors.
     """
 
+    subpage_types = []
+
     instructor_name = models.CharField(
         max_length=255,
         default="",
@@ -517,6 +519,13 @@ class InstructorPage(Page):
         FieldPanel("instructor_bio_long"),
         FieldPanel("feature_image"),
     ]
+
+    def serve(self, request, *args, **kwargs):
+        """
+        For index pages we raise a 404 because these pages do not have a template
+        of their own and we do not expect a page to available at their slug.
+        """
+        raise Http404
 
 
 class InstructorObjectIndexPage(Page):

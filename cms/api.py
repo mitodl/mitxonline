@@ -212,7 +212,7 @@ def ensure_certificate_index() -> cms_models.CertificateIndexPage:
 
 def ensure_instructors_index() -> cms_models.InstructorIndexPage:
     """
-    Ensures that an index page has been created for instructorns.
+    Ensures that an index page has been created for instructors.
     """
     home_page = get_home_page()
     instructor_index = cms_models.InstructorIndexPage.objects.first()
