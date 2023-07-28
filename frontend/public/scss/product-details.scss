@@ -32,6 +32,7 @@
   section.course-description {
     line-height: 250%;
     color: #646669;
+
   }
 
   #tab-bar {
@@ -50,6 +51,11 @@
         text-decoration: none;
       }
     }
+  }
+
+  section.about-this-class {
+    color: #000;
+    /* TODO: this requires a different font and colors */    
   }
 
   .hero-block {

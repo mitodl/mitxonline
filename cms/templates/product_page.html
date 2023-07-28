@@ -150,7 +150,7 @@
               <h1>{{ page.title }}</h1>
               {# Description field contents are already rendered wrapped in a <p> tag #}
               
-              <section name="course-description">
+              <section class="course-description">
                 {{ page.description | richtext }}
               </section>
 
@@ -162,16 +162,23 @@
                 </ul>
               </nav>
 
+              <section class="about-this-class">
+                {{ page.about |richtext }}
+              </section>
+
+              <section class="what-youll-learn">
+                <h2>What you&apos;ll learn</h2>
+                {{ page.what_you_learn |richtext }}
+              </section>
+
+
               <div class="text-holder">
                 {% if page.about %}
                 <div class="content-data">
-                  {{ page.about |richtext }}
                 </div>
                 {% endif %}
                 {% if page.what_you_learn %}
                 <div class="content-data">
-                  <h2>What you’ll learn</h2>
-                  {{ page.what_you_learn |richtext }}
                 </div>
                 {% endif %}
                 {% if page.prerequisites %}
