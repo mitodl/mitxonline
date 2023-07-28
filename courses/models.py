@@ -130,12 +130,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         return len(self.courses)
 
     @property
-    def is_catalog_visible(self):
-        """Returns True if this program should be shown on in the catalog"""
-        just_courses = [course[0] for course in self.courses]
-        return any(course.is_catalog_visible for course in just_courses)
-
-    @property
     def first_unexpired_run(self):
         """Gets the earliest unexpired CourseRun"""
         return (
@@ -473,21 +467,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
         return (
             relevant_run.products.filter(is_active=True).all() if relevant_run else None
-        )
-
-    @property
-    def is_catalog_visible(self):
-        """Returns True if this course should be shown on in the catalog"""
-        now = now_in_utc()
-        # NOTE: This is implemented with courseruns.all() to allow for prefetch_related optimization.
-        return any(
-            course_run
-            for course_run in self.courseruns.all()
-            if course_run.live
-            and (
-                (course_run.start_date and course_run.start_date > now)
-                or (course_run.enrollment_end and course_run.enrollment_end > now)
-            )
         )
 
     @property
