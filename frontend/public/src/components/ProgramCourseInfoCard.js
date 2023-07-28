@@ -47,14 +47,6 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
         <div className="row flex-grow-1">
           {featuredImage}
           <div className="col-12 col-md px-3 py-3 py-md-0 box">
-            <div className="align-content-start enrollment-mode-container w-100">
-              {courseRunStatusDetail !== null &&
-              courseRunStatusDetail.active ? (
-                  <span className="badge badge-in-progress mr-2">
-                  In Progress
-                  </span>
-                ) : null}
-            </div>
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container flex-wrap pb-1">
               <h2 className="my-0 mr-3">{course.title}</h2>
             </div>
