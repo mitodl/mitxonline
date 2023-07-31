@@ -25,7 +25,8 @@ export type BaseCourseRun = {
   products: Array<Product>,
   id: number,
   page: ?Page,
-  course_number: ?string
+  course_number: ?string,
+  live: boolean
 }
 
 export type EnrollmentFlaggedCourseRun = BaseCourseRun & {
