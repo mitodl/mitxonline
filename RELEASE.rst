@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.70.2
+Version 0.70.2 (Released July 31, 2023)
 --------------
 
 - Migrate instructor data to individual selectable pages (#1786)
