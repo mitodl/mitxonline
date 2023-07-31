@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.70.2
+--------------
+
+- Migrate instructor data to individual selectable pages (#1786)
+- Updates to the dashboard functionality (#1756)
+- Deferrals better message (#1776)
+- Manage certificates command: require letter grades when overriding grade (#1767)
+
 Version 0.70.1 (Released July 26, 2023)
 --------------
 
