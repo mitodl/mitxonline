@@ -21,8 +21,8 @@ module.exports = function (env, argv) {
     output: {
       path: path.resolve(__dirname, "build"),
       ...(isProduction ? {
-        filename: "[name]-[chunkhash].js",
-        chunkFilename: "[id]-[chunkhash].js",
+        filename: "[name]-[contenthash].js",
+        chunkFilename: "[id]-[contenthash].js",
         crossOriginLoading: "anonymous",
         hashFunction: "xxhash64"
       } : {
