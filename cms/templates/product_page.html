@@ -8,8 +8,8 @@
 {% block content %}
     <div id="main" class="product-page">
       <div class="container">
-        <div class="row d-flex flex-row">
-          <div class="col flex-grow-1">
+        <div class="row d-flex flex-row sticky-top">
+          <div class="col flex-grow-1" id="product-details">
             <div class="text">
               <h1>{{ page.title }}</h1>
               {# Description field contents are already rendered wrapped in a <p> tag #}
@@ -20,41 +20,24 @@
 
               <nav id="tab-bar">
                 <ul class="nav">
-                  <li class="nav-item">About</li>
-                  <li class="nav-item">What you'll learn</li>
-                  <li class="nav-item">Instructors</li>
+                  <li class="nav-item"><a href="#about-this-class">About</a></li>
+                  {% if page.what_you_learn %}<li class="nav-item"><a href="#what-youll-learn">What you'll learn</a></li>{% endif %}
+                  {% if instructors %}<li class="nav-item"><a href="#instructors">Instructors</a></li>{% endif %}
+                  {% if page.faq_url %}<li class="nav-item"><a href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
                 </ul>
               </nav>
 
-              <section class="about-this-class">
+              <section class="about-this-class" id="about-this-class">
                 {{ page.about |richtext }}
               </section>
 
-              <section class="what-youll-learn">
+              <section class="what-youll-learn" id="what-youll-learn">
                 <h2>What you&apos;ll learn</h2>
                 {{ page.what_you_learn |richtext }}
               </section>
-
-
-              <div class="text-holder">
-                {% if page.about %}
-                <div class="content-data">
-                </div>
-                {% endif %}
-                {% if page.what_you_learn %}
-                <div class="content-data">
-                </div>
-                {% endif %}
-                {% if page.prerequisites %}
-                  <div class="content-data">
-                    <h2>Prerequisites</h2>
-                    {{ page.prerequisites |richtext }}
-                  </div>
-                {% endif %}
-              </div>
     
               {% if instructors or page.faculty_members %}
-              <section class="faculty-section">
+              <section class="faculty-section" id="instructors">
                 <div class="container">
                   <h2>{{ page.faculty_section_title }}</h2>
                   <ul class="faculty-members card-listing">
@@ -72,24 +55,11 @@
                       </li>
                     {% endfor %}
                     {% endif %}
-        
-                    {% if page.faculty_members %}
-                    {% for member in page.faculty_members %}
-                      <li>
-                        <div class="member-card highlight-card">
-                          <img src="{% wagtail_img_src member.value.image %}" alt="{{ member.name }}">
-                          <div class="member-info">
-                            <h3 class="name">{{ member.value.name }}</h3>
-                            <div class="description">{{ member.value.description }}</div>
-                          </div>
-                        </div>
-                      </li>
-                    {% endfor %}
-                    {% endif %}
                   </ul>
                 </div>
               </section>
               {% endif %}
+
               <section class="ofac-message">
                 <div class="container">
                   <p><em>Who can take this course?</em></p>
@@ -100,7 +70,7 @@
         
             </div>
           </div>
-          <div class="col m-2 p-2 sticky-top border align-items-center justify-items-top d-flex flex-column" style="max-width: 380px">
+          <div class="col m-2 p-2 sticky-top border align-items-center justify-items-top d-flex flex-column" id="product-info-box">
             <div class="hero-media">
               {% if page.video_url %}
               <video-js
@@ -111,13 +81,18 @@
               >
               </video-js>
               {% else %}
-              <img style="max-width: 350px;" src="{% feature_img_src page.feature_image %}" alt="">
+              <img src="{% feature_img_src page.feature_image %}" alt="">
               {% endif %}
             </div>
 
             {% if page.course %}
-            <input id="courseId" type="hidden" value="{{page.course.readable_id}}" />
-            <div id="productDetailEnrollment"></div>
+            <div class="stats-row">
+              <input id="courseId" type="hidden" value="{{page.course.readable_id}}" />
+              <div class="w-100" id="productDetailEnrollment"></div>
+            </div>
+            <div class="stats-row">
+              <div class="w-100" id="upsellCard"></div>
+            </div>
             {% endif %}
 
             <div class="stats-row">

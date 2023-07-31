@@ -188,24 +188,70 @@
     }
   }
 
-  .info-block {
+  #product-info-box {
     padding-bottom: 25px;
     font-size: 14px;
-    line-height: 16px;
+    line-height: 20px;
     color: $black;
+    max-width: 380px;
 
     @include media-breakpoint-up(lg) {
       padding: 30px 0;
     }
 
+    border-radius: 5px;
+
+    .hero-media {
+      margin: 7px 15px;
+
+      img {
+        border-radius: 5px;
+        max-width: 350px;
+      }
+    }
+
     .stats-row {
       display: flex;
-      flex-flow: row wrap;
-      margin: 0 -8px;
-      align-items: baseline;
+      flex-flow: column;
+      align-items: top;
+
+      margin-top: 10px;
 
       @include media-breakpoint-up(xl) {
         margin: 0 -18px;
+      }
+
+      .btn-enrollment-button {
+        width: 350px;
+        height: 50px;
+        padding: 0!important;
+      }
+
+      .enrollment-info-box {
+        border: 1px solid #d1d1d1;
+        border-left: none;
+        border-right: none;
+
+        margin: 10px 0;
+        padding: 10px 0;
+
+        .row {
+          margin: 10px 0;
+        }
+
+        .enrollment-info-icon {
+          width: 20px;
+          margin-right: 12px;
+        }
+
+        .enrollment-info-text {
+          width: auto;
+          flex-grow: 1;
+
+          .enrollment-effort {
+            font-size: smaller;
+          }
+        }
       }
 
       .stat-col {

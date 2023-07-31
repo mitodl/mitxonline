@@ -284,6 +284,9 @@ export class ProductDetailEnrollApp extends React.Component<
   render() {
     const { courseRuns, isLoading, currentUser } = this.props
     const csrfToken = getCookie("csrftoken")
+
+    console.log("the card is rendering!")
+
     let run =
       !this.getCurrentCourseRun() && courseRuns
         ? courseRuns[0]
@@ -324,78 +327,124 @@ export class ProductDetailEnrollApp extends React.Component<
       </p>
     ) : null
 
+    console.log(run)
+
     return (
-      // $FlowFixMe: isLoading null or undefined
-      <Loader isLoading={isLoading}>
-        {run && run.is_enrolled ? (
-          <Fragment>
-            {run.courseware_url ? (
-              <a
-                href={run.courseware_url}
-                onClick={ev =>
-                  run
-                    ? this.redirectToCourseHomepage(run.courseware_url, ev)
-                    : ev
-                }
-                className={`btn btn-primary btn-gradient-red highlight outline ${disableEnrolledBtn}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+      <>
+        {// $FlowFixMe: isLoading null or undefined
+        }
+        <Loader isLoading={isLoading}><>
+          {run && run.is_enrolled ? (
+            <Fragment>
+              {run.courseware_url ? (
+                <a
+                  href={run.courseware_url}
+                  onClick={ev =>
+                    run
+                      ? this.redirectToCourseHomepage(run.courseware_url, ev)
+                      : ev
+                  }
+                  className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                 Enrolled &#10003;
-              </a>
-            ) : (
-              <div
-                className={`btn btn-primary btn-gradient-red highlight outline ${disableEnrolledBtn}`}
-              >
+                </a>
+              ) : (
+                <div
+                  className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
+                >
                 Enrolled &#10003;
-              </div>
-            )}
-            {waitingForCourseToBeginMessage}
-          </Fragment>
-        ) : (
-          <Fragment>
-            {run &&
+                </div>
+              )}
+              {waitingForCourseToBeginMessage}
+            </Fragment>
+          ) : (
+            <Fragment>
+              {run &&
             isWithinEnrollmentPeriod(run) &&
             currentUser &&
             !currentUser.id ? (
-                <a
-                  href={routes.login}
-                  className="btn btn-primary btn-lg btn-gradient-red highlight"
-                >
-                Enroll now
-                </a>
-              ) : run && isWithinEnrollmentPeriod(run) ? (
-                product && run.is_upgradable ? (
-                  <button
-                    className="btn btn-primary btn-lg btn-gradient-red highlight enroll-now"
-                    onClick={() => this.toggleUpgradeDialogVisibility()}
+                  <a
+                    href={routes.login}
+                    className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
                   >
+                Enroll now
+                  </a>
+                ) : run && isWithinEnrollmentPeriod(run) ? (
+                  product && run.is_upgradable ? (
+                    <button
+                      className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
+                      onClick={() => this.toggleUpgradeDialogVisibility()}
+                    >
                   Enroll now
-                  </button>
-                ) : (
-                  <Fragment>
-                    <form action="/enrollments/" method="post">
-                      <input
-                        type="hidden"
-                        name="csrfmiddlewaretoken"
-                        value={csrfToken}
-                      />
-                      <input type="hidden" name="run" value={run ? run.id : ""} />
-                      <button
-                        type="submit"
-                        className="btn btn-primary btn-gradient-red highlight enroll-now"
-                      >
+                    </button>
+                  ) : (
+                    <Fragment>
+                      <form action="/enrollments/" method="post">
+                        <input
+                          type="hidden"
+                          name="csrfmiddlewaretoken"
+                          value={csrfToken}
+                        />
+                        <input type="hidden" name="run" value={run ? run.id : ""} />
+                        <button
+                          type="submit"
+                          className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+                        >
                       Enroll now
-                      </button>
-                    </form>
-                  </Fragment>
-                )
-              ) : null}
-            {run ? this.renderUpgradeEnrollmentDialog() : null}
-          </Fragment>
-        )}
-        {currentUser ? this.renderAddlProfileFieldsModal() : null}
-      </Loader>
+                        </button>
+                      </form>
+                    </Fragment>
+                  )
+                ) : null}
+              {run ? this.renderUpgradeEnrollmentDialog() : null}
+            </Fragment>
+          )}
+
+          {run ? <>
+            <div className="enrollment-info-box">
+              <div className="row d-flex align-items-center">
+                <div className="enrollment-info-icon">
+                  <img src="/static/images/products/start-date.png" alt="Course Timing" />
+                </div>
+                <div className="enrollment-info-text">
+                  {startDate ? startDate.format("MMMM D, YYYY") : "Start Anytime"}
+                </div>
+              </div>
+              <div className="row d-flex align-items-top">
+                <div className="enrollment-info-icon">
+                  <img src="/static/images/products/effort.png" alt="Expected Length and Effort" />
+                </div>
+                <div className="enrollment-info-text">
+                  {run.page && run.page["length"] ? run.page["length"] : "No Data"}
+                  {run.page && run.page.effort ? <>
+                    <div className="enrollment-effort">{run.page.effort}
+                      <span className="badge badge-secondary">SELF-PACED</span>
+                    </div>
+                  </> : null}
+                </div>
+              </div>
+              <div className="row d-flex align-items-center">
+                <div className="enrollment-info-icon">
+                  <img src="/static/images/products/cost.png" alt="Cost" />
+                </div>
+                <div className="enrollment-info-text font-weight-bold">
+                Free
+                </div>
+              </div>
+              <div className="row d-flex align-items-center">
+                <div className="enrollment-info-icon">
+                  <img src="/static/images/products/certificate.png" alt="Certificate Track Information" />
+                </div>
+                <div className="enrollment-info-text">
+                </div>
+              </div>
+            </div></> : null}
+
+          {currentUser ? this.renderAddlProfileFieldsModal() : null}
+        </></Loader>
+      </>
     )
   }
 }
