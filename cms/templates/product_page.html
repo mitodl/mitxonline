@@ -140,11 +140,27 @@
           </div>
         </div>
       </section>
-      {% if page.faculty_members %}
+      {% if instructors or page.faculty_members %}
       <section class="faculty-section">
         <div class="container">
           <h2>{{ page.faculty_section_title }}</h2>
           <ul class="faculty-members card-listing">
+            {% if instructors %}
+            {% for member in instructors %}
+              <li>
+                <div class="member-card highlight-card">
+                  <img src="{% feature_img_src member.feature_image %}" alt="">
+                  <div class="member-info">
+                    <h3 class="name">{{ member.instructor_name }}</h3>
+                    {% if member.instructor_title %}<h4 class="title">{{ member.instructor_title }}</h4>{% endif %}
+                    <div class="description">{{ member.instructor_bio_short|safe }}</div>
+                  </div>
+                </div>
+              </li>
+            {% endfor %}
+            {% endif %}
+
+            {% if page.faculty_members %}
             {% for member in page.faculty_members %}
               <li>
                 <div class="member-card highlight-card">
@@ -156,6 +172,7 @@
                 </div>
               </li>
             {% endfor %}
+            {% endif %}
           </ul>
         </div>
       </section>

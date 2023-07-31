@@ -22,6 +22,9 @@ def test_configure_wagtail(mocker):
     patched_ensure_certificate_index = mocker.patch(
         "cms.management.commands.configure_wagtail.ensure_certificate_index"
     )
+    patched_ensure_instructors_index = mocker.patch(
+        "cms.management.commands.configure_wagtail.ensure_instructors_index"
+    )
     call_command("configure_wagtail")
     patched_ensure_home_page.assert_called_once()
     patched_ensure_resource_pages.assert_called_once()
@@ -29,3 +32,4 @@ def test_configure_wagtail(mocker):
     patched_ensure_program_product_index.assert_called_once()
     patched_ensure_signatory_index.assert_called_once()
     patched_ensure_certificate_index.assert_called_once()
+    patched_ensure_instructors_index.assert_called_once()

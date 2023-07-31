@@ -2,12 +2,13 @@
 from django.core.management.base import BaseCommand
 
 from cms.api import (
+    ensure_certificate_index,
     ensure_home_page_and_site,
-    ensure_resource_pages,
+    ensure_instructors_index,
     ensure_product_index,
     ensure_program_product_index,
+    ensure_resource_pages,
     ensure_signatory_index,
-    ensure_certificate_index,
 )
 
 
@@ -23,3 +24,4 @@ class Command(BaseCommand):
         ensure_program_product_index()
         ensure_signatory_index()
         ensure_certificate_index()
+        ensure_instructors_index()
