@@ -530,7 +530,7 @@ def defer_enrollment(
         user,
         [to_run],
         keep_failed_enrollments=keep_failed_enrollments,
-        mode=from_enrollment.enrollment_mode,
+        mode=EDX_ENROLLMENT_VERIFIED_MODE,
     )
     if not enroll_success and not keep_failed_enrollments:
         raise Exception(
