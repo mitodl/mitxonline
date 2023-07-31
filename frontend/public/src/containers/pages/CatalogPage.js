@@ -1,11 +1,12 @@
 import React from "react"
-import { CSSTransition, TransitionGroup } from "react-transition-group";
+import { CSSTransition, TransitionGroup } from "react-transition-group"
+import moment from "moment"
 
 import {
-  courseRunsSelector,
-  courseRunsQuery,
-  courseRunsQueryKey
-} from "../../lib/queries/courseRuns"
+  coursesSelector,
+  coursesQuery,
+  coursesQueryKey
+} from "../../lib/queries/courses"
 
 import {
   programsSelector,
@@ -20,19 +21,78 @@ import { connectRequest } from "redux-query"
 import { pathOr } from "ramda"
 
 type Props = {
-  courseRunsIsLoading: ?boolean,
+  coursesIsLoading: ?boolean,
   programsIsLoading: ?boolean,
-  courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
+  courses: ?Array<CourseDetailWithRuns>,
   programs: ?Array<Program>
 }
 
 export class CatalogPage extends React.Component<Props> {
   state = {
-    tabSelected: "courses"
+    tabSelected:         "courses",
+    filteredCourses:     [],
+    filterCoursesCalled: false
+  }
+
+  componentDidUpdate = () => {
+    const {
+      coursesIsLoading,
+    } = this.props
+    if (!coursesIsLoading && !this.state.filterCoursesCalled) {
+      this.setState({ filterCoursesCalled: true })
+      this.filterCoursesBasedOnCourseRunCriteria()
+    }
   }
 
   changeSelectedTab = (btn: string) => {
     this.setState({ tabSelected: btn })
+  }
+
+  getFutureCourseRunClosestToToday(courseRunA: BaseCourseRun, courseRunB: BaseCourseRun) {
+    if (courseRunA.start_date > courseRunB.start_date) {
+      return -1
+    }
+    if (courseRunA.start_date < courseRunB.start_date) {
+      return 1
+    }
+    // CourseRunA and CourseRunB share the same start date.
+    return 0
+  }
+
+  renderCatalogCardTagForCourse(course: CourseDetailWithRuns) {
+    const nonSelfPacedCourseRuns = course.courseruns.filter(courseRun => !courseRun.is_self_paced)
+    if (nonSelfPacedCourseRuns.length > 0) {
+      const futureStartDateCourseRuns = nonSelfPacedCourseRuns.filter(courseRun => moment(courseRun.start_date).isAfter(moment()))
+      if (futureStartDateCourseRuns.length > 0) {
+        return futureStartDateCourseRuns.sort(this.getFutureCourseRunClosestToToday)[0].start_date
+      } else {
+        return "Start Anytime"
+      }
+    } else {
+      return "Start Anytime"
+    }
+  }
+
+  validateCoursesCourseRuns(courseRuns: Array<BaseCourseRun>) {
+    return courseRuns.filter(courseRun =>
+      courseRun.live &&
+      courseRun.start_date &&
+      courseRun.enrollment_start &&
+      moment(courseRun.enrollment_start).isBefore(moment()) &&
+      (!courseRun.enrollment_end || moment(courseRun.enrollment_end).isAfter(moment())))
+  }
+
+  filterCoursesBasedOnCourseRunCriteria() {
+    const {
+      courses,
+    } = this.props
+    this.setState({ filteredCourses: courses.filter(course =>
+      (
+        course.page.live === true &&
+        course.courseruns.length > 0 &&
+        this.validateCoursesCourseRuns(course.courseruns).length > 0
+      )
+    )})
   }
 
   /**
@@ -40,13 +100,12 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderNumberOfCatalogItems() {
     const {
-      courseRuns,
       programs,
-      courseRunsIsLoading,
+      coursesIsLoading,
       programsIsLoading
     } = this.props
-    if (this.state.tabSelected === "courses" && !courseRunsIsLoading) {
-      return courseRuns.length
+    if (this.state.tabSelected === "courses" && !coursesIsLoading) {
+      return this.state.filteredCourses.length
     } else if (this.state.tabSelected === "programs" && !programsIsLoading) {
       return programs.length
     }
@@ -54,20 +113,20 @@ export class CatalogPage extends React.Component<Props> {
 
   /**
    * Renders a single course catalog card.
-   * @param {EnrollmentFlaggedCourseRun} courseRun The course run instance used to populate the card.
+   * @param {CourseDetailWithRuns} course The course instance used to populate the card.
    */
-  renderCourseCatalogCard(courseRun: EnrollmentFlaggedCourseRun) {
+  renderCourseCatalogCard(course: CourseDetailWithRuns) {
     return (
-      <a href={courseRun.page.page_url} key={courseRun.id}>
+      <a href={course.page.page_url} key={course.id}>
         <div className="col catalog-item">
-          {courseRun.page && courseRun.page.feature_image_src && (
-            <img src={courseRun.page.feature_image_src} alt="" />
+          {course.page && course.page.feature_image_src && (
+            <img src={course.page.feature_image_src} alt="" />
           )}
           <div className="catalog-item-description">
             <div className="start-date-description">
-              {courseRun.is_self_paced ? "Start Anytime" : courseRun.start_date}
+              {this.renderCatalogCardTagForCourse(course)}
             </div>
-            <div className="item-title">{courseRun.title}</div>
+            <div className="item-title">{course.title}</div>
           </div>
         </div>
       </a>
@@ -98,11 +157,11 @@ export class CatalogPage extends React.Component<Props> {
 
   /**
    * Dynamically renders all rows of cards in the catalog.  Each row contains 3 course or program cards.
-   * @param {Array<EnrollmentFlaggedCourseRun | Program>} itemsInCatalog The items associated with the currently selected catalog page.
+   * @param {Array<CourseDetailWithRuns | Program>} itemsInCatalog The items associated with the currently selected catalog page.
    * @param {Function} renderCatalogCardFunction The card render function that will be used for each item on the current catalog page.
    */
   renderCatalogRows(
-    itemsInCatalog: Array<EnrollmentFlaggedCourseRun | Program>,
+    itemsInCatalog: Array<CourseDetailWithRuns | Program>,
     renderCatalogCardFunction: Function
   ) {
     const numberOfItemsInEachRow = Math.min(itemsInCatalog.length, 3)
@@ -123,13 +182,11 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderCatalog() {
     const {
-      courseRuns,
       programs,
-      courseRunsIsLoading,
       programsIsLoading
     } = this.props
-    if (this.state.tabSelected === "courses" && !courseRunsIsLoading) {
-      return this.renderCatalogRows(courseRuns, this.renderCourseCatalogCard)
+    if (this.state.tabSelected === "courses" && this.state.filteredCourses.length > 0) {
+      return this.renderCatalogRows(this.state.filteredCourses, this.renderCourseCatalogCard.bind(this))
     } else if (this.state.tabSelected === "programs" && !programsIsLoading) {
       return this.renderCatalogRows(programs, this.renderProgramCatalogCard)
     }
@@ -151,36 +208,54 @@ export class CatalogPage extends React.Component<Props> {
           </div>
           <div className="container">
             <div className="row" id="tab-row">
-              <div className="col" id="tabs">
-                <div
-                  className={
-                    this.state.tabSelected === "courses"
-                      ? "selected-tab"
-                      : "unselected-tab"
-                  }
-                >
-                  <button onClick={() => this.changeSelectedTab("courses")}>
-                    Courses
-                  </button>
-                </div>
-                <div
-                  className={
-                    this.state.tabSelected === "programs"
-                      ? "selected-tab"
-                      : "unselected-tab"
-                  }
-                >
-                  <button onClick={() => this.changeSelectedTab("programs")}>
-                    Programs
-                  </button>
-                </div>
+              <div className="col tab-fade-animation" id="tabs">
+                <TransitionGroup>
+                  <CSSTransition
+                    key={this.state.tabSelected}
+                    timeout={1000}
+                    classNames="messageout"
+                  >
+                    <div
+                      className={
+                        this.state.tabSelected === "courses"
+                          ? "selected-tab"
+                          : "unselected-tab"
+                      }
+                    >
+                      <button onClick={() => this.changeSelectedTab("courses")}>
+                        Courses
+                      </button>
+                    </div>
+                  </CSSTransition>
+                </TransitionGroup>
+                <TransitionGroup>
+                  <CSSTransition
+                    key={this.state.tabSelected}
+                    timeout={1000}
+                    classNames="messageout"
+                  >
+                    <div className="tab-fade-animation">
+                      <div
+                        className={
+                          this.state.tabSelected === "programs"
+                            ? "selected-tab"
+                            : "unselected-tab"
+                        }
+                      >
+                        <button onClick={() => this.changeSelectedTab("programs")}>
+                          Programs
+                        </button>
+                      </div>
+                    </div>
+                  </CSSTransition>
+                </TransitionGroup>
               </div>
               <div className="col" id="catalog-page-item-count">
                 {/* Could add logic to display only "course" if only 1 course is showing. */}
                 {this.renderNumberOfCatalogItems()} {this.state.tabSelected}
               </div>
             </div>
-            <div className="catalog-animation">
+            <div className="tab-fade-animation">
               <TransitionGroup>
                 <CSSTransition
                   key={this.state.tabSelected}
@@ -200,14 +275,14 @@ export class CatalogPage extends React.Component<Props> {
   }
 }
 
-const mapPropsToConfig = () => [courseRunsQuery(), programsQuery()]
+const mapPropsToConfig = () => [coursesQuery(), programsQuery()]
 
 const mapStateToProps = createStructuredSelector({
-  courseRuns:          courseRunsSelector,
-  programs:            programsSelector,
-  courseRunsIsLoading: pathOr(true, [
+  courses:          coursesSelector,
+  programs:         programsSelector,
+  coursesIsLoading: pathOr(true, [
     "queries",
-    courseRunsQueryKey,
+    coursesQueryKey,
     "isPending"
   ]),
   programsIsLoading: pathOr(true, ["queries", programsQueryKey, "isPending"])

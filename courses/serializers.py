@@ -103,6 +103,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "is_self_paced",
             "run_tag",
             "id",
+            "live"
         ]
 
 
@@ -172,21 +173,10 @@ class CourseSerializer(BaseCourseSerializer):
         return run.id if run is not None else None
 
     def get_courseruns(self, instance):
-        """Unexpired and unenrolled course runs"""
-        all_runs = self.context.get("all_runs", False)
-        if all_runs:
-            active_runs = instance.unexpired_runs
-        else:
-            user = self.context["request"].user if "request" in self.context else None
-            active_runs = (
-                instance.available_runs(user)
-                if user and user.is_authenticated
-                else instance.unexpired_runs
-            )
+        """Returns all course runs related to the course."""
         return [
             CourseRunSerializer(instance=run, context=self.context).data
-            for run in active_runs
-            if run.live
+            for run in instance.courseruns.all()
         ]
 
     def get_topics(self, instance):
