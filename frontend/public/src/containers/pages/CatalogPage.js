@@ -208,33 +208,35 @@ export class CatalogPage extends React.Component<Props> {
           </div>
           <div className="container">
             <div className="row" id="tab-row">
-              <div className="col tab-fade-animation" id="tabs">
-                <TransitionGroup>
-                  <CSSTransition
-                    key={this.state.tabSelected}
-                    timeout={1000}
-                    classNames="messageout"
-                  >
-                    <div
-                      className={
-                        this.state.tabSelected === "courses"
-                          ? "selected-tab"
-                          : "unselected-tab"
-                      }
+              <div className="col" id="tabs">
+                <div className="catalog-animation">
+                  <TransitionGroup>
+                    <CSSTransition
+                      key={this.state.tabSelected}
+                      timeout={300}
+                      classNames="messageout"
                     >
-                      <button onClick={() => this.changeSelectedTab("courses")}>
-                        Courses
-                      </button>
-                    </div>
-                  </CSSTransition>
-                </TransitionGroup>
-                <TransitionGroup>
-                  <CSSTransition
-                    key={this.state.tabSelected}
-                    timeout={1000}
-                    classNames="messageout"
-                  >
-                    <div className="tab-fade-animation">
+                      <div
+                        className={
+                          this.state.tabSelected === "courses"
+                            ? "selected-tab"
+                            : "unselected-tab"
+                        }
+                      >
+                        <button onClick={() => this.changeSelectedTab("courses")}>
+                          Courses
+                        </button>
+                      </div>
+                    </CSSTransition>
+                  </TransitionGroup>
+                </div>
+                <div className="catalog-animation">
+                  <TransitionGroup>
+                    <CSSTransition
+                      key={this.state.tabSelected}
+                      timeout={300}
+                      classNames="messageout"
+                    >
                       <div
                         className={
                           this.state.tabSelected === "programs"
@@ -246,20 +248,20 @@ export class CatalogPage extends React.Component<Props> {
                           Programs
                         </button>
                       </div>
-                    </div>
-                  </CSSTransition>
-                </TransitionGroup>
+                    </CSSTransition>
+                  </TransitionGroup>
+                </div>
               </div>
               <div className="col" id="catalog-page-item-count">
                 {/* Could add logic to display only "course" if only 1 course is showing. */}
                 {this.renderNumberOfCatalogItems()} {this.state.tabSelected}
               </div>
             </div>
-            <div className="tab-fade-animation">
+            <div className="catalog-animation">
               <TransitionGroup>
                 <CSSTransition
                   key={this.state.tabSelected}
-                  timeout={1000}
+                  timeout={300}
                   classNames="messageout"
                 >
                   <div>
