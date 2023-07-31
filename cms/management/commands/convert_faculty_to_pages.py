@@ -5,7 +5,7 @@ them to be InstructorPage, then assigns them to the course/program they were in.
 If there's no root-level instructor index page, this will also create it.
 """
 
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.management import BaseCommand
 from django.utils.text import slugify
 from wagtail.images.models import Image
@@ -16,7 +16,6 @@ from cms.models import (
     InstructorIndexPage,
     InstructorPage,
     InstructorPageLink,
-    ProgramPage,
 )
 from courses.models import Course, Program
 
