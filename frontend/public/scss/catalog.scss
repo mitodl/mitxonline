@@ -14,6 +14,69 @@
     #tab-row {
         margin-left: 0;
         height: 70px;
+
+        .col {
+            padding-left: 0;
+        }
+
+        #catalog-page-item-count {
+            color: var(--blue-dark, #03152D);
+            text-align: right;
+            font-family: Inter;
+            font-size: 14px;
+            font-style: normal;
+            font-weight: 400;
+            line-height: normal;
+            margin-right: 64px;
+            margin-left: auto;
+            margin-top: 40px;
+            padding-right: 0;
+        }
+    
+        #tabs {
+            display: inline-flex;
+            align-items: flex-start;
+            gap: 20px;
+            padding-left: 24px;
+            padding-top: 30px;
+            font-size: 16px;
+            font-style: normal;
+            font-weight: 700;
+            line-height: normal;
+        
+            .selected-tab {
+                display: flex;
+                padding: 10px;
+                align-items: flex-start;
+                border-bottom: 2px solid #A31F34;
+                color: var(--blue-dark, #03152D);
+                -webkit-transition-timing-function: ease-out;
+                -webkit-transition: 300ms;
+                transition-timing-function: ease-out;
+                transition: 300ms;
+            }
+            
+            .unselected-tab {
+                display: flex;
+                padding: 10px;
+                align-items: flex-start;
+                color: var(--grey-secoundary, #8A8B8C);
+                -webkit-transition-timing-function: ease-out;
+                -webkit-transition: 300ms;
+                transition-timing-function: ease-out;
+                transition: 300ms;
+            }
+        
+            button {
+                background: none;
+                border: none;
+                padding: 0;
+                font: inherit;
+                color: inherit;
+                cursor: pointer;
+                outline: inherit;
+            }
+        }
     }
 
     .catalog-animation {
@@ -25,17 +88,20 @@
         
         /* ending ENTER animation */
         .messageout-enter-active {
+            position: absolute;
             opacity: 1;
             transition: all 300ms ease-in;
         }
         
         /* starting EXIT animation */
         .messageout-exit {
+            position: absolute;
             opacity: 1;
         }
 
         /* ending ENTER animation */
         .messageout-exit-active {
+            position: absolute;
             opacity: 0;
             transition: all 300ms ease-in;
         }
@@ -151,65 +217,6 @@
                     line-height: 18px; /* 128.571% */
                 }
             }
-        }
-    }
-
-    #catalog-page-item-count {
-        color: var(--blue-dark, #03152D);
-        text-align: right;
-        font-family: Inter;
-        font-size: 14px;
-        font-style: normal;
-        font-weight: 400;
-        line-height: normal;
-        margin-right: 64px;
-        margin-left: auto;
-        margin-top: 40px;
-        padding-right: 0;
-    }
-
-    #tabs {
-        display: inline-flex;
-        align-items: flex-start;
-        gap: 20px;
-        padding-left: 24px;
-        padding-top: 30px;
-        font-size: 16px;
-        font-style: normal;
-        font-weight: 700;
-        line-height: normal;
-    
-        .selected-tab {
-            display: flex;
-            padding: 10px;
-            align-items: flex-start;
-            border-bottom: 2px solid #A31F34;
-            color: var(--blue-dark, #03152D);
-            -webkit-transition-timing-function: ease-out;
-            -webkit-transition: 300ms;
-            transition-timing-function: ease-out;
-            transition: 300ms;
-        }
-        
-        .unselected-tab {
-            display: flex;
-            padding: 10px;
-            align-items: flex-start;
-            color: var(--grey-secoundary, #8A8B8C);
-            -webkit-transition-timing-function: ease-out;
-            -webkit-transition: 300ms;
-            transition-timing-function: ease-out;
-            transition: 300ms;
-        }
-    
-        button {
-            background: none;
-            border: none;
-            padding: 0;
-            font: inherit;
-            color: inherit;
-            cursor: pointer;
-            outline: inherit;
         }
     }
 
