@@ -2,6 +2,7 @@
 
 .product-page {
   position: relative;
+  margin-top: 1.5rem;
 
   @include media-breakpoint-down(sm) {
     h2 {
@@ -236,7 +237,7 @@
         padding: 10px 0;
 
         .row {
-          margin: 10px 0;
+          margin: 20px 0;
         }
 
         .enrollment-info-icon {
@@ -250,6 +251,14 @@
 
           .enrollment-effort {
             font-size: smaller;
+          }
+
+          .badge-pacing {
+            background-color: $black;
+            text-transform: uppercase;
+            margin-left: .5rem;
+            padding: 3px;
+            font-weight: normal;
           }
         }
       }
