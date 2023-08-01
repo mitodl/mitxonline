@@ -244,19 +244,21 @@ export class CatalogPage extends React.Component<Props> {
                   </CSSTransition>
                 </TransitionGroup>
               </div>
-              <div className="col catalog-count-animation">
-                <TransitionGroup>
-                  <CSSTransition
-                    key={this.state.tabSelected}
-                    timeout={300}
-                    classNames="messageout"
-                  >
-                    <div id="catalog-page-item-count">
-                      {/* Could add logic to display only "course" if only 1 course is showing. */}
-                      {this.renderNumberOfCatalogItems()} {this.state.tabSelected}
-                    </div>
-                  </CSSTransition>
-                </TransitionGroup>
+              <div className="col catalog-page-item-count">
+                <div className="catalog-count-animation">
+                  <TransitionGroup>
+                    <CSSTransition
+                      key={this.state.tabSelected}
+                      timeout={300}
+                      classNames="test"
+                    >
+                      <div>
+                        {/* Could add logic to display only "course" if only 1 course is showing. */}
+                        {this.renderNumberOfCatalogItems()} {this.state.tabSelected}
+                      </div>
+                    </CSSTransition>
+                  </TransitionGroup>
+                </div>
               </div>
             </div>
             <div className="catalog-animation">
