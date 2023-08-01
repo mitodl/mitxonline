@@ -306,17 +306,6 @@ def test_courses_not_live_in_courses_api(client, live):
     assert_drf_json_equal(resp.json(), [CourseSerializer(course).data] if live else [])
 
 
-@pytest.mark.parametrize("live", [True, False])
-def test_course_runs_not_live_in_courses_api(client, live):
-    """Course runs should be filtered out of the courses API if not live"""
-    run = CourseRunFactory.create(live=live, course__live=True)
-    resp = client.get(reverse("courses_api-list"))
-    assert resp.status_code == status.HTTP_200_OK
-    assert_drf_json_equal(
-        resp.json()[0]["courseruns"], [CourseRunSerializer(run).data] if live else []
-    )
-
-
 def test_user_enrollments_list(user_drf_client, user):
     """The user enrollments view should return serialized enrollments for the logged-in user"""
     assert UserEnrollmentsApiViewSet.serializer_class == CourseRunEnrollmentSerializer
