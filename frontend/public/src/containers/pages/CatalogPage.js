@@ -1,6 +1,7 @@
 import React from "react"
 import { CSSTransition, TransitionGroup } from "react-transition-group"
 import moment from "moment"
+import { parseDateString, formatPrettyDate } from "../../lib/util"
 
 import {
   coursesSelector,
@@ -64,7 +65,8 @@ export class CatalogPage extends React.Component<Props> {
     if (nonSelfPacedCourseRuns.length > 0) {
       const futureStartDateCourseRuns = nonSelfPacedCourseRuns.filter(courseRun => moment(courseRun.start_date).isAfter(moment()))
       if (futureStartDateCourseRuns.length > 0) {
-        return futureStartDateCourseRuns.sort(this.getFutureCourseRunClosestToToday)[0].start_date
+        const startDate = parseDateString(futureStartDateCourseRuns.sort(this.getFutureCourseRunClosestToToday)[0].start_date)
+        return `Start Date: ${formatPrettyDate(startDate)}`
       } else {
         return "Start Anytime"
       }
@@ -207,8 +209,8 @@ export class CatalogPage extends React.Component<Props> {
             </ul>
           </div>
           <div className="container">
-            <div className="row catalog-animation" id="tab-row">
-              <div className="col">
+            <div className="row" id="tab-row">
+              <div className="col catalog-animation">
                 <TransitionGroup>
                   <CSSTransition
                     key={this.state.tabSelected}
@@ -242,14 +244,14 @@ export class CatalogPage extends React.Component<Props> {
                   </CSSTransition>
                 </TransitionGroup>
               </div>
-              <div className="col" id="catalog-page-item-count">
+              <div className="col catalog-count-animation">
                 <TransitionGroup>
                   <CSSTransition
                     key={this.state.tabSelected}
                     timeout={300}
                     classNames="messageout"
                   >
-                    <div>
+                    <div id="catalog-page-item-count">
                       {/* Could add logic to display only "course" if only 1 course is showing. */}
                       {this.renderNumberOfCatalogItems()} {this.state.tabSelected}
                     </div>
