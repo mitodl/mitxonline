@@ -28,11 +28,15 @@ type Props = {
   programs: ?Array<Program>
 }
 
+const ALL_DEPARTMENTS = "All Departments"
+
 export class CatalogPage extends React.Component<Props> {
   state = {
     tabSelected:         "courses",
     filteredCourses:     [],
-    filterCoursesCalled: false
+    filterCoursesCalled: false,
+    courseTopics:        [],
+    selectedTopic:       ALL_DEPARTMENTS
   }
 
   componentDidUpdate = () => {
@@ -41,12 +45,24 @@ export class CatalogPage extends React.Component<Props> {
     } = this.props
     if (!coursesIsLoading && !this.state.filterCoursesCalled) {
       this.setState({ filterCoursesCalled: true })
-      this.filterCoursesBasedOnCourseRunCriteria()
+      const courses = this.filteredCoursesBasedOnCourseRunCriteria(this.state.selectedTopic)
+      this.setState({ filteredCourses: courses })
+      this.setState({ courseTopics: this.collectCourseTopicsFromCourses(courses) })
     }
+  }
+
+  collectCourseTopicsFromCourses(courses: Array<CourseDetailWithRuns>) {
+    const topics = Array.from(courses, course => course.topics)
+    return [ALL_DEPARTMENTS, ...topics.flat().map(topic => topic.name)]
   }
 
   changeSelectedTab = (btn: string) => {
     this.setState({ tabSelected: btn })
+  }
+
+  changeSelectedTopic = (selectedTopic: string) => {
+    this.setState({ selectedTopic: selectedTopic })
+    this.setState({ filteredCourses: this.filteredCoursesBasedOnCourseRunCriteria(selectedTopic) })
   }
 
   getFutureCourseRunClosestToToday(courseRunA: BaseCourseRun, courseRunB: BaseCourseRun) {
@@ -79,22 +95,22 @@ export class CatalogPage extends React.Component<Props> {
     return courseRuns.filter(courseRun =>
       courseRun.live &&
       courseRun.start_date &&
-      courseRun.enrollment_start &&
-      moment(courseRun.enrollment_start).isBefore(moment()) &&
+      moment(courseRun?.enrollment_start).isBefore(moment()) &&
       (!courseRun.enrollment_end || moment(courseRun.enrollment_end).isAfter(moment())))
   }
 
-  filterCoursesBasedOnCourseRunCriteria() {
+  filteredCoursesBasedOnCourseRunCriteria(selectedTopic: string) {
     const {
       courses,
     } = this.props
-    this.setState({ filteredCourses: courses.filter(course =>
+    return courses.filter(course =>
       (
+        (selectedTopic === ALL_DEPARTMENTS || course.topics.map(topic => topic.name).includes(selectedTopic)) &&
         course.page.live === true &&
         course.courseruns.length > 0 &&
         this.validateCoursesCourseRuns(course.courseruns).length > 0
       )
-    )})
+    )
   }
 
   /**
@@ -121,9 +137,9 @@ export class CatalogPage extends React.Component<Props> {
     return (
       <a href={course.page.page_url} key={course.id}>
         <div className="col catalog-item">
-          {course.page && course.page.feature_image_src && (
-            <img src={course.page.feature_image_src} alt="" />
-          )}
+          {
+            <img src={course?.page?.feature_image_src} alt="" />
+          }
           <div className="catalog-item-description">
             <div className="start-date-description">
               {this.renderCatalogCardTagForCourse(course)}
@@ -144,9 +160,9 @@ export class CatalogPage extends React.Component<Props> {
       <a href={program.page.page_url} key={program.id}>
         <div className="col catalog-item">
           <div className="program-image-and-badge">
-            {program.page && program.page.feature_image_src && (
-              <img src={program.page.feature_image_src} alt="" />
-            )}
+            {
+              <img src={program?.page?.feature_image_src} alt="" />
+            }
             <div className="program-type-badge">{program.program_type}</div>
           </div>
           <div className="catalog-item-description">
@@ -194,6 +210,26 @@ export class CatalogPage extends React.Component<Props> {
     }
   }
 
+  renderDepartmentSideBarList() {
+    const departmentSideBarListItems = []
+    this.state.courseTopics.forEach(courseTopic =>
+      departmentSideBarListItems.push(
+        <li className={this.state.selectedTopic === courseTopic ? "department-selected-link" : "department-link"} key={courseTopic}>
+          <button onClick={() => this.changeSelectedTopic(courseTopic)}>
+            {courseTopic}
+          </button>
+        </li>
+      )
+    )
+    return (
+      <div id="department-sidebar">
+        <ul id="department-sidebar-link-list">
+          {departmentSideBarListItems}
+        </ul>
+      </div>
+    )
+  }
+
   render() {
     return (
       <div id="catalog-page">
@@ -201,13 +237,7 @@ export class CatalogPage extends React.Component<Props> {
           <h1>MITx Online Catalog</h1>
         </div>
         <div id="course-catalog-navigation">
-          <div id="department-sidebar">
-            <ul id="department-sidebar-link-list">
-              <li className="department-selected-link">All Departments</li>
-              <li className="department-link">Tea</li>
-              <li className="department-link">Milk</li>
-            </ul>
-          </div>
+          {this.renderDepartmentSideBarList()}
           <div className="container">
             <div className="row" id="tab-row">
               <div className="col catalog-animation">
