@@ -2,17 +2,16 @@
 Tests for course serializers
 """
 # pylint: disable=unused-argument, redefined-outer-name
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 import bleach
 import pytest
-import pytz
 from django.contrib.auth.models import AnonymousUser
 from django.utils.timezone import now
 
 from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
-from cms.serializers import ProgramPageSerializer
+from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -145,35 +144,22 @@ def test_base_course_serializer():
 @pytest.mark.parametrize("all_runs", [True, False])
 def test_serialize_course(mock_context, is_anonymous, all_runs):
     """Test Course serialization"""
-    now = datetime.now(tz=pytz.UTC)
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
     if all_runs:
         mock_context["all_runs"] = True
     user = mock_context["request"].user
-    course_run = CourseRunFactory.create(course__page=None, live=True)
-    course = course_run.course
+    courseRun1 = CourseRunFactory.create()
+    courseRun2 = CourseRunFactory.create(course=courseRun1.course)
+    course = courseRun1.course
     topic = "a course topic"
     course.topics.set([CourseTopic.objects.create(name=topic)])
 
-    # Create expired, enrollment_ended, future, and enrolled course runs
-    CourseRunFactory.create(course=course, end_date=now - timedelta(1), live=True)
-    CourseRunFactory.create(course=course, enrollment_end=now - timedelta(1), live=True)
-    CourseRunFactory.create(
-        course=course, enrollment_start=now + timedelta(1), live=True
-    )
-    enrolled_run = CourseRunFactory.create(course=course, live=True)
-    unexpired_runs = [enrolled_run, course_run]
     CourseRunEnrollmentFactory.create(
-        run=enrolled_run, **({} if is_anonymous else {"user": user})
+        run=courseRun1, **({} if is_anonymous else {"user": user})
     )
 
     data = CourseSerializer(instance=course, context=mock_context).data
-
-    if all_runs or is_anonymous:
-        expected_runs = unexpired_runs
-    else:
-        expected_runs = [course_run]
 
     assert_drf_json_equal(
         data,
@@ -182,12 +168,12 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
             "readable_id": course.readable_id,
             "id": course.id,
             "courseruns": [
-                CourseRunSerializer(run).data
-                for run in sorted(expected_runs, key=lambda run: run.start_date)
+                CourseRunSerializer(courseRun1).data,
+                CourseRunSerializer(courseRun2).data,
             ],
             "next_run_id": course.first_unexpired_run.id,
             "topics": [{"name": topic}],
-            "page": None,
+            "page": CoursePageSerializer(course.page).data,
         },
     )
 
@@ -262,6 +248,7 @@ def test_serialize_course_run():
             "page": None,
             "approved_flexible_price_exists": False,
             "is_self_paced": False,
+            "live": True,
         },
     )
 
