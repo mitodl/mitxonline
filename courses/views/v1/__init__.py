@@ -83,7 +83,13 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = []
 
     serializer_class = CourseSerializer
-    queryset = Course.objects.filter(live=True)
+
+    def get_queryset(self):
+        readable_id = self.request.query_params.get("readable_id", None)
+        if readable_id:
+            return Course.objects.filter(live=True, readable_id=readable_id)
+
+        return Course.objects.filter(live=True)
 
 
 class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):

@@ -124,10 +124,18 @@ class CoursePageSerializer(serializers.ModelSerializer):
         return instance.live
 
     def get_effort(self, instance):
-        return bleach.clean(instance.effort, tags=[], strip=True)
+        return (
+            bleach.clean(instance.effort, tags=[], strip=True)
+            if instance.effort
+            else None
+        )
 
     def get_length(self, instance):
-        return bleach.clean(instance.length, tags=[], strip=True)
+        return (
+            bleach.clean(instance.length, tags=[], strip=True)
+            if instance.length
+            else None
+        )
 
     class Meta:
         model = models.CoursePage

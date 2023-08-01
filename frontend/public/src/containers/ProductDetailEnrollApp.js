@@ -15,7 +15,10 @@ import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
   courseRunsSelector,
   courseRunsQuery,
-  courseRunsQueryKey
+  courseRunsQueryKey,
+  coursesSelector,
+  coursesQuery,
+  coursesQueryKey
 } from "../lib/queries/courseRuns"
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
@@ -35,7 +38,10 @@ type Props = {
   courseId: string,
   isLoading: ?boolean,
   courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
+  courses: ?Array<any>,
   status: ?number,
+  courseIsLoading: ?boolean,
+  courseStatus: ?number,
   upgradeEnrollmentDialogVisibility: boolean,
   addProductToBasket: (user: number, productId: number) => Promise<any>,
   currentUser: User,
@@ -281,8 +287,107 @@ export class ProductDetailEnrollApp extends React.Component<
     )
   }
 
+  renderCourseInfoBox(courses: any) {
+    if (!courses || courses.length < 1) {
+      return null
+    }
+
+    console.log(courses)
+
+    const run = courses[0].next_run_id
+      ? courses[0].courseruns.find(elem => elem.id === courses[0].next_run_id)
+      : courses[0].courseruns[0]
+
+    if (!run) return null
+
+    const product = run.products.length > 0 && run.products[0]
+
+    const startDate =
+      run && !emptyOrNil(run.start_date)
+        ? moment(new Date(run.start_date))
+        : null
+
+    return (
+      <div className="enrollment-info-box">
+        <div className="row d-flex align-items-center">
+          <div className="enrollment-info-icon">
+            <img
+              src="/static/images/products/start-date.png"
+              alt="Course Timing"
+            />
+          </div>
+          <div className="enrollment-info-text">
+            {startDate ? startDate.format("MMMM D, YYYY") : "Start Anytime"}
+          </div>
+        </div>
+        {run && run.page ? (
+          <div className="row d-flex align-items-top">
+            <div className="enrollment-info-icon">
+              <img
+                src="/static/images/products/effort.png"
+                alt="Expected Length and Effort"
+              />
+            </div>
+            <div className="enrollment-info-text">
+              {run.page["length"] ? run.page.length : "No Data"}
+              <span className="badge badge-pacing">SELF-PACED</span>
+              {run.page.effort ? (
+                <>
+                  <div className="enrollment-effort">{run.page.effort}</div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        <div className="row d-flex align-items-center">
+          <div className="enrollment-info-icon">
+            <img src="/static/images/products/cost.png" alt="Cost" />
+          </div>
+          <div className="enrollment-info-text font-weight-bold">Free</div>
+        </div>
+        <div className="row d-flex align-items-center">
+          <div className="enrollment-info-icon">
+            <img
+              src="/static/images/products/certificate.png"
+              alt="Certificate Track Information"
+            />
+          </div>
+          <div className="enrollment-info-text">
+            {product ? (
+              <>
+                Certificate track: $
+                {product.price.toLocaleString("en-us", {
+                  style:    "currency",
+                  currency: "en-US"
+                })}
+                {run.upgrade_deadline ? (
+                  <>
+                    <div className="text-danger">
+                      Payment deadline:{" "}
+                      {moment(new Date(run.upgrade_deadline)).format(
+                        "MMMM D, YYYY"
+                      )}
+                    </div>
+                  </>
+                ) : null}
+              </>
+            ) : (
+              "No certificate available."
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   render() {
-    const { courseRuns, isLoading, currentUser } = this.props
+    const {
+      courseRuns,
+      isLoading,
+      courses,
+      courseIsLoading,
+      currentUser
+    } = this.props
     const csrfToken = getCookie("csrftoken")
 
     console.log("the card is rendering!")
@@ -328,122 +433,94 @@ export class ProductDetailEnrollApp extends React.Component<
     ) : null
 
     console.log(run)
+    console.log(courses)
 
     return (
       <>
-        {// $FlowFixMe: isLoading null or undefined
+        <p>enrollment card</p>
+        {
+          // $FlowFixMe: isLoading null or undefined
         }
-        <Loader isLoading={isLoading}><>
-          {run && run.is_enrolled ? (
-            <Fragment>
-              {run.courseware_url ? (
-                <a
-                  href={run.courseware_url}
-                  onClick={ev =>
-                    run
-                      ? this.redirectToCourseHomepage(run.courseware_url, ev)
-                      : ev
-                  }
-                  className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                Enrolled &#10003;
-                </a>
-              ) : (
-                <div
-                  className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
-                >
-                Enrolled &#10003;
-                </div>
-              )}
-              {waitingForCourseToBeginMessage}
-            </Fragment>
-          ) : (
-            <Fragment>
-              {run &&
-            isWithinEnrollmentPeriod(run) &&
-            currentUser &&
-            !currentUser.id ? (
+        <Loader isLoading={isLoading}>
+          <>
+            {run && run.is_enrolled ? (
+              <Fragment>
+                {run.courseware_url ? (
                   <a
-                    href={routes.login}
-                    className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
+                    href={run.courseware_url}
+                    onClick={ev =>
+                      run
+                        ? this.redirectToCourseHomepage(run.courseware_url, ev)
+                        : ev
+                    }
+                    className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
-                Enroll now
+                    Enrolled &#10003;
                   </a>
-                ) : run && isWithinEnrollmentPeriod(run) ? (
-                  product && run.is_upgradable ? (
-                    <button
-                      className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
-                      onClick={() => this.toggleUpgradeDialogVisibility()}
+                ) : (
+                  <div
+                    className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
+                  >
+                    Enrolled &#10003;
+                  </div>
+                )}
+                {waitingForCourseToBeginMessage}
+              </Fragment>
+            ) : (
+              <Fragment>
+                {run &&
+                isWithinEnrollmentPeriod(run) &&
+                currentUser &&
+                !currentUser.id ? (
+                    <a
+                      href={routes.login}
+                      className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
                     >
-                  Enroll now
-                    </button>
-                  ) : (
-                    <Fragment>
-                      <form action="/enrollments/" method="post">
-                        <input
-                          type="hidden"
-                          name="csrfmiddlewaretoken"
-                          value={csrfToken}
-                        />
-                        <input type="hidden" name="run" value={run ? run.id : ""} />
-                        <button
-                          type="submit"
-                          className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
-                        >
+                    Enroll now
+                    </a>
+                  ) : run && isWithinEnrollmentPeriod(run) ? (
+                    product && run.is_upgradable ? (
+                      <button
+                        className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
+                        onClick={() => this.toggleUpgradeDialogVisibility()}
+                      >
                       Enroll now
-                        </button>
-                      </form>
-                    </Fragment>
-                  )
-                ) : null}
-              {run ? this.renderUpgradeEnrollmentDialog() : null}
-            </Fragment>
-          )}
+                      </button>
+                    ) : (
+                      <Fragment>
+                        <form action="/enrollments/" method="post">
+                          <input
+                            type="hidden"
+                            name="csrfmiddlewaretoken"
+                            value={csrfToken}
+                          />
+                          <input
+                            type="hidden"
+                            name="run"
+                            value={run ? run.id : ""}
+                          />
+                          <button
+                            type="submit"
+                            className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+                          >
+                          Enroll now
+                          </button>
+                        </form>
+                      </Fragment>
+                    )
+                  ) : null}
+                {run ? this.renderUpgradeEnrollmentDialog() : null}
+              </Fragment>
+            )}
 
-          {run ? <>
-            <div className="enrollment-info-box">
-              <div className="row d-flex align-items-center">
-                <div className="enrollment-info-icon">
-                  <img src="/static/images/products/start-date.png" alt="Course Timing" />
-                </div>
-                <div className="enrollment-info-text">
-                  {startDate ? startDate.format("MMMM D, YYYY") : "Start Anytime"}
-                </div>
-              </div>
-              <div className="row d-flex align-items-top">
-                <div className="enrollment-info-icon">
-                  <img src="/static/images/products/effort.png" alt="Expected Length and Effort" />
-                </div>
-                <div className="enrollment-info-text">
-                  {run.page && run.page["length"] ? run.page["length"] : "No Data"}
-                  {run.page && run.page.effort ? <>
-                    <div className="enrollment-effort">{run.page.effort}
-                      <span className="badge badge-secondary">SELF-PACED</span>
-                    </div>
-                  </> : null}
-                </div>
-              </div>
-              <div className="row d-flex align-items-center">
-                <div className="enrollment-info-icon">
-                  <img src="/static/images/products/cost.png" alt="Cost" />
-                </div>
-                <div className="enrollment-info-text font-weight-bold">
-                Free
-                </div>
-              </div>
-              <div className="row d-flex align-items-center">
-                <div className="enrollment-info-icon">
-                  <img src="/static/images/products/certificate.png" alt="Certificate Track Information" />
-                </div>
-                <div className="enrollment-info-text">
-                </div>
-              </div>
-            </div></> : null}
-
-          {currentUser ? this.renderAddlProfileFieldsModal() : null}
-        </></Loader>
+            {currentUser ? this.renderAddlProfileFieldsModal() : null}
+          </>
+        </Loader>
+        <Loader isLoading={courseIsLoading}>
+          {this.renderCourseInfoBox(courses)}
+        </Loader>
       </>
     )
   }
@@ -467,14 +544,18 @@ const updateAddlFields = (currentUser: User) => {
 }
 
 const mapStateToProps = createStructuredSelector({
-  courseRuns:  courseRunsSelector,
-  currentUser: currentUserSelector,
-  isLoading:   pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
-  status:      pathOr(null, ["queries", courseRunsQueryKey, "status"])
+  courseRuns:      courseRunsSelector,
+  courses:         coursesSelector,
+  currentUser:     currentUserSelector,
+  isLoading:       pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
+  courseIsLoading: pathOr(true, ["queries", coursesQueryKey, "isPending"]),
+  status:          pathOr(null, ["queries", courseRunsQueryKey, "status"]),
+  courseStatus:    pathOr(true, ["queries", coursesQueryKey, "status"])
 })
 
 const mapPropsToConfig = props => [
   courseRunsQuery(props.courseId),
+  coursesQuery(props.courseId),
   users.currentUserQuery()
 ]
 
