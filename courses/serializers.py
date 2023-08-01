@@ -103,7 +103,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "is_self_paced",
             "run_tag",
             "id",
-            "live"
+            "live",
         ]
 
 
