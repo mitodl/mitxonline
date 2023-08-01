@@ -26,7 +26,8 @@ export type BaseCourseRun = {
   id: number,
   page: ?Page,
   course_number: ?string,
-  live: boolean
+  live: boolean,
+  topics: ?Array<CourseTopic>
 }
 
 export type EnrollmentFlaggedCourseRun = BaseCourseRun & {
@@ -140,4 +141,8 @@ export type LearnerRecord = {
   program: LearnerRecordProgram,
   sharing: Array<LearnerRecordShare>,
   partner_schools: Array<PartnerSchool>,
+}
+
+export type CourseTopic = {
+  name: string
 }
