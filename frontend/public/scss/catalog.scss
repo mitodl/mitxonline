@@ -9,6 +9,10 @@
         margin-left: 0;
         padding-left: 0;
         padding-right: 0;
+
+        .row {
+            margin-right: 0;
+        }
     }
 
     #tab-row {
@@ -19,7 +23,40 @@
             padding-left: 0;
         }
 
-        #catalog-page-item-count {
+        .catalog-count-animation {
+
+            .test-enter {
+                right: 0;
+                width: inherit;
+                position: absolute;
+                margin-right: 64px;
+                opacity: 0;
+            }
+            
+            /* ending ENTER animation */
+            .test-enter-active {
+                opacity: 1;
+                transition: opacity 300ms ease-in;
+            }
+            
+            /* starting EXIT animation */
+            .test-exit {
+                right: 0;
+                width: inherit;
+                position: absolute;
+                margin-right: 64px;
+                opacity: 1;
+            }
+    
+            /* ending ENTER animation */
+            .test-exit-active {
+                opacity: 0;
+                transition: opacity 300ms ease-in;
+            }
+    
+        }
+
+        .catalog-page-item-count {
             color: var(--blue-dark, #03152D);
             text-align: right;
             font-family: Inter;
@@ -28,9 +65,10 @@
             font-weight: 400;
             line-height: normal;
             margin-right: 64px;
-            margin-left: auto;
             margin-top: 40px;
             padding-right: 0;
+            right: 0;
+            width: inherit;
         }
     
         #tabs {
@@ -83,7 +121,6 @@
         /* starting ENTER animation */
         .messageout-enter {
             position: absolute;
-            opacity: 0.01;
         }
         
         /* ending ENTER animation */
