@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.70.3
+--------------
+
+- Populate passing DEDP grades that were set to None by Admin (#1787)
+
 Version 0.70.2 (Released July 31, 2023)
 --------------
 
