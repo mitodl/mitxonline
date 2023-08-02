@@ -489,6 +489,14 @@
       "description": "The 'name' value for the Open edX OAuth Application",
       "required": true
     },
+    "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID": {
+      "description": "Active access token with staff level permissions to use with OpenEdX API client for service tasks",
+      "required": false
+    },
+    "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET": {
+      "description": "Active access token with staff level permissions to use with OpenEdX API client for service tasks",
+      "required": false
+    },
     "OPENEDX_SERVICE_WORKER_API_TOKEN": {
       "description": "Active access token with staff level permissions to use with OpenEdX API client for service tasks",
       "required": false
