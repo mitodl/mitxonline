@@ -174,6 +174,24 @@ class CourseSerializer(BaseCourseSerializer):
 
     def get_courseruns(self, instance):
         """Returns all course runs related to the course."""
+        """Unexpired and unenrolled course runs"""
+        all_runs = self.context.get("all_runs", False)
+        if all_runs:
+            active_runs = instance.unexpired_runs
+        else:
+            user = self.context["request"].user if "request" in self.context else None
+            active_runs = (
+                instance.available_runs(user)
+                if user and user.is_authenticated
+                else instance.unexpired_runs
+            )
+        return [
+            CourseRunSerializer(instance=run, context=self.context).data
+            for run in active_runs
+            if run.live
+        ]
+        
+        # TODO: COLLIN WRAP IN FLAG
         return [
             CourseRunSerializer(instance=run, context=self.context).data
             for run in instance.courseruns.all()
