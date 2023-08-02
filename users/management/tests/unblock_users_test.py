@@ -14,7 +14,7 @@ from users.models import BlockList
 User = get_user_model()
 
 
-@patch("users.management.commands.retire_users.bulk_retire_edx_users")
+# @patch("users.management.commands.retire_users.bulk_retire_edx_users")
 class TestUnblockUsers(TestCase):
     """
     Tests unblock users management command.
@@ -25,6 +25,7 @@ class TestUnblockUsers(TestCase):
         self.RETIRE_USER_COMMAND = retire_users.Command()
         self.UNBLOCK_USER_COMMAND = unblock_users.Command()
 
+    @patch("users.management.commands.retire_users.bulk_retire_edx_users")
     @pytest.mark.django_db
     def test_user_unblocking_with_email(self, mocked_bulk_retire_edx_users):
         """test unblock_users command success with user email"""
@@ -58,6 +59,7 @@ class TestUnblockUsers(TestCase):
         assert BlockList.objects.all().count() == 0
         assert BlockList.objects.filter(hashed_email=hashed_email).count() == 0
 
+    @patch("users.management.commands.retire_users.bulk_retire_edx_users")
     @pytest.mark.django_db
     def test_multiple_success_unblocking_user(self, mocked_bulk_retire_edx_users):
         """test unblock_users command unblocking emails success with more than one user"""
