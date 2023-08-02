@@ -29,49 +29,78 @@ type Props = {
 }
 
 const ALL_DEPARTMENTS = "All Departments"
+const PROGRAMS_TAB = "programs"
+const COURSES_TAB = "courses"
 
 export class CatalogPage extends React.Component<Props> {
   state = {
-    tabSelected:         "courses",
+    tabSelected:         COURSES_TAB,
     filteredCourses:     [],
     filterCoursesCalled: false,
-    courseTopics:        [],
-    selectedTopic:       ALL_DEPARTMENTS
+    courseDepartments:   [],
+    selectedDepartment:  ALL_DEPARTMENTS
   }
 
+  /**
+   * Updates the filteredCourses and courseDepartments state variables
+   * once coursesIsLoading is False.
+   */
   componentDidUpdate = () => {
-    const { coursesIsLoading } = this.props
+    const { courses, coursesIsLoading } = this.props
     if (!coursesIsLoading && !this.state.filterCoursesCalled) {
       this.setState({ filterCoursesCalled: true })
-      const courses = this.filteredCoursesBasedOnCourseRunCriteria(
-        this.state.selectedTopic
+      const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+        this.state.selectedDepartment,
+        courses
       )
-      this.setState({ filteredCourses: courses })
+      this.setState({ filteredCourses: filteredCourses })
       this.setState({
-        courseTopics: this.collectCourseTopicsFromCourses(courses)
+        courseDepartments: this.collectCourseDepartmentsFromCourses(
+          filteredCourses
+        )
       })
     }
   }
 
-  collectCourseTopicsFromCourses(courses: Array<CourseDetailWithRuns>) {
-    const topics = Array.from(courses, course => course.topics)
-    return [ALL_DEPARTMENTS, ...topics.flat().map(topic => topic.name)]
+  /**
+   * Returns an array of CourseDepartment names that are associated with the Courses in the
+   * parameter and also includes an entry for "All Departments".
+   * @param {Array<CourseDetailWithRuns>} courses Array of Courses to collect CourseDepartment names from.
+   */
+  collectCourseDepartmentsFromCourses(courses: Array<CourseDetailWithRuns>) {
+    const departments = Array.from(courses, course => course.departments)
+    return [
+      ALL_DEPARTMENTS,
+      ...departments.flat().map(department => department.name)
+    ]
   }
 
   changeSelectedTab = (btn: string) => {
     this.setState({ tabSelected: btn })
   }
 
-  changeSelectedTopic = (selectedTopic: string) => {
-    this.setState({ selectedTopic: selectedTopic })
+  /**
+   * Changes the selectedDepartment state variable and updated the filteredCourses state variable.
+   * @param {string} selectedDepartment The department name to set selectedDepartment to and filter courses by.
+   */
+  changeSelectedDepartment = (selectedDepartment: string) => {
+    const { courses } = this.props
+    this.setState({ selectedDepartment: selectedDepartment })
     this.setState({
       filteredCourses: this.filteredCoursesBasedOnCourseRunCriteria(
-        selectedTopic
+        selectedDepartment,
+        courses
       )
     })
   }
 
-  getFutureCourseRunClosestToToday(
+  /**
+   * This is a comparision method used to sort an array of Course Runs
+   * from earliest start date to latest start date.
+   * @param {BaseCourseRun} courseRunA The first Course Run to compare.
+   * @param {BaseCourseRun} courseRunB The second Course Run to compare.
+   */
+  compareCourseRunStartDates(
     courseRunA: BaseCourseRun,
     courseRunB: BaseCourseRun
   ) {
@@ -85,6 +114,16 @@ export class CatalogPage extends React.Component<Props> {
     return 0
   }
 
+  /**
+   * Returns the text to be displayed on a course catalog card's tag.
+   * This text will either be "Start Anytime" or "Start Date: <most recent, future, start date for the course>".
+   * If the Course has at least one associated Course Run which is not self-paced, and
+   * Course Run start date is in the future, then return "Start Date: <most recent, future, start date for the course>".
+   * If the Course has at least one associated Course Run which is not self-paced, and
+   * Course Run start date is in the past, then return "Start Anytime".
+   * If the course only has Course Runs which are self-paced, display "Start Anytime".
+   * @param {CourseDetailWithRuns} course The course being evaluated.
+   */
   renderCatalogCardTagForCourse(course: CourseDetailWithRuns) {
     const nonSelfPacedCourseRuns = course.courseruns.filter(
       courseRun => !courseRun.is_self_paced
@@ -95,9 +134,8 @@ export class CatalogPage extends React.Component<Props> {
       )
       if (futureStartDateCourseRuns.length > 0) {
         const startDate = parseDateString(
-          futureStartDateCourseRuns.sort(
-            this.getFutureCourseRunClosestToToday
-          )[0].start_date
+          futureStartDateCourseRuns.sort(this.compareCourseRunStartDates)[0]
+            .start_date
         )
         return `Start Date: ${formatPrettyDate(startDate)}`
       } else {
@@ -108,6 +146,12 @@ export class CatalogPage extends React.Component<Props> {
     }
   }
 
+  /**
+   * Returns a filtered array of Course Runs which are live, define a start date,
+   * enrollment start date is before the current date and time, and
+   * enrollment end date is not defined or is after the current date and time.
+   * @param {Array<BaseCourseRun>} courseRuns The array of Course Runs apply the filter to.
+   */
   validateCoursesCourseRuns(courseRuns: Array<BaseCourseRun>) {
     return courseRuns.filter(
       courseRun =>
@@ -119,12 +163,23 @@ export class CatalogPage extends React.Component<Props> {
     )
   }
 
-  filteredCoursesBasedOnCourseRunCriteria(selectedTopic: string) {
-    const { courses } = this.props
+  /**
+   * Returns a filtered array of courses which have: an associated CourseDepartment name matching the selectedDepartment
+   * if the selectedDepartment does not equal "All Departments",
+   * an associated page which is live, and at least 1 associated Course Run.
+   * @param {Array<CourseDetailWithRuns>} courses An array of courses which will be filtered by CourseDepartment.
+   * @param {string} selectedDepartment The CourseDepartment name used to compare against the courses in the array.
+   */
+  filteredCoursesBasedOnCourseRunCriteria(
+    selectedDepartment: string,
+    courses: Array<CourseDetailWithRuns>
+  ) {
     return courses.filter(
       course =>
-        (selectedTopic === ALL_DEPARTMENTS ||
-          course.topics.map(topic => topic.name).includes(selectedTopic)) &&
+        (selectedDepartment === ALL_DEPARTMENTS ||
+          course.departments
+            .map(department => department.name)
+            .includes(selectedDepartment)) &&
         course.page.live === true &&
         course.courseruns.length > 0 &&
         this.validateCoursesCourseRuns(course.courseruns).length > 0
@@ -136,9 +191,9 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderNumberOfCatalogItems() {
     const { programs, coursesIsLoading, programsIsLoading } = this.props
-    if (this.state.tabSelected === "courses" && !coursesIsLoading) {
+    if (this.state.tabSelected === COURSES_TAB && !coursesIsLoading) {
       return this.state.filteredCourses.length
-    } else if (this.state.tabSelected === "programs" && !programsIsLoading) {
+    } else if (this.state.tabSelected === PROGRAMS_TAB && !programsIsLoading) {
       return programs.length
     }
   }
@@ -211,32 +266,37 @@ export class CatalogPage extends React.Component<Props> {
   renderCatalog() {
     const { programs, programsIsLoading } = this.props
     if (
-      this.state.tabSelected === "courses" &&
+      this.state.tabSelected === COURSES_TAB &&
       this.state.filteredCourses.length > 0
     ) {
       return this.renderCatalogRows(
         this.state.filteredCourses,
         this.renderCourseCatalogCard.bind(this)
       )
-    } else if (this.state.tabSelected === "programs" && !programsIsLoading) {
+    } else if (this.state.tabSelected === PROGRAMS_TAB && !programsIsLoading) {
       return this.renderCatalogRows(programs, this.renderProgramCatalogCard)
     }
   }
 
+  /**
+   * Returns the rendering of the Department sidebar.
+   */
   renderDepartmentSideBarList() {
     const departmentSideBarListItems = []
-    this.state.courseTopics.forEach(courseTopic =>
+    this.state.courseDepartments.forEach(courseDepartment =>
       departmentSideBarListItems.push(
         <li
           className={
-            this.state.selectedTopic === courseTopic
+            this.state.selectedDepartment === courseDepartment
               ? "department-selected-link"
               : "department-link"
           }
-          key={courseTopic}
+          key={courseDepartment}
         >
-          <button onClick={() => this.changeSelectedTopic(courseTopic)}>
-            {courseTopic}
+          <button
+            onClick={() => this.changeSelectedDepartment(courseDepartment)}
+          >
+            {courseDepartment}
           </button>
         </li>
       )
@@ -268,26 +328,26 @@ export class CatalogPage extends React.Component<Props> {
                     <div id="tabs">
                       <div
                         className={
-                          this.state.tabSelected === "courses"
+                          this.state.tabSelected === COURSES_TAB
                             ? "selected-tab"
                             : "unselected-tab"
                         }
                       >
                         <button
-                          onClick={() => this.changeSelectedTab("courses")}
+                          onClick={() => this.changeSelectedTab(COURSES_TAB)}
                         >
                           Courses
                         </button>
                       </div>
                       <div
                         className={
-                          this.state.tabSelected === "programs"
+                          this.state.tabSelected === PROGRAMS_TAB
                             ? "selected-tab"
                             : "unselected-tab"
                         }
                       >
                         <button
-                          onClick={() => this.changeSelectedTab("programs")}
+                          onClick={() => this.changeSelectedTab(PROGRAMS_TAB)}
                         >
                           Programs
                         </button>

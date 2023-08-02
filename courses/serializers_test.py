@@ -20,7 +20,11 @@ from courses.factories import (
     ProgramFactory,
     program_with_empty_requirements,
 )
-from courses.models import CourseTopic, ProgramRequirement, ProgramRequirementNodeType
+from courses.models import (
+    CourseDepartment,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
+)
 from courses.serializers import (
     BaseCourseSerializer,
     BaseProgramSerializer,
@@ -86,9 +90,11 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
             for _ in range(2)
         ]
     )
-    topics = [CourseTopic.objects.create(name=f"topic{num}") for num in range(3)]
-    course1.topics.set([topics[0], topics[1]])
-    course2.topics.set([topics[1], topics[2]])
+    departments = [
+        CourseDepartment.objects.create(name=f"department{num}") for num in range(3)
+    ]
+    course1.departments.set([departments[0], departments[1]])
+    course2.departments.set([departments[1], departments[2]])
 
     formatted_reqs = {"required": [], "electives": []}
 
@@ -152,8 +158,8 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
     courseRun1 = CourseRunFactory.create()
     courseRun2 = CourseRunFactory.create(course=courseRun1.course)
     course = courseRun1.course
-    topic = "a course topic"
-    course.topics.set([CourseTopic.objects.create(name=topic)])
+    department = "a course departments"
+    course.departments.set([CourseDepartment.objects.create(name=department)])
 
     CourseRunEnrollmentFactory.create(
         run=courseRun1, **({} if is_anonymous else {"user": user})
@@ -172,7 +178,7 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
                 CourseRunSerializer(courseRun2).data,
             ],
             "next_run_id": course.first_unexpired_run.id,
-            "topics": [{"name": topic}],
+            "departments": [{"name": department}],
             "page": CoursePageSerializer(course.page).data,
         },
     )

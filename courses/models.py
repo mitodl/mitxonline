@@ -410,9 +410,9 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
         return f"{self.program.readable_id} | {self.program.title}"
 
 
-class CourseTopic(TimestampedModel):
+class CourseDepartment(TimestampedModel):
     """
-    Topics for all courses (e.g. "History")
+    Departments that Courses can be associated with.
     """
 
     name = models.CharField(max_length=128, unique=True)
@@ -430,7 +430,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
     live = models.BooleanField(default=False)
-    topics = models.ManyToManyField(CourseTopic, blank=True)
+    departments = models.ManyToManyField(CourseDepartment, blank=True)
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
         object_id_field="courseware_object_id",

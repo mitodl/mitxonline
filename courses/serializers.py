@@ -164,7 +164,7 @@ class CourseSerializer(BaseCourseSerializer):
 
     courseruns = serializers.SerializerMethodField()
     next_run_id = serializers.SerializerMethodField()
-    topics = serializers.SerializerMethodField()
+    departments = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
 
     def get_next_run_id(self, instance):
@@ -179,11 +179,11 @@ class CourseSerializer(BaseCourseSerializer):
             for run in instance.courseruns.all()
         ]
 
-    def get_topics(self, instance):
-        """List topics of a course"""
+    def get_departments(self, instance):
+        """List departments of a course"""
         return sorted(
-            [{"name": topic.name} for topic in instance.topics.all()],
-            key=lambda topic: topic["name"],
+            [{"name": department.name} for department in instance.departments.all()],
+            key=lambda department: department["name"],
         )
 
     def get_page(self, instance):
@@ -203,7 +203,7 @@ class CourseSerializer(BaseCourseSerializer):
             "readable_id",
             "courseruns",
             "next_run_id",
-            "topics",
+            "departments",
             "page",
         ]
 
@@ -320,7 +320,7 @@ class FullProgramSerializer(ProgramSerializer):
     start_date = serializers.SerializerMethodField()
     end_date = serializers.SerializerMethodField()
     enrollment_start = serializers.SerializerMethodField()
-    topics = serializers.SerializerMethodField()
+    departments = serializers.SerializerMethodField()
 
     def get_start_date(self, instance):
         """
@@ -364,15 +364,15 @@ class FullProgramSerializer(ProgramSerializer):
             .first()
         )
 
-    def get_topics(self, instance):
-        """List all topics in all courses in the program"""
+    def get_departments(self, instance):
+        """List all departments in all courses in the program"""
         courses_in_program = [course[0] for course in instance.courses]
-        topics = (
-            models.CourseTopic.objects.filter(course__in=courses_in_program)
+        departments = (
+            models.CourseDepartment.objects.filter(course__in=courses_in_program)
             .values("name")
             .distinct("name")
         )
-        return list(topics)
+        return list(departments)
 
     class Meta(ProgramSerializer.Meta):
         fields = ProgramSerializer.Meta.fields + [

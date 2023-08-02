@@ -18,7 +18,7 @@ from courses.models import (
     CourseRunEnrollmentAudit,
     CourseRunGrade,
     CourseRunGradeAudit,
-    CourseTopic,
+    CourseDepartment,
     LearnerProgramRecordShare,
     PaidCourseRun,
     PartnerSchool,
@@ -56,13 +56,13 @@ class CourseAdmin(admin.ModelAdmin):
     """Admin for Course"""
 
     model = Course
-    search_fields = ["title", "topics__name", "readable_id"]
+    search_fields = ["title", "departments__name", "readable_id"]
     list_display = (
         "id",
         "title",
         "readable_id",
     )
-    list_filter = ["live", "topics"]
+    list_filter = ["live", "departments"]
 
     formfield_overrides = {
         models.CharField: {"widget": TextInput(attrs={"size": "80"})}
@@ -349,10 +349,10 @@ class CourseRunGradeAuditAdmin(TimestampedModelAdmin):
         return False
 
 
-class CourseTopicAdmin(admin.ModelAdmin):
-    """Admin for CourseTopic"""
+class CourseDepartmentAdmin(admin.ModelAdmin):
+    """Admin for CourseDepartment"""
 
-    model = CourseTopic
+    model = CourseDepartment
 
 
 class BlockedCountryAdmin(TimestampedModelAdmin):
@@ -493,7 +493,7 @@ admin.site.register(CourseRunEnrollment, CourseRunEnrollmentAdmin)
 admin.site.register(CourseRunEnrollmentAudit, CourseRunEnrollmentAuditAdmin)
 admin.site.register(CourseRunGrade, CourseRunGradeAdmin)
 admin.site.register(CourseRunGradeAudit, CourseRunGradeAuditAdmin)
-admin.site.register(CourseTopic, CourseTopicAdmin)
+admin.site.register(CourseDepartment, CourseDepartmentAdmin)
 admin.site.register(BlockedCountry, BlockedCountryAdmin)
 admin.site.register(PaidCourseRun, PaidCourseRunAdmin)
 admin.site.register(CourseRunCertificate, CourseRunCertificateAdmin)

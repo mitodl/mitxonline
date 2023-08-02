@@ -36,7 +36,7 @@
   - **Title**: the title of the course, e.g. `Leading Change in Organizations`
   - **Readable id**: the id, e.g. `course-v1:xPRO+LASERx3`
   - **Live**: Set to live when ready to launch. Note that you should not check this box for courses that will not need a catalog page, e.g. a SPOC or a private course. 
-  - **Topics**: select the applicable topic(s)
+  - **Departments**: select the applicable department(s)
 
 
 
