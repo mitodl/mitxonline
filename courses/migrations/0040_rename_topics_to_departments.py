@@ -4,23 +4,24 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    """Changes the CourseTopic model to CourseDepartment.  Adds the departments field to the Course model."""
 
     dependencies = [
-        ('courses', '0039_program_program_type'),
+        ("courses", "0039_program_program_type"),
     ]
 
     operations = [
         migrations.RenameModel(
-            old_name='CourseTopic',
-            new_name='CourseDepartment',
+            old_name="CourseTopic",
+            new_name="CourseDepartment",
         ),
         migrations.RemoveField(
-            model_name='course',
-            name='topics',
+            model_name="course",
+            name="topics",
         ),
         migrations.AddField(
-            model_name='course',
-            name='departments',
-            field=models.ManyToManyField(blank=True, to='courses.CourseDepartment'),
+            model_name="course",
+            name="departments",
+            field=models.ManyToManyField(blank=True, to="courses.CourseDepartment"),
         ),
     ]
