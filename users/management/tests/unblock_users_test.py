@@ -1,5 +1,6 @@
 """retire user test"""
 import hashlib
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -13,6 +14,7 @@ from users.models import BlockList
 User = get_user_model()
 
 
+@patch("users.management.commands.retire_users.bulk_retire_edx_users")
 class TestUnblockUsers(TestCase):
     """
     Tests unblock users management command.
@@ -24,7 +26,7 @@ class TestUnblockUsers(TestCase):
         self.UNBLOCK_USER_COMMAND = unblock_users.Command()
 
     @pytest.mark.django_db
-    def test_user_unblocking_with_email(self):
+    def test_user_unblocking_with_email(self, mocked_bulk_retire_edx_users):
         """test unblock_users command success with user email"""
         test_email = "test@email.com"
 
@@ -37,6 +39,9 @@ class TestUnblockUsers(TestCase):
         assert UserSocialAuth.objects.filter(user=user).count() == 1
         assert BlockList.objects.all().count() == 0
 
+        mocked_bulk_retire_edx_users.return_value = {
+            "successful_user_retirements": [user.username]
+        }
         self.RETIRE_USER_COMMAND.handle(
             "retire_users", users=[test_email], block_users=True
         )
@@ -54,12 +59,16 @@ class TestUnblockUsers(TestCase):
         assert BlockList.objects.filter(hashed_email=hashed_email).count() == 0
 
     @pytest.mark.django_db
-    def test_multiple_success_unblocking_user(self):
+    def test_multiple_success_unblocking_user(self, mocked_bulk_retire_edx_users):
         """test unblock_users command unblocking emails success with more than one user"""
-        test_users = ["foo@email.com", "bar@email.com", "baz@email.com"]
+        test_user_emails = ["foo@email.com", "bar@email.com", "baz@email.com"]
+        test_usernames = ["foo", "bar", "baz"]
+        mocked_bulk_retire_edx_users.return_value = {
+            "successful_user_retirements": test_usernames
+        }
 
-        for email in test_users:
-            user = UserFactory.create(email=email, is_active=True)
+        for email, username in zip(test_user_emails, test_usernames):
+            user = UserFactory.create(email=email, username=username, is_active=True)
             UserSocialAuthFactory.create(user=user, provider="not_edx")
 
             assert user.is_active is True
@@ -68,12 +77,12 @@ class TestUnblockUsers(TestCase):
             assert BlockList.objects.all().count() == 0
 
         self.RETIRE_USER_COMMAND.handle(
-            "retire_users", users=test_users, block_users=True
+            "retire_users", users=test_user_emails, block_users=True
         )
         assert BlockList.objects.all().count() == 3
 
         # Now we need to unblock the user from block list.
-        self.UNBLOCK_USER_COMMAND.handle("unblock_users", users=test_users)
+        self.UNBLOCK_USER_COMMAND.handle("unblock_users", users=test_user_emails)
         assert BlockList.objects.all().count() == 0
 
     @pytest.mark.django_db
