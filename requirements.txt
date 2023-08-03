@@ -405,7 +405,7 @@ redis==4.4.4
     #   -r requirements.in
     #   celery-redbeat
     #   django-redis
-requests==2.28.2
+requests==2.31.0
     # via
     #   -r requirements.in
     #   coreapi
