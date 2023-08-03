@@ -1681,4 +1681,3 @@ Version 0.1.0 (Released August 04, 2021)
 - Fix flaky util test
 - Add courses app
 - Added Wagtail and initial model definitions
-
