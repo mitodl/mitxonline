@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.70.4
+--------------
+
+- Use poetry for python dependency management (#1766)
+- remove assertRaises
+- remove unncessary momentjs locales
+
 Version 0.70.3 (Released August 01, 2023)
 --------------
 
