@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.70.4
+Version 0.70.4 (Released August 03, 2023)
 --------------
 
 - Use poetry for python dependency management (#1766)
