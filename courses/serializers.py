@@ -100,6 +100,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "courseware_id",
             "upgrade_deadline",
             "is_upgradable",
+            "is_self_paced",
             "run_tag",
             "id",
         ]

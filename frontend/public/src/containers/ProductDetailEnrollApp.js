@@ -11,7 +11,7 @@ import { Modal, ModalBody, ModalHeader } from "reactstrap"
 import Loader from "../components/Loader"
 import { routes } from "../lib/urls"
 import { getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
-import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
+import { BaseCourseRun, EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
   courseRunsSelector,
   courseRunsQuery,
@@ -33,6 +33,18 @@ import users, { currentUserSelector } from "../lib/queries/users"
 import { enrollmentMutation } from "../lib/queries/enrollment"
 import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "../components/forms/AddlProfileFieldsForm"
+
+const expandExpandBlock = event => {
+  console.log("we're doing it!")
+  const block = event.target.getAttribute("data-expand-body")
+  console.log("the block is", block)
+  const elem = document.querySelector(`div#exp${block}`)
+  console.log("elem is", elem)
+  console.log("classList is", elem.classList)
+  if (!elem.classList.toggle("open")) {
+    console.log("it failed")
+  }
+}
 
 type Props = {
   courseId: string,
@@ -287,12 +299,10 @@ export class ProductDetailEnrollApp extends React.Component<
     )
   }
 
-  renderCourseInfoBox(courses: any) {
+  renderCourseInfoBox(courses: Array<BaseCourseRun>) {
     if (!courses || courses.length < 1) {
       return null
     }
-
-    console.log(courses)
 
     const run = courses[0].next_run_id
       ? courses[0].courseruns.find(elem => elem.id === courses[0].next_run_id)
@@ -329,8 +339,8 @@ export class ProductDetailEnrollApp extends React.Component<
               />
             </div>
             <div className="enrollment-info-text">
-              {run.page["length"] ? run.page.length : "No Data"}
-              <span className="badge badge-pacing">SELF-PACED</span>
+              {run.page.length}
+              {run.is_self_paced ? <span className="badge badge-pacing">SELF-PACED</span> : null}
               {run.page.effort ? (
                 <>
                   <div className="enrollment-effort">{run.page.effort}</div>
@@ -345,7 +355,7 @@ export class ProductDetailEnrollApp extends React.Component<
           </div>
           <div className="enrollment-info-text font-weight-bold">Free</div>
         </div>
-        <div className="row d-flex align-items-center">
+        <div className="row d-flex align-items-top">
           <div className="enrollment-info-icon">
             <img
               src="/static/images/products/certificate.png"
@@ -370,6 +380,12 @@ export class ProductDetailEnrollApp extends React.Component<
                     </div>
                   </>
                 ) : null}
+                <div>
+                  <a target="_blank" rel="noreferrer" href="#">What's the certificate track?</a>
+                </div>
+                {run.page.financial_assistance_form_url ? <div>
+                  <a target="_blank" rel="noreferrer" href={run.page.financial_assistance_form_url}>Financial assistance available</a>
+                </div> : null}
               </>
             ) : (
               "No certificate available."
@@ -389,8 +405,6 @@ export class ProductDetailEnrollApp extends React.Component<
       currentUser
     } = this.props
     const csrfToken = getCookie("csrftoken")
-
-    console.log("the card is rendering!")
 
     let run =
       !this.getCurrentCourseRun() && courseRuns
@@ -432,12 +446,14 @@ export class ProductDetailEnrollApp extends React.Component<
       </p>
     ) : null
 
-    console.log(run)
-    console.log(courses)
+    document.querySelectorAll("a.expand_here_link").forEach(link => {
+      console.log("adding event handlers")
+      link.removeEventListener("click", expandExpandBlock)
+      link.addEventListener("click", expandExpandBlock)
+    })
 
     return (
       <>
-        <p>enrollment card</p>
         {
           // $FlowFixMe: isLoading null or undefined
         }
