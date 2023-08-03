@@ -37,7 +37,7 @@ cachetools==4.2.4
     # via
     #   google-auth
     #   premailer
-celery==5.2.2
+celery==5.3.1
     # via
     #   -r requirements.in
     #   celery-redbeat
