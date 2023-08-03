@@ -312,13 +312,19 @@ export class CatalogPage extends React.Component<Props> {
     return (
       <div id="catalog-page">
         <div id="catalog-title">
-          <h1>MITx Online Catalog</h1>
+          {/* Hidden on small screens. */}
+          <h1 className="d-none d-sm-block">MITx Online Catalog</h1>
+          {/* Visible on small screens. */}
+          <h1 className="d-block d-sm-none">Catalog</h1>
         </div>
         <div id="course-catalog-navigation">
-          {this.renderDepartmentSideBarList()}
+          <div className="d-none d-sm-block">
+            {/* Hidden on small screens. */}
+            {this.renderDepartmentSideBarList()}
+          </div>
           <div className="container">
             <div className="row" id="tab-row">
-              <div className="col catalog-animation">
+              <div className="col col-sm-2 catalog-animation">
                 <TransitionGroup>
                   <CSSTransition
                     key={this.state.tabSelected}
@@ -362,9 +368,10 @@ export class CatalogPage extends React.Component<Props> {
                     <CSSTransition
                       key={this.state.tabSelected}
                       timeout={300}
-                      classNames="test"
+                      classNames="count"
                     >
-                      <div>
+                      <div className="d-none d-sm-block">
+                        {/* Hidden on small screens. */}
                         {/* Could add logic to display only "course" if only 1 course is showing. */}
                         {this.renderNumberOfCatalogItems()}{" "}
                         {this.state.tabSelected}
