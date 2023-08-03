@@ -3,6 +3,7 @@ const webpack = require("webpack")
 const BundleTracker = require("webpack-bundle-tracker")
 const MiniCssExtractPlugin = require("mini-css-extract-plugin")
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer")
+const MomentLocalesPlugin = require('moment-locales-webpack-plugin');
 
 module.exports = function (env, argv) {
   const mode = argv.mode || process.env.NODE_ENV || "production"
@@ -66,7 +67,8 @@ module.exports = function (env, argv) {
     plugins: [
       new BundleTracker({
         filename: path.resolve(__dirname, "../../webpack-stats/default.json")
-      })
+      }),
+      new MomentLocalesPlugin() // Removes all but the default locale, 'en'
     ].concat(isProduction ? [
       new webpack.LoaderOptionsPlugin({
         minimize: true
