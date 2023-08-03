@@ -3,6 +3,18 @@
 .product-page {
   position: relative;
   margin-top: 1.5rem;
+  background-color: white;
+  font-family: "Avenir Next", sans-serif;
+
+  section.course-description,
+  #tab-bar,
+  section.about-richtext-container {
+    font-family: "Roboto", sans-serif;
+
+    h2 {
+      font-family: "Avenir Next", "Roboto", sans-serif;
+    }
+  }
 
   @include media-breakpoint-down(sm) {
     h2 {
@@ -31,9 +43,9 @@
   }
 
   section.course-description {
-    line-height: 250%;
+    line-height: 46px;
+    font-size: 20px;
     color: #646669;
-
   }
 
   #tab-bar {
@@ -45,7 +57,7 @@
       padding: 0;
       padding-right: 40px;
       color: #35607a;
-      font-weight: bold;
+      font-weight: normal;
 
       a {
         color: #35607a;
@@ -54,9 +66,26 @@
     }
   }
 
+  section.about-richtext-container {
+    margin: 2.5rem 0;
+
+    div.expand_here_body {
+      max-height: 0px;
+      overflow-y: hidden;
+      transition: all 0.4s ease;
+    }
+
+    div.expand_here_body.open {
+      max-height: 400rem;
+    }
+  }
+
   section.about-this-class {
     color: #000;
     /* TODO: this requires a different font and colors */    
+    h2, h3, h4, h5, h6 {
+      font-size: smaller;
+    }
   }
 
   .hero-block {
@@ -189,6 +218,19 @@
     }
   }
 
+  #instructors {
+    background-color: #eff3f6;
+    margin: 1.5rem 0;
+    padding: 30px 20px;
+    border: 1px solid #dce1e9;
+  }
+
+  .ofac-message {
+    border: 1px solid #e4e9ef;
+    padding: 2rem;
+    clear: both;
+  }
+
   #product-info-box {
     padding-bottom: 25px;
     font-size: 14px;
@@ -217,14 +259,19 @@
       align-items: top;
 
       margin-top: 10px;
+      width: 350px;
 
       @include media-breakpoint-up(xl) {
         margin: 0 -18px;
       }
 
+      .font-weight-bold {
+        font-weight: bold;
+      }
+
       .btn-enrollment-button {
-        width: 350px;
         height: 50px;
+        width: 100%;
         padding: 0!important;
       }
 
@@ -461,10 +508,6 @@
     @include media-breakpoint-down(sm) {
       padding-bottom: 20px;
     }
-  }
-
-  .ofac-message {
-    clear: both;
   }
 }
 

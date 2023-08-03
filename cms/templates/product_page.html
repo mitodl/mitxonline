@@ -156,21 +156,21 @@
 
               <nav id="tab-bar">
                 <ul class="nav">
-                  <li class="nav-item"><a href="#about-this-class">About</a></li>
+                  {% if page.about %}<li class="nav-item"><a href="#about-this-class">About</a></li>{% endif %}
                   {% if page.what_you_learn %}<li class="nav-item"><a href="#what-youll-learn">What you'll learn</a></li>{% endif %}
                   {% if instructors %}<li class="nav-item"><a href="#instructors">Instructors</a></li>{% endif %}
                   {% if page.faq_url %}<li class="nav-item"><a href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
                 </ul>
               </nav>
 
-              <section class="about-this-class" id="about-this-class">
-                {{ page.about |richtext }}
-              </section>
+              {% if page.about %}<section class="about-this-class about-richtext-container" id="about-this-class">
+                {{ page.about | richtext | expand }}
+              </section>{% endif %}
 
-              <section class="what-youll-learn" id="what-youll-learn">
+              {% if page.what_you_learn %}<section class="what-youll-learn about-richtext-container" id="what-youll-learn">
                 <h2>What you&apos;ll learn</h2>
                 {{ page.what_you_learn |richtext }}
-              </section>
+              </section>{% endif %}
     
               {% if instructors or page.faculty_members %}
               <section class="faculty-section" id="instructors">
@@ -196,9 +196,9 @@
               </section>
               {% endif %}
 
-              <section class="ofac-message">
+              <section class="ofac-message border">
                 <div class="container">
-                  <p><em>Who can take this course?</em></p>
+                  <h2>Who can take this course?</h2>
         
                   <p>Because of U.S. Office of Foreign Assets Control (OFAC) restrictions and other U.S. federal regulations, learners residing in one or more of the following countries or regions will not be able to register for this course: Iran, Cuba, Syria, North Korea and the Crimea, Donetsk People's Republic and Luhansk People's Republic regions of Ukraine.</p>
                 </div>
