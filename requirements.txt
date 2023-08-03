@@ -14,7 +14,7 @@ asgiref==3.3.4
     #   djoser
 async-timeout==4.0.2
     # via redis
-attrs==22.1.0
+attrs==23.1.0
     # via pytest
 backcall==0.2.0
     # via ipython
