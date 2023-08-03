@@ -322,22 +322,18 @@ export class CatalogPage extends React.Component<Props> {
             {/* Hidden on small screens. */}
             {this.renderDepartmentSideBarList()}
           </div>
-          <div className="container">
+          <div className="container-fluid">
             <div className="row" id="tab-row">
-              <div className="col col-sm-2 catalog-animation">
+              <div className="col catalog-animation d-sm-flex d-md-inline-flex">
                 <TransitionGroup>
                   <CSSTransition
                     key={this.state.tabSelected}
                     timeout={300}
                     classNames="messageout"
                   >
-                    <div id="tabs">
+                    <div className="row" id="tabs">
                       <div
-                        className={
-                          this.state.tabSelected === COURSES_TAB
-                            ? "selected-tab"
-                            : "unselected-tab"
-                        }
+                        className={`col ${this.state.tabSelected === COURSES_TAB ? "selected-tab" : "unselected-tab"}`}
                       >
                         <button
                           onClick={() => this.changeSelectedTab(COURSES_TAB)}
@@ -346,11 +342,7 @@ export class CatalogPage extends React.Component<Props> {
                         </button>
                       </div>
                       <div
-                        className={
-                          this.state.tabSelected === PROGRAMS_TAB
-                            ? "selected-tab"
-                            : "unselected-tab"
-                        }
+                        className={`col ${this.state.tabSelected === PROGRAMS_TAB ? "selected-tab" : "unselected-tab"}`}
                       >
                         <button
                           onClick={() => this.changeSelectedTab(PROGRAMS_TAB)}
@@ -362,7 +354,7 @@ export class CatalogPage extends React.Component<Props> {
                   </CSSTransition>
                 </TransitionGroup>
               </div>
-              <div className="col catalog-page-item-count">
+              <div className="col catalog-page-item-count d-none d-sm-block">
                 <div className="catalog-count-animation">
                   <TransitionGroup>
                     <CSSTransition
@@ -370,7 +362,7 @@ export class CatalogPage extends React.Component<Props> {
                       timeout={300}
                       classNames="count"
                     >
-                      <div className="d-none d-sm-block">
+                      <div>
                         {/* Hidden on small screens. */}
                         {/* Could add logic to display only "course" if only 1 course is showing. */}
                         {this.renderNumberOfCatalogItems()}{" "}
