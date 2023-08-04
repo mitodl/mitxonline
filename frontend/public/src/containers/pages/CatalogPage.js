@@ -80,8 +80,8 @@ export class CatalogPage extends React.Component<Props> {
     this.setState({ tabSelected: btn })
   }
 
-  changeMobileFilterWindowExpanded = () => {
-    this.setState({ mobileFilterWindowExpanded: !this.state.mobileFilterWindowExpanded})
+  toggleMobileFilterWindowExpanded = (expanded: boolean) => {
+    this.setState({ mobileFilterWindowExpanded: expanded})
   }
 
   /**
@@ -322,12 +322,16 @@ export class CatalogPage extends React.Component<Props> {
             <h1 className="d-none d-sm-block">MITx Online Catalog</h1>
             {/* Visible on small screens. */}
             <div className="d-block d-sm-none" id="mobile-catalog-title">
-              <button onClick={() => this.changeMobileFilterWindowExpanded()}/>
+              <button onClick={() => this.toggleMobileFilterWindowExpanded(!this.state.mobileFilterWindowExpanded)}/>
               <h1>Catalog</h1>
             </div>
           </div>
           <div id="course-catalog-navigation">
-            <div className={`${this.state.mobileFilterWindowExpanded ? "d-flex mobile-filter-overlay" : "d-none"}`}>
+            {/* Only visible on small screen when mobileFilterWindowExpanded is true. */}
+            <div className={`mobile-filter-overlay ${this.state.mobileFilterWindowExpanded ? "slide-mobile-filter-overlay" : "hidden-mobile-filter-overlay"}`}>
+              {this.renderDepartmentSideBarList()}
+            </div>
+            <div className="d-none d-sm-block">
               {/* Hidden on small screens. */}
               {this.renderDepartmentSideBarList()}
             </div>
