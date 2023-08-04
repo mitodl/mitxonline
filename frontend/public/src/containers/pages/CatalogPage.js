@@ -34,11 +34,12 @@ const COURSES_TAB = "courses"
 
 export class CatalogPage extends React.Component<Props> {
   state = {
-    tabSelected:         COURSES_TAB,
-    filteredCourses:     [],
-    filterCoursesCalled: false,
-    courseDepartments:   [],
-    selectedDepartment:  ALL_DEPARTMENTS
+    tabSelected:                COURSES_TAB,
+    filteredCourses:            [],
+    filterCoursesCalled:        false,
+    courseDepartments:          [],
+    selectedDepartment:         ALL_DEPARTMENTS,
+    mobileFilterWindowExpanded: false,
   }
 
   /**
@@ -77,6 +78,10 @@ export class CatalogPage extends React.Component<Props> {
 
   changeSelectedTab = (btn: string) => {
     this.setState({ tabSelected: btn })
+  }
+
+  changeMobileFilterWindowExpanded = () => {
+    this.setState({ mobileFilterWindowExpanded: !this.state.mobileFilterWindowExpanded})
   }
 
   /**
@@ -310,79 +315,84 @@ export class CatalogPage extends React.Component<Props> {
 
   render() {
     return (
-      <div id="catalog-page">
-        <div id="catalog-title">
-          {/* Hidden on small screens. */}
-          <h1 className="d-none d-sm-block">MITx Online Catalog</h1>
-          {/* Visible on small screens. */}
-          <h1 className="d-block d-sm-none">Catalog</h1>
-        </div>
-        <div id="course-catalog-navigation">
-          <div className="d-none d-sm-block">
+      <div>
+        <div id="catalog-page">
+          <div id="catalog-title">
             {/* Hidden on small screens. */}
-            {this.renderDepartmentSideBarList()}
+            <h1 className="d-none d-sm-block">MITx Online Catalog</h1>
+            {/* Visible on small screens. */}
+            <div className="d-block d-sm-none" id="mobile-catalog-title">
+              <button onClick={() => this.changeMobileFilterWindowExpanded()}/>
+              <h1>Catalog</h1>
+            </div>
           </div>
-          <div className="container-fluid">
-            <div className="row" id="tab-row">
-              <div className="col catalog-animation d-sm-flex d-md-inline-flex">
+          <div id="course-catalog-navigation">
+            <div className={`${this.state.mobileFilterWindowExpanded ? "d-flex mobile-filter-overlay" : "d-none"}`}>
+              {/* Hidden on small screens. */}
+              {this.renderDepartmentSideBarList()}
+            </div>
+            <div className="container-fluid">
+              <div className="row" id="tab-row">
+                <div className="col catalog-animation d-sm-flex d-md-inline-flex">
+                  <TransitionGroup>
+                    <CSSTransition
+                      key={this.state.tabSelected}
+                      timeout={300}
+                      classNames="messageout"
+                    >
+                      <div className="row" id="tabs">
+                        <div
+                          className={`col ${this.state.tabSelected === COURSES_TAB ? "selected-tab" : "unselected-tab"}`}
+                        >
+                          <button
+                            onClick={() => this.changeSelectedTab(COURSES_TAB)}
+                          >
+                            Courses
+                          </button>
+                        </div>
+                        <div
+                          className={`col ${this.state.tabSelected === PROGRAMS_TAB ? "selected-tab" : "unselected-tab"}`}
+                        >
+                          <button
+                            onClick={() => this.changeSelectedTab(PROGRAMS_TAB)}
+                          >
+                            Programs
+                          </button>
+                        </div>
+                      </div>
+                    </CSSTransition>
+                  </TransitionGroup>
+                </div>
+                <div className="col catalog-page-item-count d-none d-sm-block">
+                  <div className="catalog-count-animation">
+                    <TransitionGroup>
+                      <CSSTransition
+                        key={this.state.tabSelected}
+                        timeout={300}
+                        classNames="count"
+                      >
+                        <div>
+                          {/* Hidden on small screens. */}
+                          {/* Could add logic to display only "course" if only 1 course is showing. */}
+                          {this.renderNumberOfCatalogItems()}{" "}
+                          {this.state.tabSelected}
+                        </div>
+                      </CSSTransition>
+                    </TransitionGroup>
+                  </div>
+                </div>
+              </div>
+              <div className="catalog-animation">
                 <TransitionGroup>
                   <CSSTransition
                     key={this.state.tabSelected}
                     timeout={300}
                     classNames="messageout"
                   >
-                    <div className="row" id="tabs">
-                      <div
-                        className={`col ${this.state.tabSelected === COURSES_TAB ? "selected-tab" : "unselected-tab"}`}
-                      >
-                        <button
-                          onClick={() => this.changeSelectedTab(COURSES_TAB)}
-                        >
-                          Courses
-                        </button>
-                      </div>
-                      <div
-                        className={`col ${this.state.tabSelected === PROGRAMS_TAB ? "selected-tab" : "unselected-tab"}`}
-                      >
-                        <button
-                          onClick={() => this.changeSelectedTab(PROGRAMS_TAB)}
-                        >
-                          Programs
-                        </button>
-                      </div>
-                    </div>
+                    <div>{this.renderCatalog()}</div>
                   </CSSTransition>
                 </TransitionGroup>
               </div>
-              <div className="col catalog-page-item-count d-none d-sm-block">
-                <div className="catalog-count-animation">
-                  <TransitionGroup>
-                    <CSSTransition
-                      key={this.state.tabSelected}
-                      timeout={300}
-                      classNames="count"
-                    >
-                      <div>
-                        {/* Hidden on small screens. */}
-                        {/* Could add logic to display only "course" if only 1 course is showing. */}
-                        {this.renderNumberOfCatalogItems()}{" "}
-                        {this.state.tabSelected}
-                      </div>
-                    </CSSTransition>
-                  </TransitionGroup>
-                </div>
-              </div>
-            </div>
-            <div className="catalog-animation">
-              <TransitionGroup>
-                <CSSTransition
-                  key={this.state.tabSelected}
-                  timeout={300}
-                  classNames="messageout"
-                >
-                  <div>{this.renderCatalog()}</div>
-                </CSSTransition>
-              </TransitionGroup>
             </div>
           </div>
         </div>
