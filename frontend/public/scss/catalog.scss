@@ -61,7 +61,13 @@
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 10px;
+                font-weight: 400;
+                font-size: 16px;
                 align-self: stretch;
+
+                @include media-breakpoint-down(sm) {
+                    color: var(--grey-lite, #F0F5F7);
+                }
             }
         }
     }
@@ -270,10 +276,7 @@
         margin-left: 24px;
         padding-left: 0;
         margin-right: 24px;
-
-        @include media-breakpoint-up(md) {
-            gap: 24px;
-          }
+        gap: 24px;
 
         a {
             @include media-breakpoint-up(md) {

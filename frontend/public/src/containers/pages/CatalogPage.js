@@ -39,7 +39,7 @@ export class CatalogPage extends React.Component<Props> {
     filterCoursesCalled:        false,
     courseDepartments:          [],
     selectedDepartment:         ALL_DEPARTMENTS,
-    mobileFilterWindowExpanded: false,
+    mobileFilterWindowExpanded: false
   }
 
   /**
@@ -81,7 +81,7 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   toggleMobileFilterWindowExpanded = (expanded: boolean) => {
-    this.setState({ mobileFilterWindowExpanded: expanded})
+    this.setState({ mobileFilterWindowExpanded: expanded })
   }
 
   /**
@@ -322,13 +322,25 @@ export class CatalogPage extends React.Component<Props> {
             <h1 className="d-none d-sm-block">MITx Online Catalog</h1>
             {/* Visible on small screens. */}
             <div className="d-block d-sm-none" id="mobile-catalog-title">
-              <button onClick={() => this.toggleMobileFilterWindowExpanded(!this.state.mobileFilterWindowExpanded)}/>
+              <button
+                onClick={() =>
+                  this.toggleMobileFilterWindowExpanded(
+                    !this.state.mobileFilterWindowExpanded
+                  )
+                }
+              />
               <h1>Catalog</h1>
             </div>
           </div>
           <div id="course-catalog-navigation">
             {/* Only visible on small screen when mobileFilterWindowExpanded is true. */}
-            <div className={`mobile-filter-overlay ${this.state.mobileFilterWindowExpanded ? "slide-mobile-filter-overlay" : "hidden-mobile-filter-overlay"}`}>
+            <div
+              className={`mobile-filter-overlay ${
+                this.state.mobileFilterWindowExpanded
+                  ? "slide-mobile-filter-overlay"
+                  : "hidden-mobile-filter-overlay"
+              }`}
+            >
               {this.renderDepartmentSideBarList()}
             </div>
             <div className="d-none d-sm-block">
@@ -346,7 +358,11 @@ export class CatalogPage extends React.Component<Props> {
                     >
                       <div className="row" id="tabs">
                         <div
-                          className={`col ${this.state.tabSelected === COURSES_TAB ? "selected-tab" : "unselected-tab"}`}
+                          className={`col ${
+                            this.state.tabSelected === COURSES_TAB
+                              ? "selected-tab"
+                              : "unselected-tab"
+                          }`}
                         >
                           <button
                             onClick={() => this.changeSelectedTab(COURSES_TAB)}
@@ -355,7 +371,11 @@ export class CatalogPage extends React.Component<Props> {
                           </button>
                         </div>
                         <div
-                          className={`col ${this.state.tabSelected === PROGRAMS_TAB ? "selected-tab" : "unselected-tab"}`}
+                          className={`col ${
+                            this.state.tabSelected === PROGRAMS_TAB
+                              ? "selected-tab"
+                              : "unselected-tab"
+                          }`}
                         >
                           <button
                             onClick={() => this.changeSelectedTab(PROGRAMS_TAB)}
