@@ -36,8 +36,10 @@ export class CatalogPage extends React.Component<Props> {
   state = {
     tabSelected:                COURSES_TAB,
     filteredCourses:            [],
+    filteredPrograms:           [],
     filterCoursesCalled:        false,
-    courseDepartments:          [],
+    filterProgramsCalled:       false,
+    departments:                [],
     selectedDepartment:         ALL_DEPARTMENTS,
     mobileFilterWindowExpanded: false
   }
@@ -56,20 +58,20 @@ export class CatalogPage extends React.Component<Props> {
       )
       this.setState({ filteredCourses: filteredCourses })
       this.setState({
-        courseDepartments: this.collectCourseDepartmentsFromCourses(
-          filteredCourses
-        )
+        departments: this.collectDepartmentsFromCatalogItems(filteredCourses)
       })
     }
   }
 
   /**
-   * Returns an array of CourseDepartment names that are associated with the Courses in the
+   * Returns an array of Department names that are associated with the Courses or Programs in the
    * parameter and also includes an entry for "All Departments".
-   * @param {Array<CourseDetailWithRuns>} courses Array of Courses to collect CourseDepartment names from.
+   * @param {Array<CourseDetailWithRuns | Program>} catalogItems Array of Courses or Programs to collect Department names from.
    */
-  collectCourseDepartmentsFromCourses(courses: Array<CourseDetailWithRuns>) {
-    const departments = Array.from(courses, course => course.departments)
+  collectDepartmentsFromCatalogItems(
+    catalogItems: Array<CourseDetailWithRuns | Program>
+  ) {
+    const departments = Array.from(catalogItems, item => item.departments)
     return [
       ALL_DEPARTMENTS,
       ...departments.flat().map(department => department.name)
@@ -77,7 +79,31 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   changeSelectedTab = (btn: string) => {
+    this.setState({ selectedDepartment: ALL_DEPARTMENTS })
     this.setState({ tabSelected: btn })
+
+    if (btn === COURSES_TAB) {
+      this.setState({
+        departments: this.collectDepartmentsFromCatalogItems(
+          this.state.filteredCourses
+        )
+      })
+    } else {
+      const { programs, programsIsLoading } = this.props
+      if (!programsIsLoading) {
+        this.setState({
+          filteredPrograms: this.filteredProgramsByDepartmentAndCriteria(
+            ALL_DEPARTMENTS,
+            programs
+          )
+        })
+        this.setState({
+          departments: this.collectDepartmentsFromCatalogItems(
+            this.state.filteredPrograms
+          )
+        })
+      }
+    }
   }
 
   toggleMobileFilterWindowExpanded = (expanded: boolean) => {
@@ -85,18 +111,29 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Changes the selectedDepartment state variable and updated the filteredCourses state variable.
+   * Changes the selectedDepartment state variable and, depending on the value of this.state.tabSelected, updates either
+   * the filteredCourses or filteredPrograms state variable.
    * @param {string} selectedDepartment The department name to set selectedDepartment to and filter courses by.
    */
   changeSelectedDepartment = (selectedDepartment: string) => {
-    const { courses } = this.props
     this.setState({ selectedDepartment: selectedDepartment })
-    this.setState({
-      filteredCourses: this.filteredCoursesBasedOnCourseRunCriteria(
-        selectedDepartment,
-        courses
-      )
-    })
+    if (this.state.tabSelected === COURSES_TAB) {
+      const { courses } = this.props
+      this.setState({
+        filteredCourses: this.filteredCoursesBasedOnCourseRunCriteria(
+          selectedDepartment,
+          courses
+        )
+      })
+    } else {
+      const { programs } = this.props
+      this.setState({
+        filteredPrograms: this.filteredProgramsByDepartmentAndCriteria(
+          selectedDepartment,
+          programs
+        )
+      })
+    }
   }
 
   /**
@@ -169,11 +206,11 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Returns a filtered array of courses which have: an associated CourseDepartment name matching the selectedDepartment
+   * Returns a filtered array of courses which have: an associated Department name matching the selectedDepartment
    * if the selectedDepartment does not equal "All Departments",
    * an associated page which is live, and at least 1 associated Course Run.
-   * @param {Array<CourseDetailWithRuns>} courses An array of courses which will be filtered by CourseDepartment.
-   * @param {string} selectedDepartment The CourseDepartment name used to compare against the courses in the array.
+   * @param {Array<CourseDetailWithRuns>} courses An array of courses which will be filtered by Department.
+   * @param {string} selectedDepartment The Department name used to compare against the courses in the array.
    */
   filteredCoursesBasedOnCourseRunCriteria(
     selectedDepartment: string,
@@ -185,9 +222,29 @@ export class CatalogPage extends React.Component<Props> {
           course.departments
             .map(department => department.name)
             .includes(selectedDepartment)) &&
-        course.page.live === true &&
+        course.page.live &&
         course.courseruns.length > 0 &&
         this.validateCoursesCourseRuns(course.courseruns).length > 0
+    )
+  }
+
+  /**
+   * Returns an array of Programs which have live = true, page.live = true, and a department name which
+   * matches the currently selected department.
+   * @param {Array<Program>} programs An array of Programs which will be filtered by Department and other criteria.
+   * @param {string} selectedDepartment The Department name used to compare against the courses in the array.
+   */
+  filteredProgramsByDepartmentAndCriteria(
+    selectedDepartment: string,
+    programs: Array<Program>
+  ) {
+    return programs.filter(
+      program =>
+        (selectedDepartment === ALL_DEPARTMENTS ||
+          program.departments
+            .map(department => department.name)
+            .includes(selectedDepartment)) &&
+        program.live
     )
   }
 
@@ -195,11 +252,11 @@ export class CatalogPage extends React.Component<Props> {
    * Returns the number of courseRuns or programs based on the selected catalog tab.
    */
   renderNumberOfCatalogItems() {
-    const { programs, coursesIsLoading, programsIsLoading } = this.props
+    const { coursesIsLoading, programsIsLoading } = this.props
     if (this.state.tabSelected === COURSES_TAB && !coursesIsLoading) {
       return this.state.filteredCourses.length
     } else if (this.state.tabSelected === PROGRAMS_TAB && !programsIsLoading) {
-      return programs.length
+      return this.state.filteredPrograms.length
     }
   }
 
@@ -269,7 +326,6 @@ export class CatalogPage extends React.Component<Props> {
    * Renders the entire catalog of course or program cards based on the catalog tab selected.
    */
   renderCatalog() {
-    const { programs, programsIsLoading } = this.props
     if (
       this.state.tabSelected === COURSES_TAB &&
       this.state.filteredCourses.length > 0
@@ -278,8 +334,11 @@ export class CatalogPage extends React.Component<Props> {
         this.state.filteredCourses,
         this.renderCourseCatalogCard.bind(this)
       )
-    } else if (this.state.tabSelected === PROGRAMS_TAB && !programsIsLoading) {
-      return this.renderCatalogRows(programs, this.renderProgramCatalogCard)
+    } else if (this.state.tabSelected === PROGRAMS_TAB) {
+      return this.renderCatalogRows(
+        this.state.filteredPrograms,
+        this.renderProgramCatalogCard.bind(this)
+      )
     }
   }
 
@@ -288,20 +347,18 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderDepartmentSideBarList() {
     const departmentSideBarListItems = []
-    this.state.courseDepartments.forEach(courseDepartment =>
+    this.state.departments.forEach(department =>
       departmentSideBarListItems.push(
         <li
-          className={
-            this.state.selectedDepartment === courseDepartment
+          className={`sidebar-link ${
+            this.state.selectedDepartment === department
               ? "department-selected-link"
               : "department-link"
-          }
-          key={courseDepartment}
+          }`}
+          key={department}
         >
-          <button
-            onClick={() => this.changeSelectedDepartment(courseDepartment)}
-          >
-            {courseDepartment}
+          <button onClick={() => this.changeSelectedDepartment(department)}>
+            {department}
           </button>
         </li>
       )
@@ -319,7 +376,7 @@ export class CatalogPage extends React.Component<Props> {
         <div id="catalog-page">
           <div id="catalog-title">
             {/* Hidden on small screens. */}
-            <h1 className="d-none d-sm-block">MITx Online Catalog</h1>
+            <h2 className="d-none d-sm-block">MITx Online Catalog</h2>
             {/* Visible on small screens. */}
             <div className="d-block d-sm-none" id="mobile-catalog-title">
               <button
@@ -329,7 +386,7 @@ export class CatalogPage extends React.Component<Props> {
                   )
                 }
               />
-              <h1>Catalog</h1>
+              <h2>Catalog</h2>
             </div>
           </div>
           <div id="course-catalog-navigation">
@@ -341,10 +398,6 @@ export class CatalogPage extends React.Component<Props> {
                   : "hidden-mobile-filter-overlay"
               }`}
             >
-              {this.renderDepartmentSideBarList()}
-            </div>
-            <div className="d-none d-sm-block">
-              {/* Hidden on small screens. */}
               {this.renderDepartmentSideBarList()}
             </div>
             <div className="container-fluid">
@@ -366,6 +419,7 @@ export class CatalogPage extends React.Component<Props> {
                         >
                           <button
                             onClick={() => this.changeSelectedTab(COURSES_TAB)}
+                            tabIndex="0"
                           >
                             Courses
                           </button>

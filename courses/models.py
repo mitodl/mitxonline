@@ -103,6 +103,17 @@ validate_url_path_field = RegexValidator(
 )
 
 
+class Department(TimestampedModel):
+    """
+    Departments.
+    """
+
+    name = models.CharField(max_length=128, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Program(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course program"""
 
@@ -118,6 +129,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         blank=True,
         null=True,
     )
+    departments = models.ManyToManyField(Department, blank=True)
 
     @cached_property
     def page(self):
@@ -410,17 +422,6 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
         return f"{self.program.readable_id} | {self.program.title}"
 
 
-class CourseDepartment(TimestampedModel):
-    """
-    Departments that Courses can be associated with.
-    """
-
-    name = models.CharField(max_length=128, unique=True)
-
-    def __str__(self):
-        return self.name
-
-
 class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
 
@@ -430,7 +431,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
     live = models.BooleanField(default=False)
-    departments = models.ManyToManyField(CourseDepartment, blank=True)
+    departments = models.ManyToManyField(Department, blank=True)
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
         object_id_field="courseware_object_id",

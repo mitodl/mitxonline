@@ -21,7 +21,7 @@ from courses.factories import (
     program_with_empty_requirements,
 )
 from courses.models import (
-    CourseDepartment,
+    Department,
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
@@ -91,7 +91,7 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
         ]
     )
     departments = [
-        CourseDepartment.objects.create(name=f"department{num}") for num in range(3)
+        Department.objects.create(name=f"department{num}") for num in range(3)
     ]
     course1.departments.set([departments[0], departments[1]])
     course2.departments.set([departments[1], departments[2]])
@@ -159,7 +159,7 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
     courseRun2 = CourseRunFactory.create(course=courseRun1.course)
     course = courseRun1.course
     department = "a course departments"
-    course.departments.set([CourseDepartment.objects.create(name=department)])
+    course.departments.set([Department.objects.create(name=department)])
 
     CourseRunEnrollmentFactory.create(
         run=courseRun1, **({} if is_anonymous else {"user": user})
