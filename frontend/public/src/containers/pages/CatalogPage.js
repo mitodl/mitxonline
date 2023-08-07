@@ -268,7 +268,7 @@ export class CatalogPage extends React.Component<Props> {
     return (
       <a href={course.page.page_url} key={course.id}>
         <div className="col catalog-item">
-          {<img src={course?.page?.feature_image_src} alt="" />}
+          {<img src={course?.page?.feature_image_src} key={course?.page?.feature_image_src} alt="" />}
           <div className="catalog-item-description">
             <div className="start-date-description">
               {this.renderCatalogCardTagForCourse(course)}
