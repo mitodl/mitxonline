@@ -18,7 +18,7 @@ from courses.models import (
     CourseRunEnrollmentAudit,
     CourseRunGrade,
     CourseRunGradeAudit,
-    CourseDepartment,
+    Department,
     LearnerProgramRecordShare,
     PaidCourseRun,
     PartnerSchool,
@@ -40,7 +40,7 @@ class ProgramAdmin(admin.ModelAdmin):
     form = ProgramAdminForm
     search_fields = ["title", "readable_id", "program_type"]
     list_display = ("id", "title", "readable_id", "program_type")
-    list_filter = ["live", "program_type"]
+    list_filter = ["live", "program_type", "departments"]
 
 
 class ProgramRunAdmin(admin.ModelAdmin):
@@ -350,9 +350,9 @@ class CourseRunGradeAuditAdmin(TimestampedModelAdmin):
 
 
 class CourseDepartmentAdmin(admin.ModelAdmin):
-    """Admin for CourseDepartment"""
+    """Admin for Department"""
 
-    model = CourseDepartment
+    model = Department
 
 
 class BlockedCountryAdmin(TimestampedModelAdmin):
@@ -493,7 +493,7 @@ admin.site.register(CourseRunEnrollment, CourseRunEnrollmentAdmin)
 admin.site.register(CourseRunEnrollmentAudit, CourseRunEnrollmentAuditAdmin)
 admin.site.register(CourseRunGrade, CourseRunGradeAdmin)
 admin.site.register(CourseRunGradeAudit, CourseRunGradeAuditAdmin)
-admin.site.register(CourseDepartment, CourseDepartmentAdmin)
+admin.site.register(Department, CourseDepartmentAdmin)
 admin.site.register(BlockedCountry, BlockedCountryAdmin)
 admin.site.register(PaidCourseRun, PaidCourseRunAdmin)
 admin.site.register(CourseRunCertificate, CourseRunCertificateAdmin)
