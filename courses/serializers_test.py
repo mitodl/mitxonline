@@ -130,6 +130,8 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
             ).data,
             "page": ProgramPageSerializer(program_with_empty_requirements.page).data,
             "program_type": "Series",
+            "departments": [],
+            "live": True,
         },
     )
 
