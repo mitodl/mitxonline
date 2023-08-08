@@ -436,8 +436,10 @@ export class ProductDetailEnrollApp extends React.Component<
               />
             </div>
             <div className="enrollment-info-text">
-              {run.page["length"] ? run.page.length : "No Data"}
-              <span className="badge badge-pacing">SELF-PACED</span>
+              {run.page.length}
+              {run.is_self_paced ? (
+                <span className="badge badge-pacing">SELF-PACED</span>
+              ) : null}
               {run.page.effort ? (
                 <>
                   <div className="enrollment-effort">{run.page.effort}</div>
@@ -476,6 +478,22 @@ export class ProductDetailEnrollApp extends React.Component<
                       )}
                     </div>
                   </>
+                ) : null}
+                <div>
+                  <a target="_blank" rel="noreferrer" href="#">
+                    What's the certificate track?
+                  </a>
+                </div>
+                {run.page.financial_assistance_form_url ? (
+                  <div>
+                    <a
+                      target="_blank"
+                      rel="noreferrer"
+                      href={run.page.financial_assistance_form_url}
+                    >
+                      Financial assistance available
+                    </a>
+                  </div>
                 ) : null}
               </>
             ) : (

@@ -249,6 +249,47 @@
             <div id="productDetailEnrollment"></div>
             {% endif %}
           </div>
+
+          {% if instructors %}
+          {% for member in instructors %}
+          <div class="modal instructor-modal" tabindex="-1" id="instructor-modal-{{ member.id }}">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">{{ member.instructor_name }}</h5>
+                  <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                  </button>
+                </div>
+                <div class="modal-body">
+                  <div className="row">
+                    <div className="col col-instructor-photo">
+                      <img className="img-thumbnail" src="{{ feature_img_src member.feature_image_src}}" alt="Photo for {{member.instructor_name}}" />
+                    </div>
+                    <div className="col col-instructor-title">
+                      <h2>{{member.instructor_name}}</h2>
+                      {% if member.instructor_title %}<h3>{{member.instructor_title}}</h3>{% endif %}
+        
+                      <p>{{member.instructor_bio_short|safe}}</p>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col">
+                      {% if member.instructor_bio_long %}
+                        {{ member.instructor_bio_long|safe }}
+                      {% endif %}
+                      {% if not member.instructor_bio_long %}
+                        {{ member.instructor_bio_short|safe}}
+                      {% endif %}
+                    </div>
+                  </div>        
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+          {% endif %}
+
         </div>
       </div>
     </div>
