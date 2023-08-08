@@ -48,15 +48,8 @@ const expandExpandBlock = (event: MouseEvent) => {
 }
 
 const expandExpandBlock = event => {
-  console.log("we're doing it!")
   const block = event.target.getAttribute("data-expand-body")
-  console.log("the block is", block)
-  const elem = document.querySelector(`div#exp${block}`)
-  console.log("elem is", elem)
-  console.log("classList is", elem.classList)
-  if (!elem.classList.toggle("open")) {
-    console.log("it failed")
-  }
+  document.querySelector(`div#exp${block}`)
 }
 
 type Props = {
@@ -440,7 +433,9 @@ export class ProductDetailEnrollApp extends React.Component<
             </div>
             <div className="enrollment-info-text">
               {run.page.length}
-              {run.is_self_paced ? <span className="badge badge-pacing">SELF-PACED</span> : null}
+              {run.is_self_paced ? (
+                <span className="badge badge-pacing">SELF-PACED</span>
+              ) : null}
               {run.page.effort ? (
                 <>
                   <div className="enrollment-effort">{run.page.effort}</div>
@@ -481,11 +476,21 @@ export class ProductDetailEnrollApp extends React.Component<
                   </>
                 ) : null}
                 <div>
-                  <a target="_blank" rel="noreferrer" href="#">What's the certificate track?</a>
+                  <a target="_blank" rel="noreferrer" href="#">
+                    What's the certificate track?
+                  </a>
                 </div>
-                {run.page.financial_assistance_form_url ? <div>
-                  <a target="_blank" rel="noreferrer" href={run.page.financial_assistance_form_url}>Financial assistance available</a>
-                </div> : null}
+                {run.page.financial_assistance_form_url ? (
+                  <div>
+                    <a
+                      target="_blank"
+                      rel="noreferrer"
+                      href={run.page.financial_assistance_form_url}
+                    >
+                      Financial assistance available
+                    </a>
+                  </div>
+                ) : null}
               </>
             ) : (
               "No certificate available."

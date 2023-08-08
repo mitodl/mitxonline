@@ -144,7 +144,7 @@
 {% else %}
     <div id="main" class="product-page">
       <div class="container">
-        <div class="row d-flex flex-row sticky-top">
+        <div class="row d-flex flex-row">
           <div class="col flex-grow-1" id="product-details">
             <div class="text">
               <h1>{{ page.title }}</h1>
@@ -180,10 +180,12 @@
                     {% if instructors %}
                     {% for member in instructors %}
                       <li>
-                        <div class="member-card highlight-card">
+                        <div class="member-card highlight-card" onClick="$('#instructor-modal-{{ member.id }}').modal('show');">
                           <img src="{% feature_img_src member.feature_image %}" alt="">
                           <div class="member-info">
-                            <h3 class="name">{{ member.instructor_name }}</h3>
+                            <h3 class="name">
+                                {{ member.instructor_name }}
+                            </h3>
                             {% if member.instructor_title %}<h4 class="title">{{ member.instructor_title }}</h4>{% endif %}
                             <div class="description">{{ member.instructor_bio_short|safe }}</div>
                           </div>
@@ -231,6 +233,47 @@
             </div>
             {% endif %}
           </div>
+
+          {% if instructors %}
+          {% for member in instructors %}
+          <div class="modal instructor-modal" tabindex="-1" id="instructor-modal-{{ member.id }}">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">{{ member.instructor_name }}</h5>
+                  <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                  </button>
+                </div>
+                <div class="modal-body">
+                  <div className="row">
+                    <div className="col col-instructor-photo">
+                      <img className="img-thumbnail" src="{{ feature_img_src member.feature_image_src}}" alt="Photo for {{member.instructor_name}}" />
+                    </div>
+                    <div className="col col-instructor-title">
+                      <h2>{{member.instructor_name}}</h2>
+                      {% if member.instructor_title %}<h3>{{member.instructor_title}}</h3>{% endif %}
+        
+                      <p>{{member.instructor_bio_short|safe}}</p>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col">
+                      {% if member.instructor_bio_long %}
+                        {{ member.instructor_bio_long|safe }}
+                      {% endif %}
+                      {% if not member.instructor_bio_long %}
+                        {{ member.instructor_bio_short|safe}}
+                      {% endif %}
+                    </div>
+                  </div>        
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+          {% endif %}
+
         </div>
       </section>
       <section class="text-block">
