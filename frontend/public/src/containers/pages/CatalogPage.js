@@ -28,9 +28,16 @@ type Props = {
   programs: ?Array<Program>
 }
 
+// Department filter name for all items.
 const ALL_DEPARTMENTS = "All Departments"
+
+// Program tab name.
 const PROGRAMS_TAB = "programs"
+
+// Course tab name.
 const COURSES_TAB = "courses"
+
+// The max number of catalog items per row in the catalog.
 const ITEMS_PER_ROW = 3
 
 export class CatalogPage extends React.Component<Props> {
@@ -59,8 +66,9 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Increments this.state.numberCatalogRowsToDisplay if the current value, multipled by
+   * Increments this.state.numberCatalogRowsToDisplay by 4 if the current value, multipled by
    * {ITEMS_PER_ROW}, is less than the number of filtered catalog items for the respective tab.
+   * This allows us to render catalog rows incrementally which will improve page performance.
    */
   bottomOfLoadedCatalogCallback = entries => {
     const [entry] = entries
@@ -134,12 +142,22 @@ export class CatalogPage extends React.Component<Props> {
     ]
   }
 
-  changeSelectedTab = (btn: string) => {
+  /**
+   * Updates this.state.selectedDepartment to {ALL_DEPARTMENTS},
+   * updates this.state.tabSelected to the parameter,
+   * updates this.state.numberCatalogRowsToDisplay to 4,
+   * updates this.state.departments to equal the unique department
+   * names from the catalog items in the selected tab,
+   * updates this.state.filteredPrograms to equal the programs
+   * which meet the criteria to be displayed in the catalog.
+   * @param {string} selectTabName The name of the tab that was selected.
+   */
+  changeSelectedTab = (selectTabName: string) => {
     this.setState({ selectedDepartment: ALL_DEPARTMENTS })
-    this.setState({ tabSelected: btn })
+    this.setState({ tabSelected: selectTabName })
     this.setState({ numberCatalogRowsToDisplay: 4 })
 
-    if (btn === COURSES_TAB) {
+    if (selectTabName === COURSES_TAB) {
       this.setState({
         departments: this.collectDepartmentsFromCatalogItems(
           this.state.filteredCourses
@@ -161,6 +179,10 @@ export class CatalogPage extends React.Component<Props> {
     }
   }
 
+  /**
+   * Set the value of this.state.mobileFilterWindowExpanded.
+   * @param {boolean} expanded The value that this.state.mobileFilterWindowExpanded will be set to.
+   */
   toggleMobileFilterWindowExpanded = (expanded: boolean) => {
     this.setState({ mobileFilterWindowExpanded: expanded })
   }
@@ -364,7 +386,8 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Dynamically renders all rows of cards in the catalog.  Each row can contain up to {ITEMS_PER_ROW} course or program cards.
+   * Dynamically renders rows of cards in the catalog.  Each row can contain up to {ITEMS_PER_ROW} course or program cards.
+   * Only rows up to {this.state.numberCatalogRowsToDisplay} will be rendered.
    * @param {Array<CourseDetailWithRuns | Program>} itemsInCatalog The items associated with the currently selected catalog page.
    * @param {Function} renderCatalogCardFunction The card render function that will be used for each item on the current catalog page.
    */
