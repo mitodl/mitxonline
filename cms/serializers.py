@@ -175,3 +175,36 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             "feature_image_src",
             "page_url",
         ]
+
+
+class InstructorPageSerializer(serializers.ModelSerializer):
+    """Instructor page model serializer"""
+
+    feature_image_src = serializers.SerializerMethodField()
+
+    def get_feature_image_src(self, instance):
+        """Serializes the source of the feature_image"""
+        feature_img_src = None
+        if hasattr(instance, "feature_image"):
+            feature_img_src = get_wagtail_img_src(instance.feature_image)
+
+        return feature_img_src or static(DEFAULT_COURSE_IMG_PATH)
+
+    class Meta:
+        model = models.InstructorPage
+        fields = [
+            "id",
+            "instructor_name",
+            "instructor_title",
+            "instructor_bio_short",
+            "instructor_bio_long",
+            "feature_image_src",
+        ]
+        read_only_fields = [
+            "id",
+            "instructor_name",
+            "instructor_title",
+            "instructor_bio_short",
+            "instructor_bio_long",
+            "feature_image_src",
+        ]
