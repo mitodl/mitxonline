@@ -40,6 +40,9 @@ const COURSES_TAB = "courses"
 // The max number of catalog items per row in the catalog.
 const ITEMS_PER_ROW = 3
 
+// The default number of catalog rows rendered.
+const DEFAULT_MIN_CATALOG_ROWS_RENDERED = 4
+
 export class CatalogPage extends React.Component<Props> {
   state = {
     tabSelected:                COURSES_TAB,
@@ -50,7 +53,7 @@ export class CatalogPage extends React.Component<Props> {
     departments:                [],
     selectedDepartment:         ALL_DEPARTMENTS,
     mobileFilterWindowExpanded: false,
-    numberCatalogRowsToDisplay: 4
+    numberCatalogRowsToDisplay: DEFAULT_MIN_CATALOG_ROWS_RENDERED
   }
 
   constructor(props) {
@@ -145,7 +148,7 @@ export class CatalogPage extends React.Component<Props> {
   /**
    * Updates this.state.selectedDepartment to {ALL_DEPARTMENTS},
    * updates this.state.tabSelected to the parameter,
-   * updates this.state.numberCatalogRowsToDisplay to 4,
+   * updates this.state.numberCatalogRowsToDisplay to {DEFAULT_MIN_CATALOG_ROWS_RENDERED},
    * updates this.state.departments to equal the unique department
    * names from the catalog items in the selected tab,
    * updates this.state.filteredPrograms to equal the programs
@@ -155,7 +158,9 @@ export class CatalogPage extends React.Component<Props> {
   changeSelectedTab = (selectTabName: string) => {
     this.setState({ selectedDepartment: ALL_DEPARTMENTS })
     this.setState({ tabSelected: selectTabName })
-    this.setState({ numberCatalogRowsToDisplay: 4 })
+    this.setState({
+      numberCatalogRowsToDisplay: DEFAULT_MIN_CATALOG_ROWS_RENDERED
+    })
 
     if (selectTabName === COURSES_TAB) {
       this.setState({
