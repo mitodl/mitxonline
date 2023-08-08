@@ -76,26 +76,17 @@ export class CatalogPage extends React.Component<Props> {
   bottomOfLoadedCatalogCallback = entries => {
     const [entry] = entries
     if (entry.isIntersecting) {
-      if (this.state.tabSelected === COURSES_TAB) {
-        if (
+      if (
+        (this.state.tabSelected === COURSES_TAB &&
           this.state.numberCatalogRowsToDisplay * ITEMS_PER_ROW <
-          this.state.filteredCourses.length
-        ) {
-          this.setState({
-            numberCatalogRowsToDisplay:
-              this.state.numberCatalogRowsToDisplay + 4
-          })
-        }
-      } else {
-        if (
+            this.state.filteredCourses.length) ||
+        (this.state.tabSelected === PROGRAMS_TAB &&
           this.state.numberCatalogRowsToDisplay * ITEMS_PER_ROW <
-          this.state.filteredPrograms.length
-        ) {
-          this.setState({
-            numberCatalogRowsToDisplay:
-              this.state.numberCatalogRowsToDisplay + 4
-          })
-        }
+            this.state.filteredPrograms.length)
+      ) {
+        this.setState({
+          numberCatalogRowsToDisplay: this.state.numberCatalogRowsToDisplay + 4
+        })
       }
     }
   }
