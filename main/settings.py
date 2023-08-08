@@ -1023,12 +1023,12 @@ OPENEDX_SERVICE_WORKER_USERNAME = get_string(
 OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID = get_string(
     name="OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID",
     default=None,
-    description="Active access token with staff level permissions to use with OpenEdX API client for service tasks",
+    description="OAuth2 client id for retirement service worker",
 )
 OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET = get_string(
     name="OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET",
     default=None,
-    description="Active access token with staff level permissions to use with OpenEdX API client for service tasks",
+    description="OAuth2 client secret for retirement service worker",
 )
 
 EDX_API_CLIENT_TIMEOUT = get_int(

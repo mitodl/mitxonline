@@ -490,11 +490,11 @@
       "required": true
     },
     "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID": {
-      "description": "Active access token with staff level permissions to use with OpenEdX API client for service tasks",
+      "description": "OAuth2 client id for retirement service worker",
       "required": false
     },
     "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET": {
-      "description": "Active access token with staff level permissions to use with OpenEdX API client for service tasks",
+      "description": "OAuth2 client secret for retirement service worker",
       "required": false
     },
     "OPENEDX_SERVICE_WORKER_API_TOKEN": {

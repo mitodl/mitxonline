@@ -1,5 +1,5 @@
 """
-Retire user(s) from MITx Online
+Retire user(s) from MITx Online and user initiate retirement on edX
 """
 import hashlib
 import sys

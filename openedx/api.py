@@ -519,6 +519,15 @@ def get_edx_retirement_service_client():
     """
     Generates a JWT access token for the retirement service worker and returns the edX api client.
     """
+    if not settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID:
+        raise ImproperlyConfigured(
+            "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID is not set"
+        )
+    elif not settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET:
+        raise ImproperlyConfigured(
+            "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET is not set"
+        )
+
     data = {
         "grant_type": "client_credentials",
         "client_id": settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID,
