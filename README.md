@@ -41,3 +41,14 @@ In order to manage the certificates, follow these steps:
 * Create Signatories (In CMS, go to Pages-> HomePage -> Signatories and then add child pages). Signatories are independent of courses and a signatory can be used with any number of certificates
 * Create Certificate Template (In CMS, go to Pages -> Courses -> (Your Course Page) and add a certificate child page). Note that this is course based which means you need to create separate templates for each course
 * User certificates are automatically created through a regular task, but you can test these by adding manual entries in CourseRunCertificate model (This is only recommended for local testing because it will make the data inconsistent with payment and grades)
+
+
+# Updating python dependencies
+
+Python dependencies are managed with poetry.  If you need to add a new dependency, run this command:
+
+```
+docker compose run --rm web poetry add <dependency>
+```
+This will update the `pyproject.toml` and `poetry.lock` files.  Then run `docker-compose build web celery` to make the change permanent in your docker images.
+Refer to the [poetry documentation](https://python-poetry.org/docs/cli/) for particulars about specifying versions, removing dependencies, etc.
