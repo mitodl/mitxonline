@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.70.5
+--------------
+
+- Forgot to actually retrieve the course (#1807)
+- Instructions for updating python dependencies with poetry (#1800)
+
 Version 0.70.4 (Released August 03, 2023)
 --------------
 
