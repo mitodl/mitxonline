@@ -335,7 +335,6 @@
                 align-items: flex-start;
                 border-radius: 0px 3px 0px 0px;
                 background: var(--blue-dark, #03152D);
-                z-index: 1000;
                 position: absolute;
                 left: 0;
                 bottom: 0px;
@@ -393,6 +392,7 @@
 #catalog-title {
     display: flex;
     padding: 30px 60px;
+    z-index: 100;
     justify-content: center;
     align-items: flex-start;
     background: var(--blue-dark, #03152D);

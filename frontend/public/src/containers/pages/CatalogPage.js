@@ -31,6 +31,7 @@ type Props = {
 const ALL_DEPARTMENTS = "All Departments"
 const PROGRAMS_TAB = "programs"
 const COURSES_TAB = "courses"
+const ITEMS_PER_ROW = 3
 
 export class CatalogPage extends React.Component<Props> {
   state = {
@@ -41,12 +42,57 @@ export class CatalogPage extends React.Component<Props> {
     filterProgramsCalled:       false,
     departments:                [],
     selectedDepartment:         ALL_DEPARTMENTS,
-    mobileFilterWindowExpanded: false
+    mobileFilterWindowExpanded: false,
+    numberCatalogRowsToDisplay: 4
+  }
+
+  constructor(props) {
+    super(props)
+    this.io = null
+    this.container = React.createRef(null)
+  }
+
+  componentWillUnmount() {
+    if (this.io) {
+      this.io.disconnect()
+    }
+  }
+
+  /**
+   * Increments this.state.numberCatalogRowsToDisplay if the current value, multipled by
+   * {ITEMS_PER_ROW}, is less than the number of filtered catalog items for the respective tab.
+   */
+  bottomOfLoadedCatalogCallback = entries => {
+    const [entry] = entries
+    if (entry.isIntersecting) {
+      if (this.state.tabSelected === COURSES_TAB) {
+        if (
+          this.state.numberCatalogRowsToDisplay * ITEMS_PER_ROW <
+          this.state.filteredCourses.length
+        ) {
+          this.setState({
+            numberCatalogRowsToDisplay:
+              this.state.numberCatalogRowsToDisplay + 4
+          })
+        }
+      } else {
+        if (
+          this.state.numberCatalogRowsToDisplay * ITEMS_PER_ROW <
+          this.state.filteredPrograms.length
+        ) {
+          this.setState({
+            numberCatalogRowsToDisplay:
+              this.state.numberCatalogRowsToDisplay + 4
+          })
+        }
+      }
+    }
   }
 
   /**
    * Updates the filteredCourses and courseDepartments state variables
-   * once coursesIsLoading is False.
+   * once coursesIsLoading is False.  Adds an observer to detect when
+   * the learner has scrolled to the bottom of the visible catalog items.
    */
   componentDidUpdate = () => {
     const { courses, coursesIsLoading } = this.props
@@ -60,6 +106,13 @@ export class CatalogPage extends React.Component<Props> {
       this.setState({
         departments: this.collectDepartmentsFromCatalogItems(filteredCourses)
       })
+
+      // Detect when the bottom of the catalog page has been reached and display more catalog items.
+      this.io = new window.IntersectionObserver(
+        this.bottomOfLoadedCatalogCallback,
+        { threshold: 1.0 }
+      )
+      this.io.observe(this.container.current)
     }
   }
 
@@ -72,15 +125,19 @@ export class CatalogPage extends React.Component<Props> {
     catalogItems: Array<CourseDetailWithRuns | Program>
   ) {
     const departments = Array.from(catalogItems, item => item.departments)
+    // Extract all of the unique names from the array of Departments.
     return [
-      ALL_DEPARTMENTS,
-      ...departments.flat().map(department => department.name)
+      ...new Set([
+        ALL_DEPARTMENTS,
+        ...departments.flat().map(department => department.name)
+      ])
     ]
   }
 
   changeSelectedTab = (btn: string) => {
     this.setState({ selectedDepartment: ALL_DEPARTMENTS })
     this.setState({ tabSelected: btn })
+    this.setState({ numberCatalogRowsToDisplay: 4 })
 
     if (btn === COURSES_TAB) {
       this.setState({
@@ -98,9 +155,7 @@ export class CatalogPage extends React.Component<Props> {
           )
         })
         this.setState({
-          departments: this.collectDepartmentsFromCatalogItems(
-            this.state.filteredPrograms
-          )
+          departments: this.collectDepartmentsFromCatalogItems(programs)
         })
       }
     }
@@ -268,7 +323,11 @@ export class CatalogPage extends React.Component<Props> {
     return (
       <a href={course.page.page_url} key={course.id}>
         <div className="col catalog-item">
-          {<img src={course?.page?.feature_image_src} key={course?.page?.feature_image_src} alt="" />}
+          <img
+            src={course?.page?.feature_image_src}
+            key={course.id + course?.page?.feature_image_src}
+            alt=""
+          />
           <div className="catalog-item-description">
             <div className="start-date-description">
               {this.renderCatalogCardTagForCourse(course)}
@@ -289,7 +348,11 @@ export class CatalogPage extends React.Component<Props> {
       <a href={program.page.page_url} key={program.id}>
         <div className="col catalog-item">
           <div className="program-image-and-badge">
-            {<img src={program?.page?.feature_image_src} alt="" />}
+            <img
+              src={program?.page?.feature_image_src}
+              key={program.id + program?.page?.feature_image_src}
+              alt=""
+            />
             <div className="program-type-badge">{program.program_type}</div>
           </div>
           <div className="catalog-item-description">
@@ -301,7 +364,7 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Dynamically renders all rows of cards in the catalog.  Each row contains 3 course or program cards.
+   * Dynamically renders all rows of cards in the catalog.  Each row can contain up to {ITEMS_PER_ROW} course or program cards.
    * @param {Array<CourseDetailWithRuns | Program>} itemsInCatalog The items associated with the currently selected catalog page.
    * @param {Function} renderCatalogCardFunction The card render function that will be used for each item on the current catalog page.
    */
@@ -309,9 +372,17 @@ export class CatalogPage extends React.Component<Props> {
     itemsInCatalog: Array<CourseDetailWithRuns | Program>,
     renderCatalogCardFunction: Function
   ) {
-    const numberOfItemsInEachRow = Math.min(itemsInCatalog.length, 3)
+    const numberOfItemsInEachRow = Math.min(
+      itemsInCatalog.length,
+      ITEMS_PER_ROW
+    )
     const catalogRows = []
-    for (let i = 0; i < itemsInCatalog.length; i += numberOfItemsInEachRow) {
+    for (
+      let i = 0;
+      i < itemsInCatalog.length &&
+      i < numberOfItemsInEachRow * this.state.numberCatalogRowsToDisplay;
+      i += numberOfItemsInEachRow
+    ) {
       const itemsInRow = itemsInCatalog.slice(i, i + numberOfItemsInEachRow)
       catalogRows.push(
         <div className="row" id="catalog-grid" key={i}>
@@ -355,7 +426,7 @@ export class CatalogPage extends React.Component<Props> {
               ? "department-selected-link"
               : "department-link"
           }`}
-          key={department}
+          key={this.state.tabSelected + department}
         >
           <button onClick={() => this.changeSelectedDepartment(department)}>
             {department}
@@ -471,6 +542,8 @@ export class CatalogPage extends React.Component<Props> {
                   </CSSTransition>
                 </TransitionGroup>
               </div>
+              {/* span is used to detect when the learner has scrolled to the bottom of the catalog page. */}
+              <span ref={this.container}></span>
             </div>
           </div>
         </div>
