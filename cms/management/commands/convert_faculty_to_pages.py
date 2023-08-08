@@ -61,7 +61,7 @@ class Command(BaseCommand):
                 course = Course.objects.filter(readable_id=kwargs["courseware"])
 
                 if course.exists():
-                    pages = [course.page]
+                    pages = [course.get().page]
                 else:
                     pages = [Program.objects.get(readable_id=kwargs["courseware"]).page]
             except ObjectDoesNotExist:
