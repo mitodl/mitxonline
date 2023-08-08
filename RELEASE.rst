@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.70.5
+Version 0.70.5 (Released August 08, 2023)
 --------------
 
 - Forgot to actually retrieve the course (#1807)
