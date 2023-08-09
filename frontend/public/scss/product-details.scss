@@ -512,10 +512,11 @@
 }
 
 .upgrade-enrollment-modal {
-  max-width: 550px;
+  max-width: 750px;
+  font-family: "Avenir Next", "Roboto", sans-serif;
 
   .modal-content {
-    padding: 5px 12px;
+    padding: 5px 14px;
     
     .required {
       color: $brand-button-bg;
@@ -527,6 +528,8 @@
     font-size: large;
     border-bottom: none;
     padding-bottom: 0;
+
+    font-family: "Poppins", "Avenir Next", "Roboto", sans-serif;
 
     h5 {
       font-size: 30px;
@@ -557,7 +560,6 @@
 
   .faq-link a {
     color: black;
-    font-weight: bold;
   }
 
   .faq-link a:visited {
@@ -572,17 +574,60 @@
   .enroll-now-free {
     text-decoration: underline;
     box-shadow: none;
-    font-weight: bold;
   }
   form {
     margin-bottom: 20px;
+
+    .btn-upgrade {
+      width: 100%;
+      background-color: #A41E34;
+      color: white;
+      text-align: left;
+      background-image: url('/static/images/arrow-line-right.png');
+      background-position: 90% 50%;
+      background-repeat: no-repeat;
+      padding: 11px 22px;
+    }
   }
+
+  .acheiving-text {
+    font-weight: 600;
+    color: #A41E34;
+    margin-bottom: 1.5rem;
+  }
+
+  ul { 
+    padding: 0;
+  }
+
+  li {
+    list-style: none;
+    min-height: 3.5rem;
+    background-image: url('/static/images/upsell-check.png');
+    background-repeat: no-repeat;
+    background-position: 0 0;
+    padding-left: 33px;
+    line-height: 24px;
+  }
+}
+
+div.certificate-pricing-row { 
+  border: 1px solid #DFE5EC;
+  border-left: none;
+  border-right: none;
+  padding: 25px 0 15px 0;
+}
+
+div.certificate-pricing{
+  background-image: url('/static/images/products/certificate.png');
+  background-repeat: no-repeat;
+  background-position: 10px 5px;
+
+  padding-left: 43px;
 }
 
 .financial-assistance-link {
   height: 22px;
-  font-size: 18px;
-  font-weight: bold;
   letter-spacing: 0;
   line-height: 20px;
   text-align: center;
@@ -620,6 +665,82 @@
   margin: 0;
 }
 
-.instructor-modal .modal-dialog {
-  z-index: 2000;
+.instructor-modal {
+  .modal-dialog {
+    width: 770px;
+    max-width: 770px;
+    border-radius: 5px;
+
+    .modal-header {
+      background-color: #03152d;
+      background-image: url('/static/images/instructor-modal-head.jpg');
+      background-position: 0 60%;
+      background-size: cover;
+      height: 130px;
+      align-items: start;
+      padding: 20px;
+  
+      h5 {
+        margin-left: -9999px;
+      }
+  
+      button.close {
+        border: 0;
+        border-radius: 100%;
+        width: 30px;
+        height: 30px;
+      }
+    }
+  
+    .modal-body {
+      padding-left: 50px;
+      padding-right: 50px;
+
+      div.col-instructor-photo {
+        margin-top: -50px;
+        width: 165px !important;
+        max-width: 165px;
+
+        img.img-thumbnail {
+          width: 130px;
+          height: 145px;
+          padding: 7px;
+          margin: 7px;
+          object-fit: cover;
+          object-position: 50% 0;
+
+          box-shadow: 0px 2px #e1e1e1;
+        }
+      }
+
+      div.col-instructor-title {
+        width: auto;
+        margin-left: 10px;
+
+        h2 {
+          margin-bottom: 0px;
+          line-height: 30px;
+          font-size: 25px;
+          font-weight: 700;
+        }
+        h3, p {
+          font-size: 18px;
+          line-height: 21.6px;
+          font-weight: 400;
+          margin-bottom: 0px;
+        }
+        h3 {
+          font-weight: 600;
+        }
+        p {
+          margin-top: 5px;
+        }
+      }
+
+      .row-instructor-body {
+        padding: 10px 10px;
+      }
+    }
+
+  }
 }

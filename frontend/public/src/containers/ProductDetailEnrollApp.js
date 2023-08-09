@@ -11,7 +11,7 @@ import { Modal, ModalBody, ModalHeader } from "reactstrap"
 import Loader from "../components/Loader"
 import { routes } from "../lib/urls"
 import { getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
-import { BaseCourseRun, EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
+import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
   courseRunsSelector,
   courseRunsQuery,
@@ -78,7 +78,7 @@ export class ProductDetailEnrollApp extends React.Component<
   ProductDetailState
 > {
   state = {
-    upgradeEnrollmentDialogVisibility: false,
+    upgradeEnrollmentDialogVisibility: true,
     currentCourseRun:                  null,
     showAddlProfileFieldsModal:        false,
     destinationUrl:                    ""
@@ -182,154 +182,76 @@ export class ProductDetailEnrollApp extends React.Component<
     const product = run.products ? run.products[0] : null
 
     return product ? (
-      showNewDesign ? (
-        <Modal
-          id={`upgrade-enrollment-dialog`}
-          className="upgrade-enrollment-modal"
-          isOpen={upgradeEnrollmentDialogVisibility}
-          toggle={() => this.toggleUpgradeDialogVisibility()}
-          centered
-        >
-          <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
-            {run.title}
-          </ModalHeader>
-          <ModalBody>
-            <div className="row">
-              <div className="col-12">
-                <p>
-                  Thank you for choosing an MITx online course. By paying for
-                  this course, you're joining the most engaged and motivated
-                  learners on your path to a certificate from MITx.
-                </p>
-              </div>
+      <Modal
+        id={`upgrade-enrollment-dialog`}
+        className="upgrade-enrollment-modal"
+        isOpen={upgradeEnrollmentDialogVisibility}
+        toggle={() => this.toggleUpgradeDialogVisibility()}
+        centered
+      >
+        <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
+          {run.title}
+        </ModalHeader>
+        <ModalBody>
+          <div className="row">
+            <div className="col-12">
+              <p>
+                Thank you for choosing an MITx online course. By paying for this
+                course, you're joining the most engaged and motivated learners
+                on your path to a certificate from MITx.
+              </p>
             </div>
+          </div>
 
-            <div className="row">
-              <div className="col-12">
-                <p className="acheiving-text">
-                  Acheiving a certificate has its advantages:
-                </p>
-              </div>
+          <div className="row">
+            <div className="col-12">
+              <p className="acheiving-text">Acheiving a certificate has its advantages:</p>
             </div>
+          </div>
 
-            <div className="row">
-              <div className="col-6">
-                <ul>
-                  <li> Certificate is signed by MIT faculty</li>
-                  <li>
-                    {" "}
-                    Demonstrates knowledge and skills taught in this course
-                  </li>
-                  <li> Enhance your college &amp; earn a promotion</li>
-                </ul>
-              </div>
-              <div className="col-6">
-                <ul>
-                  <li>Highlight on your resume/CV</li>
-                  <li>Share on your social channels &amp; LinkedIn</li>
-                  <li>
-                    Enhance your college application with an earned certificate
-                    from MIT
-                  </li>
-                </ul>
-              </div>
+          <div className="row">
+            <div className="col-6">
+              <ul>
+                <li> Certificate is signed by MIT faculty</li>
+                <li> Demonstrates knowledge and skills taught in this course</li>
+                <li> Enhance your college &amp; earn a promotion</li>
+              </ul>
             </div>
-
-            <div className="row certificate-pricing-row">
-              <div className="col-6 certificate-pricing">
-                <p>
-                  Certitficate track:{" "}
-                  <strong>
-                    ${product && formatLocalePrice(product.price)}
-                  </strong>
-                  {run.upgrade_deadline ? (
-                    <>
-                      <br />
-                      <span className="text-danger">
-                        Payment date:{" "}
-                        {formatPrettyDate(moment(run.upgrade_deadline))}
-                      </span>
-                    </>
-                  ) : null}
-                </p>
-
-                <p>{needFinancialAssistanceLink}</p>
-              </div>
-              <div className="col-6">
-                <form action="/cart/add/" method="get" className="text-center">
-                  <input type="hidden" name="product_id" value={product.id} />
-                  <button type="submit" className="btn btn-upgrade">
-                    <strong>Continue</strong>
-                    <br />
-                    on the certificate track
-                  </button>
-                </form>
-              </div>
+            <div className="col-6">
+              <ul>
+                <li>Highlight on your resume/CV</li>
+                <li>Share on your social channels &amp; LinkedIn</li>
+                <li>Enhance your college application with an earned certificate from MIT</li>
+              </ul>
             </div>
+          </div>
 
-            <div className="cancel-link">{this.getEnrollmentForm()}</div>
-          </ModalBody>
-        </Modal>
-      ) : (
-        <Modal
-          id={`upgrade-enrollment-dialog`}
-          className="upgrade-enrollment-modal"
-          isOpen={upgradeEnrollmentDialogVisibility}
-          toggle={() => this.toggleUpgradeDialogVisibility()}
-        >
-          <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
-            Enroll
-          </ModalHeader>
-          <ModalBody>
-            <div className="row modal-subheader d-flex">
-              <div className="flex-grow-1 align-self-end">
-                Learn online and get a certificate
-              </div>
-              <div className="text-end align-self-end">
-                {formatLocalePrice(getFlexiblePriceForProduct(product))}
-              </div>
-            </div>
-            <div className="row">
-              <div className="col-12">
-                <p>
-                  Thank you for choosing an MITx online course. By paying for
-                  this course, you're joining the most engaged and motivated
-                  learners on your path to a certificate from MITx.
-                </p>
+          <div className="row certificate-pricing-row">
+            <div className="col-6 certificate-pricing">
+              <p>
+                Certitficate track: <strong>${ product && formatLocalePrice(product.price) }</strong>
+                {run.upgrade_deadline ? <><br /><span className="text-danger">Payment date: { formatPrettyDate(moment(run.upgrade_deadline)) }</span></> : null}
+              </p>
 
-                <p>
-                  Your certificate is signed by MIT faculty and demonstrates
-                  that you have gained the knowledge and skills taught in this
-                  course. Showcase your certificate on your resume and social
-                  channels to advance your career, earn a promotion, or enhance
-                  your college applications.
-                </p>
+              <p>{needFinancialAssistanceLink}</p>
+            </div>
+            <div className="col-6">
+              <form action="/cart/add/" method="get" className="text-center">
+                <input type="hidden" name="product_id" value={product.id} />
+                <button
+                  type="submit"
+                  className="btn btn-upgrade"
+                >
+                  <strong>Continue</strong><br />
+                  on the certificate track
+                </button>
+              </form>
+            </div>
+          </div>
 
-                <form action="/cart/add/" method="get" className="text-center">
-                  <input type="hidden" name="product_id" value={product.id} />
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-gradient-red"
-                  >
-                    Continue
-                  </button>
-                </form>
-                {needFinancialAssistanceLink}
-              </div>
-            </div>
-            <div className="cancel-link">{this.getEnrollmentForm()}</div>
-            <div className="faq-link">
-              <a
-                href="https://mitxonline.zendesk.com/hc/en-us"
-                target="_blank"
-                rel="noreferrer"
-              >
-                FAQs
-              </a>
-            </div>
-          </ModalBody>
-        </Modal>
-      )
+          <div className="cancel-link">{this.getEnrollmentForm()}</div>
+        </ModalBody>
+      </Modal>
     ) : null
   }
 
@@ -392,114 +314,6 @@ export class ProductDetailEnrollApp extends React.Component<
     )
   }
 
-  renderCourseInfoBox(courses: Array<BaseCourseRun>) {
-    if (!courses || courses.length < 1) {
-      return null
-    }
-
-    const run = courses[0].next_run_id
-      ? courses[0].courseruns.find(elem => elem.id === courses[0].next_run_id)
-      : courses[0].courseruns[0]
-
-    if (!run) return null
-
-    const product = run.products.length > 0 && run.products[0]
-
-    const startDate =
-      run && !emptyOrNil(run.start_date)
-        ? moment(new Date(run.start_date))
-        : null
-
-    return (
-      <div className="enrollment-info-box">
-        <div className="row d-flex align-items-center">
-          <div className="enrollment-info-icon">
-            <img
-              src="/static/images/products/start-date.png"
-              alt="Course Timing"
-            />
-          </div>
-          <div className="enrollment-info-text">
-            {startDate ? startDate.format("MMMM D, YYYY") : "Start Anytime"}
-          </div>
-        </div>
-        {run && run.page ? (
-          <div className="row d-flex align-items-top">
-            <div className="enrollment-info-icon">
-              <img
-                src="/static/images/products/effort.png"
-                alt="Expected Length and Effort"
-              />
-            </div>
-            <div className="enrollment-info-text">
-              {run.page.length}
-              {run.is_self_paced ? (
-                <span className="badge badge-pacing">SELF-PACED</span>
-              ) : null}
-              {run.page.effort ? (
-                <>
-                  <div className="enrollment-effort">{run.page.effort}</div>
-                </>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-        <div className="row d-flex align-items-center">
-          <div className="enrollment-info-icon">
-            <img src="/static/images/products/cost.png" alt="Cost" />
-          </div>
-          <div className="enrollment-info-text font-weight-bold">Free</div>
-        </div>
-        <div className="row d-flex align-items-top">
-          <div className="enrollment-info-icon">
-            <img
-              src="/static/images/products/certificate.png"
-              alt="Certificate Track Information"
-            />
-          </div>
-          <div className="enrollment-info-text">
-            {product ? (
-              <>
-                Certificate track: $
-                {product.price.toLocaleString("en-us", {
-                  style:    "currency",
-                  currency: "en-US"
-                })}
-                {run.upgrade_deadline ? (
-                  <>
-                    <div className="text-danger">
-                      Payment deadline:{" "}
-                      {moment(new Date(run.upgrade_deadline)).format(
-                        "MMMM D, YYYY"
-                      )}
-                    </div>
-                  </>
-                ) : null}
-                <div>
-                  <a target="_blank" rel="noreferrer" href="#">
-                    What's the certificate track?
-                  </a>
-                </div>
-                {run.page.financial_assistance_form_url ? (
-                  <div>
-                    <a
-                      target="_blank"
-                      rel="noreferrer"
-                      href={run.page.financial_assistance_form_url}
-                    >
-                      Financial assistance available
-                    </a>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              "No certificate available."
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   render() {
     const {
