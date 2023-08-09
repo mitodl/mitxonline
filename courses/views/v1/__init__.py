@@ -91,6 +91,13 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 
         return Course.objects.filter(live=True)
 
+    def get_serializer_context(self):
+        added_context = {}
+        if self.request.query_params.get("readable_id", None):
+            added_context["all_runs"] = True
+
+        return {**super().get_serializer_context(), **added_context}
+
 
 class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for CourseRuns"""
