@@ -515,6 +515,14 @@
     "PGBOUNCER_MIN_POOL_SIZE": {
       "value": "5"
     },
+    "POSTHOG_API_HOST": {
+      "description": "API host for PostHog",
+      "required": false
+    },
+    "POSTHOG_API_TOKEN": {
+      "description": "API token to communicate with PostHog",
+      "required": false
+    },
     "RECAPTCHA_SECRET_KEY": {
       "description": "The ReCaptcha secret key",
       "required": false
