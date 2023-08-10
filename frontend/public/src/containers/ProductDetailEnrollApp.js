@@ -35,17 +35,10 @@ import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "../components/forms/AddlProfileFieldsForm"
 import CourseInfoBox from "../components/CourseInfoBox"
 
-const expandExpandBlock = (event: MouseEvent) => {
-  const blockTarget = event.target
+import posthog from "posthog-js"
 
-  if (blockTarget instanceof HTMLElement) {
-    const block = blockTarget.getAttribute("data-expand-body")
-    if (block) {
-      const elem = document.querySelector(`div#exp${block}`)
-      elem && elem.classList && elem.classList.toggle("open")
-    }
-  }
-}
+/* global SETTINGS:false */
+posthog.init(SETTINGS.posthog_api_token, { api_host: SETTINGS.posthog_api_host })
 
 const expandExpandBlock = event => {
   const block = event.target.getAttribute("data-expand-body")
