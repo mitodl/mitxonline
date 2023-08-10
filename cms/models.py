@@ -4,6 +4,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 from json import dumps
+from posthog import Posthog
 from urllib.parse import quote_plus
 
 from django.conf import settings
@@ -70,7 +71,9 @@ from flexiblepricing.models import (
 from main.views import get_base_context
 
 log = logging.getLogger()
+posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
 
+show_new_featured_carousel = posthog.feature_enabled('mitxonline-new-featured-carousel', 'random text for now')
 
 class SignatoryObjectIndexPage(Page):
     """
@@ -642,6 +645,10 @@ class HomePage(Page):
         "SignatoryIndexPage",
         "InstructorIndexPage",
     ]
+
+    if show_new_featured_carousel:
+        subpage_types.append("ProgramPage")
+
 
     def _get_child_page_of_type(self, cls):
         """Gets the first child page of the given type if it exists"""
