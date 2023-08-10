@@ -73,7 +73,7 @@ from main.views import get_base_context
 log = logging.getLogger()
 posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
 
-show_new_featured_carousel = posthog.feature_enabled('mitxonline-new-featured-carousel', 'random text for now')
+show_new_featured_carousel = posthog.feature_enabled('mitxonline-new-featured-carousel', 'cms models update', person_properties={'environment':settings.ENVIRONMENT})
 
 class SignatoryObjectIndexPage(Page):
     """
