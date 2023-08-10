@@ -35,6 +35,11 @@ import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "../components/forms/AddlProfileFieldsForm"
 import CourseInfoBox from "../components/CourseInfoBox"
 
+import posthog from "posthog-js"
+
+/* global SETTINGS:false */
+posthog.init(SETTINGS.posthog_api_token, { api_host: SETTINGS.posthog_api_host })
+
 const expandExpandBlock = event => {
   const block = event.target.getAttribute("data-expand-body")
   document.querySelector(`div#exp${block}`)
@@ -356,6 +361,10 @@ export class ProductDetailEnrollApp extends React.Component<
       </p>
     ) : null
 
+    const testFeatureFlag = posthog.isFeatureEnabled("enable-upsell-dialog")
+
+    console.log("testFeatureFlag", testFeatureFlag)
+
     document.querySelectorAll("a.expand_here_link").forEach(link => {
       link.removeEventListener("click", expandExpandBlock)
       link.addEventListener("click", expandExpandBlock)
@@ -436,7 +445,7 @@ export class ProductDetailEnrollApp extends React.Component<
                       </Fragment>
                     )
                   ) : null}
-                {run ? this.renderUpgradeEnrollmentDialog() : null}
+                {run && testFeatureFlag ? this.renderUpgradeEnrollmentDialog() : null}
               </Fragment>
             )}
 
