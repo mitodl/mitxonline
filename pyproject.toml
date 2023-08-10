@@ -82,6 +82,7 @@ ulid-py = "^1.1.0"
 uwsgi = "^2.0.19"
 wagtail = "^5.0"
 hypothesis = "4.23.9"
+posthog = "^3.0.1"
 
 
 [tool.poetry.group.dev.dependencies]
