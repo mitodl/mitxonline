@@ -919,7 +919,7 @@ def bulk_retire_edx_users(usernames):
     """
     Bulk retires edX users.
 
-    This method calls edX bulk enrollment API to initiate the user retirement on edX.
+    This method calls edX bulk retirement API to initiate the user retirement on edX.
     Users will be moved to the pending retirement state and then retirement will be carried out by our
     tubular concourse pipeline.
 

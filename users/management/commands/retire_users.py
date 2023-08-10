@@ -116,7 +116,7 @@ class Command(BaseCommand):
                         )
                     )
                 )
-                sys.exit(1)
+                continue
             else:
                 self.stdout.write(
                     self.style.SUCCESS(

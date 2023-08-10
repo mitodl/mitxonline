@@ -19,7 +19,7 @@ def test_single_success(mocker):
     """test retire_users command success with one user"""
     test_username = "test_user"
 
-    mocker.patch(
+    mock_bulk_retire_edx_users = mocker.patch(
         "users.management.commands.retire_users.bulk_retire_edx_users",
         return_value={"successful_user_retirements": [test_username]},
     )
@@ -37,6 +37,7 @@ def test_single_success(mocker):
     assert user.is_active is False
     assert "retired_email" in user.email
     assert UserSocialAuth.objects.filter(user=user).count() == 0
+    mock_bulk_retire_edx_users.assert_called()
 
 
 @pytest.mark.django_db
@@ -44,7 +45,7 @@ def test_multiple_success(mocker):
     """test retire_users command success with more than one user"""
     test_usernames = ["foo", "bar", "baz"]
 
-    mocker.patch(
+    mock_bulk_retire_edx_users = mocker.patch(
         "users.management.commands.retire_users.bulk_retire_edx_users",
         return_value={"successful_user_retirements": test_usernames},
     )
@@ -64,6 +65,7 @@ def test_multiple_success(mocker):
         assert user.is_active is False
         assert "retired_email" in user.email
         assert UserSocialAuth.objects.filter(user=user).count() == 0
+    mock_bulk_retire_edx_users.assert_called()
 
 
 @pytest.mark.django_db
@@ -74,7 +76,7 @@ def test_retire_user_with_email(mocker):
     user = UserFactory.create(email=test_email, is_active=True)
     UserSocialAuthFactory.create(user=user, provider="edX")
 
-    mocker.patch(
+    mock_bulk_retire_edx_users = mocker.patch(
         "users.management.commands.retire_users.bulk_retire_edx_users",
         return_value={"successful_user_retirements": [user.username]},
     )
@@ -89,6 +91,7 @@ def test_retire_user_with_email(mocker):
     assert user.is_active is False
     assert "retired_email" in user.email
     assert UserSocialAuth.objects.filter(user=user).count() == 0
+    mock_bulk_retire_edx_users.assert_called_with(user.username)
 
 
 @pytest.mark.django_db
@@ -105,7 +108,7 @@ def test_retire_user_blocking_with_email(mocker):
     assert UserSocialAuth.objects.filter(user=user).count() == 1
     assert BlockList.objects.all().count() == 0
 
-    mocker.patch(
+    mock_bulk_retire_edx_users = mocker.patch(
         "users.management.commands.retire_users.bulk_retire_edx_users",
         return_value={"successful_user_retirements": [user.username]},
     )
@@ -117,13 +120,14 @@ def test_retire_user_blocking_with_email(mocker):
     assert UserSocialAuth.objects.filter(user=user).count() == 0
     assert BlockList.objects.all().count() == 1
     assert BlockList.objects.filter(hashed_email=hashed_email).count() == 1
+    mock_bulk_retire_edx_users.assert_called_with(user.username)
 
 
 @pytest.mark.django_db
 def test_multiple_success_blocking_user(mocker):
     """test retire_users command blocking emails success with more than one user"""
     test_usernames = ["foo", "bar", "baz"]
-    mocker.patch(
+    mock_bulk_retire_edx_users = mocker.patch(
         "users.management.commands.retire_users.bulk_retire_edx_users",
         return_value={"successful_user_retirements": test_usernames},
     )
@@ -146,6 +150,7 @@ def test_multiple_success_blocking_user(mocker):
         assert UserSocialAuth.objects.filter(user=user).count() == 0
 
     assert BlockList.objects.all().count() == 3
+    mock_bulk_retire_edx_users.assert_called()
 
 
 @pytest.mark.django_db
@@ -162,7 +167,7 @@ def test_user_blocking_if_not_requested(mocker):
     assert UserSocialAuth.objects.filter(user=user).count() == 1
     assert BlockList.objects.all().count() == 0
 
-    mocker.patch(
+    mock_bulk_retire_edx_users = mocker.patch(
         "users.management.commands.retire_users.bulk_retire_edx_users",
         return_value={"successful_user_retirements": [user.username]},
     )
@@ -173,3 +178,4 @@ def test_user_blocking_if_not_requested(mocker):
     assert "retired_email" in user.email
     assert UserSocialAuth.objects.filter(user=user).count() == 0
     assert BlockList.objects.all().count() == 0
+    mock_bulk_retire_edx_users.assert_called_with(user.username)
