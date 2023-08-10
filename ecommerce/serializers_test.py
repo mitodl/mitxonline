@@ -348,7 +348,10 @@ def get_receipt_serializer_test_data(mocker, user, products, user_client):
     return (order, test_data)
 
 
-def test_order_receipt_purchase_serializer(mocker, user, products, user_client):
+def test_order_receipt_purchase_serializer(
+    settings, mocker, user, products, user_client
+):
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     (order, test_data) = get_receipt_serializer_test_data(
         mocker, user, products, user_client
     )
@@ -358,7 +361,10 @@ def test_order_receipt_purchase_serializer(mocker, user, products, user_client):
     assert serialized_data == test_data["receipt"]
 
 
-def test_order_receipt_purchaser_serializer(mocker, user, products, user_client):
+def test_order_receipt_purchaser_serializer(
+    settings, mocker, user, products, user_client
+):
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     (order, test_data) = get_receipt_serializer_test_data(
         mocker, user, products, user_client
     )
@@ -368,7 +374,8 @@ def test_order_receipt_purchaser_serializer(mocker, user, products, user_client)
     assert serialized_data == test_data["purchaser"]
 
 
-def test_order_receipt_order_serializer(mocker, user, products, user_client):
+def test_order_receipt_order_serializer(settings, mocker, user, products, user_client):
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     (order, test_data) = get_receipt_serializer_test_data(
         mocker, user, products, user_client
     )
@@ -379,7 +386,8 @@ def test_order_receipt_order_serializer(mocker, user, products, user_client):
     assert serialized_data == test_data["order"]
 
 
-def test_order_receipt_lines_serializer(mocker, user, products, user_client):
+def test_order_receipt_lines_serializer(settings, mocker, user, products, user_client):
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     (order, test_data) = get_receipt_serializer_test_data(
         mocker, user, products, user_client
     )

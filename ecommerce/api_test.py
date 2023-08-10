@@ -414,9 +414,12 @@ def test_unenrollment_unenrolls_learner(mocker, user):
     unenroll_mock.assert_called()
 
 
-def test_process_cybersource_payment_response(rf, mocker, user_client, user, products):
+def test_process_cybersource_payment_response(
+    settings, rf, mocker, user_client, user, products
+):
     """Test that ensures the response from Cybersource for an ACCEPTed payment updates the orders state"""
 
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     mocker.patch(
         "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
         return_value=True,

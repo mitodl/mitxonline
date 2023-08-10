@@ -608,8 +608,7 @@ def enroll_in_edx_course_runs(
     course_runs,
     *,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
-    force_enrollment=False,
-    regen_auth_tokens=True,
+    force_enrollment=True,
 ):
     """
     Enrolls a user in edx course runs. If the user doesn't have a valid
@@ -621,7 +620,6 @@ def enroll_in_edx_course_runs(
         mode (str): The course mode to enroll the user with
         force_enrollment (bool): If True, Enforces Enrollment after the enrollment end date
                                     has been passed or upgrade_deadline is ended
-        regen_auth_token (bool): Regenerate the auth tokens if the learner's are invalid
 
     Returns:
         list of edx_api.enrollments.models.Enrollment:
@@ -631,48 +629,8 @@ def enroll_in_edx_course_runs(
         EdxApiEnrollErrorException: Raised if the underlying edX API HTTP request fails
         UnknownEdxApiEnrollException: Raised if an unknown error was encountered during the edX API request
     """
-    username = None
-    if force_enrollment:
-        edx_client = get_edx_api_service_client()
-        username = user.username
-    else:
-        try:
-            edx_client = get_edx_api_client(user)
-        except (HTTPError, NoEdxApiAuthError) as exc:
-            log.exception(
-                "enroll_in_edx_course_runs got exception getting API client: %s %s",
-                type(exc),
-                exc,
-            )
-
-            if regen_auth_tokens and (
-                "Bad Request" in str(exc) or type(exc) == NoEdxApiAuthError
-            ):
-                if OpenEdxApiAuth.objects.filter(user=user).count():
-                    OpenEdxApiAuth.objects.filter(user=user).delete()
-                    user.refresh_from_db()
-
-                try:
-                    log.exception(
-                        "enroll_in_edx_course_runs: creating new auth tokens for %s",
-                        user,
-                    )
-                    create_edx_auth_token(user)
-                    user.refresh_from_db()
-                    edx_client = get_edx_api_client(user)
-                except Exception as auth_exc:
-                    log.exception(
-                        "enroll_in_edx_course_runs: got exception creating new auth token: %s",
-                        auth_exc,
-                    )
-                    raise auth_exc
-            elif not regen_auth_tokens and (
-                "Bad Request" in str(exc) or type(exc) == NoEdxApiAuthError
-            ):
-                regenerate_openedx_auth_tokens.delay(user.id)
-                raise exc
-            else:
-                raise exc
+    edx_client = get_edx_api_service_client()
+    username = user.username
 
     results = []
     for course_run in course_runs:

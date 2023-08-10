@@ -143,7 +143,6 @@ class Command(BaseCommand):
                 [run],
                 keep_failed_enrollments=options["keep_failed_enrollments"],
                 mode=EDX_ENROLLMENT_VERIFIED_MODE,
-                force_enrollment=force_enrollment,
             )
             if not successful_enrollments:
                 raise CommandError("Failed to create the enrollment record")

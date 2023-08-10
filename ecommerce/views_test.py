@@ -505,6 +505,7 @@ def test_start_checkout_with_invalid_discounts(user, user_client, products, disc
     ],
 )
 def test_checkout_result(
+    settings,
     user,
     user_client,
     api_client,
@@ -519,6 +520,7 @@ def test_checkout_result(
     Generates an order (using the API endpoint) and then cancels it using the endpoint.
     There shouldn't be any PendingOrders after that happens.
     """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     mocker.patch(
         "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
         return_value=True,
@@ -830,13 +832,14 @@ def test_user_discounts_api(user_drf_client, admin_drf_client, discounts, user):
 
 
 def test_paid_and_unpaid_courserun_checkout(
-    user, user_client, user_drf_client, products
+    settings, user, user_client, user_drf_client, products
 ):
     """
     Tests checking out a paid or unpaid course run:
      - If a course run is already paid, it should redirect to cart with 302 status code including a user message in the response cookies
      - Otherwise, it should be successful with 200 status code
     """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     product = products[0]
     basket = create_basket_with_product(user, product)
     order = PendingOrder.create_from_basket(basket)
@@ -875,6 +878,7 @@ def test_paid_and_unpaid_courserun_checkout(
     ],
 )
 def test_checkout_api_result(
+    settings,
     user,
     user_client,
     api_client,
@@ -887,6 +891,7 @@ def test_checkout_api_result(
     """
     Tests the proper handling of an order after receiving a valid Cybersource payment response.
     """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     mocker.patch(
         "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
         return_value=True,
@@ -1008,10 +1013,11 @@ def test_non_upgradable_courserun_checkout(
         )
 
 
-def test_start_checkout_with_zero_value(user, user_client, products):
+def test_start_checkout_with_zero_value(settings, user, user_client, products):
     """
     Check that the checkout redirects the user to dashboard when basket price is zero
     """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     discount = DiscountFactory.create(
         discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=100
     )

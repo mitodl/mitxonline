@@ -18,7 +18,7 @@ def products():
 
 
 def test_mail_api_task_called(
-    mocker, user, products, user_client, django_capture_on_commit_callbacks
+    settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):
     """
     Tests that the Order model is properly calling the send email receipt task
@@ -26,6 +26,7 @@ def test_mail_api_task_called(
     function should create a basket and process the order through to the point
     where the Order model itself will send the receipt email.
     """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     mock_delayed_send_ecommerce_order_receipt = mocker.patch(
         "ecommerce.tasks.send_ecommerce_order_receipt.delay"
     )
@@ -38,13 +39,14 @@ def test_mail_api_task_called(
 
 
 def test_mail_api_receipt_generation(
-    mocker, user, products, user_client, django_capture_on_commit_callbacks
+    settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):
     """
     Tests email generation. Mocks actual message sending and then looks for some
     key data in the rendered template body (name from legal address, order ID,
     and line item unit price).
     """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     mock_send_message = mocker.patch("mitol.mail.api.send_message")
 
     with django_capture_on_commit_callbacks(execute=True):
@@ -67,11 +69,14 @@ def test_mail_api_receipt_generation(
     assert str(lines[0].unit_price) in rendered_template.body
 
 
-def test_mail_api_refund_email_generation(mocker, user, products, user_client):
+def test_mail_api_refund_email_generation(
+    settings, mocker, user, products, user_client
+):
     """
     Tests email generation for the refund message. Generates a fulfilled order,
     then attemps to refund it after mocking the mail sender.
     """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     order = create_order_receipt(mocker, user, products, user_client)
 
     mock_send_message = mocker.patch("mitol.mail.api.send_message")

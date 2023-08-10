@@ -421,8 +421,9 @@ def test_get_edx_api_client(mocker, settings, user):
     )
 
 
-def test_enroll_in_edx_course_runs(mocker, user):
+def test_enroll_in_edx_course_runs(settings, mocker, user):
     """Tests that enroll_in_edx_course_runs uses the EdxApi client to enroll in course runs"""
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     mock_client = mocker.MagicMock()
     enroll_return_values = ["result1", "result2"]
     mock_client.enrollments.create_student_enrollment = mocker.Mock(
@@ -435,14 +436,14 @@ def test_enroll_in_edx_course_runs(mocker, user):
     mock_client.enrollments.create_student_enrollment.assert_any_call(
         course_runs[0].courseware_id,
         mode=EDX_DEFAULT_ENROLLMENT_MODE,
-        username=None,
-        force_enrollment=False,
+        username=user.username,
+        force_enrollment=True,
     )
     mock_client.enrollments.create_student_enrollment.assert_any_call(
         course_runs[1].courseware_id,
         mode=EDX_DEFAULT_ENROLLMENT_MODE,
-        username=None,
-        force_enrollment=False,
+        username=user.username,
+        force_enrollment=True,
     )
     assert enroll_results == enroll_return_values
 
@@ -464,11 +465,12 @@ def test_enroll_api_fail(mocker, user):
         enroll_in_edx_course_runs(user, [course_run])
 
 
-def test_enroll_pro_unknown_fail(mocker, user):
+def test_enroll_pro_unknown_fail(settings, mocker, user):
     """
     Tests that enroll_in_edx_course_runs raises an UnknownEdxApiEnrollException if an unexpected exception
     is encountered
     """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     mock_client = mocker.MagicMock()
     mock_client.enrollments.create_student_enrollment = mocker.Mock(
         side_effect=ValueError("Unexpected error")

@@ -200,12 +200,12 @@ def test_basket_discount_conversion(user, unlimited_discount):
     assert converted_discount == reconverted_discount
 
 
-def test_order_refund():
+def test_order_refund(settings):
     """
     Tests state change from fulfilled to refund. There should be a new
     Transaction record after the order has been refunded.
     """
-
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
     with reversion.create_revision():
         basket_item = BasketItemFactory.create()
 
