@@ -100,7 +100,7 @@ class Command(BaseCommand):
                 page_framework = {
                     "title": block["title"],
                     "instructor_name": block["name"],
-                    "instructor_bio_short": block["description"],
+                    "instructor_bio_short": block["name"],
                     "instructor_bio_long": block["description"],
                     "live": kwargs["publish"],
                     "slug": slugify(block["title"]),
