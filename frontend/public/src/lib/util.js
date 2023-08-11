@@ -262,7 +262,6 @@ export const intCheckFeatureFlag = (
   document: Object,
   settings: Object
 ) => {
-<<<<<<< HEAD
   const params = new URLSearchParams(document.location.search)
   if (SETTINGS.posthog_api_host) {
     posthog.setPersonPropertiesForFlags({ environment: SETTINGS.environment })
@@ -272,9 +271,6 @@ export const intCheckFeatureFlag = (
     params.get(flag) !== null ||
     (settings && settings.features && settings.features[flag])
   )
-=======
-  return posthog.isFeatureEnabled(flag)
->>>>>>> 8ca14d70 (Feature flagging stuff)
 }
 
 export const checkFeatureFlag = (flag: string) => {
