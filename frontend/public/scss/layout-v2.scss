@@ -14,33 +14,25 @@
 @import "slick";
 @import "resource";
 @import "notification";
-@import "user-menu";
+@import "v2/user-menu";
 @import "error";
 @import "expandable";
 @import "dashboard";
 @import "course-cards";
 @import "home";
-@import "product-details";
-@import "product-faculty-members";
+@import "v2/product-details";
+@import "v2/product-faculty-members";
 @import "cart";
 @import "receipt";
 @import "certificates/certificate";
 @import "learner-records";
 @import "order-history";
-@import "catalog";
-@import "home-page/featured-product-cards";
-@import "home-page/home-page-hero";
-@import "home-page/home-page-video-component";
-@import "product-page/user-menu";
-@import "product-page/product-details";
-@import "product-page/product-faculty-members";
-@import "home-page/home-page-contact-row";
 
 body {
   font-family: "Montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
   margin: 0;
   color: #000000;
-  background: #f5f5f5;
+  background: white;
   display: flex;
   min-height: 100vh;
   flex-direction: column;
