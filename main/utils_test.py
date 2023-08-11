@@ -49,6 +49,8 @@ def test_get_js_settings(settings, rf):
         "features": {
             "enable_addl_profile_fields": False,
         },
+        "posthog_api_token": settings.POSTHOG_API_TOKEN,
+        "posthog_api_host": settings.POSTHOG_API_HOST,
     }
 
 

@@ -14,12 +14,11 @@ from django.http import HttpRequest, HttpResponseRedirect
 from mitol.common.utils.urls import remove_password_from_url
 from rest_framework import status
 from rest_framework.response import Response
+from wagtail import VERSION as WAGTAIL_VERSION
 
 from main import features
 from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME
 from main.settings import TIME_ZONE
-
-from wagtail import VERSION as WAGTAIL_VERSION
 
 
 class FeatureFlag(Flag):
@@ -56,6 +55,8 @@ def get_js_settings(request: HttpRequest):
                 features.ENABLE_ADDL_PROFILE_FIELDS
             )
         },
+        "posthog_api_token": settings.POSTHOG_API_TOKEN,
+        "posthog_api_host": settings.POSTHOG_API_HOST,
     }
 
 
