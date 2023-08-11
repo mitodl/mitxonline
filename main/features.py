@@ -2,10 +2,14 @@
 from functools import wraps
 
 from django.conf import settings
+from posthog import Posthog
+
+posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
 
 IGNORE_EDX_FAILURES = "IGNORE_EDX_FAILURES"
 SYNC_ON_DASHBOARD_LOAD = "SYNC_ON_DASHBOARD_LOAD"
 ENABLE_ADDL_PROFILE_FIELDS = "ENABLE_ADDL_PROFILE_FIELDS"
+ENABLE_NEW_DESIGN = "jkachel-new-design"
 
 
 def is_enabled(name, default=None):
@@ -19,7 +23,10 @@ def is_enabled(name, default=None):
     Returns:
         bool: True if the feature flag is enabled
     """
-    return settings.FEATURES.get(name, default or settings.FEATURES_DEFAULT)
+
+    return posthog.feature_enabled(name, settings.HOSTNAME) or settings.FEATURES.get(
+        name, default or settings.FEATURES_DEFAULT
+    )
 
 
 def if_feature_enabled(name, default=None):

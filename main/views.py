@@ -10,16 +10,20 @@ from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from rest_framework.pagination import LimitOffsetPagination
 
+from main.features import is_enabled
+
 
 def get_base_context(request):
     """
     Returns the template context key/values needed for the base template and all templates that extend it
     """
-    context = {}
+    context = {"new_design": is_enabled("jkachel-new-design", False)}
+
     if settings.GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE:
         context[
             "domain_verification_tag"
         ] = settings.GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE
+
     return context
 
 

@@ -11,7 +11,6 @@ The following rules are followed to determine where the content is split:
 This is intended for use with a Wagtail RichText field.
 """
 
-import hashlib
 import uuid
 
 from bs4 import BeautifulSoup

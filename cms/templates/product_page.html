@@ -7,6 +7,7 @@
 {% block title %}{{ page.title }} | {{ site_name }}{% endblock %}
 
 {% block content %}
+{% if new_design %}
     <div id="main" class="product-page">
       <div class="container">
         <div class="row d-flex flex-row">
@@ -212,4 +213,7 @@
         </div>
       </section>
     </div>
+{% else %}
+<h1>flag is off</h1>
+{% endif %}
 {% endblock %}

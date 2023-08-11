@@ -71,7 +71,7 @@ export class ProductDetailEnrollApp extends React.Component<
   ProductDetailState
 > {
   state = {
-    upgradeEnrollmentDialogVisibility: true,
+    upgradeEnrollmentDialogVisibility: false,
     currentCourseRun:                  null,
     showAddlProfileFieldsModal:        false,
     destinationUrl:                    ""

@@ -18,6 +18,7 @@ import _truncate from "lodash/truncate"
 import qs from "query-string"
 import * as R from "ramda"
 import moment from "moment-timezone"
+import posthog from "posthog-js"
 
 import type Moment from "moment"
 import type { HttpRespErrorMessage, HttpResponse } from "../flow/httpTypes"
@@ -28,6 +29,11 @@ import {
   DISCOUNT_TYPE_PERCENT_OFF,
   DISCOUNT_TYPE_FIXED_PRICE
 } from "../constants"
+
+
+/* global SETTINGS:false */
+posthog.init(SETTINGS.posthog_api_token, { api_host: SETTINGS.posthog_api_host })
+
 
 /**
  * Returns a promise which resolves after a number of milliseconds have elapsed
@@ -241,12 +247,7 @@ export const intCheckFeatureFlag = (
   document: Object,
   settings: Object
 ) => {
-  const params = new URLSearchParams(document.location.search)
-
-  return (
-    params.get(flag) !== null ||
-    (settings && settings.features && settings.features[flag])
-  )
+  return posthog.isFeatureEnabled(flag)
 }
 
 export const checkFeatureFlag = (flag: string) => {
