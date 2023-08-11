@@ -119,7 +119,7 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Returns an array of Department names that are associated with the Courses or Programs in the
+   * Returns an array of unique Department names that are associated with the Courses or Programs in the
    * parameter and also includes an entry for "All Departments".
    * @param {Array<CourseDetailWithRuns | Program>} catalogItems Array of Courses or Programs to collect Department names from.
    */
@@ -127,7 +127,6 @@ export class CatalogPage extends React.Component<Props> {
     catalogItems: Array<CourseDetailWithRuns | Program>
   ) {
     const departments = Array.from(catalogItems, item => item.departments)
-    // Extract all of the unique names from the array of Departments.
     return [
       ...new Set([
         ALL_DEPARTMENTS,
@@ -219,10 +218,10 @@ export class CatalogPage extends React.Component<Props> {
     courseRunA: BaseCourseRun,
     courseRunB: BaseCourseRun
   ) {
-    if (courseRunA.start_date > courseRunB.start_date) {
+    if (moment(courseRunA.start_date).isBefore(courseRunB.start_date)) {
       return -1
     }
-    if (courseRunA.start_date < courseRunB.start_date) {
+    if (moment(courseRunA.start_date).isAfter(courseRunB.start_date)) {
       return 1
     }
     // CourseRunA and CourseRunB share the same start date.
@@ -295,7 +294,7 @@ export class CatalogPage extends React.Component<Props> {
           course.departments
             .map(department => department.name)
             .includes(selectedDepartment)) &&
-        course.page.live &&
+        course?.page?.live &&
         course.courseruns.length > 0 &&
         this.validateCoursesCourseRuns(course.courseruns).length > 0
     )

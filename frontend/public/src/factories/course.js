@@ -46,7 +46,9 @@ export const makeCourseRun = (): CourseRun => ({
   // $FlowFixMe
   id:               genCourseRunId.next().value,
   course_number:    casual.word,
-  products:         []
+  products:         [],
+  departments:      [makeDepartment()],
+  live:             true
 })
 
 export const makeCourseRunWithProduct = (): CourseRun => ({
@@ -90,7 +92,9 @@ const makeCourseDetail = (): CourseDetail => ({
   title:             casual.text,
   description:       casual.text,
   readable_id:       casual.word,
-  feature_image_src: casual.url
+  feature_image_src: casual.url,
+  departments:       [makeDepartment()],
+  live:              true
 })
 
 const makeRequirementRootNode = (
@@ -255,8 +259,11 @@ export const makeProgram = (): Program => ({
   courses:     [makeCourseDetailWithRuns()],
   page:        {
     financial_assistance_form_url: casual.url,
-    feature_image_src:             casual.url
-  }
+    feature_image_src:             casual.url,
+    live:                          true
+  },
+  departments: [makeDepartment()],
+  live:        true
 })
 
 export const makeProgramWithReqTree = (): Program => {
@@ -459,3 +466,7 @@ export const makeLearnerRecord = (
 
   return learnerRecord
 }
+
+export const makeDepartment = (): Department => ({
+  name: casual.word
+})
