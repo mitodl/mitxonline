@@ -30,91 +30,114 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         : null
 
     return (
-      <div className="enrollment-info-box">
-        <div className="row d-flex align-items-center">
-          <div className="enrollment-info-icon">
-            <img
-              src="/static/images/products/start-date.png"
-              alt="Course Timing"
-            />
-          </div>
-          <div className="enrollment-info-text">
-            {startDate ? formatPrettyDate(startDate) : "Start Anytime"}
-          </div>
-        </div>
-        {course && course.page ? (
-          <div className="row d-flex align-items-top">
+      <>
+        <div className="enrollment-info-box">
+          <div className="row d-flex align-items-center">
             <div className="enrollment-info-icon">
               <img
-                src="/static/images/products/effort.png"
-                alt="Expected Length and Effort"
+                src="/static/images/products/start-date.png"
+                alt="Course Timing"
               />
             </div>
             <div className="enrollment-info-text">
-              {course.page.length}
-              {run && run.is_self_paced ? (
-                <span className="badge badge-pacing">SELF-PACED</span>
-              ) : null}
-              {course.page.effort ? (
-                <>
-                  <div className="enrollment-effort">{course.page.effort}</div>
-                </>
-              ) : null}
+              {startDate ? formatPrettyDate(startDate) : "Start Anytime"}
             </div>
           </div>
-        ) : null}
-        <div className="row d-flex align-items-center">
-          <div className="enrollment-info-icon">
-            <img src="/static/images/products/cost.png" alt="Cost" />
-          </div>
-          <div className="enrollment-info-text font-weight-bold">Free</div>
-        </div>
-        <div className="row d-flex align-items-top">
-          <div className="enrollment-info-icon">
-            <img
-              src="/static/images/products/certificate.png"
-              alt="Certificate Track Information"
-            />
-          </div>
-          <div className="enrollment-info-text">
-            {product ? (
-              <>
-                Certificate track: $
-                {product.price.toLocaleString("en-us", {
-                  style: "currency",
-                  currency: "en-US"
-                })}
-                {run.upgrade_deadline ? (
+          {course && course.page ? (
+            <div className="row d-flex align-items-top">
+              <div className="enrollment-info-icon">
+                <img
+                  src="/static/images/products/effort.png"
+                  alt="Expected Length and Effort"
+                />
+              </div>
+              <div className="enrollment-info-text">
+                {course.page.length}
+                {run && run.is_self_paced ? (
+                  <span className="badge badge-pacing">SELF-PACED</span>
+                ) : null}
+                {course.page.effort ? (
                   <>
-                    <div className="text-danger">
-                      Payment deadline:{" "}
-                      {formatPrettyDate(moment(run.upgrade_deadline))}
+                    <div className="enrollment-effort">
+                      {course.page.effort}
                     </div>
                   </>
                 ) : null}
-                <div>
-                  <a target="_blank" rel="noreferrer" href="#">
-                    What's the certificate track?
-                  </a>
-                </div>
-                {course.page.financial_assistance_form_url ? (
+              </div>
+            </div>
+          ) : null}
+          <div className="row d-flex align-items-center">
+            <div className="enrollment-info-icon">
+              <img src="/static/images/products/cost.png" alt="Cost" />
+            </div>
+            <div className="enrollment-info-text font-weight-bold">Free</div>
+          </div>
+          <div className="row d-flex align-items-top">
+            <div className="enrollment-info-icon">
+              <img
+                src="/static/images/products/certificate.png"
+                alt="Certificate Track Information"
+              />
+            </div>
+            <div className="enrollment-info-text">
+              {product ? (
+                <>
+                  Certificate track: $
+                  {product.price.toLocaleString("en-us", {
+                    style:    "currency",
+                    currency: "en-US"
+                  })}
+                  {run.upgrade_deadline ? (
+                    <>
+                      <div className="text-danger">
+                        Payment deadline:{" "}
+                        {formatPrettyDate(moment(run.upgrade_deadline))}
+                      </div>
+                    </>
+                  ) : null}
                   <div>
-                    <a
-                      target="_blank"
-                      rel="noreferrer"
-                      href={course.page.financial_assistance_form_url}
-                    >
-                      Financial assistance available
+                    <a target="_blank" rel="noreferrer" href="#">
+                      What's the certificate track?
                     </a>
                   </div>
-                ) : null}
-              </>
-            ) : (
-              "No certificate available."
-            )}
+                  {course.page.financial_assistance_form_url ? (
+                    <div>
+                      <a
+                        target="_blank"
+                        rel="noreferrer"
+                        href={course.page.financial_assistance_form_url}
+                      >
+                        Financial assistance available
+                      </a>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                "No certificate available."
+              )}
+            </div>
           </div>
         </div>
-      </div>
+        {course && course.programs && course.programs.length > 0 ? (
+          <div className="program-info-box">
+            <strong>
+              Part of the following program
+              {course.programs.length === 1 ? null : "s"}
+            </strong>
+
+            <ul>
+              {course.programs.map(elem => (
+                <>
+                  <li>
+                    {" "}
+                    <a href="#">{elem.title}</a>
+                  </li>
+                </>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </>
     )
   }
 }

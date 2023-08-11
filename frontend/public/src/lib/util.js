@@ -30,10 +30,9 @@ import {
   DISCOUNT_TYPE_FIXED_PRICE
 } from "../constants"
 
-
-/* global SETTINGS:false */
-posthog.init(SETTINGS.posthog_api_token, { api_host: SETTINGS.posthog_api_host })
-
+posthog.init(SETTINGS.posthog_api_token, {
+  api_host: SETTINGS.posthog_api_host
+})
 
 /**
  * Returns a promise which resolves after a number of milliseconds have elapsed
@@ -242,11 +241,7 @@ export const getFlexiblePriceForProduct = (product: Product) => {
   }
 }
 
-export const intCheckFeatureFlag = (
-  flag: string,
-  document: Object,
-  settings: Object
-) => {
+export const intCheckFeatureFlag = (flag: string) => {
   return posthog.isFeatureEnabled(flag)
 }
 

@@ -38,7 +38,9 @@ import CourseInfoBox from "../components/CourseInfoBox"
 import posthog from "posthog-js"
 
 /* global SETTINGS:false */
-posthog.init(SETTINGS.posthog_api_token, { api_host: SETTINGS.posthog_api_host })
+posthog.init(SETTINGS.posthog_api_token, {
+  api_host: SETTINGS.posthog_api_host
+})
 
 const expandExpandBlock = event => {
   const block = event.target.getAttribute("data-expand-body")
@@ -159,7 +161,7 @@ export class ProductDetailEnrollApp extends React.Component<
     return this.state.currentCourseRun
   }
 
-  renderUpgradeEnrollmentDialog() {
+  renderUpgradeEnrollmentDialog(showNewDesign: boolean) {
     const { courseRuns } = this.props
     const run =
       !this.getCurrentCourseRun() && courseRuns
@@ -178,76 +180,154 @@ export class ProductDetailEnrollApp extends React.Component<
     const product = run.products ? run.products[0] : null
 
     return product ? (
-      <Modal
-        id={`upgrade-enrollment-dialog`}
-        className="upgrade-enrollment-modal"
-        isOpen={upgradeEnrollmentDialogVisibility}
-        toggle={() => this.toggleUpgradeDialogVisibility()}
-        centered
-      >
-        <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
-          {run.title}
-        </ModalHeader>
-        <ModalBody>
-          <div className="row">
-            <div className="col-12">
-              <p>
-                Thank you for choosing an MITx online course. By paying for this
-                course, you're joining the most engaged and motivated learners
-                on your path to a certificate from MITx.
-              </p>
+      showNewDesign ? (
+        <Modal
+          id={`upgrade-enrollment-dialog`}
+          className="upgrade-enrollment-modal"
+          isOpen={upgradeEnrollmentDialogVisibility}
+          toggle={() => this.toggleUpgradeDialogVisibility()}
+          centered
+        >
+          <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
+            {run.title}
+          </ModalHeader>
+          <ModalBody>
+            <div className="row">
+              <div className="col-12">
+                <p>
+                  Thank you for choosing an MITx online course. By paying for
+                  this course, you're joining the most engaged and motivated
+                  learners on your path to a certificate from MITx.
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="row">
-            <div className="col-12">
-              <p className="acheiving-text">Acheiving a certificate has its advantages:</p>
+            <div className="row">
+              <div className="col-12">
+                <p className="acheiving-text">
+                  Acheiving a certificate has its advantages:
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="row">
-            <div className="col-6">
-              <ul>
-                <li> Certificate is signed by MIT faculty</li>
-                <li> Demonstrates knowledge and skills taught in this course</li>
-                <li> Enhance your college &amp; earn a promotion</li>
-              </ul>
+            <div className="row">
+              <div className="col-6">
+                <ul>
+                  <li> Certificate is signed by MIT faculty</li>
+                  <li>
+                    {" "}
+                    Demonstrates knowledge and skills taught in this course
+                  </li>
+                  <li> Enhance your college &amp; earn a promotion</li>
+                </ul>
+              </div>
+              <div className="col-6">
+                <ul>
+                  <li>Highlight on your resume/CV</li>
+                  <li>Share on your social channels &amp; LinkedIn</li>
+                  <li>
+                    Enhance your college application with an earned certificate
+                    from MIT
+                  </li>
+                </ul>
+              </div>
             </div>
-            <div className="col-6">
-              <ul>
-                <li>Highlight on your resume/CV</li>
-                <li>Share on your social channels &amp; LinkedIn</li>
-                <li>Enhance your college application with an earned certificate from MIT</li>
-              </ul>
-            </div>
-          </div>
 
-          <div className="row certificate-pricing-row">
-            <div className="col-6 certificate-pricing">
-              <p>
-                Certitficate track: <strong>${ product && formatLocalePrice(product.price) }</strong>
-                {run.upgrade_deadline ? <><br /><span className="text-danger">Payment date: { formatPrettyDate(moment(run.upgrade_deadline)) }</span></> : null}
-              </p>
+            <div className="row certificate-pricing-row">
+              <div className="col-6 certificate-pricing">
+                <p>
+                  Certitficate track:{" "}
+                  <strong>
+                    ${product && formatLocalePrice(product.price)}
+                  </strong>
+                  {run.upgrade_deadline ? (
+                    <>
+                      <br />
+                      <span className="text-danger">
+                        Payment date:{" "}
+                        {formatPrettyDate(moment(run.upgrade_deadline))}
+                      </span>
+                    </>
+                  ) : null}
+                </p>
 
-              <p>{needFinancialAssistanceLink}</p>
+                <p>{needFinancialAssistanceLink}</p>
+              </div>
+              <div className="col-6">
+                <form action="/cart/add/" method="get" className="text-center">
+                  <input type="hidden" name="product_id" value={product.id} />
+                  <button type="submit" className="btn btn-upgrade">
+                    <strong>Continue</strong>
+                    <br />
+                    on the certificate track
+                  </button>
+                </form>
+              </div>
             </div>
-            <div className="col-6">
-              <form action="/cart/add/" method="get" className="text-center">
-                <input type="hidden" name="product_id" value={product.id} />
-                <button
-                  type="submit"
-                  className="btn btn-upgrade"
-                >
-                  <strong>Continue</strong><br />
-                  on the certificate track
-                </button>
-              </form>
-            </div>
-          </div>
 
-          <div className="cancel-link">{this.getEnrollmentForm()}</div>
-        </ModalBody>
-      </Modal>
+            <div className="cancel-link">{this.getEnrollmentForm()}</div>
+          </ModalBody>
+        </Modal>
+      ) : (
+        <Modal
+          id={`upgrade-enrollment-dialog`}
+          className="upgrade-enrollment-modal"
+          isOpen={upgradeEnrollmentDialogVisibility}
+          toggle={() => this.toggleUpgradeDialogVisibility()}
+        >
+          <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
+            Enroll
+          </ModalHeader>
+          <ModalBody>
+            <div className="row modal-subheader d-flex">
+              <div className="flex-grow-1 align-self-end">
+                Learn online and get a certificate
+              </div>
+              <div className="text-end align-self-end">
+                {formatLocalePrice(getFlexiblePriceForProduct(product))}
+              </div>
+            </div>
+            <div className="row">
+              <div className="col-12">
+                <p>
+                  Thank you for choosing an MITx online course. By paying for
+                  this course, you're joining the most engaged and motivated
+                  learners on your path to a certificate from MITx.
+                </p>
+
+                <p>
+                  Your certificate is signed by MIT faculty and demonstrates
+                  that you have gained the knowledge and skills taught in this
+                  course. Showcase your certificate on your resume and social
+                  channels to advance your career, earn a promotion, or enhance
+                  your college applications.
+                </p>
+
+                <form action="/cart/add/" method="get" className="text-center">
+                  <input type="hidden" name="product_id" value={product.id} />
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-gradient-red"
+                  >
+                    Continue
+                  </button>
+                </form>
+                {needFinancialAssistanceLink}
+              </div>
+            </div>
+            <div className="cancel-link">{this.getEnrollmentForm()}</div>
+            <div className="faq-link">
+              <a
+                href="https://mitxonline.zendesk.com/hc/en-us"
+                target="_blank"
+                rel="noreferrer"
+              >
+                FAQs
+              </a>
+            </div>
+          </ModalBody>
+        </Modal>
+      )
     ) : null
   }
 
@@ -310,7 +390,6 @@ export class ProductDetailEnrollApp extends React.Component<
     )
   }
 
-
   render() {
     const {
       courseRuns,
@@ -361,14 +440,14 @@ export class ProductDetailEnrollApp extends React.Component<
       </p>
     ) : null
 
-    const testFeatureFlag = posthog.isFeatureEnabled("enable-upsell-dialog")
+    const showNewDesign = posthog.isFeatureEnabled("jkachel-new-design")
 
-    console.log("testFeatureFlag", testFeatureFlag)
-
-    document.querySelectorAll("a.expand_here_link").forEach(link => {
-      link.removeEventListener("click", expandExpandBlock)
-      link.addEventListener("click", expandExpandBlock)
-    })
+    if (showNewDesign) {
+      document.querySelectorAll("a.expand_here_link").forEach(link => {
+        link.removeEventListener("click", expandExpandBlock)
+        link.addEventListener("click", expandExpandBlock)
+      })
+    }
 
     return (
       <>
@@ -445,16 +524,18 @@ export class ProductDetailEnrollApp extends React.Component<
                       </Fragment>
                     )
                   ) : null}
-                {run && testFeatureFlag ? this.renderUpgradeEnrollmentDialog() : null}
+                {run ? this.renderUpgradeEnrollmentDialog(showNewDesign) : null}
               </Fragment>
             )}
 
             {currentUser ? this.renderAddlProfileFieldsModal() : null}
           </>
         </Loader>
-        <Loader isLoading={courseIsLoading}>
-          <CourseInfoBox courses={courses}></CourseInfoBox>
-        </Loader>
+        {showNewDesign ? (
+          <Loader isLoading={courseIsLoading}>
+            <CourseInfoBox courses={courses}></CourseInfoBox>
+          </Loader>
+        ) : null}
       </>
     )
   }
