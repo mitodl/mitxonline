@@ -3,6 +3,7 @@ Course model serializers
 """
 import logging
 from urllib.parse import urljoin
+from posthog import Posthog
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
@@ -25,6 +26,8 @@ from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED
 from users.models import User
 
 logger = logging.getLogger(__name__)
+
+posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
 
 
 def _get_thumbnail_url(page):
@@ -174,24 +177,22 @@ class CourseSerializer(BaseCourseSerializer):
 
     def get_courseruns(self, instance):
         """Returns all course runs related to the course."""
-        """Unexpired and unenrolled course runs"""
-        all_runs = self.context.get("all_runs", False)
-        if all_runs:
-            active_runs = instance.unexpired_runs
-        else:
-            user = self.context["request"].user if "request" in self.context else None
-            active_runs = (
-                instance.available_runs(user)
-                if user and user.is_authenticated
-                else instance.unexpired_runs
-            )
-        return [
-            CourseRunSerializer(instance=run, context=self.context).data
-            for run in active_runs
-            if run.live
-        ]
-        
-        # TODO: COLLIN WRAP IN FLAG
+        if posthog.feature_enabled('new-feature', 'distinct id'):
+            all_runs = self.context.get("all_runs", False)
+            if all_runs:
+                active_runs = instance.unexpired_runs
+            else:
+                user = self.context["request"].user if "request" in self.context else None
+                active_runs = (
+                    instance.available_runs(user)
+                    if user and user.is_authenticated
+                    else instance.unexpired_runs
+                )
+            return [
+                CourseRunSerializer(instance=run, context=self.context).data
+                for run in active_runs
+                if run.live
+            ]
         return [
             CourseRunSerializer(instance=run, context=self.context).data
             for run in instance.courseruns.all()
@@ -287,6 +288,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     requirements = serializers.SerializerMethodField()
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
+    departments = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         """Serializer for courses"""
@@ -318,6 +320,13 @@ class ProgramSerializer(serializers.ModelSerializer):
         else:
             return {"feature_image_src": _get_thumbnail_url(None)}
 
+    def get_departments(self, instance):
+        """List departments of a course"""
+        return sorted(
+            [{"name": department.name} for department in instance.departments.all()],
+            key=lambda department: department["name"],
+        )
+
     class Meta:
         model = models.Program
         fields = [
@@ -329,6 +338,8 @@ class ProgramSerializer(serializers.ModelSerializer):
             "req_tree",
             "page",
             "program_type",
+            "departments",
+            "live",
         ]
 
 
@@ -386,7 +397,7 @@ class FullProgramSerializer(ProgramSerializer):
         """List all departments in all courses in the program"""
         courses_in_program = [course[0] for course in instance.courses]
         departments = (
-            models.CourseDepartment.objects.filter(course__in=courses_in_program)
+            models.Department.objects.filter(course__in=courses_in_program)
             .values("name")
             .distinct("name")
         )
