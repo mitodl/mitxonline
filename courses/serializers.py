@@ -197,6 +197,12 @@ class CourseSerializer(BaseCourseSerializer):
             CourseRunSerializer(instance=run, context=self.context).data
             for run in instance.courseruns.all()
         ]
+        
+        # TODO: COLLIN WRAP IN FLAG
+        return [
+            CourseRunSerializer(instance=run, context=self.context).data
+            for run in instance.courseruns.all()
+        ]
 
     def get_departments(self, instance):
         """List departments of a course"""
