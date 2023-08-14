@@ -42,9 +42,15 @@ posthog.init(SETTINGS.posthog_api_token, {
   api_host: SETTINGS.posthog_api_host
 })
 
-const expandExpandBlock = event => {
-  const block = event.target.getAttribute("data-expand-body")
-  document.querySelector(`div#exp${block}`)
+const expandExpandBlock = (event: MouseEvent) => {
+  const blockTarget = event.target
+
+  if (blockTarget instanceof HTMLElement) {
+    const block = blockTarget.getAttribute("data-expand-body")
+    if (block) {
+      document.querySelector(`div#exp${block}`)
+    }
+  }
 }
 
 type Props = {
@@ -437,13 +443,11 @@ export class ProductDetailEnrollApp extends React.Component<
 
     if (showNewDesign) {
       document.querySelectorAll("a.expand_here_link").forEach(link => {
-        const eventType: MouseEventTypes = "click"
-        link.removeEventListener(eventType, expandExpandBlock)
-        link.addEventListener(eventType, expandExpandBlock)
+        link.removeEventListener("click", expandExpandBlock)
+        link.addEventListener("click", expandExpandBlock)
       })
     }
 
-    // $FlowFixMe: isLoading null or undefined
     return (
       <>
         {
