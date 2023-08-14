@@ -49,7 +49,7 @@ const expandExpandBlock = (event: MouseEvent) => {
     const block = blockTarget.getAttribute("data-expand-body")
     if (block) {
       const elem = document.querySelector(`div#exp${block}`)
-      elem.classList.toggle("open")
+      elem && elem.classList && elem.classList.toggle("open")
     }
   }
 }
