@@ -1,4 +1,3 @@
-// @flow
 import { nextState } from "./util"
 import { pathOr } from "ramda"
 

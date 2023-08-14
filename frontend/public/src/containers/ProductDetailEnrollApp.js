@@ -42,9 +42,15 @@ posthog.init(SETTINGS.posthog_api_token, {
   api_host: SETTINGS.posthog_api_host
 })
 
-const expandExpandBlock = event => {
-  const block = event.target.getAttribute("data-expand-body")
-  document.querySelector(`div#exp${block}`)
+const expandExpandBlock = (event: MouseEvent) => {
+  const blockTarget = event.target
+
+  if (blockTarget instanceof HTMLElement) {
+    const block = blockTarget.getAttribute("data-expand-body")
+    if (block) {
+      document.querySelector(`div#exp${block}`)
+    }
+  }
 }
 
 type Props = {
@@ -444,96 +450,107 @@ export class ProductDetailEnrollApp extends React.Component<
 
     if (showNewDesign) {
       document.querySelectorAll("a.expand_here_link").forEach(link => {
-        const eventType: MouseEventTypes = "click"
-        link.removeEventListener(eventType, expandExpandBlock)
-        link.addEventListener(eventType, expandExpandBlock)
+        link.removeEventListener("click", expandExpandBlock)
+        link.addEventListener("click", expandExpandBlock)
       })
     }
 
-    // $FlowFixMe: isLoading null or undefined
     return (
       <>
-        <Loader key="product_detail_enroll_loader" isLoading={isLoading}>
-          <>
-            {run && run.is_enrolled ? (
-              <Fragment>
-                {run.courseware_url ? (
-                  <a
-                    href={run.courseware_url}
-                    onClick={ev =>
-                      run
-                        ? this.redirectToCourseHomepage(run.courseware_url, ev)
-                        : ev
-                    }
-                    className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Enrolled &#10003;
-                  </a>
-                ) : (
-                  <div
-                    className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
-                  >
-                    Enrolled &#10003;
-                  </div>
-                )}
-                {waitingForCourseToBeginMessage}
-              </Fragment>
-            ) : (
-              <Fragment>
-                {run &&
-                isWithinEnrollmentPeriod(run) &&
-                currentUser &&
-                !currentUser.id ? (
+        {
+          // $FlowFixMe: isLoading null or undefined
+          <Loader key="product_detail_enroll_loader" isLoading={isLoading}>
+            <>
+              {run && run.is_enrolled ? (
+                <Fragment>
+                  {run.courseware_url ? (
                     <a
-                      href={routes.login}
-                      className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
+                      href={run.courseware_url}
+                      onClick={ev =>
+                        run
+                          ? this.redirectToCourseHomepage(
+                            run.courseware_url,
+                            ev
+                          )
+                          : ev
+                      }
+                      className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
-                    Enroll now
+                      Enrolled &#10003;
                     </a>
-                  ) : run && isWithinEnrollmentPeriod(run) ? (
-                    product && run.is_upgradable ? (
-                      <button
-                        className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
-                        onClick={() => this.toggleUpgradeDialogVisibility()}
+                  ) : (
+                    <div
+                      className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
+                    >
+                      Enrolled &#10003;
+                    </div>
+                  )}
+                  {waitingForCourseToBeginMessage}
+                </Fragment>
+              ) : (
+                <Fragment>
+                  {run &&
+                  isWithinEnrollmentPeriod(run) &&
+                  currentUser &&
+                  !currentUser.id ? (
+                      <a
+                        href={routes.login}
+                        className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
                       >
                       Enroll now
-                      </button>
-                    ) : (
-                      <Fragment>
-                        <form action="/enrollments/" method="post">
-                          <input
-                            type="hidden"
-                            name="csrfmiddlewaretoken"
-                            value={csrfToken}
-                          />
-                          <input
-                            type="hidden"
-                            name="run"
-                            value={run ? run.id : ""}
-                          />
-                          <button
-                            type="submit"
-                            className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
-                          >
-                          Enroll now
-                          </button>
-                        </form>
-                      </Fragment>
-                    )
-                  ) : null}
-                {run ? this.renderUpgradeEnrollmentDialog(showNewDesign) : null}
-              </Fragment>
-            )}
+                      </a>
+                    ) : run && isWithinEnrollmentPeriod(run) ? (
+                      product && run.is_upgradable ? (
+                        <button
+                          className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
+                          onClick={() => this.toggleUpgradeDialogVisibility()}
+                        >
+                        Enroll now
+                        </button>
+                      ) : (
+                        <Fragment>
+                          <form action="/enrollments/" method="post">
+                            <input
+                              type="hidden"
+                              name="csrfmiddlewaretoken"
+                              value={csrfToken}
+                            />
+                            <input
+                              type="hidden"
+                              name="run"
+                              value={run ? run.id : ""}
+                            />
+                            <button
+                              type="submit"
+                              className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+                            >
+                            Enroll now
+                            </button>
+                          </form>
+                        </Fragment>
+                      )
+                    ) : null}
+                  {run
+                    ? this.renderUpgradeEnrollmentDialog(showNewDesign)
+                    : null}
+                </Fragment>
+              )}
 
-            {currentUser ? this.renderAddlProfileFieldsModal() : null}
-          </>
-        </Loader>
-        {showNewDesign ? (
-          <Loader key="course_info_loader" isLoading={courseIsLoading}>
-            <CourseInfoBox courses={courses}></CourseInfoBox>
+              {currentUser ? this.renderAddlProfileFieldsModal() : null}
+            </>
           </Loader>
+        }
+        {showNewDesign ? (
+          <>
+            {
+              // $FlowFixMe: isLoading null or undefined
+              <Loader key="course_info_loader" isLoading={courseIsLoading}>
+                <CourseInfoBox courses={courses}></CourseInfoBox>
+              </Loader>
+            }
+          </>
         ) : null}
       </>
     )
