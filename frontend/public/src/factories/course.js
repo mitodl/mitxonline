@@ -12,6 +12,7 @@ import type {
   CourseRunEnrollment,
   CourseDetail,
   CourseDetailWithRuns,
+  Department,
   ProgramEnrollment,
   Program,
   PartnerSchool,

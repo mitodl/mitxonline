@@ -177,12 +177,14 @@ class CourseSerializer(BaseCourseSerializer):
 
     def get_courseruns(self, instance):
         """Returns all course runs related to the course."""
-        if posthog.feature_enabled('new-feature', 'distinct id'):
+        if posthog.feature_enabled("new-feature", "distinct id"):
             all_runs = self.context.get("all_runs", False)
             if all_runs:
                 active_runs = instance.unexpired_runs
             else:
-                user = self.context["request"].user if "request" in self.context else None
+                user = (
+                    self.context["request"].user if "request" in self.context else None
+                )
                 active_runs = (
                     instance.available_runs(user)
                     if user and user.is_authenticated
@@ -197,7 +199,7 @@ class CourseSerializer(BaseCourseSerializer):
             CourseRunSerializer(instance=run, context=self.context).data
             for run in instance.courseruns.all()
         ]
-        
+
         # TODO: COLLIN WRAP IN FLAG
         return [
             CourseRunSerializer(instance=run, context=self.context).data
