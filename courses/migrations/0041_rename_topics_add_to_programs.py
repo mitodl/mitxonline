@@ -4,28 +4,27 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0040_populate_none_letter_grades_for_DEDP'),
+        ("courses", "0040_populate_none_letter_grades_for_DEDP"),
     ]
 
     operations = [
         migrations.RenameModel(
-            old_name='CourseTopic',
-            new_name='Department',
+            old_name="CourseTopic",
+            new_name="Department",
         ),
         migrations.RemoveField(
-            model_name='course',
-            name='topics',
+            model_name="course",
+            name="topics",
         ),
         migrations.AddField(
-            model_name='course',
-            name='departments',
-            field=models.ManyToManyField(blank=True, to='courses.Department'),
+            model_name="course",
+            name="departments",
+            field=models.ManyToManyField(blank=True, to="courses.Department"),
         ),
         migrations.AddField(
-            model_name='program',
-            name='departments',
-            field=models.ManyToManyField(blank=True, to='courses.Department'),
+            model_name="program",
+            name="departments",
+            field=models.ManyToManyField(blank=True, to="courses.Department"),
         ),
     ]

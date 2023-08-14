@@ -618,10 +618,15 @@ describe("CatalogPage", () => {
           courses: {
             isPending: false,
             status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
           }
         },
         entities: {
-          courses: courses
+          courses:  courses,
+          programs: [displayedProgram]
         }
       },
       {}
