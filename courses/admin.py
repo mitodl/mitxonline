@@ -349,7 +349,7 @@ class CourseRunGradeAuditAdmin(TimestampedModelAdmin):
         return False
 
 
-class CourseDepartmentAdmin(admin.ModelAdmin):
+class DepartmentAdmin(admin.ModelAdmin):
     """Admin for Department"""
 
     model = Department
@@ -493,7 +493,7 @@ admin.site.register(CourseRunEnrollment, CourseRunEnrollmentAdmin)
 admin.site.register(CourseRunEnrollmentAudit, CourseRunEnrollmentAuditAdmin)
 admin.site.register(CourseRunGrade, CourseRunGradeAdmin)
 admin.site.register(CourseRunGradeAudit, CourseRunGradeAuditAdmin)
-admin.site.register(Department, CourseDepartmentAdmin)
+admin.site.register(Department, DepartmentAdmin)
 admin.site.register(BlockedCountry, BlockedCountryAdmin)
 admin.site.register(PaidCourseRun, PaidCourseRunAdmin)
 admin.site.register(CourseRunCertificate, CourseRunCertificateAdmin)
