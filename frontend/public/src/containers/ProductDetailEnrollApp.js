@@ -440,7 +440,7 @@ export class ProductDetailEnrollApp extends React.Component<
       </p>
     ) : null
 
-    const showNewDesign = posthog.isFeatureEnabled("jkachel-new-design")
+    const showNewDesign = checkFeatureFlag("jkachel-new-design")
 
     if (showNewDesign) {
       document.querySelectorAll("a.expand_here_link").forEach(link => {
@@ -454,7 +454,7 @@ export class ProductDetailEnrollApp extends React.Component<
         {
           // $FlowFixMe: isLoading null or undefined
         }
-        <Loader isLoading={isLoading}>
+        <Loader key="product_detail_enroll_loader" isLoading={isLoading}>
           <>
             {run && run.is_enrolled ? (
               <Fragment>
@@ -532,7 +532,7 @@ export class ProductDetailEnrollApp extends React.Component<
           </>
         </Loader>
         {showNewDesign ? (
-          <Loader isLoading={courseIsLoading}>
+          <Loader key="course_info_loader" isLoading={courseIsLoading}>
             <CourseInfoBox courses={courses}></CourseInfoBox>
           </Loader>
         ) : null}
