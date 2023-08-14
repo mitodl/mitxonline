@@ -437,11 +437,13 @@ export class ProductDetailEnrollApp extends React.Component<
 
     if (showNewDesign) {
       document.querySelectorAll("a.expand_here_link").forEach(link => {
-        link.removeEventListener("click", expandExpandBlock)
-        link.addEventListener("click", expandExpandBlock)
+        const eventType: MouseEventTypes = "click"
+        link.removeEventListener(eventType, expandExpandBlock)
+        link.addEventListener(eventType, expandExpandBlock)
       })
     }
 
+    // $FlowFixMe: isLoading null or undefined
     return (
       <>
         {
