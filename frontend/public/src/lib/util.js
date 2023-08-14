@@ -30,7 +30,6 @@ import {
   DISCOUNT_TYPE_FIXED_PRICE
 } from "../constants"
 
-<<<<<<< HEAD
 if (SETTINGS.posthog_api_host && SETTINGS.posthog_api_token) {
   const environment = SETTINGS.environment
   if (environment === "dev") {
@@ -50,11 +49,6 @@ if (SETTINGS.posthog_api_host && SETTINGS.posthog_api_token) {
     }
   })
 }
-=======
-posthog.init(SETTINGS.posthog_api_token, {
-  api_host: SETTINGS.posthog_api_host
-})
->>>>>>> 63886a4f (finishing touches pt 1)
 
 /**
  * Returns a promise which resolves after a number of milliseconds have elapsed
