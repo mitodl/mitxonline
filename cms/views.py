@@ -9,10 +9,6 @@ from cms.serializers import InstructorPageSerializer
 
 @api_view(["GET"])
 def instructor_page(request, id, format=None):
-    try:
-        page = InstructorPage.objects.get(pk=id)
-    except Exception:
-        logging.debug("got exception")
-        return "nope"
+    page = InstructorPage.objects.get(pk=id)
 
     return Response(InstructorPageSerializer(page).data)

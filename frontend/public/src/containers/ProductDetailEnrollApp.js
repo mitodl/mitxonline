@@ -446,7 +446,7 @@ export class ProductDetailEnrollApp extends React.Component<
       </p>
     ) : null
 
-    const showNewDesign = checkFeatureFlag("jkachel-new-design")
+    const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
 
     if (showNewDesign) {
       document.querySelectorAll("a.expand_here_link").forEach(link => {

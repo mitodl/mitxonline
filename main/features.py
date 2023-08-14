@@ -14,7 +14,7 @@ else:
 IGNORE_EDX_FAILURES = "IGNORE_EDX_FAILURES"
 SYNC_ON_DASHBOARD_LOAD = "SYNC_ON_DASHBOARD_LOAD"
 ENABLE_ADDL_PROFILE_FIELDS = "ENABLE_ADDL_PROFILE_FIELDS"
-ENABLE_NEW_DESIGN = "jkachel-new-design"
+ENABLE_NEW_DESIGN = "mitxonline-new-product-page"
 
 
 def is_enabled(name, default=None):
