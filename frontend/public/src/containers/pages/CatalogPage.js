@@ -37,9 +37,6 @@ const PROGRAMS_TAB = "programs"
 // Course tab name.
 const COURSES_TAB = "courses"
 
-// The max number of catalog items per row in the catalog.
-const ITEMS_PER_ROW = 3
-
 // The default number of catalog rows rendered.
 const DEFAULT_MIN_CATALOG_ROWS_RENDERED = 4
 
@@ -53,7 +50,9 @@ export class CatalogPage extends React.Component<Props> {
     departments:                [],
     selectedDepartment:         ALL_DEPARTMENTS,
     mobileFilterWindowExpanded: false,
-    numberCatalogRowsToDisplay: DEFAULT_MIN_CATALOG_ROWS_RENDERED
+    numberCatalogRowsToDisplay: DEFAULT_MIN_CATALOG_ROWS_RENDERED,
+    windowSize:                 0,
+    items_per_row:              3
   }
 
   constructor(props) {
@@ -65,6 +64,26 @@ export class CatalogPage extends React.Component<Props> {
   componentWillUnmount() {
     if (this.io) {
       this.io.disconnect()
+    }
+    window.removeEventListener("resize", this.resize.bind(this))
+  }
+
+  componentDidMount() {
+    window.addEventListener("resize", this.resize.bind(this))
+    this.resize()
+  }
+
+  /**
+   * Changes the items_per_row state variable when the screen size changes.
+   * If the screen is less than 1404px wide, then the max items per row is 2.
+   * If the screen is larger or equal to 1404px wide, then the max items per row is 3.
+   */
+  resize() {
+    if (window.innerWidth < 1404 && this.state.items_per_row !== 2) {
+      this.setState({ items_per_row: 2 })
+    }
+    if (window.innerWidth >= 1404 && this.state.items_per_row !== 3) {
+      this.setState({ items_per_row: 3 })
     }
   }
 
@@ -78,10 +97,10 @@ export class CatalogPage extends React.Component<Props> {
     if (entry.isIntersecting) {
       if (
         (this.state.tabSelected === COURSES_TAB &&
-          this.state.numberCatalogRowsToDisplay * ITEMS_PER_ROW <
+          this.state.numberCatalogRowsToDisplay * this.state.items_per_row <
             this.state.filteredCourses.length) ||
         (this.state.tabSelected === PROGRAMS_TAB &&
-          this.state.numberCatalogRowsToDisplay * ITEMS_PER_ROW <
+          this.state.numberCatalogRowsToDisplay * this.state.items_per_row <
             this.state.filteredPrograms.length)
       ) {
         this.setState({
@@ -390,7 +409,7 @@ export class CatalogPage extends React.Component<Props> {
   ) {
     const numberOfItemsInEachRow = Math.min(
       itemsInCatalog.length,
-      ITEMS_PER_ROW
+      this.state.items_per_row
     )
     const catalogRows = []
     for (
@@ -467,9 +486,9 @@ export class CatalogPage extends React.Component<Props> {
         <div id="catalog-page">
           <div id="catalog-title">
             {/* Hidden on small screens. */}
-            <h2 className="d-none d-sm-block">MITx Online Catalog</h2>
+            <h2 className="d-none d-md-block">MITx Online Catalog</h2>
             {/* Visible on small screens. */}
-            <div className="d-block d-sm-none" id="mobile-catalog-title">
+            <div className="d-block d-md-none" id="mobile-catalog-title">
               <button
                 onClick={() =>
                   this.toggleMobileFilterWindowExpanded(

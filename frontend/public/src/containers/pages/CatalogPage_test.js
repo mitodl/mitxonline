@@ -653,5 +653,12 @@ describe("CatalogPage", () => {
     inner.instance().changeSelectedTab("programs")
     // Confirm that the selected departement resets to "All Departments".
     expect(inner.state().selectedDepartment).equals("All Departments")
+
+    // Change back to the courses tab.
+    inner.instance().changeSelectedTab("courses")
+    // All of the courses should be visible.
+    expect(JSON.stringify(inner.state().filteredCourses)).equals(
+      JSON.stringify(courses)
+    )
   })
 })
