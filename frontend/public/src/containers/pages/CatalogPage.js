@@ -146,27 +146,22 @@ export class CatalogPage extends React.Component<Props> {
    * @param {string} selectTabName The name of the tab that was selected.
    */
   changeSelectedTab = (selectTabName: string) => {
-    this.setState({ selectedDepartment: ALL_DEPARTMENTS })
     this.setState({ tabSelected: selectTabName })
+    this.changeSelectedDepartment(ALL_DEPARTMENTS, selectTabName)
     this.setState({
       numberCatalogRowsToDisplay: DEFAULT_MIN_CATALOG_ROWS_RENDERED
     })
 
     if (selectTabName === COURSES_TAB) {
-      this.setState({
-        departments: this.collectDepartmentsFromCatalogItems(
-          this.state.filteredCourses
-        )
-      })
+      const { courses, coursesIsLoading } = this.props
+      if (!coursesIsLoading) {
+        this.setState({
+          departments: this.collectDepartmentsFromCatalogItems(courses)
+        })
+      }
     } else {
       const { programs, programsIsLoading } = this.props
       if (!programsIsLoading) {
-        this.setState({
-          filteredPrograms: this.filteredProgramsByDepartmentAndCriteria(
-            ALL_DEPARTMENTS,
-            programs
-          )
-        })
         this.setState({
           departments: this.collectDepartmentsFromCatalogItems(programs)
         })
@@ -183,13 +178,16 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Changes the selectedDepartment state variable and, depending on the value of this.state.tabSelected, updates either
+   * Changes the selectedDepartment state variable and, depending on the value of tabSelected, updates either
    * the filteredCourses or filteredPrograms state variable.
    * @param {string} selectedDepartment The department name to set selectedDepartment to and filter courses by.
    */
-  changeSelectedDepartment = (selectedDepartment: string) => {
+  changeSelectedDepartment = (
+    selectedDepartment: string,
+    tabSelected: string
+  ) => {
     this.setState({ selectedDepartment: selectedDepartment })
-    if (this.state.tabSelected === COURSES_TAB) {
+    if (tabSelected === COURSES_TAB) {
       const { courses } = this.props
       this.setState({
         filteredCourses: this.filteredCoursesBasedOnCourseRunCriteria(
@@ -446,7 +444,11 @@ export class CatalogPage extends React.Component<Props> {
           }`}
           key={this.state.tabSelected + department}
         >
-          <button onClick={() => this.changeSelectedDepartment(department)}>
+          <button
+            onClick={() =>
+              this.changeSelectedDepartment(department, this.state.tabSelected)
+            }
+          >
             {department}
           </button>
         </li>

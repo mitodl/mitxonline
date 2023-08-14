@@ -639,7 +639,7 @@ describe("CatalogPage", () => {
     expect(inner.instance().renderNumberOfCatalogItems()).equals(3)
 
     // Select a department to filter by.
-    inner.instance().changeSelectedDepartment("History")
+    inner.instance().changeSelectedDepartment("History", "courses")
     // Confirm the state updated to reflect the selected department.
     expect(inner.state().selectedDepartment).equals("History")
     // Confirm the number of catalog items updated to reflect the items filtered by department.

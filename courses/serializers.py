@@ -3,7 +3,6 @@ Course model serializers
 """
 import logging
 from urllib.parse import urljoin
-from posthog import Posthog
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
@@ -26,8 +25,6 @@ from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED
 from users.models import User
 
 logger = logging.getLogger(__name__)
-
-posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
 
 
 def _get_thumbnail_url(page):
@@ -177,28 +174,28 @@ class CourseSerializer(BaseCourseSerializer):
 
     def get_courseruns(self, instance):
         """Returns all course runs related to the course."""
-        if posthog.feature_enabled("new-feature", "distinct id"):
-            all_runs = self.context.get("all_runs", False)
-            if all_runs:
-                active_runs = instance.unexpired_runs
-            else:
-                user = (
-                    self.context["request"].user if "request" in self.context else None
-                )
-                active_runs = (
-                    instance.available_runs(user)
-                    if user and user.is_authenticated
-                    else instance.unexpired_runs
-                )
-            return [
-                CourseRunSerializer(instance=run, context=self.context).data
-                for run in active_runs
-                if run.live
-            ]
-        return [
-            CourseRunSerializer(instance=run, context=self.context).data
-            for run in instance.courseruns.all()
-        ]
+        # if posthog.feature_enabled("new-feature", "distinct id"):
+        #     all_runs = self.context.get("all_runs", False)
+        #     if all_runs:
+        #         active_runs = instance.unexpired_runs
+        #     else:
+        #         user = (
+        #             self.context["request"].user if "request" in self.context else None
+        #         )
+        #         active_runs = (
+        #             instance.available_runs(user)
+        #             if user and user.is_authenticated
+        #             else instance.unexpired_runs
+        #         )
+        #     return [
+        #         CourseRunSerializer(instance=run, context=self.context).data
+        #         for run in active_runs
+        #         if run.live
+        #     ]
+        # return [
+        #     CourseRunSerializer(instance=run, context=self.context).data
+        #     for run in instance.courseruns.all()
+        # ]
 
         # TODO: COLLIN WRAP IN FLAG
         return [
