@@ -1,0 +1,63 @@
+@import "variables";
+@import "~@material/layout-grid/dist/mdc.layout-grid";
+@import "~@material/top-app-bar/dist/mdc.top-app-bar";
+@import "~react-picky/dist/picky";
+@import "~react-day-picker/lib/style";
+@import "~bootstrap/scss/bootstrap";
+@import "~video.js/dist/video-js";
+@import "common";
+@import "loader";
+@import "auth";
+@import "top-app-bar";
+@import "collapsible";
+@import "footer";
+@import "slick";
+@import "resource";
+@import "notification";
+@import "user-menu";
+@import "error";
+@import "expandable";
+@import "dashboard";
+@import "course-cards";
+@import "v2/featured-product-cards";
+@import "v2/home";
+@import "product-details";
+@import "product-faculty-members";
+@import "cart";
+@import "receipt";
+@import "certificates/certificate";
+@import "learner-records";
+@import "order-history";
+
+body {
+  font-family: "Montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  margin: 0;
+  color: #000000;
+  background: white;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+
+  .main-panel {
+    flex: 1;
+    min-height: calc(100vh - 351px);
+    position: relative;
+
+    // TODO: temporary fix for home page image size, please remove it after home page design
+    p {
+      img {
+        width: 100% !important;
+      }
+    }
+  }
+
+  .std-page-body {
+    @include media-breakpoint-down(md) {
+      padding-top: 32px;
+      padding-bottom: 32px;
+    }
+
+    padding-top: 50px;
+    padding-bottom: 50px;
+  }
+}
