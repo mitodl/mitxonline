@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.70.7
+--------------
+
+- Changes template to display long bio, adds migration to move short bios to long, updates management command to fill short bio with something else to prevent confusion (#1812)
+- Adds the PostHog settings to the JS settings so we can use it in React. (#1814)
+- Add posthog to repo (#1809)
+
 Version 0.70.6 (Released August 15, 2023)
 --------------
 
