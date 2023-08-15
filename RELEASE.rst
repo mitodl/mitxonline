@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.70.6 (Released August 15, 2023)
+--------------
+
+- feat: force all enrollments (#1761)
+
 Version 0.70.5 (Released August 08, 2023)
 --------------
 
