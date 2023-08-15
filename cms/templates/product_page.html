@@ -153,7 +153,7 @@
                   <div class="member-info">
                     <h3 class="name">{{ member.instructor_name }}</h3>
                     {% if member.instructor_title %}<h4 class="title">{{ member.instructor_title }}</h4>{% endif %}
-                    <div class="description">{{ member.instructor_bio_short|safe }}</div>
+                    <div class="description">{{ member.instructor_bio_long|safe }}</div>
                   </div>
                 </div>
               </li>
