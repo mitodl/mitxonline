@@ -30,7 +30,12 @@ def is_enabled(name, default=None):
     """
 
     return (
-        posthog and posthog.feature_enabled(name, settings.HOSTNAME)
+        posthog
+        and posthog.feature_enabled(
+            name,
+            settings.HOSTNAME,
+            person_properties={"environment": settings.ENVIRONMENT},
+        )
     ) or settings.FEATURES.get(name, default or settings.FEATURES_DEFAULT)
 
 
