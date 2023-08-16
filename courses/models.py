@@ -339,6 +339,15 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns just the courses under the "Required Courses" node.
         """
         return [course for (course, type) in self.courses if type == "Required Courses"]
+    
+    @cached_property
+    def required_title(self):
+        """
+        Returns the title of the requirements node that holds the required
+        courses (e.g. the one that has elective_flag = False).
+        """
+
+        return self.requirements_root.get_children().filter(elective_flag=False).get().title
 
     @cached_property
     def elective_courses(self):
@@ -350,6 +359,15 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."
+
+    @cached_property
+    def elective_title(self):
+        """
+        Returns the title of the requirements node that holds the elective
+        courses (e.g. the one that has elective_flag = True).
+        """
+
+        return self.requirements_root.get_children().filter(elective_flag=True).get().title
 
     @cached_property
     def minimum_elective_courses_requirement(self):

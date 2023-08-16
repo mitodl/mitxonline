@@ -1,4 +1,19 @@
 // sass-lint:disable mixins-before-declarations
+.badge.badge-dark {
+    font-weight: 400;
+    color: white;
+    background-color: black;
+}
+
+p.program-type-badge {
+    margin-bottom: 0;
+}
+
+.badge-program-type {
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
 .program-courses-container {
     margin: 0 0 35px;
 
@@ -10,24 +25,38 @@
         }
     }
 
+    h2.electives-title {
+        margin-top: 35px;
+    }
+
+    ul {
+        display: flex;
+        margin: 0;
+        padding: 0;
+    }
+
     li {
         @include media-breakpoint-down(md) {
             width: calc(100% - 44px);
         }
 
-        width: calc(33% - 44px);
-        margin: 0 22px 24px;
+        width: 273px;
+        margin: 0 16px 0 0;
+        list-style: none;
+        display: inline;
+        font-family: "Roboto", sans-serif;
 
         .program-course-card {
             padding: 0;
             overflow: hidden;
             border-radius: 4px !important;
-            box-shadow: 0 1px 0 0 rgb(0 0 0 / 12%);
+            box-shadow: 1px 1px 1px 1px rgb(0 0 0 / 12%);
             width: 243px;
 
             .program-course-card-info {
                 overflow: hidden;
                 margin-top: 7px;
+                padding: 7px;
 
                 @include media-breakpoint-down(md) {
                     margin-top: 20px;
@@ -37,7 +66,7 @@
                     max-width: 243px;
                     max-height: 136px;
                     object-fit: cover;
-                    object-position: 50% 0;
+                    object-position: 50% 50%;
 
                     @include media-breakpoint-down(sm) {
                         display: block;
@@ -66,5 +95,4 @@
             }
         }
     }
-
 }
