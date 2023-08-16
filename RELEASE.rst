@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.70.7
+Version 0.70.7 (Released August 16, 2023)
 --------------
 
 - Changes template to display long bio, adds migration to move short bios to long, updates management command to fill short bio with something else to prevent confusion (#1812)
