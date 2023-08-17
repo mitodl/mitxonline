@@ -157,43 +157,11 @@
                 <div class="w-100" id="upsellCard"></div>
               </div>
               {% endif %}
-            </div>
-          </div>
 
-          {% if instructors %}
-          {% for member in instructors %}
-          <div class="modal instructor-modal" tabindex="-1" id="instructor-modal-{{ member.id }}">
-            <div class="modal-dialog modal-dialog-centered">
-              <div class="modal-content">
-                <div class="modal-header">
-                  <h5 class="modal-title">{{ member.instructor_name }}</h5>
-                  <button type="button" class="close" data-dismiss="modal" aria-label="Close" onClick="$('#instructor-modal-{{ member.id }}').modal('hide');">
-                    <span aria-hidden="true">&times;</span>
-                  </button>
-                </div>
-                <div class="modal-body">
-                  <div class="row d-flex">
-                    <div class="col col-instructor-photo">
-                      <img class="img-thumbnail" src="{% feature_img_src member.feature_image %}" alt="Photo for {{member.instructor_name}}" />
-                    </div>
-                    <div class="col col-instructor-title flex-grow-1">
-                      <h2>{{member.instructor_name}}</h2>
-                      {% if member.instructor_title %}<h3>{{member.instructor_title}}</h3>{% endif %}
-        
-                      <p>{{member.instructor_bio_short|safe}}</p>
-                    </div>
-                  </div>
-                  <div class="row row-instructor-body">
-                    <div class="col">
-                      {% if member.instructor_bio_long %}
-                        {{ member.instructor_bio_long|safe }}
-                      {% endif %}
-                      {% if not member.instructor_bio_long %}
-                        {{ member.instructor_bio_short|safe}}
-                      {% endif %}
-                    </div>
-                  </div>        
-                </div>
+              {% if page.program %}
+              <div class="stats-row product-info-box-body">
+                <input id="programId" type="hidden" value="{{page.program.readable_id}}" />
+                <div class="w-100" id="productDetailEnrollment"></div>
               </div>
             </div>
           </div>

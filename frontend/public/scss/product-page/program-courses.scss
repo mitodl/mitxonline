@@ -14,7 +14,12 @@ p.program-type-badge {
     padding-right: 15px;
 }
 
+#product-details {
+    max-width: 872px;
+}
+
 .program-courses-container {
+    width: 100%;
     margin: 0 0 35px;
 
     h2 {
@@ -33,6 +38,8 @@ p.program-type-badge {
         display: flex;
         margin: 0;
         padding: 0;
+        flex-flow: row wrap;
+        justify-content: space-between;
     }
 
     li {
@@ -41,7 +48,7 @@ p.program-type-badge {
         }
 
         width: 273px;
-        margin: 0 16px 0 0;
+        margin: 0 0 15px 0;
         list-style: none;
         display: inline;
         font-family: "Roboto", sans-serif;
@@ -66,7 +73,7 @@ p.program-type-badge {
                     max-width: 243px;
                     max-height: 136px;
                     object-fit: cover;
-                    object-position: 50% 50%;
+                    object-position: center;
 
                     @include media-breakpoint-down(sm) {
                         display: block;

@@ -130,7 +130,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                 <>
                   <li>
                     {" "}
-                    <a href="#">{elem.title}</a>
+                    <a href={`/programs/${elem.readable_id}/`}>{elem.title}</a>
                   </li>
                 </>
               ))}

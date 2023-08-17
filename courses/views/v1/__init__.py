@@ -89,9 +89,6 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = []
 
     serializer_class = ProgramSerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["id", "live"]
-    queryset = Program.objects.filter().prefetch_related("departments")
     pagination_class = Pagination
 
     def paginate_queryset(self, queryset):
@@ -102,6 +99,13 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
         if self.paginator and self.request.query_params.get("page", None) is None:
             return None
         return super().paginate_queryset(queryset)
+
+    def get_queryset(self):
+        readable_id = self.request.query_params.get("readable_id", None)
+        if readable_id:
+            return Program.objects.filter(live=True, readable_id=readable_id)
+
+        return Program.objects.filter(live=True)
 
 
 class CourseFilterSet(django_filters.FilterSet):

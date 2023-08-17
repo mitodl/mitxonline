@@ -18,7 +18,10 @@ import {
   courseRunsQueryKey,
   coursesSelector,
   coursesQuery,
-  coursesQueryKey
+  coursesQueryKey,
+  programsSelector,
+  programsQuery,
+  programsQueryKey
 } from "../lib/queries/courseRuns"
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
@@ -62,6 +65,9 @@ type Props = {
   status: ?number,
   courseIsLoading: ?boolean,
   courseStatus: ?number,
+  programs: ?Array<any>,
+  programIsLoading: ?boolean,
+  programStatus: ?number,
   upgradeEnrollmentDialogVisibility: boolean,
   addProductToBasket: (user: number, productId: number) => Promise<any>,
   currentUser: User,
@@ -514,6 +520,14 @@ export class ProductDetailEnrollApp extends React.Component<
       currentUser
     } = this.props
     const csrfToken = getCookie("csrftoken")
+    const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
+
+    if (showNewDesign) {
+      document.querySelectorAll("a.expand_here_link").forEach(link => {
+        link.removeEventListener("click", expandExpandBlock)
+        link.addEventListener("click", expandExpandBlock)
+      })
+    }
 
     let run =
       !this.getCurrentCourseRun() && !courseRuns
@@ -551,14 +565,6 @@ export class ProductDetailEnrollApp extends React.Component<
       </p>
     ) : null
 
-    const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
-
-    if (showNewDesign) {
-      document.querySelectorAll("a.expand_here_link").forEach(link => {
-        link.removeEventListener("click", expandExpandBlock)
-        link.addEventListener("click", expandExpandBlock)
-      })
-    }
 
     return (
       <>
