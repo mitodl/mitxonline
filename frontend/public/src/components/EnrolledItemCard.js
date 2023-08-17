@@ -502,11 +502,12 @@ export class EnrolledItemCard extends React.Component<
                       passed
                     </span>
                   ) : null}
-                  {enrollment.enrollment_mode === "verified" ? (
-                    <span className="badge badge-enrolled-verified mr-2">
+                  {enrollment.enrollment_mode === "verified" ||
+                  enrollment.certificate ? (
+                      <span className="badge badge-enrolled-verified mr-2">
                       Enrolled in certificate track
-                    </span>
-                  ) : null}
+                      </span>
+                    ) : null}
                 </div>
 
                 <h2 className="my-0 mr-3">{title}</h2>
