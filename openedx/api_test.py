@@ -22,12 +22,14 @@ from openedx.api import (
     OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS,
     OPENEDX_REGISTRATION_VALIDATION_PATH,
     OPENEDX_UPDATE_USER_PATH,
+    bulk_retire_edx_users,
     create_edx_auth_token,
     create_edx_user,
     create_user,
     enroll_in_edx_course_runs,
     existing_edx_enrollment,
     get_edx_api_client,
+    get_edx_retirement_service_client,
     get_valid_edx_api_auth,
     repair_faulty_edx_user,
     repair_faulty_openedx_users,
@@ -419,6 +421,26 @@ def test_get_edx_api_client(mocker, settings, user):
     mock_refresh.assert_called_with(
         user, ttl_in_seconds=OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS
     )
+
+
+def test_get_edx_retirement_service_client(mocker, settings):
+    """Tests that get_edx_retirement_service_client returns an EdxApi client"""
+
+    settings.OPENEDX_API_BASE_URL = "http://example.com"
+    settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID = (
+        "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID"
+    )
+    settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET = (
+        "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET"
+    )
+    mock_resp = mocker.Mock()
+    mock_resp.json.return_value = {"access_token": "an_access_token"}
+    mock_resp.json.status_code = 200
+    mock_resp.raise_for_status.side_effect = None
+    mocker.patch("openedx.api.requests.post", return_value=mock_resp)
+    client = get_edx_retirement_service_client()
+    assert client.credentials["access_token"] == "an_access_token"
+    assert client.base_url == settings.OPENEDX_API_BASE_URL
 
 
 def test_enroll_in_edx_course_runs(settings, mocker, user):
@@ -890,3 +912,23 @@ def test_existing_edx_enrollment(
             )
             is None
         )
+
+
+def test_bulk_retire_edx_users(mocker):
+    """Tests that bulk_retire_edx_users calls the edX bulk retirement api via the edx api client"""
+    test_usernames = "test_username1,test_username2"
+    mock_client = mocker.MagicMock()
+    mock_get_edx_retirement_service_client = mocker.patch(
+        "openedx.api.get_edx_retirement_service_client", return_value=mock_client
+    )
+    mock_client.bulk_user_retirement.retire_users = mocker.Mock(
+        return_value={
+            "successful_user_retirements": ["test_username1", "test_username2"]
+        }
+    )
+    resp = bulk_retire_edx_users(test_usernames)
+    assert resp["successful_user_retirements"] == ["test_username1", "test_username2"]
+    mock_get_edx_retirement_service_client.assert_called()
+    mock_client.bulk_user_retirement.retire_users.assert_called_with(
+        {"usernames": test_usernames}
+    )

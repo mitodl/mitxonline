@@ -1019,6 +1019,18 @@ OPENEDX_SERVICE_WORKER_USERNAME = get_string(
     default=None,
     description="Username of the user whose token has been set in OPENEDX_SERVICE_WORKER_API_TOKEN",
 )
+
+OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID = get_string(
+    name="OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID",
+    default=None,
+    description="OAuth2 client id for retirement service worker",
+)
+OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET = get_string(
+    name="OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET",
+    default=None,
+    description="OAuth2 client secret for retirement service worker",
+)
+
 EDX_API_CLIENT_TIMEOUT = get_int(
     name="EDX_API_CLIENT_TIMEOUT",
     default=60,
