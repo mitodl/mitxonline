@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.70.8
+--------------
+
+- feat: add ability to retire users on edX (#1785)
+
 Version 0.70.7 (Released August 16, 2023)
 --------------
 
