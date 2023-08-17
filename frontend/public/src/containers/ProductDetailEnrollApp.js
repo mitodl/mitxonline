@@ -605,7 +605,7 @@ export class ProductDetailEnrollApp extends React.Component<
                         className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
                       >
                       Enroll now
-                      </button>
+                      </a>
                     ) : (
                       <Fragment>
                         <form action="/enrollments/" method="post">
@@ -628,10 +628,10 @@ export class ProductDetailEnrollApp extends React.Component<
                         </form>
                       </Fragment>
                     )
-                  ) : null}
-                {run ? this.renderUpgradeEnrollmentDialog(showNewDesign) : null}
-              </Fragment>
-            )}
+                  }
+                  {run ? this.renderUpgradeEnrollmentDialog(showNewDesign) : null}
+                </Fragment>
+              )}
 
               {currentUser ? this.renderAddlProfileFieldsModal() : null}
             </>
