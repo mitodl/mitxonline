@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("cms", "0029_add_linked_instructors_to_product_pages"),
+        ("cms", "0030_move_instructor_short_bios_to_long"),
     ]
 
     operations = [
