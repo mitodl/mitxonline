@@ -198,7 +198,7 @@ def test_home_page_featured_products(mocker):
             "start_date": run.start_date if run is not None else None,
             "url_path": course_page.get_url(),
             "is_program": False,
-            "program_type": None
+            "program_type": None,
         }
     ]
 
@@ -223,7 +223,7 @@ def test_home_page_featured_products_sorting(mocker):
                 "start_date": run.start_date if run is not None else None,
                 "url_path": course_page.get_url(),
                 "is_program": False,
-                "program_type": None
+                "program_type": None,
             }
         )
 
@@ -255,7 +255,6 @@ def test_home_page_featured_products_published_only():
     assert len(featured_products) == 4
     assert unpublished_course_page not in featured_products
     assert unpublished_program_page not in featured_products
-
 
 
 @pytest.mark.django_db

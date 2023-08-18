@@ -645,7 +645,6 @@ class HomePage(Page):
         "ProgramPage",
     ]
 
-
     def _get_child_page_of_type(self, cls):
         """Gets the first child page of the given type if it exists"""
         child = self.get_children().type(cls).live().first()
@@ -666,7 +665,9 @@ class HomePage(Page):
                     "start_date": run.start_date if run is not None else None,
                     "url_path": product_page.get_url(),
                     "is_program": product_page.is_program_page,
-                    "program_type": product_page.product.program_type if product_page.is_program_page else None,
+                    "program_type": product_page.product.program_type
+                    if product_page.is_program_page
+                    else None,
                 }
 
                 if run and run.start_date and run.start_date < now_in_utc():
@@ -724,9 +725,7 @@ class HomeProductLink(models.Model):
     )
 
     panels = [
-        PageChooserPanel(
-            "course_product_page", ["cms.CoursePage", "cms.ProgramPage"]
-        )
+        PageChooserPanel("course_product_page", ["cms.CoursePage", "cms.ProgramPage"])
     ]
 
 
