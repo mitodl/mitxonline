@@ -79,7 +79,8 @@
       {% endif %}
       <ul class="course-listing card-listing">
         {% for product in products %}
-        <li>
+          {% if not product.is_program %}
+            <li>
           <div class="course-card highlight-card clickable">
             <a href="{{ product.url_path }}" class="course-card-link">
               <img src="{% feature_img_src product.feature_image %}" alt="">
@@ -99,6 +100,7 @@
             </a>
           </div>
         </li>
+          {% endif %}
         {% endfor %}
       </ul>
     </div>

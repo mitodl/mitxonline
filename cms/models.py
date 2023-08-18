@@ -72,13 +72,6 @@ from main.views import get_base_context
 
 log = logging.getLogger()
 
-posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
-show_new_featured_carousel = posthog.feature_enabled(
-    "mitxonline-new-featured-carousel",
-    "randomID",
-    person_properties={"environment": settings.ENVIRONMENT},
-)
-
 
 class SignatoryObjectIndexPage(Page):
     """
@@ -649,10 +642,9 @@ class HomePage(Page):
         "CertificateIndexPage",
         "SignatoryIndexPage",
         "InstructorIndexPage",
+        "ProgramPage",
     ]
 
-    if show_new_featured_carousel:
-        subpage_types.append("ProgramPage")
 
     def _get_child_page_of_type(self, cls):
         """Gets the first child page of the given type if it exists"""
@@ -673,14 +665,9 @@ class HomePage(Page):
                     "feature_image": product_page.feature_image,
                     "start_date": run.start_date if run is not None else None,
                     "url_path": product_page.get_url(),
+                    "is_program": product_page.is_program_page,
+                    "program_type": product_page.product.program_type if product_page.is_program_page else None,
                 }
-                if show_new_featured_carousel:
-                    run_data["is_program"] = product_page.is_program_page
-                    run_data["program_type"] = (
-                        product_page.product.program_type
-                        if run_data["is_program"]
-                        else None
-                    )
 
                 if run and run.start_date and run.start_date < now_in_utc():
                     past_data.append(run_data)
@@ -703,6 +690,12 @@ class HomePage(Page):
         return page_data
 
     def get_context(self, request, *args, **kwargs):
+        posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
+        show_new_featured_carousel = posthog.feature_enabled(
+            "mitxonline-new-featured-carousel",
+            "randomID",
+            person_properties={"environment": settings.ENVIRONMENT},
+        )
         return {
             **super().get_context(request),
             **get_base_context(request),
@@ -730,14 +723,11 @@ class HomeProductLink(models.Model):
         verbose_name="Featured Product Page",
     )
 
-    if show_new_featured_carousel:
-        panels = [
-            PageChooserPanel(
-                "course_product_page", ["cms.CoursePage", "cms.ProgramPage"]
-            )
-        ]
-    else:
-        panels = [PageChooserPanel("course_product_page", "cms.CoursePage")]
+    panels = [
+        PageChooserPanel(
+            "course_product_page", ["cms.CoursePage", "cms.ProgramPage"]
+        )
+    ]
 
 
 class CourseObjectIndexPage(Page):
@@ -1175,27 +1165,16 @@ class ProgramPage(ProductPage):
         )
         start_date = None
         can_access_edx_course = False
-        if show_new_featured_carousel:
-            return {
-                **super().get_context(request, *args, **kwargs),
-                **get_base_context(request),
-                "run": relevant_run,
-                "is_enrolled": is_enrolled,
-                "sign_in_url": sign_in_url,
-                "start_date": start_date,
-                "can_access_edx_course": can_access_edx_course,
-                "program_type": self.product.program_type,
-            }
-        else:
-            return {
-                **super().get_context(request, *args, **kwargs),
-                **get_base_context(request),
-                "run": relevant_run,
-                "is_enrolled": is_enrolled,
-                "sign_in_url": sign_in_url,
-                "start_date": start_date,
-                "can_access_edx_course": can_access_edx_course,
-            }
+        return {
+            **super().get_context(request, *args, **kwargs),
+            **get_base_context(request),
+            "run": relevant_run,
+            "is_enrolled": is_enrolled,
+            "sign_in_url": sign_in_url,
+            "start_date": start_date,
+            "can_access_edx_course": can_access_edx_course,
+            "program_type": self.product.program_type,
+        }
 
     content_panels = [
         FieldPanel("program"),
