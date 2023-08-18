@@ -6,6 +6,7 @@
 {% block title %}{{ site_name }}{% endblock %}
 
 {% block content %}
+  {% if show_new_design_hero %}
 <div id="main" class="hero-container" style="background-image: url('{% wagtail_img_src page.hero%}')">
   <div class="container hero-content">
     <div class="hero-title">

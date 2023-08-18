@@ -697,12 +697,18 @@ class HomePage(Page):
             "randomID",
             person_properties={"environment": settings.ENVIRONMENT},
         )
+        show_new_design_hero = posthog.feature_enabled(
+            "mitxonline-new-featured-hero",
+            "randomID",
+            person_properties={"environment": settings.ENVIRONMENT},
+        )
         return {
             **super().get_context(request),
             **get_base_context(request),
             "product_cards_section_title": self.product_section_title,
             "products": self.products,
             "show_new_featured_carousel": show_new_featured_carousel,
+            "show_new_design_hero": show_new_design_hero,
         }
 
 
