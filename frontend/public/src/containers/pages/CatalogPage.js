@@ -18,14 +18,15 @@ import {
 import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { connectRequest } from "redux-query"
+import { connectRequest, requestAsync } from "redux-query"
 import { pathOr } from "ramda"
 
 type Props = {
   coursesIsLoading: ?boolean,
   programsIsLoading: ?boolean,
   courses: ?Array<CourseDetailWithRuns>,
-  programs: ?Array<Program>
+  programs: ?Array<Program>,
+  forceRequest: () => Promise<*>
 }
 
 // Department filter name for all items.
@@ -52,7 +53,8 @@ export class CatalogPage extends React.Component<Props> {
     mobileFilterWindowExpanded: false,
     numberCatalogRowsToDisplay: DEFAULT_MIN_CATALOG_ROWS_RENDERED,
     windowSize:                 0,
-    items_per_row:              3
+    items_per_row:              3,
+    page:                       1
   }
 
   constructor(props) {
@@ -92,9 +94,13 @@ export class CatalogPage extends React.Component<Props> {
    * {ITEMS_PER_ROW}, is less than the number of filtered catalog items for the respective tab.
    * This allows us to render catalog rows incrementally which will improve page performance.
    */
-  bottomOfLoadedCatalogCallback = entries => {
+  bottomOfLoadedCatalogCallback = async entries => {
     const [entry] = entries
     if (entry.isIntersecting) {
+      this.setState({ page: this.state.page + 1 })
+      const { getNextCoursePage } = this.props
+      await getNextCoursePage(this.state.page + 1)
+      console.log(this.props.courses)
       if (
         (this.state.tabSelected === COURSES_TAB &&
           this.state.numberCatalogRowsToDisplay * this.state.items_per_row <
@@ -591,7 +597,17 @@ export class CatalogPage extends React.Component<Props> {
   }
 }
 
-const mapPropsToConfig = () => [coursesQuery(), programsQuery()]
+const getNextCoursePage = page =>
+  requestAsync({
+    ...coursesQuery(page),
+    force: true
+  })
+
+const mapPropsToConfig = () => [coursesQuery(1), programsQuery()]
+
+const mapDispatchToProps = {
+  getNextCoursePage: getNextCoursePage
+}
 
 const mapStateToProps = createStructuredSelector({
   courses:           coursesSelector,
@@ -601,6 +617,6 @@ const mapStateToProps = createStructuredSelector({
 })
 
 export default compose(
-  connect(mapStateToProps),
+  connect(mapStateToProps, mapDispatchToProps),
   connectRequest(mapPropsToConfig)
 )(CatalogPage)

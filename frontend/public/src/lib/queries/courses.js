@@ -2,17 +2,17 @@ import { pathOr } from "ramda"
 
 import { nextState } from "./util"
 
-export const coursesSelector = pathOr(null, ["entities", "courses"])
+export const coursesSelector = pathOr(null, ["entities", "courses", "results"])
 
 export const coursesQueryKey = "courses"
 
-export const coursesQuery = () => ({
+export const coursesQuery = page => ({
   queryKey:  coursesQueryKey,
-  url:       `/api/courses/`,
+  url:       `/api/courses?page=${page}`,
   transform: json => ({
     courses: json
   }),
   update: {
     courses: nextState
-  }
+  },
 })

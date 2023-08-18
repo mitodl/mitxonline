@@ -157,7 +157,7 @@
                 opacity: 1;
             }
     
-            /* ending ENTER animation */
+            /* ending EXIT animation */
             .count-exit-active {
                 opacity: 0;
                 transition: opacity 300ms ease-in;
@@ -239,14 +239,13 @@
         
         /* ending ENTER animation */
         .messageout-enter-active {
-            position: absolute;
             opacity: 1;
             @include media-breakpoint-down(sm) {
                 width: -moz-available;          /* WebKit-based browsers will ignore this. */
                 width: -webkit-fill-available;  /* Mozilla-based browsers will ignore this. */
               }
             width: inherit;
-            transition: opacity 300ms ease-in-out;
+            transition: opacity 300ms ease-in;
 
         }
         
@@ -261,11 +260,10 @@
             width: inherit;
         }
 
-        /* ending ENTER animation */
+        /* ending EXIT animation */
         .messageout-exit-active {
-            position: absolute;
             opacity: 0;
-            transition: opacity 300ms ease-in-out;
+            transition: opacity 300ms ease-in;
 
             @include media-breakpoint-down(sm) {
                 width: -moz-available;          /* WebKit-based browsers will ignore this. */
