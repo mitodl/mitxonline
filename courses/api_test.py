@@ -813,7 +813,7 @@ def test_defer_enrollment(
             existing_enrollment.user,
             [target_run],
             keep_failed_enrollments=keep_failed_enrollments,
-            mode=existing_enrollment.enrollment_mode,
+            mode=EDX_ENROLLMENT_VERIFIED_MODE,
         )
         patched_deactivate_enrollments.assert_called_once_with(
             existing_enrollment,
