@@ -10,6 +10,7 @@ from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
+from hubspot_sync.task_helpers import sync_hubspot_user
 from main.permissions import UserIsOwnerPermission
 from main.views import RefinePagination
 from openedx import tasks
@@ -54,6 +55,7 @@ class CurrentUserRetrieveUpdateViewSet(
             if user_name != request.data.get("name"):
                 tasks.change_edx_user_name_async.delay(request.user.id)
             tasks.update_edx_user_profile(request.user.id)
+            sync_hubspot_user(request.user)
             return update_result
 
 
