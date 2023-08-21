@@ -295,7 +295,18 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 program=self, node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value
             )
 
-    @cached_property
+    @property
+    def courses_qset(self):
+        """
+        Returns a QuerySet of the related courses for this program, using the
+        requirements tree.
+        """
+
+        course_ids = [course_id for course_id in ProgramRequirement.objects.filter(program=self, node_type=ProgramRequirementNodeType.COURSE).all().values_list("course__id", flat=True)]
+
+        return Course.objects.filter(id__in=course_ids)
+
+    @property
     def courses(self):
         """
         Returns the courses associated with this program via the requirements

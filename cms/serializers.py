@@ -156,6 +156,10 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         fields = [
             "feature_image_src",
             "page_url",
+            "description",
+            "live",
+            "length",
+            "effort",
         ]
 
 

@@ -24,6 +24,7 @@ from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
     get_user_relevant_course_run_qset,
+    get_user_relevant_program_course_run_qset,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
@@ -207,7 +208,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
                 return get_user_relevant_course_run_qset(course, self.request.user)
             else:
                 program = Program.objects.filter(readable_id=relevant_to).first()
-                return CourseRun.objects.none()
+                return get_user_relevant_program_course_run_qset(program, self.request.user)
         else:
             return (
                 CourseRun.objects.select_related("course")

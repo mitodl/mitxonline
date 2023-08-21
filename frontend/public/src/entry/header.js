@@ -68,11 +68,14 @@ document.addEventListener("DOMContentLoaded", function() {
   const upsellCardEl = document.getElementById("upsellCard")
   const courseIdEl = document.getElementById("courseId")
   const programIdEl = document.getElementById("programId")
-  if (enrollSectionEl && (programIdEl || courseIdEl) && upsellCardEl) {
+  if (enrollSectionEl && (programIdEl || courseIdEl)) {
     const productDetailStore = configureStore()
     const courseId = courseIdEl ? courseIdEl.value : undefined
     const programId = programIdEl ? programIdEl.value : undefined
     renderEnrollSection(courseId, programId, enrollSectionEl, productDetailStore)
-    renderUpsellCard(courseId, upsellCardEl, productDetailStore)
+
+    if (upsellCardEl) {
+      renderUpsellCard(courseId, upsellCardEl, productDetailStore)
+    }
   }
 })

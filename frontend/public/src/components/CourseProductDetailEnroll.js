@@ -35,12 +35,6 @@ import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import CourseInfoBox from "./CourseInfoBox"
 
-import posthog from "posthog-js"
-
-/* global SETTINGS:false */
-posthog.init(SETTINGS.posthog_api_token, {
-  api_host: SETTINGS.posthog_api_host
-})
 
 type Props = {
   courseId: ?string,
@@ -507,13 +501,6 @@ export class CourseProductDetailEnroll extends React.Component<
     const csrfToken = getCookie("csrftoken")
     const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
 
-    if (showNewDesign) {
-      document.querySelectorAll("a.expand_here_link").forEach(link => {
-        link.removeEventListener("click", expandExpandBlock)
-        link.addEventListener("click", expandExpandBlock)
-      })
-    }
-
     let run =
       !this.getCurrentCourseRun() && courseRuns
         ? courseRuns[0]
@@ -553,7 +540,6 @@ export class CourseProductDetailEnroll extends React.Component<
         Enrolled and waiting for the course to begin.
       </p>
     ) : null
-
 
     return (
       <>

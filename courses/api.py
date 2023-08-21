@@ -124,7 +124,7 @@ def get_user_relevant_program_course_run_qset(
     Returns a QuerySet of relevant course runs
     """
     now = now or now_in_utc()
-    run_qset = course.courseruns.exclude(start_date=None).exclude(enrollment_start=None)
+    run_qset = CourseRun.objects.filter(course__in=program.courses_qset.all()).exclude(start_date=None).exclude(enrollment_start=None)
     if user and user.is_authenticated:
         user_enrollments = Count(
             "enrollments",

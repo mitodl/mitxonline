@@ -33,7 +33,7 @@ import users, { currentUserSelector } from "../lib/queries/users"
 import { enrollmentMutation } from "../lib/queries/enrollment"
 import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
-import CourseInfoBox from "./CourseInfoBox"
+import ProgramInfoBox from "./ProgramInfoBox"
 
 type Props = {
   programId: ?string,
@@ -378,117 +378,6 @@ export class ProductDetailEnrollApp extends React.Component<
     )
   }
 
-  renderCourseInfoBox(courses: any) {
-    if (!courses || courses.length < 1) {
-      return null
-    }
-
-    console.log(courses)
-
-    const run = courses[0].next_run_id
-      ? courses[0].courseruns.find(elem => elem.id === courses[0].next_run_id)
-      : courses[0].courseruns[0]
-
-    if (!run) return null
-
-    const product = run.products.length > 0 && run.products[0]
-
-    const startDate =
-      run && !emptyOrNil(run.start_date)
-        ? moment(new Date(run.start_date))
-        : null
-
-    return (
-      <div className="enrollment-info-box">
-        <div className="row d-flex align-items-center">
-          <div className="enrollment-info-icon">
-            <img
-              src="/static/images/products/start-date.png"
-              alt="Course Timing"
-            />
-          </div>
-          <div className="enrollment-info-text">
-            {startDate ? startDate.format("MMMM D, YYYY") : "Start Anytime"}
-          </div>
-        </div>
-        {run && run.page ? (
-          <div className="row d-flex align-items-top">
-            <div className="enrollment-info-icon">
-              <img
-                src="/static/images/products/effort.png"
-                alt="Expected Length and Effort"
-              />
-            </div>
-            <div className="enrollment-info-text">
-              {run.page.length}
-              {run.is_self_paced ? (
-                <span className="badge badge-pacing">SELF-PACED</span>
-              ) : null}
-              {run.page.effort ? (
-                <>
-                  <div className="enrollment-effort">{run.page.effort}</div>
-                </>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-        <div className="row d-flex align-items-center">
-          <div className="enrollment-info-icon">
-            <img src="/static/images/products/cost.png" alt="Cost" />
-          </div>
-          <div className="enrollment-info-text font-weight-bold">Free</div>
-        </div>
-        <div className="row d-flex align-items-center">
-          <div className="enrollment-info-icon">
-            <img
-              src="/static/images/products/certificate.png"
-              alt="Certificate Track Information"
-            />
-          </div>
-          <div className="enrollment-info-text">
-            {product ? (
-              <>
-                Certificate track: $
-                {product.price.toLocaleString("en-us", {
-                  style:    "currency",
-                  currency: "en-US"
-                })}
-                {run.upgrade_deadline ? (
-                  <>
-                    <div className="text-danger">
-                      Payment deadline:{" "}
-                      {moment(new Date(run.upgrade_deadline)).format(
-                        "MMMM D, YYYY"
-                      )}
-                    </div>
-                  </>
-                ) : null}
-                <div>
-                  <a target="_blank" rel="noreferrer" href="#">
-                    What's the certificate track?
-                  </a>
-                </div>
-                {run.page.financial_assistance_form_url ? (
-                  <div>
-                    <a
-                      target="_blank"
-                      rel="noreferrer"
-                      href={run.page.financial_assistance_form_url}
-                    >
-                      Financial assistance available
-                    </a>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              "No certificate available."
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   render() {
     const {
       courseRuns,
@@ -623,7 +512,7 @@ export class ProductDetailEnrollApp extends React.Component<
             {
               // $FlowFixMe: isLoading null or undefined
               <Loader key="course_info_loader" isLoading={programIsLoading}>
-                <CourseInfoBox courses={programs}></CourseInfoBox>
+                <ProgramInfoBox programs={programs}></ProgramInfoBox>
               </Loader>
             }
           </>

@@ -165,19 +165,10 @@
                 <div class="w-100" id="upsellCard"></div>
               </div>
               {% endif %}
-
-              {% if page.program %}
-              <div class="stats-row product-info-box-body">
-                <input id="programId" type="hidden" value="{{page.program.readable_id}}" />
-                <div class="w-100" id="productDetailEnrollment"></div>
-              </div>
             </div>
           </div>
-          {% endfor %}
-          {% endif %}
-
         </div>
-      </section>
+      </div>
     </div>
 {% else %}
     <div id="main" class="product-page">
