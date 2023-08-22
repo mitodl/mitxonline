@@ -44,6 +44,9 @@
           background: $home-page-header-blue;
           margin-top: 147px;
           margin-bottom: 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
         }
 
         h1 {
