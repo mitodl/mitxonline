@@ -126,6 +126,33 @@
     </div>
   </div>
 {% endif %}
+{% if show_home_page_video_component %}
+<div class="home-page-video-row d-flex justify-content-center row">
+  <div class="home-page-video-container">
+    <div class="home-page-video-description">
+      <h3>{{ page.video_component_title }}</h3>
+      <p>{{ page.video_component_description|richtext }}</p>
+    </div>
+      <div class="home-page-video-wrapper">
+        <div class="home-page-video-player">
+          {% if page.video_url %}
+            <video-js
+                  class="vjs-default-skin vjs-big-play-centered"
+                  controls
+                  data-setup="{{page.video_player_config}}"
+                  preload="metadata"
+                >
+              </video-js>
+            <div class="home-page-video-underlay">
+
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 {% block scripts %}
 <script>
