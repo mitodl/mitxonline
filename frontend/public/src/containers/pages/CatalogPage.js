@@ -5,12 +5,14 @@ import { parseDateString, formatPrettyDate } from "../../lib/util"
 
 import {
   coursesSelector,
+  coursesNextPageSelector,
   coursesQuery,
   coursesQueryKey
 } from "../../lib/queries/courses"
 
 import {
   programsSelector,
+  programsNextPageSelector,
   programsQuery,
   programsQueryKey
 } from "../../lib/queries/programs"
@@ -26,7 +28,9 @@ type Props = {
   programsIsLoading: ?boolean,
   courses: ?Array<CourseDetailWithRuns>,
   programs: ?Array<Program>,
-  forceRequest: () => Promise<*>
+  forceRequest: () => Promise<*>,
+  coursesNextPage: ?string,
+  programsNextPage: ?string
 }
 
 // Department filter name for all items.
@@ -38,23 +42,21 @@ const PROGRAMS_TAB = "programs"
 // Course tab name.
 const COURSES_TAB = "courses"
 
-// The default number of catalog rows rendered.
-const DEFAULT_MIN_CATALOG_ROWS_RENDERED = 4
-
 export class CatalogPage extends React.Component<Props> {
   state = {
     tabSelected:                COURSES_TAB,
+    allCoursesRetrieved:        [],
+    allProgramsRetrieved:       [],
     filteredCourses:            [],
     filteredPrograms:           [],
     filterCoursesCalled:        false,
-    filterProgramsCalled:       false,
     departments:                [],
     selectedDepartment:         ALL_DEPARTMENTS,
     mobileFilterWindowExpanded: false,
-    numberCatalogRowsToDisplay: DEFAULT_MIN_CATALOG_ROWS_RENDERED,
-    windowSize:                 0,
     items_per_row:              3,
-    page:                       1
+    courseQueryPage:            1,
+    programQueryPage:           1,
+    isLoadingMoreItems:         false
   }
 
   constructor(props) {
@@ -90,28 +92,63 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Increments this.state.numberCatalogRowsToDisplay by 4 if the current value, multipled by
-   * {ITEMS_PER_ROW}, is less than the number of filtered catalog items for the respective tab.
-   * This allows us to render catalog rows incrementally which will improve page performance.
+   * Makes another API call to the courses or programs endpoint if there is
+   * a next page defined in the prior request.
+   * Appends the courses or programs from the API call to the current allCoursesRetrieved
+   * or allProgramsRetrieved state variable.  Increments the courseQueryPage or programQueryPage
+   * state variable.  Updates the filteredCourses or filteredPrograms state variable using the
+   * updated allCoursesRetrieved or allProgramsRetrieved state variable.
    */
   bottomOfLoadedCatalogCallback = async entries => {
     const [entry] = entries
     if (entry.isIntersecting) {
-      this.setState({ page: this.state.page + 1 })
-      const { getNextCoursePage } = this.props
-      await getNextCoursePage(this.state.page + 1)
-      console.log(this.props.courses)
-      if (
-        (this.state.tabSelected === COURSES_TAB &&
-          this.state.numberCatalogRowsToDisplay * this.state.items_per_row <
-            this.state.filteredCourses.length) ||
-        (this.state.tabSelected === PROGRAMS_TAB &&
-          this.state.numberCatalogRowsToDisplay * this.state.items_per_row <
-            this.state.filteredPrograms.length)
-      ) {
-        this.setState({
-          numberCatalogRowsToDisplay: this.state.numberCatalogRowsToDisplay + 4
-        })
+      if (this.state.tabSelected === COURSES_TAB) {
+        const { getNextCoursePage, coursesNextPage } = this.props
+
+        // Only request the next page if a next page exists (coursesNextPage)
+        // and if we aren't already requesting the next page (isLoadingMoreItems).
+        if (coursesNextPage && !this.state.isLoadingMoreItems) {
+          this.setState({ isLoadingMoreItems: true })
+          this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
+          const response = await getNextCoursePage(this.state.courseQueryPage)
+          this.setState({ isLoadingMoreItems: false })
+          if (response.body.results) {
+            const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+              this.state.selectedDepartment,
+              [...this.state.allCoursesRetrieved, ...response.body.results]
+            )
+            this.setState({ filteredCourses: filteredCourses })
+            this.setState({
+              allCoursesRetrieved: [
+                ...this.state.allCoursesRetrieved,
+                ...response.body.results
+              ]
+            })
+          }
+        }
+      } else {
+        const { getNextProgramPage, programsNextPage } = this.props
+        if (programsNextPage) {
+          this.setState({ isLoadingMoreItems: true })
+          const response = await getNextProgramPage(
+            this.state.programQueryPage + 1
+          )
+          this.setState({ isLoadingMoreItems: false })
+          this.setState({ programQueryPage: this.state.programQueryPage + 1 })
+          if (response.body.results) {
+            const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
+              this.state.selectedDepartment,
+              [...this.state.allProgramsRetrieved, ...response.body.results]
+            )
+            this.setState({ filteredPrograms: filteredPrograms })
+            this.setState({
+              allProgramsRetrieved: [
+                ...this.state.allProgramsRetrieved,
+                ...response.body.results
+              ]
+            })
+          }
+        }
       }
     }
   }
@@ -125,6 +162,7 @@ export class CatalogPage extends React.Component<Props> {
     const { courses, coursesIsLoading } = this.props
     if (!coursesIsLoading && !this.state.filterCoursesCalled) {
       this.setState({ filterCoursesCalled: true })
+      this.setState({ allCoursesRetrieved: courses })
       const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
         this.state.selectedDepartment,
         courses
@@ -173,22 +211,38 @@ export class CatalogPage extends React.Component<Props> {
   changeSelectedTab = (selectTabName: string) => {
     this.setState({ tabSelected: selectTabName })
     this.changeSelectedDepartment(ALL_DEPARTMENTS, selectTabName)
-    this.setState({
-      numberCatalogRowsToDisplay: DEFAULT_MIN_CATALOG_ROWS_RENDERED
-    })
 
     if (selectTabName === COURSES_TAB) {
-      const { courses, coursesIsLoading } = this.props
+      const { coursesIsLoading } = this.props
       if (!coursesIsLoading) {
         this.setState({
-          departments: this.collectDepartmentsFromCatalogItems(courses)
+          departments: this.collectDepartmentsFromCatalogItems(
+            this.state.allCoursesRetrieved
+          )
         })
       }
     } else {
       const { programs, programsIsLoading } = this.props
       if (!programsIsLoading) {
+        const programsToFilter = []
+        // The first time that a user switches to the programs tab, allProgramsRetrieved will be
+        // empty and should be populated with the results from the first programs API call.
+        if (this.state.allProgramsRetrieved.length === 0) {
+          this.setState({ allProgramsRetrieved: programs })
+          programsToFilter.push(...programs)
+        } else {
+          programsToFilter.push(...this.state.allProgramsRetrieved)
+        }
+
+        const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
+          this.state.selectedDepartment,
+          programsToFilter
+        )
         this.setState({
-          departments: this.collectDepartmentsFromCatalogItems(programs)
+          filteredPrograms: filteredPrograms
+        })
+        this.setState({
+          departments: this.collectDepartmentsFromCatalogItems(programsToFilter)
         })
       }
     }
@@ -213,19 +267,17 @@ export class CatalogPage extends React.Component<Props> {
   ) => {
     this.setState({ selectedDepartment: selectedDepartment })
     if (tabSelected === COURSES_TAB) {
-      const { courses } = this.props
       this.setState({
         filteredCourses: this.filteredCoursesBasedOnCourseRunCriteria(
           selectedDepartment,
-          courses
+          this.state.allCoursesRetrieved
         )
       })
     } else {
-      const { programs } = this.props
       this.setState({
         filteredPrograms: this.filteredProgramsByDepartmentAndCriteria(
           selectedDepartment,
-          programs
+          this.state.allProgramsRetrieved
         )
       })
     }
@@ -418,12 +470,7 @@ export class CatalogPage extends React.Component<Props> {
       this.state.items_per_row
     )
     const catalogRows = []
-    for (
-      let i = 0;
-      i < itemsInCatalog.length &&
-      i < numberOfItemsInEachRow * this.state.numberCatalogRowsToDisplay;
-      i += numberOfItemsInEachRow
-    ) {
+    for (let i = 0; i < itemsInCatalog.length; i += numberOfItemsInEachRow) {
       const itemsInRow = itemsInCatalog.slice(i, i + numberOfItemsInEachRow)
       catalogRows.push(
         <div className="row" id="catalog-grid" key={i}>
@@ -587,6 +634,16 @@ export class CatalogPage extends React.Component<Props> {
                   </CSSTransition>
                 </TransitionGroup>
               </div>
+              <div
+                className={`${
+                  this.state.isLoadingMoreItems ? "lds-ring" : "d-none"
+                }`}
+              >
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+              </div>
               {/* span is used to detect when the learner has scrolled to the bottom of the catalog page. */}
               <span ref={this.container}></span>
             </div>
@@ -603,15 +660,24 @@ const getNextCoursePage = page =>
     force: true
   })
 
-const mapPropsToConfig = () => [coursesQuery(1), programsQuery()]
+const getNextProgramPage = page =>
+  requestAsync({
+    ...programsQuery(page),
+    force: true
+  })
+
+const mapPropsToConfig = () => [coursesQuery(1), programsQuery(1)]
 
 const mapDispatchToProps = {
-  getNextCoursePage: getNextCoursePage
+  getNextCoursePage:  getNextCoursePage,
+  getNextProgramPage: getNextProgramPage
 }
 
 const mapStateToProps = createStructuredSelector({
   courses:           coursesSelector,
+  coursesNextPage:   coursesNextPageSelector,
   programs:          programsSelector,
+  programsNextPage:  programsNextPageSelector,
   coursesIsLoading:  pathOr(true, ["queries", coursesQueryKey, "isPending"]),
   programsIsLoading: pathOr(true, ["queries", programsQueryKey, "isPending"])
 })

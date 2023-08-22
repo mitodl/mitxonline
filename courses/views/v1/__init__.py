@@ -16,7 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from reversion.models import Version
-from rest_framework.pagination import CursorPagination
+from rest_framework.pagination import PageNumberPagination
 
 from courses.api import (
     create_run_enrollments,
@@ -69,10 +69,12 @@ from openedx.exceptions import (
 log = logging.getLogger(__name__)
 
 
-class CursorSetPagination(CursorPagination):
+class Pagination(PageNumberPagination):
+    """Paginator class for infinite loading"""
+
     page_size = 12
     page_size_query_param = "page_size"
-    ordering = "-created_on"  # '-created' is default
+    ordering = "-created_on"
 
 
 class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
@@ -82,13 +84,13 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = ProgramSerializer
     queryset = Program.objects.filter(live=True)
-    pagination_class = CursorSetPagination
+    pagination_class = Pagination
 
 
 class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for Courses"""
 
-    pagination_class = CursorSetPagination
+    pagination_class = Pagination
     permission_classes = []
 
     serializer_class = CourseSerializer

@@ -4,6 +4,7 @@ import moment from "moment-timezone"
 import IntegrationTestHelper from "../../util/integration_test_helper"
 import CatalogPage, { CatalogPage as InnerCatalogPage } from "./CatalogPage"
 import { formatPrettyDate } from "../../lib/util"
+import sinon from "sinon"
 
 const displayedCourse = {
   id:          2,
@@ -207,7 +208,7 @@ const displayedProgram = {
   live: true
 }
 
-describe("CatalogPage", () => {
+describe("CatalogPage", function() {
   const mockIntersectionObserver = class {
     constructor() {}
     observe() {}
@@ -215,6 +216,8 @@ describe("CatalogPage", () => {
     disconnect() {}
   }
   let helper, courses, programs, renderPage
+
+  this.timeout(50000)
 
   beforeEach(() => {
     // Mock the intersection observer.
@@ -239,7 +242,9 @@ describe("CatalogPage", () => {
           }
         },
         entities: {
-          courses: courses
+          courses: {
+            results: courses
+          }
         }
       },
       {}
@@ -247,8 +252,10 @@ describe("CatalogPage", () => {
     inner.instance().componentDidUpdate({}, {})
     expect(inner.state().selectedDepartment).equals("All Departments")
     expect(inner.state().tabSelected).equals("courses")
-    expect(inner.state().numberCatalogRowsToDisplay).equals(4)
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
+      JSON.stringify(courses)
+    )
+    expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
       JSON.stringify(courses)
     )
     expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
@@ -270,8 +277,12 @@ describe("CatalogPage", () => {
           }
         },
         entities: {
-          courses:  courses,
-          programs: programs
+          courses: {
+            results: courses
+          },
+          programs: {
+            results: programs
+          }
         }
       },
       {}
@@ -280,8 +291,10 @@ describe("CatalogPage", () => {
     inner.instance().changeSelectedTab("programs")
     expect(inner.state().selectedDepartment).equals("All Departments")
     expect(inner.state().tabSelected).equals("programs")
-    expect(inner.state().numberCatalogRowsToDisplay).equals(4)
     expect(JSON.stringify(inner.state().filteredPrograms)).equals(
+      JSON.stringify(programs)
+    )
+    expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
       JSON.stringify(programs)
     )
     expect(inner.instance().renderNumberOfCatalogItems()).equals(5)
@@ -625,8 +638,12 @@ describe("CatalogPage", () => {
           }
         },
         entities: {
-          courses:  courses,
-          programs: [displayedProgram]
+          courses: {
+            results: courses
+          },
+          programs: {
+            results: [displayedProgram]
+          }
         }
       },
       {}
@@ -638,6 +655,9 @@ describe("CatalogPage", () => {
     expect(inner.state().tabSelected).equals("courses")
     // All of the courses should be visible.
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
+      JSON.stringify(courses)
+    )
+    expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
       JSON.stringify(courses)
     )
     // Number of catalog items should match the number of visible courses.
@@ -653,6 +673,9 @@ describe("CatalogPage", () => {
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify([course2, course3])
     )
+    expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
+      JSON.stringify(courses)
+    )
 
     // Change to the programs tab.
     inner.instance().changeSelectedTab("programs")
@@ -665,5 +688,254 @@ describe("CatalogPage", () => {
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
     )
+  })
+
+  it("load more at the bottom of the courses catalog page, all departments filter", async () => {
+    courses = [displayedCourse]
+    programs = [displayedProgram]
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            results: courses,
+            next:    "http://fake.com/api/courses/?page=2"
+          },
+          programs: {
+            results: programs
+          }
+        }
+      },
+      {}
+    )
+    inner.instance().componentDidUpdate({}, {})
+    expect(inner.state().selectedDepartment).equals("All Departments")
+    expect(inner.state().tabSelected).equals("courses")
+    expect(JSON.stringify(inner.state().filteredCourses)).equals(
+      JSON.stringify(courses)
+    )
+    expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
+      JSON.stringify(courses)
+    )
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+    expect(inner.state().courseQueryPage).equals(1)
+
+    // Mock the second page of course API results.
+    helper.handleRequestStub.returns({
+      body: {
+        next:    null,
+        results: courses
+      }
+    })
+
+    // Simulate the user reaching the bottom of the catalog page.
+    const entry = [{ isIntersecting: true }]
+    await inner.instance().bottomOfLoadedCatalogCallback(entry)
+
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/courses/?page=2",
+      "GET"
+    )
+
+    // Should expect 2 courses to be displayed in the catalog now.
+    expect(inner.state().courseQueryPage).equals(2)
+    expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
+      JSON.stringify([displayedCourse, displayedCourse])
+    )
+    expect(JSON.stringify(inner.state().filteredCourses)).equals(
+      JSON.stringify([displayedCourse, displayedCourse])
+    )
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
+  })
+
+  it("do not load more at the bottom of the courses catalog page if next page is null", async () => {
+    courses = [displayedCourse]
+    programs = [displayedProgram]
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            results: courses,
+            next:    null
+          },
+          programs: {
+            results: programs
+          }
+        }
+      },
+      {}
+    )
+    inner.instance().componentDidUpdate({}, {})
+    expect(inner.state().selectedDepartment).equals("All Departments")
+    expect(inner.state().tabSelected).equals("courses")
+    expect(JSON.stringify(inner.state().filteredCourses)).equals(
+      JSON.stringify(courses)
+    )
+    expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
+      JSON.stringify(courses)
+    )
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+    expect(inner.state().courseQueryPage).equals(1)
+
+    // Simulate the user reaching the bottom of the catalog page.
+    const entry = [{ isIntersecting: true }]
+    await inner.instance().bottomOfLoadedCatalogCallback(entry)
+
+    // Should not expect any additional courses.
+    expect(inner.state().courseQueryPage).equals(1)
+    expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
+      JSON.stringify(courses)
+    )
+    expect(JSON.stringify(inner.state().filteredCourses)).equals(
+      JSON.stringify(courses)
+    )
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+  })
+
+  it("do not load more at the bottom of the courses catalog page if isLoadingMoreItems is true", async () => {
+    courses = [displayedCourse]
+    programs = [displayedProgram]
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            results: courses,
+            next:    "http://fake.com/api/courses/?page=2"
+          },
+          programs: {
+            results: programs
+          }
+        }
+      },
+      {}
+    )
+    inner.instance().componentDidUpdate({}, {})
+    expect(inner.state().selectedDepartment).equals("All Departments")
+    expect(inner.state().tabSelected).equals("courses")
+    expect(JSON.stringify(inner.state().filteredCourses)).equals(
+      JSON.stringify(courses)
+    )
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+    expect(inner.state().courseQueryPage).equals(1)
+
+    // Simulate the user reaching the bottom of the catalog page.
+    const entry = [{ isIntersecting: true }]
+
+    // Set isLoadingMoreItems to true which simualtes that the next page
+    // request is already in progress.
+    inner.instance().setState({ isLoadingMoreItems: true })
+    await inner.instance().bottomOfLoadedCatalogCallback(entry)
+
+    // Should not expect any additional courses.
+    expect(inner.state().courseQueryPage).equals(1)
+    expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
+      JSON.stringify(courses)
+    )
+    expect(JSON.stringify(inner.state().filteredCourses)).equals(
+      JSON.stringify(courses)
+    )
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+  })
+
+  it("load more at the bottom of the programs catalog page, all departments filter", async () => {
+    courses = [displayedCourse]
+    programs = [displayedProgram]
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            results: courses,
+            next:    "http://fake.com/api/courses/?page=2"
+          },
+          programs: {
+            results: programs,
+            next:    "http://fake.com/api/courses/?page=2"
+          }
+        }
+      },
+      {}
+    )
+    inner.instance().componentDidUpdate({}, {})
+    expect(inner.state().allProgramsRetrieved.length).equals(0)
+    expect(inner.state().filteredPrograms.length).equals(0)
+    inner.instance().changeSelectedTab("programs")
+    expect(inner.state().selectedDepartment).equals("All Departments")
+    expect(inner.state().tabSelected).equals("programs")
+    expect(JSON.stringify(inner.state().filteredPrograms)).equals(
+      JSON.stringify(programs)
+    )
+    expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
+      JSON.stringify(programs)
+    )
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+    expect(inner.state().programQueryPage).equals(1)
+
+    // Mock the second page of program API results.
+    helper.handleRequestStub.returns({
+      body: {
+        next:    null,
+        results: programs
+      }
+    })
+
+    // Simulate the user reaching the bottom of the catalog page.
+    const entry = [{ isIntersecting: true }]
+    await inner.instance().bottomOfLoadedCatalogCallback(entry)
+
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/programs/?page=2",
+      "GET"
+    )
+
+    // Should expect 2 courses to be displayed in the catalog now.
+    expect(inner.state().programQueryPage).equals(2)
+    expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
+      JSON.stringify([displayedProgram, displayedProgram])
+    )
+    expect(JSON.stringify(inner.state().filteredPrograms)).equals(
+      JSON.stringify([displayedProgram, displayedProgram])
+    )
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
   })
 })
