@@ -457,7 +457,6 @@ export class CatalogPage extends React.Component<Props> {
 
   /**
    * Dynamically renders rows of cards in the catalog.  Each row can contain up to {ITEMS_PER_ROW} course or program cards.
-   * Only rows up to {this.state.numberCatalogRowsToDisplay} will be rendered.
    * @param {Array<CourseDetailWithRuns | Program>} itemsInCatalog The items associated with the currently selected catalog page.
    * @param {Function} renderCatalogCardFunction The card render function that will be used for each item on the current catalog page.
    */

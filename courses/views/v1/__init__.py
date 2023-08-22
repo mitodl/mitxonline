@@ -74,6 +74,7 @@ class Pagination(PageNumberPagination):
 
     page_size = 12
     page_size_query_param = "page_size"
+    max_page_size = 100
     ordering = "-created_on"
 
 
@@ -86,6 +87,16 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Program.objects.filter(live=True)
     pagination_class = Pagination
 
+    def paginate_queryset(self, queryset):
+        """
+        Override to check whether the API request includes the 'page' parameter.
+        If the 'page' parameter is defined, paginate the results, otherwise don't
+        paginate the results.
+        """
+        if self.paginator and self.request.query_params.get("page", None) is None:
+            return None
+        return super().paginate_queryset(queryset)
+
 
 class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for Courses"""
@@ -95,6 +106,16 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = CourseSerializer
     queryset = Course.objects.filter(live=True)
+
+    def paginate_queryset(self, queryset):
+        """
+        Override to check whether the API request includes the 'page' parameter.
+        If the 'page' parameter is defined, paginate the results, otherwise don't
+        paginate the results.
+        """
+        if self.paginator and self.request.query_params.get("page", None) is None:
+            return None
+        return super().paginate_queryset(queryset)
 
 
 class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
