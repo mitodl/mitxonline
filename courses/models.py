@@ -116,6 +116,9 @@ class Department(TimestampedModel):
 
 class Program(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course program"""
+    
+    class Meta:
+        ordering = ["id"]
 
     objects = ProgramQuerySet.as_manager()
     title = models.CharField(max_length=255)
@@ -424,6 +427,9 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
 
 class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
+    
+    class Meta:
+        ordering = ["id"]
 
     objects = CourseQuerySet.as_manager()
     title = models.CharField(max_length=255)
