@@ -89,9 +89,8 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
 
     def paginate_queryset(self, queryset):
         """
-        Override to check whether the API request includes the 'page' parameter.
-        If the 'page' parameter is defined, paginate the results, otherwise don't
-        paginate the results.
+        Enable pagination if a 'page' parameter is included in the request,
+        otherwise, do not use pagination.
         """
         if self.paginator and self.request.query_params.get("page", None) is None:
             return None
@@ -109,9 +108,8 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 
     def paginate_queryset(self, queryset):
         """
-        Override to check whether the API request includes the 'page' parameter.
-        If the 'page' parameter is defined, paginate the results, otherwise don't
-        paginate the results.
+        Enable pagination if a 'page' parameter is included in the request,
+        otherwise, do not use pagination.
         """
         if self.paginator and self.request.query_params.get("page", None) is None:
             return None
