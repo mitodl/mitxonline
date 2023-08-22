@@ -6,19 +6,38 @@
 {% block title %}{{ site_name }}{% endblock %}
 
 {% block content %}
-  {% if show_new_design_hero %}
-<div id="main" class="hero-container" style="background-image: url('{% wagtail_img_src page.hero%}')">
-  <div class="container hero-content">
-    <div class="hero-title">
-      {% if page.hero_title %}
-        <h2>{{ page.hero_title }}</h2>
-      {% endif %}
-      {% if page.hero_subtitle %}
-        <h3>{{ page.hero_subtitle }}</h3>
-      {% endif %}
+{% if show_new_design_hero %}
+  <div class="home-page-hero-row d-flex justify-content-md-center align-items-md-center">
+    <div class="home-page-hero hero-container col-12">
+      <div class="home-page-hero-overlay container hero-content d-flex justify-content-md-end align-items-md-end">
+        <div class="hero-title hero-text d-sm-flex justify-content-sm-center">
+            <h1>MITx Online</h1>
+            <h2>Open Online Courses - from MIT</h2>
+            <p>
+              Learners anywhere in the world can enroll in a course of their choosing and <br>
+              <b>learn for free</b>, or <b>aim to earn a certificate for a low fee</b>.
+            </p>
+        </div>
+        <div class="hero-button-container">
+          <button type="button" class="hero-explore-button" href="">Explore Courses</button>
+        </div>
+      </div>
     </div>
   </div>
-</div>
+{% else %}
+  <div id="main" class="hero-container" style="background-image: url('{% wagtail_img_src page.hero%}')">
+    <div class="container hero-content">
+      <div class="hero-title">
+        {% if page.hero_title %}
+          <h2>{{ page.hero_title }}</h2>
+        {% endif %}
+        {% if page.hero_subtitle %}
+          <h3>{{ page.hero_subtitle }}</h3>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endif %}
 {% if show_new_featured_carousel %}
   <div class="featured-product-section-container container">
     <div class="featured-product-section carousel slide" id="featuredProductCarousel">
