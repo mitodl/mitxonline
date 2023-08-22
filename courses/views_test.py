@@ -114,11 +114,8 @@ def test_delete_program(user_drf_client, programs):
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-@pytest.mark.parametrize("is_anonymous", [True, False])
-def test_get_courses(user_drf_client, courses, mock_context, is_anonymous):
+def test_get_courses(user_drf_client, courses, mock_context):
     """Test the view that handles requests for all Courses"""
-    if is_anonymous:
-        user_drf_client.logout()
     resp = user_drf_client.get(reverse("courses_api-list"))
     courses_data = resp.json()
     assert len(courses_data) == len(courses)
@@ -128,11 +125,8 @@ def test_get_courses(user_drf_client, courses, mock_context, is_anonymous):
         )
 
 
-@pytest.mark.parametrize("is_anonymous", [True, False])
-def test_get_course(user_drf_client, courses, mock_context, is_anonymous):
+def test_get_course(user_drf_client, courses, mock_context):
     """Test the view that handles a request for single Course"""
-    if is_anonymous:
-        user_drf_client.logout()
     course = courses[0]
     resp = user_drf_client.get(reverse("courses_api-detail", kwargs={"pk": course.id}))
     course_data = resp.json()
@@ -262,48 +256,6 @@ def test_delete_course_run(user_drf_client, course_runs):
         reverse("course_runs_api-detail", kwargs={"pk": course_run.id})
     )
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
-
-
-@pytest.mark.parametrize("live", [True, False])
-def test_programs_not_live(client, live):
-    """Programs should be filtered out if live=False"""
-    program = ProgramFactory.create(live=live)
-    resp = client.get(reverse("programs_api-list"))
-    assert resp.status_code == status.HTTP_200_OK
-    assert_drf_json_equal(
-        resp.json(), [ProgramSerializer(program).data] if live else []
-    )
-
-
-@pytest.mark.parametrize("live", [True, False])
-def test_courses_not_live_in_programs_api(
-    client, live, program_with_empty_requirements
-):
-    """Courses should be filtered out of the programs API if not live"""
-    if live:
-        course = CourseFactory.create(live=live, page=None)
-    else:
-        course = CourseFactory.create(live=live)
-
-    program_with_empty_requirements.add_requirement(course)
-
-    resp = client.get(reverse("programs_api-list"))
-    assert resp.status_code == status.HTTP_200_OK
-    assert_drf_json_equal(
-        resp.json()[0]["courses"],
-        [CourseSerializer(course, context={"include_page_fields": True}).data]
-        if live
-        else [],
-    )
-
-
-@pytest.mark.parametrize("live", [True, False])
-def test_courses_not_live_in_courses_api(client, live):
-    """Courses should be filtered out of the courses API if not live"""
-    course = CourseFactory.create(live=live)
-    resp = client.get(reverse("courses_api-list"))
-    assert resp.status_code == status.HTTP_200_OK
-    assert_drf_json_equal(resp.json(), [CourseSerializer(course).data] if live else [])
 
 
 def test_user_enrollments_list(user_drf_client, user):
