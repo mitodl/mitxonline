@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.70.9
+--------------
+
+- update full name on user profile (#1825)
+- When deferring enrollment set to verified (#1790)
+- Update to Enrolled in certificate track label to count for audit enrollment with certificates (#1823)
+
 Version 0.70.8 (Released August 17, 2023)
 --------------
 
