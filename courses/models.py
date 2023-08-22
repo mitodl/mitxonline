@@ -116,7 +116,7 @@ class Department(TimestampedModel):
 
 class Program(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course program"""
-    
+
     class Meta:
         ordering = ["id"]
 
@@ -427,7 +427,7 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
 
 class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
-    
+
     class Meta:
         ordering = ["id"]
 
