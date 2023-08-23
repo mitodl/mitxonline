@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.70.9
+Version 0.70.9 (Released August 23, 2023)
 --------------
 
 - update full name on user profile (#1825)
