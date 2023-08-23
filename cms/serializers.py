@@ -139,6 +139,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
 
     feature_image_src = serializers.SerializerMethodField()
     page_url = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField()
 
     def get_feature_image_src(self, instance):
         """Serializes the source of the feature_image"""
@@ -150,6 +151,9 @@ class ProgramPageSerializer(serializers.ModelSerializer):
 
     def get_page_url(self, instance):
         return instance.get_url()
+    
+    def get_price(self, instance):
+        return instance.price[0]['value']['text']
 
     class Meta:
         model = models.ProgramPage
@@ -160,6 +164,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             "live",
             "length",
             "effort",
+            "price",
         ]
 
 
