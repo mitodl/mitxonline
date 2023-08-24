@@ -11,7 +11,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.utils.timezone import now
 
 from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
-from cms.serializers import CoursePageSerializer, ProgramPageSerializer
+from cms.serializers import ProgramPageSerializer
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,

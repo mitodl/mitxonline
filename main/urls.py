@@ -25,6 +25,7 @@ from wagtail.documents import urls as wagtaildocs_urls
 
 from cms.views import instructor_page
 from main.views import cms_signin_redirect_to_site_signin, index, refine
+from main import features
 
 handler500 = "main.views.handler500"
 handler404 = "main.views.handler404"
@@ -99,4 +100,8 @@ if settings.DEBUG:
 
     urlpatterns += [
         path("__debug__/", include(debug_toolbar.urls)),
+    ]
+if features.is_enabled(features.ENABLE_NEW_DESIGN):
+    urlpatterns += [
+        path("catalog/", index, name="catalog"),
     ]
