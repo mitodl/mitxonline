@@ -1,4 +1,20 @@
 // sass-lint:disable mixins-before-declarations
+// TODO: `featured-product-section h1` should replace `course-section h1` in home.css on feature merge
+.featured-product-section h1 {
+  color: $home-page-header-blue;
+  text-align: left;
+  font-size: 25px;
+  margin: 0;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+  padding: 60px 0 33px 0;
+  @include media-breakpoint-down(sm) {
+    font-size: 30px;
+    padding: 20px 0;
+  }
+}
+
 .featured-product-section-container {
   width: 100%;
   display: flex;
@@ -12,7 +28,8 @@
 
   .featured-product-section {
     display: flex;
-    width: 1440px;
+    width: 100%;
+    max-width: 1440px;
     height: 520px;
     flex-shrink: 0;
     background-image: url('/static/images/featured-product-rectangle.svg');
@@ -27,7 +44,8 @@
     }
 
     .featured-product-header {
-      width: 1344px;
+      max-width: 1344px;
+      width: 93.333333%;
       margin: 0 auto;
       padding-top: 60px;
       flex-shrink: 0;
@@ -86,7 +104,8 @@
     .featured-product-listing {
       display: flex;
       margin: 40px auto 0 auto;
-      width: 1344px;
+      max-width: 1344px;
+      width: 93.333333%;
       height: 238px;
       justify-content: flex-end;
       align-items: center;
@@ -233,7 +252,7 @@
         margin: auto;
         @include media-breakpoint-down(sm) {
           width: 100%;
-          margin: 0 15px 0 15px;
+          max-width: 280px;
         }
       }
     }

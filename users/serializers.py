@@ -338,7 +338,6 @@ class UserSerializer(serializers.ModelSerializer):
 
             user = super().update(instance, validated_data)
 
-        sync_hubspot_user(user)
         return user
 
     class Meta:
