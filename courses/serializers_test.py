@@ -42,6 +42,7 @@ from ecommerce.serializers import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
+from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = [pytest.mark.django_db]
@@ -150,9 +151,9 @@ def test_base_course_serializer():
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
 @pytest.mark.parametrize("all_runs", [True, False])
-def test_serialize_course(mocker, mock_context, is_anonymous, all_runs):
+def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings):
     """Test Course serialization"""
-    patched_feature_flag = mocker.patch("main.features.is_enabled", return_value=True)
+    settings.FEATURES[features.ENABLE_NEW_DESIGN] = True
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
     if all_runs:

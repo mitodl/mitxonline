@@ -1,4 +1,5 @@
 // @flow
+/* global SETTINGS: false */
 import { expect } from "chai"
 import moment from "moment-timezone"
 import IntegrationTestHelper from "../../util/integration_test_helper"
@@ -225,6 +226,10 @@ describe("CatalogPage", function() {
     window.IntersectionObserver = mockIntersectionObserver
 
     renderPage = helper.configureHOCRenderer(CatalogPage, InnerCatalogPage)
+
+    SETTINGS.features = {
+      "mitxonline-new-product-page": true
+    }
   })
 
   afterEach(() => {
