@@ -166,6 +166,7 @@ class CourseSerializer(BaseCourseSerializer):
     next_run_id = serializers.SerializerMethodField()
     departments = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
+    programs = serializers.SerializerMethodField()
 
     def get_next_run_id(self, instance):
         """Get next run id"""
@@ -219,6 +220,14 @@ class CourseSerializer(BaseCourseSerializer):
             else None
         )
 
+    def get_programs(self, instance):
+        if self.context.get("all_runs", False):
+            from courses.serializers import BaseProgramSerializer
+
+            return BaseProgramSerializer(instance.programs, many=True).data
+
+        return None
+
     class Meta:
         model = models.Course
         fields = [
@@ -229,6 +238,7 @@ class CourseSerializer(BaseCourseSerializer):
             "next_run_id",
             "departments",
             "page",
+            "programs",
         ]
 
 

@@ -19,10 +19,11 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, re_path
 from oauth2_provider.urls import base_urlpatterns, oidc_urlpatterns
-from wagtail.admin import urls as wagtailadmin_urls
 from wagtail import urls as wagtail_urls
+from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.documents import urls as wagtaildocs_urls
 
+from cms.views import instructor_page
 from main.views import cms_signin_redirect_to_site_signin, index, refine
 
 handler500 = "main.views.handler500"
@@ -77,6 +78,7 @@ urlpatterns = [
     re_path(r"^orders/receipt/.*", index, name="order-receipt"),
     re_path(r"^records/.*", index, name="learner-records"),
     re_path(r"^catalog/", index, name="catalog"),
+    path("api/instructor/<int:id>/", instructor_page, name="cms_instructor_page"),
     # Wagtail
     re_path(
         r"^cms/login", cms_signin_redirect_to_site_signin, name="wagtailadmin_login"
