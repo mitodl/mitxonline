@@ -34,6 +34,9 @@ if (SETTINGS.posthog_api_host && SETTINGS.posthog_api_token) {
   posthog.init(SETTINGS.posthog_api_token, {
     api_host: SETTINGS.posthog_api_host
   })
+  posthog.setPersonPropertiesForFlags({
+    environment: SETTINGS.environment
+  })
 }
 
 /**
