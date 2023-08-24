@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.71.0
+--------------
+
+- New design: Course page layout changes (#1816)
+
 Version 0.70.9 (Released August 23, 2023)
 --------------
 
