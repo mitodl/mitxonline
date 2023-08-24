@@ -7,23 +7,36 @@ import wagtail.fields
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('cms', '0031_alter_homeproductlink_course_product_page'),
+        ("cms", "0031_alter_homeproductlink_course_product_page"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='homepage',
-            name='video_component_description',
-            field=wagtail.fields.RichTextField(blank=True, help_text='The text supporting the video in the video component on the homepage.', null=True),
+            model_name="homepage",
+            name="video_component_description",
+            field=wagtail.fields.RichTextField(
+                blank=True,
+                help_text="The text supporting the video in the video component on the homepage.",
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='homepage',
-            name='video_component_title',
-            field=models.CharField(blank=True, help_text='The title text to display in the video section of the home page.', max_length=255, null=True),
+            model_name="homepage",
+            name="video_component_title",
+            field=models.CharField(
+                blank=True,
+                help_text="The title text to display in the video section of the home page.",
+                max_length=255,
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='homepage',
-            name='video_url',
-            field=models.URLField(blank=True, help_text='URL to the video to be displayed for the homepage video component. It can be an HLS or Youtube video URL.', null=True),
+            model_name="homepage",
+            name="video_url",
+            field=models.URLField(
+                blank=True,
+                help_text="URL to the video to be displayed for the homepage video component. It can be an HLS or Youtube video URL.",
+                null=True,
+            ),
         ),
     ]
