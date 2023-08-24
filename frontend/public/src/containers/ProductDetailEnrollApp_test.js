@@ -39,7 +39,6 @@ describe("ProductDetailEnrollApp", () => {
     helper = new IntegrationTestHelper()
     courseRun = makeCourseRunDetailWithProduct()
     currentUser = makeUser()
-    courseRun["products"] = [{ id: 1 }]
     renderPage = helper.configureHOCRenderer(
       ProductDetailEnrollApp,
       InnerProductDetailEnrollApp,
@@ -52,8 +51,9 @@ describe("ProductDetailEnrollApp", () => {
       {}
     )
     SETTINGS.features = {
-      enable_learner_records:     false,
-      enable_addl_profile_fields: false
+      enable_learner_records:        false,
+      enable_addl_profile_fields:    false,
+      "mitxonline-new-product-page": false
     }
 
     isWithinEnrollmentPeriodStub = helper.sandbox.stub(
@@ -79,7 +79,6 @@ describe("ProductDetailEnrollApp", () => {
       }
     })
 
-    assert.isTrue(inner.props().isLoading)
     const loader = inner.find("Loader")
     assert.isOk(loader.exists())
     assert.isTrue(loader.props().isLoading)

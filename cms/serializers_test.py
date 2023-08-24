@@ -55,6 +55,8 @@ def test_serialize_course_page(
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
             "live": True,
+            "length": course_page.length,
+            "effort": course_page.effort,
         },
     )
     patched_get_wagtail_src.assert_called_once_with(course_page.feature_image)
@@ -96,6 +98,8 @@ def test_serialize_course_page_with_flex_price_with_program_fk_and_parent(
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
             "live": True,
+            "length": course_page.length,
+            "effort": course_page.effort,
         },
     )
 
@@ -136,6 +140,8 @@ def test_serialize_course_page_with_flex_price_with_program_fk_no_parent(
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
             "live": True,
+            "length": course_page.length,
+            "effort": course_page.effort,
         },
     )
 
@@ -176,6 +182,8 @@ def test_serialize_course_page_with_flex_price_form_as_program_child(
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
             "live": True,
+            "length": course_page.length,
+            "effort": course_page.effort,
         },
     )
 
@@ -213,5 +221,7 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
             "live": True,
+            "length": course_page.length,
+            "effort": course_page.effort,
         },
     )
