@@ -178,7 +178,7 @@ class CourseSerializer(BaseCourseSerializer):
         if features.is_enabled(features.ENABLE_NEW_DESIGN):
             return [
                 CourseRunSerializer(instance=run, context=self.context).data
-                for run in instance.courseruns.all()
+                for run in instance.courseruns.all().order_by("id")
             ]
         all_runs = self.context.get("all_runs", False)
         if all_runs:

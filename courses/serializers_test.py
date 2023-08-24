@@ -11,7 +11,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.utils.timezone import now
 
 from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
-from cms.serializers import ProgramPageSerializer
+from cms.serializers import ProgramPageSerializer, CoursePageSerializer
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -150,8 +150,9 @@ def test_base_course_serializer():
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
 @pytest.mark.parametrize("all_runs", [True, False])
-def test_serialize_course(mock_context, is_anonymous, all_runs):
+def test_serialize_course(mocker, mock_context, is_anonymous, all_runs):
     """Test Course serialization"""
+    patched_feature_flag = mocker.patch("main.features.is_enabled", return_value=True)
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
     if all_runs:
@@ -181,7 +182,7 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
             ],
             "next_run_id": course.first_unexpired_run.id,
             "departments": [{"name": department}],
-            "page": course.page,
+            "page": CoursePageSerializer(course.page).data,
             "programs": ProgramSerializer(course.programs, many=True).data
             if all_runs
             else None,
