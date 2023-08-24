@@ -75,8 +75,10 @@ log = logging.getLogger()
 
 class VideoPlayerConfigMixin(Page):
     """Mixin to generate the config of a video, based on url, for a model"""
+
     class Meta:
         abstract = True
+
     @property
     def video_player_config(self):
         """Get configuration for video player"""
@@ -968,7 +970,6 @@ class ProductPage(VideoPlayerConfigMixin):
     def certificate_page(self):
         """Gets the certificate child page"""
         return self._get_child_page_of_type(CertificatePage)
-
 
     @property
     def is_course_page(self):
