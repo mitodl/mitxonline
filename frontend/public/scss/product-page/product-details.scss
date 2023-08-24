@@ -230,6 +230,454 @@ body.new-design {
     .modal-content {
       padding: 5px 14px;
     }
+    
+    @include media-breakpoint-up(lg) {
+      padding: 30px 0;
+    }
+
+    border-radius: 5px;
+
+    .hero-media {
+      margin: 7px 15px;
+
+      img {
+        border-radius: 5px;
+        max-width: 350px;
+      }
+    }
+
+    .stats-row {
+      display: flex;
+      flex-flow: column;
+      align-items: top;
+
+      margin-top: 10px;
+      width: 350px;
+
+      @include media-breakpoint-up(xl) {
+        margin: 0 -18px;
+      }
+
+      .font-weight-bold {
+        font-weight: 600;
+      }
+
+      .btn-enrollment-button {
+        height: 50px;
+        width: 100%;
+        padding: 0!important;
+        text-align: center;
+      }
+
+      a.btn-enrollment-button {
+        padding: 9px 0 0 0 !important;
+      }
+
+      .enrollment-info-box, .program-info-box {
+        margin: 10px 0;
+        padding: 10px 0;
+      }
+
+      .enrollment-info-box {
+        border: 1px solid #d1d1d1;
+        border-left: none;
+        border-right: none;
+
+        .row {
+          margin: 20px 0;
+        }
+
+        .enrollment-info-icon {
+          width: 20px;
+          margin-right: 12px;
+          img {
+            max-width: 20px;
+          }
+        }
+
+        .enrollment-info-text {
+          width: auto;
+          flex-grow: 1;
+
+          .enrollment-effort {
+            font-size: smaller;
+          }
+
+          .badge-pacing {
+            background-color: $black;
+            text-transform: uppercase;
+            margin-left: .5rem;
+            padding: 3px;
+            font-weight: normal;
+          }
+        }
+      }
+
+      .program-info-box {
+        ul {
+          margin-top: 1em;
+        }
+      }
+
+      .stat-col {
+        margin: 0 8px 16px;
+        background: $white;
+        border-radius: 3px;
+        overflow: hidden;
+        text-align: center;
+        display: flex;
+        flex-flow: column;
+        flex-grow: 1;
+        width: calc(50% - 16px);
+        box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14);
+
+        @include media-breakpoint-up(lg) {
+          width: auto;
+        }
+
+        @include media-breakpoint-up(xl) {
+          margin: 0 18px;
+          width: 180px;
+          flex-grow: inherit;
+        }
+
+        &.small {
+          font-size: 14px;
+          @include media-breakpoint-up(xl) {
+            width: 140px;
+          }
+        }
+
+        &.large {
+          flex-grow: 1;
+          text-align: left;
+          }
+        }
+
+      .text {
+        padding: 14px 20px;
+        width: 100%;
+        flex-grow: 1;
+        display: inline-block;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        font-size: 13px;
+
+        p {
+          margin: 0;
+        }
+
+        a:link {
+          color: $link-blue;
+          text-decoration: underline;
+        }
+      }
+
+      .more-dates {
+        padding-bottom: 6px;
+        width: 100%;
+        font-size: 12px;
+
+        .dates-tooltip {
+          font-weight: bolder;
+          color: $link-blue !important;
+          text-decoration: underline;
+          background-color: transparent;
+          border: none;
+        }
+      }
+
+      .date-links-text {
+        padding-bottom: 7px !important;
+      }
+
+      .title {
+        background-color: $sirocco;
+        font-weight: 500;
+        color: $tile-background;
+        text-align: center;
+        padding: 9px 8px;
+        width: 100%;
+        box-sizing: border-box;
+        height: 34px;
+        text-transform: uppercase;
+      }
+    }
+
+    a {
+      color: $black;
+
+      &:hover {
+        text-decoration: none;
+      }
+    }
+  }
+
+  .text-block {
+    color: $black;
+    padding: 0;
+
+    @include media-breakpoint-up(lg) {
+      padding: 25px 0 10px;
+    }
+
+    p {
+      margin: 0 0 25px;
+      line-height: 28px;
+    }
+
+    .text-holder {
+      max-width: 1020px;
+
+      a {
+        font-weight: 700;
+        color: $black;
+      }
+
+      .content-data {
+        @include media-breakpoint-up(lg) {
+          padding-bottom: 20px;
+        }
+      }
+
+    }
+
+    .more {
+      font-weight: 700;
+      color: $black;
+    }
+
+    ul:not(class) {
+      margin: 0 0 6px;
+      padding: 0;
+      list-style: none;
+
+      li {
+        position: relative;
+        padding: 0 0 0 18px;
+
+        &:before {
+          position: absolute;
+          left: 0;
+          top: 11px;
+          content: '';
+          background: $black;
+          width: 6px;
+          height: 6px;
+          border-radius: 100%;
+        }
+      }
+    }
+
+    #upsellCard {
+      width: 497px;
+      padding: 0 24px 24px 24px;
+      flex-shrink: 0;
+      float: right;
+
+      @include media-breakpoint-down(lg) {
+        width: 100%;
+        padding: 0 12px 12px 12px;
+      }
+
+      div.card {
+        padding: 24px;
+      }
+
+      p {
+        line-height: 24px;
+      }
+
+      div.upsell-header {
+        margin-left: 0;
+        margin-right: 0;
+
+        span.badge {
+          font-weight: normal;
+          font-size: .85rem;
+          margin-bottom: .25rem !important;
+          padding: 0.35rem !important;
+        }
+
+        span.bg-danger {
+          background-color: #fae8e8 !important;
+          color: #b43e3e;
+        }
+      }
+      form {
+        margin-bottom: 20px;
+      }
+    }
+  }
+
+  .about-text {
+    padding-bottom: 37px;
+
+    @include media-breakpoint-down(sm) {
+      padding-bottom: 20px;
+    }
+  }
+}
+
+.upgrade-enrollment-modal {
+  max-width: 750px;
+  font-family: "Avenir Next", "Roboto", sans-serif;
+
+  .modal-content {
+    padding: 5px 14px;
+    
+    .required {
+      color: $brand-button-bg;
+    }
+  }
+
+  .modal-header {
+    font-weight: 600;
+    font-size: large;
+    border-bottom: none;
+    padding-bottom: 0;
+
+    font-family: "Poppins", "Avenir Next", "Roboto", sans-serif;
+
+    h5 {
+      font-size: 30px;
+    }
+
+    span {
+      font-size: 45px;
+      font-weight: 200;
+    }
+  }
+
+  a {
+    text-decoration: underline;
+  }
+
+  .modal-subheader {
+    font-weight: 600;
+    font-size: 20px;
+    margin-bottom: 20px;
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+
+  .cancel-link, .faq-link {
+    text-align: center !important;
+    margin: 20px 0;
+  }
+
+  .faq-link a {
+    color: black;
+  }
+
+  .faq-link a:visited {
+    color: rgba(0, 0, 0, 0.14);
+  }
+
+  .upgrade-icon {
+    background: url("https://via.placeholder.com/150 ") left no-repeat;
+    height: 70px;
+  }
+
+  .enroll-now-free {
+    text-decoration: underline;
+    box-shadow: none;
+  }
+  form {
+    margin-bottom: 20px;
+
+    .btn-upgrade {
+      width: 100%;
+      background-color: #A41E34;
+      color: white;
+      text-align: left;
+      background-image: url('/static/images/arrow-line-right.png');
+      background-position: 90% 50%;
+      background-repeat: no-repeat;
+      padding: 11px 22px;
+    }
+  }
+
+  .acheiving-text {
+    font-weight: 600;
+    color: #A41E34;
+    margin-bottom: 1.5rem;
+  }
+
+  ul { 
+    padding: 0;
+  }
+
+  li {
+    list-style: none;
+    min-height: 3.5rem;
+    background-image: url('/static/images/upsell-check.png');
+    background-repeat: no-repeat;
+    background-position: 0 0;
+    padding-left: 33px;
+    line-height: 24px;
+  }
+}
+
+div.certificate-pricing-row { 
+  border: 1px solid #DFE5EC;
+  border-left: none;
+  border-right: none;
+  padding: 25px 0 15px 0;
+}
+
+div.certificate-pricing{
+  background-image: url('/static/images/products/certificate.png');
+  background-repeat: no-repeat;
+  background-position: 10px 5px;
+
+  padding-left: 43px;
+}
+
+.financial-assistance-link {
+  height: 22px;
+  letter-spacing: 0;
+  line-height: 20px;
+  text-decoration: underline;
+  margin-bottom: 0;
+
+  &:hover{
+    text-decoration: none !important;
+  }
+
+  a {
+    color: black;
+
+    &:hover{
+      color: $brand-darker-bg;
+      text-decoration: none !important;
+    }
+  }
+}
+
+.popover-header {
+  text-align: center;
+  background: $white;
+}
+
+.date-link {
+  color: $link-blue !important;
+  text-decoration: underline;
+  background-color: transparent;
+  border: none;
+}
+
+.date-link-disabled {
+  padding: 5px 5px 0;
+  margin: 0;
+}
+
+.instructor-modal {
+  .modal-dialog {
+    width: 770px;
+    max-width: 770px;
+    border-radius: 5px;
 
     .modal-header {
       font-family: "Poppins", "Avenir Next", "Roboto", sans-serif;

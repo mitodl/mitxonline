@@ -153,7 +153,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         return instance.get_url()
     
     def get_price(self, instance):
-        return instance.price[0]['value']['text']
+        return instance.price[0].value['text']
 
     class Meta:
         model = models.ProgramPage

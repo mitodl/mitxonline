@@ -35,6 +35,32 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
     return courseRun
   }
 
+  getReqNode(nodeFlag: boolean = true) {
+    const { programs } = this.props
+
+    if (!programs || programs.length < 1 || !programs[0].req_tree) {
+      return null
+    }
+
+    if (nodeFlag) {
+      return programs[0].req_tree[0].children.find(elem => elem.data.node_type === "operator" && !elem.data.elective_flag)
+    }
+
+    return programs[0].req_tree[0].children.find(elem => elem.data.node_type === "operator" && elem.data.elective_flag)
+  }
+
+  getRequiredTitle() {
+    const requiredNode = this.getReqNode()
+
+    return requiredNode.data.title || "Core Courses"
+  }
+
+  getElectiveTitle() {
+    const requiredNode = this.getReqNode(false)
+
+    return requiredNode.data.title || "Electives"
+  }
+
   render() {
     const { programs } = this.props
 
@@ -53,9 +79,33 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
         ? moment(new Date(run.start_date))
         : null
 
+    const reqCount = program.requirements.required.length
+    const electiveCount = program.requirements.electives.length
+    let electiveCountPrefix = ''
+
+    if (electiveCount > 0) {
+      const electives = this.getReqNode(false)
+
+      if (electives.data.operator !== "all_of") {
+        electiveCountPrefix = `${electives.data.operator_value} of `
+      }
+    }
+
     return (
       <>
         <div className="enrollment-info-box">
+          <div className="row d-flex align-items-top">
+            <div className="enrollment-info-icon">
+              <img
+                src="/static/images/products/browser.png"
+                alt="Program Requirements"
+              />
+            </div>
+            <div className="enrollment-info-text">
+              {reqCount} {this.getRequiredTitle()}: Complete All
+              {electiveCount > 0 ? <><br />{electiveCount} {this.getElectiveTitle()}: Complete {electiveCountPrefix}{electiveCount}</> : null}
+            </div>
+          </div>
           <div className="row d-flex align-items-center">
             <div className="enrollment-info-icon">
               <img
@@ -106,19 +156,7 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
             <div className="enrollment-info-text">
               {product ? (
                 <>
-                  Certificate track: $
-                  {product.price.toLocaleString("en-us", {
-                    style: "currency",
-                    currency: "en-US"
-                  })}
-                  {run.upgrade_deadline ? (
-                    <>
-                      <div className="text-danger">
-                        Payment deadline:{" "}
-                        {formatPrettyDate(moment(run.upgrade_deadline))}
-                      </div>
-                    </>
-                  ) : null}
+                  Certificate track: {program.page.price}
                   <div>
                     <a target="_blank" rel="noreferrer" href="#">
                       What's the certificate track?

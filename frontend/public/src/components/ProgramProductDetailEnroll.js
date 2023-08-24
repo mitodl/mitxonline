@@ -431,7 +431,7 @@ export class ProductDetailEnrollApp extends React.Component<
 
 
     return (
-      <><h1>wuffles?</h1>
+      <>
         {
           // $FlowFixMe: isLoading null or undefined
           <Loader key="product_detail_enroll_loader" isLoading={isLoading}>
