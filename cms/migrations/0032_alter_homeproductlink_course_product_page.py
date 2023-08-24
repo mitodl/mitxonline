@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("cms", "0030_move_instructor_short_bios_to_long"),
+        ("cms", "0031_add_faq_remove_faculty_reorder_things"),
     ]
 
     operations = [
