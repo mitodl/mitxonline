@@ -181,7 +181,7 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
             ],
             "next_run_id": course.first_unexpired_run.id,
             "departments": [{"name": department}],
-            "page": None,
+            "page": course.page,
             "programs": ProgramSerializer(course.programs, many=True).data
             if all_runs
             else None,
