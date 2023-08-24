@@ -1,5 +1,5 @@
 import { checkFeatureFlag } from "../lib/util"
 
-if (checkFeatureFlag("mitxonline-new-featured-carousel")) {
-  import("../../scss/layout-v2.scss")
+if (checkFeatureFlag("mitxonline-new-home-page-video-component")) {
+  import("../../scss/home-page-video-component.scss")
 }
