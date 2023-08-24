@@ -57,6 +57,35 @@
           z-index: 99;
 
         }
+        .video-js {
+      .vjs-big-play-button {
+        background: black;
+        opacity: 0.8;
+        width: 64px;
+        height: 64px;
+        border: none;
+        border-radius: 50%;
+
+        &:hover {
+          opacity: 0.6;
+        }
+      }
+
+      .vjs-poster {
+        height: fit-content;
+      }
+    }
+
+    .video-js .vjs-big-play-button .vjs-icon-placeholder:before {
+      top: 0.3em;
+    }
+
+    .vjs-youtube {
+
+      .vjs-big-play-button {
+        display: none;
+      }
+    }
         .home-page-video-underlay {
           position: absolute;
           right: 30px;
