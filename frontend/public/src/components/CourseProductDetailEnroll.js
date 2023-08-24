@@ -18,7 +18,7 @@ import {
   courseRunsQueryKey,
   coursesSelector,
   coursesQuery,
-  coursesQueryKey,
+  coursesQueryKey
 } from "../lib/queries/courseRuns"
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
@@ -34,7 +34,6 @@ import { enrollmentMutation } from "../lib/queries/enrollment"
 import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import CourseInfoBox from "./CourseInfoBox"
-
 
 type Props = {
   courseId: ?string,
@@ -608,9 +607,10 @@ export class CourseProductDetailEnroll extends React.Component<
                           </button>
                         </form>
                       </Fragment>
-                    )
-                  }
-                  {run ? this.renderUpgradeEnrollmentDialog(showNewDesign) : null}
+                    )}
+                  {run
+                    ? this.renderUpgradeEnrollmentDialog(showNewDesign)
+                    : null}
                 </Fragment>
               )}
 
@@ -651,13 +651,13 @@ const updateAddlFields = (currentUser: User) => {
 }
 
 const mapStateToProps = createStructuredSelector({
-  courseRuns:       courseRunsSelector,
-  courses:          coursesSelector,
-  currentUser:      currentUserSelector,
-  isLoading:        pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
-  courseIsLoading:  pathOr(true, ["queries", coursesQueryKey, "isPending"]),
-  status:           pathOr(null, ["queries", courseRunsQueryKey, "status"]),
-  courseStatus:     pathOr(true, ["queries", coursesQueryKey, "status"]),
+  courseRuns:      courseRunsSelector,
+  courses:         coursesSelector,
+  currentUser:     currentUserSelector,
+  isLoading:       pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
+  courseIsLoading: pathOr(true, ["queries", coursesQueryKey, "isPending"]),
+  status:          pathOr(null, ["queries", courseRunsQueryKey, "status"]),
+  courseStatus:    pathOr(true, ["queries", coursesQueryKey, "status"])
 })
 
 const mapPropsToConfig = props => [

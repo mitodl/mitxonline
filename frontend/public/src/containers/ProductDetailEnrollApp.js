@@ -19,15 +19,12 @@ const expandExpandBlock = (event: MouseEvent) => {
 
 type Props = {
   courseId: ?string,
-  programId: ?string,
+  programId: ?string
 }
 
 export class ProductDetailEnrollApp extends React.Component<Props> {
   render() {
-    const {
-      courseId,
-      programId
-    } = this.props
+    const { courseId, programId } = this.props
 
     const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
 
@@ -38,7 +35,15 @@ export class ProductDetailEnrollApp extends React.Component<Props> {
       })
     }
 
-    return programId && showNewDesign ? (<ProgramProductDetailEnroll programId={programId}></ProgramProductDetailEnroll>) : (<CourseProductDetailEnroll courseId={courseId}></CourseProductDetailEnroll>)
+    return programId && showNewDesign ? (
+      <ProgramProductDetailEnroll
+        programId={programId}
+      ></ProgramProductDetailEnroll>
+    ) : (
+      <CourseProductDetailEnroll
+        courseId={courseId}
+      ></CourseProductDetailEnroll>
+    )
   }
 }
 

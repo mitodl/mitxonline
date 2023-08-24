@@ -72,7 +72,12 @@ document.addEventListener("DOMContentLoaded", function() {
     const productDetailStore = configureStore()
     const courseId = courseIdEl ? courseIdEl.value : undefined
     const programId = programIdEl ? programIdEl.value : undefined
-    renderEnrollSection(courseId, programId, enrollSectionEl, productDetailStore)
+    renderEnrollSection(
+      courseId,
+      programId,
+      enrollSectionEl,
+      productDetailStore
+    )
 
     if (upsellCardEl) {
       renderUpsellCard(courseId, upsellCardEl, productDetailStore)

@@ -2,7 +2,11 @@ import React from "react"
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 
-import type { Program, BaseCourseRun, CourseDetailWithRuns } from "../flow/courseTypes"
+import type {
+  Program,
+  BaseCourseRun,
+  CourseDetailWithRuns
+} from "../flow/courseTypes"
 
 type ProgramInfoBoxProps = {
   programs: Array<Program>
@@ -16,17 +20,23 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
       return null
     }
 
-    let courseRun: BaseCourseRun|null = null
+    let courseRun: BaseCourseRun | null = null
 
     programs[0].courses.forEach((course: CourseDetailWithRuns) => {
       const thisNextRun = course.next_run_id
         ? course.courseruns.find(elem => elem.id === course.next_run_id)
         : course.courseruns[0]
 
-      if (!courseRun || (emptyOrNil(courseRun.start_date && !emptyOrNil(thisNextRun.start_date)))) {
+      if (
+        !courseRun ||
+        emptyOrNil(courseRun.start_date && !emptyOrNil(thisNextRun.start_date))
+      ) {
         courseRun = thisNextRun
       } else {
-        if (moment(new Date(thisNextRun.start_date)) <= moment(new Date(courseRun.start_date))) {
+        if (
+          moment(new Date(thisNextRun.start_date)) <=
+          moment(new Date(courseRun.start_date))
+        ) {
           courseRun = thisNextRun
         }
       }
@@ -43,10 +53,14 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
     }
 
     if (nodeFlag) {
-      return programs[0].req_tree[0].children.find(elem => elem.data.node_type === "operator" && !elem.data.elective_flag)
+      return programs[0].req_tree[0].children.find(
+        elem => elem.data.node_type === "operator" && !elem.data.elective_flag
+      )
     }
 
-    return programs[0].req_tree[0].children.find(elem => elem.data.node_type === "operator" && elem.data.elective_flag)
+    return programs[0].req_tree[0].children.find(
+      elem => elem.data.node_type === "operator" && elem.data.elective_flag
+    )
   }
 
   getRequiredTitle() {
@@ -81,7 +95,7 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
 
     const reqCount = program.requirements.required.length
     const electiveCount = program.requirements.electives.length
-    let electiveCountPrefix = ''
+    let electiveCountPrefix = ""
 
     if (electiveCount > 0) {
       const electives = this.getReqNode(false)
@@ -103,7 +117,14 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
             </div>
             <div className="enrollment-info-text">
               {reqCount} {this.getRequiredTitle()}: Complete All
-              {electiveCount > 0 ? <><br />{electiveCount} {this.getElectiveTitle()}: Complete {electiveCountPrefix}{electiveCount}</> : null}
+              {electiveCount > 0 ? (
+                <>
+                  <br />
+                  {electiveCount} {this.getElectiveTitle()}: Complete{" "}
+                  {electiveCountPrefix}
+                  {electiveCount}
+                </>
+              ) : null}
             </div>
           </div>
           <div className="row d-flex align-items-center">

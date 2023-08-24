@@ -20,6 +20,11 @@ import {
   programsQuery,
   programsQueryKey
 } from "../lib/queries/courseRuns"
+import {
+  programEnrollmentsQuery,
+  programEnrollmentsQueryKey,
+  programEnrollmentsSelector
+} from "../lib/queries/enrollment"
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
@@ -34,6 +39,7 @@ import { enrollmentMutation } from "../lib/queries/enrollment"
 import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import ProgramInfoBox from "./ProgramInfoBox"
+import type { ProgramEnrollment } from "../flow/courseTypes"
 
 type Props = {
   programId: ?string,
@@ -47,7 +53,9 @@ type Props = {
   addProductToBasket: (user: number, productId: number) => Promise<any>,
   currentUser: User,
   createEnrollment: (runId: number) => Promise<any>,
-  updateAddlFields: (currentUser: User) => Promise<any>
+  updateAddlFields: (currentUser: User) => Promise<any>,
+  programEnrollments: ?Array<ProgramEnrollment>,
+  programEnrollmentsLoading: ?boolean
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
@@ -122,26 +130,30 @@ export class ProductDetailEnrollApp extends React.Component<
 
   toggleUpgradeDialogVisibility = () => {
     const { upgradeEnrollmentDialogVisibility } = this.state
-    const { createEnrollment, courseRuns } = this.props
-    const run =
-      !this.getCurrentCourseRun() && courseRuns
-        ? courseRuns[0]
-        : this.getCurrentCourseRun()
+    // const { createEnrollment, courseRuns } = this.props
+    // const run =
+    //   !this.getCurrentCourseRun() && courseRuns
+    //     ? courseRuns[0]
+    //     : this.getCurrentCourseRun()
 
-    if (!upgradeEnrollmentDialogVisibility) {
-      createEnrollment(run)
-    } else {
-      window.location = "/dashboard/"
-    }
+    // if (!upgradeEnrollmentDialogVisibility) {
+    //   createEnrollment(run)
+    // } else {
+    //   window.location = "/dashboard/"
+    // }
 
     this.setState({
       upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
     })
   }
 
-  setCurrentCourseRun = (courseRun: EnrollmentFlaggedCourseRun) => {
+  setCurrentCourseRun = (runId: string) => {
+    const { courseRuns } = this.props
+
+    const courserun = courseRuns.find(run => run.courseware_id === runId)
+
     this.setState({
-      currentCourseRun: courseRun
+      currentCourseRun: courserun
     })
   }
 
@@ -149,174 +161,162 @@ export class ProductDetailEnrollApp extends React.Component<
     return this.state.currentCourseRun
   }
 
-  renderUpgradeEnrollmentDialog(showNewDesign: boolean) {
-    const { courseRuns } = this.props
-    const run =
-      !this.getCurrentCourseRun() && courseRuns
-        ? courseRuns[0]
-        : this.getCurrentCourseRun()
-    const needFinancialAssistanceLink =
-      isFinancialAssistanceAvailable(run) &&
-      !run.approved_flexible_price_exists ? (
-          <p className="financial-assistance-link">
-            <a href={run.page.financial_assistance_form_url}>
-            Need financial assistance?
-            </a>
-          </p>
-        ) : null
-    const { upgradeEnrollmentDialogVisibility } = this.state
+  renderCertificateInfoPanel() {
+    const { currentCourseRun: run } = this.state
+
     const product = run.products ? run.products[0] : null
+    const needFinancialAssistanceLink = (
+      <p className="financial-assistance-link">
+        <a href="#">Need financial assistance?</a>
+      </p>
+    )
 
-    return product ? (
-      showNewDesign ? (
-        <Modal
-          id={`upgrade-enrollment-dialog`}
-          className="upgrade-enrollment-modal"
-          isOpen={upgradeEnrollmentDialogVisibility}
-          toggle={() => this.toggleUpgradeDialogVisibility()}
-          centered
-        >
-          <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
-            {run.title}
-          </ModalHeader>
-          <ModalBody>
-            <div className="row">
-              <div className="col-12">
-                <p>
-                  Thank you for choosing an MITx online course. By paying for
-                  this course, you're joining the most engaged and motivated
-                  learners on your path to a certificate from MITx.
-                </p>
+    return (
+      <>
+        <div className="row certificate-pricing-row">
+          <div className="col-6 certificate-pricing">
+            <p>
+              Certitficate track:{" "}
+              <strong>${product && formatLocalePrice(product.price)}</strong>
+              {run.upgrade_deadline ? (
+                <>
+                  <br />
+                  <span className="text-danger">
+                    Payment date:{" "}
+                    {formatPrettyDate(moment(run.upgrade_deadline))}
+                  </span>
+                </>
+              ) : null}
+            </p>
+
+            <p>{needFinancialAssistanceLink}</p>
+          </div>
+          <div className="col-6">
+            <form action="/cart/add/" method="get" className="text-center">
+              <input type="hidden" name="product_id" value={product.id} />
+              <button type="submit" className="btn btn-upgrade">
+                <strong>Continue</strong>
+                <br />
+                on the certificate track
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <div className="cancel-link">{this.getEnrollmentForm()}</div>
+      </>
+    )
+  }
+
+  renderUpgradeEnrollmentDialog() {
+    const { programs } = this.props
+
+    const { upgradeEnrollmentDialogVisibility } = this.state
+
+    const program = programs[0]
+    const courseRuns = []
+
+    const { currentCourseRun } = this.state
+
+    program.courses.forEach(course => {
+      if (course.next_run_id) {
+        course.courseruns.forEach(run => {
+          if (course.next_run_id === run.id) {
+            courseRuns.push(run)
+          }
+        })
+      } else {
+        if (course.courseruns.length > 0) {
+          courseRuns.push(course.courseruns[0])
+        }
+      }
+    })
+
+    return (
+      <Modal
+        id={`upgrade-enrollment-dialog`}
+        className="upgrade-enrollment-modal"
+        isOpen={upgradeEnrollmentDialogVisibility}
+        toggle={() => this.toggleUpgradeDialogVisibility()}
+        centered
+      >
+        <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
+          {program.title}
+        </ModalHeader>
+        <ModalBody>
+          <div className="row">
+            <div className="col-12">
+              <p>
+                Thank you for choosing an MITx online course. By paying for this
+                course, you're joining the most engaged and motivated learners
+                on your path to a certificate from MITx.
+              </p>
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="col-12">
+              <div className="form-group">
+                <label
+                  htmlFor="program-course-selection"
+                  className="text-strong"
+                >
+                  Select Course
+                </label>
+                <select
+                  className="form-control"
+                  name="program-course-selection"
+                  onChange={ev => this.setCurrentCourseRun(ev.target.value)}
+                >
+                  <option></option>
+                  {courseRuns.map(run => (
+                    <option
+                      key={`selectable-courserun-${run.id}`}
+                      value={run.courseware_id}
+                    >
+                      {run.courseware_id} - {run.title}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
+          </div>
 
-            <div className="row">
-              <div className="col-12">
-                <p className="acheiving-text">
-                  Acheiving a certificate has its advantages:
-                </p>
-              </div>
+          <div className="row">
+            <div className="col-12">
+              <p className="acheiving-text">
+                Acheiving a certificate has its advantages:
+              </p>
             </div>
+          </div>
 
-            <div className="row">
-              <div className="col-6">
-                <ul>
-                  <li> Certificate is signed by MIT faculty</li>
-                  <li>
-                    {" "}
-                    Demonstrates knowledge and skills taught in this course
-                  </li>
-                  <li> Enhance your college &amp; earn a promotion</li>
-                </ul>
-              </div>
-              <div className="col-6">
-                <ul>
-                  <li>Highlight on your resume/CV</li>
-                  <li>Share on your social channels &amp; LinkedIn</li>
-                  <li>
-                    Enhance your college application with an earned certificate
-                    from MIT
-                  </li>
-                </ul>
-              </div>
+          <div className="row">
+            <div className="col-6">
+              <ul>
+                <li> Certificate is signed by MIT faculty</li>
+                <li>
+                  {" "}
+                  Demonstrates knowledge and skills taught in this course
+                </li>
+                <li> Enhance your college &amp; earn a promotion</li>
+              </ul>
             </div>
-
-            <div className="row certificate-pricing-row">
-              <div className="col-6 certificate-pricing">
-                <p>
-                  Certitficate track:{" "}
-                  <strong>
-                    ${product && formatLocalePrice(product.price)}
-                  </strong>
-                  {run.upgrade_deadline ? (
-                    <>
-                      <br />
-                      <span className="text-danger">
-                        Payment date:{" "}
-                        {formatPrettyDate(moment(run.upgrade_deadline))}
-                      </span>
-                    </>
-                  ) : null}
-                </p>
-
-                <p>{needFinancialAssistanceLink}</p>
-              </div>
-              <div className="col-6">
-                <form action="/cart/add/" method="get" className="text-center">
-                  <input type="hidden" name="product_id" value={product.id} />
-                  <button type="submit" className="btn btn-upgrade">
-                    <strong>Continue</strong>
-                    <br />
-                    on the certificate track
-                  </button>
-                </form>
-              </div>
+            <div className="col-6">
+              <ul>
+                <li>Highlight on your resume/CV</li>
+                <li>Share on your social channels &amp; LinkedIn</li>
+                <li>
+                  Enhance your college application with an earned certificate
+                  from MIT
+                </li>
+              </ul>
             </div>
+          </div>
 
-            <div className="cancel-link">{this.getEnrollmentForm()}</div>
-          </ModalBody>
-        </Modal>
-      ) : (
-        <Modal
-          id={`upgrade-enrollment-dialog`}
-          className="upgrade-enrollment-modal"
-          isOpen={upgradeEnrollmentDialogVisibility}
-          toggle={() => this.toggleUpgradeDialogVisibility()}
-        >
-          <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
-            Enroll
-          </ModalHeader>
-          <ModalBody>
-            <div className="row modal-subheader d-flex">
-              <div className="flex-grow-1 align-self-end">
-                Learn online and get a certificate
-              </div>
-              <div className="text-end align-self-end">
-                {formatLocalePrice(getFlexiblePriceForProduct(product))}
-              </div>
-            </div>
-            <div className="row">
-              <div className="col-12">
-                <p>
-                  Thank you for choosing an MITx online course. By paying for
-                  this course, you're joining the most engaged and motivated
-                  learners on your path to a certificate from MITx.
-                </p>
-
-                <p>
-                  Your certificate is signed by MIT faculty and demonstrates
-                  that you have gained the knowledge and skills taught in this
-                  course. Showcase your certificate on your resume and social
-                  channels to advance your career, earn a promotion, or enhance
-                  your college applications.
-                </p>
-
-                <form action="/cart/add/" method="get" className="text-center">
-                  <input type="hidden" name="product_id" value={product.id} />
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-gradient-red"
-                  >
-                    Continue
-                  </button>
-                </form>
-                {needFinancialAssistanceLink}
-              </div>
-            </div>
-            <div className="cancel-link">{this.getEnrollmentForm()}</div>
-            <div className="faq-link">
-              <a
-                href="https://mitxonline.zendesk.com/hc/en-us"
-                target="_blank"
-                rel="noreferrer"
-              >
-                FAQs
-              </a>
-            </div>
-          </ModalBody>
-        </Modal>
-      )
-    ) : null
+          {currentCourseRun ? <>{this.renderCertificateInfoPanel()}</> : null}
+        </ModalBody>
+      </Modal>
+    )
   }
 
   getEnrollmentForm() {
@@ -380,130 +380,64 @@ export class ProductDetailEnrollApp extends React.Component<
 
   render() {
     const {
-      courseRuns,
-      isLoading,
       programs,
       programIsLoading,
-      currentUser
+      currentUser,
+      programEnrollments,
+      programEnrollmentsLoading
     } = this.props
-    const csrfToken = getCookie("csrftoken")
+
     const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
 
-    let run =
-      !this.getCurrentCourseRun() && courseRuns
-        ? courseRuns[0]
-        : this.getCurrentCourseRun() && courseRuns
-          ? courseRuns[0].page && this.getCurrentCourseRun().page
-            ? courseRuns[0].page.page_url ===
-            this.getCurrentCourseRun().page.page_url
-              ? this.getCurrentCourseRun()
-              : courseRuns[0]
-            : courseRuns[0]
-          : null
-    if (run) this.updateDate(run)
-    let product = run && run.products ? run.products[0] : null
-    if (courseRuns) {
-      const thisScope = this
-      courseRuns.map(courseRun => {
-        // $FlowFixMe
-        document.addEventListener("click", function(e) {
-          if (e.target && e.target.id === courseRun.courseware_id) {
-            thisScope.setCurrentCourseRun(courseRun)
-            run = thisScope.getCurrentCourseRun()
-            product = run && run.products ? run.products[0] : null
-            // $FlowFixMe
-            thisScope.updateDate(run)
-          }
-        })
-      })
+    let enrollment = undefined
+
+    if (!programEnrollmentsLoading) {
+      enrollment = programEnrollments.find(
+        (elem: ProgramEnrollment) => elem.program.id === programs[0].id
+      )
     }
-
-    const startDate =
-      run && !emptyOrNil(run.start_date)
-        ? moment(new Date(run.start_date))
-        : null
-    const disableEnrolledBtn = moment().isBefore(startDate) ? "disabled" : ""
-    const waitingForCourseToBeginMessage = moment().isBefore(startDate) ? (
-      <p style={{ fontSize: "16px" }}>
-        Enrolled and waiting for the course to begin.
-      </p>
-    ) : null
-
 
     return (
       <>
         {
-          // $FlowFixMe: isLoading null or undefined
-          <Loader key="product_detail_enroll_loader" isLoading={isLoading}>
+          // $FlowFixMe: programEnrollmentsLoading null or undefined
+          <Loader
+            key="product_detail_enroll_loader"
+            isLoading={programEnrollmentsLoading}
+          >
             <>
-              {run && run.is_enrolled ? (
+              {enrollment ? (
                 <Fragment>
-                  {run.courseware_url ? (
-                    <a
-                      href={run.courseware_url}
-                      onClick={ev =>
-                        run
-                          ? this.redirectToCourseHomepage(
-                            run.courseware_url,
-                            ev
-                          )
-                          : ev
-                      }
-                      className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Enrolled &#10003;
-                    </a>
-                  ) : (
-                    <div
-                      className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
-                    >
-                      Enrolled &#10003;
-                    </div>
-                  )}
-                  {waitingForCourseToBeginMessage}
+                  <div
+                    className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline`}
+                  >
+                    Enrolled &#10003;
+                  </div>
                 </Fragment>
               ) : (
                 <Fragment>
-                  {run &&
-                  isWithinEnrollmentPeriod(run) &&
-                  currentUser &&
-                  !currentUser.id ? (
-                      <a
-                        href={routes.login}
-                        className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
-                      >
+                  {currentUser && !currentUser.id ? (
+                    <a
+                      href={routes.login}
+                      className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
+                    >
                       Enroll now
-                      </a>
-                    ) : (
-                      <Fragment>
-                        <form action="/enrollments/" method="post">
-                          <input
-                            type="hidden"
-                            name="csrfmiddlewaretoken"
-                            value={csrfToken}
-                          />
-                          <input
-                            type="hidden"
-                            name="run"
-                            value={run ? run.id : ""}
-                          />
-                          <button
-                            type="submit"
-                            className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
-                          >
-                          Enroll now
-                          </button>
-                        </form>
-                      </Fragment>
-                    )
-                  }
-                  {run ? this.renderUpgradeEnrollmentDialog(showNewDesign) : null}
+                    </a>
+                  ) : (
+                    <Fragment>
+                      <button
+                        className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+                        onClick={this.toggleUpgradeDialogVisibility}
+                      >
+                        Enroll now button
+                      </button>
+                    </Fragment>
+                  )}
                 </Fragment>
               )}
 
               {currentUser ? this.renderAddlProfileFieldsModal() : null}
+              {programs ? this.renderUpgradeEnrollmentDialog() : null}
             </>
           </Loader>
         }
@@ -540,18 +474,25 @@ const updateAddlFields = (currentUser: User) => {
 }
 
 const mapStateToProps = createStructuredSelector({
-  courseRuns:       courseRunsSelector,
-  programs:         programsSelector,
-  currentUser:      currentUserSelector,
-  isLoading:        pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
-  programIsLoading: pathOr(true, ["queries", programsQueryKey, "isPending"]),
-  status:           pathOr(null, ["queries", courseRunsQueryKey, "status"]),
-  programStatus:     pathOr(true, ["queries", programsQueryKey, "status"])
+  courseRuns:                courseRunsSelector,
+  programs:                  programsSelector,
+  currentUser:               currentUserSelector,
+  programEnrollments:        programEnrollmentsSelector,
+  isLoading:                 pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
+  programIsLoading:          pathOr(true, ["queries", programsQueryKey, "isPending"]),
+  status:                    pathOr(null, ["queries", courseRunsQueryKey, "status"]),
+  programStatus:             pathOr(true, ["queries", programsQueryKey, "status"]),
+  programEnrollmentsLoading: pathOr(true, [
+    "queries",
+    programEnrollmentsQueryKey,
+    "isPending"
+  ])
 })
 
 const mapPropsToConfig = props => [
   courseRunsQuery(props.programId),
   programsQuery(props.programId),
+  programEnrollmentsQuery(),
   users.currentUserQuery()
 ]
 
