@@ -252,7 +252,9 @@ export const intCheckFeatureFlag = (
   settings: Object
 ) => {
   const params = new URLSearchParams(document.location.search)
-
+  if (SETTINGS.posthog_api_host) {
+    posthog.setPersonPropertiesForFlags({ environment: SETTINGS.environment })
+  }
   return (
     (SETTINGS.posthog_api_host && posthog.isFeatureEnabled(flag)) ||
     params.get(flag) !== null ||

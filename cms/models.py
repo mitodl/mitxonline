@@ -18,6 +18,7 @@ from django.urls import reverse
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from modelcluster.fields import ParentalKey
+from posthog import Posthog
 from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel
 from wagtail.blocks import PageChooserBlock, StreamBlock
 from wagtail.contrib.forms.forms import FormBuilder
@@ -641,6 +642,7 @@ class HomePage(Page):
         "CertificateIndexPage",
         "SignatoryIndexPage",
         "InstructorIndexPage",
+        "ProgramPage",
     ]
 
     def _get_child_page_of_type(self, cls):
@@ -662,7 +664,12 @@ class HomePage(Page):
                     "feature_image": product_page.feature_image,
                     "start_date": run.start_date if run is not None else None,
                     "url_path": product_page.get_url(),
+                    "is_program": product_page.is_program_page,
+                    "program_type": product_page.product.program_type
+                    if product_page.is_program_page
+                    else None,
                 }
+
                 if run and run.start_date and run.start_date < now_in_utc():
                     past_data.append(run_data)
                 else:
@@ -684,11 +691,18 @@ class HomePage(Page):
         return page_data
 
     def get_context(self, request, *args, **kwargs):
+        posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
+        show_new_featured_carousel = posthog.feature_enabled(
+            "mitxonline-new-featured-carousel",
+            "randomID",
+            person_properties={"environment": settings.ENVIRONMENT},
+        )
         return {
             **super().get_context(request),
             **get_base_context(request),
             "product_cards_section_title": self.product_section_title,
             "products": self.products,
+            "show_new_featured_carousel": show_new_featured_carousel,
         }
 
 
@@ -701,16 +715,22 @@ class HomeProductLink(models.Model):
         HomePage, on_delete=models.CASCADE, related_name="featured_products"
     )
 
+    # Previously, this was only a link to a course page. To keep these in the same inline field and for behavior to
+    # stay consistent, programs were added to the PageChooserPanel. This did not require a model change and, rather than
+    # cause potential downstream effects, the field name has stayed course_product_page although this now encompasses a
+    # course or program. Technically the FK points to the Page model, it is the wagtail panel setting that restricts the
+    # page type.
     course_product_page = models.ForeignKey(
         "wagtailcore.Page",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
+        verbose_name="Featured Product Page",
     )
 
     panels = [
-        PageChooserPanel("course_product_page", "cms.CoursePage"),
+        PageChooserPanel("course_product_page", ["cms.CoursePage", "cms.ProgramPage"])
     ]
 
 
@@ -1169,6 +1189,7 @@ class ProgramPage(ProductPage):
             "sign_in_url": sign_in_url,
             "start_date": start_date,
             "can_access_edx_course": can_access_edx_course,
+            "program_type": self.product.program_type,
         }
 
     content_panels = [

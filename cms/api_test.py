@@ -6,6 +6,7 @@ from wagtail.models import Page
 from wagtail_factories import PageFactory
 from django.core.exceptions import ValidationError
 
+
 from cms.api import (
     ensure_home_page_and_site,
     get_wagtail_img_src,
@@ -196,6 +197,8 @@ def test_home_page_featured_products(mocker):
             "feature_image": course_page.feature_image,
             "start_date": run.start_date if run is not None else None,
             "url_path": course_page.get_url(),
+            "is_program": False,
+            "program_type": None,
         }
     ]
 
@@ -219,8 +222,11 @@ def test_home_page_featured_products_sorting(mocker):
                 "feature_image": course_page.feature_image,
                 "start_date": run.start_date if run is not None else None,
                 "url_path": course_page.get_url(),
+                "is_program": False,
+                "program_type": None,
             }
         )
+
     page_data = sorted(
         page_data,
         key=lambda item: (item["start_date"] is None, item["start_date"]),
@@ -235,14 +241,20 @@ def test_home_page_featured_products_published_only():
     """Tests that featured products contain only published products/pages in the HomePage"""
     home_page = HomePageFactory.create()
     course_pages = CoursePageFactory.create_batch(2, parent=home_page)
+    program_pages = ProgramPageFactory.create_batch(2, parent=home_page)
     unpublished_course_page = CoursePageFactory.create(parent=home_page, live=False)
+    unpublished_program_page = ProgramPageFactory.create(parent=home_page, live=False)
 
     for course_page in course_pages + [unpublished_course_page]:
         HomeProductLink.objects.create(page=home_page, course_product_page=course_page)
 
+    for program_page in program_pages + [unpublished_program_page]:
+        HomeProductLink.objects.create(page=home_page, course_product_page=program_page)
+
     featured_products = home_page.products
-    assert len(featured_products) == 2
+    assert len(featured_products) == 4
     assert unpublished_course_page not in featured_products
+    assert unpublished_program_page not in featured_products
 
 
 @pytest.mark.django_db
