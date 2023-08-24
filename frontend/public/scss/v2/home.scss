@@ -1,13 +1,8 @@
 // sass-lint:disable mixins-before-declarations
-.featured-product-section h1 {
-  color: $home-page-header-blue;
-  text-align: left;
-  font-size: 25px;
+.course-section h1 {
+  text-align: center;
+  padding: 50px 10%;
   margin: 0;
-  font-style: normal;
-  font-weight: 700;
-  line-height: normal;
-  padding: 60px 0 33px 0;
   @include media-breakpoint-down(sm) {
     font-size: 30px;
     padding: 20px 0;

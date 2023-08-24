@@ -1,7 +1,6 @@
 import { checkFeatureFlag } from "../lib/util"
+import("../../scss/layout.scss")
 
 if (checkFeatureFlag("mitxonline-new-product-page")) {
-  import("../../scss/layout-v2.scss")
-} else {
-  import("../../scss/layout.scss")
+  import("../../scss/featured-product-cards.scss")
 }
