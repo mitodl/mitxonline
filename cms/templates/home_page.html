@@ -62,12 +62,12 @@
               <a href="{{ product.url_path }}" class="featured-product-card-link">
               <div class="featured-product-thumb">
                 <img src="{% feature_img_src product.feature_image %}" alt="" />
-                {% if product.is_program and product.program_type %}
+                {% if product.program_type %}
                   <span class="badge badge-program-type">{{ product.program_type }}</span>
                 {% endif %}
               </div>
               <div class="featured-product-info card-body">
-                {% if product.start_date and not product.is_program and show_new_featured_carousel %}
+                {% if product.start_date and not product.is_program %}
                   <p class="date">
                     Starts {{ product.start_date | date:"F j, Y" }}
                   </p>

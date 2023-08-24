@@ -1,6 +1,25 @@
 Release Notes
 =============
 
+Version 0.70.9 (Released August 23, 2023)
+--------------
+
+- update full name on user profile (#1825)
+- When deferring enrollment set to verified (#1790)
+- Update to Enrolled in certificate track label to count for audit enrollment with certificates (#1823)
+
+Version 0.70.8 (Released August 17, 2023)
+--------------
+
+- feat: add ability to retire users on edX (#1785)
+
+Version 0.70.7 (Released August 16, 2023)
+--------------
+
+- Changes template to display long bio, adds migration to move short bios to long, updates management command to fill short bio with something else to prevent confusion (#1812)
+- Adds the PostHog settings to the JS settings so we can use it in React. (#1814)
+- Add posthog to repo (#1809)
+
 Version 0.70.6 (Released August 15, 2023)
 --------------
 

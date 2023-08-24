@@ -662,7 +662,7 @@ def sync_contact_with_hubspot(user: User):
         body=body,
     )
     user.hubspot_sync_datetime = now_in_utc()
-    user.save()
+    user.save(update_fields=["hubspot_sync_datetime"])
 
     return result
 

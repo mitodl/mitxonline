@@ -21,6 +21,8 @@ class CoursePageSerializer(serializers.ModelSerializer):
     current_price = serializers.SerializerMethodField()
     instructors = serializers.SerializerMethodField()
     live = serializers.SerializerMethodField()
+    effort = serializers.SerializerMethodField()
+    length = serializers.SerializerMethodField()
 
     def get_feature_image_src(self, instance):
         """Serializes the source of the feature_image"""
@@ -100,15 +102,18 @@ class CoursePageSerializer(serializers.ModelSerializer):
         return relevant_product.price if relevant_product else None
 
     def get_instructors(self, instance):
-        members = [member.value for member in instance.faculty_members]
+        members = [
+            member.linked_instructor_page
+            for member in instance.linked_instructors.all()
+        ]
         returnable_members = []
 
         for member in members:
             returnable_members.append(
                 {
-                    "name": member["name"],
+                    "name": member.instructor_name,
                     "description": bleach.clean(
-                        member["description"].source, tags=[], strip=True
+                        member.instructor_bio_short, tags=[], strip=True
                     ),
                 }
             )
@@ -117,6 +122,20 @@ class CoursePageSerializer(serializers.ModelSerializer):
 
     def get_live(self, instance):
         return instance.live
+
+    def get_effort(self, instance):
+        return (
+            bleach.clean(instance.effort, tags=[], strip=True)
+            if instance.effort
+            else None
+        )
+
+    def get_length(self, instance):
+        return (
+            bleach.clean(instance.length, tags=[], strip=True)
+            if instance.length
+            else None
+        )
 
     class Meta:
         model = models.CoursePage
@@ -128,6 +147,8 @@ class CoursePageSerializer(serializers.ModelSerializer):
             "current_price",
             "instructors",
             "live",
+            "length",
+            "effort",
         ]
 
 
@@ -153,4 +174,37 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         fields = [
             "feature_image_src",
             "page_url",
+        ]
+
+
+class InstructorPageSerializer(serializers.ModelSerializer):
+    """Instructor page model serializer"""
+
+    feature_image_src = serializers.SerializerMethodField()
+
+    def get_feature_image_src(self, instance):
+        """Serializes the source of the feature_image"""
+        feature_img_src = None
+        if hasattr(instance, "feature_image"):
+            feature_img_src = get_wagtail_img_src(instance.feature_image)
+
+        return feature_img_src or static(DEFAULT_COURSE_IMG_PATH)
+
+    class Meta:
+        model = models.InstructorPage
+        fields = [
+            "id",
+            "instructor_name",
+            "instructor_title",
+            "instructor_bio_short",
+            "instructor_bio_long",
+            "feature_image_src",
+        ]
+        read_only_fields = [
+            "id",
+            "instructor_name",
+            "instructor_title",
+            "instructor_bio_short",
+            "instructor_bio_long",
+            "feature_image_src",
         ]

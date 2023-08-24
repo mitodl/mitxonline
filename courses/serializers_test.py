@@ -39,7 +39,7 @@ from ecommerce.serializers import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = [pytest.mark.django_db]
 
@@ -187,6 +187,9 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
             "next_run_id": course.first_unexpired_run.id,
             "topics": [{"name": topic}],
             "page": None,
+            "programs": ProgramSerializer(course.programs, many=True).data
+            if all_runs
+            else None,
         },
     )
 
@@ -231,6 +234,8 @@ def test_serialize_course_with_page_fields(
             "current_price": None,
             "description": bleach.clean(course_page.description, tags=[], strip=True),
             "live": True,
+            "effort": course_page.effort,
+            "length": course_page.length,
         },
     )
     patched_get_wagtail_src.assert_called_once_with(course_page.feature_image)
@@ -260,6 +265,7 @@ def test_serialize_course_run():
             "products": [],
             "page": None,
             "approved_flexible_price_exists": False,
+            "is_self_paced": course_run.is_self_paced,
         },
     )
 
