@@ -2,6 +2,19 @@
 
 .product-page {
   position: relative;
+  margin-top: 1.5rem;
+  background-color: white;
+  font-family: "Avenir Next", sans-serif;
+
+  section.course-description,
+  #tab-bar,
+  section.about-richtext-container {
+    font-family: "Roboto", sans-serif;
+
+    h2 {
+      font-family: "Avenir Next", "Roboto", sans-serif;
+    }
+  }
 
   @include media-breakpoint-down(sm) {
     h2 {
@@ -26,6 +39,52 @@
     @include media-breakpoint-down(sm) {
       display: block;
       width: 100%;
+    }
+  }
+
+  section.course-description {
+    line-height: 46px;
+    font-size: 20px;
+    color: #646669;
+  }
+
+  #tab-bar {
+    background-color: #edf2f4;
+    padding: 15px 19px;
+    margin: 2em 0;
+
+    ul li.nav-item {
+      padding: 0;
+      padding-right: 40px;
+      color: #35607a;
+      font-weight: normal;
+
+      a {
+        color: #35607a;
+        text-decoration: none;
+      }
+    }
+  }
+
+  section.about-richtext-container {
+    margin: 2.5rem 0;
+
+    div.expand_here_body {
+      max-height: 0px;
+      overflow-y: hidden;
+      transition: all 0.4s ease;
+    }
+
+    div.expand_here_body.open {
+      max-height: 400rem;
+    }
+  }
+
+  section.about-this-class {
+    color: #000;
+    /* TODO: this requires a different font and colors */    
+    h2, h3, h4, h5, h6 {
+      font-size: smaller;
     }
   }
 
@@ -159,24 +218,109 @@
     }
   }
 
-  .info-block {
-    padding-bottom: 25px;
-    font-size: 14px;
-    line-height: 16px;
-    color: $black;
+  #instructors {
+    background-color: #eff3f6;
+    margin: 1.5rem 0;
+    padding: 30px 20px;
+    border: 1px solid #dce1e9;
+  }
 
+  .ofac-message {
+    border: 1px solid #e4e9ef;
+    padding: 2rem;
+    clear: both;
+  }
+
+  #product-info-box {
+    padding-bottom: 25px;
+    font-size: 16px;
+    line-height: 24px;
+    color: $black;
+    max-width: 380px;
+    height: auto;
+
+    strong {
+      font-weight: 600;
+    }
+    
     @include media-breakpoint-up(lg) {
       padding: 30px 0;
     }
 
+    border-radius: 5px;
+
+    .hero-media {
+      margin: 7px 15px;
+
+      img {
+        border-radius: 5px;
+        max-width: 350px;
+      }
+    }
+
     .stats-row {
       display: flex;
-      flex-flow: row wrap;
-      margin: 0 -8px;
-      align-items: baseline;
+      flex-flow: column;
+      align-items: top;
+
+      margin-top: 10px;
+      width: 350px;
 
       @include media-breakpoint-up(xl) {
         margin: 0 -18px;
+      }
+
+      .font-weight-bold {
+        font-weight: 600;
+      }
+
+      .btn-enrollment-button {
+        height: 50px;
+        width: 100%;
+        padding: 0!important;
+      }
+
+      .enrollment-info-box, .program-info-box {
+        margin: 10px 0;
+        padding: 10px 0;
+      }
+
+      .enrollment-info-box {
+        border: 1px solid #d1d1d1;
+        border-left: none;
+        border-right: none;
+
+        .row {
+          margin: 20px 0;
+        }
+
+        .enrollment-info-icon {
+          width: 20px;
+          margin-right: 12px;
+        }
+
+        .enrollment-info-text {
+          width: auto;
+          flex-grow: 1;
+
+          .enrollment-effort {
+            font-size: smaller;
+          }
+
+          .badge-pacing {
+            background-color: $black;
+            text-transform: uppercase;
+            margin-left: .5rem;
+            padding: 3px;
+            font-weight: normal;
+          }
+        }
+      }
+
+      .program-info-box {
+        ul {
+          margin-top: 1em;
+        }
       }
 
       .stat-col {
@@ -378,17 +522,14 @@
       padding-bottom: 20px;
     }
   }
-
-  .ofac-message {
-    clear: both;
-  }
 }
 
 .upgrade-enrollment-modal {
-  max-width: 550px;
+  max-width: 750px;
+  font-family: "Avenir Next", "Roboto", sans-serif;
 
   .modal-content {
-    padding: 5px 12px;
+    padding: 5px 14px;
     
     .required {
       color: $brand-button-bg;
@@ -400,6 +541,8 @@
     font-size: large;
     border-bottom: none;
     padding-bottom: 0;
+
+    font-family: "Poppins", "Avenir Next", "Roboto", sans-serif;
 
     h5 {
       font-size: 30px;
@@ -430,7 +573,6 @@
 
   .faq-link a {
     color: black;
-    font-weight: bold;
   }
 
   .faq-link a:visited {
@@ -445,20 +587,62 @@
   .enroll-now-free {
     text-decoration: underline;
     box-shadow: none;
-    font-weight: bold;
   }
   form {
     margin-bottom: 20px;
+
+    .btn-upgrade {
+      width: 100%;
+      background-color: #A41E34;
+      color: white;
+      text-align: left;
+      background-image: url('/static/images/arrow-line-right.png');
+      background-position: 90% 50%;
+      background-repeat: no-repeat;
+      padding: 11px 22px;
+    }
   }
+
+  .acheiving-text {
+    font-weight: 600;
+    color: #A41E34;
+    margin-bottom: 1.5rem;
+  }
+
+  ul { 
+    padding: 0;
+  }
+
+  li {
+    list-style: none;
+    min-height: 3.5rem;
+    background-image: url('/static/images/upsell-check.png');
+    background-repeat: no-repeat;
+    background-position: 0 0;
+    padding-left: 33px;
+    line-height: 24px;
+  }
+}
+
+div.certificate-pricing-row { 
+  border: 1px solid #DFE5EC;
+  border-left: none;
+  border-right: none;
+  padding: 25px 0 15px 0;
+}
+
+div.certificate-pricing{
+  background-image: url('/static/images/products/certificate.png');
+  background-repeat: no-repeat;
+  background-position: 10px 5px;
+
+  padding-left: 43px;
 }
 
 .financial-assistance-link {
   height: 22px;
-  font-size: 18px;
-  font-weight: bold;
   letter-spacing: 0;
   line-height: 20px;
-  text-align: center;
   text-decoration: underline;
   margin-bottom: 0;
 
@@ -491,4 +675,84 @@
 .date-link-disabled {
   padding: 5px 5px 0;
   margin: 0;
+}
+
+.instructor-modal {
+  .modal-dialog {
+    width: 770px;
+    max-width: 770px;
+    border-radius: 5px;
+
+    .modal-header {
+      background-color: #03152d;
+      background-image: url('/static/images/instructor-modal-head.jpg');
+      background-position: 0 60%;
+      background-size: cover;
+      height: 130px;
+      align-items: start;
+      padding: 20px;
+  
+      h5 {
+        margin-left: -9999px;
+      }
+  
+      button.close {
+        border: 0;
+        border-radius: 100%;
+        width: 30px;
+        height: 30px;
+      }
+    }
+  
+    .modal-body {
+      padding-left: 50px;
+      padding-right: 50px;
+
+      div.col-instructor-photo {
+        margin-top: -50px;
+        width: 165px !important;
+        max-width: 165px;
+
+        img.img-thumbnail {
+          width: 130px;
+          height: 145px;
+          padding: 7px;
+          margin: 7px;
+          object-fit: cover;
+          object-position: 50% 0;
+
+          box-shadow: 0px 2px #e1e1e1;
+        }
+      }
+
+      div.col-instructor-title {
+        width: auto;
+        margin-left: 10px;
+
+        h2 {
+          margin-bottom: 0px;
+          line-height: 30px;
+          font-size: 25px;
+          font-weight: 700;
+        }
+        h3, p {
+          font-size: 18px;
+          line-height: 21.6px;
+          font-weight: 400;
+          margin-bottom: 0px;
+        }
+        h3 {
+          font-weight: 600;
+        }
+        p {
+          margin-top: 5px;
+        }
+      }
+
+      .row-instructor-body {
+        padding: 10px 10px;
+      }
+    }
+
+  }
 }

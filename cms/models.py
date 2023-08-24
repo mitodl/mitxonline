@@ -816,7 +816,7 @@ class ProductPage(Page):
         abstract = True
 
     description = RichTextField(
-        help_text="The description shown on the home page and product page. The recommended character limit is 1000 characters. Longer entries may not display nicely on the page."
+        help_text="The description shown on the home page and product page."
     )
 
     length = models.CharField(
@@ -841,15 +841,23 @@ class ProductPage(Page):
     prerequisites = RichTextField(
         null=True,
         blank=True,
-        help_text="A short description indicating prerequisites of this course.",
+        help_text="A short description indicating prerequisites of this course/program.",
     )
 
-    about = RichTextField(null=True, blank=True, help_text="About this course details.")
+    about = RichTextField(
+        null=True, blank=True, help_text="Details about this course/program."
+    )
+
+    faq_url = models.URLField(
+        null=True,
+        blank=True,
+        help_text="URL a relevant FAQ page or entry for the course/program.",
+    )
 
     video_url = models.URLField(
         null=True,
         blank=True,
-        help_text="URL to the video to be displayed for this program/course. It can be an HLS or Youtube video URL.",
+        help_text="URL to the video to be displayed for this course/program. It can be an HLS or Youtube video URL.",
     )
 
     what_you_learn = RichTextField(
@@ -871,14 +879,6 @@ class ProductPage(Page):
         blank=True,
         default="Meet your instructors",
         help_text="The title text to display in the faculty cards section of the product page.",
-    )
-
-    faculty_members = StreamField(
-        [("faculty_member", FacultyBlock())],
-        null=True,
-        blank=True,
-        help_text="The faculty members to display on this page",
-        use_json_field=True,
     )
 
     def save(self, clean=True, user=None, log_action=False, **kwargs):
@@ -953,13 +953,13 @@ class ProductPage(Page):
         FieldPanel("effort"),
         FieldPanel("price"),
         FieldPanel("prerequisites"),
+        FieldPanel("faq_url"),
         FieldPanel("about"),
         FieldPanel("what_you_learn"),
         FieldPanel("feature_image"),
-        InlinePanel("linked_instructors", label="Faculty Members"),
-        FieldPanel("faculty_section_title"),
-        FieldPanel("faculty_members"),
         FieldPanel("video_url"),
+        FieldPanel("faculty_section_title"),
+        InlinePanel("linked_instructors", label="Faculty Members"),
     ]
 
     subpage_types = ["FlexiblePricingRequestForm", "CertificatePage"]
@@ -1005,6 +1005,18 @@ class ProductPage(Page):
         If they're not logged in, this should return None.
         """
         raise NotImplementedError
+
+    def get_context(self, request, *args, **kwargs):
+        instructors = [
+            member.linked_instructor_page
+            for member in self.linked_instructors.order_by("order").all()
+        ]
+
+        return {
+            **super().get_context(request),
+            **get_base_context(request),
+            "instructors": instructors,
+        }
 
     def get_context(self, request, *args, **kwargs):
         instructors = [
