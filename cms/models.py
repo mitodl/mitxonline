@@ -715,6 +715,11 @@ class HomeProductLink(models.Model):
         HomePage, on_delete=models.CASCADE, related_name="featured_products"
     )
 
+    # Previously, this was only a link to a course page. To keep these in the same inline field and for behavior to
+    # stay consistent, programs were added to the PageChooserPanel. This did not require a model change and, rather than
+    # cause potential downstream effects, the field name has stayed course_product_page although this now encompasses a
+    # course or program. Technically the FK points to the Page model, it is the wagtail panel setting that restricts the
+    # page type.
     course_product_page = models.ForeignKey(
         "wagtailcore.Page",
         null=True,
