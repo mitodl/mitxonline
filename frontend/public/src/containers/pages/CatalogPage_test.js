@@ -228,7 +228,9 @@ describe("CatalogPage", function() {
     renderPage = helper.configureHOCRenderer(CatalogPage, InnerCatalogPage)
 
     SETTINGS.features = {
-      "mitxonline-new-product-page": true
+      "mitxonline-new-product-page": true,
+      enable_learner_records:        false,
+      enable_addl_profile_fields:    false
     }
   })
 
