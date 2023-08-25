@@ -1,4 +1,12 @@
-@import "layout";
+@import "variables";
+@import "~@material/layout-grid/dist/mdc.layout-grid";
+@import "~@material/top-app-bar/dist/mdc.top-app-bar";
+@import "~react-picky/dist/picky";
+@import "~react-day-picker/lib/style";
+@import "~bootstrap/scss/bootstrap";
+@import "~video.js/dist/video-js";
+
+
 @import "product-page/user-menu";
 @import "product-page/product-details";
 @import "product-page/product-faculty-members";
