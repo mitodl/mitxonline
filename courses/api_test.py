@@ -1184,7 +1184,6 @@ def test_course_certificates_with_course_end_date_self_paced_combination(
     end_date,
 ):
     """Test that correct certificates are created when there are course runs with end_date and self_paced combination"""
-    settings.CERTIFICATE_CREATION_DELAY_IN_HOURS = 1
     course_run = passed_grade_with_enrollment.course_run
     course_run.is_self_paced = self_paced
     course_run.certificate_available_date = end_date
@@ -1213,7 +1212,6 @@ def test_generate_course_certificates_with_course_end_date(
     mocker, courses_api_logs, passed_grade_with_enrollment, settings
 ):
     """Test that certificates are generated for passed grades when there are valid course runs for certificates"""
-    settings.CERTIFICATE_CREATION_DELAY_IN_HOURS = 1
     course_run = passed_grade_with_enrollment.course_run
     course_run.certificate_available_date = now_in_utc()
     course_run.save()
