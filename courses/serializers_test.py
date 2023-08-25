@@ -2,17 +2,16 @@
 Tests for course serializers
 """
 # pylint: disable=unused-argument, redefined-outer-name
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 import bleach
 import pytest
-import pytz
 from django.contrib.auth.models import AnonymousUser
 from django.utils.timezone import now
 
 from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
-from cms.serializers import ProgramPageSerializer
+from cms.serializers import ProgramPageSerializer, CoursePageSerializer
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -21,7 +20,11 @@ from courses.factories import (
     ProgramFactory,
     program_with_empty_requirements,
 )
-from courses.models import CourseTopic, ProgramRequirement, ProgramRequirementNodeType
+from courses.models import (
+    Department,
+    ProgramRequirement,
+    ProgramRequirementNodeType,
+)
 from courses.serializers import (
     BaseCourseSerializer,
     BaseProgramSerializer,
@@ -39,6 +42,7 @@ from ecommerce.serializers import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
+from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = [pytest.mark.django_db]
@@ -87,9 +91,11 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
             for _ in range(2)
         ]
     )
-    topics = [CourseTopic.objects.create(name=f"topic{num}") for num in range(3)]
-    course1.topics.set([topics[0], topics[1]])
-    course2.topics.set([topics[1], topics[2]])
+    departments = [
+        Department.objects.create(name=f"department{num}") for num in range(3)
+    ]
+    course1.departments.set([departments[0], departments[1]])
+    course2.departments.set([departments[1], departments[2]])
 
     formatted_reqs = {"required": [], "electives": []}
 
@@ -124,6 +130,9 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
                 program_with_empty_requirements.requirements_root
             ).data,
             "page": ProgramPageSerializer(program_with_empty_requirements.page).data,
+            "program_type": "Series",
+            "departments": [],
+            "live": True,
         },
     )
 
@@ -142,37 +151,25 @@ def test_base_course_serializer():
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
 @pytest.mark.parametrize("all_runs", [True, False])
-def test_serialize_course(mock_context, is_anonymous, all_runs):
+def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings):
     """Test Course serialization"""
-    now = datetime.now(tz=pytz.UTC)
+    settings.FEATURES[features.ENABLE_NEW_DESIGN] = True
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
     if all_runs:
         mock_context["all_runs"] = True
     user = mock_context["request"].user
-    course_run = CourseRunFactory.create(course__page=None, live=True)
-    course = course_run.course
-    topic = "a course topic"
-    course.topics.set([CourseTopic.objects.create(name=topic)])
+    courseRun1 = CourseRunFactory.create()
+    courseRun2 = CourseRunFactory.create(course=courseRun1.course)
+    course = courseRun1.course
+    department = "a course departments"
+    course.departments.set([Department.objects.create(name=department)])
 
-    # Create expired, enrollment_ended, future, and enrolled course runs
-    CourseRunFactory.create(course=course, end_date=now - timedelta(1), live=True)
-    CourseRunFactory.create(course=course, enrollment_end=now - timedelta(1), live=True)
-    CourseRunFactory.create(
-        course=course, enrollment_start=now + timedelta(1), live=True
-    )
-    enrolled_run = CourseRunFactory.create(course=course, live=True)
-    unexpired_runs = [enrolled_run, course_run]
     CourseRunEnrollmentFactory.create(
-        run=enrolled_run, **({} if is_anonymous else {"user": user})
+        run=courseRun1, **({} if is_anonymous else {"user": user})
     )
 
     data = CourseSerializer(instance=course, context=mock_context).data
-
-    if all_runs or is_anonymous:
-        expected_runs = unexpired_runs
-    else:
-        expected_runs = [course_run]
 
     assert_drf_json_equal(
         data,
@@ -181,12 +178,12 @@ def test_serialize_course(mock_context, is_anonymous, all_runs):
             "readable_id": course.readable_id,
             "id": course.id,
             "courseruns": [
-                CourseRunSerializer(run).data
-                for run in sorted(expected_runs, key=lambda run: run.start_date)
+                CourseRunSerializer(courseRun1).data,
+                CourseRunSerializer(courseRun2).data,
             ],
             "next_run_id": course.first_unexpired_run.id,
-            "topics": [{"name": topic}],
-            "page": None,
+            "departments": [{"name": department}],
+            "page": CoursePageSerializer(course.page).data,
             "programs": ProgramSerializer(course.programs, many=True).data
             if all_runs
             else None,
@@ -265,6 +262,7 @@ def test_serialize_course_run():
             "products": [],
             "page": None,
             "approved_flexible_price_exists": False,
+            "live": True,
             "is_self_paced": course_run.is_self_paced,
         },
     )

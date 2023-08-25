@@ -407,6 +407,7 @@ class ProgramAdminForm(ModelForm):
             "title",
             "readable_id",
             "program_type",
+            "departments",
             "live",
             "requirements",
         ]

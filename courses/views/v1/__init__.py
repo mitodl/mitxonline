@@ -16,6 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from reversion.models import Version
+from rest_framework.pagination import PageNumberPagination
 
 from courses.api import (
     create_run_enrollments,
@@ -68,6 +69,15 @@ from openedx.exceptions import (
 log = logging.getLogger(__name__)
 
 
+class Pagination(PageNumberPagination):
+    """Paginator class for infinite loading"""
+
+    page_size = 12
+    page_size_query_param = "page_size"
+    max_page_size = 100
+    ordering = "-created_on"
+
+
 class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for Programs"""
 
@@ -75,11 +85,22 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = ProgramSerializer
     queryset = Program.objects.filter(live=True)
+    pagination_class = Pagination
+
+    def paginate_queryset(self, queryset):
+        """
+        Enable pagination if a 'page' parameter is included in the request,
+        otherwise, do not use pagination.
+        """
+        if self.paginator and self.request.query_params.get("page", None) is None:
+            return None
+        return super().paginate_queryset(queryset)
 
 
 class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for Courses"""
 
+    pagination_class = Pagination
     permission_classes = []
 
     serializer_class = CourseSerializer
@@ -97,6 +118,15 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             added_context["all_runs"] = True
 
         return {**super().get_serializer_context(), **added_context}
+
+    def paginate_queryset(self, queryset):
+        """
+        Enable pagination if a 'page' parameter is included in the request,
+        otherwise, do not use pagination.
+        """
+        if self.paginator and self.request.query_params.get("page", None) is None:
+            return None
+        return super().paginate_queryset(queryset)
 
 
 class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
