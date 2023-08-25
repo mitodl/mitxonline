@@ -41,10 +41,10 @@ def catalog(request, **kwargs):
     """
     The catalog view.
     """
-    if features.is_enabled(features.ENABLE_NEW_DESIGN):
+    if features.is_enabled("tests"):
         context = get_base_context(request)
         return render(request, "index.html", context=context)
-    return handler404(request)
+    return handler404(request, Exception)
 
 
 @never_cache
@@ -55,7 +55,7 @@ def refine(request, **kwargs):
     return render(request, "refine.html", context=get_base_context(request))
 
 
-def handler404(request, **kwargs):  # pylint: disable=unused-argument
+def handler404(request, exception):  # pylint: disable=unused-argument
     """404: NOT FOUND ERROR handler"""
     context = get_base_context(request)
     return HttpResponseNotFound(
