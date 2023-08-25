@@ -41,7 +41,7 @@ def catalog(request, **kwargs):
     """
     The catalog view.
     """
-    if features.is_enabled("tests"):
+    if features.is_enabled(features.ENABLE_NEW_DESIGN):
         context = get_base_context(request)
         return render(request, "index.html", context=context)
     return handler404(request, Exception)
