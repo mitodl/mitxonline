@@ -7,7 +7,7 @@ import wagtail.fields
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("cms", "0031_alter_homeproductlink_course_product_page"),
+        ("cms", "0032_alter_homeproductlink_course_product_page"),
     ]
 
     operations = [
