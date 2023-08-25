@@ -165,11 +165,15 @@ export class ProductDetailEnrollApp extends React.Component<
     const { currentCourseRun: run } = this.state
 
     const product = run.products ? run.products[0] : null
-    const needFinancialAssistanceLink = (
-      <p className="financial-assistance-link">
-        <a href="#">Need financial assistance?</a>
-      </p>
-    )
+    const needFinancialAssistanceLink =
+      isFinancialAssistanceAvailable(run) &&
+      !run.approved_flexible_price_exists ? (
+          <p className="financial-assistance-link">
+            <a href={run.page.financial_assistance_form_url}>
+            Need financial assistance?
+            </a>
+          </p>
+        ) : null
 
     return (
       <>
@@ -203,7 +207,7 @@ export class ProductDetailEnrollApp extends React.Component<
           </div>
         </div>
 
-        <div className="cancel-link">{this.getEnrollmentForm()}</div>
+        <div className="cancel-link">{this.getEnrollmentForm(run)}</div>
       </>
     )
   }
@@ -319,11 +323,15 @@ export class ProductDetailEnrollApp extends React.Component<
     )
   }
 
-  getEnrollmentForm() {
+  getEnrollmentForm(run) {
+    const csrfToken = getCookie("csrftoken")
+
     return (
-      <form>
+      <form action="/enrollments/" method="post">
+        <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+        <input type="hidden" name="run" value={run ? run.id : ""} />
         <button type="submit" className="btn enroll-now enroll-now-free">
-          No thanks, I'll take the free version without a certificate
+          No thanks, I'll take the free version
         </button>
       </form>
     )

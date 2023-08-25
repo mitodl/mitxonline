@@ -320,10 +320,15 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   getEnrollmentForm() {
+    const csrfToken = getCookie("csrftoken")
+    const { courseRuns } = this.props
+    const run = courseRuns ? courseRuns[0] : null
     return (
-      <form>
+      <form action="/enrollments/" method="post">
+        <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+        <input type="hidden" name="run" value={run ? run.id : ""} />
         <button type="submit" className="btn enroll-now enroll-now-free">
-          No thanks, I'll take the free version without a certificate
+          No thanks, I'll take the free version
         </button>
       </form>
     )
