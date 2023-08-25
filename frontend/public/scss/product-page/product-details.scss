@@ -290,6 +290,10 @@ body.new-design {
         .enrollment-info-icon {
           width: 20px;
           margin-right: 12px;
+
+          img {
+            max-width: 20px;
+          }
         }
 
         .enrollment-info-text {

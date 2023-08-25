@@ -437,7 +437,7 @@ export class ProductDetailEnrollApp extends React.Component<
                         className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
                         onClick={this.toggleUpgradeDialogVisibility}
                       >
-                        Enroll now button
+                        Enroll now
                       </button>
                     </Fragment>
                   )}

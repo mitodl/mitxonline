@@ -86,11 +86,19 @@
                 {% endif %}
               </div>
 
-              {% if page.course %}
               <div class="stats-row product-info-box-body">
+                {% if page.is_course_page %}
                 <input id="courseId" type="hidden" value="{{page.course.readable_id}}" />
+                {% endif %}
+
+                {% if page.is_program_page %}
+                <input id="programId" type="hidden" value="{{page.program.readable_id}}" />
+                {% endif %}
+
                 <div class="w-100" id="productDetailEnrollment"></div>
               </div>
+
+              {% if page.is_course_page %}
               <div class="stats-row">
                 <div class="w-100" id="upsellCard"></div>
               </div>
