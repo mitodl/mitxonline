@@ -1134,7 +1134,7 @@ def test_generate_course_certificates_no_valid_course_run(settings, courses_api_
         5,
         is_self_paced=False,
         certificate_available_date=now_in_utc()
-        - timedelta(hours=settings.CERTIFICATE_CREATION_DELAY_IN_HOURS + 1),
+        - timedelta(days=settings.CERTIFICATE_CREATION_WINDOW_IN_DAYS + 1),
     )
     generate_course_run_certificates()
     assert (

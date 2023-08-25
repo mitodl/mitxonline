@@ -775,15 +775,15 @@ def get_certificate_grade_eligible_runs(now):
     """
     Get the list of course runs that are eligible for Grades update/creation and certificates creation
     """
-    # Get all the course runs valid course runs for certificates/Grades
-    # For a valid run it would be live, certificate_available_date would be in future with addition of
-    # delay settings.CERTIFICATE_CREATION_DELAY_IN_HOURS.
+    # Get all the course runs eligible for certificates generation
+    # For a valid run it would be live, certificate_available_date would be in future or within a month of passing
+    # the certificate_available_date.
 
     course_runs = CourseRun.objects.live().filter(
         Q(certificate_available_date__isnull=True)
         | Q(
             certificate_available_date__gt=now
-            - timedelta(hours=settings.CERTIFICATE_CREATION_DELAY_IN_HOURS)
+            - timedelta(days=settings.CERTIFICATE_CREATION_WINDOW_IN_DAYS)
         )
     )
     return course_runs

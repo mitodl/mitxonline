@@ -808,6 +808,12 @@ CERTIFICATE_CREATION_DELAY_IN_HOURS = get_int(
     description="The number of hours to delay automated certificate creation after a course run ends.",
 )
 
+CERTIFICATE_CREATION_WINDOW_IN_DAYS = get_int(
+    name="CERTIFICATE_CREATION_WINDOW_IN_DAYS",
+    default=31,
+    description="The number of days a course run is eligible for certificate creation after it ends.",
+)
+
 RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY = get_int(
     name="RETRY_FAILED_EDX_ENROLLMENT_FREQUENCY",
     default=60 * 30,
