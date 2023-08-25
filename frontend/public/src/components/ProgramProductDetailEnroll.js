@@ -444,7 +444,6 @@ export class ProductDetailEnrollApp extends React.Component<
                 </Fragment>
               )}
 
-              {currentUser ? this.renderAddlProfileFieldsModal() : null}
               {programs ? this.renderUpgradeEnrollmentDialog() : null}
             </>
           </Loader>
@@ -453,12 +452,13 @@ export class ProductDetailEnrollApp extends React.Component<
           <>
             {
               // $FlowFixMe: isLoading null or undefined
-              <Loader key="course_info_loader" isLoading={programIsLoading}>
+              <Loader key="program_info_loader" isLoading={programIsLoading}>
                 <ProgramInfoBox programs={programs}></ProgramInfoBox>
               </Loader>
             }
           </>
         ) : null}
+        {currentUser ? this.renderAddlProfileFieldsModal() : null}
       </>
     )
   }

@@ -66,13 +66,13 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
   getRequiredTitle() {
     const requiredNode = this.getReqNode()
 
-    return requiredNode.data.title || "Core Courses"
+    return requiredNode ? requiredNode.data.title : "Core Courses"
   }
 
   getElectiveTitle() {
     const requiredNode = this.getReqNode(false)
 
-    return requiredNode.data.title || "Electives"
+    return requiredNode ? requiredNode.data.title : "Electives"
   }
 
   render() {
