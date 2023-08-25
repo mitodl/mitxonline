@@ -9,6 +9,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from rest_framework.pagination import LimitOffsetPagination
+from main import features
 
 from main.features import is_enabled
 
@@ -36,6 +37,16 @@ def index(request, **kwargs):
     return render(request, "index.html", context=context)
 
 
+def catalog(request, **kwargs):
+    """
+    The catalog view.
+    """
+    if features.is_enabled(features.ENABLE_NEW_DESIGN):
+        context = get_base_context(request)
+        return render(request, "index.html", context=context)
+    return handler404(request)
+
+
 @never_cache
 def refine(request, **kwargs):
     """
@@ -44,7 +55,7 @@ def refine(request, **kwargs):
     return render(request, "refine.html", context=get_base_context(request))
 
 
-def handler404(request, exception):  # pylint: disable=unused-argument
+def handler404(request, *args):  # pylint: disable=unused-argument
     """404: NOT FOUND ERROR handler"""
     context = get_base_context(request)
     return HttpResponseNotFound(
