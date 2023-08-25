@@ -30,29 +30,26 @@ import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 import {
   isFinancialAssistanceAvailable,
-  isWithinEnrollmentPeriod
 } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
-import { enrollmentMutation } from "../lib/queries/enrollment"
 import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import ProgramInfoBox from "./ProgramInfoBox"
-import type { ProgramEnrollment } from "../flow/courseTypes"
+import type { ProgramEnrollment, Program } from "../flow/courseTypes"
 
 type Props = {
   programId: ?string,
   isLoading: ?boolean,
   courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
   status: ?number,
-  programs: ?Array<any>,
+  programs: ?Array<Program>,
   programIsLoading: ?boolean,
   programStatus: ?number,
   upgradeEnrollmentDialogVisibility: boolean,
   addProductToBasket: (user: number, productId: number) => Promise<any>,
   currentUser: User,
-  createEnrollment: (runId: number) => Promise<any>,
   updateAddlFields: (currentUser: User) => Promise<any>,
   programEnrollments: ?Array<ProgramEnrollment>,
   programEnrollmentsLoading: ?boolean
@@ -130,17 +127,6 @@ export class ProductDetailEnrollApp extends React.Component<
 
   toggleUpgradeDialogVisibility = () => {
     const { upgradeEnrollmentDialogVisibility } = this.state
-    // const { createEnrollment, courseRuns } = this.props
-    // const run =
-    //   !this.getCurrentCourseRun() && courseRuns
-    //     ? courseRuns[0]
-    //     : this.getCurrentCourseRun()
-
-    // if (!upgradeEnrollmentDialogVisibility) {
-    //   createEnrollment(run)
-    // } else {
-    //   window.location = "/dashboard/"
-    // }
 
     this.setState({
       upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
@@ -464,9 +450,6 @@ export class ProductDetailEnrollApp extends React.Component<
   }
 }
 
-const createEnrollment = (run: EnrollmentFlaggedCourseRun) =>
-  mutateAsync(enrollmentMutation(run.id))
-
 const updateAddlFields = (currentUser: User) => {
   const updatedUser = {
     name:          currentUser.name,
@@ -505,7 +488,6 @@ const mapPropsToConfig = props => [
 ]
 
 const mapDispatchToProps = {
-  createEnrollment,
   updateAddlFields
 }
 
