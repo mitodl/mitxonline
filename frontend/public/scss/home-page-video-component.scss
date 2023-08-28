@@ -9,23 +9,30 @@
     display: flex;
     justify-content: center;
     align-content: center;
-  @include media-breakpoint-down(sm) {
-      width: 100%;
-    }
   .home-page-video-container {
     margin-top: -60px;
-    width: 1440px;
+    width: 100%;
     max-width: 1440px;
-    height: 713px;
     flex-shrink: 0;
     display: flex;
+    @include media-breakpoint-down(lg) {
+      flex-direction: column;
+      width: 100%;
+    }
     .home-page-video-description {
-      width: 434px;
-      max-width: 434px;
+      width: 36%;
+      max-width: 517px;
       display: flex;
       flex-direction: column;
-      margin: 140px 23px 120px 60px;
-
+      padding: 140px 23px 0 60px;
+      @include media-breakpoint-down(lg) {
+        width: 100%;
+        max-width: 100%;
+        padding: 100px 0 0 60px;
+      }
+      @include media-breakpoint-down(md) {
+        padding-left: 20px;
+      }
       h3 {
         color: $home-page-header-blue;
         font-size: 36px;
@@ -33,6 +40,10 @@
         font-weight: 700;
         line-height: 45px;
         align-self: stretch;
+        @include media-breakpoint-down(sm) {
+          font-size: 18px;
+          line-height: normal;
+        }
       }
 
       p {
@@ -42,27 +53,54 @@
         font-weight: 400;
         line-height: 32px;
         align-self: stretch;
+        @include media-breakpoint-down(sm) {
+          font-size: 13px;
+          line-height: 24px;
+        }
       }
     }
 
     .home-page-video-wrapper {
-      max-width: 923px;
-      width: 100%;
-      height: inherit;
-
+      max-width: 900px;
+      width: 64%;
+      height: 500px;
+      @include media-breakpoint-down(lg) {
+        width: 100%;
+        max-width: 100%;
+        padding: 0 0 0 60px;
+      }
+      @include media-breakpoint-down(md) {
+        padding-left: 20px;
+      }
       .home-page-video-player {
         width: 100%;
-        max-width: 923px;
+        max-width: 900px;
         height: inherit;
         position: relative;
+
         .vjs-default-skin{
           width: 863px;
           height: 485px;
           position: absolute;
           top: 120px;
-          right: 60px;
+          left: 0;
           z-index: 99;
-
+          @include media-breakpoint-down(xl) {
+            top: 180px;
+            width: 574px;
+            height: 322px;
+          }
+          @include media-breakpoint-down(lg) {
+            top: 0;
+          }
+          @include media-breakpoint-down(md) {
+            width: 574px;
+            height: 322px;
+          }
+          @include media-breakpoint-down(sm) {
+            width: 319px;
+            height: 179px;
+          }
         }
         .video-js {
       .vjs-big-play-button {
@@ -95,11 +133,33 @@
     }
         .home-page-video-underlay {
           position: absolute;
-          right: 30px;
+          left: 307px;
           top: 175px;
           width: 586px;
           height: 460px;
           background: $home-page-video-player-blue;
+          @include media-breakpoint-down(xl) {
+            width: 490px;
+            height: 319px;
+            top: 210px;
+            left: 113px;
+          }
+          @include media-breakpoint-down(lg) {
+            top: 30px;
+            left: 113px;
+          }
+          @include media-breakpoint-down(md) {
+            width: 420px;
+            height: 269px;
+            top: 83px;
+            left: 185px;
+          }
+          @include media-breakpoint-down(sm) {
+            width: 239px;
+            height: 159px;
+            top: 41px;
+            left: 101px;
+          }
         }
       }
     }
