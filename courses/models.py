@@ -103,8 +103,22 @@ validate_url_path_field = RegexValidator(
 )
 
 
+class Department(TimestampedModel):
+    """
+    Departments.
+    """
+
+    name = models.CharField(max_length=128, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Program(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course program"""
+
+    class Meta:
+        ordering = ["id"]
 
     objects = ProgramQuerySet.as_manager()
     title = models.CharField(max_length=255)
@@ -118,6 +132,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         blank=True,
         null=True,
     )
+    departments = models.ManyToManyField(Department, blank=True)
 
     @cached_property
     def page(self):
@@ -128,12 +143,6 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def num_courses(self):
         """Gets the number of courses in this program"""
         return len(self.courses)
-
-    @property
-    def is_catalog_visible(self):
-        """Returns True if this program should be shown on in the catalog"""
-        just_courses = [course[0] for course in self.courses]
-        return any(course.is_catalog_visible for course in just_courses)
 
     @property
     def first_unexpired_run(self):
@@ -416,19 +425,11 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
         return f"{self.program.readable_id} | {self.program.title}"
 
 
-class CourseTopic(TimestampedModel):
-    """
-    Topics for all courses (e.g. "History")
-    """
-
-    name = models.CharField(max_length=128, unique=True)
-
-    def __str__(self):
-        return self.name
-
-
 class Course(TimestampedModel, ValidateOnSaveMixin):
     """Model for a course"""
+
+    class Meta:
+        ordering = ["id"]
 
     objects = CourseQuerySet.as_manager()
     title = models.CharField(max_length=255)
@@ -436,7 +437,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
     live = models.BooleanField(default=False)
-    topics = models.ManyToManyField(CourseTopic, blank=True)
+    departments = models.ManyToManyField(Department, blank=True)
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
         object_id_field="courseware_object_id",
@@ -473,21 +474,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
 
         return (
             relevant_run.products.filter(is_active=True).all() if relevant_run else None
-        )
-
-    @property
-    def is_catalog_visible(self):
-        """Returns True if this course should be shown on in the catalog"""
-        now = now_in_utc()
-        # NOTE: This is implemented with courseruns.all() to allow for prefetch_related optimization.
-        return any(
-            course_run
-            for course_run in self.courseruns.all()
-            if course_run.live
-            and (
-                (course_run.start_date and course_run.start_date > now)
-                or (course_run.enrollment_end and course_run.enrollment_end > now)
-            )
         )
 
     @property

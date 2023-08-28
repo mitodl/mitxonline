@@ -25,6 +25,8 @@ import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
 
+import { checkFeatureFlag } from "../lib/util"
+
 type Props = {
   courseId: string,
   isLoading: ?boolean,
@@ -112,12 +114,12 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
 
     const run = courseRuns ? courseRuns[0] : null
 
-    return (
+    return !checkFeatureFlag("mitxonline-new-product-page") ? (
       // $FlowFixMe: isLoading null or undefined
       <Loader isLoading={isLoading}>
         {run ? this.renderUpgradeEnrollmentDialog(run) : null}
       </Loader>
-    )
+    ) : null
   }
 }
 

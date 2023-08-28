@@ -62,8 +62,8 @@
       "description": "Early executed tasks propagate exceptions",
       "required": false
     },
-    "CERTIFICATE_CREATION_DELAY_IN_HOURS": {
-      "description": "The number of hours to delay automated certificate creation after a course run ends.",
+    "CERTIFICATE_CREATION_WINDOW_IN_DAYS": {
+      "description": "The number of days a course run is eligible for certificate creation after it ends.",
       "required": false
     },
     "CLOUDFRONT_DIST": {

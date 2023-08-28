@@ -24,7 +24,7 @@ from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.documents import urls as wagtaildocs_urls
 
 from cms.views import instructor_page
-from main.views import cms_signin_redirect_to_site_signin, index, refine
+from main.views import cms_signin_redirect_to_site_signin, index, refine, catalog
 
 handler500 = "main.views.handler500"
 handler404 = "main.views.handler404"
@@ -77,6 +77,7 @@ urlpatterns = [
     re_path(r"^orders/history/.*", index, name="order-history"),
     re_path(r"^orders/receipt/.*", index, name="order-receipt"),
     re_path(r"^records/.*", index, name="learner-records"),
+    re_path(r"^catalog/", catalog, name="catalog"),
     path("api/instructor/<int:id>/", instructor_page, name="cms_instructor_page"),
     # Wagtail
     re_path(
@@ -86,6 +87,7 @@ urlpatterns = [
     re_path(r"^documents/", include(wagtaildocs_urls)),
     path("", include(wagtail_urls)),
     path("", include("cms.urls")),
+    path("catalog/", index, name="catalog"),
     # Example view
     path("", index, name="main-index"),
 ] + (
