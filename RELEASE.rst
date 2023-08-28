@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.71.0
+--------------
+
+- New extended certificate generation window (#1832)
+- 1676 design new catalog page (#1818)
+- Fixes text alignment for the Enrolled button, hide the upsell card in new design (#1830)
+- Featured Products Carousel (#1820)
+- New design: Course page layout changes (#1816)
+
 Version 0.70.9 (Released August 23, 2023)
 --------------
 
