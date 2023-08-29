@@ -691,10 +691,16 @@ class HomePage(Page):
         return page_data
 
     def get_context(self, request, *args, **kwargs):
+        user = request.user.email
         posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
         show_new_featured_carousel = posthog.feature_enabled(
             "mitxonline-new-featured-carousel",
-            "randomID",
+            user,
+            person_properties={"environment": settings.ENVIRONMENT},
+        )
+        show_new_design_hero = posthog.feature_enabled(
+            "mitxonline-new-featured-hero",
+            user,
             person_properties={"environment": settings.ENVIRONMENT},
         )
         return {
@@ -703,6 +709,7 @@ class HomePage(Page):
             "product_cards_section_title": self.product_section_title,
             "products": self.products,
             "show_new_featured_carousel": show_new_featured_carousel,
+            "show_new_design_hero": show_new_design_hero,
         }
 
 
