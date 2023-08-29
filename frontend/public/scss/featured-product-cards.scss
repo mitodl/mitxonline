@@ -253,6 +253,7 @@
         background-color: transparent;
         align-self: center;
         margin: auto;
+        text-decoration: none;
         @include media-breakpoint-down(sm) {
           width: 100%;
           max-width: 280px;
