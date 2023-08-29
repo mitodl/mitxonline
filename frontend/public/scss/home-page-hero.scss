@@ -1,0 +1,139 @@
+@import "variables";
+@import "~bootstrap/scss/bootstrap";
+
+.home-page-hero-row {
+  width: 100%;
+  height: 600px;
+  @include media-breakpoint-down(sm) {
+    width: 100%;
+    height: 300px;
+  }
+
+  .home-page-hero {
+    max-width: 1440px;
+    max-height: 600px;
+    flex-shrink: 0;
+    background: url("/static/images/home-page-hero-image.png") lightgray 50% 50% / cover no-repeat content-box;
+    padding-bottom: 0;
+    margin: 0 auto;
+    @include media-breakpoint-down(md) {
+      max-width: 100%;
+    }
+
+    @include media-breakpoint-down(sm) {
+      max-width: 100%;
+      max-height: 147px;
+      background-position-y: top;
+      background-position-x: 0;
+    }
+
+    .home-page-hero-overlay {
+      max-width: 1440px;
+      height: 600px;
+      border-bottom: 1px solid #491EA4;
+      background: linear-gradient(270deg, rgba(0, 0, 0, 0.90) 0%, rgba(0, 0, 0, 0.00) 100%) content-box;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      @include media-breakpoint-down(sm) {
+        align-self: start;
+        max-width: 100%;
+        max-height: 147px;
+      }
+
+      .hero-title {
+        background: none;
+        max-width: 650px;
+        width: 650px;
+        padding: 0;
+        margin-bottom: 50px;
+        @include media-breakpoint-down(sm) {
+          max-width: 100%;
+          background: $home-page-header-blue;
+          margin-top: 147px;
+          margin-bottom: 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+
+        h1 {
+          color: #FFF;
+          font-size: 65px;
+          font-style: normal;
+          font-weight: 700;
+          line-height: normal;
+          @include media-breakpoint-down(sm) {
+            font-size: 25px;
+            margin-top: 20px;
+            text-align: center;
+          }
+        }
+
+        h2 {
+          color: #03ADD2;
+          font-size: 24px;
+          font-style: normal;
+          font-weight: 500;
+          line-height: normal;
+          text-transform: uppercase;
+          margin-bottom: 50px;
+          @include media-breakpoint-down(sm) {
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 0;
+            padding-bottom: 68px;
+          }
+        }
+
+        p {
+          color: #FFF;
+          font-size: 16px;
+          font-style: normal;
+          font-weight: 400;
+          line-height: 25px;
+          margin-bottom: 0;
+          @include media-breakpoint-down(sm) {
+            display: none;
+          }
+        }
+      }
+
+      .hero-button-container {
+        padding-bottom: 93px;
+        display: flex;
+        justify-items: start;
+        width: 650px;
+        @include media-breakpoint-down(sm) {
+          width: 100%;
+          margin-top: -55px;
+          justify-items: center;
+        }
+
+        .hero-explore-button {
+          display: inline-flex;
+          padding: 20px 40px;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          border-radius: 5px;
+          background: $brand-darker-bg;
+          color: #FFF;
+          text-align: center;
+          font-size: 20px;
+          font-style: normal;
+          font-weight: 700;
+          line-height: normal;
+          border: none;
+          text-decoration: none;
+          @include media-breakpoint-down(sm) {
+            padding: 12px 15px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin: auto;
+          }
+        }
+      }
+    }
+  }
+}

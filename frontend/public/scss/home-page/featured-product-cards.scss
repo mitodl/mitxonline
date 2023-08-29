@@ -226,7 +226,7 @@
       padding-bottom: 66px;
       display: flex;
       margin-top: 17px;
-      width: 1344px;
+      width: 100%;
       @include media-breakpoint-down(sm) {
         width: 100%;
         margin-top: 30px;
@@ -249,6 +249,7 @@
         background-color: transparent;
         align-self: center;
         margin: auto;
+        text-decoration: none;
         @include media-breakpoint-down(sm) {
           width: 100%;
           max-width: 280px;
