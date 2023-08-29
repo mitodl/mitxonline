@@ -73,6 +73,45 @@ from main.views import get_base_context
 log = logging.getLogger()
 
 
+class VideoPlayerConfigMixin(Page):
+    """Mixin to generate the config of a video, based on url, for a model"""
+
+    class Meta:
+        abstract = True
+
+    @property
+    def video_player_config(self):
+        """Get configuration for video player"""
+
+        if self.video_url:
+            config = {"techOrder": ["html5"], "sources": [{"src": self.video_url}]}
+            try:
+                embed = get_embed(self.video_url)
+                provider_name = embed.provider_name.lower()
+                config["techOrder"] = [provider_name, *config["techOrder"]]
+                config["sources"][0]["type"] = f"video/{provider_name}"
+
+                # As per https://github.com/mitodl/mitxonline/issues/490 we want to use the same controls of youtube in
+                # case of youtube videos for supporting closed captions. We can do it in two possible ways:
+                # 1) We add "Track" key of type `Captions` to the config with a hosted or static transcript file URL
+                # 2) Or we can just disable `video.js` self controls and enable all the youtube controls for the youtube
+                # based videos with embedded support for the closed captioning.
+                # The solution in #2 is used below.
+                if provider_name == "youtube":
+                    config["controls"] = False
+                    config["youtube"] = {
+                        "ytControls": 2,
+                        "cc_load_policy": 1,
+                        "cc_lang_pref": 1,
+                    }
+
+            except EmbedException:
+                log.info(
+                    f"The embed for the current url {self.video_url} is unavailable."
+                )
+            return dumps(config)
+
+
 class SignatoryObjectIndexPage(Page):
     """
     A placeholder class to group signatory object pages as children.
@@ -589,7 +628,7 @@ class InstructorPageLink(models.Model):
     ]
 
 
-class HomePage(Page):
+class HomePage(VideoPlayerConfigMixin):
     """
     Site home page
     """
@@ -624,6 +663,22 @@ class HomePage(Page):
         blank=True,
         help_text="The title text to display in the product cards section of the home page.",
     )
+    video_component_title = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="The title text to display in the video section of the home page.",
+    )
+    video_component_description = RichTextField(
+        null=True,
+        blank=True,
+        help_text="The text supporting the video in the video component on the homepage.",
+    )
+    video_url = models.URLField(
+        null=True,
+        blank=True,
+        help_text="URL to the video to be displayed for the homepage video component. It can be an HLS or Youtube video URL.",
+    )
 
     content_panels = Page.content_panels + [
         FieldPanel("hero"),
@@ -631,6 +686,9 @@ class HomePage(Page):
         FieldPanel("hero_subtitle"),
         FieldPanel("product_section_title"),
         InlinePanel("featured_products", label="Featured Products"),
+        FieldPanel("video_component_title"),
+        FieldPanel("video_component_description"),
+        FieldPanel("video_url"),
     ]
 
     parent_page_types = [Page]
@@ -703,6 +761,12 @@ class HomePage(Page):
             user,
             person_properties={"environment": settings.ENVIRONMENT},
         )
+        show_home_page_video_component = posthog.feature_enabled(
+            "mitxonline-new-home-page-video-component",
+            "randomID",
+            person_properties={"environment": settings.ENVIRONMENT},
+        )
+
         return {
             **super().get_context(request),
             **get_base_context(request),
@@ -710,6 +774,7 @@ class HomePage(Page):
             "products": self.products,
             "show_new_featured_carousel": show_new_featured_carousel,
             "show_new_design_hero": show_new_design_hero,
+            "show_home_page_video_component": show_home_page_video_component,
         }
 
 
@@ -814,7 +879,7 @@ class ProgramIndexPage(CourseObjectIndexPage):
         return self.get_children().get(programpage__program__readable_id=readable_id)
 
 
-class ProductPage(Page):
+class ProductPage(VideoPlayerConfigMixin):
     """
     Abstract detail page for course runs and any other "product" that a user can enroll in
     """
@@ -911,38 +976,6 @@ class ProductPage(Page):
     def certificate_page(self):
         """Gets the certificate child page"""
         return self._get_child_page_of_type(CertificatePage)
-
-    @property
-    def video_player_config(self):
-        """Get configuration for video player"""
-
-        if self.video_url:
-            config = {"techOrder": ["html5"], "sources": [{"src": self.video_url}]}
-            try:
-                embed = get_embed(self.video_url)
-                provider_name = embed.provider_name.lower()
-                config["techOrder"] = [provider_name, *config["techOrder"]]
-                config["sources"][0]["type"] = f"video/{provider_name}"
-
-                # As per https://github.com/mitodl/mitxonline/issues/490 we want to use the same controls of youtube in
-                # case of youtube videos for supporting closed captions. We can do it in two possible ways:
-                # 1) We add "Track" key of type `Captions` to the config with a hosted or static transcript file URL
-                # 2) Or we can just disable `video.js` self controls and enable all the youtube controls for the youtube
-                # based videos with embedded support for the closed captioning.
-                # The solution in #2 is used below.
-                if provider_name == "youtube":
-                    config["controls"] = False
-                    config["youtube"] = {
-                        "ytControls": 2,
-                        "cc_load_policy": 1,
-                        "cc_lang_pref": 1,
-                    }
-
-            except EmbedException:
-                log.info(
-                    f"The embed for the current url {self.video_url} is unavailable."
-                )
-            return dumps(config)
 
     @property
     def is_course_page(self):

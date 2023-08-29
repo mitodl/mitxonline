@@ -19,7 +19,7 @@
             </p>
         </div>
         <div class="hero-button-container">
-          <button type="button" class="hero-explore-button" href="">Explore Courses</button>
+          <a role="button" class="hero-explore-button" href="/catalog">Explore Courses</a>
         </div>
       </div>
     </div>
@@ -87,7 +87,7 @@
         </div>
       </div>
     <div class="featured-product-navigation">
-      <button type="button" href="" class="view-catalog-button">View MITx Online Catalog</button>
+      <a role="button" href="/catalog" class="view-catalog-button">View MITx Online Catalog</a>
     </div>
     </div>
   </div>
@@ -125,6 +125,33 @@
       </ul>
     </div>
   </div>
+{% endif %}
+{% if show_home_page_video_component %}
+<div class="home-page-video-row d-flex justify-content-center row">
+  <div class="home-page-video-container">
+    <div class="home-page-video-description">
+      <h3>{{ page.video_component_title }}</h3>
+      <p>{{ page.video_component_description|richtext }}</p>
+    </div>
+      <div class="home-page-video-wrapper">
+        <div class="home-page-video-player">
+          {% if page.video_url %}
+            <video-js
+                  class="vjs-default-skin vjs-big-play-centered"
+                  controls
+                  data-setup="{{page.video_player_config}}"
+                  preload="metadata"
+                >
+              </video-js>
+            <div class="home-page-video-underlay">
+
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+  </div>
+</div>
 {% endif %}
 {% endblock %}
 {% block scripts %}

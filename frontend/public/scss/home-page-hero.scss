@@ -125,6 +125,7 @@
           font-weight: 700;
           line-height: normal;
           border: none;
+          text-decoration: none;
           @include media-breakpoint-down(sm) {
             padding: 12px 15px;
             border-radius: 3px;
