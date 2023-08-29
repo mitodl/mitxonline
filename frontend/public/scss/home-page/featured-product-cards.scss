@@ -1,6 +1,5 @@
-@import "variables";
+@import "../variables";
 @import "~bootstrap/scss/bootstrap";
-@import "~video.js/dist/video-js";
 
 // TODO: `featured-product-section h1` should replace `course-section h1` in home.css on feature merge
 .featured-product-section h1 {

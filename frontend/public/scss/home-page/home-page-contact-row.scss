@@ -1,0 +1,18 @@
+
+.home-page-contact-row {
+  width: 100%;
+  max-width: 1440px;
+  display: flex;
+  margin-top: 140px;
+  margin-bottom: -80px;
+  justify-content: space-between;
+
+  .home-page-hbspt-form-wrapper {
+    width: 50%;
+
+  }
+  .home-page-social-links {
+    width: 50%;
+    color: green;
+  }
+}

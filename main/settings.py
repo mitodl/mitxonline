@@ -1144,3 +1144,15 @@ POSTHOG_API_HOST = get_string(
     default="",
     description="API host for PostHog",
 )
+
+HUBSPOT_HOME_PAGE_FORM_GUID=get_string(
+    name="HUBSPOT_HOME_PAGE_FORM_GUID",
+    default="",
+    description="Hubspot ID for the home page contact form",
+)
+
+HUBSPOT_PORTAL_ID=get_string(
+    name="HUBSPOT_PORTAL_ID",
+    default="",
+    description="Hubspot Portal ID",
+)

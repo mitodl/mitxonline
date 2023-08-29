@@ -751,6 +751,8 @@ class HomePage(VideoPlayerConfigMixin):
     def get_context(self, request, *args, **kwargs):
         user = request.user.email
         posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
+        hubspot_portal_id = settings.HUBSPOT_PORTAL_ID
+        hubspot_home_page_form_guid = settings.HUBSPOT_HOME_PAGE_FORM_GUID
         show_new_featured_carousel = posthog.feature_enabled(
             "mitxonline-new-featured-carousel",
             user,
@@ -763,7 +765,12 @@ class HomePage(VideoPlayerConfigMixin):
         )
         show_home_page_video_component = posthog.feature_enabled(
             "mitxonline-new-home-page-video-component",
-            "randomID",
+            user,
+            person_properties={"environment": settings.ENVIRONMENT},
+        )
+        show_home_page_contact_form = posthog.feature_enabled(
+            "mitxonline-new-home-page-contact-form",
+            user,
             person_properties={"environment": settings.ENVIRONMENT},
         )
 
@@ -775,6 +782,9 @@ class HomePage(VideoPlayerConfigMixin):
             "show_new_featured_carousel": show_new_featured_carousel,
             "show_new_design_hero": show_new_design_hero,
             "show_home_page_video_component": show_home_page_video_component,
+            "show_home_page_contact_form": show_home_page_contact_form,
+            "hubspot_portal_id": hubspot_portal_id,
+            "hubspot_home_page_form_guid": hubspot_home_page_form_guid
         }
 
 
