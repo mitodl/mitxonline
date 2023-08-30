@@ -2,6 +2,7 @@
 import json
 import logging
 import re
+import uuid
 from datetime import datetime, timedelta
 from json import dumps
 from urllib.parse import quote_plus
@@ -749,7 +750,12 @@ class HomePage(VideoPlayerConfigMixin):
         return page_data
 
     def get_context(self, request, *args, **kwargs):
-        user = request.user.email
+        if request.user.is_authenticated:
+            user = request.user.email
+        else:
+            if "anonymous_session_id" not in request.session:
+                request.session["anonymous_session_id"] = str(uuid.uuid4())
+            user = request.session["anonymous_session_id"]
         posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
         show_new_featured_carousel = posthog.feature_enabled(
             "mitxonline-new-featured-carousel",
@@ -763,7 +769,7 @@ class HomePage(VideoPlayerConfigMixin):
         )
         show_home_page_video_component = posthog.feature_enabled(
             "mitxonline-new-home-page-video-component",
-            "randomID",
+            user,
             person_properties={"environment": settings.ENVIRONMENT},
         )
 
