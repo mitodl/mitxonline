@@ -1,9 +1,5 @@
 {% extends "base.html" %}
-{% block bodyclass %}
-  {% if show_new_design_hero or show_new_featured_carousel or show_home_page_video_component %}
-    new-design
-  {% endif %}
-{% endblock %}
+{% block bodyclass %}{% if show_new_design_hero or show_new_featured_carousel or show_home_page_video_component %}new-design{% endif %}{% endblock %}
 
 {% load static wagtail_img_src feature_img_src %}
 {% load wagtailcore_tags wagtailembeds_tags %}
