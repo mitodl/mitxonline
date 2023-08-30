@@ -160,38 +160,40 @@
 {% endif %}
 {% if show_home_page_contact_form %}
   <div class="home-page-contact-row">
-  <div class="home-page-hbspt-form-wrapper">
-    <h3>Sign up for updates</h3>
-    <p>Join our newsletter for course updates and more.</p>
-    <script
-          defer
-          charset="utf-8"
-          type="text/javascript"
-          src="//js.hsforms.net/forms/v2-legacy.js"
-        ></script>
+    <div class="home-page-contact-row-container">
+      <div class="home-page-hbspt-form-wrapper">
+        <h3>Sign up for updates</h3>
+        <p>Join our newsletter for course updates and more.</p>
         <script
-          defer
-          charset="utf-8"
-          type="text/javascript"
-          src="//js.hsforms.net/forms/v2.js"
-        ></script>
-     <script type="text/javascript">
-        document.addEventListener('DOMContentLoaded', function() {
-            if (typeof hbspt !== 'undefined') {
-                hbspt.forms.create({
-                    portalId: "{{ hubspot_portal_id | safe }}",
-                    formId: "{{ hubspot_home_page_form_guid | safe }}"
-                });
-            }
-        });
-    </script>
-  </div>
-  <div class="home-page-social-links">
-    <h3>Connect with us</h3>
-    <div class="button--icon facebook-button">Facebook</div>
-    <div class="button--icon linkedin-button">linkedin</div>
-    <div class="button--icon twitter-button">Twitter</div>
-  </div>
+              defer
+              charset="utf-8"
+              type="text/javascript"
+              src="//js.hsforms.net/forms/v2-legacy.js"
+            ></script>
+            <script
+              defer
+              charset="utf-8"
+              type="text/javascript"
+              src="//js.hsforms.net/forms/v2.js"
+            ></script>
+         <script type="text/javascript">
+            document.addEventListener('DOMContentLoaded', function() {
+                if (typeof hbspt !== 'undefined') {
+                    hbspt.forms.create({
+                        portalId: "{{ hubspot_portal_id | safe }}",
+                        formId: "{{ hubspot_home_page_form_guid | safe }}"
+                    });
+                }
+            });
+        </script>
+      </div>
+      <div class="home-page-social-links">
+        <h3>Connect with us</h3>
+        <div class="button--icon facebook-button">Facebook</div>
+        <div class="button--icon linkedin-button">linkedin</div>
+        <div class="button--icon twitter-button">Twitter</div>
+      </div>
+    </div>
   </div>
 {% endif %}
 {% endblock %}
