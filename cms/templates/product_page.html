@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block bodyclass %}{% if new_design %}new-design{% endif %}{% endblock %}
 
 {% load static wagtail_img_src feature_img_src %}
 {% load wagtailcore_tags wagtailembeds_tags %}
