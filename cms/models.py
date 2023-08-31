@@ -1062,6 +1062,7 @@ class ProductPage(VideoPlayerConfigMixin):
             "instructors": instructors,
         }
 
+
 class CoursePage(ProductPage):
     """
     Detail page for courses
