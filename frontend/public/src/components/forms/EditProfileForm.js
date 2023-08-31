@@ -1,7 +1,6 @@
 // @flow
 import React from "react"
 import { Formik, Form } from "formik"
-import { checkFeatureFlag } from "../../lib/util"
 import {
   legalAddressValidation,
   profileValidation,
