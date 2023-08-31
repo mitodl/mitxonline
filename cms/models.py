@@ -1,7 +1,6 @@
 """CMS model definitions"""
 import json
 import logging
-import posthog
 import re
 import uuid
 from datetime import datetime, timedelta
@@ -67,6 +66,7 @@ from flexiblepricing.models import (
     FlexiblePrice,
     FlexiblePricingRequestSubmission,
 )
+from main import features
 from main.views import get_base_context
 
 log = logging.getLogger()
@@ -755,22 +755,9 @@ class HomePage(VideoPlayerConfigMixin):
                 request.session["anonymous_session_id"] = str(uuid.uuid4())
             user = request.session["anonymous_session_id"]
 
-        show_new_featured_carousel = posthog.feature_enabled(
-            "mitxonline-new-featured-carousel",
-            user,
-            person_properties={"environment": settings.ENVIRONMENT},
-        )
-        show_new_design_hero = posthog.feature_enabled(
-            "mitxonline-new-featured-hero",
-            user,
-            person_properties={"environment": settings.ENVIRONMENT},
-        )
-        show_home_page_video_component = posthog.feature_enabled(
-            "mitxonline-new-home-page-video-component",
-            user,
-            person_properties={"environment": settings.ENVIRONMENT},
-        )
-
+        show_new_featured_carousel = features.is_enabled(features.ENABLE_NEW_HOME_PAGE_FEATURED, False, user)
+        show_new_design_hero = features.is_enabled(features.ENABLE_NEW_HOME_PAGE_HERO, False, user)
+        show_home_page_video_component = features.is_enabled(features.ENABLE_NEW_HOME_PAGE_VIDEO, False, user)
         return {
             **super().get_context(request),
             **get_base_context(request),

@@ -1,5 +1,4 @@
 """MITxOnline feature flags"""
-import os
 import posthog
 from functools import wraps
 
@@ -9,15 +8,18 @@ from django.conf import settings
 IGNORE_EDX_FAILURES = "IGNORE_EDX_FAILURES"
 SYNC_ON_DASHBOARD_LOAD = "SYNC_ON_DASHBOARD_LOAD"
 ENABLE_NEW_DESIGN = "mitxonline-new-product-page"
+ENABLE_NEW_HOME_PAGE_FEATURED = "mitxonline-new-featured-carousel"
+ENABLE_NEW_HOME_PAGE_HERO = "mitxonline-new-featured-hero"
+ENABLE_NEW_HOME_PAGE_VIDEO = "mitxonline-new-home-page-video-component"
 
-
-def is_enabled(name, default=None):
+def is_enabled(name, default=None, unique_id=settings.HOSTNAME):
     """
     Returns True if the feature flag is enabled
 
     Args:
         name (str): feature flag name
         default (bool): default value if not set in settings
+        unique_id (str): person identifier passed back to posthog
 
     Returns:
         bool: True if the feature flag is enabled
@@ -27,7 +29,7 @@ def is_enabled(name, default=None):
         posthog
         and posthog.feature_enabled(
             name,
-            settings.HOSTNAME,
+            unique_id,
             person_properties={"environment": settings.ENVIRONMENT},
         )
     ) or settings.FEATURES.get(name, default or settings.FEATURES_DEFAULT)
