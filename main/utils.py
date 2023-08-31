@@ -48,6 +48,7 @@ def get_js_settings(request: HttpRequest):
         "sentry_dsn": remove_password_from_url(settings.SENTRY_DSN),
         "support_email": settings.EMAIL_SUPPORT,
         "site_name": settings.SITE_NAME,
+        "features": {},
         "posthog_api_token": settings.POSTHOG_API_TOKEN,
         "posthog_api_host": settings.POSTHOG_API_HOST,
     }
