@@ -1,6 +1,7 @@
 """CMS model definitions"""
 import json
 import logging
+import posthog
 import re
 import uuid
 from datetime import datetime, timedelta
@@ -19,7 +20,6 @@ from django.urls import reverse
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from modelcluster.fields import ParentalKey
-from posthog import Posthog
 from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel
 from wagtail.blocks import PageChooserBlock, StreamBlock
 from wagtail.contrib.forms.forms import FormBuilder
@@ -756,7 +756,7 @@ class HomePage(VideoPlayerConfigMixin):
             if "anonymous_session_id" not in request.session:
                 request.session["anonymous_session_id"] = str(uuid.uuid4())
             user = request.session["anonymous_session_id"]
-        posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
+
         show_new_featured_carousel = posthog.feature_enabled(
             "mitxonline-new-featured-carousel",
             user,
