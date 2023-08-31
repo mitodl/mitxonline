@@ -27,7 +27,6 @@ from wagtail.contrib.forms.models import (
     FORM_FIELD_CHOICES,
     AbstractForm,
     AbstractFormField,
-    AbstractFormSubmission,
 )
 from wagtail.contrib.routable_page.models import RoutablePageMixin, route
 from wagtail.coreutils import WAGTAIL_APPEND_SLASH
@@ -35,12 +34,11 @@ from wagtail.embeds.embeds import get_embed
 from wagtail.embeds.exceptions import EmbedException
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images.models import Image
-from wagtail.models import Orderable, Page, Site
+from wagtail.models import Page
 from wagtail.search import index
 
 from cms.blocks import (
     CourseRunCertificateOverrides,
-    FacultyBlock,
     PriceBlock,
     ResourceBlock,
     validate_unique_readable_ids,
@@ -1063,19 +1061,6 @@ class ProductPage(VideoPlayerConfigMixin):
             **get_base_context(request),
             "instructors": instructors,
         }
-
-    def get_context(self, request, *args, **kwargs):
-        instructors = [
-            member.linked_instructor_page
-            for member in self.linked_instructors.order_by("order").all()
-        ]
-
-        return {
-            **super().get_context(request),
-            **get_base_context(request),
-            "instructors": instructors,
-        }
-
 
 class CoursePage(ProductPage):
     """
