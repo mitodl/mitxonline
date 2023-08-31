@@ -757,9 +757,15 @@ class HomePage(VideoPlayerConfigMixin):
                 request.session["anonymous_session_id"] = str(uuid.uuid4())
             user = request.session["anonymous_session_id"]
 
-        show_new_featured_carousel = features.is_enabled(features.ENABLE_NEW_HOME_PAGE_FEATURED, False, user)
-        show_new_design_hero = features.is_enabled(features.ENABLE_NEW_HOME_PAGE_HERO, False, user)
-        show_home_page_video_component = features.is_enabled(features.ENABLE_NEW_HOME_PAGE_VIDEO, False, user)
+        show_new_featured_carousel = features.is_enabled(
+            features.ENABLE_NEW_HOME_PAGE_FEATURED, False, user
+        )
+        show_new_design_hero = features.is_enabled(
+            features.ENABLE_NEW_HOME_PAGE_HERO, False, user
+        )
+        show_home_page_video_component = features.is_enabled(
+            features.ENABLE_NEW_HOME_PAGE_VIDEO, False, user
+        )
         return {
             **super().get_context(request),
             **get_base_context(request),
