@@ -23,7 +23,6 @@ import {
 } from "../../../lib/auth"
 import queries from "../../../lib/queries"
 import { qsPartialTokenSelector } from "../../../lib/selectors"
-import { checkFeatureFlag } from "../../../lib/util"
 
 import RegisterDetailsForm from "../../../components/forms/RegisterDetailsForm"
 import { addUserNotification } from "../../../actions"
@@ -100,10 +99,7 @@ export class RegisterDetailsPage extends React.Component<Props> {
         })
       }
 
-      if (
-        body.state === STATE_SUCCESS &&
-        checkFeatureFlag("enable_addl_profile_fields")
-      ) {
+      if (body.state === STATE_SUCCESS) {
         body.redirect_url = routes.register.additionalDetails
       }
 
