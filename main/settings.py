@@ -10,6 +10,7 @@ from urllib.parse import urljoin, urlparse
 
 import cssutils
 import dj_database_url
+import posthog
 from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common.envs import (
@@ -1133,6 +1134,7 @@ HUBSPOT_TASK_DELAY = get_int(
     description="Number of milliseconds to wait between consecutive Hubspot calls",
 )
 
+# posthog setup
 POSTHOG_API_TOKEN = get_string(
     name="POSTHOG_API_TOKEN",
     default="",
@@ -1144,3 +1146,9 @@ POSTHOG_API_HOST = get_string(
     default="",
     description="API host for PostHog",
 )
+
+if "IN_TEST_SUITE" not in os.environ:
+    posthog.api_key = POSTHOG_API_TOKEN
+    posthog.host = POSTHOG_API_HOST
+else:
+    posthog.disabled = True

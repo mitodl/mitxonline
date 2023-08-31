@@ -1,14 +1,9 @@
 """MITxOnline feature flags"""
 import os
+import posthog
 from functools import wraps
 
 from django.conf import settings
-from posthog import Posthog
-
-if "IN_TEST_SUITE" not in os.environ:
-    posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
-else:
-    posthog = None
 
 
 IGNORE_EDX_FAILURES = "IGNORE_EDX_FAILURES"
