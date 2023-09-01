@@ -127,6 +127,8 @@ jobs:
           OPENEDX_API_CLIENT_SECRET: fake_client_secret
           OPENEDX_API_KEY: test-openedx-api-key  # pragma: allowlist secret
           SECRET_KEY: local_unsafe_key
+          POSTHOG_API_TOKEN: fake_posthog_api_token
+          POSTHOG_API_HOST: http://fakeurl.com
 
       - name: Upload coverage to CodeCov
         uses: codecov/codecov-action@v3
