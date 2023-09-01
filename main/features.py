@@ -1,5 +1,4 @@
 """MITxOnline feature flags"""
-import posthog
 from functools import wraps
 
 from django.conf import settings
@@ -21,12 +20,18 @@ def is_enabled(name, default=None, unique_id=settings.HOSTNAME):
     Args:
         name (str): feature flag name
         default (bool): default value if not set in settings
-        unique_id (str): person identifier passed back to posthog
+        unique_id (str): person identifier passed back to posthog which is the display value for person. I recommend
+                         this be a readable id for logged-in users to allow for user flags as well as troubleshooting.
+                         For anonymous users, a persistent ID will help with troubleshooting and tracking efforts.
 
     Returns:
         bool: True if the feature flag is enabled
     """
-
+    
+     if "IN_TEST_SUITE" not in os.environ:
+        import posthog
+    else:
+        posthog = None
     return (
         posthog
         and posthog.feature_enabled(
