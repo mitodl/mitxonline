@@ -1,5 +1,5 @@
 """MITxOnline feature flags"""
-import posthog
+import os
 from functools import wraps
 
 from django.conf import settings
@@ -26,6 +26,11 @@ def is_enabled(name, default=None, unique_id=settings.HOSTNAME):
     Returns:
         bool: True if the feature flag is enabled
     """
+
+    if "IN_TEST_SUITE" not in os.environ:
+        import posthog
+    else:
+        posthog = None
 
     return (
         posthog
