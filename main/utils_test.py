@@ -46,9 +46,7 @@ def test_get_js_settings(settings, rf):
         "recaptchaKey": settings.RECAPTCHA_SITE_KEY,
         "support_email": settings.EMAIL_SUPPORT,
         "site_name": settings.SITE_NAME,
-        "features": {
-            "enable_addl_profile_fields": False,
-        },
+        "features": {},
         "posthog_api_token": settings.POSTHOG_API_TOKEN,
         "posthog_api_host": settings.POSTHOG_API_HOST,
     }

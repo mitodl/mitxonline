@@ -12,8 +12,6 @@ declare type Settings = {
   recaptchaKey: ?string,
   support_email: string,
   features: {
-    enable_learner_records: boolean,
-    enable_addl_profile_fields: boolean,
   },
   site_name: string,
   zendesk_config: {

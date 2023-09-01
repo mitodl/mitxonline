@@ -1,7 +1,6 @@
 // @flow
 import React from "react"
 import { Formik, Form } from "formik"
-import { checkFeatureFlag } from "../../lib/util"
 import {
   legalAddressValidation,
   profileValidation,
@@ -29,9 +28,7 @@ const getInitialValues = (user: User) => ({
 const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
   const validation = legalAddressValidation.concat(profileValidation)
 
-  if (checkFeatureFlag("enable_addl_profile_fields")) {
-    validation.concat(addlProfileFieldsValidation)
-  }
+  validation.concat(addlProfileFieldsValidation)
 
   return (
     <Formik
@@ -55,14 +52,12 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
             values={values}
             isNewAccount={false}
           />
-          {checkFeatureFlag("enable_addl_profile_fields") ? (
-            <AddlProfileFields
-              setFieldValue={setFieldValue}
-              setFieldTouched={setFieldTouched}
-              values={values}
-              isNewAccount={false}
-            />
-          ) : null}
+          <AddlProfileFields
+            setFieldValue={setFieldValue}
+            setFieldTouched={setFieldTouched}
+            values={values}
+            isNewAccount={false}
+          />
           <div className="row submit-row no-gutters">
             <div className="col d-flex justify-content-end">
               <button

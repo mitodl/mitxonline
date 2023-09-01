@@ -14,9 +14,7 @@ from django.http import HttpRequest, HttpResponseRedirect
 from mitol.common.utils.urls import remove_password_from_url
 from rest_framework import status
 from rest_framework.response import Response
-from wagtail import VERSION as WAGTAIL_VERSION
 
-from main import features
 from main.constants import USER_MSG_COOKIE_MAX_AGE, USER_MSG_COOKIE_NAME
 from main.settings import TIME_ZONE
 
@@ -50,11 +48,7 @@ def get_js_settings(request: HttpRequest):
         "sentry_dsn": remove_password_from_url(settings.SENTRY_DSN),
         "support_email": settings.EMAIL_SUPPORT,
         "site_name": settings.SITE_NAME,
-        "features": {
-            "enable_addl_profile_fields": features.is_enabled(
-                features.ENABLE_ADDL_PROFILE_FIELDS
-            )
-        },
+        "features": {},
         "posthog_api_token": settings.POSTHOG_API_TOKEN,
         "posthog_api_host": settings.POSTHOG_API_HOST,
     }
