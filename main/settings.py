@@ -5,6 +5,7 @@ Django settings for main.
 import logging
 import os
 import platform
+import posthog
 from datetime import timedelta
 from urllib.parse import urljoin, urlparse
 
@@ -1133,6 +1134,7 @@ HUBSPOT_TASK_DELAY = get_int(
     description="Number of milliseconds to wait between consecutive Hubspot calls",
 )
 
+# PostHog related settings
 POSTHOG_API_TOKEN = get_string(
     name="POSTHOG_API_TOKEN",
     default="",
@@ -1144,3 +1146,6 @@ POSTHOG_API_HOST = get_string(
     default="",
     description="API host for PostHog",
 )
+if "IN_TEST_SUITE" not in os.environ:
+    posthog.api_key = POSTHOG_API_TOKEN
+    posthog.host = POSTHOG_API_HOST
