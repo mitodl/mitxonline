@@ -184,6 +184,7 @@ const renderYearOfBirthField = () => {
         className="form-control"
         autoComplete="bday-year"
         aria-describedby="user_profile.year_of_birth_error"
+        required
       >
         <option value="">-----</option>
         {reverse(range(seedYear - 120, seedYear - 13)).map((year, i) => (
@@ -220,6 +221,8 @@ export const LegalAddressFields = ({
         autoComplete="given-name"
         aria-describedby="first-name-subtitle"
         aria-label="First Name"
+        required
+        title={NAME_REGEX_FAIL_MESSAGE}
       />
       <ErrorMessage name="legal_address.first_name" component={FormError} />
     </div>
@@ -234,6 +237,8 @@ export const LegalAddressFields = ({
         id="legal_address.last_name"
         className="form-control"
         autoComplete="family-name"
+        required
+        title={NAME_REGEX_FAIL_MESSAGE}
       />
       <ErrorMessage name="legal_address.last_name" component={FormError} />
     </div>
@@ -254,6 +259,8 @@ export const LegalAddressFields = ({
         autoComplete="name"
         aria-describedby="full-name-subtitle"
         aria-label="Full Name"
+        required
+        title={fullNameErrorMessage}
       />
       <ErrorMessage name="name" component={FormError} />
     </div>
@@ -342,6 +349,7 @@ export const LegalAddressFields = ({
           className="form-control"
           autoComplete="state"
           aria-describedby="legal_address.state_error"
+          required
         >
           <option value="">-----</option>
           {findStates(values.legal_address.country, countries)
