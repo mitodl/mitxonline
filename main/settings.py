@@ -1147,8 +1147,8 @@ POSTHOG_API_HOST = get_string(
     description="API host for PostHog",
 )
 
-if "IN_TEST_SUITE" not in os.environ:
-    posthog.api_key = POSTHOG_API_TOKEN
-    posthog.host = POSTHOG_API_HOST
-else:
+posthog.api_key = POSTHOG_API_TOKEN
+posthog.host = POSTHOG_API_HOST
+
+if "IN_TEST_SUITE" in os.environ:
     posthog.disabled = True
