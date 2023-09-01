@@ -20,8 +20,9 @@ def is_enabled(name, default=None, unique_id=settings.HOSTNAME):
         name (str): feature flag name
         default (bool): default value if not set in settings
         unique_id (str): person identifier passed back to posthog which is the display value for person. I recommend
-                         this be a readable id for logged-in users to allow for user flags as well as troubleshooting.
-                         For anonymous users, a persistent ID will help with troubleshooting and tracking efforts.
+                         this be user.id for logged-in users to allow for more readable user flags as well as more clear
+                         troubleshooting. For anonymous users, a persistent ID will help with troubleshooting and
+                         tracking efforts.
 
     Returns:
         bool: True if the feature flag is enabled

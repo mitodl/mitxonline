@@ -1134,6 +1134,7 @@ HUBSPOT_TASK_DELAY = get_int(
     description="Number of milliseconds to wait between consecutive Hubspot calls",
 )
 
+# PostHog related settings
 POSTHOG_API_TOKEN = get_string(
     name="POSTHOG_API_TOKEN",
     default="",
