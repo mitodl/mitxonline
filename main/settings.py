@@ -1150,4 +1150,4 @@ posthog.api_key = POSTHOG_API_TOKEN
 posthog.host = POSTHOG_API_HOST
 
 if "IN_TEST_SUITE" in os.environ:
-    posthog.disabled = True
+    posthog = None
