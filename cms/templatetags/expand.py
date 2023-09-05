@@ -1,12 +1,14 @@
 """
-Adds an expandable Read More section to a text block. 
+Adds an expandable Read More section to a text block.
 
 The following rules are followed to determine where the content is split:
-- If the text is HTML and contains a special tag (class="expand_here"), then 
+- If the text is HTML and contains a special tag (class="expand_here"), then
   that will be where the split occurs.
-- If the text is HTML, the content will be split in two after the first <p> or
-  <div> tag. 
-- If the text is not HTML, then split after the first two concurrent newlines.
+- If the text is HTML and contains at least two paragraphs, the content will
+  be split in two after the first <p> or <div> tag.
+- If the text contains two paragraphs separated by two concurrent newlines,
+  then split after the first two concurrent newlines.
+- else for single paragraph, no need to split just return the content
 
 This is intended for use with a Wagtail RichText field.
 """
@@ -33,16 +35,17 @@ def expand(text):
         post = "".join([str(sib) for sib in expand_here.find_next_siblings()])
 
         output = f'{pre}<p class="expand_here_container"><a href="#" class="expand_here_link" data-expand-body="{container_uuid}">Show More</a></p><div class="expand_here_body" id="exp{container_uuid}">{str(expand_here[0])}{post}</div>'
-    elif len(soup.find_all(["p", "div"])) > 0:
+    elif len(soup.find_all(["p", "div"])) > 1:
         expand_here = soup.find_all(["p", "div"], limit=2)
 
         pre = str(expand_here[0])
         post = "".join([str(sib) for sib in expand_here[1].find_next_siblings()])
 
         output = f'<!-- pre -->{pre}<!-- /pre --><p class="expand_here_container"><a href="#" class="expand_here_link" data-expand-body="{container_uuid}">Show More</a></p><div class="expand_here_body" id="exp{container_uuid}">{str(expand_here[1])}{post}</div>'
-    else:
+    elif len(text.split("\n\n")) > 1:
         (pre, post) = text.split("\n\n", maxsplit=1)
 
         output = f'{pre}<p class="expand_here_container"><a href="#" class="expand_here_link" data-expand-body="exp{container_uuid}">Show More</a></p><div class="expand_here_body" id="{container_uuid}">{post}</div>'
-
+    else:
+        output = text
     return output
