@@ -73,7 +73,10 @@ body.new-design {
         }
       }
       .hbspt-form {
-        height: 150px;
+        height: 110px;
+        @include media-breakpoint-down(md) {
+          height: 150px;
+        }
         .submitted-message {
           margin: 20px 0 40px 20px;
         }
