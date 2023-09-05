@@ -23,7 +23,8 @@ import {
   usernameFieldErrorMessage
 } from "../../lib/validation"
 
-export const NAME_REGEX = "^(?![~!@&\\)\\(+:'.?,\\-]+)([^\\/\\^$#*=\\[\\]`%_;\\\\<>\"\\|]+)$"
+export const NAME_REGEX =
+  "^(?![~!@&\\)\\(+:'.?,\\-]+)([^\\/\\^$#*=\\[\\]`%_;\\\\<>\"\\|]+)$"
 
 const seedYear = moment().year()
 
