@@ -223,17 +223,39 @@ body.new-design {
             font-size: 12px;
             margin-right: 0;
           }
+          @include media-breakpoint-down(sm) {
+            font-size: 10px;
+            padding: 7px 10px;
+        }
         }
         .facebook-button {
           background: $home-page-facebook-blue;
+          @include media-breakpoint-down(sm) {
+            svg {
+              width: 10px;
+              height: 18px;
+            }
+          }
         }
         .linkedin-button {
           background: $home-page-linkedin-blue;
+          @include media-breakpoint-down(sm) {
+            svg {
+              width: 18px;
+              height: 18px;
+            }
+          }
         }
         .twitter-button {
           background: $home-page-twitter-blue;
           @include media-breakpoint-down(md) {
             margin-right: 0;
+          }
+          @include media-breakpoint-down(sm) {
+            svg {
+              width: 18px;
+              height: 18px;
+            }
           }
         }
       }
