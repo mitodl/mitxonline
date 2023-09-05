@@ -19,7 +19,6 @@ from django.urls import reverse
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from modelcluster.fields import ParentalKey
-from posthog import Posthog
 from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel
 from wagtail.blocks import PageChooserBlock, StreamBlock
 from wagtail.contrib.forms.forms import FormBuilder
@@ -27,7 +26,6 @@ from wagtail.contrib.forms.models import (
     FORM_FIELD_CHOICES,
     AbstractForm,
     AbstractFormField,
-    AbstractFormSubmission,
 )
 from wagtail.contrib.routable_page.models import RoutablePageMixin, route
 from wagtail.coreutils import WAGTAIL_APPEND_SLASH
@@ -35,12 +33,11 @@ from wagtail.embeds.embeds import get_embed
 from wagtail.embeds.exceptions import EmbedException
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images.models import Image
-from wagtail.models import Orderable, Page, Site
+from wagtail.models import Page
 from wagtail.search import index
 
 from cms.blocks import (
     CourseRunCertificateOverrides,
-    FacultyBlock,
     PriceBlock,
     ResourceBlock,
     validate_unique_readable_ids,
@@ -69,6 +66,7 @@ from flexiblepricing.models import (
     FlexiblePrice,
     FlexiblePricingRequestSubmission,
 )
+from main import features
 from main.views import get_base_context
 
 log = logging.getLogger()
@@ -756,28 +754,19 @@ class HomePage(VideoPlayerConfigMixin):
             if "anonymous_session_id" not in request.session:
                 request.session["anonymous_session_id"] = str(uuid.uuid4())
             user = request.session["anonymous_session_id"]
-        posthog = Posthog(settings.POSTHOG_API_TOKEN, host=settings.POSTHOG_API_HOST)
         hubspot_portal_id = settings.HUBSPOT_PORTAL_ID
         hubspot_home_page_form_guid = settings.HUBSPOT_HOME_PAGE_FORM_GUID
-        show_new_featured_carousel = posthog.feature_enabled(
-            "mitxonline-new-featured-carousel",
-            user,
-            person_properties={"environment": settings.ENVIRONMENT},
+        show_new_featured_carousel = features.is_enabled(
+            features.ENABLE_NEW_HOME_PAGE_FEATURED, False, user
         )
-        show_new_design_hero = posthog.feature_enabled(
-            "mitxonline-new-featured-hero",
-            user,
-            person_properties={"environment": settings.ENVIRONMENT},
+        show_new_design_hero = features.is_enabled(
+            features.ENABLE_NEW_HOME_PAGE_HERO, False, user
         )
-        show_home_page_video_component = posthog.feature_enabled(
-            "mitxonline-new-home-page-video-component",
-            user,
-            person_properties={"environment": settings.ENVIRONMENT},
+        show_home_page_video_component = features.is_enabled(
+            features.ENABLE_NEW_HOME_PAGE_VIDEO, False, user
         )
-        show_home_page_contact_form = posthog.feature_enabled(
-            "mitxonline-new-home-page-contact-form",
-            user,
-            person_properties={"environment": settings.ENVIRONMENT},
+        show_home_page_contact_form = features.is_enabled(
+            features.ENABLE_NEW_HOME_PAGE_CONTACT_FORM, False, user
         )
 
         return {
@@ -1061,18 +1050,6 @@ class ProductPage(VideoPlayerConfigMixin):
         If they're not logged in, this should return None.
         """
         raise NotImplementedError
-
-    def get_context(self, request, *args, **kwargs):
-        instructors = [
-            member.linked_instructor_page
-            for member in self.linked_instructors.order_by("order").all()
-        ]
-
-        return {
-            **super().get_context(request),
-            **get_base_context(request),
-            "instructors": instructors,
-        }
 
     def get_context(self, request, *args, **kwargs):
         instructors = [

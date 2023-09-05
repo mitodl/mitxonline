@@ -1,5 +1,4 @@
 // @flow
-/* global SETTINGS:false */
 import React from "react"
 import moment from "moment"
 
@@ -32,10 +31,6 @@ describe("EnrolledItemCard", () => {
     helper = new IntegrationTestHelper()
     userEnrollment = makeCourseRunEnrollment()
     currentUser = makeUser()
-    SETTINGS.features = {
-      enable_learner_records:     false,
-      enable_addl_profile_fields: false
-    }
     enrollmentCardProps = {
       enrollment:           userEnrollment,
       currentUser:          currentUser,
@@ -131,10 +126,6 @@ describe("EnrolledItemCard", () => {
         const pricingLinks = inner.find(".pricing-links")
         assert.isFalse(pricingLinks.exists())
       } else {
-        SETTINGS.features = {
-          enable_learner_records:     false,
-          enable_addl_profile_fields: false
-        }
         const pricingLinks = inner.find(".pricing-links")
         assert.isFalse(pricingLinks.exists())
       }
