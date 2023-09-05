@@ -8,31 +8,54 @@ body.new-design {
   margin-bottom: -10%;
   display: flex;
   justify-content: center;
-  background-color: $home-page-grey-lite;
+  border-top: thin solid $home-page-border-grey;
+  background: $home-page-grey-lite linear-gradient($home-page-border-grey, $home-page-border-grey) no-repeat center/1px 100%;
+  @include media-breakpoint-down(lg) {
+    background: $home-page-grey-lite;
+  }
+
   .home-page-contact-col {
-    width: 50%;
-    border: thin solid $home-page-border-grey;
-    border-left: none;
+    width: calc(50% - 72px);
+    @include media-breakpoint-down(lg) {
+      width: 100%;
+    }
   }
   .home-page-contact-row-container {
     max-width: 1440px;
     width: 100%;
     display: flex;
     justify-content: space-between;
+    padding-left: 12px;
+    padding-right: 12px;
+    @include media-breakpoint-down(lg) {
+      flex-direction: column;
+    }
     .home-page-hbspt-form-wrapper {
-      padding-right: 95px;
       padding-top: 40px;
+      padding-left: 60px;
+      @include media-breakpoint-down(md) {
+        padding: 30px 3px 0 3px;
+      }
       .home-page-hbspt-form-heading-row {
         display: flex;
         flex-direction: row;
         align-content: space-around;
+        @include media-breakpoint-down(md) {
+          align-content: normal;
+          flex-direction: column;
+          justify-content: start;
+        }
         h3 {
           color: $home-page-header-blue;
           font-size: 20px;
           font-style: normal;
           font-weight: 700;
           line-height: normal;
-          margin: auto;
+          margin-bottom: 0;
+          @include media-breakpoint-down(md) {
+            font-size: 18px;
+            margin: 15px 0 0 0;
+          }
         }
         p {
           margin-left: 22px;
@@ -42,10 +65,15 @@ body.new-design {
           font-weight: 400;
           line-height: normal;
           margin: auto;
+          @include media-breakpoint-down(md) {
+            font-size: 13px;
+            line-height: 24px;
+            margin: 15px 0 0 0;
+          }
         }
       }
       .hbspt-form {
-        height: 110px;
+        height: 150px;
         .submitted-message {
           margin: 20px 0 40px 20px;
         }
@@ -57,6 +85,9 @@ body.new-design {
           .hs_email {
             order: 1;
             width: 70%;
+            @include media-breakpoint-down(md) {
+              width: 100%;
+            }
             label {
               display: none;
             }
@@ -102,10 +133,16 @@ body.new-design {
           .hs_submit {
             order: 2;
             width: 30%;
-
+            @include media-breakpoint-down(md) {
+              width: 100%;
+              margin-top: 20px;
+            }
             .actions {
               width: 100%;
-                max-width: 138px;
+              max-width: 138px;
+              @include media-breakpoint-down(md) {
+                max-width: 100%;
+              }
               .hs-button {
                 height: 50px;
                 display: inline-flex;
@@ -122,6 +159,9 @@ body.new-design {
                 border: unset;
                 width: 100%;
                 max-width: 138px;
+                @include media-breakpoint-down(md) {
+                  max-width: 100%;
+                }
               }
             }
           }
@@ -133,10 +173,19 @@ body.new-design {
 
     .home-page-social-links {
       display: flex;
-      padding-left: 95px;
       flex-direction: column;
+      @include media-breakpoint-down(lg) {
+        padding-left: 60px;
+        margin-bottom: 40px;
+      }
+      @include media-breakpoint-down(md) {
+        padding: 0 3px 0 3px;
+      }
       .social-links-heading {
         margin-top: 40px;
+        @include media-breakpoint-down(lg) {
+          margin-top: 0;
+        }
         h3 {
           color: $home-page-header-blue;
           font-size: 20px;
@@ -144,11 +193,17 @@ body.new-design {
           font-weight: 700;
           line-height: normal;
           margin-bottom: 0;
+          @include media-breakpoint-down(md) {
+            font-size: 18px;
+          }
         }
       }
       .social-links-buttons {
         display: flex;
         margin-top: 20px;
+        @include media-breakpoint-down(md) {
+          justify-content: space-between;
+        }
         a {
           margin-right: 20px;
           text-decoration: none;
@@ -160,6 +215,10 @@ body.new-design {
           color: white;
           font-size: 16px;
           font-weight: 700;
+
+          @include media-breakpoint-down(md) {
+            font-size: 12px;
+          }
         }
         .facebook-button {
           background: $home-page-facebook-blue;
@@ -169,6 +228,9 @@ body.new-design {
         }
         .twitter-button {
           background: $home-page-twitter-blue;
+          @include media-breakpoint-down(md) {
+            margin-right: 0;
+          }
         }
       }
     }
