@@ -90,6 +90,7 @@ body.new-design {
             width: 70%;
             @include media-breakpoint-down(md) {
               width: 100%;
+              max-width: 100%;
             }
             label {
               display: none;
@@ -110,6 +111,10 @@ body.new-design {
                   font-style: normal;
                   font-weight: 400;
                   line-height: normal;
+                }
+                @include media-breakpoint-down(md) {
+                  width: 100%;
+                  max-width: 100%;
                 }
               }
             }
@@ -135,7 +140,11 @@ body.new-design {
           }
           .hs_submit {
             order: 2;
-            width: 30%;
+            width: calc(30% - 1.25rem);
+            margin-left: 1.25rem;
+            @include media-breakpoint-down(lg) {
+              margin-left: 0;
+            }
             @include media-breakpoint-down(md) {
               width: 100%;
               margin-top: 20px;
@@ -153,7 +162,7 @@ body.new-design {
                 border-radius: 5px;
                 background: $brand-darker-bg;
                 color: #FFF;
-                font-size: 14px;
+                font-size: 0.875rem;
                 font-style: normal;
                 font-weight: 700;
                 line-height: normal;
@@ -199,34 +208,43 @@ body.new-design {
           @include media-breakpoint-down(md) {
             font-size: 18px;
           }
+          @media (max-width: 395px) {
+            text-align: center;
+          }
         }
       }
       .social-links-buttons {
         display: flex;
         margin-top: 20px;
-        @include media-breakpoint-down(md) {
+        @include media-breakpoint-down(sm) {
           justify-content: space-between;
         }
+        @media (max-width: 395px) {
+            justify-content: space-evenly;
+          }
         a {
           margin-right: 20px;
           text-decoration: none;
           display: flex;
-          padding: 13px 20px;
+          padding: 0.8125rem 1.25rem;
           align-items: center;
           gap: 10px;
           border-radius: 3px;
           color: white;
-          font-size: 16px;
+          font-size: 1rem;
           font-weight: 700;
 
-          @include media-breakpoint-down(md) {
-            font-size: 12px;
-            margin-right: 0;
-          }
           @include media-breakpoint-down(sm) {
-            font-size: 10px;
-            padding: 7px 10px;
-        }
+            margin-right: 0;
+            font-size: .75rem;
+          }
+          @media (max-width: 395px) {
+            font-size: 0 !important;
+            gap: 0;
+            width: 4.375rem;
+            padding: 0.8125rem 0;
+            justify-content: center;
+          }
         }
         .facebook-button {
           background: $home-page-facebook-blue;

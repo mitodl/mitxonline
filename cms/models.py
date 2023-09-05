@@ -779,7 +779,7 @@ class HomePage(VideoPlayerConfigMixin):
             "show_home_page_video_component": show_home_page_video_component,
             "show_home_page_contact_form": show_home_page_contact_form,
             "hubspot_portal_id": hubspot_portal_id,
-            "hubspot_home_page_form_guid": hubspot_home_page_form_guid
+            "hubspot_home_page_form_guid": hubspot_home_page_form_guid,
         }
 
 
