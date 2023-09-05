@@ -348,7 +348,6 @@ export const LegalAddressFields = ({
             )
             : null}
         </Field>
-        <ErrorMessage name="legal_address.state" component={FormError} />
       </div>
     ) : null}
     {isNewAccount ? (
