@@ -23,13 +23,13 @@ import {
   usernameFieldErrorMessage
 } from "../../lib/validation"
 
-export const NAME_REGEX = /^(?![~!@&)(+:'.?/,`-]+)([^/^$#*=[\]`%_;<>{}"|]+)$/
+export const NAME_REGEX = "^(?![~!@&\\)\\(+:'.?,\\-]+)([^\\/\\^$#*=\\[\\]`%_;\\\\<>\"\\|]+)$"
 
 const seedYear = moment().year()
 
 // Field Error messages
 export const NAME_REGEX_FAIL_MESSAGE =
-  "Name cannot start with a special character (~!@&)(+:'.?/,`-), and cannot contain any of (/^$#*=[]`%_;\\<>{}\"|)"
+  "Name cannot start with a special character (~!@&)(+:'.?/,-), and cannot contain any of (/^$#*=[]`%_;\\<>{}\"|)"
 
 export const fullNameRegex = "^.{2,255}$"
 const fullNameErrorMessage = "Full name must be between 2 and 254 characters."
@@ -37,24 +37,12 @@ const fullNameErrorMessage = "Full name must be between 2 and 254 characters."
 const countryRegex = "^\\S{2,}$"
 
 export const legalAddressValidation = yup.object().shape({
-  name: yup
-    .string()
-    .label("Full Name")
-    .matches(fullNameRegex, fullNameErrorMessage)
-    .required(),
+  name:          yup.string().label("Full Name"),
   legal_address: yup.object().shape({
-    first_name: yup
-      .string()
-      .label("First Name")
-      .matches(NAME_REGEX, NAME_REGEX_FAIL_MESSAGE)
-      .required(),
-    last_name: yup
-      .string()
-      .label("First Name")
-      .matches(NAME_REGEX, NAME_REGEX_FAIL_MESSAGE)
-      .required(),
-    country: yup.string().label("Country"),
-    state:   yup
+    first_name: yup.string().label("First Name"),
+    last_name:  yup.string().label("Last Name"),
+    country:    yup.string().label("Country"),
+    state:      yup
       .string()
       .label("State")
       .when("country", {
@@ -193,7 +181,6 @@ const renderYearOfBirthField = () => {
           </option>
         ))}
       </Field>
-      <ErrorMessage name="user_profile.year_of_birth" component={FormError} />
     </div>
   )
 }
@@ -222,9 +209,9 @@ export const LegalAddressFields = ({
         aria-describedby="first-name-subtitle"
         aria-label="First Name"
         required
+        pattern={NAME_REGEX}
         title={NAME_REGEX_FAIL_MESSAGE}
       />
-      <ErrorMessage name="legal_address.first_name" component={FormError} />
     </div>
     <div className="form-group">
       <label htmlFor="legal_address.last_name" className="fw-bold">
@@ -238,9 +225,9 @@ export const LegalAddressFields = ({
         className="form-control"
         autoComplete="family-name"
         required
+        pattern={NAME_REGEX}
         title={NAME_REGEX_FAIL_MESSAGE}
       />
-      <ErrorMessage name="legal_address.last_name" component={FormError} />
     </div>
     <div className="form-group">
       <label htmlFor="name" className="row">
@@ -260,9 +247,9 @@ export const LegalAddressFields = ({
         aria-describedby="full-name-subtitle"
         aria-label="Full Name"
         required
+        pattern={fullNameRegex}
         title={fullNameErrorMessage}
       />
-      <ErrorMessage name="name" component={FormError} />
     </div>
     {isNewAccount ? (
       <React.Fragment>
@@ -348,7 +335,6 @@ export const LegalAddressFields = ({
           id="legal_address.state"
           className="form-control"
           autoComplete="state"
-          aria-describedby="legal_address.state_error"
           required
         >
           <option value="">-----</option>
