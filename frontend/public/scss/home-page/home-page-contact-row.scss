@@ -15,7 +15,7 @@ body.new-design {
   }
 
   .home-page-contact-col {
-    width: calc(50% - 72px);
+    width: 47%;
     @include media-breakpoint-down(lg) {
       width: 100%;
     }
@@ -35,6 +35,13 @@ body.new-design {
       padding-left: 60px;
       @include media-breakpoint-down(md) {
         padding: 30px 3px 0 3px;
+      }
+      @include media-breakpoint-down(sm) {
+        padding: 10px 3px 0 3px;
+      }
+
+      @media (max-width: 395px) {
+        padding: 10px 3px 0px 3px;
       }
       .home-page-hbspt-form-heading-row {
         display: flex;
@@ -56,6 +63,9 @@ body.new-design {
             font-size: 18px;
             margin: 15px 0 0 0;
           }
+          @media (max-width: 395px) {
+            padding: 0;
+          }
         }
         p {
           margin-left: 22px;
@@ -69,6 +79,9 @@ body.new-design {
             font-size: 13px;
             line-height: 24px;
             margin: 15px 0 0 0;
+          }
+          @media (max-width: 395px) {
+            margin: 5px 0 0 0;
           }
         }
       }
@@ -112,6 +125,10 @@ body.new-design {
                   font-weight: 400;
                   line-height: normal;
                 }
+                @include media-breakpoint-down(lg) {
+                  width: 95%;
+                  max-width: 95%;
+                }
                 @include media-breakpoint-down(md) {
                   width: 100%;
                   max-width: 100%;
@@ -144,6 +161,7 @@ body.new-design {
             margin-left: 1.25rem;
             @include media-breakpoint-down(lg) {
               margin-left: 0;
+              width: 15%;
             }
             @include media-breakpoint-down(md) {
               width: 100%;
@@ -220,7 +238,7 @@ body.new-design {
           justify-content: space-between;
         }
         @media (max-width: 395px) {
-            justify-content: space-evenly;
+            justify-content: space-between;
           }
         a {
           margin-right: 20px;
@@ -234,6 +252,12 @@ body.new-design {
           font-size: 1rem;
           font-weight: 700;
 
+          @include media-breakpoint-down(xl) {
+            font-size: .75rem;
+          }
+          @include media-breakpoint-down(lg) {
+            font-size: 1rem;
+          }
           @include media-breakpoint-down(sm) {
             margin-right: 0;
             font-size: .75rem;
@@ -241,7 +265,7 @@ body.new-design {
           @media (max-width: 395px) {
             font-size: 0 !important;
             gap: 0;
-            width: 4.375rem;
+            width: 30%;
             padding: 0.8125rem 0;
             justify-content: center;
           }
