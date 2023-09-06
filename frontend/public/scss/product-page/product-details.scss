@@ -115,13 +115,18 @@ body.new-design {
 
         .btn-enrollment-button {
           height: 50px;
+          line-height: 50px;
           width: 100%;
           padding: 0!important;
           text-align: center;
         }
 
-        a.btn-enrollment-button {
-          padding: 9px 0 0 0 !important;
+        button.btn-enrollment-button {
+          color: $white;
+        }
+
+        button.btn-enrollment-button:hover {
+          color: $brand-darker-bg;
         }
 
         .enrollment-info-box, .program-info-box {
