@@ -10,18 +10,20 @@
 {% if show_new_design_hero %}
   <div class="home-page-hero-row d-flex justify-content-md-center align-items-md-center">
     <div class="home-page-hero hero-container col-12">
-      <div class="home-page-hero-overlay container hero-content d-flex justify-content-md-end align-items-md-end">
+      <div class="home-page-hero-overlay container hero-content">
+        <div class="hero-fade hero-fade-left"> </div>
         <div class="hero-title hero-text">
-            <h1>MITx Online</h1>
-            <h2>Open Online Courses - from MIT</h2>
-            <p>
-              Learners anywhere in the world can enroll in a course of their choosing and <br>
-              <b>learn for free</b>, or <b>aim to earn a certificate for a low fee</b>.
-            </p>
+          <h1>MITx Online</h1>
+          <h2>Open Online Courses - from MIT</h2>
+          <p>
+            Learners anywhere in the world can enroll in a course of their choosing and
+            <b>learn for free</b>, or <b>aim to earn a certificate for a low fee</b>.
+          </p>
+          <div class="hero-button-container">
+            <a role="button" class="hero-explore-button" href="/catalog">Explore Courses</a>
+          </div>
         </div>
-        <div class="hero-button-container">
-          <a role="button" class="hero-explore-button" href="/catalog">Explore Courses</a>
-        </div>
+        <div class="hero-fade hero-fade-right"> </div>
       </div>
     </div>
   </div>
@@ -127,7 +129,7 @@
     </div>
   </div>
 {% endif %}
-{% if show_home_page_video_component %}
+{% if show_home_page_video_component and page.video_component_title %}
 <div class="home-page-video-row d-flex justify-content-center row">
   <div class="home-page-video-container">
     <div class="home-page-video-description">
@@ -153,6 +155,78 @@
       </div>
   </div>
 </div>
+{% endif %}
+{% if show_home_page_contact_form %}
+  <div class="home-page-contact-row">
+    <div class="home-page-contact-row-container">
+      <div class="home-page-contact-col">
+        <div class="home-page-hbspt-form-wrapper">
+          <div class="home-page-hbspt-form-heading-row">
+            <h3>Sign up for updates</h3>
+            <p>Join our newsletter for course updates and more.</p>
+          </div>
+          <script
+                defer
+                charset="utf-8"
+                type="text/javascript"
+                src="//js.hsforms.net/forms/v2-legacy.js"
+              ></script>
+          <script
+            defer
+            charset="utf-8"
+            type="text/javascript"
+            src="//js.hsforms.net/forms/v2.js"
+          ></script>
+          <script type="text/javascript">
+            document.addEventListener('DOMContentLoaded', function() {
+                if (typeof hbspt !== 'undefined') {
+                    hbspt.forms.create({
+                        portalId: "{{ hubspot_portal_id | safe }}",
+                        formId: "{{ hubspot_home_page_form_guid | safe }}"
+                    });
+                }
+            });
+        </script>
+        </div>
+      </div>
+      <div class="home-page-contact-col">
+        <div class="home-page-social-links">
+          <div class="social-links-heading">
+            <h3>Connect with us</h3>
+          </div>
+          <div class="social-links-buttons">
+            <a role="button" class="icon-link facebook-button" href="https://facebook.com/mitxonedx/"><svg
+                xmlns="http://www.w3.org/2000/svg" width="14" height="22" viewBox="0 0 14 22" fill="none">
+              <path d="M4.03153 22L4 12H0V8H4V5.5C4 1.7886 6.29832 0 9.60914 0C11.1951 0 12.5581 0.11807 12.9553 0.17085V4.04948L10.6591 4.05052C8.85845 4.05052 8.50981 4.90614 8.50981 6.16171V8H13.75L11.75 12H8.50981V22H4.03153Z" fill="white"/>
+            </svg>Facebook</a>
+            <a role="button" class="icon-link linkedin-button" href="https://www.linkedin.com/school/mitx-courses/"><svg
+                xmlns="http://www.w3.org/2000/svg" width="23" height="23" viewBox="0 0 22 22" fill="none">
+              <g clip-path="url(#clip0_2722_647)">
+                <rect width="24" height="24" transform="matrix(-1 0 0 1 24.75 0)" fill="white"/>
+                <path d="M23.6667 -3H-0.166667C-0.816667 -3 -1.25 -2.56667 -1.25 -1.91667V21.9167C-1.25 22.5667 -0.816667 23 -0.166667 23H23.6667C24.3167 23 24.75 22.5667 24.75 21.9167V-1.91667C24.75 -2.56667 24.3167 -3 23.6667 -3ZM6.44167 19.2083H2.65V6.75H6.55V19.2083H6.44167ZM4.49167 5.01667C3.3 5.01667 2.21667 4.04167 2.21667 2.74167C2.21667 1.55 3.19167 0.466667 4.49167 0.466667C5.68333 0.466667 6.76667 1.44167 6.76667 2.74167C6.76667 4.04167 5.79167 5.01667 4.49167 5.01667ZM20.9583 19.2083H17.0583V13.1417C17.0583 11.7333 17.0583 9.89167 15.1083 9.89167C13.05 9.89167 12.8333 11.4083 12.8333 13.0333V19.2083H8.93333V6.75H12.6167V8.48333C13.1583 7.50833 14.35 6.53333 16.3 6.53333C20.2 6.53333 20.9583 9.13333 20.9583 12.4917V19.2083Z" fill="#0A66C2"/>
+              </g>
+              <defs>
+                <clipPath id="clip0_2722_647">
+                  <rect x="0.75" width="23" height="23" rx="3" fill="white"/>
+                </clipPath>
+              </defs>
+            </svg>linkedin</a>
+            <a role="button" class="icon-link twitter-button" href="https://twitter.com/MITxCourses"><svg
+                xmlns="http://www.w3.org/2000/svg" width="23" height="22" viewBox="0 0 23 22" fill="none">
+              <g clip-path="url(#clip0_2722_391)">
+                <path d="M24.75 4.60005C23.85 5.00005 22.95 5.30005 21.95 5.40005C22.95 4.80005 23.75 3.80005 24.15 2.70005C23.15 3.30005 22.15 3.70005 21.05 3.90005C20.15 2.90005 18.85 2.30005 17.45 2.30005C14.75 2.30005 12.55 4.50005 12.55 7.20005C12.55 7.60005 12.55 8.00005 12.65 8.30005C8.45 8.10005 4.85 6.10005 2.45 3.10005C1.95 3.90005 1.75 4.70005 1.75 5.60005C1.75 7.30005 2.65 8.80005 3.95 9.70005C3.15 9.70005 2.35 9.50005 1.75 9.10005C1.75 9.10005 1.75 9.10005 1.75 9.20005C1.75 11.6 3.45 13.6 5.65 14C5.25 14.1 4.85 14.2 4.35 14.2C4.05 14.2 3.75 14.2 3.45 14.1C4.05 16.1 5.85 17.5 8.05 17.5C6.35 18.8 4.25 19.6 1.95 19.6C1.55 19.6 1.15 19.6 0.75 19.5C2.95 20.9 5.55 21.7001 8.25 21.7001C17.35 21.7001 22.25 14.2 22.25 7.70005C22.25 7.50005 22.25 7.30005 22.25 7.10005C23.25 6.40005 24.05 5.50005 24.75 4.60005Z" fill="white"/>
+              </g>
+              <defs>
+                <clipPath id="clip0_2722_391">
+                  <rect width="24" height="24" fill="white" transform="translate(0.75)"/>
+                </clipPath>
+              </defs>
+            </svg>Twitter</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 {% endif %}
 {% endblock %}
 {% block scripts %}

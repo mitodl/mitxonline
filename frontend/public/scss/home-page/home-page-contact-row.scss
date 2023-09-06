@@ -1,0 +1,306 @@
+body.new-design {
+  background: white;
+}
+
+.home-page-contact-row {
+  width: 100%;
+  margin-top: 78px;
+  margin-bottom: -10%;
+  display: flex;
+  justify-content: center;
+  border-top: thin solid $home-page-border-grey;
+  background: $home-page-grey-lite linear-gradient($home-page-border-grey, $home-page-border-grey) no-repeat center/1px 100%;
+  @include media-breakpoint-down(lg) {
+    background: $home-page-grey-lite;
+  }
+
+  .home-page-contact-col {
+    width: 47%;
+    @include media-breakpoint-down(lg) {
+      width: 100%;
+    }
+  }
+  .home-page-contact-row-container {
+    max-width: 1440px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding-left: 12px;
+    padding-right: 12px;
+    @include media-breakpoint-down(lg) {
+      flex-direction: column;
+    }
+    .home-page-hbspt-form-wrapper {
+      padding-top: 40px;
+      padding-left: 60px;
+      @include media-breakpoint-down(md) {
+        padding: 30px 3px 0 3px;
+      }
+      @include media-breakpoint-down(sm) {
+        padding: 10px 3px 0 3px;
+      }
+
+      @media (max-width: 395px) {
+        padding: 10px 3px 0px 3px;
+      }
+      .home-page-hbspt-form-heading-row {
+        display: flex;
+        flex-direction: row;
+        align-content: space-around;
+        @include media-breakpoint-down(md) {
+          align-content: normal;
+          flex-direction: column;
+          justify-content: start;
+        }
+        h3 {
+          color: $home-page-header-blue;
+          font-size: 20px;
+          font-style: normal;
+          font-weight: 700;
+          line-height: normal;
+          margin-bottom: 0;
+          @include media-breakpoint-down(md) {
+            font-size: 18px;
+            margin: 15px 0 0 0;
+          }
+          @media (max-width: 395px) {
+            padding: 0;
+          }
+        }
+        p {
+          margin-left: 22px;
+          color: $home-page-header-blue;
+          font-size: 14px;
+          font-style: normal;
+          font-weight: 400;
+          line-height: normal;
+          margin: auto;
+          @include media-breakpoint-down(md) {
+            font-size: 13px;
+            line-height: 24px;
+            margin: 15px 0 0 0;
+          }
+          @media (max-width: 395px) {
+            margin: 5px 0 0 0;
+          }
+        }
+      }
+      .hbspt-form {
+        height: 110px;
+        @include media-breakpoint-down(md) {
+          height: 150px;
+        }
+        .submitted-message {
+          margin: 20px 0 40px 20px;
+        }
+        .hs-form-private {
+          display: flex;
+          margin-top: 20px;
+          margin-bottom: 40px;
+          flex-wrap: wrap;
+          .hs_email {
+            order: 1;
+            width: 70%;
+            @include media-breakpoint-down(md) {
+              width: 100%;
+              max-width: 100%;
+            }
+            label {
+              display: none;
+            }
+            .input {
+              .hs-input {
+                height: 50px;
+                border-radius: 5px;
+                border: 1px solid $home-page-border-grey;
+                background: #FFF;
+                margin-right: 20px;
+                width: 100%;
+                max-width: 400px;
+                padding-left: 20px;
+                ::placeholder {
+                  color: $home-page-grey-text;
+                  font-size: 16px;
+                  font-style: normal;
+                  font-weight: 400;
+                  line-height: normal;
+                }
+                @include media-breakpoint-down(lg) {
+                  width: 95%;
+                  max-width: 95%;
+                }
+                @include media-breakpoint-down(md) {
+                  width: 100%;
+                  max-width: 100%;
+                }
+              }
+            }
+            ul.hs-error-msgs {
+              display: none;
+              height: 36px;
+            }
+          }
+          .hs_error_rollup {
+            width: 100%;
+            order: 4;
+            display: flex;
+            .hs-error-msgs {
+              height: 36px;
+              margin-bottom: -36px;
+              list-style-type: none;
+              li {
+                margin-top: 6px;
+                color: $brand-darker-bg;
+              }
+
+            }
+          }
+          .hs_submit {
+            order: 2;
+            width: calc(30% - 1.25rem);
+            margin-left: 1.25rem;
+            @include media-breakpoint-down(lg) {
+              margin-left: 0;
+              width: 15%;
+            }
+            @include media-breakpoint-down(md) {
+              width: 100%;
+              margin-top: 20px;
+            }
+            .actions {
+              width: 100%;
+              max-width: 138px;
+              @include media-breakpoint-down(md) {
+                max-width: 100%;
+              }
+              .hs-button {
+                height: 50px;
+                display: inline-flex;
+                align-items: flex-start;
+                border-radius: 5px;
+                background: $brand-darker-bg;
+                color: #FFF;
+                font-size: 0.875rem;
+                font-style: normal;
+                font-weight: 700;
+                line-height: normal;
+                text-transform: uppercase;
+                justify-content: center;
+                border: unset;
+                width: 100%;
+                max-width: 138px;
+                @include media-breakpoint-down(md) {
+                  max-width: 100%;
+                }
+              }
+            }
+          }
+        }
+
+      }
+
+    }
+
+    .home-page-social-links {
+      display: flex;
+      flex-direction: column;
+      @include media-breakpoint-down(lg) {
+        padding-left: 60px;
+        margin-bottom: 40px;
+      }
+      @include media-breakpoint-down(md) {
+        padding: 0 3px 0 3px;
+      }
+      .social-links-heading {
+        margin-top: 40px;
+        @include media-breakpoint-down(lg) {
+          margin-top: 0;
+        }
+        h3 {
+          color: $home-page-header-blue;
+          font-size: 20px;
+          font-style: normal;
+          font-weight: 700;
+          line-height: normal;
+          margin-bottom: 0;
+          @include media-breakpoint-down(md) {
+            font-size: 18px;
+          }
+          @media (max-width: 395px) {
+            text-align: center;
+          }
+        }
+      }
+      .social-links-buttons {
+        display: flex;
+        margin-top: 20px;
+        @include media-breakpoint-down(sm) {
+          justify-content: space-between;
+        }
+        @media (max-width: 395px) {
+            justify-content: space-between;
+          }
+        a {
+          margin-right: 20px;
+          text-decoration: none;
+          display: flex;
+          padding: 0.8125rem 1.25rem;
+          align-items: center;
+          gap: 10px;
+          border-radius: 3px;
+          color: white;
+          font-size: 1rem;
+          font-weight: 700;
+
+          @include media-breakpoint-down(xl) {
+            font-size: .75rem;
+          }
+          @include media-breakpoint-down(lg) {
+            font-size: 1rem;
+          }
+          @include media-breakpoint-down(sm) {
+            margin-right: 0;
+            font-size: .75rem;
+          }
+          @media (max-width: 395px) {
+            font-size: 0 !important;
+            gap: 0;
+            width: 30%;
+            padding: 0.8125rem 0;
+            justify-content: center;
+          }
+        }
+        .facebook-button {
+          background: $home-page-facebook-blue;
+          @include media-breakpoint-down(sm) {
+            svg {
+              width: 10px;
+              height: 18px;
+            }
+          }
+        }
+        .linkedin-button {
+          background: $home-page-linkedin-blue;
+          @include media-breakpoint-down(sm) {
+            svg {
+              width: 18px;
+              height: 18px;
+            }
+          }
+        }
+        .twitter-button {
+          background: $home-page-twitter-blue;
+          @include media-breakpoint-down(md) {
+            margin-right: 0;
+          }
+          @include media-breakpoint-down(sm) {
+            svg {
+              width: 18px;
+              height: 18px;
+            }
+          }
+        }
+      }
+    }
+  }
+}

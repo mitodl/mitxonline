@@ -1149,3 +1149,16 @@ POSTHOG_API_HOST = get_string(
 if "IN_TEST_SUITE" not in os.environ:
     posthog.api_key = POSTHOG_API_TOKEN
     posthog.host = POSTHOG_API_HOST
+
+# HomePage Hubspot Form Settings
+HUBSPOT_HOME_PAGE_FORM_GUID = get_string(
+    name="HUBSPOT_HOME_PAGE_FORM_GUID",
+    default="",
+    description="Hubspot ID for the home page contact form",
+)
+
+HUBSPOT_PORTAL_ID = get_string(
+    name="HUBSPOT_PORTAL_ID",
+    default="",
+    description="Hubspot Portal ID",
+)
