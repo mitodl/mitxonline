@@ -25,6 +25,7 @@
               <nav id="tab-bar">
                 <ul class="nav">
                   {% if page.about %}<li class="nav-item"><a href="#about-this-class">About</a></li>{% endif %}
+                  {% if page.is_program_page %}<li class="nav-item"><a href="#program-courses">Courses</a></li>{% endif %}
                   {% if page.what_you_learn %}<li class="nav-item"><a href="#what-youll-learn">What you'll learn</a></li>{% endif %}
                   {% if instructors %}<li class="nav-item"><a href="#instructors">Instructors</a></li>{% endif %}
                   {% if page.faq_url %}<li class="nav-item"><a href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
@@ -35,6 +36,59 @@
                 {{ page.about | richtext | expand }}
               </section>{% endif %}
 
+              {% if page.is_program_page %}
+              <section class="program-courses-container" id="program-courses">
+                {% if page.product.required_courses %}
+                <h2>{{ page.product.required_title }}</h2>
+
+                <ul>
+                  {% for course in page.product.required_courses %}
+                  <li> 
+                    <div class="program-course-card">
+                      <img src="{% feature_img_src member.feature_image %}" alt="">
+                      <div class="program-course-card-info">
+                        <h4 class="startdate">
+                          {% if course.first_unexpired_run.start_date %}
+                            Starts {{ course.first_unexpired_run.start_date }}
+                          {% else %}
+                            Starts Anytime 
+                          {% endif %}
+                        </h4>
+                        <h3 class="title">{{ course.title }}</h3>
+                      </div>
+                    </div>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+
+                {% if page.product.elective_courses %}
+                <h2 class="electives-title">{{ page.product.elective_title }}</h2>
+
+                <ul>
+                  {% for course in page.product.elective_courses %}
+                  <li> 
+                    <div class="program-course-card">
+                      <img src="{% feature_img_src member.feature_image %}" alt="">
+                      <div class="program-course-card-info">
+                        <h4 class="startdate">
+                          {% if course.first_unexpired_run.start_date %}
+                            Starts {{ course.first_unexpired_run.start_date }}
+                          {% else %}
+                            Starts Anytime 
+                          {% endif %}
+                        </h4>
+                        <h3 class="title">{{ course.title }}</h3>
+                      </div>
+                    </div>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+
+              </section>
+              {% endif %}
+              
               {% if page.what_you_learn %}<section class="what-youll-learn about-richtext-container" id="what-youll-learn">
                 <h2>What you&apos;ll learn</h2>
                 {{ page.what_you_learn |richtext }}
