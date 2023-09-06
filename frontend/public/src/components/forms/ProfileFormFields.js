@@ -23,13 +23,14 @@ import {
   usernameFieldErrorMessage
 } from "../../lib/validation"
 
-export const NAME_REGEX = "^(?![~!@&)(+:'.?,-]+)([^/\\^$#*=[\\]`%_;<>{}\"|]+)$"
+export const NAME_REGEX =
+  "^(?![~!@&\\)\\(+:'.?,\\-]+)([^\\/\\^$#*=\\[\\]`%_;\\\\<>\\{\\}\"\\|]+)$"
 
 const seedYear = moment().year()
 
 // Field Error messages
 export const NAME_REGEX_FAIL_MESSAGE =
-  "Name cannot start with a special character ~!@&)(+:'.?,-, and cannot contain any of /^$#*=[]`%_;\\<>{}\"|"
+  "Name cannot start with a special character (~!@&)(+:'.?,-), and cannot contain any of (/^$#*=[]`%_;\\<>{}\"|)"
 
 export const fullNameRegex = "^.{2,255}$"
 const fullNameErrorMessage = "Full name must be between 2 and 254 characters."
