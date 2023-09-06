@@ -754,6 +754,8 @@ class HomePage(VideoPlayerConfigMixin):
             if "anonymous_session_id" not in request.session:
                 request.session["anonymous_session_id"] = str(uuid.uuid4())
             user = request.session["anonymous_session_id"]
+        hubspot_portal_id = settings.HUBSPOT_PORTAL_ID
+        hubspot_home_page_form_guid = settings.HUBSPOT_HOME_PAGE_FORM_GUID
         show_new_featured_carousel = features.is_enabled(
             features.ENABLE_NEW_HOME_PAGE_FEATURED, False, user
         )
@@ -762,6 +764,9 @@ class HomePage(VideoPlayerConfigMixin):
         )
         show_home_page_video_component = features.is_enabled(
             features.ENABLE_NEW_HOME_PAGE_VIDEO, False, user
+        )
+        show_home_page_contact_form = features.is_enabled(
+            features.ENABLE_NEW_HOME_PAGE_CONTACT_FORM, False, user
         )
 
         return {
@@ -772,6 +777,9 @@ class HomePage(VideoPlayerConfigMixin):
             "show_new_featured_carousel": show_new_featured_carousel,
             "show_new_design_hero": show_new_design_hero,
             "show_home_page_video_component": show_home_page_video_component,
+            "show_home_page_contact_form": show_home_page_contact_form,
+            "hubspot_portal_id": hubspot_portal_id,
+            "hubspot_home_page_form_guid": hubspot_home_page_form_guid,
         }
 
 

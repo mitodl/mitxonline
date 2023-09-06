@@ -146,6 +146,10 @@
       "description": "The name of the review app",
       "required": false
     },
+    "HUBSPOT_HOME_PAGE_FORM_GUID": {
+      "description": "Hubspot ID for the home page contact form",
+      "required": false
+    },
     "HOST_IP": {
       "description": "This server's host IP",
       "required": false
@@ -156,6 +160,10 @@
     },
     "HUBSPOT_PIPELINE_ID": {
       "description": "Hubspot ID for the ecommerce pipeline",
+      "required": false
+    },
+    "HUBSPOT_PORTAL_ID": {
+      "description": "Hubspot Portal ID",
       "required": false
     },
     "HUBSPOT_TASK_DELAY": {
