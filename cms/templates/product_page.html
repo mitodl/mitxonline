@@ -5,6 +5,7 @@
 {% load wagtailcore_tags wagtailembeds_tags %}
 {% load expand %}
 {% load videojs %}
+{% load course_list %}
 
 {% block title %}{{ page.title }} | {{ site_name }}{% endblock %}
 
@@ -42,23 +43,7 @@
                 <h2>{{ page.product.required_title }}</h2>
 
                 <ul>
-                  {% for course in page.product.required_courses %}
-                  <li> 
-                    <div class="program-course-card">
-                      <img src="{% feature_img_src member.feature_image %}" alt="">
-                      <div class="program-course-card-info">
-                        <h4 class="startdate">
-                          {% if course.first_unexpired_run.start_date %}
-                            Starts {{ course.first_unexpired_run.start_date }}
-                          {% else %}
-                            Starts Anytime 
-                          {% endif %}
-                        </h4>
-                        <h3 class="title">{{ course.title }}</h3>
-                      </div>
-                    </div>
-                  </li>
-                  {% endfor %}
+                  {% course_list page.product.required_courses %}
                 </ul>
                 {% endif %}
 
@@ -66,29 +51,13 @@
                 <h2 class="electives-title">{{ page.product.elective_title }}</h2>
 
                 <ul>
-                  {% for course in page.product.elective_courses %}
-                  <li> 
-                    <div class="program-course-card">
-                      <img src="{% feature_img_src member.feature_image %}" alt="">
-                      <div class="program-course-card-info">
-                        <h4 class="startdate">
-                          {% if course.first_unexpired_run.start_date %}
-                            Starts {{ course.first_unexpired_run.start_date }}
-                          {% else %}
-                            Starts Anytime 
-                          {% endif %}
-                        </h4>
-                        <h3 class="title">{{ course.title }}</h3>
-                      </div>
-                    </div>
-                  </li>
-                  {% endfor %}
+                  {% course_list page.product.elective_courses %}
                 </ul>
                 {% endif %}
 
               </section>
               {% endif %}
-              
+
               {% if page.what_you_learn %}<section class="what-youll-learn about-richtext-container" id="what-youll-learn">
                 <h2>What you&apos;ll learn</h2>
                 {{ page.what_you_learn |richtext }}
