@@ -1,6 +1,25 @@
 Release Notes
 =============
 
+Version 0.71.0 (Released September 06, 2023)
+--------------
+
+- uncaught merge issue on fixing the previous issue (#1859)
+- Posthog refactor  (#1857)
+- 1845: Remove unused feature flag and import (#1847)
+- 1842: duplicate ProductPage get_context method in model (#1846)
+- use contenthash not chunkhash (#1792)
+- Fix background css on feature flagged areas (#1840)
+- made a session variable for anonymous user for the purpose of posthog tracking (#1841)
+- Moving home-page files, pulling out unnecessary imports from styles.js and meta-product-page (#1838)
+- Home Page Video Component (#1828)
+- Home Page Hero Component (#1826)
+- New extended certificate generation window (#1832)
+- 1676 design new catalog page (#1818)
+- Fixes text alignment for the Enrolled button, hide the upsell card in new design (#1830)
+- Featured Products Carousel (#1820)
+- New design: Course page layout changes (#1816)
+
 Version 0.70.9 (Released August 23, 2023)
 --------------
 
