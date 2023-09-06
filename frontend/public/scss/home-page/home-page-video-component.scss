@@ -63,7 +63,8 @@
       @include media-breakpoint-down(lg) {
         width: 100%;
         max-width: 100%;
-        padding: 0 0 0 60px;
+        display: flex;
+        justify-content: center;
       }
       @include media-breakpoint-down(md) {
         padding-left: 20px;
@@ -75,12 +76,12 @@
         width: 100%;
         max-width: 900px;
         height: inherit;
-        position: relative;
+        display: flex;
+        justify-content: center;
 
         .vjs-default-skin{
           width: 863px;
           height: 485px;
-          position: absolute;
           top: 120px;
           left: 0;
           z-index: 99;
@@ -132,32 +133,24 @@
     }
         .home-page-video-underlay {
           position: absolute;
-          left: 307px;
-          top: 175px;
           width: 586px;
           height: 460px;
           background: $home-page-video-player-blue;
           @include media-breakpoint-down(xl) {
             width: 490px;
             height: 319px;
-            top: 210px;
-            left: 113px;
+            margin: 50px 0 0 50px;
           }
           @include media-breakpoint-down(lg) {
-            top: 30px;
-            left: 113px;
+
           }
           @include media-breakpoint-down(md) {
             width: 420px;
             height: 269px;
-            top: 83px;
-            left: 185px;
           }
           @include media-breakpoint-down(sm) {
             width: 239px;
             height: 159px;
-            top: 41px;
-            left: 101px;
           }
         }
       }
