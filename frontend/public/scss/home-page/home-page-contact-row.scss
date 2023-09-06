@@ -41,7 +41,7 @@ body.new-design {
       }
 
       @media (max-width: 395px) {
-        padding: 10px 3px 0px 3px;
+        padding: 10px 3px 0 3px;
       }
       .home-page-hbspt-form-heading-row {
         display: flex;
@@ -58,6 +58,7 @@ body.new-design {
           font-style: normal;
           font-weight: 700;
           line-height: normal;
+          font-family: Poppins, sans-serif;
           margin-bottom: 0;
           @include media-breakpoint-down(md) {
             font-size: 18px;
@@ -74,6 +75,7 @@ body.new-design {
           font-style: normal;
           font-weight: 400;
           line-height: normal;
+          font-family: Inter, sans-serif;
           margin: auto;
           @include media-breakpoint-down(md) {
             font-size: 13px;
@@ -124,6 +126,7 @@ body.new-design {
                   font-style: normal;
                   font-weight: 400;
                   line-height: normal;
+                  font-family: Inter, sans-serif;
                 }
                 @include media-breakpoint-down(lg) {
                   width: 95%;
@@ -183,6 +186,7 @@ body.new-design {
                 font-size: 0.875rem;
                 font-style: normal;
                 font-weight: 700;
+                font-family: Poppins, sans-serif;
                 line-height: normal;
                 text-transform: uppercase;
                 justify-content: center;
