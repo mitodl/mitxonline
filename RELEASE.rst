@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.71.0
+Version 0.71.0 (Released September 06, 2023)
 --------------
 
 - uncaught merge issue on fixing the previous issue (#1859)
