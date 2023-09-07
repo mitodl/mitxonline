@@ -436,7 +436,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
     readable_id = models.CharField(
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
-    live = models.BooleanField(default=False)
+    live = models.BooleanField(default=False, db_index=True)
     departments = models.ManyToManyField(Department, blank=True)
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
@@ -449,7 +449,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         content_type_field="courseware_content_type",
     )
 
-    @property
+    @cached_property
     def course_number(self):
         """
         Returns:
@@ -523,6 +523,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             ProgramRequirement.objects.filter(
                 node_type=ProgramRequirementNodeType.COURSE, course=self
             )
+            .all()
             .distinct("program_id")
             .order_by("program_id")
             .values_list("program_id", flat=True)
@@ -575,7 +576,7 @@ class CourseRun(TimestampedModel):
 
     objects = CourseRunQuerySet.as_manager()
     course = models.ForeignKey(
-        Course, on_delete=models.CASCADE, related_name="courseruns"
+        Course, on_delete=models.CASCADE, related_name="courseruns", db_index=True
     )
     # product = GenericRelation(Product, related_query_name="course_run")
     title = models.CharField(
@@ -633,7 +634,7 @@ class CourseRun(TimestampedModel):
 
     live = models.BooleanField(default=False)
     is_self_paced = models.BooleanField(default=False)
-    products = GenericRelation("ecommerce.Product", related_query_name="courseruns")
+    products = GenericRelation("ecommerce.Product", related_query_name="courserunproducts")
 
     class Meta:
         unique_together = ("course", "run_tag")

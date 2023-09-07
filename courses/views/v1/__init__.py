@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
+from django_filters.rest_framework import DjangoFilterBackend
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, status, viewsets
@@ -102,15 +103,16 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 
     pagination_class = Pagination
     permission_classes = []
-
+    filter_backends = [DjangoFilterBackend]
     serializer_class = CourseSerializer
+    filterset_fields = ['id', 'title']
 
     def get_queryset(self):
         readable_id = self.request.query_params.get("readable_id", None)
         if readable_id:
             return Course.objects.filter(live=True, readable_id=readable_id)
-
-        return Course.objects.filter(live=True)
+        print("query from queryset BEFORE")
+        return Course.objects.filter(live=True).prefetch_related("courseruns").all()
 
     def get_serializer_context(self):
         added_context = {}

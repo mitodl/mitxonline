@@ -162,7 +162,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 class CourseSerializer(BaseCourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
-    courseruns = serializers.SerializerMethodField()
+    courseruns = CourseRunSerializer(many=True, read_only=True)
     next_run_id = serializers.SerializerMethodField()
     departments = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
@@ -173,42 +173,20 @@ class CourseSerializer(BaseCourseSerializer):
         run = instance.first_unexpired_run
         return run.id if run is not None else None
 
-    def get_courseruns(self, instance):
-        """Returns all course runs related to the course."""
-        if features.is_enabled(features.ENABLE_NEW_DESIGN):
-            return [
-                CourseRunSerializer(instance=run, context=self.context).data
-                for run in instance.courseruns.all().order_by("id")
-            ]
-        all_runs = self.context.get("all_runs", False)
-        if all_runs:
-            active_runs = instance.unexpired_runs
-        else:
-            user = self.context["request"].user if "request" in self.context else None
-            active_runs = (
-                instance.available_runs(user)
-                if user and user.is_authenticated
-                else instance.unexpired_runs
-            )
-        return [
-            CourseRunSerializer(instance=run, context=self.context).data
-            for run in active_runs
-            if run.live
-        ]
-
     def get_departments(self, instance):
         """List departments of a course"""
         return sorted(
-            [{"name": department.name} for department in instance.departments.all()],
+            [{"name": department.name} for department in instance.departments.all().iterator()],
             key=lambda department: department["name"],
         )
 
     def get_page(self, instance):
+        page_query = CoursePage.objects.filter(course=instance)
         return (
             CoursePageSerializer(
-                instance=CoursePage.objects.filter(course=instance).get()
+                instance=page_query.get()
             ).data
-            if CoursePage.objects.filter(course=instance).exists()
+            if page_query.exists()
             else None
         )
 
