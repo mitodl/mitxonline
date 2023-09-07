@@ -1,103 +1,101 @@
 // sass-lint:disable mixins-before-declarations
-.badge.badge-dark {
-    font-weight: 400;
-    color: white;
-    background-color: black;
-}
+body.new-design {
+    .badge.badge-dark {
+        font-weight: 400;
+        color: white;
+        background-color: black;
+    }
 
-p.program-type-badge {
-    margin-bottom: 0;
-}
+    p.program-type-badge {
+        margin-bottom: 0;
+    }
 
-.badge-program-type {
-    padding-left: 15px;
-    padding-right: 15px;
-}
+    .badge-program-type {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
 
-#product-details {
-    max-width: 872px;
-}
-
-.program-courses-container {
-    width: 100%;
-    margin: 0 0 35px;
-
-    h2 {
+    .program-courses-container {
+        width: 100%;
         margin: 0 0 35px;
 
-        @include media-breakpoint-down(sm) {
-            margin: 0 0 27px;
-        }
-    }
+        h2 {
+            margin: 0 0 35px;
 
-    h2.electives-title {
-        margin-top: 35px;
-    }
-
-    ul {
-        display: flex;
-        margin: 0;
-        padding: 0;
-        flex-flow: row wrap;
-        justify-content: left;
-    }
-
-    li {
-        @include media-breakpoint-down(md) {
-            width: calc(100% - 44px);
+            @include media-breakpoint-down(sm) {
+                margin: 0 0 27px;
+            }
         }
 
-        width: 273px;
-        margin: 0 0 15px 0;
-        list-style: none;
-        display: inline;
-        font-family: "Roboto", sans-serif;
+        h2.electives-title {
+            margin-top: 35px;
+        }
 
-        .program-course-card {
+        ul {
+            display: flex;
+            margin: 0;
             padding: 0;
-            overflow: hidden;
-            border-radius: 4px !important;
-            box-shadow: 1px 1px 1px 1px rgb(0 0 0 / 12%);
-            width: 243px;
+            flex-flow: row wrap;
+            justify-content: left;
+        }
 
-            .program-course-card-info {
+        li {
+            @include media-breakpoint-down(md) {
+                width: calc(100% - 44px);
+            }
+
+            width: 273px;
+            margin: 0 0 15px 0;
+            list-style: none;
+            display: inline;
+            font-family: "Roboto", sans-serif;
+
+            .program-course-card {
+                padding: 0;
                 overflow: hidden;
-                margin-top: 7px;
-                padding: 7px;
+                border-radius: 4px !important;
+                box-shadow: 1px 1px 1px 1px rgb(0 0 0 / 12%);
+                width: 243px;
 
-                @include media-breakpoint-down(md) {
-                    margin-top: 20px;
-                }
+                .program-course-card-info {
+                    overflow: hidden;
+                    margin-top: 7px;
+                    padding: 7px;
 
-                img {
-                    max-width: 243px;
-                    max-height: 136px;
-                    object-fit: cover;
-                    object-position: center;
+                    @include media-breakpoint-down(md) {
+                        margin-top: 20px;
+                    }
 
-                    @include media-breakpoint-down(sm) {
-                        display: block;
-                        float: none;
-                        margin: 0 auto 10px;
+                    img {
+                        max-width: 243px;
+                        max-height: 136px;
+                        object-fit: cover;
+                        object-position: center;
+
+                        @include media-breakpoint-down(sm) {
+                            display: block;
+                            float: none;
+                            margin: 0 auto 10px;
+                        }
+                    }
+
+                    h4 {
+                        font-weight: 400;
+                        font-size: 12px;
+                        color: #6f7175;
+                    }
+
+                    h3 {
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: rgba(3, 21, 45, 0.85);
                     }
                 }
 
-                h4 {
-                    font-weight: 400;
-                    font-size: 12px;
-                    color: #6f7175;
-                }
-
-                h3 {
-                    font-size: 14px;
-                    font-weight: 600;
-                    color: rgba(3, 21, 45, 0.85);
-                }
-            }
-
-            &:hover {
-                h3 {
-                    color: $brand-button-bg;
+                &:hover {
+                    h3 {
+                        color: $brand-button-bg;
+                    }
                 }
             }
         }
