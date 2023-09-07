@@ -238,6 +238,11 @@ body.new-design {
       font-family: "Poppins", "Avenir Next", "Roboto", sans-serif;
     }
 
+    .enroll-now-free {
+      font-size: 16px;
+      font-weight: 400;
+    }
+
     form {
       margin-bottom: 20px;
 
@@ -365,6 +370,15 @@ body.new-design {
           padding: 10px 10px;
         }
       }
+    }
+  }
+
+  .financial-assistance-link {
+    text-align: left;
+    font-size: 16px;
+
+    a {
+      font-weight: 400;
     }
   }
 }

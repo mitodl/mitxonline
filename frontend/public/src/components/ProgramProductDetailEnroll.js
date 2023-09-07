@@ -317,7 +317,7 @@ export class ProductDetailEnrollApp extends React.Component<
         <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
         <input type="hidden" name="run" value={run ? run.id : ""} />
         <button type="submit" className="btn enroll-now enroll-now-free">
-          No thanks, I'll take the free version
+          No thanks, I'll take the course for free without a certificate
         </button>
       </form>
     )
