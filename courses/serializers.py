@@ -158,13 +158,24 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         )
         return flexible_price_exists
 
+class DepartmentSerializer(serializers.ModelSerializer):
+
+    name = serializers.SerializerMethodField()
+
+    def get_name(self, instance):
+        return instance.name
+    class Meta:
+        model = models.Department
+        fields = [
+            "name"
+        ]
 
 class CourseSerializer(BaseCourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
     courseruns = CourseRunSerializer(many=True, read_only=True)
+    departments = DepartmentSerializer(many=True, read_only=True)
     next_run_id = serializers.SerializerMethodField()
-    departments = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
     programs = serializers.SerializerMethodField()
 
@@ -172,13 +183,6 @@ class CourseSerializer(BaseCourseSerializer):
         """Get next run id"""
         run = instance.first_unexpired_run
         return run.id if run is not None else None
-
-    def get_departments(self, instance):
-        """List departments of a course"""
-        return sorted(
-            [{"name": department.name} for department in instance.departments.all().iterator()],
-            key=lambda department: department["name"],
-        )
 
     def get_page(self, instance):
         page_query = CoursePage.objects.filter(course=instance)
@@ -273,7 +277,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     requirements = serializers.SerializerMethodField()
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
-    departments = serializers.SerializerMethodField()
+    departments = DepartmentSerializer(many=True, read_only=True)
 
     def get_courses(self, instance):
         """Serializer for courses"""
@@ -305,13 +309,6 @@ class ProgramSerializer(serializers.ModelSerializer):
         else:
             return {"feature_image_src": _get_thumbnail_url(None)}
 
-    def get_departments(self, instance):
-        """List departments of a course"""
-        return sorted(
-            [{"name": department.name} for department in instance.departments.all()],
-            key=lambda department: department["name"],
-        )
-
     class Meta:
         model = models.Program
         fields = [
@@ -334,7 +331,6 @@ class FullProgramSerializer(ProgramSerializer):
     start_date = serializers.SerializerMethodField()
     end_date = serializers.SerializerMethodField()
     enrollment_start = serializers.SerializerMethodField()
-    departments = serializers.SerializerMethodField()
 
     def get_start_date(self, instance):
         """
@@ -377,16 +373,6 @@ class FullProgramSerializer(ProgramSerializer):
             .values_list("enrollment_start", flat=True)
             .first()
         )
-
-    def get_departments(self, instance):
-        """List all departments in all courses in the program"""
-        courses_in_program = [course[0] for course in instance.courses]
-        departments = (
-            models.Department.objects.filter(course__in=courses_in_program)
-            .values("name")
-            .distinct("name")
-        )
-        return list(departments)
 
     class Meta(ProgramSerializer.Meta):
         fields = ProgramSerializer.Meta.fields + [

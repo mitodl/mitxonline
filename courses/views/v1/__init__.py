@@ -112,7 +112,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         if readable_id:
             return Course.objects.filter(live=True, readable_id=readable_id)
         print("query from queryset BEFORE")
-        return Course.objects.filter(live=True).prefetch_related("courseruns").all()
+        return Course.objects.filter(live=True).prefetch_related("courseruns", "departments").all()
 
     def get_serializer_context(self):
         added_context = {}
