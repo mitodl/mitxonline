@@ -208,7 +208,9 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
                 return get_user_relevant_course_run_qset(course, self.request.user)
             else:
                 program = Program.objects.filter(readable_id=relevant_to).first()
-                return get_user_relevant_program_course_run_qset(program, self.request.user)
+                return get_user_relevant_program_course_run_qset(
+                    program, self.request.user
+                )
         else:
             return (
                 CourseRun.objects.select_related("course")

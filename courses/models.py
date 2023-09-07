@@ -302,7 +302,14 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         requirements tree.
         """
 
-        course_ids = [course_id for course_id in ProgramRequirement.objects.filter(program=self, node_type=ProgramRequirementNodeType.COURSE).all().values_list("course__id", flat=True)]
+        course_ids = [
+            course_id
+            for course_id in ProgramRequirement.objects.filter(
+                program=self, node_type=ProgramRequirementNodeType.COURSE
+            )
+            .all()
+            .values_list("course__id", flat=True)
+        ]
 
         return Course.objects.filter(id__in=course_ids)
 
@@ -350,7 +357,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         Returns just the courses under the "Required Courses" node.
         """
         return [course for (course, type) in self.courses if type == "Required Courses"]
-    
+
     @cached_property
     def required_title(self):
         """
@@ -358,7 +365,12 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         courses (e.g. the one that has elective_flag = False).
         """
 
-        return self.requirements_root.get_children().filter(elective_flag=False).get().title
+        return (
+            self.requirements_root.get_children()
+            .filter(elective_flag=False)
+            .get()
+            .title
+        )
 
     @cached_property
     def elective_courses(self):
@@ -378,7 +390,9 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         courses (e.g. the one that has elective_flag = True).
         """
 
-        return self.requirements_root.get_children().filter(elective_flag=True).get().title
+        return (
+            self.requirements_root.get_children().filter(elective_flag=True).get().title
+        )
 
     @cached_property
     def minimum_elective_courses_requirement(self):
