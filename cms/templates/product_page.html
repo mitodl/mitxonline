@@ -39,21 +39,17 @@
 
               {% if page.is_program_page %}
               <section class="program-courses-container" id="program-courses">
-                {% if page.product.required_courses %}
+              {% if page.product.required_courses %}
                 <h2>{{ page.product.required_title }}</h2>
 
-                <ul>
-                  {% course_list page.product.required_courses %}
-                </ul>
-                {% endif %}
+                {% course_list page.product.required_courses %}
+              {% endif %}
 
-                {% if page.product.elective_courses %}
+              {% if page.product.elective_courses %}
                 <h2 class="electives-title">{{ page.product.elective_title }}</h2>
 
-                <ul>
-                  {% course_list page.product.elective_courses %}
-                </ul>
-                {% endif %}
+                {% course_list page.product.elective_courses %}
+              {% endif %}
 
               </section>
               {% endif %}

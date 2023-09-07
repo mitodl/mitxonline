@@ -1,7 +1,8 @@
 """
-Generates a list of <li> elements for a given set of courses. Pass in the list
-of courses and it should spit out a bunch of <li> tags. 
+Generates a <ul> block for a list of courses. Pass in the list of courses.
 """
+
+import re
 
 from django import template
 from django.utils.safestring import mark_safe
@@ -11,30 +12,39 @@ from cms.templatetags.feature_img_src import feature_img_src
 register = template.Library()
 
 
-@register.simple_tag(name="course_list")
+def format_course_start_time(start_date):
+    hour = start_date.hour
+    minute = start_date.minute
+    timespec = ""
+
+    if (hour == 23 and minute == 59) or (hour == 0 and minute == 0):
+        timespec = "midnight"
+    else:
+        timespec = re.sub(r"^0", "", start_date.strftime("%I:%M %p"))
+
+    return (
+        f"{start_date.strftime('%b')} {start_date.day}, {start_date.year}, {timespec}"
+    )
+
+
+@register.inclusion_tag("course_list_card.html", name="course_list")
 def course_list(courses):
-    retstr = ""
+    cards = []
 
     for course in courses:
         start_descriptor = (
-            course.first_unexpired_run.start_date
+            f"Starts {format_course_start_time(course.first_unexpired_run.start_date)}"
             if course.first_unexpired_run.start_date
             else "Start Anytime"
         )
         featured_image = feature_img_src(course.page.feature_image)
 
-        retstr += f"""
-                  <li onClick="javascript:window.open('{course.page.url}');"> 
-                    <div class="program-course-card">
-                      <img src="{featured_image}" alt="">
-                      <div class="program-course-card-info">
-                        <h4 class="startdate">
-                          {start_descriptor}
-                        </h4>
-                        <h3 class="title">{course.title}</h3>
-                      </div>
-                    </div>
-                  </li>
-"""
+        cards.append(
+            {
+                "course": course,
+                "start_descriptor": start_descriptor,
+                "featured_image": featured_image,
+            }
+        )
 
-    return mark_safe(retstr)
+    return {"cards": cards}

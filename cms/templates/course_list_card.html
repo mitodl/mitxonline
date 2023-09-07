@@ -1,0 +1,15 @@
+<ul>
+    {% for card in cards %}
+    <li onClick="javascript:window.open('{{card.course.page.url}}');"> 
+        <div class="program-course-card">
+        <img src="{{card.featured_image}}" alt="">
+        <div class="program-course-card-info">
+            <h4 class="startdate">
+            {{card.start_descriptor}}
+            </h4>
+            <h3 class="title">{{card.course.title}}</h3>
+        </div>
+        </div>
+    </li>
+    {% endfor %}
+</ul>
