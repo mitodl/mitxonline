@@ -5,12 +5,13 @@ import moment from "moment-timezone"
 import React from "react"
 
 import IntegrationTestHelper from "../util/integration_test_helper"
-import ProductDetailEnrollApp, {
-  ProductDetailEnrollApp as InnerProductDetailEnrollApp
-} from "./ProductDetailEnrollApp"
+import CourseProductDetailEnroll, {
+  CourseProductDetailEnroll as InnerCourseProductDetailEnroll
+} from "./CourseProductDetailEnroll"
 
 import { courseRunsSelector } from "../lib/queries/courseRuns"
 import {
+  makeCourseDetailWithRuns,
   makeCourseRunDetail,
   makeCourseRunEnrollment,
   makeCourseRunDetailWithProduct
@@ -27,31 +28,34 @@ import * as courseApi from "../lib/courseApi"
 import sinon from "sinon"
 import { makeUser } from "../factories/user"
 
-describe("ProductDetailEnrollApp", () => {
+describe("CourseProductDetailEnroll", () => {
   let helper,
     renderPage,
     isWithinEnrollmentPeriodStub,
     isFinancialAssistanceAvailableStub,
     courseRun,
+    course,
     currentUser
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
     courseRun = makeCourseRunDetailWithProduct()
+    course = makeCourseDetailWithRuns()
     currentUser = makeUser()
     renderPage = helper.configureHOCRenderer(
-      ProductDetailEnrollApp,
-      InnerProductDetailEnrollApp,
+      CourseProductDetailEnroll,
+      InnerCourseProductDetailEnroll,
       {
         entities: {
           courseRuns:  [courseRun],
+          courses:     [course],
           currentUser: currentUser
         }
       },
       {}
     )
     SETTINGS.features = {
-      "mitxonline-new-product-page": false
+      "mitxonline-new-product-page": true
     }
 
     isWithinEnrollmentPeriodStub = helper.sandbox.stub(
@@ -99,6 +103,7 @@ describe("ProductDetailEnrollApp", () => {
       },
       {}
     )
+
     assert.equal(
       inner
         .find(".enroll-now")

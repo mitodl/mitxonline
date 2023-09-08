@@ -31,7 +31,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
 
     return (
       <>
-        <div className="enrollment-info-box">
+        <div className="enrollment-info-box componentized">
           <div className="row d-flex align-items-center">
             <div className="enrollment-info-icon">
               <img
