@@ -111,14 +111,12 @@ class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
     products = ProductRelatedField(many=True, queryset=Product.objects.all())
-    page = serializers.SerializerMethodField()
     approved_flexible_price_exists = serializers.SerializerMethodField()
 
     class Meta:
         model = models.CourseRun
         fields = BaseCourseRunSerializer.Meta.fields + [
             "products",
-            "page",
             "approved_flexible_price_exists",
         ]
 
@@ -133,14 +131,6 @@ class CourseRunSerializer(BaseCourseRunSerializer):
                 },
             }
         return data
-
-    def get_page(self, instance):
-        try:
-            return CoursePageSerializer(
-                instance=CoursePage.objects.filter(course=instance.course).get()
-            ).data
-        except ObjectDoesNotExist:
-            return None
 
     def get_approved_flexible_price_exists(self, instance):
         # Get the User object if it exists.
@@ -158,17 +148,17 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         )
         return flexible_price_exists
 
-class DepartmentSerializer(serializers.ModelSerializer):
 
+class DepartmentSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
 
     def get_name(self, instance):
         return instance.name
+
     class Meta:
         model = models.Department
-        fields = [
-            "name"
-        ]
+        fields = ["name"]
+
 
 class CourseSerializer(BaseCourseSerializer):
     """Course model serializer - also serializes child course runs"""
@@ -176,23 +166,13 @@ class CourseSerializer(BaseCourseSerializer):
     courseruns = CourseRunSerializer(many=True, read_only=True)
     departments = DepartmentSerializer(many=True, read_only=True)
     next_run_id = serializers.SerializerMethodField()
-    page = serializers.SerializerMethodField()
+    page = CoursePageSerializer(read_only=True)
     programs = serializers.SerializerMethodField()
 
     def get_next_run_id(self, instance):
         """Get next run id"""
         run = instance.first_unexpired_run
         return run.id if run is not None else None
-
-    def get_page(self, instance):
-        page_query = CoursePage.objects.filter(course=instance)
-        return (
-            CoursePageSerializer(
-                instance=page_query.get()
-            ).data
-            if page_query.exists()
-            else None
-        )
 
     def get_programs(self, instance):
         if self.context.get("all_runs", False):
@@ -225,13 +205,6 @@ class CourseRunDetailSerializer(serializers.ModelSerializer):
 
     course = BaseCourseSerializer(read_only=True, context={"include_page_fields": True})
     products = BaseProductSerializer(read_only=True, many=True)
-    page = serializers.SerializerMethodField()
-
-    def get_page(self, instance):
-        try:
-            return CoursePageSerializer(instance=instance.course.page).data
-        except ObjectDoesNotExist:
-            return None
 
     class Meta:
         model = models.CourseRun
@@ -252,7 +225,6 @@ class CourseRunDetailSerializer(serializers.ModelSerializer):
             "is_self_paced",
             "id",
             "products",
-            "page",
         ]
 
 
@@ -302,9 +274,9 @@ class ProgramSerializer(serializers.ModelSerializer):
         return ProgramRequirementTreeSerializer(instance=req_root).data
 
     def get_page(self, instance):
-        if ProgramPage.objects.filter(program=instance).exists():
+        if instance.page:
             return ProgramPageSerializer(
-                instance=ProgramPage.objects.filter(program=instance).get()
+                instance.page
             ).data
         else:
             return {"feature_image_src": _get_thumbnail_url(None)}

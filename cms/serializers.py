@@ -20,7 +20,6 @@ class CoursePageSerializer(serializers.ModelSerializer):
     description = serializers.SerializerMethodField()
     current_price = serializers.SerializerMethodField()
     instructors = serializers.SerializerMethodField()
-    live = serializers.SerializerMethodField()
     effort = serializers.SerializerMethodField()
     length = serializers.SerializerMethodField()
 
@@ -76,28 +75,14 @@ class CoursePageSerializer(serializers.ModelSerializer):
             else ""
         )
 
-    def get_next_run_id(self, instance):
-        """Get next run id"""
-        run = instance.course.first_unexpired_run
-        return run.id if run is not None else None
-
     def get_description(self, instance):
         return bleach.clean(instance.description, tags=[], strip=True)
 
     def get_current_price(self, instance):
-        next_run = self.get_next_run_id(instance)
-
-        if next_run is None:
-            return None
-
-        course_ct = ContentType.objects.get(app_label="courses", model="courserun")
-
         relevant_product = (
-            Product.objects.filter(
-                content_type=course_ct, object_id=next_run, is_active=True
-            )
-            .order_by("-price")
-            .first()
+            instance.product.active_products.filter().order_by("-price").first()
+            if instance.product.active_products
+            else None
         )
         return relevant_product.price if relevant_product else None
 
@@ -119,9 +104,6 @@ class CoursePageSerializer(serializers.ModelSerializer):
             )
 
         return returnable_members
-
-    def get_live(self, instance):
-        return instance.live
 
     def get_effort(self, instance):
         return (

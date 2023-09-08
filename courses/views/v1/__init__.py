@@ -105,14 +105,18 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = []
     filter_backends = [DjangoFilterBackend]
     serializer_class = CourseSerializer
-    filterset_fields = ['id', 'title']
+    filterset_fields = ["id", "live"]
 
     def get_queryset(self):
         readable_id = self.request.query_params.get("readable_id", None)
         if readable_id:
             return Course.objects.filter(live=True, readable_id=readable_id)
-        print("query from queryset BEFORE")
-        return Course.objects.filter(live=True).prefetch_related("courseruns", "departments").all()
+        return (
+            Course.objects.filter()
+            .select_related("page")
+            .prefetch_related("courseruns", "departments")
+            .all()
+        )
 
     def get_serializer_context(self):
         added_context = {}
