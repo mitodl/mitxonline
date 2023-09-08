@@ -125,7 +125,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     readable_id = models.CharField(
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
-    live = models.BooleanField(default=False)
+    live = models.BooleanField(default=False, db_index=True)
     program_type = models.CharField(
         max_length=255,
         default="Series",
@@ -295,7 +295,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 program=self, node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value
             )
 
-    @property
+    @cached_property
     def courses(self):
         """
         Returns the courses associated with this program via the requirements
@@ -315,7 +315,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                     path__startswith=op.path,
                     node_type=ProgramRequirementNodeType.COURSE,
                 )
-                .select_related("course", "course__page")
+                .select_related("course")
                 .all()
             )
 

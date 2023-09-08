@@ -85,7 +85,9 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = []
 
     serializer_class = ProgramSerializer
-    queryset = Program.objects.filter(live=True)
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ["id", "live"]
+    queryset = Program.objects.filter().prefetch_related("departments")
     pagination_class = Pagination
 
     def paginate_queryset(self, queryset):
