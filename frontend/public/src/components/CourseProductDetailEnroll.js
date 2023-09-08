@@ -517,7 +517,7 @@ export class CourseProductDetailEnroll extends React.Component<
             : courseRuns[0]
           : null
     if (run) this.updateDate(run)
-    let product = run && run.products ? run.products[0] : null
+
     if (courseRuns) {
       const thisScope = this
       courseRuns.map(courseRun => {
@@ -526,7 +526,6 @@ export class CourseProductDetailEnroll extends React.Component<
           if (e.target && e.target.id === courseRun.courseware_id) {
             thisScope.setCurrentCourseRun(courseRun)
             run = thisScope.getCurrentCourseRun()
-            product = run && run.products ? run.products[0] : null
             // $FlowFixMe
             thisScope.updateDate(run)
           }

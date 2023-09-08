@@ -10,7 +10,7 @@ import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 import Loader from "./Loader"
 import { routes } from "../lib/urls"
-import { getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
+import { formatLocalePrice } from "../lib/util"
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
   courseRunsSelector,
@@ -28,9 +28,7 @@ import {
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
-import {
-  isFinancialAssistanceAvailable,
-} from "../lib/courseApi"
+import { isFinancialAssistanceAvailable } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
