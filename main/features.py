@@ -11,6 +11,7 @@ ENABLE_NEW_HOME_PAGE_FEATURED = "mitxonline-new-featured-carousel"
 ENABLE_NEW_HOME_PAGE_HERO = "mitxonline-new-featured-hero"
 ENABLE_NEW_HOME_PAGE_VIDEO = "mitxonline-new-home-page-video-component"
 ENABLE_NEW_HOME_PAGE_CONTACT_FORM = "mitxonline-new-home-page-contact-form"
+ENABLE_NEW_FOOTER = "mitxonline-new-footer"
 
 
 def is_enabled(name, default=None, unique_id=settings.HOSTNAME):

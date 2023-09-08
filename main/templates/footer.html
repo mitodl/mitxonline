@@ -1,5 +1,60 @@
 {% load static %}
 
+{% if new_footer %}
+<footer class="new-footer">
+  <div class="new-footer-container">
+      <div class="copyright-container">
+          <div class="address-col">
+           <img src="{% static 'images/mit.png' %}" alt="MIT" loading="lazy"/>
+            <address>
+              Massachusetts Institute of Technology <br />77 Massachusetts Avenue
+              <br />Cambridge, MA 02139
+            </address>
+          </div>
+          <div class="copyright-col">
+            {% include "copyright.html" %}
+          </div>
+      </div>
+      <div class="help-contact-container">
+        <div class="help-contact-row">
+            <div class="help-col">
+              <img src={% static 'images/help-faq.png' %} alt="Help" loading="lazy"/>
+              <div class="info">
+                <a href=" https://mitxonline.zendesk.com/hc/en-us">Help & FAQ</a>
+                <p>Find answers to your questions.</p>
+              </div>
+            </div>
+
+            <div class="contact-col">
+              <img src={% static 'images/contact-us.png' %} alt="Contact Us" loading="lazy"/>
+              <div class="info">
+                <a href="https://mitxonline.zendesk.com/hc/en-us/requests/new">Contact Us</a>
+                <p>Let us know how we can assist you.</p>
+              </div>
+            </div>
+        </div>
+        <div class="links-row">
+            <ul class="links">
+              <li><a href="/about-us/">About Us</a></li>
+              <li><a href="/terms-of-service/">Terms of Service</a></li>
+              <li>
+                <a
+                  target="_blank"
+                  href="https://accessibility.mit.edu/"
+                  rel="noopener noreferrer"
+                  >Accessibility
+                </a>
+              </li>
+              <li><a href="/privacy-policy/">Privacy Policy</a></li>
+              <li><a href="/honor-code/">Honor Code</a></li>
+              <li><a href="https://mitxonline.zendesk.com/hc/en-us/requests/new">Contact Us</a></li>
+            </ul>
+        </div>
+      </div>
+  </div>
+</footer>
+
+{% else %}
 <footer class="footer">
   <div class="support-links">
     <div class="container content-holder">
@@ -62,3 +117,4 @@
     </div>
   </div>
 </footer>
+{% endif %}
