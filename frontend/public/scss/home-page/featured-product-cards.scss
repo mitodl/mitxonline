@@ -1,19 +1,4 @@
 // TODO: `featured-product-section h1` should replace `course-section h1` in home.css on feature merge
-.featured-product-section h1 {
-  color: $home-page-header-blue;
-  text-align: left;
-  font-size: 25px;
-  margin: 0;
-  font-style: normal;
-  font-weight: 700;
-  line-height: normal;
-  padding: 60px 0 33px 0;
-  @include media-breakpoint-down(sm) {
-    font-size: 30px;
-    padding: 20px 0;
-  }
-}
-
 .featured-product-section-container {
   width: 100%;
   display: flex;
@@ -24,6 +9,20 @@
     width: 100%;
     margin: 0;
   }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: Poppins, sans-serif;
+    font-style: normal;
+    line-height: normal;
+    font-weight: 700;
+  }
+
+  p, a {
+    font-family: Inter, sans-serif;
+    font-style: normal;
+    line-height: normal;
+    font-weight: 400;
+  }
+
 
   .featured-product-section {
     display: flex;
@@ -56,12 +55,9 @@
         padding-top: 0;
       }
 
-      .featured-product-header-title {
+      h3.featured-product-header-title {
         color: $home-page-header-blue;
         font-size: 25px;
-        font-style: normal;
-        font-weight: 700;
-        line-height: normal;
         @include media-breakpoint-down(sm) {
           width: 176px;
           font-size: 18px;
@@ -116,7 +112,7 @@
         margin-top: 30px;
         align-items: unset;
         padding-bottom: 0;
-        }
+      }
 
       .carousel-inner {
         overflow-y: unset;
@@ -133,7 +129,7 @@
               width: 282px;
               margin: auto;
               height: 238px;
-              }
+            }
 
             a {
               text-decoration: none;
@@ -154,6 +150,11 @@
                   border-radius: 0 3px 3px 0;
                   background-color: $home-page-header-blue;
                   color: #FFF;
+                  font-family: Inter, sans-serif;
+                  font-size: 0.75rem;
+                  font-style: normal;
+                  font-weight: 700;
+                  line-height: normal;
                 }
               }
 
@@ -161,24 +162,19 @@
                 margin: 13px 15px 15px 15px;
                 padding: 0;
 
-                .date {
+                p.date {
                   color: $home-page-grey-text;
                   font-size: 12px;
-                  font-style: normal;
-                  font-weight: 400;
-                  line-height: normal;
                   margin-bottom: 5px;
                 }
 
-                .featured-product-card-title {
+                h2.featured-product-card-title {
                   height: 33px;
                   flex-shrink: 0;
                   align-self: stretch;
                   color: $home-page-header-blue;
-                  font-size: 14px;
-                  font-style: normal;
-                  font-weight: 700;
-                  line-height: normal;
+                  font-size: 0.875rem;
+                  font-family: Inter, sans-serif;
                   margin-top: 0;
                 }
               }
@@ -203,7 +199,7 @@
       }
 
       /* medium and up screens */
-      @include media-breakpoint-up(md)  {
+      @include media-breakpoint-up(md) {
 
         .carousel-inner .carousel-item-end.active,
         .carousel-inner .carousel-item-next {
@@ -230,24 +226,19 @@
       @include media-breakpoint-down(sm) {
         width: 100%;
         margin-top: 30px;
-        }
+      }
 
-      .view-catalog-button {
+      a.view-catalog-button {
         display: flex;
         width: 250px;
         padding: 16px 25px;
         justify-content: center;
-        align-items: flex-start;
         border-radius: 3px;
         border: 1px solid $home-page-header-blue;
         color: $home-page-header-blue;
         text-align: center;
         font-size: 14px;
-        font-style: normal;
-        font-weight: 600;
-        line-height: normal;
-        background-color: transparent;
-        align-self: center;
+        font-weight: 700;
         margin: auto;
         text-decoration: none;
         @include media-breakpoint-down(sm) {
