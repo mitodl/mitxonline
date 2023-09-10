@@ -487,7 +487,10 @@ export class EnrolledItemCard extends React.Component<
             enrollment.run.course.page.feature_image_src && (
             <div className="col-12 col-md-auto px-0 px-md-3">
               <div className="img-container">
-                <img src={enrollment.run.course.page.feature_image_src} alt="" />
+                <img
+                  src={enrollment.run.course.page.feature_image_src}
+                  alt=""
+                />
               </div>
             </div>
           )}

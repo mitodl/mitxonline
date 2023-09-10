@@ -102,7 +102,9 @@ export const generateStartDateText = (run: CourseRunDetail) => {
 }
 
 export const isFinancialAssistanceAvailable = (run: CourseRunDetail) => {
-  return run.course.page ? !!run.course.page.financial_assistance_form_url : false
+  return run.course.page
+    ? !!run.course.page.financial_assistance_form_url
+    : false
 }
 
 export const enrollmentHasPassingGrade = (enrollment: RunEnrollment) => {

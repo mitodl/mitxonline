@@ -387,10 +387,10 @@ export class CatalogPage extends React.Component<Props> {
   ) {
     return programs.filter(
       program =>
-        (selectedDepartment === ALL_DEPARTMENTS ||
-          program.departments
-            .map(department => department.name)
-            .includes(selectedDepartment))
+        selectedDepartment === ALL_DEPARTMENTS ||
+        program.departments
+          .map(department => department.name)
+          .includes(selectedDepartment)
     )
   }
 
