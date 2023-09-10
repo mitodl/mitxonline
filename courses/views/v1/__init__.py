@@ -37,11 +37,11 @@ from courses.models import (
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
     CourseRunWithCourseSerializer,
-    CourseSerializer,
     LearnerRecordSerializer,
     PartnerSchoolSerializer,
     ProgramSerializer,
     UserProgramEnrollmentDetailSerializer,
+    CourseWithCourseRunsSerializer,
 )
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
@@ -106,7 +106,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = Pagination
     permission_classes = []
     filter_backends = [DjangoFilterBackend]
-    serializer_class = CourseSerializer
+    serializer_class = CourseWithCourseRunsSerializer
     filterset_fields = ["id", "live", "readable_id"]
 
     def get_queryset(self):
@@ -139,6 +139,8 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = CourseRunWithCourseSerializer
     permission_classes = []
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ["id", "live"]
 
     def get_queryset(self):
         relevant_to = self.request.query_params.get("relevant_to", None)
@@ -149,7 +151,11 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
             else:
                 return CourseRun.objects.none()
         else:
-            return CourseRun.objects.select_related("course").all()
+            return (
+                CourseRun.objects.select_related("course")
+                .prefetch_related("course__departments", "course__page")
+                .all()
+            )
 
     def get_serializer_context(self):
         added_context = {}

@@ -26,13 +26,14 @@ from courses.models import (
     ProgramRequirementNodeType,
 )
 from courses.serializers import (
+    CourseSerializer,
     BaseCourseSerializer,
     BaseProgramSerializer,
     CourseRunWithCourseSerializer,
     CourseRunEnrollmentSerializer,
     CourseRunGradeSerializer,
     CourseRunSerializer,
-    CourseSerializer,
+    CourseWithCourseRunsSerializer,
     LearnerRecordSerializer,
     ProgramRequirementSerializer,
     ProgramRequirementTreeSerializer,
@@ -120,7 +121,9 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
             "readable_id": program_with_empty_requirements.readable_id,
             "id": program_with_empty_requirements.id,
             "courses": [
-                CourseSerializer(instance=course, context={**mock_context}).data
+                CourseWithCourseRunsSerializer(
+                    instance=course, context={**mock_context}
+                ).data
                 for course in [course1, course2]
             ]
             if not remove_tree
@@ -169,7 +172,7 @@ def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings
         run=courseRun1, **({} if is_anonymous else {"user": user})
     )
 
-    data = CourseSerializer(instance=course, context=mock_context).data
+    data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
 
     assert_drf_json_equal(
         data,
@@ -272,12 +275,12 @@ def test_serialize_course_run():
 
 
 def test_serialize_course_run_with_course():
-    """Test CourseRunWithCourseSerializer serialization"""
+    """Test CoursePageDepartmentsSerializer serialization"""
     course_run = CourseRunFactory.create(course__page=None)
     data = CourseRunWithCourseSerializer(course_run).data
 
     assert data == {
-        "course": BaseCourseSerializer(course_run.course).data,
+        "course": CourseSerializer(course_run.course).data,
         "course_number": course_run.course_number,
         "title": course_run.title,
         "courseware_id": course_run.courseware_id,
