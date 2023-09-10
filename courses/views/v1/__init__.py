@@ -112,7 +112,11 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         readable_id = self.request.query_params.get("readable_id", None)
         if readable_id:
-            return Course.objects.filter(live=True, readable_id=readable_id)
+            return (
+                Course.objects.filter(live=True, readable_id=readable_id)
+                .select_related("page")
+                .prefetch_related("courseruns", "departments")
+            )
         return (
             Course.objects.filter()
             .select_related("page")
