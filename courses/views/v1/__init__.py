@@ -149,7 +149,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
             else:
                 return CourseRun.objects.none()
         else:
-            return CourseRun.objects.all()
+            return CourseRun.objects.select_related("course").all()
 
     def get_serializer_context(self):
         added_context = {}
