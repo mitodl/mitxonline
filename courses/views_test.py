@@ -122,7 +122,8 @@ def test_get_courses(user_drf_client, courses, mock_context):
     assert len(courses_data) == len(courses)
     for course in courses:
         assert (
-            CourseWithCourseRunsSerializer(instance=course, context=mock_context).data in courses_data
+            CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+            in courses_data
         )
 
 
@@ -131,13 +132,18 @@ def test_get_course(user_drf_client, courses, mock_context):
     course = courses[0]
     resp = user_drf_client.get(reverse("courses_api-detail", kwargs={"pk": course.id}))
     course_data = resp.json()
-    assert course_data == CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+    assert (
+        course_data
+        == CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+    )
 
 
 def test_create_course(user_drf_client, courses, mock_context):
     """Test the view that handles a request to create a Course"""
     course = courses[0]
-    course_data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+    course_data = CourseWithCourseRunsSerializer(
+        instance=course, context=mock_context
+    ).data
     del course_data["id"]
     course_data["title"] = "New Course Title"
     request_url = reverse("courses_api-list")
