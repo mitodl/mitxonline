@@ -634,7 +634,9 @@ class CourseRun(TimestampedModel):
 
     live = models.BooleanField(default=False)
     is_self_paced = models.BooleanField(default=False)
-    products = GenericRelation("ecommerce.Product", related_query_name="courserunproducts")
+    products = GenericRelation(
+        "ecommerce.Product", related_query_name="courserunproducts"
+    )
 
     class Meta:
         unique_together = ("course", "run_tag")

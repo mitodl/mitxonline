@@ -28,6 +28,7 @@ from courses.serializers import (
     CourseRunSerializer,
     CourseSerializer,
     ProgramSerializer,
+    CourseRunWithCourseSerializer,
 )
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
@@ -169,7 +170,7 @@ def test_get_course_runs(user_drf_client, course_runs):
     # Force sorting by run id since this test has been flaky
     course_runs_data = sorted(course_runs_data, key=op.itemgetter("id"))
     for course_run, course_run_data in zip(course_runs, course_runs_data):
-        assert course_run_data == CourseRunSerializer(course_run).data
+        assert course_run_data == CourseRunWithCourseSerializer(course_run).data
 
 
 @pytest.mark.parametrize("is_enrolled", [True, False])
@@ -221,7 +222,7 @@ def test_get_course_run(user_drf_client, course_runs):
         reverse("course_runs_api-detail", kwargs={"pk": course_run.id})
     )
     course_run_data = resp.json()
-    assert course_run_data == CourseRunSerializer(course_run).data
+    assert course_run_data == CourseRunWithCourseSerializer(course_run).data
 
 
 def test_create_course_run(user_drf_client, course_runs):

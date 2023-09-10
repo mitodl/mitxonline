@@ -96,19 +96,21 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "expiration_date",
             "courseware_url",
             "courseware_id",
+            "certificate_available_date",
             "upgrade_deadline",
             "is_upgradable",
             "is_self_paced",
             "run_tag",
             "id",
             "live",
+            "course_number",
         ]
 
 
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
-    products = ProductRelatedField(many=True, queryset=Product.objects.all())
+    products = ProductRelatedField(many=True, read_only=True)
     approved_flexible_price_exists = serializers.SerializerMethodField()
 
     class Meta:
@@ -194,7 +196,7 @@ class CourseSerializer(BaseCourseSerializer):
         ]
 
 
-class CourseRunDetailSerializer(serializers.ModelSerializer):
+class CourseRunWithCourseSerializer(CourseRunSerializer):
     """
     CourseRun model serializer - also serializes the parent Course
     Includes the relevant Page (if there is one) and Products (if they exist,
@@ -202,27 +204,11 @@ class CourseRunDetailSerializer(serializers.ModelSerializer):
     """
 
     course = BaseCourseSerializer(read_only=True, context={"include_page_fields": True})
-    products = BaseProductSerializer(read_only=True, many=True)
 
     class Meta:
         model = models.CourseRun
-        fields = [
-            "course_number",
+        fields = CourseRunSerializer.Meta.fields + [
             "course",
-            "title",
-            "start_date",
-            "end_date",
-            "enrollment_start",
-            "enrollment_end",
-            "expiration_date",
-            "certificate_available_date",
-            "courseware_url",
-            "courseware_id",
-            "upgrade_deadline",
-            "is_upgradable",
-            "is_self_paced",
-            "id",
-            "products",
         ]
 
 
@@ -272,7 +258,7 @@ class ProgramSerializer(serializers.ModelSerializer):
         return ProgramRequirementTreeSerializer(instance=req_root).data
 
     def get_page(self, instance):
-        if instance.page:
+        if hasattr(instance, "page"):
             return ProgramPageSerializer(instance.page).data
         else:
             return {"feature_image_src": _get_thumbnail_url(None)}
@@ -449,7 +435,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
 class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
     """CourseRunEnrollment model serializer"""
 
-    run = CourseRunDetailSerializer(read_only=True)
+    run = CourseRunWithCourseSerializer(read_only=True)
     run_id = serializers.IntegerField(write_only=True)
     certificate = serializers.SerializerMethodField(read_only=True)
     enrollment_mode = serializers.ChoiceField(

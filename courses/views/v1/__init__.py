@@ -36,7 +36,7 @@ from courses.models import (
 )
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
-    CourseRunSerializer,
+    CourseRunWithCourseSerializer,
     CourseSerializer,
     LearnerRecordSerializer,
     PartnerSchoolSerializer,
@@ -107,16 +107,9 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = []
     filter_backends = [DjangoFilterBackend]
     serializer_class = CourseSerializer
-    filterset_fields = ["id", "live"]
+    filterset_fields = ["id", "live", "readable_id"]
 
     def get_queryset(self):
-        readable_id = self.request.query_params.get("readable_id", None)
-        if readable_id:
-            return (
-                Course.objects.filter(live=True, readable_id=readable_id)
-                .select_related("page")
-                .prefetch_related("courseruns", "departments")
-            )
         return (
             Course.objects.filter()
             .select_related("page")
@@ -144,7 +137,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for CourseRuns"""
 
-    serializer_class = CourseRunSerializer
+    serializer_class = CourseRunWithCourseSerializer
     permission_classes = []
 
     def get_queryset(self):

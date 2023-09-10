@@ -28,7 +28,7 @@ from courses.models import (
 from courses.serializers import (
     BaseCourseSerializer,
     BaseProgramSerializer,
-    CourseRunDetailSerializer,
+    CourseRunWithCourseSerializer,
     CourseRunEnrollmentSerializer,
     CourseRunGradeSerializer,
     CourseRunSerializer,
@@ -260,18 +260,21 @@ def test_serialize_course_run():
             "is_upgradable": course_run.is_upgradable,
             "id": course_run.id,
             "products": [],
-            "page": None,
             "approved_flexible_price_exists": False,
             "live": True,
             "is_self_paced": course_run.is_self_paced,
+            "certificate_available_date": drf_datetime(
+                course_run.certificate_available_date
+            ),
+            "course_number": course_run.course_number,
         },
     )
 
 
-def test_serialize_course_run_detail():
-    """Test CourseRunDetailSerializer serialization"""
+def test_serialize_course_run_with_course():
+    """Test CourseRunWithCourseSerializer serialization"""
     course_run = CourseRunFactory.create(course__page=None)
-    data = CourseRunDetailSerializer(course_run).data
+    data = CourseRunWithCourseSerializer(course_run).data
 
     assert data == {
         "course": BaseCourseSerializer(course_run.course).data,
@@ -292,7 +295,9 @@ def test_serialize_course_run_detail():
         "is_self_paced": False,
         "id": course_run.id,
         "products": BaseProductSerializer(course_run.products, many=True).data,
-        "page": None,
+        "approved_flexible_price_exists": False,
+        "live": True,
+        "run_tag": course_run.run_tag,
     }
 
 
@@ -303,7 +308,7 @@ def test_serialize_course_run_enrollments(settings, receipts_enabled):
     course_run_enrollment = CourseRunEnrollmentFactory.create()
     serialized_data = CourseRunEnrollmentSerializer(course_run_enrollment).data
     assert serialized_data == {
-        "run": CourseRunDetailSerializer(course_run_enrollment.run).data,
+        "run": CourseRunWithCourseSerializer(course_run_enrollment.run).data,
         "id": course_run_enrollment.id,
         "edx_emails_subscription": True,
         "enrollment_mode": "audit",
@@ -331,7 +336,7 @@ def test_serialize_course_run_enrollments_with_flexible_pricing(
     )
     serialized_data = CourseRunEnrollmentSerializer(course_run_enrollment).data
     assert serialized_data == {
-        "run": CourseRunDetailSerializer(course_run_enrollment.run).data,
+        "run": CourseRunWithCourseSerializer(course_run_enrollment.run).data,
         "id": course_run_enrollment.id,
         "edx_emails_subscription": True,
         "enrollment_mode": "audit",
@@ -351,7 +356,7 @@ def test_serialize_course_run_enrollments_with_grades():
 
     serialized_data = CourseRunEnrollmentSerializer(course_run_enrollment).data
     assert serialized_data == {
-        "run": CourseRunDetailSerializer(course_run_enrollment.run).data,
+        "run": CourseRunWithCourseSerializer(course_run_enrollment.run).data,
         "id": course_run_enrollment.id,
         "edx_emails_subscription": True,
         "enrollment_mode": "audit",
