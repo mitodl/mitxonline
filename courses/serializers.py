@@ -161,7 +161,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
 
 class CourseSerializer(BaseCourseSerializer):
-    """Course model serializer - also serializes child course runs"""
+    """Course model serializer"""
 
     departments = DepartmentSerializer(many=True, read_only=True)
     next_run_id = serializers.SerializerMethodField()
@@ -195,10 +195,11 @@ class CourseSerializer(BaseCourseSerializer):
 
 
 class CourseWithCourseRunsSerializer(CourseSerializer):
+     """Course model serializer - also serializes child course runs"""
     courseruns = CourseRunSerializer(many=True, read_only=True)
 
     class Meta:
-        model = models.CourseRun
+        model = models.Course
         fields = CourseSerializer.Meta.fields + [
             "courseruns",
         ]
@@ -206,9 +207,7 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
 
 class CourseRunWithCourseSerializer(CourseRunSerializer):
     """
-    CourseRun model serializer - also serializes the parent Course
-    Includes the relevant Page (if there is one) and Products (if they exist,
-    just the base product data)
+    CourseRun model serializer - also serializes the parent Course.
     """
 
     course = CourseSerializer(read_only=True, context={"include_page_fields": True})
