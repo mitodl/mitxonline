@@ -195,7 +195,8 @@ class CourseSerializer(BaseCourseSerializer):
 
 
 class CourseWithCourseRunsSerializer(CourseSerializer):
-     """Course model serializer - also serializes child course runs"""
+    """Course model serializer - also serializes child course runs"""
+
     courseruns = CourseRunSerializer(many=True, read_only=True)
 
     class Meta:
