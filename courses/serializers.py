@@ -6,12 +6,10 @@ from urllib.parse import urljoin
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
-from django.core.exceptions import ObjectDoesNotExist
 from django.templatetags.static import static
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from cms.models import CoursePage, ProgramPage
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses import models
 from courses.api import create_run_enrollments
@@ -275,9 +273,7 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     def get_page(self, instance):
         if instance.page:
-            return ProgramPageSerializer(
-                instance.page
-            ).data
+            return ProgramPageSerializer(instance.page).data
         else:
             return {"feature_image_src": _get_thumbnail_url(None)}
 
