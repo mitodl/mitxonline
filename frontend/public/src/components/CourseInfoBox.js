@@ -1,5 +1,5 @@
 import React from "react"
-import { formatPrettyDate, emptyOrNil } from "../lib/util"
+import { formatPrettyDate, emptyOrNil, getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
 import moment from "moment-timezone"
 
 import type { BaseCourseRun } from "../flow/courseTypes"
@@ -83,10 +83,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               {product ? (
                 <>
                   Certificate track: $
-                  {product.price.toLocaleString("en-us", {
-                    style:    "currency",
-                    currency: "en-US"
-                  })}
+                  {formatLocalePrice(getFlexiblePriceForProduct(product))}
                   {run.upgrade_deadline ? (
                     <>
                       <div className="text-danger">

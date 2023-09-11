@@ -227,8 +227,8 @@ export class CourseProductDetailEnroll extends React.Component<
               <div className="col-6 certificate-pricing">
                 <p>
                   Certitficate track:{" "}
-                  <strong>
-                    ${product && formatLocalePrice(product.price)}
+                  <strong id="certificate-price-info">
+                    ${product && formatLocalePrice(getFlexiblePriceForProduct(product.price))}
                   </strong>
                   {run.upgrade_deadline ? (
                     <>

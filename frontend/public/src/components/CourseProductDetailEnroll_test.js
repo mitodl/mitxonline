@@ -81,7 +81,7 @@ describe("CourseProductDetailEnroll", () => {
       }
     })
 
-    const loader = inner.find("Loader")
+    const loader = inner.find("Loader").first()
     assert.isOk(loader.exists())
     assert.isTrue(loader.props().isLoading)
   })
@@ -300,7 +300,7 @@ describe("CourseProductDetailEnroll", () => {
 
       assert.equal(
         inner
-          .find(".text-end")
+          .find("#certificate-price-info")
           .at(0)
           .text(),
         "$9.00"

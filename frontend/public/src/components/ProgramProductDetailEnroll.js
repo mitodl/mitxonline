@@ -209,19 +209,21 @@ export class ProductDetailEnrollApp extends React.Component<
 
     const { currentCourseRun } = this.state
 
-    program.courses.forEach(course => {
-      if (course.next_run_id) {
-        course.courseruns.forEach(run => {
-          if (course.next_run_id === run.id) {
-            courseRuns.push(run)
+    program &&
+      program.courses &&
+      program.courses.forEach(course => {
+        if (course.next_run_id) {
+          course.courseruns.forEach(run => {
+            if (course.next_run_id === run.id) {
+              courseRuns.push(run)
+            }
+          })
+        } else {
+          if (course.courseruns.length > 0) {
+            courseRuns.push(course.courseruns[0])
           }
-        })
-      } else {
-        if (course.courseruns.length > 0) {
-          courseRuns.push(course.courseruns[0])
         }
-      }
-    })
+      })
 
     return (
       <Modal
@@ -232,7 +234,7 @@ export class ProductDetailEnrollApp extends React.Component<
         centered
       >
         <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
-          {program.title}
+          {program && program.title}
         </ModalHeader>
         <ModalBody>
           <div className="row">
@@ -390,7 +392,8 @@ export class ProductDetailEnrollApp extends React.Component<
       enrollment =
         programEnrollments &&
         programEnrollments.find(
-          (elem: ProgramEnrollment) => elem.program.id === programs[0].id
+          (elem: ProgramEnrollment) =>
+            programs && elem.program.id === programs[0].id
         )
     }
 
