@@ -4,17 +4,6 @@ body.new-design {
   .product-page {
     margin-top: 1.5rem;
     background-color: white;
-    font-family: "Avenir Next", sans-serif;
-
-    section.course-description,
-    #tab-bar,
-    section.about-richtext-container {
-      font-family: "Roboto", sans-serif;
-
-      h2 {
-        font-family: "Avenir Next", "Roboto", sans-serif;
-      }
-    }
 
     section.course-description {
       line-height: 46px;
@@ -200,6 +189,7 @@ body.new-design {
           .enrollment-info-text {
             width: auto;
             flex-grow: 1;
+            font-size: 15px;
 
             .enrollment-effort {
               font-size: smaller;
@@ -228,14 +218,9 @@ body.new-design {
 
   .upgrade-enrollment-modal {
     max-width: 750px;
-    font-family: "Avenir Next", "Roboto", sans-serif;
 
     .modal-content {
       padding: 5px 14px;
-    }
-
-    .modal-header {
-      font-family: "Poppins", "Avenir Next", "Roboto", sans-serif;
     }
 
     .enroll-now-free {

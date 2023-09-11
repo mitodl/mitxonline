@@ -82,7 +82,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             <div className="enrollment-info-text">
               {product ? (
                 <>
-                  Certificate track: $
+                  Certificate track:{" "}
                   {formatLocalePrice(getFlexiblePriceForProduct(product))}
                   {run.upgrade_deadline ? (
                     <>

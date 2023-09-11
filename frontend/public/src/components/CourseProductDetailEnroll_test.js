@@ -340,7 +340,7 @@ describe("CourseProductDetailEnroll", () => {
 
       assert.equal(
         inner
-          .find(".text-end")
+          .find("#certificate-price-info")
           .at(0)
           .text()
           .at(1),
@@ -382,7 +382,7 @@ describe("CourseProductDetailEnroll", () => {
 
       assert.equal(
         inner
-          .find(".text-end")
+          .find("#certificate-price-info")
           .at(0)
           .text()
           .at(1),
