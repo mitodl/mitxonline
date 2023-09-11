@@ -1,5 +1,10 @@
 import React from "react"
-import { formatPrettyDate, emptyOrNil, getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
+import {
+  formatPrettyDate,
+  emptyOrNil,
+  getFlexiblePriceForProduct,
+  formatLocalePrice
+} from "../lib/util"
 import moment from "moment-timezone"
 
 import type { BaseCourseRun } from "../flow/courseTypes"
