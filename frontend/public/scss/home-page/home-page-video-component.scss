@@ -21,36 +21,37 @@
   }
 
   .home-page-video-container {
-    margin-top: -60px;
+    margin-top: 60px;
     width: 100%;
     max-width: 1440px;
     flex-shrink: 0;
     display: flex;
-    @include media-breakpoint-down(lg) {
+    padding: 0 48px 0 48px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    @include media-breakpoint-down(xl) {
       flex-direction: column;
       width: 100%;
     }
 
     .home-page-video-description {
-      width: 36%;
-      max-width: 517px;
+      width: 34%;
+      max-width: 28rem;
       display: flex;
       flex-direction: column;
-      padding: 140px 23px 0 60px;
-      @include media-breakpoint-down(lg) {
+      padding: 0;
+
+      @include media-breakpoint-down(xl) {
         width: 100%;
         max-width: 100%;
-        padding: 100px 0 0 60px;
-      }
-      @include media-breakpoint-down(md) {
-        padding-left: 20px;
       }
 
       h3 {
         color: $home-page-header-blue;
         font-size: 36px;
         line-height: 45px;
-        align-self: stretch;
+        margin-bottom: 1rem;
         @include media-breakpoint-down(sm) {
           font-size: 18px;
           line-height: normal;
@@ -61,7 +62,7 @@
         color: $home-page-header-blue;
         font-size: 20px;
         line-height: 32px;
-        align-self: stretch;
+        margin-bottom: 0;
         @include media-breakpoint-down(sm) {
           font-size: 13px;
           line-height: 24px;
@@ -70,14 +71,17 @@
     }
 
     .home-page-video-wrapper {
-      max-width: 900px;
-      width: 64%;
-      height: 500px;
-      @include media-breakpoint-down(lg) {
+      width: 66%;
+      max-width: 53.9375rem;
+      height: 30.3125rem;
+      @include media-breakpoint-down(xl) {
         width: 100%;
         max-width: 100%;
         display: flex;
         justify-content: center;
+      }
+      @include media-breakpoint-down(lg) {
+        height: 23rem;
       }
       @include media-breakpoint-down(md) {
         padding-left: 20px;
@@ -88,32 +92,32 @@
 
       .home-page-video-player {
         width: 100%;
-        max-width: 900px;
+        max-width: 53.9375rem;
         height: inherit;
         display: flex;
         justify-content: center;
-
+        @include media-breakpoint-only(xl) {
+          flex-wrap: wrap;
+          align-content: center;
+        }
+        @include media-breakpoint-down(xl) {
+          padding-top: 1.5rem;
+        }
         .vjs-default-skin {
-          width: 863px;
-          height: 485px;
-          top: 120px;
-          left: 0;
-          z-index: 99;
-          @include media-breakpoint-down(xl) {
-            top: 180px;
-            width: 574px;
-            height: 322px;
+          width: 100%;
+          height: inherit;
+          &:before{
+            background: $home-page-video-player-blue;
+            width: 67.71%;
+            height: 88.826%;
+            top: 16%;
+            left: 35.36%;
+            content: '';
+            position: absolute;
           }
-          @include media-breakpoint-down(lg) {
-            top: 0;
-          }
-          @include media-breakpoint-down(md) {
-            width: 574px;
-            height: 322px;
-          }
-          @include media-breakpoint-down(sm) {
-            width: 319px;
-            height: 179px;
+          .vjs-poster{
+            width: 100%;
+            height: fit-content;
           }
         }
 
@@ -141,32 +145,8 @@
         }
 
         .vjs-youtube {
-
           .vjs-big-play-button {
             display: none;
-          }
-        }
-
-        .home-page-video-underlay {
-          position: absolute;
-          width: 586px;
-          height: 460px;
-          background: $home-page-video-player-blue;
-          @include media-breakpoint-down(xl) {
-            width: 490px;
-            height: 319px;
-            margin: 50px 0 0 50px;
-          }
-          @include media-breakpoint-down(lg) {
-
-          }
-          @include media-breakpoint-down(md) {
-            width: 420px;
-            height: 269px;
-          }
-          @include media-breakpoint-down(sm) {
-            width: 239px;
-            height: 159px;
           }
         }
       }

@@ -134,7 +134,7 @@
   <div class="home-page-video-container">
     <div class="home-page-video-description">
       <h3>{{ page.video_component_title }}</h3>
-      <p>{{ page.video_component_description|richtext }}</p>
+      {{ page.video_component_description|richtext }}
     </div>
       <div class="home-page-video-wrapper">
         <div class="home-page-video-player">
@@ -145,10 +145,7 @@
                   data-setup="{{page.video_player_config}}"
                   preload="metadata"
                 >
-              </video-js>
-            <div class="home-page-video-underlay">
-
-            </div>
+            </video-js>
             {% endif %}
           </div>
         </div>
