@@ -47,6 +47,7 @@
       @include media-breakpoint-down(xl) {
         padding: 0;
       }
+
       h3 {
         color: $home-page-header-blue;
         font-size: 36px;
@@ -118,10 +119,10 @@
             }
           }
 
-      .vjs-poster {
-        height: fit-content;
-      }
-    }
+          .vjs-poster {
+            height: fit-content;
+          }
+        }
 
         .video-js .vjs-big-play-button .vjs-icon-placeholder:before {
           top: 0.3em;

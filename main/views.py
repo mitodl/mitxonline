@@ -18,7 +18,10 @@ def get_base_context(request):
     """
     Returns the template context key/values needed for the base template and all templates that extend it
     """
-    context = {"new_design": is_enabled("mitxonline-new-product-page", False)}
+    context = {
+        "new_design": features.is_enabled(features.ENABLE_NEW_DESIGN, False),
+        "new_footer": features.is_enabled(features.ENABLE_NEW_FOOTER, False),
+    }
 
     if settings.GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE:
         context[

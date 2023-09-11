@@ -171,6 +171,7 @@ def test_course_page_context(
             for member in course_page.linked_instructors.order_by("order").all()
         ],
         "new_design": features.is_enabled("mitxonline-new-product-page"),
+        "new_footer": features.is_enabled("mitxonline-new-footer"),
     }
 
     context = course_page.get_context(request=request)
