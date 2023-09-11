@@ -9,13 +9,13 @@ from django.contrib.auth.models import AnonymousUser
 from django.templatetags.static import static
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from django.db.models import CharField
 
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses import models
 from courses.api import create_run_enrollments
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
-from ecommerce.models import Product
-from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSerializer
+from ecommerce.serializers import ProductFlexibilePriceSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
 from main.serializers import StrictFieldsSerializer
@@ -150,10 +150,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
-    name = serializers.SerializerMethodField()
-
-    def get_name(self, instance):
-        return instance.name
+    name = CharField(max_length=128)
 
     class Meta:
         model = models.Department
