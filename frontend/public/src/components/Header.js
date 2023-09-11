@@ -39,7 +39,7 @@ const Header = ({ currentUser, location }: Props) => {
   } else {
     return (
       <React.Fragment>
-        <TopAppBar currentUser={currentUser} location={location}/>
+        <TopAppBar currentUser={currentUser} location={location} />
       </React.Fragment>
     )
   }

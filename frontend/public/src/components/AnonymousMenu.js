@@ -7,7 +7,7 @@ import { routes } from "../lib/urls"
 import { checkFeatureFlag } from "../lib/util"
 
 type Props = {
-  mobileView: boolean,
+  mobileView: boolean
 }
 
 const AnonymousMenu = ({ mobileView }: Props) => {
@@ -32,7 +32,7 @@ const AnonymousMenu = ({ mobileView }: Props) => {
           className="simple button"
           aria-label="Create Account"
         >
-          Create {newDesign &&  mobileView ? "" : "Account"}
+          Create {newDesign && mobileView ? "" : "Account"}
         </MixedLink>
       </li>
     </ul>
