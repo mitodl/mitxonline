@@ -10,13 +10,6 @@ import NotificationContainer from "./NotificationContainer"
 
 import type { CurrentUser } from "../flow/authTypes"
 
-import posthog from "posthog-js"
-
-/* global SETTINGS:false */
-posthog.init(SETTINGS.posthog_api_token, {
-  api_host: SETTINGS.posthog_api_host
-})
-
 type Props = {
   currentUser: CurrentUser,
   location: ?Location

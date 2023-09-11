@@ -762,9 +762,7 @@ class HomePage(VideoPlayerConfigMixin):
         show_new_design_hero = features.is_enabled(
             features.ENABLE_NEW_HOME_PAGE_HERO, False, user
         )
-        show_new_header = features.is_enabled(
-            features.ENABLE_NEW_HEADER, False, user
-        )
+        show_new_header = features.is_enabled(features.ENABLE_NEW_HEADER, False, user)
         show_home_page_video_component = features.is_enabled(
             features.ENABLE_NEW_HOME_PAGE_VIDEO, False, user
         )

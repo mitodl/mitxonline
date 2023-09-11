@@ -6,7 +6,7 @@ import TopAppBar from "./TopAppBar"
 
 import type { CurrentUser } from "../flow/authTypes"
 import type { Location } from "react-router"
-import {checkFeatureFlag} from "../lib/util";
+import { checkFeatureFlag } from "../lib/util"
 import TopBar from "./TopBar"
 
 type Props = {
@@ -29,7 +29,7 @@ const Header = ({ currentUser, location }: Props) => {
       scope.setUser(null)
     })
   }
-  const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
+  const showNewDesign = checkFeatureFlag("mitxonline-new-header")
   if (showNewDesign) {
     return (
       <React.Fragment>
