@@ -36,7 +36,6 @@ import {
   isLinkableCourseRun,
   generateStartDateText,
   courseRunStatusMessage,
-  enrollmentHasPassingGrade
 } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
