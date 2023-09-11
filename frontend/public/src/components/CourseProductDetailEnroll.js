@@ -161,7 +161,7 @@ export class CourseProductDetailEnroll extends React.Component<
       isFinancialAssistanceAvailable(run) &&
       !run.approved_flexible_price_exists ? (
           <p className="financial-assistance-link">
-            <a href={run.page.financial_assistance_form_url}>
+            <a href={run && run.page && run.page.financial_assistance_form_url}>
             Need financial assistance?
             </a>
           </p>
@@ -448,6 +448,7 @@ export class CourseProductDetailEnroll extends React.Component<
     return currentUser &&
       currentUser.id &&
       run &&
+      !run.is_enrolled &&
       isWithinEnrollmentPeriod(run) ? (
         <>
           {product && run.is_upgradable ? (

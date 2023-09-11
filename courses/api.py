@@ -31,6 +31,7 @@ from courses.models import (
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
+    Program,
     ProgramCertificate,
     ProgramEnrollment,
     ProgramRequirement,
