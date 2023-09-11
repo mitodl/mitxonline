@@ -32,6 +32,7 @@ from courses.models import (
     PartnerSchool,
     Program,
     ProgramEnrollment,
+    Department,
 )
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
@@ -496,3 +497,11 @@ def get_learner_record_from_uuid(request, uuid):
             record.program, context={"user": record.user, "anonymous_pull": True}
         ).data
     )
+    
+class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
+    """API view set for Programs"""
+
+    def list(self, request):
+        queryset = Department.objects.all()
+        serializer = DepartmentWithCountSerializer(queryset, many=True)
+        return Response(serializer.data)
