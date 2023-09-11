@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.73.0 (Released September 11, 2023)
+--------------
+
+- Change fonts to new correct fonts for home page (#1866)
+- Redesign footer (#1868)
+
 Version 0.72.0 (Released September 11, 2023)
 --------------
 
