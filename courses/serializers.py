@@ -157,6 +157,18 @@ class DepartmentSerializer(serializers.ModelSerializer):
         fields = ["name"]
 
 
+class DepartmentWithCountSerializer(DepartmentSerializer):
+    courses = serializers.IntegerField()
+    programs = serializers.IntegerField()
+
+    class Meta:
+        model = models.Department
+        fields = DepartmentSerializer.Meta.fields + [
+            "courses",
+            "programs",
+        ]
+
+
 class CourseSerializer(BaseCourseSerializer):
     """Course model serializer"""
 

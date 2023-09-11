@@ -5,7 +5,7 @@ from typing import Optional, Tuple, Union
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -43,6 +43,7 @@ from courses.serializers import (
     ProgramSerializer,
     UserProgramEnrollmentDetailSerializer,
     CourseWithCourseRunsSerializer,
+    DepartmentWithCountSerializer,
 )
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
@@ -508,11 +509,15 @@ def get_learner_record_from_uuid(request, uuid):
             record.program, context={"user": record.user, "anonymous_pull": True}
         ).data
     )
-    
+
+
+@permission_classes([])
 class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
-    """API view set for Programs"""
+    """API view set for Departments"""
 
     def list(self, request):
-        queryset = Department.objects.all()
+        queryset = Department.objects.annotate(
+            courses=Count("course"), programs=Count("program")
+        )
         serializer = DepartmentWithCountSerializer(queryset, many=True)
         return Response(serializer.data)

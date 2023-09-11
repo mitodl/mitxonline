@@ -305,34 +305,48 @@ describe("CatalogPage", function() {
     expect(inner.instance().renderNumberOfCatalogItems()).equals(5)
   })
 
-  it("renders catalog department filter for courses and programs without duplicates", async () => {
-    const course1 = JSON.parse(JSON.stringify(displayedCourse))
-    course1.departments = [{ name: "Math" }]
-    const course2 = JSON.parse(JSON.stringify(displayedCourse))
-    course2.departments = [{ name: "Math" }, { name: "Science" }]
-    const course3 = JSON.parse(JSON.stringify(displayedCourse))
-    course3.departments = [{ name: "Math" }, { name: "History" }]
-    courses = [course1, course2, course3]
-
-    const program1 = JSON.parse(JSON.stringify(displayedProgram))
-    program1.departments = [{ name: "Computer Science" }, { name: "Physics" }]
-    const program2 = JSON.parse(JSON.stringify(displayedProgram))
-    program2.departments = []
-    const program3 = JSON.parse(JSON.stringify(displayedProgram))
-    program3.departments = [{ name: "Physics" }]
-    programs = [program1, program2, program3]
-    const { inner } = await renderPage()
-    let collectedDepartments = inner
-      .instance()
-      .collectDepartmentsFromCatalogItems(courses)
-    expect(JSON.stringify(collectedDepartments)).equals(
-      JSON.stringify(["All Departments", "Math", "Science", "History"])
+  it("renders catalog department filter for courses and programs tabs", async () => {
+    const { inner } = await renderPage(
+      {
+        queries: {
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          departments: [
+            {
+              name:     "department1",
+              courses:  1,
+              programs: 0
+            },
+            {
+              name:     "department2",
+              courses:  1,
+              programs: 1
+            },
+            {
+              name:     "department3",
+              courses:  0,
+              programs: 1
+            }
+          ]
+        }
+      },
+      {}
     )
-    collectedDepartments = inner
+    let filteredDepartments = inner
       .instance()
-      .collectDepartmentsFromCatalogItems(programs)
-    expect(JSON.stringify(collectedDepartments)).equals(
-      JSON.stringify(["All Departments", "Computer Science", "Physics"])
+      .filterDepartmentsByTabName("courses")
+    expect(JSON.stringify(filteredDepartments)).equals(
+      JSON.stringify(["All Departments", "department1", "department2"])
+    )
+    filteredDepartments = inner
+      .instance()
+      .filterDepartmentsByTabName("programs")
+    expect(JSON.stringify(filteredDepartments)).equals(
+      JSON.stringify(["All Departments", "department2", "department3"])
     )
   })
 
