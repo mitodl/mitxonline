@@ -24,7 +24,6 @@
 
         @include media-breakpoint-up(md) {
             background: #FFF;
-            margin-left: 60px;
             width: 312px;
             position: sticky;
         }
@@ -34,6 +33,7 @@
     
         #department-sidebar-link-list {
             padding-left: 0;
+            margin-bottom: 0;
 
             button {
                 padding: 15px;
@@ -82,6 +82,9 @@
 }
 #course-catalog-navigation {
     display: flex;
+    max-width: 1320px;
+    margin: 0 auto;
+    font-family: 'Inter';
 
     @include media-breakpoint-down(md) {
         .slide-mobile-filter-overlay {
@@ -159,48 +162,8 @@
 
     #tab-row {
         height: 70px;
-        @include media-breakpoint-up(md) {
-            margin-left: 0;
-        }
-
-        .col {
-            padding-left: 0;
-            padding-right: 0;
-        }
-
-        .catalog-count-animation {
-
-            /* starting ENTER animation */
-            .count-enter {
-                right: 0;
-                width: inherit;
-                position: absolute;
-                margin-right: 64px;
-                opacity: 0;
-            }
-            
-            /* ending ENTER animation */
-            .count-enter-active {
-                opacity: 1;
-                transition: opacity 300ms ease-in;
-            }
-            
-            /* starting EXIT animation */
-            .count-exit {
-                right: 0;
-                width: inherit;
-                position: absolute;
-                margin-right: 64px;
-                opacity: 1;
-            }
-    
-            /* ending EXIT animation */
-            .count-exit-active {
-                opacity: 0;
-                transition: opacity 300ms ease-in;
-            }
-    
-        }
+        margin-top: 40px;
+        margin-left: 24px;
 
         .catalog-page-item-count {
             color: var(--blue-dark, #03152D);
@@ -210,18 +173,41 @@
             font-style: normal;
             font-weight: 400;
             line-height: normal;
-            margin-right: 64px;
-            margin-top: 40px;
-            padding-right: 0;
             right: 0;
             width: inherit;
+            margin-top: 15px;
+            padding-left: 0;
+            padding-right: 0;
+
+            .catalog-count-animation {
+
+                /* starting ENTER animation */
+                .count-enter {
+                    opacity: 0;
+                }
+                
+                /* ending ENTER animation */
+                .count-enter-active {
+                    opacity: 1;
+                    transition: opacity 300ms ease-in;
+                }
+                
+                /* starting EXIT animation */
+                .count-exit {
+                    opacity: 1;
+                }
+        
+                /* ending EXIT animation */
+                .count-exit-active {
+                    opacity: 0;
+                    transition: opacity 300ms ease-in;
+                }
+        
+            }
         }
     
         #tabs {
             align-items: flex-start;
-            margin-left: 24px;
-            padding-top: 30px;
-            margin-right: 24px;
             font-size: 16px;
             font-style: normal;
             font-weight: 700;
@@ -312,17 +298,15 @@
     #catalog-grid {
         display: flex;
         align-items: flex-start;
-        margin-top: 20px;
         margin-left: 24px;
-        padding-left: 0;
-        margin-right: 24px;
         gap: 24px;
+        margin-bottom: 24px;
 
         a {
             text-decoration: none;
-            padding-left: inherit;
-            padding-right: inherit;
             width: 312px;
+            padding-right: 0;
+            padding-left: 0;
         }
 
         .catalog-item {
@@ -376,7 +360,7 @@
                 padding: 15px;
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 15px;
+                gap: 5px;
                 align-self: stretch;
 
                 .start-date-description {
