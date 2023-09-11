@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.72.0
+Version 0.72.0 (Released September 11, 2023)
 --------------
 
 - Updates the course about page CSS (#1865)
