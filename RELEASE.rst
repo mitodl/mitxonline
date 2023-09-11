@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.72.0 (Released September 11, 2023)
+--------------
+
+- Updates the course about page CSS (#1865)
+- remove non-standard issue templates (#1716)
+- Home Page Contact Component (#1853)
+- add outer overlay + style desktop and mobile (#1863)
+- fix profile validation and regex error (#1848)
+- fix expandable Read More 500 error (#1861)
+
 Version 0.71.0 (Released September 06, 2023)
 --------------
 
