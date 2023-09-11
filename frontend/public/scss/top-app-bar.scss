@@ -255,7 +255,7 @@ header.site-header {
 }
 
 // New Design
-body.new-design header.site-header {
+header.site-header.new-design {
   box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14);
   background-color: $white;
 
@@ -275,7 +275,7 @@ body.new-design header.site-header {
   }
 }
 
-body.new-design .full-screen-menu {
+.full-screen-top-menu {
   display: block;
   font-size: 14px;
   line-height: 21px;
@@ -294,13 +294,10 @@ body.new-design .full-screen-menu {
       font-weight: 600;
       padding: 0 0 0 8px;
 
-
       a {
         color: black;
         text-decoration: none;
         display: block;
-        border: 1px solid var(--BorderGrey, #DFE5EC);
-
 
 
         &:hover {
@@ -312,6 +309,7 @@ body.new-design .full-screen-menu {
           padding: 12px 20px;
           align-items: flex-start;
           border-radius: 5px;
+          border: 1px solid var(--BorderGrey, #DFE5EC);
         }
 
         &.button {
@@ -386,13 +384,11 @@ body.new-design .full-screen-menu {
       font-weight: 600;
       padding: 0 0 0 8px;
 
-
       a {
         color: black;
         text-decoration: none;
         display: block;
         border: 1px solid var(--BorderGrey, #DFE5EC);
-
 
 
         &:hover {
