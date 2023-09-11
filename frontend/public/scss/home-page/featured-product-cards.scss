@@ -1,21 +1,13 @@
 // TODO: `featured-product-section h1` should replace `course-section h1` in home.css on feature merge
 .featured-product-section-container {
   width: 100%;
-  display: flex;
-  flex-direction: column;
   padding: 0 !important;
-  max-width: 1440px !important;
-  @include media-breakpoint-down(sm) {
-    width: 100%;
-    margin: 0;
-  }
   h1, h2, h3, h4, h5, h6 {
     font-family: Poppins, sans-serif;
     font-style: normal;
     line-height: normal;
     font-weight: 700;
   }
-
   p, a {
     font-family: Inter, sans-serif;
     font-style: normal;
@@ -23,15 +15,12 @@
     font-weight: 400;
   }
 
-
   .featured-product-section {
     display: flex;
     width: 100%;
     max-width: 1440px;
     height: 520px;
     flex-shrink: 0;
-    background-image: url('/static/images/featured-product-rectangle.svg');
-    background-size: cover;
     flex-direction: column;
     align-items: center;
     @include media-breakpoint-down(sm) {

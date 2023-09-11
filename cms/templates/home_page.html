@@ -42,13 +42,13 @@
   </div>
 {% endif %}
 {% if show_new_featured_carousel %}
-  <div class="featured-product-section-container container">
-    <div class="featured-product-section carousel slide" id="featuredProductCarousel">
-      <div class="featured-product-header">
+  <div class="featured-product-section-container d-flex flex-column container">
+    <div class="featured-product-section d-flex row carousel slide" id="featuredProductCarousel">
+      <div class="featured-product-header d-flex row col-12">
         {% if product_cards_section_title %}
-          <h3 class="featured-product-header-title">{{ product_cards_section_title }}</h3>
+          <h3 class="featured-product-header-title col-6">{{ product_cards_section_title }}</h3>
         {% endif %}
-        <div class="featured-product-arrows">
+        <div class="featured-product-arrows col-6">
           <a href="#featuredProductCarousel" role="button" data-bs-slide="prev">
             <img class="arrow prev-arrow" src="/static/images/featured-products-left-arrow.svg" alt="Previous Arrow" />
           </a>
@@ -89,7 +89,7 @@
           {% endfor %}
         </div>
       </div>
-    <div class="featured-product-navigation">
+      <div class="featured-product-navigation">
       <a role="button" href="/catalog" class="view-catalog-button">View MITx Online Catalog</a>
     </div>
     </div>
