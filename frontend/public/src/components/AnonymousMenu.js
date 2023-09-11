@@ -4,7 +4,7 @@ import React from "react"
 
 import MixedLink from "./MixedLink"
 import { routes } from "../lib/urls"
-import {checkFeatureFlag} from "../lib/util";
+import { checkFeatureFlag } from "../lib/util"
 
 type Props = {
   mobileView: boolean,
@@ -12,7 +12,7 @@ type Props = {
 
 const AnonymousMenu = ({ mobileView }: Props) => {
   const identifierPostfix = mobileView ? "Mobile" : "Desktop"
-  const newDesign = checkFeatureFlag("mitxonline-new-product-page")
+  const newDesign = checkFeatureFlag("mitxonline-new-header")
   return (
     <ul>
       <li>

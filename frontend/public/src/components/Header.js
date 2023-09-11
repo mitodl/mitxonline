@@ -42,7 +42,6 @@ const Header = ({ currentUser, location }: Props) => {
         <TopAppBar currentUser={currentUser} location={location}/>
       </React.Fragment>
     )
-
   }
 }
 

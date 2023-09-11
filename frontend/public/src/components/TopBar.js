@@ -64,10 +64,10 @@ const TopBar = ({ currentUser }: Props) => (
       ) : (
         <div className="justify-content-end">
           <div className="full-screen-top-menu">
-            <AnonymousMenu mobileView={false} newDesign={true}/>
+            <AnonymousMenu mobileView={false}/>
           </div>
           <div className="mobile-auth-buttons">
-            <AnonymousMenu mobileView={true} newDesign={true}/>
+            <AnonymousMenu mobileView={true}/>
           </div>
         </div>
       )}
