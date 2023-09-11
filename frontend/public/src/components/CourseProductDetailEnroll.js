@@ -436,7 +436,7 @@ export class CourseProductDetailEnroll extends React.Component<
     ) : null
   }
 
-  renderEnrollNowButton(run: EnrollmentFlaggedCourseRun, product: Product) {
+  renderEnrollNowButton(run: EnrollmentFlaggedCourseRun, product: Product|null) {
     const { currentUser } = this.props
     const csrfToken = getCookie("csrftoken")
     const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")

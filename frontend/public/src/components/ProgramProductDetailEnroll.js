@@ -134,7 +134,7 @@ export class ProductDetailEnrollApp extends React.Component<
   setCurrentCourseRun = (runId: string) => {
     const { courseRuns } = this.props
 
-    const courserun = courseRuns.find(run => run.courseware_id === runId)
+    const courserun = courseRuns && courseRuns.find(run => run.courseware_id === runId)
 
     this.setState({
       currentCourseRun: courserun
@@ -148,12 +148,12 @@ export class ProductDetailEnrollApp extends React.Component<
   renderCertificateInfoPanel() {
     const { currentCourseRun: run } = this.state
 
-    const product = run.products ? run.products[0] : null
+    const product = run && run.products ? run.products[0] : null
     const needFinancialAssistanceLink =
       isFinancialAssistanceAvailable(run) &&
-      !run.approved_flexible_price_exists ? (
+      !(run && run.approved_flexible_price_exists) ? (
           <p className="financial-assistance-link">
-            <a href={run.page.financial_assistance_form_url}>
+            <a href={run && run.page && run.page.financial_assistance_form_url}>
             Need financial assistance?
             </a>
           </p>
@@ -166,7 +166,7 @@ export class ProductDetailEnrollApp extends React.Component<
             <p>
               Certitficate track:{" "}
               <strong>${product && formatLocalePrice(product.price)}</strong>
-              {run.upgrade_deadline ? (
+              {run && run.upgrade_deadline ? (
                 <>
                   <br />
                   <span className="text-danger">
@@ -180,14 +180,14 @@ export class ProductDetailEnrollApp extends React.Component<
             <p>{needFinancialAssistanceLink}</p>
           </div>
           <div className="col-6">
-            <form action="/cart/add/" method="get" className="text-center">
+            {product ? <form action="/cart/add/" method="get" className="text-center">
               <input type="hidden" name="product_id" value={product.id} />
               <button type="submit" className="btn btn-upgrade">
                 <strong>Continue</strong>
                 <br />
                 on the certificate track
               </button>
-            </form>
+            </form> : null }
           </div>
         </div>
 
@@ -201,7 +201,7 @@ export class ProductDetailEnrollApp extends React.Component<
 
     const { upgradeEnrollmentDialogVisibility } = this.state
 
-    const program = programs[0]
+    const program = programs && programs[0]
     const courseRuns = []
 
     const { currentCourseRun } = this.state
@@ -307,7 +307,7 @@ export class ProductDetailEnrollApp extends React.Component<
     )
   }
 
-  getEnrollmentForm(run) {
+  getEnrollmentForm(run: EnrollmentFlaggedCourseRun) {
     const csrfToken = getCookie("csrftoken")
 
     return (
@@ -384,7 +384,7 @@ export class ProductDetailEnrollApp extends React.Component<
     let enrollment = undefined
 
     if (!programEnrollmentsLoading) {
-      enrollment = programEnrollments.find(
+      enrollment = programEnrollments && programEnrollments.find(
         (elem: ProgramEnrollment) => elem.program.id === programs[0].id
       )
     }
