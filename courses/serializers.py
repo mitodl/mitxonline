@@ -150,6 +150,8 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
+    """Department model serializer"""
+
     name = CharField(max_length=128)
 
     class Meta:
