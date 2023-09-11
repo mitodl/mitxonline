@@ -13,6 +13,9 @@ body.new-design {
   @include media-breakpoint-down(lg) {
     background: $home-page-grey-lite;
   }
+  @include media-breakpoint-down(sm) {
+    margin-top: 3rem;
+  }
   h1, h2, h3, h4, h5, h6 {
     font-family: Poppins, sans-serif;
     font-style: normal;

@@ -1,5 +1,6 @@
 .home-page-video-row {
   width: 100%;
+  max-width: 100%;
   margin: 0;
   padding: 0;
   display: flex;
@@ -26,32 +27,34 @@
     max-width: 1440px;
     flex-shrink: 0;
     display: flex;
-    padding: 0 48px 0 48px;
+    padding: 0 40px 0 40px;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     @include media-breakpoint-down(xl) {
       flex-direction: column;
       width: 100%;
+      padding: 0 40px 0 40px;
+      margin-top: 2rem;
+    }
+    @include media-breakpoint-down(md) {
+      padding: 0 15px 0 15px;
+      margin-top: 1rem;
     }
 
     .home-page-video-description {
-      width: 34%;
-      max-width: 28rem;
-      display: flex;
-      flex-direction: column;
-      padding: 0;
-
+      padding: 0 4.62rem 0 0;
       @include media-breakpoint-down(xl) {
-        width: 100%;
-        max-width: 100%;
+        padding: 0;
       }
-
       h3 {
         color: $home-page-header-blue;
         font-size: 36px;
         line-height: 45px;
         margin-bottom: 1rem;
+        @include media-breakpoint-down(md) {
+          margin-bottom: .25rem;
+        }
         @include media-breakpoint-down(sm) {
           font-size: 18px;
           line-height: normal;
@@ -71,31 +74,13 @@
     }
 
     .home-page-video-wrapper {
-      width: 66%;
-      max-width: 53.9375rem;
-      height: 30.3125rem;
-      @include media-breakpoint-down(xl) {
+      padding: 0 1.579% 0 0;
+      .home-page-video-player {
         width: 100%;
         max-width: 100%;
         display: flex;
         justify-content: center;
-      }
-      @include media-breakpoint-down(lg) {
-        height: 23rem;
-      }
-      @include media-breakpoint-down(md) {
-        padding-left: 20px;
-      }
-      @include media-breakpoint-down(sm) {
-        height: 200px;
-      }
 
-      .home-page-video-player {
-        width: 100%;
-        max-width: 53.9375rem;
-        height: inherit;
-        display: flex;
-        justify-content: center;
         @include media-breakpoint-only(xl) {
           flex-wrap: wrap;
           align-content: center;
@@ -103,21 +88,19 @@
         @include media-breakpoint-down(xl) {
           padding-top: 1.5rem;
         }
+
         .vjs-default-skin {
           width: 100%;
-          height: inherit;
+          height: 0;
+          padding-bottom: 56.25%;
           &:before{
             background: $home-page-video-player-blue;
-            width: 67.71%;
-            height: 88.826%;
-            top: 16%;
-            left: 35.36%;
+            width: 100%;
+            height: 100%;
+            top: 5.62%;
+            left: 3.158%;
             content: '';
             position: absolute;
-          }
-          .vjs-poster{
-            width: 100%;
-            height: fit-content;
           }
         }
 
@@ -135,10 +118,10 @@
             }
           }
 
-          .vjs-poster {
-            height: fit-content;
-          }
-        }
+      .vjs-poster {
+        height: fit-content;
+      }
+    }
 
         .video-js .vjs-big-play-button .vjs-icon-placeholder:before {
           top: 0.3em;
