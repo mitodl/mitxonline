@@ -13,6 +13,19 @@ body.new-design {
   @include media-breakpoint-down(lg) {
     background: $home-page-grey-lite;
   }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: Poppins, sans-serif;
+    font-style: normal;
+    line-height: normal;
+    font-weight: 700;
+  }
+
+  p, a {
+    font-family: Inter, sans-serif;
+    font-style: normal;
+    line-height: normal;
+    font-weight: 400;
+  }
 
   .home-page-contact-col {
     width: 47%;
@@ -41,7 +54,7 @@ body.new-design {
       }
 
       @media (max-width: 395px) {
-        padding: 10px 3px 0px 3px;
+        padding: 10px 3px 0 3px;
       }
       .home-page-hbspt-form-heading-row {
         display: flex;
@@ -55,9 +68,6 @@ body.new-design {
         h3 {
           color: $home-page-header-blue;
           font-size: 20px;
-          font-style: normal;
-          font-weight: 700;
-          line-height: normal;
           margin-bottom: 0;
           @include media-breakpoint-down(md) {
             font-size: 18px;
@@ -71,9 +81,6 @@ body.new-design {
           margin-left: 22px;
           color: $home-page-header-blue;
           font-size: 14px;
-          font-style: normal;
-          font-weight: 400;
-          line-height: normal;
           margin: auto;
           @include media-breakpoint-down(md) {
             font-size: 13px;
@@ -124,6 +131,7 @@ body.new-design {
                   font-style: normal;
                   font-weight: 400;
                   line-height: normal;
+                  font-family: Inter, sans-serif;
                 }
                 @include media-breakpoint-down(lg) {
                   width: 95%;
@@ -183,6 +191,7 @@ body.new-design {
                 font-size: 0.875rem;
                 font-style: normal;
                 font-weight: 700;
+                font-family: Poppins, sans-serif;
                 line-height: normal;
                 text-transform: uppercase;
                 justify-content: center;
@@ -219,9 +228,6 @@ body.new-design {
         h3 {
           color: $home-page-header-blue;
           font-size: 20px;
-          font-style: normal;
-          font-weight: 700;
-          line-height: normal;
           margin-bottom: 0;
           @include media-breakpoint-down(md) {
             font-size: 18px;
