@@ -603,9 +603,9 @@ export class CatalogPage extends React.Component<Props> {
                     </CSSTransition>
                   </TransitionGroup>
                 </div>
-                <div className="col catalog-page-item-count d-none d-sm-block">
+                <div className="col catalog-page-item-count">
                   <div className="catalog-count-animation">
-                    <TransitionGroup>
+                    <TransitionGroup id="count-animation-grid">
                       <CSSTransition
                         key={this.state.tabSelected}
                         timeout={300}
