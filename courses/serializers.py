@@ -156,6 +156,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
         model = models.Department
         fields = ["name"]
 
+
 class DepartmentWithCountSerializer(DepartmentSerializer):
     """CourseRun model serializer that includes the number of courses and programs associated with each departments"""
 
@@ -168,6 +169,7 @@ class DepartmentWithCountSerializer(DepartmentSerializer):
             "courses",
             "programs",
         ]
+
 
 class CourseSerializer(BaseCourseSerializer):
     """Course model serializer"""
