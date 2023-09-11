@@ -134,7 +134,8 @@ export class ProductDetailEnrollApp extends React.Component<
   setCurrentCourseRun = (runId: string) => {
     const { courseRuns } = this.props
 
-    const courserun = courseRuns && courseRuns.find(run => run.courseware_id === runId)
+    const courserun =
+      courseRuns && courseRuns.find(run => run.courseware_id === runId)
 
     this.setState({
       currentCourseRun: courserun
@@ -180,14 +181,16 @@ export class ProductDetailEnrollApp extends React.Component<
             <p>{needFinancialAssistanceLink}</p>
           </div>
           <div className="col-6">
-            {product ? <form action="/cart/add/" method="get" className="text-center">
-              <input type="hidden" name="product_id" value={product.id} />
-              <button type="submit" className="btn btn-upgrade">
-                <strong>Continue</strong>
-                <br />
-                on the certificate track
-              </button>
-            </form> : null }
+            {product ? (
+              <form action="/cart/add/" method="get" className="text-center">
+                <input type="hidden" name="product_id" value={product.id} />
+                <button type="submit" className="btn btn-upgrade">
+                  <strong>Continue</strong>
+                  <br />
+                  on the certificate track
+                </button>
+              </form>
+            ) : null}
           </div>
         </div>
 
@@ -384,9 +387,11 @@ export class ProductDetailEnrollApp extends React.Component<
     let enrollment = undefined
 
     if (!programEnrollmentsLoading) {
-      enrollment = programEnrollments && programEnrollments.find(
-        (elem: ProgramEnrollment) => elem.program.id === programs[0].id
-      )
+      enrollment =
+        programEnrollments &&
+        programEnrollments.find(
+          (elem: ProgramEnrollment) => elem.program.id === programs[0].id
+        )
     }
 
     return (
