@@ -55,14 +55,14 @@ const TopAppBar = ({ currentUser }: Props) => (
           {currentUser.is_authenticated ? (
             <UserMenu currentUser={currentUser} useScreenOverlay={false} />
           ) : (
-            <AnonymousMenu useScreenOverlay={false} />
+            <AnonymousMenu mobileView={false} />
           )}
         </div>
         <div className="mobile-menu">
           {currentUser.is_authenticated ? (
             <UserMenu currentUser={currentUser} useScreenOverlay={true} />
           ) : (
-            <AnonymousMenu useScreenOverlay={true} />
+            <AnonymousMenu mobileView={true} />
           )}
         </div>
       </div>

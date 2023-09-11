@@ -9,7 +9,7 @@ import { routes } from "../lib/urls"
 describe("AnonymousMenu component", () => {
   it("has a link to login", () => {
     assert.equal(
-      shallow(<AnonymousMenu useScreenOverlay={false} />)
+      shallow(<AnonymousMenu mobileView={false} />)
         .find("MixedLink")
         .at(0)
         .prop("dest"),
@@ -19,7 +19,7 @@ describe("AnonymousMenu component", () => {
 
   it("has a link to register", () => {
     assert.equal(
-      shallow(<AnonymousMenu useScreenOverlay={false} />)
+      shallow(<AnonymousMenu mobileView={false} />)
         .find("MixedLink")
         .at(1)
         .prop("dest"),
@@ -29,7 +29,7 @@ describe("AnonymousMenu component", () => {
 
   it("has a link to create account", () => {
     assert.equal(
-      shallow(<AnonymousMenu useScreenOverlay={true} />)
+      shallow(<AnonymousMenu mobileView={true} />)
         .find("MixedLink")
         .at(1)
         .prop("dest"),
