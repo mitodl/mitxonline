@@ -150,6 +150,8 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
+    """Department model serializer"""
+
     name = CharField(max_length=128)
 
     class Meta:
@@ -158,6 +160,8 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
 
 class DepartmentWithCountSerializer(DepartmentSerializer):
+    """CourseRun model serializer that includes the number of courses and programs associated with each departments"""
+
     courses = serializers.IntegerField()
     programs = serializers.IntegerField()
 

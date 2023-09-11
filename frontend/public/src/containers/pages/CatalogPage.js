@@ -161,9 +161,11 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Updates the filteredCourses and courseDepartments state variables
-   * once coursesIsLoading is False.  Adds an observer to detect when
+   * Updates the filteredCourses state variable
+   * once coursesIsLoading is false..  Adds an observer to detect when
    * the learner has scrolled to the bottom of the visible catalog items.
+   * Updates the filteredDepartments state variable once departmentsIsLoading
+   * is false.
    */
   componentDidUpdate = () => {
     const { courses, coursesIsLoading } = this.props
@@ -230,7 +232,7 @@ export class CatalogPage extends React.Component<Props> {
   /**
    * Updates this.state.selectedDepartment to {ALL_DEPARTMENTS},
    * updates this.state.tabSelected to the parameter,
-   * updates this.state.filteredDepartments to equal the unique department
+   * updates this.state.filteredDepartments
    * names from the catalog items in the selected tab,
    * updates this.state.filteredPrograms to equal the programs
    * which meet the criteria to be displayed in the catalog.
@@ -523,31 +525,26 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderDepartmentSideBarList() {
     const departmentSideBarListItems = []
-    if (!this.props.departmentsIsLoading) {
-      this.state.filteredDepartments.forEach(department =>
-        departmentSideBarListItems.push(
-          <li
-            className={`sidebar-link ${
-              this.state.selectedDepartment === department
-                ? "department-selected-link"
-                : "department-link"
-            }`}
-            key={this.state.tabSelected + department}
+    this.state.filteredDepartments.forEach(department =>
+      departmentSideBarListItems.push(
+        <li
+          className={`sidebar-link ${
+            this.state.selectedDepartment === department
+              ? "department-selected-link"
+              : "department-link"
+          }`}
+          key={this.state.tabSelected + department}
+        >
+          <button
+            onClick={() =>
+              this.changeSelectedDepartment(department, this.state.tabSelected)
+            }
           >
-            <button
-              onClick={() =>
-                this.changeSelectedDepartment(
-                  department,
-                  this.state.tabSelected
-                )
-              }
-            >
-              {department}
-            </button>
-          </li>
-        )
+            {department}
+          </button>
+        </li>
       )
-    }
+    )
     return (
       <div id="department-sidebar">
         <ul id="department-sidebar-link-list">{departmentSideBarListItems}</ul>

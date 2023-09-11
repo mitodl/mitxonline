@@ -330,6 +330,11 @@ describe("CatalogPage", function() {
               name:     "department3",
               courses:  0,
               programs: 1
+            },
+            {
+              name:     "department4",
+              courses:  0,
+              programs: 0
             }
           ]
         }
