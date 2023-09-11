@@ -467,8 +467,6 @@ export class EnrolledItemCard extends React.Component<
 
     const courseRunStatusMessageText = courseRunStatusMessage(enrollment.run)
 
-    const hasPassed = enrollmentHasPassingGrade(enrollment)
-
     return (
       <div
         className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3"
@@ -496,7 +494,7 @@ export class EnrolledItemCard extends React.Component<
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100">
               <div className="d-flex flex-column">
                 <div className="align-content-start d-flex enrollment-mode-container flex-wrap pb-1">
-                  {hasPassed ? (
+                  {enrollment.certificate ? (
                     <span className="badge badge-enrolled-passed mr-2">
                       <img src="/static/images/done.svg" alt="Check" /> Course
                       passed
