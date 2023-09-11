@@ -59,7 +59,7 @@ type ProductDetailState = {
   destinationUrl: string
 }
 
-export class ProductDetailEnrollApp extends React.Component<
+export class ProgramProductDetailEnroll extends React.Component<
   Props,
   ProductDetailState
 > {
@@ -147,6 +147,7 @@ export class ProductDetailEnrollApp extends React.Component<
   }
 
   renderCertificateInfoPanel() {
+    console.log("rendering")
     const { currentCourseRun: run } = this.state
 
     const product = run && run.products ? run.products[0] : null
@@ -500,4 +501,4 @@ const mapDispatchToProps = {
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),
   connectRequest(mapPropsToConfig)
-)(ProductDetailEnrollApp)
+)(ProgramProductDetailEnroll)
