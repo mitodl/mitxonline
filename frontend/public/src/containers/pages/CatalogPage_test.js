@@ -279,6 +279,10 @@ describe("CatalogPage", function() {
           programs: {
             isPending: false,
             status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
           }
         },
         entities: {
@@ -287,7 +291,19 @@ describe("CatalogPage", function() {
           },
           programs: {
             results: programs
-          }
+          },
+          departments: [
+            {
+              name:     "History",
+              courses:  0,
+              programs: 5
+            },
+            {
+              name:     "Science",
+              courses:  1,
+              programs: 0
+            }
+          ]
         }
       },
       {}
@@ -641,6 +657,10 @@ describe("CatalogPage", function() {
           programs: {
             isPending: false,
             status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
           }
         },
         entities: {
@@ -649,7 +669,24 @@ describe("CatalogPage", function() {
           },
           programs: {
             results: [displayedProgram]
-          }
+          },
+          departments: [
+            {
+              name:     "History",
+              courses:  2,
+              programs: 1
+            },
+            {
+              name:     "Math",
+              courses:  3,
+              programs: 0
+            },
+            {
+              name:     "department4",
+              courses:  0,
+              programs: 0
+            }
+          ]
         }
       },
       {}
@@ -886,6 +923,10 @@ describe("CatalogPage", function() {
           programs: {
             isPending: false,
             status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
           }
         },
         entities: {
@@ -896,7 +937,14 @@ describe("CatalogPage", function() {
           programs: {
             results: programs,
             next:    "http://fake.com/api/courses/?page=2"
-          }
+          },
+          departments: [
+            {
+              name:     "History",
+              courses:  1,
+              programs: 1
+            }
+          ]
         }
       },
       {}
