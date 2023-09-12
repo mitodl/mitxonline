@@ -18,7 +18,7 @@ export const programsQueryKey = "programs"
 
 export const programsQuery = page => ({
   queryKey:  programsQueryKey,
-  url:       `/api/programs/?page=${page}&live=true`,
+  url:       `/api/programs/?page=${page}`,
   transform: json => ({
     programs: json
   }),

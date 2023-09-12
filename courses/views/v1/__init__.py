@@ -5,10 +5,9 @@ from typing import Optional, Tuple, Union
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Q, Count
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
-from django_filters.rest_framework import DjangoFilterBackend
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, status, viewsets
@@ -33,17 +32,15 @@ from courses.models import (
     PartnerSchool,
     Program,
     ProgramEnrollment,
-    Department,
 )
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
-    CourseRunWithCourseSerializer,
+    CourseRunSerializer,
+    CourseSerializer,
     LearnerRecordSerializer,
     PartnerSchoolSerializer,
     ProgramSerializer,
     UserProgramEnrollmentDetailSerializer,
-    CourseWithCourseRunsSerializer,
-    DepartmentWithCountSerializer,
 )
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
@@ -87,9 +84,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = []
 
     serializer_class = ProgramSerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["id", "live"]
-    queryset = Program.objects.filter().prefetch_related("departments")
+    queryset = Program.objects.filter(live=True)
     pagination_class = Pagination
 
     def paginate_queryset(self, queryset):
@@ -107,17 +102,15 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 
     pagination_class = Pagination
     permission_classes = []
-    filter_backends = [DjangoFilterBackend]
-    serializer_class = CourseWithCourseRunsSerializer
-    filterset_fields = ["id", "live", "readable_id"]
+
+    serializer_class = CourseSerializer
 
     def get_queryset(self):
-        return (
-            Course.objects.filter()
-            .select_related("page")
-            .prefetch_related("courseruns", "departments")
-            .all()
-        )
+        readable_id = self.request.query_params.get("readable_id", None)
+        if readable_id:
+            return Course.objects.filter(live=True, readable_id=readable_id)
+
+        return Course.objects.filter(live=True)
 
     def get_serializer_context(self):
         added_context = {}
@@ -139,10 +132,8 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for CourseRuns"""
 
-    serializer_class = CourseRunWithCourseSerializer
+    serializer_class = CourseRunSerializer
     permission_classes = []
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["id", "live"]
 
     def get_queryset(self):
         relevant_to = self.request.query_params.get("relevant_to", None)
@@ -153,11 +144,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
             else:
                 return CourseRun.objects.none()
         else:
-            return (
-                CourseRun.objects.select_related("course")
-                .prefetch_related("course__departments", "course__page")
-                .all()
-            )
+            return CourseRun.objects.all()
 
     def get_serializer_context(self):
         added_context = {}
@@ -287,7 +274,7 @@ class UserEnrollmentsApiViewSet(
     def get_queryset(self):
         return (
             CourseRunEnrollment.objects.filter(user=self.request.user)
-            .select_related("run__course__page", "user", "run")
+            .select_related("run__course__page")
             .all()
         )
 
@@ -509,15 +496,3 @@ def get_learner_record_from_uuid(request, uuid):
             record.program, context={"user": record.user, "anonymous_pull": True}
         ).data
     )
-
-
-@permission_classes([])
-class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
-    """API view set for Departments"""
-
-    serializer_class = DepartmentWithCountSerializer
-
-    def get_queryset(self):
-        return Department.objects.annotate(
-            courses=Count("course"), programs=Count("program")
-        )

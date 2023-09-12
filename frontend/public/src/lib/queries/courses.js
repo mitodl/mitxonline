@@ -14,7 +14,7 @@ export const coursesQueryKey = "courses"
 
 export const coursesQuery = page => ({
   queryKey:  coursesQueryKey,
-  url:       `/api/courses/?page=${page}&live=true`,
+  url:       `/api/courses/?page=${page}`,
   transform: json => ({
     courses: json
   }),

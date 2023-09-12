@@ -147,7 +147,7 @@ describe("Course API", () => {
       ["/courses/course-v1:MITx+14.310x/financial-assistance-request/", true]
     ].forEach(([url, expResult]) => {
       it(`returns ${String(expResult)}`, () => {
-        courseRun["course"]["page"] = { financial_assistance_form_url: url }
+        courseRun["page"] = { financial_assistance_form_url: url }
         assert.equal(isFinancialAssistanceAvailable(courseRun), expResult)
       })
     })

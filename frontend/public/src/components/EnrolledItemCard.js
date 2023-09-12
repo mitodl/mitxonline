@@ -426,7 +426,7 @@ export class EnrolledItemCard extends React.Component<
     const financialAssistanceLink =
       isFinancialAssistanceAvailable(enrollment.run) &&
       !enrollment.approved_flexible_price_exists ? (
-          <a href={enrollment.run.course.page.financial_assistance_form_url}>
+          <a href={enrollment.run.page.financial_assistance_form_url}>
           Financial assistance?
           </a>
         ) : null
@@ -462,7 +462,7 @@ export class EnrolledItemCard extends React.Component<
     const startDateDescription = generateStartDateText(enrollment.run)
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
     const courseId = enrollment.run.course_number
-    const pageLocation = enrollment.run.course.page
+    const pageLocation = enrollment.run.page
     const menuTitle = `Course options for ${enrollment.run.course.title}`
 
     const courseRunStatusMessageText = courseRunStatusMessage(enrollment.run)
@@ -483,14 +483,11 @@ export class EnrolledItemCard extends React.Component<
             </div>
           )}
           {!enrollment.run.course.feature_image_src &&
-            enrollment.run.course.page &&
-            enrollment.run.course.page.feature_image_src && (
+            enrollment.run.page &&
+            enrollment.run.page.feature_image_src && (
             <div className="col-12 col-md-auto px-0 px-md-3">
               <div className="img-container">
-                <img
-                  src={enrollment.run.course.page.feature_image_src}
-                  alt=""
-                />
+                <img src={enrollment.run.page.feature_image_src} alt="" />
               </div>
             </div>
           )}
