@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.73.1 (Released September 12, 2023)
+--------------
+
+- 1869: Course program api performance improvements (#1872)
+- Remove duplicate catalog URL path (#1871)
+
 Version 0.73.0 (Released September 11, 2023)
 --------------
 
