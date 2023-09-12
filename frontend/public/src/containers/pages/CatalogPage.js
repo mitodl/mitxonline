@@ -17,6 +17,12 @@ import {
   programsQueryKey
 } from "../../lib/queries/programs"
 
+import {
+  departmentsSelector,
+  departmentsQuery,
+  departmentsQueryKey
+} from "../../lib/queries/departments"
+
 import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
 import { connect } from "react-redux"
@@ -50,7 +56,8 @@ export class CatalogPage extends React.Component<Props> {
     filteredCourses:            [],
     filteredPrograms:           [],
     filterCoursesCalled:        false,
-    departments:                [],
+    filteredDepartments:        [],
+    filterDepartmentsCalled:    false,
     selectedDepartment:         ALL_DEPARTMENTS,
     mobileFilterWindowExpanded: false,
     items_per_row:              3,
@@ -154,9 +161,11 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Updates the filteredCourses and courseDepartments state variables
-   * once coursesIsLoading is False.  Adds an observer to detect when
+   * Updates the filteredCourses state variable
+   * once coursesIsLoading is false..  Adds an observer to detect when
    * the learner has scrolled to the bottom of the visible catalog items.
+   * Updates the filteredDepartments state variable once departmentsIsLoading
+   * is false.
    */
   componentDidUpdate = () => {
     const { courses, coursesIsLoading } = this.props
@@ -168,9 +177,6 @@ export class CatalogPage extends React.Component<Props> {
         courses
       )
       this.setState({ filteredCourses: filteredCourses })
-      this.setState({
-        departments: this.collectDepartmentsFromCatalogItems(filteredCourses)
-      })
 
       // Detect when the bottom of the catalog page has been reached and display more catalog items.
       this.io = new window.IntersectionObserver(
@@ -179,30 +185,54 @@ export class CatalogPage extends React.Component<Props> {
       )
       this.io.observe(this.container.current)
     }
+
+    if (
+      !this.props.departmentsIsLoading &&
+      !this.state.filterDepartmentsCalled
+    ) {
+      this.setState({ filterDepartmentsCalled: true })
+      this.setState({
+        filteredDepartments: this.filterDepartmentsByTabName(
+          this.state.tabSelected
+        )
+      })
+    }
   }
 
   /**
-   * Returns an array of unique Department names that are associated with the Courses or Programs in the
-   * parameter and also includes an entry for "All Departments".
-   * @param {Array<CourseDetailWithRuns | Program>} catalogItems Array of Courses or Programs to collect Department names from.
+   * Returns an array of departments names which have one or more course(s) or program(s)
+   * related to them depending on the currently selected tab.
+   * @param {string} selectedTabName the name of the currently selected tab.
    */
-  collectDepartmentsFromCatalogItems(
-    catalogItems: Array<CourseDetailWithRuns | Program>
-  ) {
-    const departments = Array.from(catalogItems, item => item.departments)
-    return [
-      ...new Set([
-        ALL_DEPARTMENTS,
-        ...departments.flat().map(department => department.name)
-      ])
-    ]
+  filterDepartmentsByTabName(selectedTabName: string) {
+    if (!this.props.departmentsIsLoading) {
+      const { departments } = this.props
+      if (selectedTabName === COURSES_TAB) {
+        return [
+          ...new Set([
+            ALL_DEPARTMENTS,
+            ...departments.flatMap(department =>
+              department.courses > 0 ? department.name : []
+            )
+          ])
+        ]
+      } else {
+        return [
+          ...new Set([
+            ALL_DEPARTMENTS,
+            ...departments.flatMap(department =>
+              department.programs > 0 ? department.name : []
+            )
+          ])
+        ]
+      }
+    }
   }
 
   /**
    * Updates this.state.selectedDepartment to {ALL_DEPARTMENTS},
    * updates this.state.tabSelected to the parameter,
-   * updates this.state.numberCatalogRowsToDisplay to {DEFAULT_MIN_CATALOG_ROWS_RENDERED},
-   * updates this.state.departments to equal the unique department
+   * updates this.state.filteredDepartments
    * names from the catalog items in the selected tab,
    * updates this.state.filteredPrograms to equal the programs
    * which meet the criteria to be displayed in the catalog.
@@ -212,16 +242,7 @@ export class CatalogPage extends React.Component<Props> {
     this.setState({ tabSelected: selectTabName })
     this.changeSelectedDepartment(ALL_DEPARTMENTS, selectTabName)
 
-    if (selectTabName === COURSES_TAB) {
-      const { coursesIsLoading } = this.props
-      if (!coursesIsLoading) {
-        this.setState({
-          departments: this.collectDepartmentsFromCatalogItems(
-            this.state.allCoursesRetrieved
-          )
-        })
-      }
-    } else {
+    if (selectTabName === PROGRAMS_TAB) {
       const { programs, programsIsLoading } = this.props
       if (!programsIsLoading) {
         const programsToFilter = []
@@ -241,11 +262,11 @@ export class CatalogPage extends React.Component<Props> {
         this.setState({
           filteredPrograms: filteredPrograms
         })
-        this.setState({
-          departments: this.collectDepartmentsFromCatalogItems(programsToFilter)
-        })
       }
     }
+    this.setState({
+      filteredDepartments: this.filterDepartmentsByTabName(selectTabName)
+    })
   }
 
   /**
@@ -376,7 +397,7 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Returns an array of Programs which have live = true, page.live = true, and a department name which
+   * Returns an array of Programs which have page.live = true and a department name which
    * matches the currently selected department.
    * @param {Array<Program>} programs An array of Programs which will be filtered by Department and other criteria.
    * @param {string} selectedDepartment The Department name used to compare against the courses in the array.
@@ -387,11 +408,10 @@ export class CatalogPage extends React.Component<Props> {
   ) {
     return programs.filter(
       program =>
-        (selectedDepartment === ALL_DEPARTMENTS ||
-          program.departments
-            .map(department => department.name)
-            .includes(selectedDepartment)) &&
-        program.live
+        selectedDepartment === ALL_DEPARTMENTS ||
+        program.departments
+          .map(department => department.name)
+          .includes(selectedDepartment)
     )
   }
 
@@ -505,7 +525,7 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderDepartmentSideBarList() {
     const departmentSideBarListItems = []
-    this.state.departments.forEach(department =>
+    this.state.filteredDepartments.forEach(department =>
       departmentSideBarListItems.push(
         <li
           className={`sidebar-link ${
@@ -665,7 +685,11 @@ const getNextProgramPage = page =>
     force: true
   })
 
-const mapPropsToConfig = () => [coursesQuery(1), programsQuery(1)]
+const mapPropsToConfig = () => [
+  coursesQuery(1),
+  programsQuery(1),
+  departmentsQuery()
+]
 
 const mapDispatchToProps = {
   getNextCoursePage:  getNextCoursePage,
@@ -673,12 +697,18 @@ const mapDispatchToProps = {
 }
 
 const mapStateToProps = createStructuredSelector({
-  courses:           coursesSelector,
-  coursesNextPage:   coursesNextPageSelector,
-  programs:          programsSelector,
-  programsNextPage:  programsNextPageSelector,
-  coursesIsLoading:  pathOr(true, ["queries", coursesQueryKey, "isPending"]),
-  programsIsLoading: pathOr(true, ["queries", programsQueryKey, "isPending"])
+  courses:              coursesSelector,
+  coursesNextPage:      coursesNextPageSelector,
+  programs:             programsSelector,
+  programsNextPage:     programsNextPageSelector,
+  departments:          departmentsSelector,
+  coursesIsLoading:     pathOr(true, ["queries", coursesQueryKey, "isPending"]),
+  programsIsLoading:    pathOr(true, ["queries", programsQueryKey, "isPending"]),
+  departmentsIsLoading: pathOr(true, [
+    "queries",
+    departmentsQueryKey,
+    "isPending"
+  ])
 })
 
 export default compose(
