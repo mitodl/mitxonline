@@ -515,9 +515,9 @@ def get_learner_record_from_uuid(request, uuid):
 class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for Departments"""
 
-    def list(self, request):
-        queryset = Department.objects.annotate(
+    serializer_class = DepartmentWithCountSerializer
+
+    def get_queryset(self):
+        return Department.objects.annotate(
             courses=Count("course"), programs=Count("program")
         )
-        serializer = DepartmentWithCountSerializer(queryset, many=True)
-        return Response(serializer.data)
