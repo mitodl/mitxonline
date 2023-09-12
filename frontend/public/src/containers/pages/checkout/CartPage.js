@@ -27,7 +27,6 @@ import {
 
 import type { RouterHistory } from "react-router"
 import { isSuccessResponse } from "../../../lib/util"
-import { isFinancialAssistanceAvailable } from "../../../lib/courseApi"
 import { addUserNotification } from "../../../actions"
 
 type Props = {
@@ -137,7 +136,8 @@ export class CartPage extends React.Component<Props, CartState> {
       userFlexiblePriceExists === false
     ) {
       if (
-        cartItems[0]?.product?.purchasable_object?.course?.page?.financial_assistance_form_url
+        cartItems[0]?.product?.purchasable_object?.course?.page
+          ?.financial_assistance_form_url
       ) {
         return (
           <a
