@@ -69,27 +69,9 @@ export class CatalogPage extends React.Component<Props> {
     if (this.io) {
       this.io.disconnect()
     }
-    window.removeEventListener("resize", this.resize.bind(this))
   }
 
-  componentDidMount() {
-    window.addEventListener("resize", this.resize.bind(this))
-    this.resize()
-  }
-
-  /**
-   * Changes the items_per_row state variable when the screen size changes.
-   * If the screen is less than 1404px wide, then the max items per row is 2.
-   * If the screen is larger or equal to 1404px wide, then the max items per row is 3.
-   */
-  resize() {
-    if (window.innerWidth < 1404 && this.state.items_per_row !== 2) {
-      this.setState({ items_per_row: 2 })
-    }
-    if (window.innerWidth >= 1404 && this.state.items_per_row !== 3) {
-      this.setState({ items_per_row: 3 })
-    }
-  }
+  componentDidMount() {}
 
   /**
    * Makes another API call to the courses or programs endpoint if there is
@@ -464,20 +446,11 @@ export class CatalogPage extends React.Component<Props> {
     itemsInCatalog: Array<CourseDetailWithRuns | Program>,
     renderCatalogCardFunction: Function
   ) {
-    const numberOfItemsInEachRow = Math.min(
-      itemsInCatalog.length,
-      this.state.items_per_row
+    return (
+      <div id="catalog-grid">
+        {itemsInCatalog.map(x => renderCatalogCardFunction(x))}
+      </div>
     )
-    const catalogRows = []
-    for (let i = 0; i < itemsInCatalog.length; i += numberOfItemsInEachRow) {
-      const itemsInRow = itemsInCatalog.slice(i, i + numberOfItemsInEachRow)
-      catalogRows.push(
-        <div className="row" id="catalog-grid" key={i}>
-          {itemsInRow.map(x => renderCatalogCardFunction(x))}
-        </div>
-      )
-    }
-    return catalogRows
   }
 
   /**
@@ -551,100 +524,106 @@ export class CatalogPage extends React.Component<Props> {
               <h2>Catalog</h2>
             </div>
           </div>
-          <div id="course-catalog-navigation">
-            {/* Only visible on small screen when mobileFilterWindowExpanded is true. */}
-            <div
-              className={`mobile-filter-overlay ${
-                this.state.mobileFilterWindowExpanded
-                  ? "slide-mobile-filter-overlay"
-                  : "hidden-mobile-filter-overlay"
-              }`}
-            >
-              {this.renderDepartmentSideBarList()}
-            </div>
-            <div className="container-fluid">
-              <div className="row" id="tab-row">
-                <div className="col catalog-animation d-sm-flex d-md-inline-flex">
+          <div className="container">
+            <div id="course-catalog-navigation">
+              {/* Only visible on small screen when mobileFilterWindowExpanded is true. */}
+              <div
+                className={`mobile-filter-overlay ${
+                  this.state.mobileFilterWindowExpanded
+                    ? "slide-mobile-filter-overlay"
+                    : "hidden-mobile-filter-overlay"
+                }`}
+              >
+                {this.renderDepartmentSideBarList()}
+              </div>
+              <div className="container-fluid">
+                <div className="row" id="tab-row">
+                  <div className="col catalog-animation d-sm-flex d-md-inline-flex">
+                    <TransitionGroup>
+                      <CSSTransition
+                        key={this.state.tabSelected}
+                        timeout={300}
+                        classNames="messageout"
+                      >
+                        <div className="row" id="tabs">
+                          <div
+                            className={`col ${
+                              this.state.tabSelected === COURSES_TAB
+                                ? "selected-tab"
+                                : "unselected-tab"
+                            }`}
+                          >
+                            <button
+                              onClick={() =>
+                                this.changeSelectedTab(COURSES_TAB)
+                              }
+                              tabIndex="0"
+                            >
+                              Courses
+                            </button>
+                          </div>
+                          <div
+                            className={`col ${
+                              this.state.tabSelected === PROGRAMS_TAB
+                                ? "selected-tab"
+                                : "unselected-tab"
+                            }`}
+                          >
+                            <button
+                              onClick={() =>
+                                this.changeSelectedTab(PROGRAMS_TAB)
+                              }
+                            >
+                              Programs
+                            </button>
+                          </div>
+                        </div>
+                      </CSSTransition>
+                    </TransitionGroup>
+                  </div>
+                  <div className="col catalog-page-item-count">
+                    <div className="catalog-count-animation">
+                      <TransitionGroup id="count-animation-grid">
+                        <CSSTransition
+                          key={this.state.tabSelected}
+                          timeout={300}
+                          classNames="count"
+                        >
+                          <div>
+                            {/* Hidden on small screens. */}
+                            {/* Could add logic to display only "course" if only 1 course is showing. */}
+                            {this.renderNumberOfCatalogItems()}{" "}
+                            {this.state.tabSelected}
+                          </div>
+                        </CSSTransition>
+                      </TransitionGroup>
+                    </div>
+                  </div>
+                </div>
+                <div className="catalog-animation">
                   <TransitionGroup>
                     <CSSTransition
                       key={this.state.tabSelected}
                       timeout={300}
                       classNames="messageout"
                     >
-                      <div className="row" id="tabs">
-                        <div
-                          className={`col ${
-                            this.state.tabSelected === COURSES_TAB
-                              ? "selected-tab"
-                              : "unselected-tab"
-                          }`}
-                        >
-                          <button
-                            onClick={() => this.changeSelectedTab(COURSES_TAB)}
-                            tabIndex="0"
-                          >
-                            Courses
-                          </button>
-                        </div>
-                        <div
-                          className={`col ${
-                            this.state.tabSelected === PROGRAMS_TAB
-                              ? "selected-tab"
-                              : "unselected-tab"
-                          }`}
-                        >
-                          <button
-                            onClick={() => this.changeSelectedTab(PROGRAMS_TAB)}
-                          >
-                            Programs
-                          </button>
-                        </div>
-                      </div>
+                      <div>{this.renderCatalog()}</div>
                     </CSSTransition>
                   </TransitionGroup>
                 </div>
-                <div className="col catalog-page-item-count">
-                  <div className="catalog-count-animation">
-                    <TransitionGroup id="count-animation-grid">
-                      <CSSTransition
-                        key={this.state.tabSelected}
-                        timeout={300}
-                        classNames="count"
-                      >
-                        <div>
-                          {/* Hidden on small screens. */}
-                          {/* Could add logic to display only "course" if only 1 course is showing. */}
-                          {this.renderNumberOfCatalogItems()}{" "}
-                          {this.state.tabSelected}
-                        </div>
-                      </CSSTransition>
-                    </TransitionGroup>
-                  </div>
+                <div
+                  className={`${
+                    this.state.isLoadingMoreItems ? "lds-ring" : "d-none"
+                  }`}
+                >
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
                 </div>
+                {/* span is used to detect when the learner has scrolled to the bottom of the catalog page. */}
+                <span ref={this.container}></span>
               </div>
-              <div className="catalog-animation">
-                <TransitionGroup>
-                  <CSSTransition
-                    key={this.state.tabSelected}
-                    timeout={300}
-                    classNames="messageout"
-                  >
-                    <div>{this.renderCatalog()}</div>
-                  </CSSTransition>
-                </TransitionGroup>
-              </div>
-              <div
-                className={`${
-                  this.state.isLoadingMoreItems ? "lds-ring" : "d-none"
-                }`}
-              >
-                <div></div>
-                <div></div>
-                <div></div>
-                <div></div>
-              </div>
-              {/* span is used to detect when the learner has scrolled to the bottom of the catalog page. */}
-              <span ref={this.container}></span>
             </div>
           </div>
         </div>
