@@ -4,7 +4,7 @@ a course run).
 """
 from django.core.management import BaseCommand
 
-from courses.models import Course, CourseRun, Program
+from courses.models import Course, CourseRun, Department, Program
 from main.utils import parse_supplied_date
 
 
@@ -168,6 +168,21 @@ class Command(BaseCommand):
             dest="force",
         )
 
+        parser.add_argument(
+            "-d",
+            "--dept",
+            "--department",
+            help="Add the courseware object to the specified department(s).",
+            action="append",
+            dest="depts",
+        )
+
+        parser.add_argument(
+            "--create-depts",
+            help="If departments specified aren't found, create them.",
+            action="store_true",
+        )
+
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
         if not (
             kwargs["force"]
@@ -180,6 +195,22 @@ class Command(BaseCommand):
                 )
             )
             exit(-1)
+
+        if kwargs["depts"] and len(kwargs["depts"]) > 0:
+            add_depts = Department.objects.filter(name__in=kwargs["depts"]).all()
+
+            if kwargs["create_depts"]:
+                for dept in kwargs["depts"]:
+                    found = (
+                        len([db_dept for db_dept in add_depts if db_dept.name == dept])
+                        > 0
+                    )
+
+                    if not found:
+                        new_dept = Department(name=dept)
+                        new_dept.save()
+
+                add_depts = Department.objects.filter(name__in=kwargs["depts"]).all()
 
         if kwargs["type"] == "program":
             if Program.objects.filter(readable_id=kwargs["courseware_id"]).exists():
@@ -195,6 +226,10 @@ class Command(BaseCommand):
                 title=kwargs["title"],
                 live=kwargs["live"],
             )
+
+            if add_depts:
+                new_program.departments.add(*add_depts)
+                new_program.save()
 
             self.stdout.write(
                 self.style.SUCCESS(
@@ -249,6 +284,10 @@ class Command(BaseCommand):
                 readable_id=kwargs["courseware_id"],
                 live=kwargs["live"],
             )
+
+            if add_depts:
+                new_course.departments.add(*add_depts)
+                new_course.save()
 
             self.stdout.write(
                 self.style.SUCCESS(
