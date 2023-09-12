@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.73.1
+Version 0.73.1 (Released September 12, 2023)
 --------------
 
 - 1869: Course program api performance improvements (#1872)
