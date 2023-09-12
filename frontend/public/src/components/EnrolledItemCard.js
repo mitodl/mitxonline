@@ -35,7 +35,7 @@ import {
   isFinancialAssistanceAvailable,
   isLinkableCourseRun,
   generateStartDateText,
-  courseRunStatusMessage,
+  courseRunStatusMessage
 } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
