@@ -4,6 +4,7 @@
 {% load static wagtail_img_src feature_img_src %}
 {% load wagtailcore_tags wagtailembeds_tags %}
 {% load expand %}
+{% load videojs %}
 
 {% block title %}{{ page.title }} | {{ site_name }}{% endblock %}
 
@@ -79,13 +80,7 @@
             <div class="px-4 py-2 border align-items-center justify-items-top d-flex flex-column">
               <div class="hero-media">
                 {% if page.video_url %}
-                <video-js
-                  class="vjs-default-skin vjs-big-play-centered"
-                  controls
-                  data-setup="{{page.video_player_config}}"
-                  preload="metadata"
-                >
-                </video-js>
+                  {% videojs page %}
                 {% else %}
                 <img src="{% feature_img_src page.feature_image %}" alt="">
                 {% endif %}
