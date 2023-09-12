@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.73.2
+--------------
+
+- Revert "Department REST API (#1877)" (#1882)
+- New design footer css updates (#1881)
+- Add new header design (#1873)
+- Department REST API (#1877)
+
 Version 0.73.1 (Released September 12, 2023)
 --------------
 
