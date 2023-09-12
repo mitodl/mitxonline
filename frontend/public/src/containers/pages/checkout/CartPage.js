@@ -137,9 +137,7 @@ export class CartPage extends React.Component<Props, CartState> {
       userFlexiblePriceExists === false
     ) {
       if (
-        isFinancialAssistanceAvailable(
-          cartItems[0].product.purchasable_object.course
-        )
+        cartItems[0]?.product?.purchasable_object?.course?.page?.financial_assistance_form_url
       ) {
         return (
           <a
