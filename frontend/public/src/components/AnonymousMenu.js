@@ -4,23 +4,18 @@ import React from "react"
 
 import MixedLink from "./MixedLink"
 import { routes } from "../lib/urls"
+import { checkFeatureFlag } from "../lib/util"
 
 type Props = {
-  useScreenOverlay: boolean
+  mobileView: boolean
 }
 
-const overlayListItemProps = {
-  "data-bs-target": "#nav"
-}
-
-const AnonymousMenu = ({ useScreenOverlay }: Props) => {
-  /* eslint-disable prefer-const */
-  let listItemProps: Object
-  listItemProps = useScreenOverlay ? overlayListItemProps : null
-  let identifierPostfix = useScreenOverlay ? "Mobile" : "Desktop"
+const AnonymousMenu = ({ mobileView }: Props) => {
+  const identifierPostfix = mobileView ? "Mobile" : "Desktop"
+  const newDesign = checkFeatureFlag("mitxonline-new-header")
   return (
     <ul>
-      <li {...(listItemProps || {})}>
+      <li>
         <MixedLink
           id={"login".concat(identifierPostfix)}
           dest={routes.login.begin}
@@ -30,14 +25,14 @@ const AnonymousMenu = ({ useScreenOverlay }: Props) => {
           Sign In
         </MixedLink>
       </li>
-      <li {...(listItemProps || {})}>
+      <li>
         <MixedLink
           id={"createAccount".concat(identifierPostfix)}
           dest={routes.register.begin}
           className="simple button"
           aria-label="Create Account"
         >
-          Create Account
+          Create {newDesign && mobileView ? "" : "Account"}
         </MixedLink>
       </li>
     </ul>

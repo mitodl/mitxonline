@@ -6,6 +6,8 @@ import TopAppBar from "./TopAppBar"
 
 import type { CurrentUser } from "../flow/authTypes"
 import type { Location } from "react-router"
+import { checkFeatureFlag } from "../lib/util"
+import TopBar from "./TopBar"
 
 type Props = {
   currentUser: CurrentUser,
@@ -27,11 +29,20 @@ const Header = ({ currentUser, location }: Props) => {
       scope.setUser(null)
     })
   }
-  return (
-    <React.Fragment>
-      <TopAppBar currentUser={currentUser} location={location} />
-    </React.Fragment>
-  )
+  const showNewDesign = checkFeatureFlag("mitxonline-new-header")
+  if (showNewDesign) {
+    return (
+      <React.Fragment>
+        <TopBar currentUser={currentUser} location={location} />
+      </React.Fragment>
+    )
+  } else {
+    return (
+      <React.Fragment>
+        <TopAppBar currentUser={currentUser} location={location} />
+      </React.Fragment>
+    )
+  }
 }
 
 export default Header
