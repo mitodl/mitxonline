@@ -21,7 +21,7 @@ export const courseRunsQuery = (courseKey: string = "") => ({
 
 export const coursesQuery = (courseKey: string = "") => ({
   queryKey:  coursesQueryKey,
-  url:       `/api/courses/?readable_id=${encodeURIComponent(courseKey)}&live=true`,
+  url:       `/api/courses/?readable_id=${encodeURIComponent(courseKey)}`,
   transform: json => ({
     courses: json
   }),

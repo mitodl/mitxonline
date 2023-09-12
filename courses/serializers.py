@@ -6,16 +6,18 @@ from urllib.parse import urljoin
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ObjectDoesNotExist
 from django.templatetags.static import static
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from django.db.models import CharField
 
+from cms.models import CoursePage, ProgramPage
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses import models
 from courses.api import create_run_enrollments
 from courses.constants import CONTENT_TYPE_MODEL_COURSE, CONTENT_TYPE_MODEL_PROGRAM
-from ecommerce.serializers import ProductFlexibilePriceSerializer
+from ecommerce.models import Product
+from ecommerce.serializers import BaseProductSerializer, ProductFlexibilePriceSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
 from main.serializers import StrictFieldsSerializer
@@ -96,27 +98,27 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "expiration_date",
             "courseware_url",
             "courseware_id",
-            "certificate_available_date",
             "upgrade_deadline",
             "is_upgradable",
             "is_self_paced",
             "run_tag",
             "id",
             "live",
-            "course_number",
         ]
 
 
 class CourseRunSerializer(BaseCourseRunSerializer):
     """CourseRun model serializer"""
 
-    products = ProductRelatedField(many=True, read_only=True)
+    products = ProductRelatedField(many=True, queryset=Product.objects.all())
+    page = serializers.SerializerMethodField()
     approved_flexible_price_exists = serializers.SerializerMethodField()
 
     class Meta:
         model = models.CourseRun
         fields = BaseCourseRunSerializer.Meta.fields + [
             "products",
+            "page",
             "approved_flexible_price_exists",
         ]
 
@@ -131,6 +133,14 @@ class CourseRunSerializer(BaseCourseRunSerializer):
                 },
             }
         return data
+
+    def get_page(self, instance):
+        try:
+            return CoursePageSerializer(
+                instance=CoursePage.objects.filter(course=instance.course).get()
+            ).data
+        except ObjectDoesNotExist:
+            return None
 
     def get_approved_flexible_price_exists(self, instance):
         # Get the User object if it exists.
@@ -149,26 +159,58 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         return flexible_price_exists
 
 
-class DepartmentSerializer(serializers.ModelSerializer):
-    """Department model serializer"""
-
-    class Meta:
-        model = models.Department
-        fields = ["name"]
-
-
 class CourseSerializer(BaseCourseSerializer):
-    """Course model serializer"""
+    """Course model serializer - also serializes child course runs"""
 
-    departments = DepartmentSerializer(many=True, read_only=True)
+    courseruns = serializers.SerializerMethodField()
     next_run_id = serializers.SerializerMethodField()
-    page = CoursePageSerializer(read_only=True)
+    departments = serializers.SerializerMethodField()
+    page = serializers.SerializerMethodField()
     programs = serializers.SerializerMethodField()
 
     def get_next_run_id(self, instance):
         """Get next run id"""
         run = instance.first_unexpired_run
         return run.id if run is not None else None
+
+    def get_courseruns(self, instance):
+        """Returns all course runs related to the course."""
+        if features.is_enabled(features.ENABLE_NEW_DESIGN):
+            return [
+                CourseRunSerializer(instance=run, context=self.context).data
+                for run in instance.courseruns.all().order_by("id")
+            ]
+        all_runs = self.context.get("all_runs", False)
+        if all_runs:
+            active_runs = instance.unexpired_runs
+        else:
+            user = self.context["request"].user if "request" in self.context else None
+            active_runs = (
+                instance.available_runs(user)
+                if user and user.is_authenticated
+                else instance.unexpired_runs
+            )
+        return [
+            CourseRunSerializer(instance=run, context=self.context).data
+            for run in active_runs
+            if run.live
+        ]
+
+    def get_departments(self, instance):
+        """List departments of a course"""
+        return sorted(
+            [{"name": department.name} for department in instance.departments.all()],
+            key=lambda department: department["name"],
+        )
+
+    def get_page(self, instance):
+        return (
+            CoursePageSerializer(
+                instance=CoursePage.objects.filter(course=instance).get()
+            ).data
+            if CoursePage.objects.filter(course=instance).exists()
+            else None
+        )
 
     def get_programs(self, instance):
         if self.context.get("all_runs", False):
@@ -184,6 +226,7 @@ class CourseSerializer(BaseCourseSerializer):
             "id",
             "title",
             "readable_id",
+            "courseruns",
             "next_run_id",
             "departments",
             "page",
@@ -191,29 +234,43 @@ class CourseSerializer(BaseCourseSerializer):
         ]
 
 
-class CourseWithCourseRunsSerializer(CourseSerializer):
-    """Course model serializer - also serializes child course runs"""
-
-    courseruns = CourseRunSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = models.Course
-        fields = CourseSerializer.Meta.fields + [
-            "courseruns",
-        ]
-
-
-class CourseRunWithCourseSerializer(CourseRunSerializer):
+class CourseRunDetailSerializer(serializers.ModelSerializer):
     """
-    CourseRun model serializer - also serializes the parent Course.
+    CourseRun model serializer - also serializes the parent Course
+    Includes the relevant Page (if there is one) and Products (if they exist,
+    just the base product data)
     """
 
-    course = CourseSerializer(read_only=True, context={"include_page_fields": True})
+    course = BaseCourseSerializer(read_only=True, context={"include_page_fields": True})
+    products = BaseProductSerializer(read_only=True, many=True)
+    page = serializers.SerializerMethodField()
+
+    def get_page(self, instance):
+        try:
+            return CoursePageSerializer(instance=instance.course.page).data
+        except ObjectDoesNotExist:
+            return None
 
     class Meta:
         model = models.CourseRun
-        fields = CourseRunSerializer.Meta.fields + [
+        fields = [
+            "course_number",
             "course",
+            "title",
+            "start_date",
+            "end_date",
+            "enrollment_start",
+            "enrollment_end",
+            "expiration_date",
+            "certificate_available_date",
+            "courseware_url",
+            "courseware_id",
+            "upgrade_deadline",
+            "is_upgradable",
+            "is_self_paced",
+            "id",
+            "products",
+            "page",
         ]
 
 
@@ -238,11 +295,11 @@ class ProgramSerializer(serializers.ModelSerializer):
     requirements = serializers.SerializerMethodField()
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
-    departments = DepartmentSerializer(many=True, read_only=True)
+    departments = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         """Serializer for courses"""
-        return CourseWithCourseRunsSerializer(
+        return CourseSerializer(
             [course[0] for course in instance.courses if course[0].live],
             many=True,
             context={"include_page_fields": True},
@@ -263,10 +320,19 @@ class ProgramSerializer(serializers.ModelSerializer):
         return ProgramRequirementTreeSerializer(instance=req_root).data
 
     def get_page(self, instance):
-        if hasattr(instance, "page"):
-            return ProgramPageSerializer(instance.page).data
+        if ProgramPage.objects.filter(program=instance).exists():
+            return ProgramPageSerializer(
+                instance=ProgramPage.objects.filter(program=instance).get()
+            ).data
         else:
             return {"feature_image_src": _get_thumbnail_url(None)}
+
+    def get_departments(self, instance):
+        """List departments of a course"""
+        return sorted(
+            [{"name": department.name} for department in instance.departments.all()],
+            key=lambda department: department["name"],
+        )
 
     class Meta:
         model = models.Program
@@ -290,6 +356,7 @@ class FullProgramSerializer(ProgramSerializer):
     start_date = serializers.SerializerMethodField()
     end_date = serializers.SerializerMethodField()
     enrollment_start = serializers.SerializerMethodField()
+    departments = serializers.SerializerMethodField()
 
     def get_start_date(self, instance):
         """
@@ -332,6 +399,16 @@ class FullProgramSerializer(ProgramSerializer):
             .values_list("enrollment_start", flat=True)
             .first()
         )
+
+    def get_departments(self, instance):
+        """List all departments in all courses in the program"""
+        courses_in_program = [course[0] for course in instance.courses]
+        departments = (
+            models.Department.objects.filter(course__in=courses_in_program)
+            .values("name")
+            .distinct("name")
+        )
+        return list(departments)
 
     class Meta(ProgramSerializer.Meta):
         fields = ProgramSerializer.Meta.fields + [
@@ -440,7 +517,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
 class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
     """CourseRunEnrollment model serializer"""
 
-    run = CourseRunWithCourseSerializer(read_only=True)
+    run = CourseRunDetailSerializer(read_only=True)
     run_id = serializers.IntegerField(write_only=True)
     certificate = serializers.SerializerMethodField(read_only=True)
     enrollment_mode = serializers.ChoiceField(

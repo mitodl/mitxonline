@@ -412,6 +412,24 @@ describe("CatalogPage", function() {
     expect(programsFilteredByCriteriaAndDepartment.length).equals(3)
   })
 
+  it("renders catalog programs only if the program is live", async () => {
+    const program1 = JSON.parse(JSON.stringify(displayedProgram))
+    program1.live = true
+    const program2 = JSON.parse(JSON.stringify(displayedProgram))
+    program2.live = true
+    const { inner } = await renderPage()
+    programs = [program1, program2]
+    let programsFilteredByCriteriaAndDepartment = inner
+      .instance()
+      .filteredProgramsByDepartmentAndCriteria("All Departments", programs)
+    expect(programsFilteredByCriteriaAndDepartment.length).equals(2)
+    program2.live = false
+    programsFilteredByCriteriaAndDepartment = inner
+      .instance()
+      .filteredProgramsByDepartmentAndCriteria("All Departments", programs)
+    expect(programsFilteredByCriteriaAndDepartment.length).equals(1)
+  })
+
   it("renders no catalog courses if the course's associated course run is not live", async () => {
     const courseRuns = JSON.parse(JSON.stringify(displayedCourse.courseruns))
     const { inner } = await renderPage()
@@ -730,7 +748,7 @@ describe("CatalogPage", function() {
 
     sinon.assert.calledWith(
       helper.handleRequestStub,
-      "/api/courses/?page=2&live=true",
+      "/api/courses/?page=2",
       "GET"
     )
 
@@ -911,7 +929,7 @@ describe("CatalogPage", function() {
 
     sinon.assert.calledWith(
       helper.handleRequestStub,
-      "/api/programs/?page=2&live=true",
+      "/api/programs/?page=2",
       "GET"
     )
 

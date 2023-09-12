@@ -376,7 +376,7 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Returns an array of Programs which have page.live = true and a department name which
+   * Returns an array of Programs which have live = true, page.live = true, and a department name which
    * matches the currently selected department.
    * @param {Array<Program>} programs An array of Programs which will be filtered by Department and other criteria.
    * @param {string} selectedDepartment The Department name used to compare against the courses in the array.
@@ -387,10 +387,11 @@ export class CatalogPage extends React.Component<Props> {
   ) {
     return programs.filter(
       program =>
-        selectedDepartment === ALL_DEPARTMENTS ||
-        program.departments
-          .map(department => department.name)
-          .includes(selectedDepartment)
+        (selectedDepartment === ALL_DEPARTMENTS ||
+          program.departments
+            .map(department => department.name)
+            .includes(selectedDepartment)) &&
+        program.live
     )
   }
 

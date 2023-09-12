@@ -65,6 +65,7 @@ export const makeCourseRunWithProduct = (): CourseRun => ({
   // $FlowFixMe
   id:               genCourseRunId.next().value,
   course_number:    casual.word,
+  page:             { financial_assistance_form_url: casual.url },
   is_upgradable:    true,
   products:         [
     {
@@ -94,17 +95,7 @@ const makeCourseDetail = (): CourseDetail => ({
   readable_id:       casual.word,
   feature_image_src: casual.url,
   departments:       [makeDepartment()],
-  live:              true,
-  page:              {
-    financial_assistance_form_url: casual.url,
-    feature_image_src:             casual.url,
-    live:                          true,
-    description:                   casual.text,
-    current_price:                 casual.integer(),
-    instructors:                   [],
-    length:                        casual.text,
-    effort:                        casual.text
-  }
+  live:              true
 })
 
 const makeRequirementRootNode = (
