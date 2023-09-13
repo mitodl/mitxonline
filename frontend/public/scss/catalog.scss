@@ -18,7 +18,6 @@
         height: fit-content;
         margin-top: 30px;
         padding: 15px;
-        align-items: flex-start;
         border-radius: 5px;
         top: 100px;
 
@@ -350,15 +349,14 @@
         
             #catalog-grid {
                 display: flex;
-                align-items: flex-start;
+                flex-wrap: wrap;
                 margin-left: 24px;
                 gap: 24px;
                 margin-bottom: 24px;
-                flex-wrap: wrap;
         
                 a {
                     text-decoration: none;
-                    width: 312px;
+                    width: 305px;
                     padding-right: 0;
                     padding-left: 0;
                 }
