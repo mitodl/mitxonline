@@ -12,7 +12,6 @@ import type Moment from "moment"
 import type {
   CourseRunDetail,
   CourseRun,
-  RunEnrollment,
   RequirementNode,
   LearnerRecord,
   ProgramRequirement,
