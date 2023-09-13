@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.73.2
+Version 0.73.2 (Released September 13, 2023)
 --------------
 
 - Repair cart page including reinstated course api improvements (#1885)
