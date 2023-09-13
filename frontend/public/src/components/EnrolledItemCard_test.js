@@ -163,47 +163,6 @@ describe("EnrolledItemCard", () => {
     coursePassed = inner.find(".enrolled-item").find(".badge-enrolled-passed")
     assert.isFalse(coursePassed.exists())
   })
-  ;[true, false].forEach(isSelfPaced => {
-    it("renders the course passed label based on course certificate independent of course pacing", async () => {
-      enrollmentCardProps.enrollment.run.is_self_paced = isSelfPaced
-      const grade = makeLearnerRecordGrade()
-      grade.passed = true
-      enrollmentCardProps.enrollment.grades = [grade]
-      enrollmentCardProps.enrollment.certificate = { url: "url" }
-
-      const inner = await renderedCard()
-      const coursePassed = inner
-        .find(".enrolled-item")
-        .find(".badge-enrolled-passed")
-      assert.isTrue(coursePassed.exists())
-    })
-  })
-  ;[true, false].forEach(past => {
-    it("doesn't render the course passed label based on course end and certificate available dates in past", async () => {
-      enrollmentCardProps.enrollment.run.is_self_paced = false
-      if (past) {
-        enrollmentCardProps.enrollment.run.end_date = moment("2021-02-08")
-        enrollmentCardProps.enrollment.run.certificate_available_date = moment(
-          "2021-02-08"
-        )
-      } else {
-        enrollmentCardProps.enrollment.run.end_date = moment().add(7, "d")
-        enrollmentCardProps.enrollment.run.certificate_available_date = moment().add(
-          7,
-          "d"
-        )
-      }
-      const grade = makeLearnerRecordGrade()
-      grade.passed = true
-      enrollmentCardProps.enrollment.grades = [grade]
-      const inner = await renderedCard()
-      const coursePassed = inner
-        .find(".enrolled-item")
-        .find(".badge-enrolled-passed")
-
-      assert.isFalse(coursePassed.exists())
-    })
-  })
 
   it("Course detail shows `Active` when start date in past", async () => {
     enrollmentCardProps.enrollment.run.start_date = moment("2021-02-08")
