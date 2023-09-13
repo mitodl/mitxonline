@@ -3,7 +3,6 @@
   max-width: 100%;
   margin: 0;
   padding: 0;
-  display: flex;
 
   h1, h2, h3, h4, h5, h6 {
     font-family: Poppins, sans-serif;
@@ -21,7 +20,7 @@
 
   .home-page-video-container {
     margin-top: 60px;
-    width: 100%;
+    width: 95%;
     max-width: 1320px;
     flex-shrink: 0;
     display: flex;
