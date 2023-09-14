@@ -147,7 +147,7 @@ describe("EnrolledItemCard", () => {
     })
   })
 
-  it("doesn't renders the course passed label if course is not passed", async () => {
+  it("doesn't renders the course passed label if course is passed but no certificate", async () => {
     // If there are no grades at all
     let inner = await renderedCard()
     let coursePassed = inner
@@ -155,59 +155,13 @@ describe("EnrolledItemCard", () => {
       .find(".badge-enrolled-passed")
     assert.isFalse(coursePassed.exists())
 
-    // If the user has grades but not passed
+    // If the user has passed grades but no certificate
     const grade = makeLearnerRecordGrade()
-    grade.passed = false
+    grade.passed = true
     enrollmentCardProps.enrollment.grades = [grade]
     inner = await renderedCard()
     coursePassed = inner.find(".enrolled-item").find(".badge-enrolled-passed")
     assert.isFalse(coursePassed.exists())
-  })
-  ;[true, false].forEach(isSelfPaced => {
-    it("renders the course passed label based on self_paced and course passed", async () => {
-      enrollmentCardProps.enrollment.run.is_self_paced = isSelfPaced
-      const grade = makeLearnerRecordGrade()
-      grade.passed = true
-      enrollmentCardProps.enrollment.grades = [grade]
-      const inner = await renderedCard()
-      const coursePassed = inner
-        .find(".enrolled-item")
-        .find(".badge-enrolled-passed")
-      if (isSelfPaced) {
-        assert.isTrue(coursePassed.exists())
-      } else {
-        assert.isFalse(coursePassed.exists())
-      }
-    })
-  })
-  ;[true, false].forEach(past => {
-    it("renders the course passed label based on course end and certificate available dates in past", async () => {
-      enrollmentCardProps.enrollment.run.is_self_paced = false
-      if (past) {
-        enrollmentCardProps.enrollment.run.end_date = moment("2021-02-08")
-        enrollmentCardProps.enrollment.run.certificate_available_date = moment(
-          "2021-02-08"
-        )
-      } else {
-        enrollmentCardProps.enrollment.run.end_date = moment().add(7, "d")
-        enrollmentCardProps.enrollment.run.certificate_available_date = moment().add(
-          7,
-          "d"
-        )
-      }
-      const grade = makeLearnerRecordGrade()
-      grade.passed = true
-      enrollmentCardProps.enrollment.grades = [grade]
-      const inner = await renderedCard()
-      const coursePassed = inner
-        .find(".enrolled-item")
-        .find(".badge-enrolled-passed")
-      if (past) {
-        assert.isTrue(coursePassed.exists())
-      } else {
-        assert.isFalse(coursePassed.exists())
-      }
-    })
   })
 
   it("Course detail shows `Active` when start date in past", async () => {
