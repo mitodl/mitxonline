@@ -12,7 +12,6 @@ import type Moment from "moment"
 import type {
   CourseRunDetail,
   CourseRun,
-  RunEnrollment,
   RequirementNode,
   LearnerRecord,
   ProgramRequirement,
@@ -102,33 +101,9 @@ export const generateStartDateText = (run: CourseRunDetail) => {
 }
 
 export const isFinancialAssistanceAvailable = (run: CourseRunDetail) => {
-  return run.page ? !!run.page.financial_assistance_form_url : false
-}
-
-export const enrollmentHasPassingGrade = (enrollment: RunEnrollment) => {
-  if (enrollment.grades && enrollment.grades.length > 0) {
-    for (let i = 0; i < enrollment.grades.length; i++) {
-      if (enrollment.grades[i].passed && isPassBadgeEligible(enrollment.run)) {
-        return true
-      }
-    }
-  }
-
-  return false
-}
-
-const isPassBadgeEligible = (run: CourseRunDetail) => {
-  if (run.is_self_paced) {
-    return true
-  } else {
-    const now = moment()
-    return (
-      notNil(run.end_date) &&
-      moment(run.end_date).isBefore(now) &&
-      notNil(run.certificate_available_date) &&
-      moment(run.certificate_available_date).isBefore(now)
-    )
-  }
+  return run.course.page
+    ? !!run.course.page.financial_assistance_form_url
+    : false
 }
 
 const isNodeCompleted = (

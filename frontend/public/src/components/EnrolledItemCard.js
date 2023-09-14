@@ -35,8 +35,7 @@ import {
   isFinancialAssistanceAvailable,
   isLinkableCourseRun,
   generateStartDateText,
-  courseRunStatusMessage,
-  enrollmentHasPassingGrade
+  courseRunStatusMessage
 } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
 
@@ -426,7 +425,7 @@ export class EnrolledItemCard extends React.Component<
     const financialAssistanceLink =
       isFinancialAssistanceAvailable(enrollment.run) &&
       !enrollment.approved_flexible_price_exists ? (
-          <a href={enrollment.run.page.financial_assistance_form_url}>
+          <a href={enrollment.run.course.page.financial_assistance_form_url}>
           Financial assistance?
           </a>
         ) : null
@@ -462,12 +461,10 @@ export class EnrolledItemCard extends React.Component<
     const startDateDescription = generateStartDateText(enrollment.run)
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
     const courseId = enrollment.run.course_number
-    const pageLocation = enrollment.run.page
+    const pageLocation = enrollment.run.course.page
     const menuTitle = `Course options for ${enrollment.run.course.title}`
 
     const courseRunStatusMessageText = courseRunStatusMessage(enrollment.run)
-
-    const hasPassed = enrollmentHasPassingGrade(enrollment)
 
     return (
       <div
@@ -483,11 +480,14 @@ export class EnrolledItemCard extends React.Component<
             </div>
           )}
           {!enrollment.run.course.feature_image_src &&
-            enrollment.run.page &&
-            enrollment.run.page.feature_image_src && (
+            enrollment.run.course.page &&
+            enrollment.run.course.page.feature_image_src && (
             <div className="col-12 col-md-auto px-0 px-md-3">
               <div className="img-container">
-                <img src={enrollment.run.page.feature_image_src} alt="" />
+                <img
+                  src={enrollment.run.course.page.feature_image_src}
+                  alt=""
+                />
               </div>
             </div>
           )}
@@ -496,7 +496,7 @@ export class EnrolledItemCard extends React.Component<
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100">
               <div className="d-flex flex-column">
                 <div className="align-content-start d-flex enrollment-mode-container flex-wrap pb-1">
-                  {hasPassed ? (
+                  {enrollment.certificate ? (
                     <span className="badge badge-enrolled-passed mr-2">
                       <img src="/static/images/done.svg" alt="Check" /> Course
                       passed
