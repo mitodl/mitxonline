@@ -52,7 +52,6 @@
       height: 450px;
       background-color: $home-page-grey-lite;
     }
-
     .featured-product-header {
       max-width: 1320px;
       width: 100%;
@@ -62,6 +61,7 @@
       @include media-breakpoint-down(sm) {
         width: 100%;
         padding-top: 0;
+        justify-content: space-between;
       }
 
       h3.featured-product-header-title {
@@ -121,28 +121,51 @@
 
       @include media-breakpoint-down(sm) {
         width: 100%;
-        margin-top: 30px;
-        align-items: unset;
         padding-bottom: 0;
+        margin-top: 0;
+        padding-top: 2rem;
       }
 
       .carousel-inner {
-        overflow-x: hidden;
-        overflow-y: unset;
-
-        .carousel-item {
           width: 110%;
           max-width: unset;
           gap: 20px;
           padding-bottom: 2rem;
-          transition: transform 0.6s linear;
+        @include media-breakpoint-down(sm) {
+          max-width: 100%;
+        }
 
-          a {
+          a.carousel-item {
             text-decoration: none;
-            width: 17.625rem;
+            width: 20%;
+            margin-right: 0;
+            flex: 0 0 20%;
+            display: block;
+            height: 260.953px;
             padding-left: inherit;
             padding-right: inherit;
+            transition: transform 0.6s linear;
+            @include media-breakpoint-down(xl) {
+              width: 25%;
+              flex: 0 0 25%;
+            }
+            @include media-breakpoint-down(lg) {
+              width: 33.33333%;
+              flex: 0 0 33.33333%;
+            }
+            @include media-breakpoint-down(md) {
+              width: 50%;
+              flex: 0 0 50%;
+            }
+            @include media-breakpoint-down(sm) {
+              width: 100%;
+              flex: 0 0 100%;
+              height: unset;
+              padding-left: 2.44rem;
+              padding-right: 2.44rem;
+            }
             .featured-product-card {
+              height: 100%;
               border-radius: 5px;
               flex-direction: column;
               align-items: center;
@@ -152,9 +175,8 @@
               flex: none;
               box-shadow: 0 2px 3px 0 rgba(18, 38, 49, 0.15);
               @include media-breakpoint-down(sm) {
-                width: 282px;
-                margin: auto;
-                height: 238px;
+                padding: unset;
+
               }
 
               .featured-product-thumb {
@@ -256,6 +278,9 @@
       @include media-breakpoint-down(sm) {
         width: 100%;
         margin-top: 30px;
+        padding-bottom: 0;
+        padding-left: 2.44rem;
+        padding-right: 2.44rem;
       }
 
       a.view-catalog-button {
@@ -273,9 +298,7 @@
         text-decoration: none;
         @include media-breakpoint-down(sm) {
           width: 100%;
-          max-width: 280px;
         }
       }
     }
-  }
 }
