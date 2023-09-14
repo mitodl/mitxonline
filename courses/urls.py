@@ -19,7 +19,6 @@ router.register(
     v1.UserProgramEnrollmentsViewSet,
     basename="user_program_enrollments_api",
 )
-router.register(r"departments", v1.DepartmentViewSet, basename="departments_api")
 
 urlpatterns = [
     re_path(r"^api/v1/", include(router.urls)),

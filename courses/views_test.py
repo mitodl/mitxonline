@@ -26,9 +26,8 @@ from courses.models import CourseRun, ProgramEnrollment
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
     CourseRunSerializer,
-    CourseWithCourseRunsSerializer,
+    CourseSerializer,
     ProgramSerializer,
-    CourseRunWithCourseSerializer,
 )
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
@@ -122,8 +121,7 @@ def test_get_courses(user_drf_client, courses, mock_context):
     assert len(courses_data) == len(courses)
     for course in courses:
         assert (
-            CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
-            in courses_data
+            CourseSerializer(instance=course, context=mock_context).data in courses_data
         )
 
 
@@ -132,18 +130,13 @@ def test_get_course(user_drf_client, courses, mock_context):
     course = courses[0]
     resp = user_drf_client.get(reverse("courses_api-detail", kwargs={"pk": course.id}))
     course_data = resp.json()
-    assert (
-        course_data
-        == CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
-    )
+    assert course_data == CourseSerializer(instance=course, context=mock_context).data
 
 
 def test_create_course(user_drf_client, courses, mock_context):
     """Test the view that handles a request to create a Course"""
     course = courses[0]
-    course_data = CourseWithCourseRunsSerializer(
-        instance=course, context=mock_context
-    ).data
+    course_data = CourseSerializer(instance=course, context=mock_context).data
     del course_data["id"]
     course_data["title"] = "New Course Title"
     request_url = reverse("courses_api-list")
@@ -176,7 +169,7 @@ def test_get_course_runs(user_drf_client, course_runs):
     # Force sorting by run id since this test has been flaky
     course_runs_data = sorted(course_runs_data, key=op.itemgetter("id"))
     for course_run, course_run_data in zip(course_runs, course_runs_data):
-        assert course_run_data == CourseRunWithCourseSerializer(course_run).data
+        assert course_run_data == CourseRunSerializer(course_run).data
 
 
 @pytest.mark.parametrize("is_enrolled", [True, False])
@@ -228,7 +221,7 @@ def test_get_course_run(user_drf_client, course_runs):
         reverse("course_runs_api-detail", kwargs={"pk": course_run.id})
     )
     course_run_data = resp.json()
-    assert course_run_data == CourseRunWithCourseSerializer(course_run).data
+    assert course_run_data == CourseRunSerializer(course_run).data
 
 
 def test_create_course_run(user_drf_client, course_runs):

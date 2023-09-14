@@ -12,7 +12,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.utils.functional import cached_property
 from django.forms import ChoiceField, DecimalField
 from django.http import Http404
 from django.template.response import TemplateResponse
@@ -1085,7 +1084,7 @@ class CoursePage(ProductPage):
         )
     ]
 
-    @cached_property
+    @property
     def product(self):
         """Gets the product associated with this page"""
         return self.course

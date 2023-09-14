@@ -404,11 +404,6 @@ describe("ProductDetailEnrollApp", () => {
   ;[[true], [false]].forEach(([flexPriceApproved]) => {
     it(`shows the flexible pricing available link if the user does not have approved flexible pricing for the course run`, async () => {
       courseRun["approved_flexible_price_exists"] = flexPriceApproved
-      courseRun["course"] = {
-        page: {
-          financial_assistance_form_url: "google.com"
-        }
-      }
       isWithinEnrollmentPeriodStub.returns(true)
       isFinancialAssistanceAvailableStub.returns(true)
       const { inner } = await renderPage()
