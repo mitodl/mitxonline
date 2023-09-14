@@ -43,41 +43,39 @@
 {% endif %}
 {% if show_new_featured_carousel %}
   <div class="featured-product-section-container d-flex flex-column container">
-    <div class="featured-product-background-section"></div>
-      <div class="featured-product-section d-flex row carousel slide" id="featuredProductCarousel">
-
-        <div class="featured-product-header d-flex row col-12">
-          {% if product_cards_section_title %}
-            <h3 class="featured-product-header-title col-6">{{ product_cards_section_title }}</h3>
-          {% endif %}
-          <div class="featured-product-arrows col-6">
-            <a href="#featuredProductCarousel" role="button" data-bs-slide="prev">
-              <img class="arrow prev-arrow" src="/static/images/featured-products-left-arrow.svg" alt="Previous Arrow" />
-            </a>
-            <a href="#featuredProductCarousel" role="button" data-bs-slide="next">
-              <img class="arrow next-arrow" src="/static/images/featured-products-right-arrow.svg" alt="Next Arrow" />
-            </a>
+    <div class="featured-product-section d-flex row carousel slide" id="featuredProductCarousel">
+      <div class="featured-product-header d-flex row col-12">
+        {% if product_cards_section_title %}
+          <h3 class="featured-product-header-title col-6">{{ product_cards_section_title }}</h3>
+        {% endif %}
+        <div class="featured-product-arrows col-6">
+          <a href="#featuredProductCarousel" role="button" data-bs-slide="prev">
+            <img class="arrow prev-arrow" src="/static/images/featured-products-left-arrow.svg" alt="Previous Arrow" />
+          </a>
+          <a href="#featuredProductCarousel" role="button" data-bs-slide="next">
+            <img class="arrow next-arrow" src="/static/images/featured-products-right-arrow.svg" alt="Next Arrow" />
+          </a>
+        </div>
+      </div>
+      <div class="featured-product-listing">
+        <div class="carousel-inner d-flex" role="listbox">
+          <div class="carousel-item active">
+            {% for product in products %}
+              {% include "partials/featured_product_card.html" with product=product %}
+              {% if forloop.last %}
+                </div>
+              {% elif forloop.counter|divisibleby:5  %}
+                </div>
+                <div class="carousel-item">
+                  {% include "partials/featured_product_card.html" with product=product %}
+              {% endif %}
+            {% endfor %}
           </div>
-        </div>
-        <div class="featured-product-listing">
-          <div class="carousel-inner d-flex" role="listbox">
-            <div class="carousel-item active">
-              {% for product in products %}
-                {% include "partials/featured_product_card.html" with product=product %}
-                {% if forloop.last %}
-                  </div>
-                {% elif forloop.counter|divisibleby:5  %}
-                  </div>
-                  <div class="carousel-item">
-                    {% include "partials/featured_product_card.html" with product=product %}
-                {% endif %}
-              {% endfor %}
-            </div>
-        </div>
-        <div class="featured-product-navigation">
+      </div>
+      <div class="featured-product-navigation">
         <a role="button" href="/catalog" class="view-catalog-button">View MITx Online Catalog</a>
       </div>
-      </div>
+    </div>
   </div>
 {% else %}
   <div class="course-section">
