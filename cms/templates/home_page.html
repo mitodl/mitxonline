@@ -132,11 +132,11 @@
 {% if show_home_page_video_component and page.video_component_title %}
 <div class="home-page-video-row d-flex justify-content-center container">
   <div class="home-page-video-container row">
-    <div class="home-page-video-description d-flex flex-column col-12 col-xl-5">
+    <div class="home-page-video-description flex-column col-12 col-xl-5">
       <h3>{{ page.video_component_title }}</h3>
       {{ page.video_component_description|richtext }}
     </div>
-      <div class="home-page-video-wrapper d-flex justify-content-center col-12 col-xl-7">
+      <div class="home-page-video-wrapper col-12 col-xl-7">
         <div class="home-page-video-player">
           {% if page.video_url %}
             <video-js
