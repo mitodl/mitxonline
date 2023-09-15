@@ -1,6 +1,27 @@
 Release Notes
 =============
 
+Version 0.73.2 (Released September 13, 2023)
+--------------
+
+- Repair cart page including reinstated course api improvements (#1885)
+- Revert "Department REST API (#1877)" (#1882)
+- New design footer css updates (#1881)
+- Add new header design (#1873)
+- Department REST API (#1877)
+
+Version 0.73.1 (Released September 12, 2023)
+--------------
+
+- 1869: Course program api performance improvements (#1872)
+- Remove duplicate catalog URL path (#1871)
+
+Version 0.73.0 (Released September 11, 2023)
+--------------
+
+- Change fonts to new correct fonts for home page (#1866)
+- Redesign footer (#1868)
+
 Version 0.72.0 (Released September 11, 2023)
 --------------
 

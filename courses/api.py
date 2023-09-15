@@ -31,11 +31,9 @@ from courses.models import (
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
-    Program,
     ProgramCertificate,
     ProgramEnrollment,
     ProgramRequirement,
-    ProgramRequirementNodeType,
 )
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
