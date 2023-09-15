@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.73.3
+--------------
+
+- Fixes to  Featured Carousel (#1889)
+- Video Component Styling fix (#1875)
+- Course passed if has course run certificate (#1878)
+- Use site name variable (MITx Online) for page title (#1888)
+- Updating video player CSS to work better in the new design (#1883)
+
 Version 0.73.2 (Released September 13, 2023)
 --------------
 
