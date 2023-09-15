@@ -112,6 +112,10 @@ class CourseFilterSet(django_filters.FilterSet):
     )
 
     def filter_courserun_is_enrollable(self, queryset, _, value):
+        """
+        courserun_is_enrollable filter to narrow down runs that are open for
+        enrollments
+        """
         now = now_in_utc()
 
         if value is True:
@@ -148,10 +152,21 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = CourseFilterSet
 
     def get_queryset(self):
+        courserun_is_enrollable = self.request.query_params.get(
+            "courserun_is_enrollable", None
+        )
+
+        if courserun_is_enrollable:
+            return (
+                Course.objects.filter()
+                .select_related("page")
+                .prefetch_related("departments")
+                .all()
+            )
         return (
             Course.objects.filter()
             .select_related("page")
-            .prefetch_related("departments")
+            .prefetch_related("courseruns", "departments")
             .all()
         )
 
