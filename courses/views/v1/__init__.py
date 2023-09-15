@@ -151,7 +151,6 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
         return (
             Course.objects.filter()
             .select_related("page")
-            # .prefetch_related("courseruns", "departments")
             .prefetch_related("departments")
             .all()
         )
