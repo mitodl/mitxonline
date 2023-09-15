@@ -73,7 +73,6 @@
     .home-page-video-wrapper {
       padding: 0;
       .home-page-video-player {
-        width: 100%;
         @include media-breakpoint-down(xl) {
           padding-top: 1.5rem;
         }
