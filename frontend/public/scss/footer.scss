@@ -108,12 +108,9 @@
          display: flex;
          flex-direction: row;
 
-        @include media-breakpoint-down(md) {
+        @include media-breakpoint-down(sm) {
            flex-direction: column;
         }
-        @include media-breakpoint-between(sm, md) {
-           flex-direction: row;
-       }
      }
 
     .help-col, .contact-col {
