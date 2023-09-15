@@ -786,7 +786,7 @@ describe("CatalogPage", function() {
 
     sinon.assert.calledWith(
       helper.handleRequestStub,
-      "/api/courses/?page=2&live=true",
+      "/api/courses/?page=2&live=true&page__live=true&courserun_is_enrollable=true",
       "GET"
     )
 

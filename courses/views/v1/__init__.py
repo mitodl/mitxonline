@@ -1,11 +1,12 @@
 """Course views verson 1"""
 import logging
+import django_filters
 from typing import Optional, Tuple, Union
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Prefetch
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -58,6 +59,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLLED,
 )
 from main.utils import encode_json_cookie_value
+from mitol.common.utils import now_in_utc
 from openedx.api import (
     subscribe_to_edx_course_emails,
     sync_enrollments_with_edx,
@@ -102,6 +104,40 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
         return super().paginate_queryset(queryset)
 
 
+class CourseFilterSet(django_filters.FilterSet):
+
+    courserun_is_enrollable = django_filters.BooleanFilter(
+        field_name="courserun_is_enrollable",
+        method="filter_courserun_is_enrollable",
+    )
+
+    def filter_courserun_is_enrollable(self, queryset, _, value):
+        now = now_in_utc()
+
+        if value is True:
+            enrollable_runs = CourseRun.objects.filter(
+                Q(live=True)
+                & Q(start_date__isnull=False)
+                & Q(enrollment_start__lt=now)
+                & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))
+            )
+            return queryset.prefetch_related(
+                Prefetch("courseruns", queryset=enrollable_runs)
+            ).filter(courseruns__id__in=enrollable_runs.values_list("id", flat=True))
+
+        else:
+            unenrollable_runs = CourseRun.objects.filter(
+                Q(live=False) | Q(start_date__isnull=True) | Q(enrollment_end__lte=now)
+            )
+            return queryset.prefetch_related(
+                Prefetch("courseruns", queryset=unenrollable_runs)
+            ).filter(courseruns__id__in=unenrollable_runs.values_list("id", flat=True))
+
+    class Meta:
+        model = Course
+        fields = ["id", "live", "readable_id", "page__live", "courserun_is_enrollable"]
+
+
 class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for Courses"""
 
@@ -109,13 +145,14 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = []
     filter_backends = [DjangoFilterBackend]
     serializer_class = CourseWithCourseRunsSerializer
-    filterset_fields = ["id", "live", "readable_id"]
+    filterset_class = CourseFilterSet
 
     def get_queryset(self):
         return (
             Course.objects.filter()
             .select_related("page")
-            .prefetch_related("courseruns", "departments")
+            # .prefetch_related("courseruns", "departments")
+            .prefetch_related("departments")
             .all()
         )
 
