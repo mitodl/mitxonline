@@ -94,10 +94,7 @@ export class CourseProductDetailEnroll extends React.Component<
 
     const { currentUser, updateAddlFields } = this.props
 
-    if (
-      !checkFeatureFlag("enable_addl_profile_fields") ||
-      (currentUser.user_profile && currentUser.user_profile.addl_field_flag)
-    ) {
+    if (currentUser.user_profile && currentUser.user_profile.addl_field_flag) {
       return
     }
 
@@ -152,16 +149,22 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   renderUpgradeEnrollmentDialog(showNewDesign: boolean) {
-    const { courseRuns } = this.props
+    const { courseRuns, courses } = this.props
     const run =
       !this.getCurrentCourseRun() && courseRuns
         ? courseRuns[0]
         : this.getCurrentCourseRun()
+
+    const course = courses.find((elem: any) => elem.id === run.course.id)
     const needFinancialAssistanceLink =
       isFinancialAssistanceAvailable(run) &&
       !run.approved_flexible_price_exists ? (
           <p className="financial-assistance-link">
-            <a href={run && run.page && run.page.financial_assistance_form_url}>
+            <a
+              href={
+                course && course.page && course.page.financial_assistance_form_url
+              }
+            >
             Need financial assistance?
             </a>
           </p>

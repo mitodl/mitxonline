@@ -95,10 +95,7 @@ export class ProgramProductDetailEnroll extends React.Component<
 
     const { currentUser, updateAddlFields } = this.props
 
-    if (
-      !checkFeatureFlag("enable_addl_profile_fields") ||
-      (currentUser.user_profile && currentUser.user_profile.addl_field_flag)
-    ) {
+    if (currentUser.user_profile && currentUser.user_profile.addl_field_flag) {
       return
     }
 
