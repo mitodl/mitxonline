@@ -26,13 +26,16 @@
        flex-direction: row-reverse;
        padding-left: 98px;
 
-      @include media-breakpoint-down(sm) {
-         margin-top: 0;
-         padding-left: 12px;
+      @include media-breakpoint-down(md) {
          width:100%;
          padding-top: 0;
          display: inline-flex;
          flex-direction: column;
+      }
+
+      @include media-breakpoint-down(sm) {
+         margin-top: 0;
+         padding-left: 12px;
         }
 
       @include media-breakpoint-between(sm, md) {
@@ -96,11 +99,16 @@
       }
     }
 
+    @include media-breakpoint-between(sm, md) {
+      padding-left: 0;
+      width:100%;
+    }
+
     .help-contact-row {
          display: flex;
          flex-direction: row;
 
-        @include media-breakpoint-down(md) {
+        @include media-breakpoint-down(sm) {
            flex-direction: column;
         }
      }
