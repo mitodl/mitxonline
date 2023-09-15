@@ -155,7 +155,8 @@ export class CourseProductDetailEnroll extends React.Component<
         ? courseRuns[0]
         : this.getCurrentCourseRun()
 
-    const course = courses.find((elem: any) => elem.id === run.course.id)
+    const course =
+      courses && courses.find((elem: any) => elem.id === run.course.id)
     const needFinancialAssistanceLink =
       isFinancialAssistanceAvailable(run) &&
       !run.approved_flexible_price_exists ? (
