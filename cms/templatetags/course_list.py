@@ -5,7 +5,6 @@ Generates a <ul> block for a list of courses. Pass in the list of courses.
 import re
 
 from django import template
-from django.utils.safestring import mark_safe
 
 from cms.templatetags.feature_img_src import feature_img_src
 

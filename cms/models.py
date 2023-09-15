@@ -12,11 +12,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.utils.functional import cached_property
 from django.forms import ChoiceField, DecimalField
 from django.http import Http404
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.utils.functional import cached_property
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from modelcluster.fields import ParentalKey
@@ -1051,18 +1051,6 @@ class ProductPage(VideoPlayerConfigMixin):
         If they're not logged in, this should return None.
         """
         raise NotImplementedError
-
-    def get_context(self, request, *args, **kwargs):
-        instructors = [
-            member.linked_instructor_page
-            for member in self.linked_instructors.order_by("order").all()
-        ]
-
-        return {
-            **super().get_context(request),
-            **get_base_context(request),
-            "instructors": instructors,
-        }
 
     def get_context(self, request, *args, **kwargs):
         instructors = [
