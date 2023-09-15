@@ -33,7 +33,7 @@ def course_list(courses):
     for course in courses:
         start_descriptor = (
             f"Starts {format_course_start_time(course.first_unexpired_run.start_date)}"
-            if course.first_unexpired_run.start_date
+            if course.first_unexpired_run and course.first_unexpired_run.start_date
             else "Start Anytime"
         )
         featured_image = feature_img_src(course.page.feature_image)

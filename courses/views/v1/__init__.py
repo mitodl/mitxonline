@@ -6,7 +6,7 @@ from typing import Optional, Tuple, Union
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Q, Count, Prefetch
+from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -31,21 +31,21 @@ from courses.models import (
     Course,
     CourseRun,
     CourseRunEnrollment,
+    Department,
     LearnerProgramRecordShare,
     PartnerSchool,
     Program,
     ProgramEnrollment,
-    Department,
 )
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
     CourseRunWithCourseSerializer,
+    CourseWithCourseRunsSerializer,
+    DepartmentWithCountSerializer,
     LearnerRecordSerializer,
     PartnerSchoolSerializer,
     ProgramSerializer,
     UserProgramEnrollmentDetailSerializer,
-    CourseWithCourseRunsSerializer,
-    DepartmentWithCountSerializer,
 )
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
@@ -91,6 +91,9 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = ProgramSerializer
     pagination_class = Pagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ["id", "live", "readable_id"]
+    queryset = Program.objects.filter().prefetch_related("departments")
 
     def paginate_queryset(self, queryset):
         """
@@ -100,13 +103,6 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
         if self.paginator and self.request.query_params.get("page", None) is None:
             return None
         return super().paginate_queryset(queryset)
-
-    def get_queryset(self):
-        readable_id = self.request.query_params.get("readable_id", None)
-        if readable_id:
-            return Program.objects.filter(live=True, readable_id=readable_id)
-
-        return Program.objects.filter(live=True)
 
 
 class CourseFilterSet(django_filters.FilterSet):

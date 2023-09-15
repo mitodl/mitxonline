@@ -75,7 +75,7 @@ UserEnrollments = namedtuple(
 
 
 def _relevant_course_qset_filter(
-    queryset: QuerySet, user: Optional[User], now: Optional[datetime] = None
+    run_qset: QuerySet, user: Optional[User], now: Optional[datetime] = None
 ) -> QuerySet:
     """
     Does the actual filtering for user_relevant_course_run_qset and
