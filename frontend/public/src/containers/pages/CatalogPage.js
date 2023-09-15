@@ -539,7 +539,7 @@ export class CatalogPage extends React.Component<Props> {
               <div className="container-fluid">
                 <div className="row" id="tab-row">
                   <div className="col catalog-animation d-sm-flex d-md-inline-flex">
-                    <TransitionGroup>
+                    <TransitionGroup id="tab-animation-grid">
                       <CSSTransition
                         key={this.state.tabSelected}
                         timeout={300}
@@ -581,7 +581,7 @@ export class CatalogPage extends React.Component<Props> {
                       </CSSTransition>
                     </TransitionGroup>
                   </div>
-                  <div className="col catalog-page-item-count">
+                  <div className="col catalog-page-item-count d-none d-sm-block">
                     <div className="catalog-count-animation">
                       <TransitionGroup id="count-animation-grid">
                         <CSSTransition

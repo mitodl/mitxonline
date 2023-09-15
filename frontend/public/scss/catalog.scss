@@ -23,7 +23,7 @@
 
         @include media-breakpoint-up(md) {
             background: #FFF;
-            width: 312px;
+            width: 305px;
             position: sticky;
         }
     
@@ -122,6 +122,10 @@
 
     .container {
         max-width: 1320px;
+
+        @include media-breakpoint-down(md) {
+            padding-left: 0;
+        }
     
         #course-catalog-navigation {
             display: flex;
@@ -144,9 +148,6 @@
                     height: 100%;
                     width: 100%;
                     background: var(--blue-dark, #03152D);
-                    flex-direction: column;
-                    align-items: flex-start;
-                    gap: 2px;
                     flex: 1 0 0;
                     z-index: 10;
                 }
@@ -212,16 +213,10 @@
                     text-align: right;
                     font-family: Inter;
                     font-size: 14px;
-                    font-style: normal;
                     font-weight: 400;
-                    line-height: normal;
-                    right: 0;
-                    width: inherit;
                     margin-top: 15px;
                     padding-left: 0;
                     padding-right: 0;
-                    display: grid;
-                    grid-template-columns: 1fr;
         
                     .catalog-count-animation {
         
@@ -261,9 +256,7 @@
                 #tabs {
                     align-items: flex-start;
                     font-size: 16px;
-                    font-style: normal;
                     font-weight: 700;
-                    line-height: normal;
                     flex-direction: row;
                     flex-wrap: nowrap;
         
@@ -300,26 +293,22 @@
             }
         
             .catalog-animation {
+
+                #tab-animation-grid{
+                    display: grid;
+                    grid-template-columns: 1fr;
+                }
         
                 /* starting ENTER animation */
                 .messageout-enter {
-                    position: absolute;
                     opacity: 0;
-                    @include media-breakpoint-down(sm) {
-                        width: -moz-available;          /* WebKit-based browsers will ignore this. */
-                        width: -webkit-fill-available;  /* Mozilla-based browsers will ignore this. */
-                      }
-                    width: inherit;
+                    grid-row-start: 1;
+                    grid-column-start: 1;
                 }
                 
                 /* ending ENTER animation */
                 .messageout-enter-active {
                     opacity: 1;
-                    @include media-breakpoint-down(sm) {
-                        width: -moz-available;          /* WebKit-based browsers will ignore this. */
-                        width: -webkit-fill-available;  /* Mozilla-based browsers will ignore this. */
-                      }
-                    width: inherit;
                     transition: all 300ms ease-in-out;
         
                 }
@@ -327,22 +316,14 @@
                 /* starting EXIT animation */
                 .messageout-exit {
                     opacity: 1;
-                    @include media-breakpoint-down(sm) {
-                        width: -moz-available;          /* WebKit-based browsers will ignore this. */
-                        width: -webkit-fill-available;  /* Mozilla-based browsers will ignore this. */
-                      }
-                    width: inherit;
+                    grid-row-start: 1;
+                    grid-column-start: 1;
                 }
         
                 /* ending EXIT animation */
                 .messageout-exit-active {
                     opacity: 0;
                     transition: all 300ms ease-in-out;
-        
-                    @include media-breakpoint-down(sm) {
-                        width: -moz-available;          /* WebKit-based browsers will ignore this. */
-                        width: -webkit-fill-available;  /* Mozilla-based browsers will ignore this. */
-                      }
                 }
         
             }
