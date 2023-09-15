@@ -42,56 +42,31 @@
   </div>
 {% endif %}
 {% if show_new_featured_carousel %}
-  <div class="featured-product-section-container container">
-    <div class="featured-product-section carousel slide" id="featuredProductCarousel">
-      <div class="featured-product-header">
+  <div class="featured-product-section-container d-flex flex-column container">
+    <div class="featured-product-section d-flex row carousel slide" id="featuredProductCarousel">
+      <div class="featured-product-header d-flex row col-12">
         {% if product_cards_section_title %}
-          <h3 class="featured-product-header-title">{{ product_cards_section_title }}</h3>
+          <h3 class="featured-product-header-title col-8">{{ product_cards_section_title }}</h3>
         {% endif %}
-        <div class="featured-product-arrows">
-          <a href="#featuredProductCarousel" role="button" data-bs-slide="prev">
+        <div class="featured-product-arrows col-4">
+          <a href="#featuredProductCarousel" class="prev" data-bs-slide="prev" onclick="handleNavigationClick('prev');">
             <img class="arrow prev-arrow" src="/static/images/featured-products-left-arrow.svg" alt="Previous Arrow" />
           </a>
-          <a href="#featuredProductCarousel" role="button" data-bs-slide="next">
+          <a href="#featuredProductCarousel" class="next" data-bs-slide="next" onclick="handleNavigationClick('next');">
             <img class="arrow next-arrow" src="/static/images/featured-products-right-arrow.svg" alt="Next Arrow" />
           </a>
         </div>
       </div>
       <div class="featured-product-listing">
-        <div class="carousel-inner" role="listbox">
-          {% for product in products %}
-          <div class="carousel-item{% if forloop.counter == 1 %} active{% endif %} ">
-            <div class="card featured-product-card">
-              <a href="{{ product.url_path }}" class="featured-product-card-link">
-              <div class="featured-product-thumb">
-                <img src="{% feature_img_src product.feature_image %}" alt="" />
-                {% if product.program_type %}
-                  <span class="badge badge-program-type">{{ product.program_type }}</span>
-                {% endif %}
-              </div>
-              <div class="featured-product-info card-body">
-                {% if product.start_date and not product.is_program %}
-                  <p class="date">
-                    Starts {{ product.start_date | date:"F j, Y" }}
-                  </p>
-                {% elif not product.is_program %}
-                  <p class="date">
-                    Start Anytime
-                  </p>
-                {% endif %}
-                <h2 class="featured-product-card-title card-title">
-                    {{ product.title }}
-                </h2>
-              </div>
-              </a>
-            </div>
+        <div class="carousel-inner d-flex" role="listbox">
+            {% for product in products %}
+              {% include "partials/featured_product_card.html" with product=product order=forloop.counter %}
+            {% endfor %}
           </div>
-          {% endfor %}
-        </div>
       </div>
-    <div class="featured-product-navigation">
-      <a role="button" href="/catalog" class="view-catalog-button">View MITx Online Catalog</a>
-    </div>
+      <div class="featured-product-navigation">
+        <a role="button" href="/catalog" class="view-catalog-button">View MITx Online Catalog</a>
+      </div>
     </div>
   </div>
 {% else %}
@@ -151,7 +126,6 @@
         </div>
       </div>
   </div>
-</div>
 {% endif %}
 {% if show_home_page_contact_form %}
   <div class="home-page-contact-row">
@@ -228,19 +202,45 @@
 {% endblock %}
 {% block scripts %}
 <script>
-let items = document.querySelectorAll('.carousel .carousel-item')
 
-items.forEach((el) => {
-    const minPerSlide = 4
-    let next = el.nextElementSibling
-    for (var i=1; i<minPerSlide; i++) {
-        if (!next) {
-        	next = items[0]
-      	}
-        let cloneChild = next.cloneNode(true)
-        el.appendChild(cloneChild.children[0])
-        next = next.nextElementSibling
+    let scrollPosition = 0;
+    let numberOfCards = 4;
+
+    function updatePosition () {
+        position = 0;
     }
-})
+
+  function handleNavigationClick(e) {
+      let carouselWidth = $(".carousel-inner")[0].scrollWidth;
+      let cardWidth = ($(".carousel-item").width() + 20);
+      if (window.matchMedia("(max-width: 1199.98px)").matches) {
+        numberOfCards = 3;
+      }
+      else if (window.matchMedia("(max-width: 991.98px)").matches) {
+        numberOfCards = 2;
+      }
+      else if (window.matchMedia("(max-width: 767.98px)").matches) {
+        numberOfCards = 1;
+      }
+      if (e==="next") {
+          if (scrollPosition < carouselWidth - (cardWidth * numberOfCards)) {
+            scrollPosition += cardWidth * numberOfCards;
+            $(".carousel-inner").animate(
+              { scrollLeft: scrollPosition },
+              600
+            );
+          }
+      } else if (e==="prev") {
+          if (scrollPosition > 0) {
+            scrollPosition -= cardWidth * numberOfCards;
+            $(".carousel-inner").animate(
+              { scrollLeft: scrollPosition },
+              600
+            );
+          }
+        }
+      }
+  window.addEventListener("resize", updatePosition);
+
 </script>
 {% endblock %}

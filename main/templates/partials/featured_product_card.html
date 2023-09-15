@@ -1,0 +1,25 @@
+{% load static wagtail_img_src feature_img_src %}
+
+
+<a href="{{ product.url_path }}" class="featured-product-card-link carousel-item{% if order == 1 %} active{% endif %}">
+  <div class="col featured-product-card">
+    <div class="featured-product-thumb">
+      <img src="{% feature_img_src product.feature_image %}" alt="" />
+      <div class="badge badge-program-type{% if not product.program_type %}-none{% endif %}">{% if product.program_type %}{{ product.program_type }}{% endif %}</div>
+    </div>
+    <div class="featured-product-info">
+      {% if product.start_date and not product.is_program %}
+      <p class="date">
+        Starts {{ product.start_date | date:"F j, Y" }}
+      </p>
+      {% elif not product.is_program %}
+        <p class="date">
+          Start Anytime
+        </p>
+      {% endif %}
+      <h2 class="featured-product-card-title card-title{% if product.is_program %} program-title{% endif %}">
+          {{ product.title }}
+      </h2>
+    </div>
+    </div>
+  </a>

@@ -1,21 +1,37 @@
 // TODO: `featured-product-section h1` should replace `course-section h1` in home.css on feature merge
 .featured-product-section-container {
   width: 100%;
-  display: flex;
-  flex-direction: column;
+  max-width: unset;
+  height: 32.5rem;
   padding: 0 !important;
-  max-width: 1440px !important;
-  @include media-breakpoint-down(sm) {
-    width: 100%;
-    margin: 0;
+  justify-content: center;
+  margin: 0;
+  overflow: hidden;
+  position: relative;
+  z-index:9;
+  &:after {
+    bottom: 0;
+    -webkit-transform: skewY(-1.5deg);
+    transform: skewY(-1.5deg);
+    -webkit-transform-origin: 0 100%;
+    transform-origin: 0 100%;
+    height: 32.5rem;
+    background: inherit;
+    content: '';
+    display: block;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: -1;
+    background-color: $home-page-grey-lite;
   }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: Poppins, sans-serif;
     font-style: normal;
     line-height: normal;
     font-weight: 700;
   }
-
   p, a {
     font-family: Inter, sans-serif;
     font-style: normal;
@@ -23,41 +39,36 @@
     font-weight: 400;
   }
 
-
   .featured-product-section {
-    display: flex;
-    width: 100%;
-    max-width: 1440px;
-    height: 520px;
+    width: calc(100% - 100px);
+    max-width: 1320px;
     flex-shrink: 0;
-    background-image: url('/static/images/featured-product-rectangle.svg');
-    background-size: cover;
     flex-direction: column;
+    align-self: center;
     align-items: center;
+    position: absolute;
     @include media-breakpoint-down(sm) {
       width: 100%;
       height: 450px;
-      background-image: unset;
       background-color: $home-page-grey-lite;
     }
-
     .featured-product-header {
-      max-width: 1344px;
-      width: 93.333333%;
-      margin: 0 auto;
-      padding-top: 60px;
+      max-width: 1320px;
+      width: 100%;
+      padding: 3rem 0 1.8rem 0;
       flex-shrink: 0;
       fill: $home-page-grey-lite;
-      display: flex;
-      align-content: space-between;
       @include media-breakpoint-down(sm) {
         width: 100%;
         padding-top: 0;
+        justify-content: space-between;
       }
 
       h3.featured-product-header-title {
         color: $home-page-header-blue;
         font-size: 25px;
+        padding-left: 0;
+        margin-bottom: 0;
         @include media-breakpoint-down(sm) {
           width: 176px;
           font-size: 18px;
@@ -68,9 +79,10 @@
 
       .featured-product-arrows {
         display: inline-flex;
-        align-items: flex-start;
+        align-items: center;
+        justify-content: flex-end;
         gap: 10px;
-        margin-left: auto;
+        padding: 0;
         @include media-breakpoint-down(sm) {
           margin-right: 15px;
           margin-top: 30px;
@@ -98,84 +110,143 @@
 
     .featured-product-listing {
       display: flex;
-      margin: 40px auto 0 auto;
-      max-width: 1344px;
-      width: 93.333333%;
+      margin: 36px 0 0 0;
+      max-width: 1320px;
+      width: 100%;
       height: 238px;
-      justify-content: flex-end;
+      justify-content: space-between;
       align-items: center;
       flex-shrink: 0;
-      padding-bottom: 17px;
+      padding: 0 0 17px 0;
 
       @include media-breakpoint-down(sm) {
         width: 100%;
-        margin-top: 30px;
-        align-items: unset;
         padding-bottom: 0;
+        margin-top: 0;
+        padding-top: 2rem;
       }
 
       .carousel-inner {
-        overflow-y: unset;
+          width: 110%;
+          max-width: unset;
+          gap: 20px;
+          padding-bottom: 2rem;
+        @include media-breakpoint-down(sm) {
+          max-width: 100%;
+        }
 
-        .carousel-item {
-          gap: 24px;
-
-          .featured-product-card {
-            width: calc(25%);
-            border-radius: 5px;
-            background: white;
-            box-shadow: 0 2px 3px 0 rgba(18, 38, 49, 0.15);
-            @include media-breakpoint-down(sm) {
-              width: 282px;
-              margin: auto;
-              height: 238px;
+          a.carousel-item {
+            text-decoration: none;
+            width: 20%;
+            margin-right: 0;
+            flex: 0 0 20%;
+            display: block;
+            height: 260.953px;
+            padding-left: inherit;
+            padding-right: inherit;
+            transition: transform 0.6s linear;
+            @include media-breakpoint-down(xl) {
+              width: 25%;
+              flex: 0 0 25%;
             }
+            @include media-breakpoint-down(lg) {
+              width: 33.33333%;
+              flex: 0 0 33.33333%;
+            }
+            @include media-breakpoint-down(md) {
+              width: 50%;
+              flex: 0 0 50%;
+            }
+            @include media-breakpoint-down(sm) {
+              width: 100%;
+              flex: 0 0 100%;
+              height: unset;
+              padding-left: 2.44rem;
+              padding-right: 2.44rem;
+            }
+            .featured-product-card {
+              height: 100%;
+              border-radius: 5px;
+              flex-direction: column;
+              align-items: center;
+              border: 1px solid $home-page-grey-lite;
+              background: #FFF;
+              padding: 0;
+              flex: none;
+              box-shadow: 0 2px 3px 0 rgba(18, 38, 49, 0.15);
+              @include media-breakpoint-down(sm) {
+                padding: unset;
 
-            a {
-              text-decoration: none;
+              }
 
               .featured-product-thumb {
+                display: flex;
                 position: relative;
+                justify-content: center;
+                border-radius: 5px;
+                width: 100%;
+                height: 10.6875rem;
+              }
 
-                img {
-                  width: 100%;
-                  border-radius: 5px 5px 0 0;
-                }
-
-                .badge-program-type {
-                  position: absolute;
-                  left: 0;
-                  bottom: 0;
-                  padding: 8px 15px;
-                  border-radius: 0 3px 3px 0;
-                  background-color: $home-page-header-blue;
-                  color: #FFF;
-                  font-family: Inter, sans-serif;
-                  font-size: 0.75rem;
-                  font-style: normal;
-                  font-weight: 700;
-                  line-height: normal;
-                }
+              img {
+                width: 100%;
+                height: 10.6875rem;
+                border-radius: 5px 5px 0 0;
+                background: rgba(0, 0, 0, 0.20);
+                object-position: center;
+                object-fit: cover;
+              }
+              .badge-program-type {
+                display: inline-flex;
+                padding: 8px 15px;
+                align-items: flex-start;
+                border-radius: 0px 3px 0px 0px;
+                background: $home-page-header-blue;
+                position: absolute;
+                left: 0;
+                bottom: 0;
+                color: #FFF;
+                font-size: 0.75rem;
+                font-weight: 700;
+                font-family: Inter, sans-serif;
+              }
+              .badge-program-type-none {
+                background: transparent;
               }
 
               .featured-product-info {
-                margin: 13px 15px 15px 15px;
-                padding: 0;
+                padding: 15px;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: .31rem;
+                align-self: stretch;
 
                 p.date {
                   color: $home-page-grey-text;
                   font-size: 12px;
                   margin-bottom: 5px;
+                  overflow: hidden;
+                  align-self: stretch;
+                  text-overflow: ellipsis;
+                  font-weight: 400;
                 }
 
                 h2.featured-product-card-title {
                   height: 33px;
-                  flex-shrink: 0;
                   align-self: stretch;
                   color: $home-page-header-blue;
                   font-size: 0.875rem;
                   font-family: Inter, sans-serif;
                   margin-top: 0;
+                  display: -webkit-box;
+                  -webkit-line-clamp: 2;
+                  -webkit-box-orient: vertical;
+                  overflow: hidden;
+                  line-height: 18px;
+                }
+                h2.featured-product-card-title.program-title {
+                  height: 57.953px;
                 }
               }
             }
@@ -197,25 +268,6 @@
       .carousel-inner .carousel-item-prev {
         display: flex;
       }
-
-      /* medium and up screens */
-      @include media-breakpoint-up(md) {
-
-        .carousel-inner .carousel-item-end.active,
-        .carousel-inner .carousel-item-next {
-          transform: translateX(25%);
-        }
-
-        .carousel-inner .carousel-item-start.active,
-        .carousel-inner .carousel-item-prev {
-          transform: translateX(-25%);
-        }
-      }
-
-      .carousel-inner .carousel-item-end,
-      .carousel-inner .carousel-item-start {
-        transform: translateX(0);
-      }
     }
 
     .featured-product-navigation {
@@ -226,6 +278,9 @@
       @include media-breakpoint-down(sm) {
         width: 100%;
         margin-top: 30px;
+        padding-bottom: 0;
+        padding-left: 2.44rem;
+        padding-right: 2.44rem;
       }
 
       a.view-catalog-button {
@@ -243,9 +298,7 @@
         text-decoration: none;
         @include media-breakpoint-down(sm) {
           width: 100%;
-          max-width: 280px;
         }
       }
     }
-  }
 }
