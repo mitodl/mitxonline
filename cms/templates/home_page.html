@@ -130,13 +130,13 @@
   </div>
 {% endif %}
 {% if show_home_page_video_component and page.video_component_title %}
-<div class="home-page-video-row d-flex justify-content-center row">
-  <div class="home-page-video-container">
-    <div class="home-page-video-description">
+<div class="home-page-video-row d-flex justify-content-center container">
+  <div class="home-page-video-container row">
+    <div class="home-page-video-description col-12 col-xl-5">
       <h3>{{ page.video_component_title }}</h3>
-      <p>{{ page.video_component_description|richtext }}</p>
+      {{ page.video_component_description|richtext }}
     </div>
-      <div class="home-page-video-wrapper">
+      <div class="home-page-video-wrapper col-12 col-xl-7">
         <div class="home-page-video-player">
           {% if page.video_url %}
             <video-js
@@ -145,10 +145,7 @@
                   data-setup="{{page.video_player_config}}"
                   preload="metadata"
                 >
-              </video-js>
-            <div class="home-page-video-underlay">
-
-            </div>
+            </video-js>
             {% endif %}
           </div>
         </div>
