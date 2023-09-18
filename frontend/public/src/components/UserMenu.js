@@ -13,7 +13,7 @@ type Props = {
 }
 
 const desktopMenuContainerProps = {
-  className: "user-menu dropdown"
+  className: "top-user-menu dropdown"
 }
 
 const desktopUListProps = {
