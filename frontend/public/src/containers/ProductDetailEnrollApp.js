@@ -156,10 +156,6 @@ export class ProductDetailEnrollApp extends React.Component<
   }
 
   setCurrentCourseRun = (courseRun: EnrollmentFlaggedCourseRun) => {
-    console.log(
-      "==> we're setting currentCourseRun but is the context right??",
-      courseRun
-    )
     this.setState({
       currentCourseRun: courseRun
     })
@@ -423,7 +419,6 @@ export class ProductDetailEnrollApp extends React.Component<
         // $FlowFixMe
         document.addEventListener("click", function(e) {
           if (e.target && e.target.id === courseRun.courseware_id) {
-            console.log(`${e.target.id} === ${courseRun.courseware_id}`)
             thisScope.setCurrentCourseRun(courseRun)
             run = thisScope.getCurrentCourseRun()
             product = run && run.products ? run.products[0] : null
