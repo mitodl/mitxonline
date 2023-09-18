@@ -1,6 +1,21 @@
 Release Notes
 =============
 
+Version 0.73.3
+--------------
+
+- Updates the code behind the More Dates selector to work without the course page (#1900)
+- Add courses api filters to catalog page (#1892)
+- change z index for hero to make it stop sitting over dropdown (#1897)
+- Issue#2382 (#1894)
+- footer css updates for mobile landscape screen (#1890)
+- Updates create_courseware to allow you to specify departments (optionally creating them) (#1887)
+- Fixes to  Featured Carousel (#1889)
+- Video Component Styling fix (#1875)
+- Course passed if has course run certificate (#1878)
+- Use site name variable (MITx Online) for page title (#1888)
+- Updating video player CSS to work better in the new design (#1883)
+
 Version 0.73.2 (Released September 13, 2023)
 --------------
 
