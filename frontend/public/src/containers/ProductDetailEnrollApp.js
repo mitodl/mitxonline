@@ -156,6 +156,10 @@ export class ProductDetailEnrollApp extends React.Component<
   }
 
   setCurrentCourseRun = (courseRun: EnrollmentFlaggedCourseRun) => {
+    console.log(
+      "==> we're setting currentCourseRun but is the context right??",
+      courseRun
+    )
     this.setState({
       currentCourseRun: courseRun
     })
@@ -405,16 +409,12 @@ export class ProductDetailEnrollApp extends React.Component<
     const csrfToken = getCookie("csrftoken")
 
     let run =
-      !this.getCurrentCourseRun() && courseRuns
-        ? courseRuns[0]
-        : this.getCurrentCourseRun() && courseRuns
-          ? courseRuns[0].page && this.getCurrentCourseRun().page
-            ? courseRuns[0].page.page_url ===
-            this.getCurrentCourseRun().page.page_url
-              ? this.getCurrentCourseRun()
-              : courseRuns[0]
-            : courseRuns[0]
-          : null
+      !this.getCurrentCourseRun() && !courseRuns
+        ? null
+        : !this.getCurrentCourseRun() && courseRuns
+          ? courseRuns[0]
+          : this.getCurrentCourseRun()
+
     if (run) this.updateDate(run)
     let product = run && run.products ? run.products[0] : null
     if (courseRuns) {
@@ -423,6 +423,7 @@ export class ProductDetailEnrollApp extends React.Component<
         // $FlowFixMe
         document.addEventListener("click", function(e) {
           if (e.target && e.target.id === courseRun.courseware_id) {
+            console.log(`${e.target.id} === ${courseRun.courseware_id}`)
             thisScope.setCurrentCourseRun(courseRun)
             run = thisScope.getCurrentCourseRun()
             product = run && run.products ? run.products[0] : null
