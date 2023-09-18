@@ -222,13 +222,15 @@
                         <p>Click below to enroll in one of these dates</p>
                       </div>
                       {% for course_run in course_runs %}
-                          <div>
-                            {% if course_run.is_not_beyond_enrollment %}
-                              <button class='date-link' id='{{ course_run.courseware_id }}' >Start Date {{ course_run.start_date|date:'F j, Y' }}</button>
-                            {% else %}
-                              <p class='date-link-disabled' id='{{ course_run.courseware_id }}' >{{ course_run.start_date|date:'F j, Y' }}(enrollment opens {{ course_run.enrollment_start|date:'F j, Y' }})</p>
+                        <div>
+                          {% if course_run.is_not_beyond_enrollment %}
+                            <button class='date-link' id='{{ course_run.courseware_id }}' >Start Date {{ course_run.start_date|date:'F j, Y' }}</button>
+                          {% else %}
+                            {% if not course_run.is_past %}
+                            <p class='date-link-disabled' id='{{ course_run.courseware_id }}' >{{ course_run.start_date|date:'F j, Y' }}(enrollment opens {{ course_run.enrollment_start|date:'F j, Y' }})</p>
                             {% endif %}
-                          </div>
+                          {% endif %}
+                        </div>
                       {% endfor %}
                     ">
                     More Dates
