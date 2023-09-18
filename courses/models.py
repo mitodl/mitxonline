@@ -632,7 +632,7 @@ class CourseRun(TimestampedModel):
         help_text="The date beyond which the learner can not enroll in paid course mode.",
     )
 
-    live = models.BooleanField(default=False)
+    live = models.BooleanField(default=False, db_index=True)
     is_self_paced = models.BooleanField(default=False)
     products = GenericRelation(
         "ecommerce.Product", related_query_name="courserunproducts"
