@@ -4,17 +4,6 @@ body.new-design {
   .product-page {
     margin-top: 1.5rem;
     background-color: white;
-    font-family: "Avenir Next", sans-serif;
-
-    section.course-description,
-    #tab-bar,
-    section.about-richtext-container {
-      font-family: "Roboto", sans-serif;
-
-      h2 {
-        font-family: "Avenir Next", "Roboto", sans-serif;
-      }
-    }
 
     section.course-description {
       line-height: 46px;
@@ -80,7 +69,7 @@ body.new-design {
       font-size: 16px;
       line-height: 24px;
       color: $black;
-      max-width: 380px;
+      max-width: 400px;
       height: auto;
       border-radius: 5px;
 
@@ -147,8 +136,7 @@ body.new-design {
         display: flex;
         flex-flow: column;
         align-items: top;
-
-        margin-top: 10px;
+        margin: 10px 12px;
         width: 350px;
 
         @include media-breakpoint-up(xl) {
@@ -190,13 +178,18 @@ body.new-design {
           }
 
           .enrollment-info-icon {
-            width: 20px;
+            max-width: 20px;
             margin-right: 12px;
+            
+            img {
+              max-width: 20px;
+            }
           }
 
           .enrollment-info-text {
             width: auto;
             flex-grow: 1;
+            font-size: 15px;
 
             .enrollment-effort {
               font-size: smaller;
@@ -225,14 +218,14 @@ body.new-design {
 
   .upgrade-enrollment-modal {
     max-width: 750px;
-    font-family: "Avenir Next", "Roboto", sans-serif;
 
     .modal-content {
       padding: 5px 14px;
     }
 
-    .modal-header {
-      font-family: "Poppins", "Avenir Next", "Roboto", sans-serif;
+    .enroll-now-free {
+      font-size: 16px;
+      font-weight: 400;
     }
 
     form {
@@ -362,6 +355,15 @@ body.new-design {
           padding: 10px 10px;
         }
       }
+    }
+  }
+
+  .financial-assistance-link {
+    text-align: left;
+    font-size: 16px;
+
+    a {
+      font-weight: 400;
     }
   }
 }

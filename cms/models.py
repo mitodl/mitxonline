@@ -12,11 +12,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.utils.functional import cached_property
 from django.forms import ChoiceField, DecimalField
 from django.http import Http404
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.utils.functional import cached_property
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from modelcluster.fields import ParentalKey

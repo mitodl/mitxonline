@@ -38,6 +38,7 @@ export const isWithinEnrollmentPeriod = (run: CourseRunDetail): boolean => {
   const enrollStart = run.enrollment_start ? moment(run.enrollment_start) : null
   const enrollEnd = run.enrollment_end ? moment(run.enrollment_end) : null
   const now = moment()
+
   return (
     !!enrollStart &&
     now.isAfter(enrollStart) &&

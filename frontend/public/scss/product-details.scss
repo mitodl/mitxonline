@@ -179,6 +179,47 @@
         margin: 0 -18px;
       }
 
+      .btn-enrollment-button {
+        width: 350px;
+        height: 50px;
+        padding: 0!important;
+      }
+
+      .enrollment-info-box {
+        border: 1px solid #d1d1d1;
+        border-left: none;
+        border-right: none;
+
+        margin: 10px 0;
+        padding: 10px 0;
+
+        .row {
+          margin: 20px 0;
+        }
+
+        .enrollment-info-icon {
+          width: 20px;
+          margin-right: 12px;
+        }
+
+        .enrollment-info-text {
+          width: auto;
+          flex-grow: 1;
+
+          .enrollment-effort {
+            font-size: smaller;
+          }
+
+          .badge-pacing {
+            background-color: $black;
+            text-transform: uppercase;
+            margin-left: .5rem;
+            padding: 3px;
+            font-weight: normal;
+          }
+        }
+      }
+
       .stat-col {
         margin: 0 8px 16px;
         background: $white;
@@ -491,4 +532,8 @@
 .date-link-disabled {
   padding: 5px 5px 0;
   margin: 0;
+}
+
+.instructor-modal .modal-dialog {
+  z-index: 2000;
 }

@@ -295,7 +295,25 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 program=self, node_type=ProgramRequirementNodeType.PROGRAM_ROOT.value
             )
 
-    @cached_property
+    @property
+    def courses_qset(self):
+        """
+        Returns a QuerySet of the related courses for this program, using the
+        requirements tree.
+        """
+
+        course_ids = [
+            course_id
+            for course_id in ProgramRequirement.objects.filter(
+                program=self, node_type=ProgramRequirementNodeType.COURSE
+            )
+            .all()
+            .values_list("course__id", flat=True)
+        ]
+
+        return Course.objects.filter(id__in=course_ids)
+
+    @property
     def courses(self):
         """
         Returns the courses associated with this program via the requirements
@@ -341,6 +359,20 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         return [course for (course, type) in self.courses if type == "Required Courses"]
 
     @cached_property
+    def required_title(self):
+        """
+        Returns the title of the requirements node that holds the required
+        courses (e.g. the one that has elective_flag = False).
+        """
+
+        return (
+            self.requirements_root.get_children()
+            .filter(elective_flag=False)
+            .get()
+            .title
+        )
+
+    @cached_property
     def elective_courses(self):
         """
         Returns just the courses under the "Required Courses" node.
@@ -350,6 +382,17 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
         return title if len(title) <= 100 else title[:97] + "..."
+
+    @cached_property
+    def elective_title(self):
+        """
+        Returns the title of the requirements node that holds the elective
+        courses (e.g. the one that has elective_flag = True).
+        """
+
+        return (
+            self.requirements_root.get_children().filter(elective_flag=True).get().title
+        )
 
     @cached_property
     def minimum_elective_courses_requirement(self):

@@ -1,5 +1,10 @@
 import React from "react"
-import { formatPrettyDate, emptyOrNil } from "../lib/util"
+import {
+  formatPrettyDate,
+  emptyOrNil,
+  getFlexiblePriceForProduct,
+  formatLocalePrice
+} from "../lib/util"
 import moment from "moment-timezone"
 
 import type { BaseCourseRun } from "../flow/courseTypes"
@@ -31,7 +36,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
 
     return (
       <>
-        <div className="enrollment-info-box">
+        <div className="enrollment-info-box componentized">
           <div className="row d-flex align-items-center">
             <div className="enrollment-info-icon">
               <img
@@ -82,11 +87,8 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             <div className="enrollment-info-text">
               {product ? (
                 <>
-                  Certificate track: $
-                  {product.price.toLocaleString("en-us", {
-                    style:    "currency",
-                    currency: "en-US"
-                  })}
+                  Certificate track:{" "}
+                  {formatLocalePrice(getFlexiblePriceForProduct(product))}
                   {run.upgrade_deadline ? (
                     <>
                       <div className="text-danger">
@@ -130,7 +132,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                 <>
                   <li>
                     {" "}
-                    <a href="#">{elem.title}</a>
+                    <a href={`/programs/${elem.readable_id}/`}>{elem.title}</a>
                   </li>
                 </>
               ))}

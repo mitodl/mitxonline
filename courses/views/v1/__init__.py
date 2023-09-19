@@ -1,50 +1,52 @@
 """Course views verson 1"""
 import logging
-import django_filters
 from typing import Optional, Tuple, Union
 
+import django_filters
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Q, Count, Prefetch
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
+from mitol.common.utils import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from reversion.models import Version
-from rest_framework.pagination import PageNumberPagination
 
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
     get_user_relevant_course_run_qset,
+    get_user_relevant_program_course_run_qset,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.models import (
     Course,
     CourseRun,
     CourseRunEnrollment,
+    Department,
     LearnerProgramRecordShare,
     PartnerSchool,
     Program,
     ProgramEnrollment,
-    Department,
 )
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
     CourseRunWithCourseSerializer,
+    CourseWithCourseRunsSerializer,
+    DepartmentWithCountSerializer,
     LearnerRecordSerializer,
     PartnerSchoolSerializer,
     ProgramSerializer,
     UserProgramEnrollmentDetailSerializer,
-    CourseWithCourseRunsSerializer,
-    DepartmentWithCountSerializer,
 )
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
@@ -59,7 +61,6 @@ from main.constants import (
     USER_MSG_TYPE_ENROLLED,
 )
 from main.utils import encode_json_cookie_value
-from mitol.common.utils import now_in_utc
 from openedx.api import (
     subscribe_to_edx_course_emails,
     sync_enrollments_with_edx,
@@ -89,10 +90,10 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = []
 
     serializer_class = ProgramSerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["id", "live"]
-    queryset = Program.objects.filter().prefetch_related("departments")
     pagination_class = Pagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ["id", "live", "readable_id"]
+    queryset = Program.objects.filter().prefetch_related("departments")
 
     def paginate_queryset(self, queryset):
         """
@@ -105,7 +106,6 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class CourseFilterSet(django_filters.FilterSet):
-
     courserun_is_enrollable = django_filters.BooleanFilter(
         field_name="courserun_is_enrollable",
         method="filter_courserun_is_enrollable",
@@ -202,7 +202,14 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
             if course:
                 return get_user_relevant_course_run_qset(course, self.request.user)
             else:
-                return CourseRun.objects.none()
+                program = Program.objects.filter(readable_id=relevant_to).first()
+                return (
+                    get_user_relevant_program_course_run_qset(
+                        program, self.request.user
+                    )
+                    if program
+                    else Program.objects.none()
+                )
         else:
             return (
                 CourseRun.objects.select_related("course")

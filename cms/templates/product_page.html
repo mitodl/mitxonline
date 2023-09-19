@@ -5,6 +5,7 @@
 {% load wagtailcore_tags wagtailembeds_tags %}
 {% load expand %}
 {% load videojs %}
+{% load course_list %}
 
 {% block title %}{{ page.title }} | {{ site_name }}{% endblock %}
 
@@ -25,6 +26,7 @@
               <nav id="tab-bar">
                 <ul class="nav">
                   {% if page.about %}<li class="nav-item"><a href="#about-this-class">About</a></li>{% endif %}
+                  {% if page.is_program_page %}<li class="nav-item"><a href="#program-courses">Courses</a></li>{% endif %}
                   {% if page.what_you_learn %}<li class="nav-item"><a href="#what-youll-learn">What you'll learn</a></li>{% endif %}
                   {% if instructors %}<li class="nav-item"><a href="#instructors">Instructors</a></li>{% endif %}
                   {% if page.faq_url %}<li class="nav-item"><a href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
@@ -34,6 +36,23 @@
               {% if page.about %}<section class="about-this-class about-richtext-container" id="about-this-class">
                 {{ page.about | richtext | expand }}
               </section>{% endif %}
+
+              {% if page.is_program_page %}
+              <section class="program-courses-container" id="program-courses">
+              {% if page.product.required_courses %}
+                <h2>{{ page.product.required_title }}</h2>
+
+                {% course_list page.product.required_courses %}
+              {% endif %}
+
+              {% if page.product.elective_courses %}
+                <h2 class="electives-title">{{ page.product.elective_title }}</h2>
+
+                {% course_list page.product.elective_courses %}
+              {% endif %}
+
+              </section>
+              {% endif %}
 
               {% if page.what_you_learn %}<section class="what-youll-learn about-richtext-container" id="what-youll-learn">
                 <h2>What you&apos;ll learn</h2>
@@ -86,11 +105,19 @@
                 {% endif %}
               </div>
 
-              {% if page.course %}
               <div class="stats-row product-info-box-body">
+                {% if page.is_course_page %}
                 <input id="courseId" type="hidden" value="{{page.course.readable_id}}" />
+                {% endif %}
+
+                {% if page.is_program_page %}
+                <input id="programId" type="hidden" value="{{page.program.readable_id}}" />
+                {% endif %}
+
                 <div class="w-100" id="productDetailEnrollment"></div>
               </div>
+
+              {% if page.is_course_page %}
               <div class="stats-row">
                 <div class="w-100" id="upsellCard"></div>
               </div>

@@ -5,12 +5,13 @@ import moment from "moment-timezone"
 import React from "react"
 
 import IntegrationTestHelper from "../util/integration_test_helper"
-import ProductDetailEnrollApp, {
-  ProductDetailEnrollApp as InnerProductDetailEnrollApp
-} from "./ProductDetailEnrollApp"
+import CourseProductDetailEnroll, {
+  CourseProductDetailEnroll as InnerCourseProductDetailEnroll
+} from "./CourseProductDetailEnroll"
 
 import { courseRunsSelector } from "../lib/queries/courseRuns"
 import {
+  makeCourseDetailWithRuns,
   makeCourseRunDetail,
   makeCourseRunEnrollment,
   makeCourseRunDetailWithProduct
@@ -27,31 +28,34 @@ import * as courseApi from "../lib/courseApi"
 import sinon from "sinon"
 import { makeUser } from "../factories/user"
 
-describe("ProductDetailEnrollApp", () => {
+describe("CourseProductDetailEnroll", () => {
   let helper,
     renderPage,
     isWithinEnrollmentPeriodStub,
     isFinancialAssistanceAvailableStub,
     courseRun,
+    course,
     currentUser
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
     courseRun = makeCourseRunDetailWithProduct()
+    course = makeCourseDetailWithRuns()
     currentUser = makeUser()
     renderPage = helper.configureHOCRenderer(
-      ProductDetailEnrollApp,
-      InnerProductDetailEnrollApp,
+      CourseProductDetailEnroll,
+      InnerCourseProductDetailEnroll,
       {
         entities: {
           courseRuns:  [courseRun],
+          courses:     [course],
           currentUser: currentUser
         }
       },
       {}
     )
     SETTINGS.features = {
-      "mitxonline-new-product-page": false
+      "mitxonline-new-product-page": true
     }
 
     isWithinEnrollmentPeriodStub = helper.sandbox.stub(
@@ -77,7 +81,7 @@ describe("ProductDetailEnrollApp", () => {
       }
     })
 
-    const loader = inner.find("Loader")
+    const loader = inner.find("Loader").first()
     assert.isOk(loader.exists())
     assert.isTrue(loader.props().isLoading)
   })
@@ -99,6 +103,7 @@ describe("ProductDetailEnrollApp", () => {
       },
       {}
     )
+
     assert.equal(
       inner
         .find(".enroll-now")
@@ -295,7 +300,7 @@ describe("ProductDetailEnrollApp", () => {
 
       assert.equal(
         inner
-          .find(".text-end")
+          .find("#certificate-price-info")
           .at(0)
           .text(),
         "$9.00"
@@ -335,7 +340,7 @@ describe("ProductDetailEnrollApp", () => {
 
       assert.equal(
         inner
-          .find(".text-end")
+          .find("#certificate-price-info")
           .at(0)
           .text()
           .at(1),
@@ -377,7 +382,7 @@ describe("ProductDetailEnrollApp", () => {
 
       assert.equal(
         inner
-          .find(".text-end")
+          .find("#certificate-price-info")
           .at(0)
           .text()
           .at(1),

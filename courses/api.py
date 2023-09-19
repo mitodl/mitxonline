@@ -31,6 +31,7 @@ from courses.models import (
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
+    Program,
     ProgramCertificate,
     ProgramEnrollment,
     ProgramRequirement,
@@ -73,14 +74,14 @@ UserEnrollments = namedtuple(
 )
 
 
-def get_user_relevant_course_run_qset(
-    course: Course, user: Optional[User], now: Optional[datetime] = None
+def _relevant_course_qset_filter(
+    run_qset: QuerySet, user: Optional[User], now: Optional[datetime] = None
 ) -> QuerySet:
     """
-    Returns a QuerySet of relevant course runs
+    Does the actual filtering for user_relevant_course_run_qset and
+    user_relevant_program_course_run_qset.
     """
-    now = now or now_in_utc()
-    run_qset = course.courseruns.exclude(start_date=None).exclude(enrollment_start=None)
+
     if user and user.is_authenticated:
         user_enrollments = Count(
             "enrollments",
@@ -115,6 +116,32 @@ def get_user_relevant_course_run_qset(
             Q(enrollment_end=None) | Q(enrollment_end__gt=now)
         ).order_by("enrollment_start")
     return runs
+
+
+def get_user_relevant_course_run_qset(
+    course: Course, user: Optional[User], now: Optional[datetime] = None
+) -> QuerySet:
+    """
+    Returns a QuerySet of relevant course runs
+    """
+    now = now or now_in_utc()
+    run_qset = course.courseruns.exclude(start_date=None).exclude(enrollment_start=None)
+    return _relevant_course_qset_filter(run_qset, user, now)
+
+
+def get_user_relevant_program_course_run_qset(
+    program: Program, user: Optional[User], now: Optional[datetime] = None
+) -> QuerySet:
+    """
+    Returns a QuerySet of relevant course runs
+    """
+    now = now or now_in_utc()
+    run_qset = (
+        CourseRun.objects.filter(course__in=program.courses_qset.all())
+        .exclude(start_date=None)
+        .exclude(enrollment_start=None)
+    )
+    return _relevant_course_qset_filter(run_qset, user, now)
 
 
 def get_user_relevant_course_run(
