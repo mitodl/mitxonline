@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.73.3
+Version 0.73.3 (Released September 19, 2023)
 --------------
 
 - Updates the code behind the More Dates selector to work without the course page (#1900)
