@@ -49,7 +49,9 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
       dropdownIdentifier: dropdownIdentifier.concat("Mobile")
     }
     : {
-      container:          showNewDesign ? newDesktopMenuContainerProps : desktopMenuContainerProps,
+      container: showNewDesign
+        ? newDesktopMenuContainerProps
+        : desktopMenuContainerProps,
       ul:                 desktopUListProps,
       li:                 desktopListItemProps,
       dropdownIdentifier: dropdownIdentifier.concat("Desktop")
