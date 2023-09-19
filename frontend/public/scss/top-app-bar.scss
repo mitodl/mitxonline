@@ -279,6 +279,8 @@ header.site-header.new-design {
   display: block;
   font-size: 14px;
   line-height: 21px;
+  border-left: 1px solid $home-page-border-grey;
+  padding-left: 15px;
 
   @include media-breakpoint-down(md) {
     display: none;

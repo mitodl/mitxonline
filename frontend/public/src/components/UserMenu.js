@@ -5,6 +5,7 @@ import MixedLink from "./MixedLink"
 import { routes } from "../lib/urls"
 
 import type { User } from "../flow/authTypes"
+import { checkFeatureFlag } from "../lib/util"
 
 type Props = {
   /* This is here for future use when we have custom profile avatars */
@@ -14,6 +15,9 @@ type Props = {
 
 const desktopMenuContainerProps = {
   className: "user-menu dropdown"
+}
+const newDesktopMenuContainerProps = {
+  className: "top-user-menu dropdown"
 }
 
 const desktopUListProps = {
@@ -38,13 +42,16 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
   /* eslint-disable prefer-const */
   let menuChildProps: MenuChildProps
   let dropdownIdentifier = "dropdownMenuButton"
+  const showNewDesign = checkFeatureFlag("mitxonline-new-header")
   menuChildProps = useScreenOverlay
     ? {
       li:                 overlayListItemProps,
       dropdownIdentifier: dropdownIdentifier.concat("Mobile")
     }
     : {
-      container:          desktopMenuContainerProps,
+      container: showNewDesign
+        ? newDesktopMenuContainerProps
+        : desktopMenuContainerProps,
       ul:                 desktopUListProps,
       li:                 desktopListItemProps,
       dropdownIdentifier: dropdownIdentifier.concat("Desktop")

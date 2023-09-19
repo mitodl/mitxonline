@@ -84,3 +84,59 @@
   border-color: transparent;
   background-color: inherit;
 }
+
+// New design
+.top-user-menu .dropdown-menu {
+  margin-top: 17px;
+  padding: 0;
+  display: none;
+
+  .dropdown-item {
+    display: block;
+    padding: 15px 20px;
+  }
+  &.show {
+    display: block;
+    box-shadow: none;
+    border-radius: 0 0 3px 3px;
+  }
+}
+.top-user-menu.dropdown {
+  @include media-breakpoint-down(sm) {
+    display: none;
+  }
+  .dropdown-toggle.user-menu-button {
+    &.show {
+      &:after {
+        border-color: $primary;
+        transform: rotate(45deg);
+        margin-top: 1px;
+      }
+    }
+  }
+  .dropdown-toggle {
+    max-width: 40ch;
+    padding: 0;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding-right: 15px;
+
+    &:after {
+      border: 1px;
+      border-top: 1px solid black;
+      border-left: 1px solid black;
+      width: 8px;
+      height: 8px;
+      transform: rotate(225deg);
+      margin-left: 10px;
+      transition: 0.5s;
+    }
+
+    &:hover {
+      cursor: pointer;
+    }
+  }
+}
