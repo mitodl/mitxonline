@@ -1,5 +1,5 @@
 import React from "react"
-import { formatPrettyDate, emptyOrNil } from "../lib/util"
+import { formatPrettyDateUtc, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 
 import type {
@@ -135,7 +135,7 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
               />
             </div>
             <div className="enrollment-info-text">
-              {startDate ? formatPrettyDate(startDate) : "Start Anytime"}
+              {startDate ? formatPrettyDateUtc(startDate) : "Start Anytime"}
             </div>
           </div>
           {program && program.page ? (

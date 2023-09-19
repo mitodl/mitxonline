@@ -54,28 +54,30 @@ body.new-design {
                 overflow: hidden;
                 border-radius: 4px !important;
                 box-shadow: 1px 1px 1px 1px rgb(0 0 0 / 12%);
-                width: 243px;
+                max-width: 262px;
+                max-height: 259px;
+                height: 259px;
+
+                img {
+                    max-width: 262px;
+                    max-height: 171px;
+                    height: 171px;
+                    object-fit: cover;
+                    object-position: center;
+
+                    @include media-breakpoint-down(sm) {
+                        display: block;
+                        float: none;
+                        margin: 0 auto 10px;
+                    }
+                }
 
                 .program-course-card-info {
                     overflow: hidden;
-                    margin-top: 7px;
-                    padding: 7px;
+                    padding: 15px;
 
                     @include media-breakpoint-down(md) {
                         margin-top: 20px;
-                    }
-
-                    img {
-                        max-width: 243px;
-                        max-height: 136px;
-                        object-fit: cover;
-                        object-position: center;
-
-                        @include media-breakpoint-down(sm) {
-                            display: block;
-                            float: none;
-                            margin: 0 auto 10px;
-                        }
                     }
 
                     h4 {
@@ -87,6 +89,7 @@ body.new-design {
                     h3 {
                         font-size: 14px;
                         font-weight: 600;
+                        line-height: 16px;
                         color: rgba(3, 21, 45, 0.85);
                     }
                 }

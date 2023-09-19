@@ -147,6 +147,9 @@ export const objectToFormData = (object: Object) => {
 export const formatPrettyDate = (momentDate: Moment) =>
   momentDate.format("MMMM D, YYYY")
 
+export const formatPrettyDateUtc = (momentDate: Moment) =>
+  momentDate.tz("UTC").format("MMMM D, YYYY")
+
 export const formatPrettyDateTimeAmPm = (momentDate: Moment) =>
   momentDate.format("LLL")
 

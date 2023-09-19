@@ -2,8 +2,6 @@
 Generates a <ul> block for a list of courses. Pass in the list of courses.
 """
 
-import re
-
 from django import template
 
 from cms.templatetags.feature_img_src import feature_img_src
@@ -12,18 +10,7 @@ register = template.Library()
 
 
 def format_course_start_time(start_date):
-    hour = start_date.hour
-    minute = start_date.minute
-    timespec = ""
-
-    if (hour == 23 and minute == 59) or (hour == 0 and minute == 0):
-        timespec = "midnight"
-    else:
-        timespec = re.sub(r"^0", "", start_date.strftime("%I:%M %p"))
-
-    return (
-        f"{start_date.strftime('%b')} {start_date.day}, {start_date.year}, {timespec}"
-    )
+    return f"{start_date.strftime('%B')} {start_date.day}, {start_date.year}"
 
 
 @register.inclusion_tag("course_list_card.html", name="course_list")

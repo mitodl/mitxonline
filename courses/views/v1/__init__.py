@@ -1,15 +1,16 @@
 """Course views verson 1"""
 import logging
-import django_filters
 from typing import Optional, Tuple, Union
 
+import django_filters
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
+from mitol.common.utils import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, status, viewsets
@@ -60,7 +61,6 @@ from main.constants import (
     USER_MSG_TYPE_ENROLLED,
 )
 from main.utils import encode_json_cookie_value
-from mitol.common.utils import now_in_utc
 from openedx.api import (
     subscribe_to_edx_course_emails,
     sync_enrollments_with_edx,
@@ -106,7 +106,6 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class CourseFilterSet(django_filters.FilterSet):
-
     courserun_is_enrollable = django_filters.BooleanFilter(
         field_name="courserun_is_enrollable",
         method="filter_courserun_is_enrollable",
