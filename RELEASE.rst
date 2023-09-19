@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.74.1
+--------------
+
+- New design: adds program page (#1833)
+- User dropdown menu updates (#1899)
+
 Version 0.74.0 (Released September 19, 2023)
 --------------
 
