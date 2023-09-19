@@ -36,13 +36,13 @@ if (SETTINGS.posthog_api_host && SETTINGS.posthog_api_token) {
     posthog.debug()
   }
   posthog.init(SETTINGS.posthog_api_token, {
-    api_host: SETTINGS.posthog_api_host,
-    autocapture: false,
-    capture_pageview: false,
-    capture_pageleave: false,
+    api_host:               SETTINGS.posthog_api_host,
+    autocapture:            false,
+    capture_pageview:       false,
+    capture_pageleave:      false,
     cross_subdomain_cookie: false,
-    persistence: "localStorage+cookie",
-    loaded: function (posthog) {
+    persistence:            "localStorage+cookie",
+    loaded:                 function(posthog) {
       posthog.setPersonPropertiesForFlags({
         environment: environment
       })
