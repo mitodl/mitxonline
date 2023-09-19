@@ -1,9 +1,6 @@
-#catalog-mobile-filter {
-    background: var(--blue-dark, #03152D);
-}
-
 #catalog-page {
     background: var(--grey-lite, #F0F5F7);
+    font-family: 'Poppins', 'san-serif';
 
     button {
         border: none;
@@ -148,7 +145,6 @@
                     height: 100%;
                     width: 100%;
                     background: var(--blue-dark, #03152D);
-                    flex: 1 0 0;
                     z-index: 10;
                 }
             }
@@ -350,7 +346,6 @@
                     border: 1px solid var(--background-grey, #F0F5F7);
                     background: #FFF;
                     padding: 0;
-                    flex: none;
                     
                     /* Dropshadow */
                     box-shadow: 0px 2px 3px 0px rgba(18, 38, 49, 0.15);
