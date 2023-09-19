@@ -1129,11 +1129,15 @@ class CoursePage(ProductPage):
         return f"{self.course.readable_id} | {self.title}"
 
     def get_context(self, request, *args, **kwargs):
+        now = now_in_utc()
+
         relevant_run = get_user_relevant_course_run(
             course=self.product, user=request.user
         )
         relevant_runs = list(
-            get_user_relevant_course_run_qset(course=self.product, user=request.user)
+            get_user_relevant_course_run_qset(
+                course=self.product, user=request.user
+            ).filter(models.Q(enrollment_end=None) | models.Q(enrollment_end__gt=now))
         )
         is_enrolled = (
             False
