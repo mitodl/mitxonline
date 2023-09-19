@@ -35,13 +35,6 @@ import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "../components/forms/AddlProfileFieldsForm"
 import CourseInfoBox from "../components/CourseInfoBox"
 
-import posthog from "posthog-js"
-
-/* global SETTINGS:false */
-posthog.init(SETTINGS.posthog_api_token, {
-  api_host: SETTINGS.posthog_api_host
-})
-
 const expandExpandBlock = (event: MouseEvent) => {
   const blockTarget = event.target
 
