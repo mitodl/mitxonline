@@ -35,7 +35,6 @@ import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "../components/forms/AddlProfileFieldsForm"
 import CourseInfoBox from "../components/CourseInfoBox"
 
-
 const expandExpandBlock = (event: MouseEvent) => {
   const blockTarget = event.target
 
