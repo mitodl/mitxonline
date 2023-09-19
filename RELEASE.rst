@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.74.0
+--------------
+
+- Swap posthog to use js sdk with minimal settings (#1904)
+
 Version 0.73.3 (Released September 19, 2023)
 --------------
 
