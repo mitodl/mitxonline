@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.74.1
+Version 0.74.1 (Released September 20, 2023)
 --------------
 
 - New design: adds program page (#1833)
