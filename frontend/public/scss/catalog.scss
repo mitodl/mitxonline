@@ -127,7 +127,7 @@
         #course-catalog-navigation {
             display: flex;
             margin: 0 auto;
-            font-family: 'Inter';
+            font-family: Inter,sans-serif;
         
             @include media-breakpoint-down(md) {
                 .slide-mobile-filter-overlay {
