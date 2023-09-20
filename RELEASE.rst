@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.74.2
+Version 0.74.2 (Released September 20, 2023)
 --------------
 
 - Re-add the fix from PR 1900 to the reworked product page components (#1909)
