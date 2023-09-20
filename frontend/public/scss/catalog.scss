@@ -1,6 +1,5 @@
 #catalog-page {
     background: var(--grey-lite, #F0F5F7);
-    font-family: 'Poppins', 'san-serif';
 
     button {
         border: none;
@@ -95,6 +94,7 @@
             color: #FFF;
             text-align: center;
             text-overflow: ellipsis;
+            font-family: 'Poppins', 'san-serif';
             /* H3 */
             font-size: 28px;
             font-style: normal;
