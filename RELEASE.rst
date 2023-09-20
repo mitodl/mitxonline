@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.74.2
+--------------
+
+- Catalog page css updates - v1 (#1891)
+
 Version 0.74.1 (Released September 20, 2023)
 --------------
 
