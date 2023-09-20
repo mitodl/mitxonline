@@ -490,16 +490,12 @@ export class CourseProductDetailEnroll extends React.Component<
     const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
 
     let run =
-      !this.getCurrentCourseRun() && courseRuns
-        ? courseRuns[0]
-        : this.getCurrentCourseRun() && courseRuns
-          ? courseRuns[0].page && this.getCurrentCourseRun().page
-            ? courseRuns[0].page.page_url ===
-            this.getCurrentCourseRun().page.page_url
-              ? this.getCurrentCourseRun()
-              : courseRuns[0]
-            : courseRuns[0]
-          : null
+      !this.getCurrentCourseRun() && !courseRuns
+        ? null
+        : !this.getCurrentCourseRun() && courseRuns
+          ? courseRuns[0]
+          : this.getCurrentCourseRun()
+
     if (run) this.updateDate(run)
 
     let product = run && run.products ? run.products[0] : null
