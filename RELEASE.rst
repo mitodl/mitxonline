@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.74.2
+--------------
+
+- Re-add the fix from PR 1900 to the reworked product page components (#1909)
+- Catalog page css updates - v1 (#1891)
+
 Version 0.74.1 (Released September 20, 2023)
 --------------
 
