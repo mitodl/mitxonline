@@ -198,6 +198,7 @@ def test_home_page_featured_products(mocker):
             "start_date": run.start_date if run is not None else None,
             "url_path": course_page.get_url(),
             "is_program": False,
+            "is_self_paced": run.is_self_paced if run is not None else None,
             "program_type": None,
         }
     ]
@@ -223,6 +224,7 @@ def test_home_page_featured_products_sorting(mocker):
                 "start_date": run.start_date if run is not None else None,
                 "url_path": course_page.get_url(),
                 "is_program": False,
+                "is_self_paced": run.is_self_paced if run is not None else None,
                 "program_type": None,
             }
         )
