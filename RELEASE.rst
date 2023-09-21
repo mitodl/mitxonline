@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.74.3
+--------------
+
+- Skip courses if they don't have a published CMS page (#1907)
+
 Version 0.74.2 (Released September 20, 2023)
 --------------
 
