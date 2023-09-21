@@ -723,6 +723,7 @@ class HomePage(VideoPlayerConfigMixin):
                     "start_date": run.start_date if run is not None else None,
                     "url_path": product_page.get_url(),
                     "is_program": product_page.is_program_page,
+                    "is_self_paced": run.is_self_paced if run is not None else None,
                     "program_type": product_page.product.program_type
                     if product_page.is_program_page
                     else None,
