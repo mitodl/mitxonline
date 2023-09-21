@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.74.4
+--------------
+
+- Self paced dates -> start any time (#1911)
+
 Version 0.74.3 (Released September 21, 2023)
 --------------
 
