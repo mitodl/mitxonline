@@ -55,6 +55,7 @@ export class CatalogPage extends React.Component<Props> {
     allProgramsRetrieved:       [],
     filteredCourses:            [],
     filteredPrograms:           [],
+    filterProgramsCalled:       false,
     filterCoursesCalled:        false,
     filteredDepartments:        [],
     filterDepartmentsCalled:    false,
@@ -150,7 +151,7 @@ export class CatalogPage extends React.Component<Props> {
    * is false.
    */
   componentDidUpdate = () => {
-    const { courses, coursesIsLoading } = this.props
+    const { courses, coursesIsLoading, programsIsLoading, programs } = this.props
     if (!coursesIsLoading && !this.state.filterCoursesCalled) {
       this.setState({ filterCoursesCalled: true })
       this.setState({ allCoursesRetrieved: courses })
@@ -177,6 +178,17 @@ export class CatalogPage extends React.Component<Props> {
         filteredDepartments: this.filterDepartmentsByTabName(
           this.state.tabSelected
         )
+      })
+    }
+    if (!programsIsLoading && !this.state.filterProgramsCalled) {
+      this.setState({ filterProgramsCalled: true })
+      this.setState({ allProgramsRetrieved: programs })
+      const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
+        this.state.selectedDepartment,
+        programs
+      )
+      this.setState({
+        filteredPrograms: filteredPrograms
       })
     }
   }
@@ -265,25 +277,21 @@ export class CatalogPage extends React.Component<Props> {
    * @param {string} selectedDepartment The department name to set selectedDepartment to and filter courses by.
    */
   changeSelectedDepartment = (
-    selectedDepartment: string,
-    tabSelected: string
+    selectedDepartment: string
   ) => {
     this.setState({ selectedDepartment: selectedDepartment })
-    if (tabSelected === COURSES_TAB) {
-      this.setState({
-        filteredCourses: this.filteredCoursesBasedOnCourseRunCriteria(
-          selectedDepartment,
-          this.state.allCoursesRetrieved
-        )
-      })
-    } else {
-      this.setState({
-        filteredPrograms: this.filteredProgramsByDepartmentAndCriteria(
-          selectedDepartment,
-          this.state.allProgramsRetrieved
-        )
-      })
-    }
+    this.setState({
+      filteredCourses: this.filteredCoursesBasedOnCourseRunCriteria(
+        selectedDepartment,
+        this.state.allCoursesRetrieved
+      )
+    })
+    this.setState({
+      filteredPrograms: this.filteredProgramsByDepartmentAndCriteria(
+        selectedDepartment,
+        this.state.allProgramsRetrieved
+      )
+    })
   }
 
   /**
@@ -593,6 +601,11 @@ export class CatalogPage extends React.Component<Props> {
                               onClick={() =>
                                 this.changeSelectedTab(PROGRAMS_TAB)
                               }
+                              className={`col ${
+                                this.state.filteredPrograms.length
+                                  ? ""
+                                  : "display-none"
+                              }`}
                             >
                               Programs
                             </button>
