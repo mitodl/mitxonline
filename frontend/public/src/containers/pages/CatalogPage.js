@@ -151,7 +151,12 @@ export class CatalogPage extends React.Component<Props> {
    * is false.
    */
   componentDidUpdate = () => {
-    const { courses, coursesIsLoading, programsIsLoading, programs } = this.props
+    const {
+      courses,
+      coursesIsLoading,
+      programsIsLoading,
+      programs
+    } = this.props
     if (!coursesIsLoading && !this.state.filterCoursesCalled) {
       this.setState({ filterCoursesCalled: true })
       this.setState({ allCoursesRetrieved: courses })
@@ -276,9 +281,7 @@ export class CatalogPage extends React.Component<Props> {
    * the filteredCourses or filteredPrograms state variable.
    * @param {string} selectedDepartment The department name to set selectedDepartment to and filter courses by.
    */
-  changeSelectedDepartment = (
-    selectedDepartment: string
-  ) => {
+  changeSelectedDepartment = (selectedDepartment: string) => {
     this.setState({ selectedDepartment: selectedDepartment })
     this.setState({
       filteredCourses: this.filteredCoursesBasedOnCourseRunCriteria(
@@ -595,17 +598,16 @@ export class CatalogPage extends React.Component<Props> {
                               this.state.tabSelected === PROGRAMS_TAB
                                 ? "selected-tab"
                                 : "unselected-tab"
+                            } ${
+                              this.state.filteredPrograms.length
+                                ? ""
+                                : "display-none"
                             }`}
                           >
                             <button
                               onClick={() =>
                                 this.changeSelectedTab(PROGRAMS_TAB)
                               }
-                              className={`col ${
-                                this.state.filteredPrograms.length
-                                  ? ""
-                                  : "display-none"
-                              }`}
                             >
                               Programs
                             </button>
