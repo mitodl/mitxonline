@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.75.0
+--------------
+
+- Hide programs tab when department has none (#1914)
+
 Version 0.74.4 (Released September 25, 2023)
 --------------
 
