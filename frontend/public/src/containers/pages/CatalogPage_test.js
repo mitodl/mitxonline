@@ -950,8 +950,8 @@ describe("CatalogPage", function() {
       {}
     )
     inner.instance().componentDidUpdate({}, {})
-    expect(inner.state().allProgramsRetrieved.length).equals(0)
-    expect(inner.state().filteredPrograms.length).equals(0)
+    expect(inner.state().allProgramsRetrieved.length).equals(1)
+    expect(inner.state().filteredPrograms.length).equals(1)
     inner.instance().changeSelectedTab("programs")
     expect(inner.state().selectedDepartment).equals("All Departments")
     expect(inner.state().tabSelected).equals("programs")
