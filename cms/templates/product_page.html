@@ -29,6 +29,7 @@
                   {% if page.is_program_page %}<li class="nav-item"><a href="#program-courses">Courses</a></li>{% endif %}
                   {% if page.what_you_learn %}<li class="nav-item"><a href="#what-youll-learn">What you'll learn</a></li>{% endif %}
                   {% if instructors %}<li class="nav-item"><a href="#instructors">Instructors</a></li>{% endif %}
+                  {% if page.prerequisites %}<li class="nav-item"><a href="#prerequisites">Prerequisites</a></li>{% endif %}
                   {% if page.faq_url %}<li class="nav-item"><a href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
                 </ul>
               </nav>
@@ -58,6 +59,10 @@
                 <h2>What you&apos;ll learn</h2>
                 {{ page.what_you_learn |richtext }}
               </section>{% endif %}
+              {% if page.prerequisites %}<section class="prerequisites about-richtext-container" id="prerequisites">
+                <h2>Prerequisites</h2>
+                {{ page.prerequisites |richtext }}
+                </section>{% endif %}
     
               {% if instructors or page.faculty_members %}
               <section class="faculty-section" id="instructors">
