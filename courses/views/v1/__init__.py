@@ -125,17 +125,27 @@ class CourseFilterSet(django_filters.FilterSet):
                 & Q(enrollment_start__lt=now)
                 & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))
             )
-            return queryset.prefetch_related(
-                Prefetch("courseruns", queryset=enrollable_runs)
-            ).filter(courseruns__id__in=enrollable_runs.values_list("id", flat=True)).distinct()
+            return (
+                queryset.prefetch_related(
+                    Prefetch("courseruns", queryset=enrollable_runs)
+                )
+                .filter(courseruns__id__in=enrollable_runs.values_list("id", flat=True))
+                .distinct()
+            )
 
         else:
             unenrollable_runs = CourseRun.objects.filter(
                 Q(live=False) | Q(start_date__isnull=True) | Q(enrollment_end__lte=now)
             )
-            return queryset.prefetch_related(
-                Prefetch("courseruns", queryset=unenrollable_runs)
-            ).filter(courseruns__id__in=unenrollable_runs.values_list("id", flat=True)).distinct()
+            return (
+                queryset.prefetch_related(
+                    Prefetch("courseruns", queryset=unenrollable_runs)
+                )
+                .filter(
+                    courseruns__id__in=unenrollable_runs.values_list("id", flat=True)
+                )
+                .distinct()
+            )
 
     class Meta:
         model = Course
