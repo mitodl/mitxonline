@@ -30,7 +30,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     const product = run && run.products.length > 0 && run.products[0]
 
     const startDate =
-      run && !emptyOrNil(run.start_date)
+      run && !emptyOrNil(run.start_date) && !run.is_self_paced
         ? moment(new Date(run.start_date))
         : null
 
