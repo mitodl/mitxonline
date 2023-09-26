@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.75.1
+Version 0.75.1 (Released September 26, 2023)
 --------------
 
 - Add FAQ cert link and prerequisites to product_page.html (#1917)
