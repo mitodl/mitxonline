@@ -722,14 +722,14 @@ describe("CatalogPage", function() {
 
     // Change to the programs tab.
     inner.instance().changeSelectedTab("programs")
-    // Confirm that the selected departement resets to "All Departments".
-    expect(inner.state().selectedDepartment).equals("All Departments")
+    // Confirm that the selected department is the same as before.
+    expect(inner.state().selectedDepartment).equals("History")
 
     // Change back to the courses tab.
     inner.instance().changeSelectedTab("courses")
-    // All of the courses should be visible.
+    // Confirm the courses filtered are those which have a department name matching the selected department.
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
-      JSON.stringify(courses)
+      JSON.stringify([course2, course3])
     )
   })
 

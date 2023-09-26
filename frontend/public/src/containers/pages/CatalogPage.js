@@ -239,7 +239,6 @@ export class CatalogPage extends React.Component<Props> {
    */
   changeSelectedTab = (selectTabName: string) => {
     this.setState({ tabSelected: selectTabName })
-    this.changeSelectedDepartment(ALL_DEPARTMENTS, selectTabName)
 
     if (selectTabName === PROGRAMS_TAB) {
       const { programs, programsIsLoading } = this.props
