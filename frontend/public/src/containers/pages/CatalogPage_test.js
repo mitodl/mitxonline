@@ -727,9 +727,9 @@ describe("CatalogPage", function() {
 
     // Change back to the courses tab.
     inner.instance().changeSelectedTab("courses")
-    // All of the courses should be visible.
+    // Confirm the courses filtered are those which have a department name matching the selected department.
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
-      JSON.stringify(courses)
+      JSON.stringify([course2, course3])
     )
   })
 
