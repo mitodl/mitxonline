@@ -49,10 +49,10 @@
           <h3 class="featured-product-header-title col-8">{{ product_cards_section_title }}</h3>
         {% endif %}
         <div class="featured-product-arrows col-4">
-          <a href="#featuredProductCarousel" class="prev" data-bs-slide="prev" onclick="handleNavigationClick('prev');">
+          <a href="#featuredProductCarousel" class="prev" id="featuredCarouselPrev">
             <img class="arrow prev-arrow" src="/static/images/featured-products-left-arrow.svg" alt="Previous Arrow" />
           </a>
-          <a href="#featuredProductCarousel" class="next" data-bs-slide="next" onclick="handleNavigationClick('next');">
+          <a href="#featuredProductCarousel" class="next" id="featuredCarouselNext">
             <img class="arrow next-arrow" src="/static/images/featured-products-right-arrow.svg" alt="Next Arrow" />
           </a>
         </div>
@@ -200,47 +200,4 @@
   </div>
 {% endif %}
 {% endblock %}
-{% block scripts %}
-<script>
 
-    let scrollPosition = 0;
-    let numberOfCards = 4;
-
-    function updatePosition () {
-        position = 0;
-    }
-
-  function handleNavigationClick(e) {
-      let carouselWidth = $(".carousel-inner")[0].scrollWidth;
-      let cardWidth = ($(".carousel-item").width() + 20);
-      if (window.matchMedia("(max-width: 1199.98px)").matches) {
-        numberOfCards = 3;
-      }
-      else if (window.matchMedia("(max-width: 991.98px)").matches) {
-        numberOfCards = 2;
-      }
-      else if (window.matchMedia("(max-width: 767.98px)").matches) {
-        numberOfCards = 1;
-      }
-      if (e==="next") {
-          if (scrollPosition < carouselWidth - (cardWidth * numberOfCards)) {
-            scrollPosition += cardWidth * numberOfCards;
-            $(".carousel-inner").animate(
-              { scrollLeft: scrollPosition },
-              600
-            );
-          }
-      } else if (e==="prev") {
-          if (scrollPosition > 0) {
-            scrollPosition -= cardWidth * numberOfCards;
-            $(".carousel-inner").animate(
-              { scrollLeft: scrollPosition },
-              600
-            );
-          }
-        }
-      }
-  window.addEventListener("resize", updatePosition);
-
-</script>
-{% endblock %}
