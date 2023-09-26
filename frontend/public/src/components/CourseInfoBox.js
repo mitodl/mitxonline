@@ -29,7 +29,9 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
 
     const product = run && run.products.length > 0 && run.products[0]
 
-    const isArchived = (moment().isAfter(run.end_date) && moment().isBefore(run.enrollment_end)) || emptyOrNil(run.enrollment_end)
+    const isArchived =
+      moment().isAfter(run.end_date) &&
+      (moment().isBefore(run.enrollment_end) || emptyOrNil(run.enrollment_end))
 
     const startDate =
       run && !emptyOrNil(run.start_date) && !run.is_self_paced && !isArchived
