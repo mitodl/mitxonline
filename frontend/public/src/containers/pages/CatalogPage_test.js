@@ -722,7 +722,7 @@ describe("CatalogPage", function() {
 
     // Change to the programs tab.
     inner.instance().changeSelectedTab("programs")
-    // Confirm that the selected department resets to "All Departments".
+    // Confirm that the selected department is the same as before.
     expect(inner.state().selectedDepartment).equals("History")
 
     // Change back to the courses tab.
