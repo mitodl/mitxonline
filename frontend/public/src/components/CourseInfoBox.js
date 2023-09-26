@@ -42,9 +42,12 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           {isArchived ? (
             <div className="row d-flex align-self-stretch callout callout-warning">
               <i className="material-symbols-outlined warning">error</i>
-              <p>This course is no longer active, but you can still enroll and access selected content.</p>
-            </div>) :
-            null}
+              <p>
+                This course is no longer active, but you can still enroll and
+                access selected content.
+              </p>
+            </div>
+          ) : null}
           <div className="row d-flex align-items-center">
             <div className="enrollment-info-icon">
               <img
@@ -53,7 +56,11 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               />
             </div>
             <div className="enrollment-info-text">
-              {startDate ? formatPrettyDate(startDate) : isArchived ? "Course content available anytime" : "Start Anytime"}
+              {startDate
+                ? formatPrettyDate(startDate)
+                : isArchived
+                  ? "Course content available anytime"
+                  : "Start Anytime"}
             </div>
           </div>
           {course && course.page ? (
@@ -127,7 +134,8 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                   >
                     Financial assistance available
                   </a>
-                </div>) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
