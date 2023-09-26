@@ -177,6 +177,17 @@ body.new-design {
             margin: 20px 0;
           }
 
+          .callout {
+
+          }
+          .callout-warning{
+            border-left: 2px solid $warning;
+          }
+          i.warning {
+
+          }
+
+
           .enrollment-info-icon {
             max-width: 20px;
             margin-right: 12px;
