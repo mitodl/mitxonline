@@ -83,7 +83,7 @@ def _relevant_course_qset_filter(
     """
     now = now or now_in_utc()
     run_qset = (
-        course.courseruns.exclude(start_date=None)
+        run_qset.exclude(start_date=None)
         .exclude(enrollment_start=None)
         .filter(live=True)
     )
