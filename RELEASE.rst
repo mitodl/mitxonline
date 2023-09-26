@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.75.2
+--------------
+
+- Fix Duplicate Courses on Catalog Page (#1920)
+
 Version 0.75.1 (Released September 26, 2023)
 --------------
 
