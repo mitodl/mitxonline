@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.75.3
+--------------
+
+- Course Calatog: Stay on selected department (#1921)
+
 Version 0.75.2 (Released September 26, 2023)
 --------------
 
