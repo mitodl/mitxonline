@@ -39,10 +39,12 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     return (
       <>
         <div className="enrollment-info-box componentized">
-          <div className="row d-flex align-self-stretch callout callout-warning">
-            <i className="material-symbols-outlined warning col-1">error</i>
-            <p className="col-11">This course is no longer active, but you can still enroll and access selected content.</p>
-          </div>
+          {isArchived ? (
+            <div className="row d-flex align-self-stretch callout callout-warning">
+              <i className="material-symbols-outlined warning">error</i>
+              <p>This course is no longer active, but you can still enroll and access selected content.</p>
+            </div>) :
+            null}
           <div className="row d-flex align-items-center">
             <div className="enrollment-info-icon">
               <img
