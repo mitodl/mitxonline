@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.75.4
+--------------
+
+- Update course info bar to respond to archived courses (#1923)
+
 Version 0.75.3 (Released September 26, 2023)
 --------------
 
