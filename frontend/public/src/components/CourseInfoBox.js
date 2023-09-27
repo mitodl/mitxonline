@@ -45,8 +45,8 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             <div className="row d-flex align-self-stretch callout callout-warning">
               <i className="material-symbols-outlined warning">error</i>
               <p>
-                This course is no longer active, but you can still 
-                access selected content.
+                This course is no longer active, but you can still access
+                selected content.
               </p>
             </div>
           ) : null}
