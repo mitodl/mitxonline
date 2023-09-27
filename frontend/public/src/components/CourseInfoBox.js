@@ -8,14 +8,73 @@ import {
 import moment from "moment-timezone"
 
 import type { BaseCourseRun } from "../flow/courseTypes"
+import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
+import { getCookie } from "../lib/api"
+import { isWithinEnrollmentPeriod } from "../lib/courseApi"
 
 type CourseInfoBoxProps = {
-  courses: Array<BaseCourseRun>
+  courses: Array<BaseCourseRun>,
+  courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
+  toggleUpgradeDialogVisibility: () => Promise<any>,
+  setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>
+}
+
+const getStartDateText = (run: BaseCourseRun, isArchived: boolean = false) => {
+  return run && !emptyOrNil(run.start_date) && !run.is_self_paced
+    ? formatPrettyDate(moment(new Date(run.start_date)))
+    : isArchived
+      ? "Course content available anytime"
+      : "Start Anytime"
 }
 
 export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProps> {
+  state = {
+    showMoreEnrollDates: false
+  }
+  toggleShowMoreEnrollDates() {
+    this.setState({
+      showMoreEnrollDates: !this.state.showMoreEnrollDates
+    })
+  }
+  setRunEnrollDialog(run: EnrollmentFlaggedCourseRun) {
+    this.props.setCurrentCourseRun(run)
+    this.props.toggleUpgradeDialogVisibility()
+  }
+
+  renderEnrollNowDateLink(run: EnrollmentFlaggedCourseRun) {
+    const { currentUser } = this.props
+    const csrfToken = getCookie("csrftoken")
+
+    const product = run && run.products.length > 0 && run.products[0]
+
+    return currentUser &&
+      currentUser.id &&
+      run &&
+      !run.is_enrolled &&
+      isWithinEnrollmentPeriod(run) ? (
+        <>
+          {product && run.is_upgradable ? (
+            <button
+              className="more-dates-link"
+              onClick={() => this.setRunEnrollDialog(run)}
+            >
+              {getStartDateText(run)}
+            </button>
+          ) : (
+            <form action="/enrollments/" method="post">
+              <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+              <input type="hidden" name="run" value={run ? run.id : ""} />
+              <button type="submit" className="more-dates-link">
+                {getStartDateText(run)}
+              </button>
+            </form>
+          )}
+        </>
+      ) : null
+  }
+
   render() {
-    const { courses } = this.props
+    const { courses, courseRuns } = this.props
 
     if (!courses || courses.length < 1) {
       return null
@@ -33,11 +92,17 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
       moment().isAfter(run.end_date) &&
       (moment().isBefore(run.enrollment_end) || emptyOrNil(run.enrollment_end))
 
-    const startDate =
-      run && !emptyOrNil(run.start_date) && !run.is_self_paced && !isArchived
-        ? moment(new Date(run.start_date))
-        : null
-
+    const startDates = []
+    if (courseRuns && courseRuns.length > 1) {
+      courseRuns.forEach((courseRun, index) => {
+        if (courseRun.id !== run.id) {
+          startDates.push(
+            <li key={index}>{this.renderEnrollNowDateLink(courseRun)}</li>
+          )
+        }
+      })
+    }
+    const startedText = run.start_date > moment() ? "Starts: " : "Started: "
     return (
       <>
         <div className="enrollment-info-box componentized">
@@ -58,12 +123,18 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               />
             </div>
             <div className="enrollment-info-text">
-              {startDate
-                ? formatPrettyDate(startDate)
-                : isArchived
-                  ? "Course content available anytime"
-                  : "Start Anytime"}
+              {startedText}
+              {getStartDateText(run, isArchived)}
             </div>
+            <button
+              className="more-enrollment-info"
+              onClick={() => this.toggleShowMoreEnrollDates()}
+            >
+              {this.state.showMoreEnrollDates ? "Show Less" : "More Dates"}
+            </button>
+            {this.state.showMoreEnrollDates ? (
+              <ul className="more-dates-enrollment-list">{startDates}</ul>
+            ) : null}
           </div>
           {course && course.page ? (
             <div className="row d-flex align-items-top">
