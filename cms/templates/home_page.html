@@ -49,10 +49,10 @@
           <h3 class="featured-product-header-title col-8">{{ product_cards_section_title }}</h3>
         {% endif %}
         <div class="featured-product-arrows col-4">
-          <a href="#featuredProductCarousel" class="prev" id="featuredCarouselPrev">
+          <a data-bs-target="#featuredProductCarousel" class="prev"  data-bs-slide-to id="featuredCarouselPrev">
             <img class="arrow prev-arrow" src="/static/images/featured-products-left-arrow.svg" alt="Previous Arrow" />
           </a>
-          <a href="#featuredProductCarousel" class="next" id="featuredCarouselNext">
+          <a data-bs-target="#featuredProductCarousel" class="next" data-bs-slide-to id="featuredCarouselNext">
             <img class="arrow next-arrow" src="/static/images/featured-products-right-arrow.svg" alt="Next Arrow" />
           </a>
         </div>

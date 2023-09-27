@@ -44,6 +44,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const featuredCarousel = bootstrap.Carousel.getInstance(featuredCarouselElement)
     const cardOffset = window.matchMedia("(max-width: 1199.98px)").matches ? 3 : window.matchMedia("(max-width: 991.98px)").matches ? 2 : window.matchMedia("(max-width: 767.98px)").matches ? 1 : 4
     const currentCard = carouselInner.getElementsByClassName("active")[0]
+    console.log(currentCard)
     const cardArray = Array.from(carouselInner.children)
     const currentPosition = cardArray.indexOf(currentCard)
     const numberOfCards = cardArray.length - 1
@@ -54,6 +55,6 @@ document.addEventListener("DOMContentLoaded", function() {
     let toPosition = direction === "prev" ? prevPosition : nextPosition
     toPosition = toPosition.toString()
     console.log(toPosition)
-    featuredCarousel.to(toPosition)
+    featuredCarousel.to(featuredCarousel[toPosition])
   }
 })
