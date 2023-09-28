@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.75.6
+--------------
+
+- Course Product Page: show more enrollment dates (#1925)
+- somehow lost this logic (#1927)
+
 Version 0.75.5 (Released September 28, 2023)
 --------------
 
