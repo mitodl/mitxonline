@@ -112,8 +112,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     const startDates = []
     const moreEnrollableCourseRuns = courseRuns && courseRuns.length > 1
     if (moreEnrollableCourseRuns) {
-      console.log(run)
-      console.log(courseRuns[0])
       courseRuns.forEach((courseRun, index) => {
         if (!courseRun.is_enrolled) {
           startDates.push(
