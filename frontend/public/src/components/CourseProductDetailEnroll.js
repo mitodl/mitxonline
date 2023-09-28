@@ -459,7 +459,6 @@ export class CourseProductDetailEnroll extends React.Component<
   ) {
     const { currentUser } = this.props
     const csrfToken = getCookie("csrftoken")
-    const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
 
     return currentUser &&
       currentUser.id &&
@@ -486,7 +485,6 @@ export class CourseProductDetailEnroll extends React.Component<
               </button>
             </form>
           )}
-          {run ? this.renderUpgradeEnrollmentDialog(showNewDesign) : null}
         </>
       ) : null
   }
@@ -546,6 +544,7 @@ export class CourseProductDetailEnroll extends React.Component<
               {this.renderEnrollNowButton(run, product)}
 
               {currentUser ? this.renderAddlProfileFieldsModal() : null}
+              {run ? this.renderUpgradeEnrollmentDialog(showNewDesign) : null}
             </>
           </Loader>
         }
@@ -554,7 +553,15 @@ export class CourseProductDetailEnroll extends React.Component<
             {
               // $FlowFixMe: isLoading null or undefined
               <Loader key="course_info_loader" isLoading={courseIsLoading}>
-                <CourseInfoBox courses={courses}></CourseInfoBox>
+                <CourseInfoBox
+                  courses={courses}
+                  courseRuns={courseRuns}
+                  currentUser={currentUser}
+                  toggleUpgradeDialogVisibility={
+                    this.toggleUpgradeDialogVisibility
+                  }
+                  setCurrentCourseRun={this.setCurrentCourseRun}
+                ></CourseInfoBox>
               </Loader>
             }
           </>

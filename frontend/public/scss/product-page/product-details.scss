@@ -172,6 +172,7 @@ body.new-design {
           border: 1px solid #d1d1d1;
           border-left: none;
           border-right: none;
+          font-size: 14px;
 
           .row {
             margin: 20px 0;
@@ -214,7 +215,6 @@ body.new-design {
           .enrollment-info-text {
             width: auto;
             flex-grow: 1;
-            font-size: 15px;
 
             .enrollment-effort {
               font-size: smaller;
@@ -226,6 +226,29 @@ body.new-design {
               margin-left: .5rem;
               padding: 3px;
               font-weight: normal;
+            }
+          }
+          .more-enrollment-info {
+            width: auto;
+            color: $brand-darker-bg;
+            font-size: 12px;
+            text-decoration-line: underline;
+            border-color: transparent;
+            background-color: transparent;
+            padding-right: 0;
+          }
+          .more-dates-enrollment-list{
+            list-style: none;
+            li {
+              padding-left: 36px;
+            }
+            button.more-dates-link {
+              color: $brand-darker-bg;
+              font-size: 14px;
+              text-decoration-line: underline;
+              border: 0;
+              padding-left: 0;
+              background-color: transparent;
             }
           }
         }
