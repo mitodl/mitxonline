@@ -183,7 +183,7 @@ export class CourseProductDetailEnroll extends React.Component<
           centered
         >
           <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
-            {run.title} {run.id}
+            {run.title}
           </ModalHeader>
           <ModalBody>
             <div className="row">
