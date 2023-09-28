@@ -81,7 +81,12 @@ def _relevant_course_qset_filter(
     Does the actual filtering for user_relevant_course_run_qset and
     user_relevant_program_course_run_qset.
     """
-
+    now = now or now_in_utc()
+    run_qset = (
+        run_qset.exclude(start_date=None)
+        .exclude(enrollment_start=None)
+        .filter(live=True)
+    )
     if user and user.is_authenticated:
         user_enrollments = Count(
             "enrollments",
