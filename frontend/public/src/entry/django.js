@@ -55,6 +55,6 @@ document.addEventListener("DOMContentLoaded", function() {
     let toPosition = direction === "prev" ? prevPosition : nextPosition
     toPosition = toPosition.toString()
     console.log(toPosition)
-    featuredCarousel.to(featuredCarousel[toPosition])
+    featuredCarousel.to(toPosition)
   }
 })
