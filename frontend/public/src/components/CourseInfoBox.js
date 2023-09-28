@@ -12,6 +12,7 @@ import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import { getCookie } from "../lib/api"
 import { isWithinEnrollmentPeriod } from "../lib/courseApi"
 import type { User } from "../flow/authTypes"
+import { routes } from "../lib/urls"
 
 type CourseInfoBoxProps = {
   courses: Array<BaseCourseRun>,
@@ -49,10 +50,8 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
 
     const product = run && run.products.length > 0 && run.products[0]
 
-    return currentUser &&
-      currentUser.id &&
-      run &&
-      isWithinEnrollmentPeriod(run) ? (
+    return currentUser && currentUser.id ? (
+      run && isWithinEnrollmentPeriod(run) ? (
         <>
           {product && run.is_upgradable ? (
             <button
@@ -63,7 +62,11 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             </button>
           ) : (
             <form action="/enrollments/" method="post">
-              <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+              <input
+                type="hidden"
+                name="csrfmiddlewaretoken"
+                value={csrfToken}
+              />
               <input type="hidden" name="run" value={run ? run.id : ""} />
               <button type="submit" className="more-dates-link">
                 {getStartDateText(run)}
@@ -72,6 +75,20 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           )}
         </>
       ) : null
+    ) : (
+      this.renderEnrollLoginDateLink(run)
+    )
+  }
+  renderEnrollLoginDateLink(run: EnrollmentFlaggedCourseRun) {
+    const { currentUser } = this.props
+
+    return !currentUser || !currentUser.id ? (
+      <>
+        <a href={routes.login} className="more-dates-link">
+          {getStartDateText(run)}
+        </a>
+      </>
+    ) : null
   }
 
   render() {
@@ -86,7 +103,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     const run = course.next_run_id
       ? course.courseruns.find(elem => elem.id === course.next_run_id)
       : course.courseruns[0]
-
     const product = run && run.products.length > 0 && run.products[0]
 
     const isArchived =
@@ -96,8 +112,10 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     const startDates = []
     const moreEnrollableCourseRuns = courseRuns && courseRuns.length > 1
     if (moreEnrollableCourseRuns) {
+      console.log(run)
+      console.log(courseRuns[0])
       courseRuns.forEach((courseRun, index) => {
-        if (courseRun.id !== run.id) {
+        if (!courseRun.is_enrolled) {
           startDates.push(
             <li key={index}>{this.renderEnrollNowDateLink(courseRun)}</li>
           )
