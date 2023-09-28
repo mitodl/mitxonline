@@ -52,7 +52,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     return currentUser &&
       currentUser.id &&
       run &&
-      !run.is_enrolled &&
       isWithinEnrollmentPeriod(run) ? (
         <>
           {product && run.is_upgradable ? (
@@ -95,7 +94,8 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
       (moment().isBefore(run.enrollment_end) || emptyOrNil(run.enrollment_end))
 
     const startDates = []
-    if (courseRuns && courseRuns.length > 1) {
+    const moreEnrollableCourseRuns = courseRuns && courseRuns.length > 1
+    if (moreEnrollableCourseRuns) {
       courseRuns.forEach((courseRun, index) => {
         if (courseRun.id !== run.id) {
           startDates.push(
@@ -132,7 +132,11 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               className="more-enrollment-info"
               onClick={() => this.toggleShowMoreEnrollDates()}
             >
-              {this.state.showMoreEnrollDates ? "Show Less" : "More Dates"}
+              {moreEnrollableCourseRuns
+                ? this.state.showMoreEnrollDates
+                  ? "Show Less"
+                  : "More Dates"
+                : null}
             </button>
             {this.state.showMoreEnrollDates ? (
               <ul className="more-dates-enrollment-list">{startDates}</ul>
