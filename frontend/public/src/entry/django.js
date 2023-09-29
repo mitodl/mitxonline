@@ -3,6 +3,7 @@ import "jquery"
 import "bootstrap"
 import "video.js"
 import "videojs-youtube/dist/Youtube"
+import "slick-carousel"
 import $ from "jquery"
 $(document).ready(function() {
   $(".dates-tooltip").popover({
@@ -26,35 +27,43 @@ $(".dates-tooltip").on("shown.bs.popover", () => {
   })
 })
 
-document.addEventListener("DOMContentLoaded", function() {
-  const prevButton = document.getElementById("featuredCarouselPrev")
-  const nextButton = document.getElementById("featuredCarouselNext")
-  const featuredCarouselElement = document.getElementById("featuredProductCarousel")
-  const carouselInner = document.getElementsByClassName("carousel-inner")[0]
-
-  prevButton.addEventListener("click", function() {
-    setToPosition("prev")
+$(document).ready(function() {
+  $('#featuredProductCarousel').slick({
+    accessibility: true,
+    arrows:        true,
+    appendArrows:  $('.featured-product-arrows'),
+    prevArrow:     $('.prev-slides'),
+    nextArrow:     $('.next-slides'),
+    responsive:    [{
+      breakpoint: 1024,
+      settings:   {
+        slidesToShow:   4,
+        slidesToScroll: 4
+      }
+    },
+    {
+      breakpoint: 960,
+      settings:   {
+        slidesToShow:   3,
+        slidesToScroll: 3
+      }
+    },
+    {
+      breakpoint: 600,
+      settings:   {
+        slidesToShow:   2,
+        slidesToScroll: 2
+      }
+    },
+    {
+      breakpoint: 480,
+      settings:   {
+        slidesToShow:   1,
+        slidesToScroll: 1
+      }
+    }
+    ],
+    slidesToShow:   5,
+    slidesToScroll: 4,
   })
-  nextButton.addEventListener("click", function() {
-    setToPosition("next")
-  })
-
-  function setToPosition(direction) {
-    const bootstrap = require("bootstrap")
-    const featuredCarousel = bootstrap.Carousel.getInstance(featuredCarouselElement)
-    const cardOffset = window.matchMedia("(max-width: 1199.98px)").matches ? 3 : window.matchMedia("(max-width: 991.98px)").matches ? 2 : window.matchMedia("(max-width: 767.98px)").matches ? 1 : 4
-    const currentCard = carouselInner.getElementsByClassName("active")[0]
-    console.log(currentCard)
-    const cardArray = Array.from(carouselInner.children)
-    const currentPosition = cardArray.indexOf(currentCard)
-    const numberOfCards = cardArray.length - 1
-    let prevPosition = currentPosition - cardOffset
-    prevPosition = prevPosition >= 0 ? prevPosition : 0
-    let nextPosition = currentPosition + cardOffset
-    nextPosition = currentPosition + cardOffset <= numberOfCards ? nextPosition : numberOfCards
-    let toPosition = direction === "prev" ? prevPosition : nextPosition
-    toPosition = toPosition.toString()
-    console.log(toPosition)
-    featuredCarousel.to(toPosition)
-  }
 })

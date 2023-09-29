@@ -13621,6 +13621,7 @@ __metadata:
     serialize-javascript: 3.1.0
     shelljs: 0.8.5
     sinon: 4.5.0
+    slick-carousel: ^1.8.1
     style-loader: 3.3.1
     styled-components: 4.4.1
     url-join: 4.0.1
@@ -18810,6 +18811,15 @@ __metadata:
     astral-regex: ^2.0.0
     is-fullwidth-code-point: ^3.0.0
   checksum: 4a82d7f085b0e1b070e004941ada3c40d3818563ac44766cca4ceadd2080427d337554f9f99a13aaeb3b4a94d9964d9466c807b3d7b7541d1ec37ee32d308756
+  languageName: node
+  linkType: hard
+
+"slick-carousel@npm:^1.8.1":
+  version: 1.8.1
+  resolution: "slick-carousel@npm:1.8.1"
+  peerDependencies:
+    jquery: ">=1.8.0"
+  checksum: acaad391e4d8bc1c7fdb8d361faa1f1d60829b31d618b54bc38c0550a59b26de36537e0ab4bc0364176ec11d1a61d0cf11e99d8d5b1285d656673c9a1a719257
   languageName: node
   linkType: hard
 

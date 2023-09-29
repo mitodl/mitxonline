@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{% block bodyclass %}{% if show_new_design_hero or show_new_featured_carousel or show_home_page_video_component %}new-design{% endif %}{% endblock %}
 
 {% load static wagtail_img_src feature_img_src %}
 {% load wagtailcore_tags wagtailembeds_tags %}
 
 {% block title %}{{ site_name }}{% endblock %}
+
+{% block bodyclass %}{% if show_new_design_hero or show_new_featured_carousel or show_home_page_video_component %}new-design{% endif %}{% endblock %}
 
 {% block content %}
 {% if show_new_design_hero %}
@@ -43,18 +44,18 @@
 {% endif %}
 {% if show_new_featured_carousel %}
   <div class="featured-product-section-container d-flex flex-column container">
-    <div class="featured-product-section d-flex row carousel slide" id="featuredProductCarousel">
+    <div class="featured-product-section d-flex row" id="featuredProductCarousel">
       <div class="featured-product-header d-flex row col-12">
         {% if product_cards_section_title %}
           <h3 class="featured-product-header-title col-8">{{ product_cards_section_title }}</h3>
         {% endif %}
         <div class="featured-product-arrows col-4">
-          <a data-bs-target="#featuredProductCarousel" class="prev-slides"  data-bs-slide-to id="featuredCarouselPrev">
+          <button class="prev-slides"  id="featuredCarouselPrev" aria-label="Previous">
             <img class="arrow prev-arrow" src="/static/images/featured-products-left-arrow.svg" alt="Previous Arrow" />
-          </a>
-          <a data-bs-target="#featuredProductCarousel" class="next-slides" data-bs-slide-to id="featuredCarouselNext">
+          </button>
+          <button class="next-slides" id="featuredCarouselNext" aria-label="Next">
             <img class="arrow next-arrow" src="/static/images/featured-products-right-arrow.svg" alt="Next Arrow" />
-          </a>
+          </button>
         </div>
       </div>
       <div class="featured-product-listing">
@@ -200,4 +201,3 @@
   </div>
 {% endif %}
 {% endblock %}
-
