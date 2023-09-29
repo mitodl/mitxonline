@@ -23,11 +23,13 @@ type CourseInfoBoxProps = {
 }
 
 const getStartDateText = (run: BaseCourseRun, isArchived: boolean = false) => {
+  if (isArchived) {
+    return "Course content available anytime"
+  }
   return run && !emptyOrNil(run.start_date) && !run.is_self_paced
-    ? formatPrettyDate(moment(new Date(run.start_date)))
-    : isArchived
-      ? "Course content available anytime"
-      : "Start Anytime"
+    ? (run.start_date > moment() ? "Starts: " : "Started: ") +
+        formatPrettyDate(moment(new Date(run.start_date)))
+    : "Start Anytime"
 }
 
 export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProps> {
@@ -120,7 +122,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         }
       })
     }
-    const startedText = run.start_date > moment() ? "Starts: " : "Started: "
     return (
       <>
         <div className="enrollment-info-box componentized">
@@ -141,21 +142,20 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               />
             </div>
             <div className="enrollment-info-text">
-              {startedText}
               {getStartDateText(run, isArchived)}
             </div>
-            <button
-              className="more-enrollment-info"
-              onClick={() => this.toggleShowMoreEnrollDates()}
-            >
-              {moreEnrollableCourseRuns
-                ? this.state.showMoreEnrollDates
-                  ? "Show Less"
-                  : "More Dates"
-                : null}
-            </button>
-            {this.state.showMoreEnrollDates ? (
-              <ul className="more-dates-enrollment-list">{startDates}</ul>
+            {!isArchived && moreEnrollableCourseRuns ? (
+              <>
+                <button
+                  className="more-enrollment-info"
+                  onClick={() => this.toggleShowMoreEnrollDates()}
+                >
+                  {this.state.showMoreEnrollDates ? "Show Less" : "More Dates"}
+                </button>
+                {this.state.showMoreEnrollDates ? (
+                  <ul className="more-dates-enrollment-list">{startDates}</ul>
+                ) : null}
+              </>
             ) : null}
           </div>
           {course && course.page ? (
