@@ -28,20 +28,13 @@ $(".dates-tooltip").on("shown.bs.popover", () => {
 })
 
 $(document).ready(function() {
-  $('#featuredProductCarousel').slick({
+  $('.carousel-content').slick({
     accessibility: true,
     arrows:        true,
-    appendArrows:  $('.featured-product-arrows'),
-    prevArrow:     $('.prev-slides'),
-    nextArrow:     $('.next-slides'),
+    prevArrow:     $('.prev-button'),
+    nextArrow:     $('.next-button'),
+    focusOnChange: true,
     responsive:    [{
-      breakpoint: 1024,
-      settings:   {
-        slidesToShow:   4,
-        slidesToScroll: 4
-      }
-    },
-    {
       breakpoint: 960,
       settings:   {
         slidesToShow:   3,
@@ -63,7 +56,7 @@ $(document).ready(function() {
       }
     }
     ],
-    slidesToShow:   5,
+    slidesToShow:   4,
     slidesToScroll: 4,
   })
 })

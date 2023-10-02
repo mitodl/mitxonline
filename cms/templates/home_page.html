@@ -50,16 +50,16 @@
           <h3 class="featured-product-header-title col-8">{{ product_cards_section_title }}</h3>
         {% endif %}
         <div class="featured-product-arrows col-4">
-          <button class="prev-slides"  id="featuredCarouselPrev" aria-label="Previous">
+          <button class="prev-button"  id="featuredCarouselPrev" aria-label="Previous">
             <img class="arrow prev-arrow" src="/static/images/featured-products-left-arrow.svg" alt="Previous Arrow" />
           </button>
-          <button class="next-slides" id="featuredCarouselNext" aria-label="Next">
+          <button class="next-button" id="featuredCarouselNext" aria-label="Next">
             <img class="arrow next-arrow" src="/static/images/featured-products-right-arrow.svg" alt="Next Arrow" />
           </button>
         </div>
       </div>
       <div class="featured-product-listing">
-        <div class="carousel-inner d-flex" role="listbox">
+        <div class="carousel-content d-flex" role="listbox">
             {% for product in products %}
               {% include "partials/featured_product_card.html" with product=product order=forloop.counter %}
             {% endfor %}

@@ -1,5 +1,5 @@
 {% load static wagtail_img_src feature_img_src %}
-<a href="{{ product.url_path }}" class="featured-product-card-link carousel-item{% if order == 1 %} active{% endif %}">
+<a href="{{ product.url_path }}" class="featured-product-card-link{% if order == 1 %} active{% endif %}">
   <div class="col featured-product-card">
     <div class="featured-product-thumb">
       <img src="{% feature_img_src product.feature_image %}" alt="" />

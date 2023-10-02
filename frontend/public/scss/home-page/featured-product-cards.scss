@@ -126,18 +126,17 @@
         padding-top: 2rem;
       }
 
-      .carousel-inner {
-          width: 110%;
-          max-width: unset;
+      .carousel-content {
+          width: 100%;
           gap: 20px;
           padding-bottom: 2rem;
         @include media-breakpoint-down(sm) {
           max-width: 100%;
         }
 
-          a.carousel-item {
+          a.featured-product-card-link {
             text-decoration: none;
-            width: 20%;
+            width: 25%;
             margin-right: 0;
             flex: 0 0 20%;
             display: block;
@@ -145,25 +144,7 @@
             padding-left: inherit;
             padding-right: inherit;
             transition: transform 0.6s linear;
-            @include media-breakpoint-down(xl) {
-              width: 25%;
-              flex: 0 0 25%;
-            }
-            @include media-breakpoint-down(lg) {
-              width: 33.33333%;
-              flex: 0 0 33.33333%;
-            }
-            @include media-breakpoint-down(md) {
-              width: 50%;
-              flex: 0 0 50%;
-            }
-            @include media-breakpoint-down(sm) {
-              width: 100%;
-              flex: 0 0 100%;
-              height: unset;
-              padding-left: 2.44rem;
-              padding-right: 2.44rem;
-            }
+
             .featured-product-card {
               height: 100%;
               border-radius: 5px;
@@ -176,9 +157,7 @@
               box-shadow: 0 2px 3px 0 rgba(18, 38, 49, 0.15);
               @include media-breakpoint-down(sm) {
                 padding: unset;
-
               }
-
               .featured-product-thumb {
                 display: flex;
                 position: relative;
