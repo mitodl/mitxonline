@@ -484,21 +484,8 @@ def test_program_requirement_deletion():
 @pytest.mark.parametrize(
     "enrollment_mode", [EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE]
 )
-# @pytest.mark.parametrize(
-#     "certificate_generated, certificate_available_date_ended, course_ended",
-#     (
-#         [True, False, False],
-#         [False, True, False],
-#         [False, False, True],
-#     ),
-# )
 def test_learner_record_serializer(
-    mock_context,
-    program_with_empty_requirements,
-    enrollment_mode,
-    # certificate_generated,
-    # certificate_available_date_ended,
-    # course_ended,
+    mock_context, program_with_empty_requirements, enrollment_mode
 ):
     """Verify that saving the requirements for one program doesn't affect other programs"""
 
