@@ -88,6 +88,12 @@
           margin-top: 30px;
         }
 
+        button {
+          border: none;
+          background: transparent;
+          padding: 0;
+        }
+
         .arrow {
           display: flex;
           padding: 8px 15px;
@@ -125,127 +131,110 @@
         margin-top: 0;
         padding-top: 2rem;
       }
-
       .carousel-content {
           width: 100%;
-          gap: 20px;
           padding-bottom: 2rem;
-        @include media-breakpoint-down(sm) {
-          max-width: 100%;
+        .slick-slide {
+          margin: 0 .75rem;
+        }
+        .slick-list {
+          margin: 0 -.75rem;
+        }
+        .slick-slider {
+          overflow-x: hidden;
         }
 
-          a.featured-product-card-link {
-            text-decoration: none;
-            width: 25%;
-            margin-right: 0;
-            flex: 0 0 20%;
-            display: block;
-            height: 260.953px;
-            padding-left: inherit;
-            padding-right: inherit;
-            transition: transform 0.6s linear;
-
-            .featured-product-card {
-              height: 100%;
+        a.featured-product-card-link {
+          text-decoration: none;
+          margin-right: 0;
+          flex: 0 0 20%;
+          height: 290px;
+          .featured-product-card {
+            height: 95%;
+            border-radius: 5px;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid $home-page-grey-lite;
+            background: #FFF;
+            padding: 0;
+            flex: none;
+            box-shadow: 0 2px 3px 0 rgba(18, 38, 49, 0.15);
+            @include media-breakpoint-down(sm) {
+              padding: unset;
+            }
+            .featured-product-thumb {
+              display: flex;
+              position: relative;
+              justify-content: center;
               border-radius: 5px;
+              width: 100%;
+              height: 10.6875rem;
+            }
+
+            img {
+              width: 100%;
+              height: 10.6875rem;
+              border-radius: 5px 5px 0 0;
+              background: rgba(0, 0, 0, 0.20);
+              object-position: center;
+              object-fit: cover;
+            }
+            .badge-program-type {
+              display: inline-flex;
+              padding: 8px 15px;
+              align-items: flex-start;
+              border-radius: 0px 3px 0px 0px;
+              background: $home-page-header-blue;
+              position: absolute;
+              left: 0;
+              bottom: 0;
+              color: #FFF;
+              font-size: 0.75rem;
+              font-weight: 700;
+              font-family: Inter, sans-serif;
+            }
+            .badge-program-type-none {
+              background: transparent;
+            }
+
+            .featured-product-info {
+              padding: 15px;
+              display: flex;
               flex-direction: column;
-              align-items: center;
-              border: 1px solid $home-page-grey-lite;
-              background: #FFF;
-              padding: 0;
-              flex: none;
-              box-shadow: 0 2px 3px 0 rgba(18, 38, 49, 0.15);
-              @include media-breakpoint-down(sm) {
-                padding: unset;
-              }
-              .featured-product-thumb {
-                display: flex;
-                position: relative;
-                justify-content: center;
-                border-radius: 5px;
-                width: 100%;
-                height: 10.6875rem;
-              }
+              align-items: flex-start;
+              gap: .31rem;
+              align-self: stretch;
 
-              img {
-                width: 100%;
-                height: 10.6875rem;
-                border-radius: 5px 5px 0 0;
-                background: rgba(0, 0, 0, 0.20);
-                object-position: center;
-                object-fit: cover;
-              }
-              .badge-program-type {
-                display: inline-flex;
-                padding: 8px 15px;
-                align-items: flex-start;
-                border-radius: 0px 3px 0px 0px;
-                background: $home-page-header-blue;
-                position: absolute;
-                left: 0;
-                bottom: 0;
-                color: #FFF;
-                font-size: 0.75rem;
-                font-weight: 700;
-                font-family: Inter, sans-serif;
-              }
-              .badge-program-type-none {
-                background: transparent;
-              }
-
-              .featured-product-info {
-                padding: 15px;
-                display: flex;
-                flex-direction: column;
-                align-items: flex-start;
-                gap: .31rem;
+              p.date {
+                color: $home-page-grey-text;
+                font-size: 12px;
+                margin-bottom: 5px;
+                overflow: hidden;
                 align-self: stretch;
+                text-overflow: ellipsis;
+                font-weight: 400;
+              }
 
-                p.date {
-                  color: $home-page-grey-text;
-                  font-size: 12px;
-                  margin-bottom: 5px;
-                  overflow: hidden;
-                  align-self: stretch;
-                  text-overflow: ellipsis;
-                  font-weight: 400;
-                }
-
-                h2.featured-product-card-title {
-                  height: 38px;
-                  align-self: stretch;
-                  color: $home-page-header-blue;
-                  font-size: 0.875rem;
-                  font-family: Inter, sans-serif;
-                  margin-top: 0;
-                  display: -webkit-box;
-                  -webkit-line-clamp: 2;
-                  -webkit-box-orient: vertical;
-                  overflow: hidden;
-                  line-height: 18px;
-                }
-                h2.featured-product-card-title.program-title {
-                  height: 57.953px;
-                }
+              h2.featured-product-card-title {
+                height: 38px;
+                align-self: stretch;
+                color: $home-page-header-blue;
+                font-size: 0.875rem;
+                font-family: Inter, sans-serif;
+                margin-top: 0;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                line-height: 18px;
+              }
+              h2.featured-product-card-title.program-title {
+                height: 57.953px;
               }
             }
           }
         }
-      }
-
-      @include media-breakpoint-down(sm) {
-        .carousel-inner .carousel-item > div {
-          display: none;
         }
-        .carousel-inner .carousel-item > div:first-child {
-          display: block;
-        }
-      }
-
-      .carousel-inner .carousel-item.active,
-      .carousel-inner .carousel-item-next,
-      .carousel-inner .carousel-item-prev {
-        display: flex;
       }
     }
 
