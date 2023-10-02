@@ -148,23 +148,11 @@ export class CourseProductDetailEnroll extends React.Component<
     return this.state.currentCourseRun
   }
 
-  getFirstUnenrolledCourseRun = (): EnrollmentFlaggedCourseRun => {
-    const { courseRuns } = this.props
-
-    return courseRuns
-      ? courseRuns.find(
-        (run: EnrollmentFlaggedCourseRun) =>
-          run.is_enrolled === false &&
-            moment(run.enrollment_start) <= moment.now()
-      ) || courseRuns[0]
-      : null
-  }
-
   renderUpgradeEnrollmentDialog(showNewDesign: boolean) {
     const { courseRuns, courses } = this.props
     const run =
       !this.getCurrentCourseRun() && courseRuns
-        ? this.getFirstUnenrolledCourseRun()
+        ? courseRuns[0]
         : this.getCurrentCourseRun()
 
     const course =
@@ -514,11 +502,7 @@ export class CourseProductDetailEnroll extends React.Component<
       courseRuns.map(courseRun => {
         // $FlowFixMe
         document.addEventListener("click", function(e) {
-          if (
-            e.target &&
-            e.target.tagName.toLowerCase() === "button" &&
-            e.target.id === courseRun.courseware_id
-          ) {
+          if (e.target && e.target.id === courseRun.courseware_id) {
             thisScope.setCurrentCourseRun(courseRun)
             run = thisScope.getCurrentCourseRun()
             product = run && run.products ? run.products[0] : null
