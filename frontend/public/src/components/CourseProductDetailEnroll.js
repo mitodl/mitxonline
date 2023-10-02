@@ -502,11 +502,7 @@ export class CourseProductDetailEnroll extends React.Component<
       courseRuns.map(courseRun => {
         // $FlowFixMe
         document.addEventListener("click", function(e) {
-          if (
-            e.target &&
-            e.target.tagName.toLowerCase() === "button" &&
-            e.target.id === courseRun.courseware_id
-          ) {
+          if (e.target && e.target.id === courseRun.courseware_id) {
             thisScope.setCurrentCourseRun(courseRun)
             run = thisScope.getCurrentCourseRun()
             product = run && run.products ? run.products[0] : null
