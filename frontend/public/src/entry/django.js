@@ -28,35 +28,36 @@ $(".dates-tooltip").on("shown.bs.popover", () => {
 })
 
 $(document).ready(function() {
-  $('.carousel-content').slick({
+  $(".carousel-content").slick({
     accessibility: true,
     arrows:        true,
-    prevArrow:     $('.prev-button'),
-    nextArrow:     $('.next-button'),
+    prevArrow:     $(".prev-button"),
+    nextArrow:     $(".next-button"),
     focusOnChange: true,
-    responsive:    [{
-      breakpoint: 1025,
-      settings:   {
-        slidesToShow:   3,
-        slidesToScroll: 3
+    responsive:    [
+      {
+        breakpoint: 1025,
+        settings:   {
+          slidesToShow:   3,
+          slidesToScroll: 3
+        }
+      },
+      {
+        breakpoint: 605,
+        settings:   {
+          slidesToShow:   2,
+          slidesToScroll: 2
+        }
+      },
+      {
+        breakpoint: 480,
+        settings:   {
+          slidesToShow:   1,
+          slidesToScroll: 1
+        }
       }
-    },
-    {
-      breakpoint: 605,
-      settings:   {
-        slidesToShow:   2,
-        slidesToScroll: 2
-      }
-    },
-    {
-      breakpoint: 480,
-      settings:   {
-        slidesToShow:   1,
-        slidesToScroll: 1
-      }
-    }
     ],
     slidesToShow:   4,
-    slidesToScroll: 4,
+    slidesToScroll: 4
   })
 })
