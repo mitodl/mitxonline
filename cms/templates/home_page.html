@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{% block bodyclass %}{% if show_new_design_hero or show_new_featured_carousel or show_home_page_video_component %}new-design{% endif %}{% endblock %}
 
 {% load static wagtail_img_src feature_img_src %}
 {% load wagtailcore_tags wagtailembeds_tags %}
 
 {% block title %}{{ site_name }}{% endblock %}
+
+{% block bodyclass %}{% if show_new_design_hero or show_new_featured_carousel or show_home_page_video_component %}new-design{% endif %}{% endblock %}
 
 {% block content %}
 {% if show_new_design_hero %}
@@ -43,22 +44,22 @@
 {% endif %}
 {% if show_new_featured_carousel %}
   <div class="featured-product-section-container d-flex flex-column container">
-    <div class="featured-product-section d-flex row carousel slide" id="featuredProductCarousel">
+    <div class="featured-product-section d-flex row" id="featuredProductCarousel">
       <div class="featured-product-header d-flex row col-12">
         {% if product_cards_section_title %}
           <h3 class="featured-product-header-title col-8">{{ product_cards_section_title }}</h3>
         {% endif %}
         <div class="featured-product-arrows col-4">
-          <a href="#featuredProductCarousel" class="prev" data-bs-slide="prev" onclick="handleNavigationClick('prev');">
+          <button class="prev-button"  id="featuredCarouselPrev" aria-label="Previous">
             <img class="arrow prev-arrow" src="/static/images/featured-products-left-arrow.svg" alt="Previous Arrow" />
-          </a>
-          <a href="#featuredProductCarousel" class="next" data-bs-slide="next" onclick="handleNavigationClick('next');">
+          </button>
+          <button class="next-button" id="featuredCarouselNext" aria-label="Next">
             <img class="arrow next-arrow" src="/static/images/featured-products-right-arrow.svg" alt="Next Arrow" />
-          </a>
+          </button>
         </div>
       </div>
       <div class="featured-product-listing">
-        <div class="carousel-inner d-flex" role="listbox">
+        <div class="carousel-content d-flex">
             {% for product in products %}
               {% include "partials/featured_product_card.html" with product=product order=forloop.counter %}
             {% endfor %}
@@ -199,48 +200,4 @@
     </div>
   </div>
 {% endif %}
-{% endblock %}
-{% block scripts %}
-<script>
-
-    let scrollPosition = 0;
-    let numberOfCards = 4;
-
-    function updatePosition () {
-        position = 0;
-    }
-
-  function handleNavigationClick(e) {
-      let carouselWidth = $(".carousel-inner")[0].scrollWidth;
-      let cardWidth = ($(".carousel-item").width() + 20);
-      if (window.matchMedia("(max-width: 1199.98px)").matches) {
-        numberOfCards = 3;
-      }
-      else if (window.matchMedia("(max-width: 991.98px)").matches) {
-        numberOfCards = 2;
-      }
-      else if (window.matchMedia("(max-width: 767.98px)").matches) {
-        numberOfCards = 1;
-      }
-      if (e==="next") {
-          if (scrollPosition < carouselWidth - (cardWidth * numberOfCards)) {
-            scrollPosition += cardWidth * numberOfCards;
-            $(".carousel-inner").animate(
-              { scrollLeft: scrollPosition },
-              600
-            );
-          }
-      } else if (e==="prev") {
-          if (scrollPosition > 0) {
-            scrollPosition -= cardWidth * numberOfCards;
-            $(".carousel-inner").animate(
-              { scrollLeft: scrollPosition },
-              600
-            );
-          }
-        }
-      }
-  window.addEventListener("resize", updatePosition);
-
-</script>
 {% endblock %}

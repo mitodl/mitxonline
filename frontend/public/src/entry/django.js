@@ -3,6 +3,7 @@ import "jquery"
 import "bootstrap"
 import "video.js"
 import "videojs-youtube/dist/Youtube"
+import "slick-carousel"
 import $ from "jquery"
 $(document).ready(function() {
   $(".dates-tooltip").popover({
@@ -23,5 +24,40 @@ $(".dates-tooltip").on("shown.bs.popover", () => {
   $(".date-link").on("click", () => {
     $(".dates-tooltip").popover("hide")
     $(".dates-tooltip").focus()
+  })
+})
+
+$(document).ready(function() {
+  $(".carousel-content").slick({
+    accessibility: true,
+    arrows:        true,
+    prevArrow:     $(".prev-button"),
+    nextArrow:     $(".next-button"),
+    focusOnChange: true,
+    responsive:    [
+      {
+        breakpoint: 1025,
+        settings:   {
+          slidesToShow:   3,
+          slidesToScroll: 3
+        }
+      },
+      {
+        breakpoint: 605,
+        settings:   {
+          slidesToShow:   2,
+          slidesToScroll: 2
+        }
+      },
+      {
+        breakpoint: 480,
+        settings:   {
+          slidesToShow:   1,
+          slidesToScroll: 1
+        }
+      }
+    ],
+    slidesToShow:   4,
+    slidesToScroll: 4
   })
 })
