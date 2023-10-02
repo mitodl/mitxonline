@@ -9,7 +9,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.templatetags.static import static
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from django.db.models import CharField
+from django.db.models import CharField, Q
 
 from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses import models
@@ -19,6 +19,7 @@ from ecommerce.serializers import ProductFlexibilePriceSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
 from main.serializers import StrictFieldsSerializer
+from mitol.common.utils.datetime import now_in_utc
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
@@ -688,12 +689,20 @@ class LearnerRecordSerializer(serializers.BaseSerializer):
             ).values_list("course_run__id", flat=True)
 
             if not runs_ids:
-                # if there are no certificates then show only verified enrollment grades
+                # if there are no certificates then show verified enrollment grades that either
+                # certificate available date has passed or course has ended if no certificate available date
                 runs_ids = models.CourseRunEnrollment.objects.filter(
-                    user=user,
-                    run__course=course,
-                    enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-                    change_status=None,
+                    Q(user=user)
+                    & Q(run__course=course)
+                    & Q(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE)
+                    & Q(change_status=None)
+                    & (
+                        Q(run__certificate_available_date__lt=now_in_utc())
+                        | (
+                            Q(run__certificate_available_date=None)
+                            & Q(run__end_date__lt=now_in_utc())
+                        )
+                    )
                 ).values_list("run__id", flat=True)
 
             grade = (

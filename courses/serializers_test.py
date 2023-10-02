@@ -44,6 +44,7 @@ from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
 from main.test_utils import assert_drf_json_equal, drf_datetime
 from main import features
+from mitol.common.utils.datetime import now_in_utc
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = [pytest.mark.django_db]
@@ -483,8 +484,21 @@ def test_program_requirement_deletion():
 @pytest.mark.parametrize(
     "enrollment_mode", [EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE]
 )
+# @pytest.mark.parametrize(
+#     "certificate_generated, certificate_available_date_ended, course_ended",
+#     (
+#         [True, False, False],
+#         [False, True, False],
+#         [False, False, True],
+#     ),
+# )
 def test_learner_record_serializer(
-    mock_context, program_with_empty_requirements, enrollment_mode
+    mock_context,
+    program_with_empty_requirements,
+    enrollment_mode,
+    # certificate_generated,
+    # certificate_available_date_ended,
+    # course_ended,
 ):
     """Verify that saving the requirements for one program doesn't affect other programs"""
 
@@ -634,6 +648,11 @@ def test_learner_record_serializer(
         "title": courses[0].title,
     }
     if enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE:
+        course_0_payload["grade"] = None
+    if course_runs[0].certificate_available_date >= now_in_utc() or (
+        not course_runs[0].certificate_available_date
+        and course_runs[0].end_date >= now_in_utc()
+    ):
         course_0_payload["grade"] = None
     assert user_info_payload == serialized_data["user"]
     assert program_requirements_payload == serialized_data["program"]["requirements"]
