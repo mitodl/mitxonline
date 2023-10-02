@@ -127,17 +127,6 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
               ) : null}
             </div>
           </div>
-          <div className="row d-flex align-items-center">
-            <div className="enrollment-info-icon">
-              <img
-                src="/static/images/products/start-date.png"
-                alt="Course Timing"
-              />
-            </div>
-            <div className="enrollment-info-text">
-              {startDate ? formatPrettyDateUtc(startDate) : "Start Anytime"}
-            </div>
-          </div>
           {program && program.page ? (
             <div className="row d-flex align-items-top">
               <div className="enrollment-info-icon">
