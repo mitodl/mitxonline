@@ -59,7 +59,7 @@
         </div>
       </div>
       <div class="featured-product-listing">
-        <div class="carousel-content d-flex" role="listbox">
+        <div class="carousel-content d-flex">
             {% for product in products %}
               {% include "partials/featured_product_card.html" with product=product order=forloop.counter %}
             {% endfor %}
