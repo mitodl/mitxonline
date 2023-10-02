@@ -1,5 +1,5 @@
 import React from "react"
-import { formatPrettyDateUtc, emptyOrNil } from "../lib/util"
+import { emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 
 import type {
@@ -87,11 +87,6 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
     const run = this.findFirstCourseRun()
 
     const product = run && run.products.length > 0 && run.products[0]
-
-    const startDate =
-      run && !emptyOrNil(run.start_date)
-        ? moment(new Date(run.start_date))
-        : null
 
     const reqCount = program.requirements.required.length
     const electiveCount = program.requirements.electives.length
