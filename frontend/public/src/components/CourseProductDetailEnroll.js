@@ -148,6 +148,18 @@ export class CourseProductDetailEnroll extends React.Component<
     return this.state.currentCourseRun
   }
 
+  getFirstUnenrolledCourseRun = (): EnrollmentFlaggedCourseRun => {
+    const { courseRuns } = this.props
+
+    return courseRuns
+      ? courseRuns.find(
+        (run: EnrollmentFlaggedCourseRun) =>
+          run.is_enrolled === false &&
+            moment(run.enrollment_start) <= moment.now()
+      ) || courseRuns[0]
+      : null
+  }
+
   renderUpgradeEnrollmentDialog(showNewDesign: boolean) {
     const { courseRuns, courses } = this.props
     const run =
@@ -491,7 +503,7 @@ export class CourseProductDetailEnroll extends React.Component<
       !this.getCurrentCourseRun() && !courseRuns
         ? null
         : !this.getCurrentCourseRun() && courseRuns
-          ? courseRuns[0]
+          ? this.getFirstUnenrolledCourseRun()
           : this.getCurrentCourseRun()
 
     if (run) this.updateDate(run)
