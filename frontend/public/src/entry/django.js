@@ -35,14 +35,14 @@ $(document).ready(function() {
     nextArrow:     $('.next-button'),
     focusOnChange: true,
     responsive:    [{
-      breakpoint: 960,
+      breakpoint: 1025,
       settings:   {
         slidesToShow:   3,
         slidesToScroll: 3
       }
     },
     {
-      breakpoint: 600,
+      breakpoint: 605,
       settings:   {
         slidesToShow:   2,
         slidesToScroll: 2
