@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.75.6
+Version 0.75.6 (Released October 03, 2023)
 --------------
 
 - Revert "Assorted fixes for More Dates selector in existing design" (#1937)
