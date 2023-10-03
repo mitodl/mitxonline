@@ -40,8 +40,17 @@ class CoursePageSerializer(serializers.ModelSerializer):
         """
         financial_assistance_page = None
         if instance.product.programs:
+            valid_program_objs = [program for program in instance.product.programs]
+            valid_related_programs = []
+
+            for valid_program in valid_program_objs:
+                for valid_related_program in valid_program.related_programs:
+                    valid_related_programs.append(valid_related_program)
+
+            valid_program_objs.extend(valid_related_programs)
+
             program_page = ProgramPage.objects.filter(
-                program_id__in=[program.id for program in instance.product.programs]
+                program_id__in=[program.id for program in valid_program_objs]
             ).first()
 
             # for courses in program, financial assistance form from program should take precedence if exist
@@ -56,7 +65,7 @@ class CoursePageSerializer(serializers.ModelSerializer):
                     return f"{program_page.get_url()}{financial_assistance_page.slug}/"
 
             financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
-                selected_program=instance.product.programs[0]
+                selected_program__in=valid_program_objs
             ).first()
 
         if financial_assistance_page is None:
