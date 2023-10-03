@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.75.6 (Released October 03, 2023)
+--------------
+
+- Revert "Assorted fixes for More Dates selector in existing design" (#1937)
+- Carousel Fixes (#1935)
+- Fix start date test on course info card (#1932)
+- Course Product Page: show more enrollment dates (#1925)
+- somehow lost this logic (#1927)
+
 Version 0.75.5 (Released September 28, 2023)
 --------------
 
