@@ -28,7 +28,7 @@ import { compose } from "redux"
 import { connect } from "react-redux"
 import { connectRequest, requestAsync } from "redux-query"
 import { pathOr } from "ramda"
-import SkeletonLoader from "../../components/SkeletonLoader"
+import CourseLoader from "../../components/CourseLoader"
 
 type Props = {
   coursesIsLoading: ?boolean,
@@ -489,14 +489,12 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderCatalog() {
     const { filteredCourses, filteredPrograms, tabSelected } = this.state
-    if (this.props.coursesIsLoading || this.props.programsIsLoading) {
-      return (
-        <div id="catalog-grid">
-          <SkeletonLoader />
-          <SkeletonLoader />
-          <SkeletonLoader />
-        </div>
-      )
+
+    if (
+      filteredCourses.length === 0 &&
+      (this.props.coursesIsLoading || this.props.programsIsLoading)
+    ) {
+      return courseLoaderGrid
     }
     if (tabSelected === COURSES_TAB && filteredCourses.length > 0) {
       return this.renderCatalogRows(
@@ -653,16 +651,7 @@ export class CatalogPage extends React.Component<Props> {
                     </CSSTransition>
                   </TransitionGroup>
                 </div>
-                <div
-                  className={`${
-                    this.state.isLoadingMoreItems ? "lds-ring" : "d-none"
-                  }`}
-                >
-                  <div></div>
-                  <div></div>
-                  <div></div>
-                  <div></div>
-                </div>
+                {this.state.isLoadingMoreItems ? courseLoaderGrid : null}
                 {/* span is used to detect when the learner has scrolled to the bottom of the catalog page. */}
                 <span ref={this.container}></span>
               </div>
@@ -673,6 +662,13 @@ export class CatalogPage extends React.Component<Props> {
     )
   }
 }
+const courseLoaderGrid = (
+  <div id="catalog-grid">
+    <CourseLoader />
+    <CourseLoader />
+    <CourseLoader />
+  </div>
+)
 
 const getNextCoursePage = page =>
   requestAsync({

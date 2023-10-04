@@ -1,7 +1,7 @@
 import React from "react"
 import ContentLoader from "react-content-loader"
 
-const SkeletonLoader = props => (
+const CourseLoader = props => (
   <ContentLoader
     width={305}
     height={229}
@@ -16,4 +16,4 @@ const SkeletonLoader = props => (
   </ContentLoader>
 )
 
-export default SkeletonLoader
+export default CourseLoader
