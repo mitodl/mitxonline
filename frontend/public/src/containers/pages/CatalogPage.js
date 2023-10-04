@@ -28,6 +28,7 @@ import { compose } from "redux"
 import { connect } from "react-redux"
 import { connectRequest, requestAsync } from "redux-query"
 import { pathOr } from "ramda"
+import CourseLoader from "../../components/CourseLoader"
 
 type Props = {
   coursesIsLoading: ?boolean,
@@ -297,7 +298,7 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * This is a comparision method used to sort an array of Course Runs
+   * This is a comparison method used to sort an array of Course Runs
    * from earliest start date to latest start date.
    * @param {BaseCourseRun} courseRunA The first Course Run to compare.
    * @param {BaseCourseRun} courseRunB The second Course Run to compare.
@@ -487,17 +488,22 @@ export class CatalogPage extends React.Component<Props> {
    * Renders the entire catalog of course or program cards based on the catalog tab selected.
    */
   renderCatalog() {
+    const { filteredCourses, filteredPrograms, tabSelected } = this.state
+
     if (
-      this.state.tabSelected === COURSES_TAB &&
-      this.state.filteredCourses.length > 0
+      filteredCourses.length === 0 &&
+      (this.props.coursesIsLoading || this.props.programsIsLoading)
     ) {
+      return courseLoaderGrid
+    }
+    if (tabSelected === COURSES_TAB && filteredCourses.length > 0) {
       return this.renderCatalogRows(
-        this.state.filteredCourses,
+        filteredCourses,
         this.renderCourseCatalogCard.bind(this)
       )
-    } else if (this.state.tabSelected === PROGRAMS_TAB) {
+    } else if (tabSelected === PROGRAMS_TAB) {
       return this.renderCatalogRows(
-        this.state.filteredPrograms,
+        filteredPrograms,
         this.renderProgramCatalogCard.bind(this)
       )
     }
@@ -645,16 +651,7 @@ export class CatalogPage extends React.Component<Props> {
                     </CSSTransition>
                   </TransitionGroup>
                 </div>
-                <div
-                  className={`${
-                    this.state.isLoadingMoreItems ? "lds-ring" : "d-none"
-                  }`}
-                >
-                  <div></div>
-                  <div></div>
-                  <div></div>
-                  <div></div>
-                </div>
+                {this.state.isLoadingMoreItems ? courseLoaderGrid : null}
                 {/* span is used to detect when the learner has scrolled to the bottom of the catalog page. */}
                 <span ref={this.container}></span>
               </div>
@@ -665,6 +662,13 @@ export class CatalogPage extends React.Component<Props> {
     )
   }
 }
+const courseLoaderGrid = (
+  <div id="catalog-grid">
+    <CourseLoader />
+    <CourseLoader />
+    <CourseLoader />
+  </div>
+)
 
 const getNextCoursePage = page =>
   requestAsync({

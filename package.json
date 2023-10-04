@@ -8,5 +8,8 @@
         "build": "yarn workspaces foreach run build"
     },
     "version": "0.0.0",
-    "packageManager": "yarn@3.2.0"
+    "packageManager": "yarn@3.2.0",
+    "dependencies": {
+        "react-content-loader": "^6.2.1"
+    }
 }
