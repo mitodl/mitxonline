@@ -13644,6 +13644,8 @@ __metadata:
 "mitx-online-root@workspace:.":
   version: 0.0.0-use.local
   resolution: "mitx-online-root@workspace:."
+  dependencies:
+    react-content-loader: ^6.2.1
   languageName: unknown
   linkType: soft
 
@@ -16826,6 +16828,15 @@ __metadata:
   peerDependencies:
     react: ">=16.4.1"
   checksum: 303890eeaf9e18d59fca77f9c891bf3b52d2ec9ea88f0af9d19c160a1f101b447c5104ca46e2dd84c19de756d4797f1f054d041b888a3d57204d9145f4b1b532
+  languageName: node
+  linkType: hard
+
+"react-content-loader@npm:^6.2.1":
+  version: 6.2.1
+  resolution: "react-content-loader@npm:6.2.1"
+  peerDependencies:
+    react: ">=16.0.0"
+  checksum: f777d408256a4218677e47f4cf3988d9fd8e556450e9b85ee1eb3952a5d5802573cea0df5eaf4dbc936c9522f355657de6f8ab0ecdf035d7dccdef15b45c9dae
   languageName: node
   linkType: hard
 

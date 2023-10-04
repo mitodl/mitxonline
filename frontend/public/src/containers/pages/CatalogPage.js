@@ -28,6 +28,7 @@ import { compose } from "redux"
 import { connect } from "react-redux"
 import { connectRequest, requestAsync } from "redux-query"
 import { pathOr } from "ramda"
+import SkeletonLoader from "../../components/SkeletonLoader"
 
 type Props = {
   coursesIsLoading: ?boolean,
@@ -297,7 +298,7 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * This is a comparision method used to sort an array of Course Runs
+   * This is a comparison method used to sort an array of Course Runs
    * from earliest start date to latest start date.
    * @param {BaseCourseRun} courseRunA The first Course Run to compare.
    * @param {BaseCourseRun} courseRunB The second Course Run to compare.
@@ -487,17 +488,24 @@ export class CatalogPage extends React.Component<Props> {
    * Renders the entire catalog of course or program cards based on the catalog tab selected.
    */
   renderCatalog() {
-    if (
-      this.state.tabSelected === COURSES_TAB &&
-      this.state.filteredCourses.length > 0
-    ) {
+    const { filteredCourses, filteredPrograms, tabSelected } = this.state
+    if (this.props.coursesIsLoading || this.props.programsIsLoading) {
+      return (
+        <div id="catalog-grid">
+          <SkeletonLoader />
+          <SkeletonLoader />
+          <SkeletonLoader />
+        </div>
+      )
+    }
+    if (tabSelected === COURSES_TAB && filteredCourses.length > 0) {
       return this.renderCatalogRows(
-        this.state.filteredCourses,
+        filteredCourses,
         this.renderCourseCatalogCard.bind(this)
       )
-    } else if (this.state.tabSelected === PROGRAMS_TAB) {
+    } else if (tabSelected === PROGRAMS_TAB) {
       return this.renderCatalogRows(
-        this.state.filteredPrograms,
+        filteredPrograms,
         this.renderProgramCatalogCard.bind(this)
       )
     }
