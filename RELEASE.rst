@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.76.0
+--------------
+
+- Catalog Page: Add content loader  (#1941)
+- don't leak grades in program record before course completed (#1931)
+
 Version 0.75.6 (Released October 03, 2023)
 --------------
 
