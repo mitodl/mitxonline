@@ -75,7 +75,7 @@
                         <div class="member-card highlight-card" onClick="$('#instructor-modal-{{ member.id }}').modal('show');">
                           <img src="{% feature_img_src member.feature_image %}" alt="">
                           <div class="member-info">
-                            <h3 class="name">
+                            <h3 id="instructor-name-{{ member.id }}" class="name" role="button" tabindex="0">
                                 {{ member.instructor_name }}
                             </h3>
                             {% if member.instructor_title %}<h4 class="title">{{ member.instructor_title }}</h4>{% endif %}
@@ -137,7 +137,9 @@
               <div class="modal-content">
                 <div class="modal-header">
                   <h5 class="modal-title">{{ member.instructor_name }}</h5>
-                  <button type="button" class="close" data-dismiss="modal" aria-label="Close" onClick="$('#instructor-modal-{{ member.id }}').modal('hide');">
+                  <button type="button" class="close" data-dismiss="modal" aria-label="Close"
+                          onClick="$('#instructor-modal-{{ member.id }}').modal('hide');
+                                   $('#instructor-name-{{ member.id }}').focus();">
                     <span aria-hidden="true">&times;</span>
                   </button>
                 </div>
