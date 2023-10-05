@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.76.0
+Version 0.76.0 (Released October 05, 2023)
 --------------
 
 - Catalog Page: Add content loader  (#1941)
