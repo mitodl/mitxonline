@@ -84,7 +84,6 @@ wagtail = "^5.0"
 hypothesis = "4.23.9"
 posthog = "^3.0.1"
 uwsgitop = "^0.11"
-locust = "^2.17.0"
 
 
 [tool.poetry.group.dev.dependencies]
