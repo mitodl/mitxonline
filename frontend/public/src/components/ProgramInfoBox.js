@@ -1,5 +1,5 @@
 import React from "react"
-import { formatPrettyDateUtc, emptyOrNil } from "../lib/util"
+import { emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 
 import type {
@@ -88,11 +88,6 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
 
     const product = run && run.products.length > 0 && run.products[0]
 
-    const startDate =
-      run && !emptyOrNil(run.start_date)
-        ? moment(new Date(run.start_date))
-        : null
-
     const reqCount = program.requirements.required.length
     const electiveCount = program.requirements.electives.length
     let electiveCountPrefix = ""
@@ -125,17 +120,6 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
                   {electiveCount}
                 </>
               ) : null}
-            </div>
-          </div>
-          <div className="row d-flex align-items-center">
-            <div className="enrollment-info-icon">
-              <img
-                src="/static/images/products/start-date.png"
-                alt="Course Timing"
-              />
-            </div>
-            <div className="enrollment-info-text">
-              {startDate ? formatPrettyDateUtc(startDate) : "Start Anytime"}
             </div>
           </div>
           {program && program.page ? (
