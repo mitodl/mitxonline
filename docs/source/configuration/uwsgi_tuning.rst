@@ -58,7 +58,7 @@ Put it all together
 
 1. Run ``docker-compose build``
 2. Run ``docker-compose up``
-3. You can use locust from ``http://0.0.0.0:8089/``
+3. You can use locust from ``http://0.0.0.0:8089/`` in a browser
 4. You can use uwsgitop in a terminal with ``docker compose exec web uwsgitop /tmp/uwsgi-stats.sock``
 
 ******************
