@@ -1,0 +1,92 @@
+import logging
+from locust import HttpUser, task, between, events
+
+
+def _get_product_json(response_json, page_type):
+    logging.info(f'User was displayed {response_json["count"]} {page_type}(s)')
+    pages = response_json["results"][:5]
+    return [page["readable_id"] for page in pages]
+
+
+class DjangoAdminUser(HttpUser):
+    wait_time = between(1, 5)
+
+    def on_start(self):
+        self.client.get("/admin/login/")
+        self.login()
+
+    def login(self):
+        csrf_token = self.client.cookies['csrftoken']
+        self.client.post(
+            "/admin/login/",
+            {
+                "username": "edx@example.org",
+                "password": "edx",
+                "csrfmiddlewaretoken": csrf_token,
+            },
+            headers={"Referer": "/admin/login/"},
+        )
+
+    @task
+    def navigate_through_course_areas(self):
+        logging.info(f"{self} has started to surf")
+        self._navigate_to_home_page()
+        programs, courses = self._navigate_to_catalog()
+        self._navigate_to_product_page("program", programs)
+        self._navigate_to_product_page("course", courses)
+        self._navigate_to_checkout_page()
+        logging.info(f"{self} has gone off to learn")
+
+    def _navigate_to_catalog(self):
+        endpoints = [
+            "/api/users/me",
+            "/api/departments/",
+            "/api/users/me",
+        ]
+        logging.info(f"User {self} opening catalog")
+        self._navigate_to_endpoints(endpoints)
+        with self.client.get("/api/programs/?page=1&live=true", catch_response=True) as response:
+            program_json = _get_product_json(response.json(), "program")
+        with self.client.get("/api/courses/?page=1&live=true&page__live=true&courserun_is_enrollable=true",
+                             catch_response=True) as response:
+            course_json = _get_product_json(response.json(), "course")
+        return program_json, course_json
+
+    def _navigate_to_home_page(self):
+        logging.info("User (%r) opening Home Page")
+        with self.client.get("/api/users/me", catch_response=True) as response:
+            logging.info(response.status_code)
+
+    def _navigate_to_checkout_page(self):
+        logging.info("User (%r) opening Checkout Page")
+        endpoints = [
+            "/api/users/me",
+            "/api/checkout/cart",
+        ]
+        self._navigate_to_endpoints(endpoints)
+
+    def _navigate_to_product_page(self, product_type, response_json):
+        logging.info(response_json)
+        for page in response_json:
+            logging.info(f"User opened {product_type} page for {page}")
+            endpoints = [
+                "/api/users/me",
+                "/api/program_enrollments/",
+                "/api/users/me",
+                f"/api/course_runs/?relevant_to={page}",
+            ]
+            if product_type == "course":
+                endpoints += [
+                    f"/api/courses/?readable_id={page}&live=true",
+                ]
+            elif product_type == "program":
+                endpoints += [
+                    f"/api/programs/?readable_id={page}",
+                ]
+            self._navigate_to_endpoints(endpoints)
+
+    def _navigate_to_endpoints(self, endpoints):
+        for endpoint in endpoints:
+            logging.info(f"endpoint: {endpoint}")
+            with self.client.get(endpoint, catch_response=True) as response:
+                logging.info(f"status: {response.status_code}")
