@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.76.1
+--------------
+
+- Product Page: Fix overflow on faculty info boxes (#1945)
+- Remove start date from ProgramInfoBox.js (#1938)
+- Course About Redesign - Accessibility issues on instructor bio (#1942)
+
 Version 0.76.0 (Released October 05, 2023)
 --------------
 
