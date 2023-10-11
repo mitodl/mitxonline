@@ -13,7 +13,7 @@ const expandExpandBlock = (event: MouseEvent) => {
     if (block) {
       const elem = document.querySelector(`div#exp${block}`)
       elem && elem.classList && elem.classList.toggle("open")
-      if (elem.classList.contains("open")) {
+      if (elem && elem.classList && elem.classList.contains("open")) {
         event.srcElement.innerText = "Show Less"
       } else {
         event.srcElement.innerText = "Show More"
