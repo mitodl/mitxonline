@@ -145,10 +145,11 @@ export class CourseProductDetailEnroll extends React.Component<
   }
   getFirstUnexpiredRun = () => {
     const { courses, courseRuns } = this.props
-    const course = courses[0]
-    return course.next_run_id
-      ? courseRuns.find(elem => elem.id === course.next_run_id)
-      : courseRuns[0]
+    return courseRuns
+      ? courses && courses[0].next_run_id
+        ? courseRuns.find(elem => elem.id === courses[0].next_run_id)
+        : courseRuns[0]
+      : null
   }
 
   getCurrentCourseRun = (): EnrollmentFlaggedCourseRun => {
@@ -514,7 +515,7 @@ export class CourseProductDetailEnroll extends React.Component<
       product = null
     if (courseRuns) {
       run = this.getFirstUnexpiredRun()
-      product = run.products ? run.products[0] : null
+      product = run && run.products ? run.products[0] : null
       this.updateDate(run)
       const thisScope = this
       courseRuns.map(courseRun => {
