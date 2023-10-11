@@ -250,6 +250,12 @@ body.new-design {
               padding-left: 0;
               background-color: transparent;
             }
+            button.more-dates-link.enrolled {
+              color: $green-darker;
+              cursor: default;
+              text-decoration-line: none;
+
+            }
           }
         }
 
