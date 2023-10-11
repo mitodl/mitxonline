@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.76.2
+--------------
+
+- wsgi tuning setup config (#1947)
+
 Version 0.76.1 (Released October 11, 2023)
 --------------
 
