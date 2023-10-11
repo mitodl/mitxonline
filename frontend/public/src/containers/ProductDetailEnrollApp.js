@@ -16,7 +16,13 @@ const expandExpandBlock = (event: MouseEvent) => {
       if (elem && elem.classList && elem.classList.contains("open")) {
         event.srcElement.innerText = "Show Less"
       } else {
-        event.srcElement.innerText = "Show More"
+        event.srcElement.classList.remove("fade")
+        setTimeout(() => {
+          requestAnimationFrame(() => {
+            event.srcElement.innerText = "Show More"
+            event.srcElement.classList.add("fade")
+          })
+        }, 225) // timeout
       }
     }
   }
