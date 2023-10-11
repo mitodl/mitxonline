@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.76.1
+Version 0.76.1 (Released October 11, 2023)
 --------------
 
 - Product Page: Fix overflow on faculty info boxes (#1945)
