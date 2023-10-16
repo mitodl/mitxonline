@@ -41,7 +41,7 @@ def expand(text):
         pre = str(expand_here[0])
         post = "".join([str(sib) for sib in expand_here[1].find_next_siblings()])
 
-        output = f'<!-- pre -->{pre}<!-- /pre --><p class="expand_here_container"><a href="#" class="expand_here_link" data-expand-body="{container_uuid}">Show More</a></p><div class="expand_here_body" id="exp{container_uuid}">{str(expand_here[1])}{post}</div>'
+        output = f'<!-- pre -->{pre}<!-- /pre --><div class="expand_here_body" id="exp{container_uuid}">{str(expand_here[1])}{post}</div><p class="expand_here_container"><a href="#" class="expand_here_link fade" data-expand-body="{container_uuid}">Show More</a></p>'
     elif len(text.split("\n\n")) > 1:
         (pre, post) = text.split("\n\n", maxsplit=1)
 
