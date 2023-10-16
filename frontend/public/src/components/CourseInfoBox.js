@@ -32,6 +32,12 @@ const getStartDateText = (run: BaseCourseRun, isArchived: boolean = false) => {
     : "Start Anytime"
 }
 
+const getStartDateForRun = (run: BaseCourseRun) => {
+  return run && !emptyOrNil(run.start_date) && !run.is_self_paced
+    ? formatPrettyDate(moment(new Date(run.start_date)))
+    : "Start Anytime"
+}
+
 export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProps> {
   state = {
     showMoreEnrollDates: false
@@ -60,7 +66,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               className="more-dates-link"
               onClick={() => this.setRunEnrollDialog(run)}
             >
-              {getStartDateText(run)}
+              {getStartDateForRun(run)}
             </button>
           ) : (
             <form action="/enrollments/" method="post">
@@ -71,7 +77,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               />
               <input type="hidden" name="run" value={run ? run.id : ""} />
               <button type="submit" className="more-dates-link">
-                {getStartDateText(run)}
+                {getStartDateForRun(run)}
               </button>
             </form>
           )}
@@ -87,10 +93,17 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     return !currentUser || !currentUser.id ? (
       <>
         <a href={routes.login} className="more-dates-link">
-          {getStartDateText(run)}
+          {getStartDateForRun(run)}
         </a>
       </>
     ) : null
+  }
+  renderEnrolledDateLink(run: EnrollmentFlaggedCourseRun) {
+    return (
+      <button className="more-dates-link enrolled">
+        {getStartDateText(run)} - Enrolled
+      </button>
+    )
   }
 
   render() {
@@ -115,9 +128,13 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     const moreEnrollableCourseRuns = courseRuns && courseRuns.length > 1
     if (moreEnrollableCourseRuns) {
       courseRuns.forEach((courseRun, index) => {
-        if (!courseRun.is_enrolled) {
+        if (courseRun.id !== run.id) {
           startDates.push(
-            <li key={index}>{this.renderEnrollNowDateLink(courseRun)}</li>
+            <li key={index}>
+              {courseRun.is_enrolled
+                ? this.renderEnrolledDateLink(courseRun)
+                : this.renderEnrollNowDateLink(courseRun)}
+            </li>
           )
         }
       })

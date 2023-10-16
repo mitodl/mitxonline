@@ -143,6 +143,14 @@ export class CourseProductDetailEnroll extends React.Component<
       currentCourseRun: courseRun
     })
   }
+  getFirstUnexpiredRun = () => {
+    const { courses, courseRuns } = this.props
+    return courseRuns
+      ? courses && courses[0].next_run_id
+        ? courseRuns.find(elem => elem.id === courses[0].next_run_id)
+        : courseRuns[0]
+      : null
+  }
 
   getCurrentCourseRun = (): EnrollmentFlaggedCourseRun => {
     return this.state.currentCourseRun
@@ -402,7 +410,11 @@ export class CourseProductDetailEnroll extends React.Component<
     )
   }
 
-  renderEnrolledButton(run: EnrollmentFlaggedCourseRun, startDate: any) {
+  renderEnrolledButton(run: EnrollmentFlaggedCourseRun) {
+    const startDate =
+      run && !emptyOrNil(run.start_date)
+        ? moment(new Date(run.start_date))
+        : null
     const waitingForCourseToBeginMessage = moment().isBefore(startDate) ? (
       <p style={{ fontSize: "16px" }}>
         Enrolled and waiting for the course to begin.
@@ -499,17 +511,12 @@ export class CourseProductDetailEnroll extends React.Component<
     } = this.props
     const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
 
-    let run =
-      !this.getCurrentCourseRun() && !courseRuns
-        ? null
-        : !this.getCurrentCourseRun() && courseRuns
-          ? this.getFirstUnenrolledCourseRun()
-          : this.getCurrentCourseRun()
-
-    if (run) this.updateDate(run)
-
-    let product = run && run.products ? run.products[0] : null
+    let run,
+      product = null
     if (courseRuns) {
+      run = this.getFirstUnexpiredRun()
+      product = run && run.products ? run.products[0] : null
+      this.updateDate(run)
       const thisScope = this
       courseRuns.map(courseRun => {
         // $FlowFixMe
@@ -524,10 +531,6 @@ export class CourseProductDetailEnroll extends React.Component<
         })
       })
     }
-    const startDate =
-      run && !emptyOrNil(run.start_date)
-        ? moment(new Date(run.start_date))
-        : null
 
     return (
       <>
@@ -535,7 +538,7 @@ export class CourseProductDetailEnroll extends React.Component<
           // $FlowFixMe: isLoading null or undefined
           <Loader key="product_detail_enroll_loader" isLoading={isLoading}>
             <>
-              {this.renderEnrolledButton(run, startDate)}
+              {this.renderEnrolledButton(run)}
               {this.renderEnrollLoginButton()}
               {this.renderEnrollNowButton(run, product)}
 
