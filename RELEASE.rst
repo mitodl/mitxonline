@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.77.0
+--------------
+
+- Filter out not live programs (#1954)
+- Product Page: about section Show More toggle updates (#1949)
+- Course Page: More enrollment dates updates (#1951)
+- wsgi tuning setup config (#1947)
+
 Version 0.76.1 (Released October 11, 2023)
 --------------
 
