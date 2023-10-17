@@ -273,6 +273,8 @@ def create_run_enrollments(
         then the change_status of that program_enrollment is checked to ensure it equals None.
         """
         for program in run.course.programs:
+            if not program.live:
+                continue
             program_enrollment, _ = ProgramEnrollment.objects.get_or_create(
                 user=user,
                 program=program,
