@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.77.0
+Version 0.77.0 (Released October 18, 2023)
 --------------
 
 - Filter out not live programs (#1954)
