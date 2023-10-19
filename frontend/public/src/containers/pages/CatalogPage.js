@@ -295,6 +295,7 @@ export class CatalogPage extends React.Component<Props> {
         this.state.allProgramsRetrieved
       )
     })
+    this.toggleMobileFilterWindowExpanded(false)
   }
 
   /**
@@ -557,7 +558,14 @@ export class CatalogPage extends React.Component<Props> {
                   )
                 }
               />
-              <h2>Catalog</h2>
+              <h2>
+                Catalog
+                <small>
+                  {this.state.selectedDepartment === ALL_DEPARTMENTS
+                    ? ""
+                    : this.state.selectedDepartment}
+                </small>
+              </h2>
             </div>
           </div>
           <div className="container">
