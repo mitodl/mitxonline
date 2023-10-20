@@ -25,7 +25,7 @@ const desktopUListProps = {
 }
 
 const overlayListItemProps = {
-  "data-bs-target": "#nav"
+  className: "mobile-dropdown-item"
 }
 
 const desktopListItemProps = {
@@ -75,22 +75,22 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
       >
         <li {...(menuChildProps.li || {})}>
           <MixedLink dest={routes.profile} aria-label="Profile">
-            Profile
+            <span data-bs-target="#nav" data-bs-toggle="collapse">Profile</span>
           </MixedLink>
         </li>
         <li {...(menuChildProps.li || {})}>
           <MixedLink dest={routes.dashboard} aria-label="Dashboard">
-            Dashboard
+            <span data-bs-target="#nav" data-bs-toggle="collapse">Dashboard</span>
           </MixedLink>
         </li>
         <li {...(menuChildProps.li || {})}>
           <MixedLink dest={routes.accountSettings} aria-label="Account">
-            Account
+            <span data-bs-target="#nav" data-bs-toggle="collapse">Account</span>
           </MixedLink>
         </li>
         <li {...(menuChildProps.li || {})}>
           <MixedLink dest={routes.orderHistory} aria-label="Order History">
-            Order History
+            <span data-bs-target="#nav" data-bs-toggle="collapse">Order History</span>
           </MixedLink>
         </li>
         <li {...(menuChildProps.li || {})}>
