@@ -202,7 +202,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             <div className="enrollment-info-icon">
               <img src="/static/images/products/cost.png" alt="Cost" />
             </div>
-            <div className="enrollment-info-text font-weight-bold">Free</div>
+            <div className="enrollment-info-text"><b>Free</b></div>
           </div>
           <div className="row d-flex align-items-top">
             <div className="enrollment-info-icon">
