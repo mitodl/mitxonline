@@ -12,7 +12,12 @@ from cms.factories import (
 )
 from cms.models import FlexiblePricingRequestForm
 from cms.serializers import CoursePageSerializer
-from courses.factories import CourseFactory, ProgramFactory
+from courses.factories import (
+    CourseFactory,
+    ProgramFactory,
+    program_with_empty_requirements,
+    program_with_requirements,
+)
 from main.test_utils import assert_drf_json_equal
 
 pytestmark = [pytest.mark.django_db]
@@ -225,3 +230,65 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
             "effort": course_page.effort,
         },
     )
+
+
+@pytest.mark.parametrize(
+    "own_program_has_form,related_program,related_program_has_form",
+    [
+        [True, False, False],
+        [True, True, False],
+        [False, True, False],
+        [False, True, True],
+        [True, True, True],
+    ],
+)
+def test_serialized_course_finaid_form_url(
+    own_program_has_form, related_program, related_program_has_form
+):
+    """
+    Tests the financial assistance form URL returned for a course that's in a
+    program that has no financial assistance form and is related to a program
+    that does have a financial assistance form. (The course should get the
+    form URL for the program that does have the financial assistance form.)
+    """
+
+    program1 = ProgramFactory.create()
+    course1 = CourseFactory.create()
+    program1.add_requirement(course1)
+
+    program2 = ProgramFactory.create()
+    course2 = CourseFactory.create()
+    program2.add_requirement(course2)
+
+    if related_program:
+        program1.add_related_program(program2)
+
+    if own_program_has_form:
+        own_fa_page = FlexiblePricingFormFactory.create(
+            parent=program1.page, selected_program=program1
+        )
+
+        serialized_output = CoursePageSerializer(course1.page).data
+
+        assert own_fa_page.slug in serialized_output["financial_assistance_form_url"]
+    else:
+        serialized_output = CoursePageSerializer(course1.page).data
+
+        assert serialized_output["financial_assistance_form_url"] == ""
+
+    if related_program_has_form:
+        related_fa_page = FlexiblePricingFormFactory.create(
+            parent=program2.page, selected_program=program2
+        )
+
+        serialized_output = CoursePageSerializer(course1.page).data
+
+        if own_program_has_form:
+            assert (
+                own_fa_page.slug in serialized_output["financial_assistance_form_url"]
+            )
+        else:
+            assert (
+                related_fa_page.slug
+                in serialized_output["financial_assistance_form_url"]
+            )
