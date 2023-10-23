@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.77.1
+Version 0.77.1 (Released October 23, 2023)
 --------------
 
 - Catalog Page: Mobile view changes (#1956)
