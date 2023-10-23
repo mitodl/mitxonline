@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.77.1 (Released October 23, 2023)
+--------------
+
+- Catalog Page: Mobile view changes (#1956)
+
 Version 0.77.0 (Released October 18, 2023)
 --------------
 
