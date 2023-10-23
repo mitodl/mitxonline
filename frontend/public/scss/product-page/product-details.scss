@@ -12,10 +12,12 @@ body.new-design {
     margin-top: 1.5rem;
     background-color: white;
 
-    .row.align-items-center {
-      justify-content: center;
-      align-items: center;
+    .row.align-center {
+      @include media-breakpoint-down(md) {
+          justify-content: center !important;
+      }
     }
+
 
     section.course-description {
       font-size: 20px;
@@ -92,7 +94,6 @@ body.new-design {
       border: 1px solid #e4e9ef;
       padding: 2rem;
       clear: both;
-      margin-bottom: 1.5rem;
     }
 
     #product-info-box {
@@ -103,6 +104,10 @@ body.new-design {
       max-width: 400px;
       height: auto;
       border-radius: 5px;
+
+      @include media-breakpoint-down(md) {
+          margin-top: 1.5rem;
+        }
 
       strong {
         font-weight: 600;
