@@ -1,14 +1,23 @@
 // sass-lint:disable mixins-before-declarations
 
 body.new-design {
+  font-family: Inter;
+
+  h1, h2 {
+      font-family: Poppins;
+
+  }
+
   .product-page {
     margin-top: 1.5rem;
     background-color: white;
 
     section.course-description {
-      line-height: 46px;
       font-size: 20px;
-      color: #646669;
+      color: var(--GreyText, #6F7175);
+      font-style: normal;
+      font-weight: 500;
+      line-height: 38px;
     }
 
     #tab-bar {
@@ -31,6 +40,12 @@ body.new-design {
 
     section.about-richtext-container {
       margin: 2.5rem 0;
+      color: var(--Blue-Dark, #03152D);
+
+      font-size: 15px;
+      font-style: normal;
+      font-weight: 400;
+      line-height: 24px;
 
       div.expand_here_body {
         max-height: 0px;
@@ -158,6 +173,7 @@ body.new-design {
         }
 
         .btn-enrollment-button {
+          font-family: Poppins;
           height: 50px;
           line-height: 50px;
           width: 100%;
@@ -182,7 +198,7 @@ body.new-design {
           border: 1px solid #d1d1d1;
           border-left: none;
           border-right: none;
-          font-size: 14px;
+          font-size: 15px;
 
           .row {
             margin: 20px 0;
