@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.78.0
+Version 0.78.0 (Released October 23, 2023)
 --------------
 
 - Course About Page: update font and styles (#1957)
