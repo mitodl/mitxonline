@@ -361,9 +361,23 @@ body.new-design {
 
   .instructor-modal {
     .modal-dialog {
-      width: 770px;
       max-width: 770px;
       border-radius: 5px;
+
+      @include media-breakpoint-down(md) {
+        width:500px;
+      }
+      @include media-breakpoint-down(sm) {
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 20px;
+        display: flex;
+        width: 360px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        margin: 0;
+      }
 
       .modal-header {
         background-color: #03152d;
@@ -373,6 +387,14 @@ body.new-design {
         height: 130px;
         align-items: start;
         padding: 20px;
+
+        @include media-breakpoint-down(sm) {
+          background-image: none;
+          border-bottom: none;
+          padding: 5px;
+          background-color: transparent;
+          height: 0;
+        }
     
         h5 {
           margin-left: -9999px;
@@ -383,6 +405,12 @@ body.new-design {
           border-radius: 100%;
           width: 30px;
           height: 30px;
+
+          @include media-breakpoint-down(sm) {
+            background-color: transparent;
+            width: 38px;
+            height: 38px;
+          }
         }
       }
     
@@ -390,10 +418,20 @@ body.new-design {
         padding-left: 50px;
         padding-right: 50px;
 
+        @include media-breakpoint-down(sm) {
+          padding-left: 20px;
+          padding-right: 20px;
+        }
+
         div.col-instructor-photo {
           margin-top: -50px;
           width: 165px !important;
           max-width: 165px;
+
+          @include media-breakpoint-down(sm) {
+            margin-top: -5px;
+            flex: 0.35 0;
+        }
 
           img.img-thumbnail {
             width: 130px;
@@ -404,6 +442,13 @@ body.new-design {
             object-position: 50% 0;
 
             box-shadow: 0px 2px #e1e1e1;
+
+            @include media-breakpoint-down(sm) {
+              width: 80px;
+              height: 90.278px;
+              padding: 5px;
+              margin: 0;
+            }
           }
         }
 
@@ -411,11 +456,23 @@ body.new-design {
           width: auto;
           margin-left: 10px;
 
+          @include media-breakpoint-down(sm) {
+            width: 218px;
+            padding: 0;
+            margin-left: 0;
+          }
+
           h2 {
             margin-bottom: 0px;
             line-height: 30px;
             font-size: 25px;
             font-weight: 700;
+
+            @include media-breakpoint-down(sm) {
+              font-size: 20px;
+              font-style: normal;
+              font-weight: 700;
+            }
           }
           h3, p {
             font-size: 18px;
@@ -425,6 +482,11 @@ body.new-design {
           }
           h3 {
             font-weight: 600;
+
+            @include media-breakpoint-down(sm) {
+              font-size: 16px;
+              font-weight: 500;
+            }
           }
           p {
             margin-top: 5px;
@@ -433,6 +495,10 @@ body.new-design {
 
         .row-instructor-body {
           padding: 10px 10px;
+
+          @include media-breakpoint-down(sm) {
+            padding: 10px 0;
+          }
         }
       }
     }
