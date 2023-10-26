@@ -9,7 +9,6 @@ import random
 import reversion
 from django.db.models import Count, Q
 from django.urls import reverse
-from nplusone.core.profiler import Profiler
 from pytest_django.fixtures import django_assert_max_num_queries
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
@@ -41,6 +40,7 @@ from courses.serializers import (
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order
+from fixtures.common import raise_nplusone
 from main import features
 from main.constants import (
     USER_MSG_COOKIE_NAME,
@@ -52,19 +52,11 @@ from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from main.utils import encode_json_cookie_value
 from openedx.exceptions import NoEdxApiAuthError
 
-pytestmark = [pytest.mark.django_db]
+
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
 
 
 EXAMPLE_URL = "http://example.com"
-
-
-@pytest.fixture(autouse=True)
-def _raise_nplusone(request):
-    if request.node.get_closest_marker("skip_nplusone"):
-        yield
-    else:
-        with Profiler():
-            yield
 
 
 def _num_queries_from_course(course):
@@ -108,8 +100,13 @@ def courses():
     return CourseFactory.create_batch(3)
 
 
-@pytest.fixture
-def course_catalog_api():
+@pytest.fixture()
+def course_runs():
+    """Fixture for a set of CourseRuns in the database"""
+    return CourseRunFactory.create_batch(3)
+
+
+def populate_course_catalog_data(num_courses, num_programs):
     """
     Current production data is around 85 courses and 150 course runs. I opted to create 3 of each to allow
     the best course run logic to play out as well as to push the endpoint a little harder in testing.
@@ -123,25 +120,22 @@ def course_catalog_api():
 
     Args:
         num_courses(int): number of courses to generate.
+        num_programs(int): number of programs to generate.
     """
-
-    def _course_catalog_api(num_courses, num_programs):
-        programs = []
-        courses = []
-        course_runs = []
-        for n in range(num_courses):
-            course, course_runs_for_course = _create_course_fixture(n)
-            courses.append(course)
-            course_runs.append(course_runs_for_course)
-        for n in range(num_programs):
-            program = _create_program_fixture(courses)
-            programs.append(program)
-        return courses, programs, course_runs
-
-    return _course_catalog_api
+    programs = []
+    courses = []
+    course_runs = []
+    for n in range(num_courses):
+        course, course_runs_for_course = _create_course(n)
+        courses.append(course)
+        course_runs.append(course_runs_for_course)
+    for n in range(num_programs):
+        program = _create_program(courses)
+        programs.append(program)
+    return courses, programs, course_runs
 
 
-def _create_course_fixture(n):
+def _create_course(n):
     test_course = CourseFactory.create(title=f"Test Course {n}")
     cr1 = CourseRunFactory.create(course=test_course, past_start=True)
     cr2 = CourseRunFactory.create(course=test_course, in_progress=True)
@@ -149,7 +143,7 @@ def _create_course_fixture(n):
     return test_course, [cr1, cr2, cr3]
 
 
-def _create_program_fixture(courses):
+def _create_program(courses):
     program = ProgramFactory.create()
     ProgramRequirementFactory.add_root(program)
     root_node = program.requirements_root
@@ -179,12 +173,6 @@ def _create_program_fixture(courses):
             node_type=ProgramRequirementNodeType.COURSE, course=courses[0]
         )
     return program
-
-
-@pytest.fixture()
-def course_runs():
-    """Fixture for a set of CourseRuns in the database"""
-    return CourseRunFactory.create_batch(3)
 
 
 def test_get_programs(user_drf_client, programs):
@@ -234,11 +222,17 @@ def test_delete_program(user_drf_client, programs):
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.parametrize("num_courses", [100])
+@pytest.mark.parametrize("num_programs", [15])
 def test_get_courses(
-    user_drf_client, course_catalog_api, mock_context, django_assert_max_num_queries
+    user_drf_client,
+    mock_context,
+    django_assert_max_num_queries,
+    num_courses,
+    num_programs,
 ):
     """Test the view that handles requests for all Courses"""
-    courses, _, _ = course_catalog_api(100, 15)
+    courses, _, _ = populate_course_catalog_data(num_courses, num_programs)
     courses_from_fixture = []
     num_queries = 0
     for course in courses:
@@ -260,11 +254,20 @@ def test_get_courses(
     assert_drf_json_equal(courses_data, courses_from_fixture, ignore_order=True)
 
 
+@pytest.mark.parametrize("num_courses", [1])
+@pytest.mark.parametrize("num_programs", [1])
 def test_get_course(
-    user_drf_client, course_catalog_api, mock_context, django_assert_max_num_queries
+    user_drf_client,
+    num_courses,
+    num_programs,
+    mock_context,
+    django_assert_max_num_queries,
 ):
     """Test the view that handles a request for single Course"""
-    courses, _, _ = course_catalog_api(1, 1)
+    courses, _, _ = populate_course_catalog_data(
+        num_courses,
+        num_programs,
+    )
     course = courses[0]
     num_queries = _num_queries_from_course(course)
     with django_assert_max_num_queries(num_queries) as context:
@@ -279,11 +282,17 @@ def test_get_course(
     assert_drf_json_equal(course_data, course_from_fixture, ignore_order=True)
 
 
+@pytest.mark.parametrize("num_courses", [1])
+@pytest.mark.parametrize("num_programs", [1])
 def test_create_course(
-    user_drf_client, course_catalog_api, mock_context, django_assert_max_num_queries
+    user_drf_client,
+    num_courses,
+    num_programs,
+    mock_context,
+    django_assert_max_num_queries,
 ):
     """Test the view that handles a request to create a Course"""
-    courses, _, _ = course_catalog_api(1, 1)
+    courses, _, _ = populate_course_catalog_data(num_courses, num_programs)
     course = courses[0]
     course_data = CourseWithCourseRunsSerializer(
         instance=course, context=mock_context
@@ -297,11 +306,16 @@ def test_create_course(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.parametrize("num_courses", [1])
+@pytest.mark.parametrize("num_programs", [1])
 def test_patch_course(
-    user_drf_client, course_catalog_api, django_assert_max_num_queries
+    user_drf_client, num_courses, num_programs, django_assert_max_num_queries
 ):
     """Test the view that handles a request to patch a Course"""
-    courses, _, _ = course_catalog_api(1, 1)
+    courses, _, _ = populate_course_catalog_data(
+        num_courses,
+        num_programs,
+    )
     course = courses[0]
     request_url = reverse("courses_api-detail", kwargs={"pk": course.id})
     with django_assert_max_num_queries(1) as context:
@@ -310,11 +324,16 @@ def test_patch_course(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
+@pytest.mark.parametrize("num_courses", [1])
+@pytest.mark.parametrize("num_programs", [1])
 def test_delete_course(
-    user_drf_client, course_catalog_api, django_assert_max_num_queries
+    user_drf_client, num_courses, num_programs, django_assert_max_num_queries
 ):
     """Test the view that handles a request to delete a Course"""
-    courses, _, _ = course_catalog_api(1, 1)
+    courses, _, _ = populate_course_catalog_data(
+        num_courses,
+        num_programs,
+    )
     course = courses[0]
     with django_assert_max_num_queries(1) as context:
         resp = user_drf_client.delete(
