@@ -5,9 +5,11 @@ Tests for course views
 import operator as op
 
 import pytest
+import random
 import reversion
 from django.db.models import Count, Q
 from django.urls import reverse
+from pytest_django.fixtures import django_assert_max_num_queries
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 from rest_framework import status
@@ -19,10 +21,9 @@ from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
-    ProgramFactory,
-    program_with_empty_requirements,
+    ProgramFactory, ProgramRequirementFactory,
 )
-from courses.models import CourseRun, ProgramEnrollment
+from courses.models import CourseRun, ProgramEnrollment, ProgramRequirementNodeType, ProgramRequirement
 from courses.serializers import (
     CourseRunEnrollmentSerializer,
     CourseRunSerializer,
@@ -40,7 +41,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_ENROLLED,
 )
-from main.test_utils import assert_drf_json_equal
+from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from main.utils import encode_json_cookie_value
 from openedx.exceptions import NoEdxApiAuthError
 
@@ -48,6 +49,35 @@ pytestmark = [pytest.mark.django_db]
 
 
 EXAMPLE_URL = "http://example.com"
+
+
+def _num_queries_from_course(course):
+    """
+    Generates approximately the number of queries we should expect to see, in a worst case scenario. This is
+    difficult to predict without weighing down the test more as it traverses a bunch of wagtail and other related models.
+    New endpoints should solve this, but the v1 endpoints will not change until/unless they are modified.
+
+    programs see about 9 hits right now:
+      -  4 are duplicated grabbing related courses
+      -  3 grab flexible pricing data
+      -  1 grabs content types related to it
+      -  1 grabs the content of that content type
+
+    course sees about 22 - this number varies on flexible pricing, wagtail data, and some relations with other objects
+      - 12 are grabbing related objects both course objects and wagtail objects
+      - 6 are grabbing flexible pricing
+      - 4 are grabbing wagtail objects (page, image, etc)
+
+    course runs grab about 6 (this varies if there's a relation to pricing)
+      - ~4 are wagtail related - this is where things get hazy
+      - 2 are checking relations
+
+    Args:
+        course (object): course object
+    """
+    num_programs = len(course.programs)
+    num_course_runs = course.courseruns.count()
+    return (9 * num_programs) + (num_course_runs * 6) + 22
 
 
 @pytest.fixture()
@@ -60,6 +90,57 @@ def programs():
 def courses():
     """Fixture for a set of Courses in the database"""
     return CourseFactory.create_batch(3)
+
+
+@pytest.fixture()
+def course_catalog_api():
+    """
+    Current production data is around 85 courses and 150 course runs. I opted to create 3 of each to allow
+    the best course run logic to play out as well as to push the endpoint a little harder in testing.
+
+    There are currently 3 programs in production, so I went with 15, again, to get ready for more data. To allow
+    things to be somewhat random, I grab courses for them at random (one required and one elective) which also allows
+    for courses to be in more than one program. If we need/want more specific test cases, we can add them, but this
+    is a more robust data set than production is presently.
+
+    Returns 3 separate lists to simulate what the tests received prior.
+    """
+    programs = []
+    courses = []
+    course_runs = []
+    for n in range(100):
+        course = CourseFactory.create(title=f"Test Course {n}")
+        courses.append(course)
+        cr1 = CourseRunFactory.create(course=course, past_start=True)
+        cr2 = CourseRunFactory.create(course=course, in_progress=True)
+        cr3 = CourseRunFactory.create(course=course, in_future=True)
+        course_runs.append([cr1, cr2, cr3])
+    for n in range(15):
+        program = ProgramFactory.create()
+        programs.append(program)
+        ProgramRequirementFactory.add_root(program)
+        root_node = program.requirements_root
+        required_courses_node = root_node.add_child(
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            operator=ProgramRequirement.Operator.ALL_OF,
+            title="Required Courses",
+        )
+        elective_courses_node = root_node.add_child(
+            node_type=ProgramRequirementNodeType.OPERATOR,
+            operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+            operator_value=2,
+            title="Elective Courses",
+            elective_flag=True,
+        )
+        for course in random.sample(courses, 3):
+            required_courses_node.add_child(
+                node_type=ProgramRequirementNodeType.COURSE, course=course
+            )
+        for course in random.sample(courses, 3):
+            elective_courses_node.add_child(
+                node_type=ProgramRequirementNodeType.COURSE, course=course
+            )
+    return courses, programs, course_runs
 
 
 @pytest.fixture()
@@ -115,31 +196,44 @@ def test_delete_program(user_drf_client, programs):
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-def test_get_courses(user_drf_client, courses, mock_context):
+def test_get_courses(user_drf_client, course_catalog_api, mock_context, django_assert_max_num_queries):
     """Test the view that handles requests for all Courses"""
-    resp = user_drf_client.get(reverse("courses_api-list"))
-    courses_data = resp.json()
-    assert len(courses_data) == len(courses)
+    courses, _, _ = course_catalog_api
+    courses_from_fixture = []
+    num_queries = 0
     for course in courses:
-        assert (
-            CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
-            in courses_data
-        )
+        courses_from_fixture.append(CourseWithCourseRunsSerializer(instance=course, context=mock_context).data)
+        num_queries += _num_queries_from_course(course)
+    with django_assert_max_num_queries(num_queries) as context:
+        resp = user_drf_client.get(reverse("courses_api-list"))
+    #     This will become an assert rather than a warning in the future, for now this function is informational
+    duplicate_queries_check(context)
+    courses_data = resp.json()
+    assert len(courses_data) == len(courses_from_fixture)
+    """
+    Due to the number of relations in our current course endpoint, and the potential for re-ordering of those nested
+    objects, deepdiff has an ignore_order flag which I've added with an optional boolean argument to the assert_drf_json
+    function.
+    """
+    assert_drf_json_equal(courses_data, courses_from_fixture, ignore_order=True)
 
 
-def test_get_course(user_drf_client, courses, mock_context):
+def test_get_course(user_drf_client, course_catalog_api, mock_context, django_assert_max_num_queries):
     """Test the view that handles a request for single Course"""
+    courses, _, _ = course_catalog_api
     course = courses[0]
-    resp = user_drf_client.get(reverse("courses_api-detail", kwargs={"pk": course.id}))
+    num_queries = _num_queries_from_course(course)
+    with django_assert_max_num_queries(num_queries) as context:
+        resp = user_drf_client.get(reverse("courses_api-detail", kwargs={"pk": course.id}))
+    duplicate_queries_check(context)
     course_data = resp.json()
-    assert (
-        course_data
-        == CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
-    )
+    course_from_fixture = dict(CourseWithCourseRunsSerializer(instance=course, context=mock_context).data)
+    assert_drf_json_equal(course_data, course_from_fixture, ignore_order=True)
 
 
-def test_create_course(user_drf_client, courses, mock_context):
+def test_create_course(user_drf_client, course_catalog_api, mock_context, django_assert_max_num_queries):
     """Test the view that handles a request to create a Course"""
+    courses, _, _ = course_catalog_api
     course = courses[0]
     course_data = CourseWithCourseRunsSerializer(
         instance=course, context=mock_context
@@ -147,30 +241,40 @@ def test_create_course(user_drf_client, courses, mock_context):
     del course_data["id"]
     course_data["title"] = "New Course Title"
     request_url = reverse("courses_api-list")
-    resp = user_drf_client.post(request_url, course_data)
+    with django_assert_max_num_queries(1) as context:
+        resp = user_drf_client.post(request_url, course_data)
+    duplicate_queries_check(context)
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-def test_patch_course(user_drf_client, courses):
+def test_patch_course(user_drf_client, course_catalog_api, django_assert_max_num_queries):
     """Test the view that handles a request to patch a Course"""
+    courses, _, _ = course_catalog_api
     course = courses[0]
     request_url = reverse("courses_api-detail", kwargs={"pk": course.id})
-    resp = user_drf_client.patch(request_url, {"title": "New Course Title"})
+    with django_assert_max_num_queries(1) as context:
+        resp = user_drf_client.patch(request_url, {"title": "New Course Title"})
+    duplicate_queries_check(context)
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-def test_delete_course(user_drf_client, courses):
+def test_delete_course(user_drf_client, course_catalog_api, django_assert_max_num_queries):
     """Test the view that handles a request to delete a Course"""
+    courses, _, _ = course_catalog_api
     course = courses[0]
-    resp = user_drf_client.delete(
-        reverse("courses_api-detail", kwargs={"pk": course.id})
-    )
+    with django_assert_max_num_queries(1) as context:
+        resp = user_drf_client.delete(
+            reverse("courses_api-detail", kwargs={"pk": course.id})
+        )
+    duplicate_queries_check(context)
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-def test_get_course_runs(user_drf_client, course_runs):
+def test_get_course_runs(user_drf_client, course_runs, django_assert_max_num_queries):
     """Test the view that handles requests for all CourseRuns"""
-    resp = user_drf_client.get(reverse("course_runs_api-list"))
+    with django_assert_max_num_queries(38) as context:
+        resp = user_drf_client.get(reverse("course_runs_api-list"))
+    duplicate_queries_check(context)
     course_runs_data = resp.json()
     assert len(course_runs_data) == len(course_runs)
     # Force sorting by run id since this test has been flaky
@@ -181,7 +285,7 @@ def test_get_course_runs(user_drf_client, course_runs):
 
 @pytest.mark.parametrize("is_enrolled", [True, False])
 def test_get_course_runs_relevant(
-    mocker, user_drf_client, course_runs, user, is_enrolled
+    mocker, user_drf_client, course_runs, user, is_enrolled, django_assert_max_num_queries
 ):
     """A GET request for course runs with a `relevant_to` parameter should return user-relevant course runs"""
     course_run = course_runs[0]
@@ -203,35 +307,41 @@ def test_get_course_runs_relevant(
     if is_enrolled:
         CourseRunEnrollmentFactory.create(user=user, run=course_run, edx_enrolled=True)
 
-    resp = user_drf_client.get(
-        f"{reverse('course_runs_api-list')}?relevant_to={course_run.course.readable_id}"
-    )
+    with django_assert_max_num_queries(20) as context:
+        resp = user_drf_client.get(
+            f"{reverse('course_runs_api-list')}?relevant_to={course_run.course.readable_id}"
+        )
+    duplicate_queries_check(context)
     patched_run_qset.assert_called_once_with(course_run.course, user)
     course_run_data = resp.json()[0]
 
     assert course_run_data["is_enrolled"] == is_enrolled
 
 
-def test_get_course_runs_relevant_missing(user_drf_client):
+def test_get_course_runs_relevant_missing(user_drf_client, django_assert_max_num_queries):
     """A GET request for course runs with an invalid `relevant_to` query parameter should return empty results"""
-    resp = user_drf_client.get(
-        f"{reverse('course_runs_api-list')}?relevant_to=invalid+course+id"
-    )
+    with django_assert_max_num_queries(3) as context:
+        resp = user_drf_client.get(
+            f"{reverse('course_runs_api-list')}?relevant_to=invalid+course+id"
+        )
+    duplicate_queries_check(context)
     course_runs_data = resp.json()
     assert course_runs_data == []
 
 
-def test_get_course_run(user_drf_client, course_runs):
+def test_get_course_run(user_drf_client, course_runs, django_assert_max_num_queries):
     """Test the view that handles a request for single CourseRun"""
     course_run = course_runs[0]
-    resp = user_drf_client.get(
-        reverse("course_runs_api-detail", kwargs={"pk": course_run.id})
-    )
+    with django_assert_max_num_queries(18) as context:
+        resp = user_drf_client.get(
+            reverse("course_runs_api-detail", kwargs={"pk": course_run.id})
+        )
+    duplicate_queries_check(context)
     course_run_data = resp.json()
     assert course_run_data == CourseRunWithCourseSerializer(course_run).data
 
 
-def test_create_course_run(user_drf_client, course_runs):
+def test_create_course_run(user_drf_client, course_runs, django_assert_max_num_queries):
     """Test the view that handles a request to create a CourseRun"""
     course_run = course_runs[0]
     course_run_data = CourseRunSerializer(course_run).data
@@ -244,24 +354,30 @@ def test_create_course_run(user_drf_client, course_runs):
         }
     )
     request_url = reverse("course_runs_api-list")
-    resp = user_drf_client.post(request_url, course_run_data)
+    with django_assert_max_num_queries(1) as context:
+        resp = user_drf_client.post(request_url, course_run_data)
+    duplicate_queries_check(context)
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-def test_patch_course_run(user_drf_client, course_runs):
+def test_patch_course_run(user_drf_client, course_runs, django_assert_max_num_queries):
     """Test the view that handles a request to patch a CourseRun"""
     course_run = course_runs[0]
     request_url = reverse("course_runs_api-detail", kwargs={"pk": course_run.id})
-    resp = user_drf_client.patch(request_url, {"title": "New CourseRun Title"})
+    with django_assert_max_num_queries(1) as context:
+        resp = user_drf_client.patch(request_url, {"title": "New CourseRun Title"})
+    duplicate_queries_check(context)
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-def test_delete_course_run(user_drf_client, course_runs):
+def test_delete_course_run(user_drf_client, course_runs, django_assert_max_num_queries):
     """Test the view does not handle a request to delete a CourseRun"""
     course_run = course_runs[0]
-    resp = user_drf_client.delete(
-        reverse("course_runs_api-detail", kwargs={"pk": course_run.id})
-    )
+    with django_assert_max_num_queries(1) as context:
+        resp = user_drf_client.delete(
+            reverse("course_runs_api-detail", kwargs={"pk": course_run.id})
+        )
+    duplicate_queries_check(context)
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 

@@ -2,12 +2,15 @@
 import abc
 import csv
 import json
+import logging
 import tempfile
 import traceback
+from collections import Counter
 from contextlib import contextmanager
 from unittest.mock import Mock
 
 import pytest
+from deepdiff import DeepDiff
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.files.uploadedfile import SimpleUploadedFile
 from requests.exceptions import HTTPError
@@ -25,7 +28,7 @@ def assert_not_raises():
         pytest.fail(f"An exception was not raised: {traceback.format_exc()}")
 
 
-def assert_drf_json_equal(obj1, obj2):
+def assert_drf_json_equal(obj1, obj2, ignore_order=False):
     """
     Asserts that two objects are equal after a round trip through JSON serialization/deserialization.
     Particularly helpful when testing DRF serializers where you may get back OrderedDict and other such objects.
@@ -33,11 +36,15 @@ def assert_drf_json_equal(obj1, obj2):
     Args:
         obj1 (object): the first object
         obj2 (object): the second object
+        ignore_order (bool): Boolean to ignore the order in the result
     """
     json_renderer = JSONRenderer()
     converted1 = json.loads(json_renderer.render(obj1))
     converted2 = json.loads(json_renderer.render(obj2))
-    assert converted1 == converted2
+    if ignore_order:
+        assert DeepDiff(converted1, converted2, ignore_order=ignore_order) == {}
+    else:
+        assert converted1 == converted2
 
 
 class MockResponse:
@@ -167,3 +174,17 @@ def update_namespace(tuple_to_update, **updates):
             **updates,
         }
     )
+
+
+def duplicate_queries_check(context):
+    """
+    For now this is informational until we fix the queries, then we will swap this over
+    to an assertion that captured_queries_list == list(set(captured_queries_list))
+    """
+    captured_queries_list = [query_dict["sql"] for query_dict in context.captured_queries]
+    total_queries = len(captured_queries_list)
+    count_of_requests = Counter(captured_queries_list)
+    if max(count_of_requests.values()) > 1:
+        logger = logging.getLogger()
+        dupes = [value for query, value in count_of_requests.items() if value > 1]
+        logger.info(f"{len(dupes)} out of {total_queries} queries duplicated", stacklevel=2)
