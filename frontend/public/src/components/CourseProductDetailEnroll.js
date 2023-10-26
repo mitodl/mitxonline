@@ -208,11 +208,32 @@ export class CourseProductDetailEnroll extends React.Component<
           <ModalBody>
             <div className="row">
               <div className="col-12">
-                <p>
-                  Thank you for choosing an MITx Online course. By paying for
-                  this course, you're joining the most engaged and motivated
-                  learners on your path to a certificate from MITx.
-                </p>
+                <div className="alert alert-dark-success">
+                  <strong>
+                    Success! You've been enrolled in '{course.title}'.
+                  </strong>
+                  <br />
+                  Choose a date below or click '
+                  <strong>Cancel Enrollment</strong>' to unenroll.
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-12">
+                <strong>Dates:</strong>
+
+                <div className="date-selector-button-bar">
+                  <button className="btn btn-primary me-2 mb-2 btn-sm">
+                    January 1, 2023 - May 1, 2023
+                  </button>
+                  <button className="btn btn-primary me-2 mb-2 btn-sm outline">
+                    May 1, 2023 - August 1, 2023
+                  </button>
+                  <button className="btn btn-primary me-2 mb-2 btn-sm outline">
+                    August 1, 2023 - December 1, 2023
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -351,13 +372,29 @@ export class CourseProductDetailEnroll extends React.Component<
     const { courseRuns } = this.props
     const run = courseRuns ? courseRuns[0] : null
     return (
-      <form action="/enrollments/" method="post">
-        <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
-        <input type="hidden" name="run" value={run ? run.id : ""} />
-        <button type="submit" className="btn enroll-now enroll-now-free">
-          No thanks, I'll take the free version
-        </button>
-      </form>
+      <div className="d-flex">
+        <div className="flex-grow-1 w-auto">
+          <form action="/enrollments/" method="post">
+            <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+            <input type="hidden" name="run" value={run ? run.id : ""} />
+            <button type="submit" className="btn enroll-now enroll-now-free">
+              No thanks, I'll take the course for free without a certificate
+            </button>
+          </form>
+        </div>
+        <div className="ml-auto">
+          <form action="/enrollments/" method="post">
+            <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+            <input type="hidden" name="run" value={run ? run.id : ""} />
+            <button
+              type="submit"
+              className="btn enroll-now enroll-now-free cancel-enrollment-button"
+            >
+              Cancel Enrollment
+            </button>
+          </form>
+        </div>
+      </div>
     )
   }
 
