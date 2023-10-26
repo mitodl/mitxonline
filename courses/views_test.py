@@ -9,6 +9,7 @@ import random
 import reversion
 from django.db.models import Count, Q
 from django.urls import reverse
+from nplusone.core.profiler import Profiler
 from pytest_django.fixtures import django_assert_max_num_queries
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
@@ -51,6 +52,14 @@ pytestmark = [pytest.mark.django_db]
 EXAMPLE_URL = "http://example.com"
 
 
+@pytest.fixture(autouse=True)
+def _raise_nplusone(request):
+    if request.node.get_closest_marker("skip_nplusone"):
+        yield
+    else:
+        with Profiler():
+            yield
+
 def _num_queries_from_course(course):
     """
     Generates approximately the number of queries we should expect to see, in a worst case scenario. This is
@@ -92,7 +101,7 @@ def courses():
     return CourseFactory.create_batch(3)
 
 
-@pytest.fixture()
+@pytest.fixture
 def course_catalog_api():
     """
     Current production data is around 85 courses and 150 course runs. I opted to create 3 of each to allow
@@ -104,43 +113,63 @@ def course_catalog_api():
     is a more robust data set than production is presently.
 
     Returns 3 separate lists to simulate what the tests received prior.
+
+    Args:
+        num_courses(int): number of courses to generate.
     """
-    programs = []
-    courses = []
-    course_runs = []
-    for n in range(100):
-        course = CourseFactory.create(title=f"Test Course {n}")
-        courses.append(course)
-        cr1 = CourseRunFactory.create(course=course, past_start=True)
-        cr2 = CourseRunFactory.create(course=course, in_progress=True)
-        cr3 = CourseRunFactory.create(course=course, in_future=True)
-        course_runs.append([cr1, cr2, cr3])
-    for n in range(15):
-        program = ProgramFactory.create()
-        programs.append(program)
-        ProgramRequirementFactory.add_root(program)
-        root_node = program.requirements_root
-        required_courses_node = root_node.add_child(
-            node_type=ProgramRequirementNodeType.OPERATOR,
-            operator=ProgramRequirement.Operator.ALL_OF,
-            title="Required Courses",
-        )
-        elective_courses_node = root_node.add_child(
-            node_type=ProgramRequirementNodeType.OPERATOR,
-            operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
-            operator_value=2,
-            title="Elective Courses",
-            elective_flag=True,
-        )
-        for course in random.sample(courses, 3):
+    def _course_catalog_api(num_courses, num_programs):
+        programs = []
+        courses = []
+        course_runs = []
+        for n in range(num_courses):
+            course, course_runs_for_course = _create_course_fixture(n)
+            courses.append(course)
+            course_runs.append(course_runs_for_course)
+        for n in range(num_programs):
+            program = _create_program_fixture(courses)
+            programs.append(program)
+        return courses, programs, course_runs
+    return _course_catalog_api
+
+
+def _create_course_fixture(n):
+    test_course = CourseFactory.create(title=f"Test Course {n}")
+    cr1 = CourseRunFactory.create(course=test_course, past_start=True)
+    cr2 = CourseRunFactory.create(course=test_course, in_progress=True)
+    cr3 = CourseRunFactory.create(course=test_course, in_future=True)
+    return test_course, [cr1, cr2, cr3]
+
+
+def _create_program_fixture(courses):
+    program = ProgramFactory.create()
+    ProgramRequirementFactory.add_root(program)
+    root_node = program.requirements_root
+    required_courses_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.ALL_OF,
+        title="Required Courses",
+    )
+    elective_courses_node = root_node.add_child(
+        node_type=ProgramRequirementNodeType.OPERATOR,
+        operator=ProgramRequirement.Operator.MIN_NUMBER_OF,
+        operator_value=2,
+        title="Elective Courses",
+        elective_flag=True,
+    )
+    if len(courses) > 3:
+        for c in random.sample(courses, 3):
             required_courses_node.add_child(
-                node_type=ProgramRequirementNodeType.COURSE, course=course
+                node_type=ProgramRequirementNodeType.COURSE, course=c
             )
-        for course in random.sample(courses, 3):
+        for c in random.sample(courses, 3):
             elective_courses_node.add_child(
-                node_type=ProgramRequirementNodeType.COURSE, course=course
+                node_type=ProgramRequirementNodeType.COURSE, course=c
             )
-    return courses, programs, course_runs
+    else:
+        required_courses_node.add_child(
+            node_type=ProgramRequirementNodeType.COURSE, course=courses[0]
+        )
+    return program
 
 
 @pytest.fixture()
@@ -198,7 +227,7 @@ def test_delete_program(user_drf_client, programs):
 
 def test_get_courses(user_drf_client, course_catalog_api, mock_context, django_assert_max_num_queries):
     """Test the view that handles requests for all Courses"""
-    courses, _, _ = course_catalog_api
+    courses, _, _ = course_catalog_api(100, 15)
     courses_from_fixture = []
     num_queries = 0
     for course in courses:
@@ -220,7 +249,7 @@ def test_get_courses(user_drf_client, course_catalog_api, mock_context, django_a
 
 def test_get_course(user_drf_client, course_catalog_api, mock_context, django_assert_max_num_queries):
     """Test the view that handles a request for single Course"""
-    courses, _, _ = course_catalog_api
+    courses, _, _ = course_catalog_api(1, 1)
     course = courses[0]
     num_queries = _num_queries_from_course(course)
     with django_assert_max_num_queries(num_queries) as context:
@@ -233,7 +262,7 @@ def test_get_course(user_drf_client, course_catalog_api, mock_context, django_as
 
 def test_create_course(user_drf_client, course_catalog_api, mock_context, django_assert_max_num_queries):
     """Test the view that handles a request to create a Course"""
-    courses, _, _ = course_catalog_api
+    courses, _, _ = course_catalog_api(1, 1)
     course = courses[0]
     course_data = CourseWithCourseRunsSerializer(
         instance=course, context=mock_context
@@ -249,7 +278,7 @@ def test_create_course(user_drf_client, course_catalog_api, mock_context, django
 
 def test_patch_course(user_drf_client, course_catalog_api, django_assert_max_num_queries):
     """Test the view that handles a request to patch a Course"""
-    courses, _, _ = course_catalog_api
+    courses, _, _ = course_catalog_api(1, 1)
     course = courses[0]
     request_url = reverse("courses_api-detail", kwargs={"pk": course.id})
     with django_assert_max_num_queries(1) as context:
@@ -260,7 +289,7 @@ def test_patch_course(user_drf_client, course_catalog_api, django_assert_max_num
 
 def test_delete_course(user_drf_client, course_catalog_api, django_assert_max_num_queries):
     """Test the view that handles a request to delete a Course"""
-    courses, _, _ = course_catalog_api
+    courses, _, _ = course_catalog_api(1, 1)
     course = courses[0]
     with django_assert_max_num_queries(1) as context:
         resp = user_drf_client.delete(
