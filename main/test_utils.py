@@ -181,10 +181,14 @@ def duplicate_queries_check(context):
     For now this is informational until we fix the queries, then we will swap this over
     to an assertion that captured_queries_list == list(set(captured_queries_list))
     """
-    captured_queries_list = [query_dict["sql"] for query_dict in context.captured_queries]
+    captured_queries_list = [
+        query_dict["sql"] for query_dict in context.captured_queries
+    ]
     total_queries = len(captured_queries_list)
     count_of_requests = Counter(captured_queries_list)
     if max(count_of_requests.values()) > 1:
         logger = logging.getLogger()
         dupes = [value for query, value in count_of_requests.items() if value > 1]
-        logger.info(f"{len(dupes)} out of {total_queries} queries duplicated", stacklevel=2)
+        logger.info(
+            f"{len(dupes)} out of {total_queries} queries duplicated", stacklevel=2
+        )
