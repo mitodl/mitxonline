@@ -186,6 +186,7 @@ def duplicate_queries_check(context):
     ]
     total_queries = len(captured_queries_list)
     count_of_requests = Counter(captured_queries_list)
+
     if max(count_of_requests.values()) > 1:
         logger = logging.getLogger()
         dupes = [value for query, value in count_of_requests.items() if value > 1]

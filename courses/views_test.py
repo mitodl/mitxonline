@@ -95,6 +95,29 @@ def _num_queries_from_course(course):
     num_course_runs = course.courseruns.count()
     return (9 * num_programs) + (num_course_runs * 6) + 22
 
+def _num_queries_from_programs(programs):
+    """
+    Program sees around 160+ queries per program. This is largely dependent on how much related data there is, but the
+    fixture always generates the same (3 course runs per course, no more than 3 courses per program.
+
+    The added on num_queries value is:
+    - 4 query to get the program, related courses, related runs, department
+    - 3 times num_courses for wagtail to get the generic data for the program and courses
+    - 3 times num_courses for program requirements plus one for the initial call
+
+
+    Args:
+        program (object): program object
+    """
+    num_queries = 0
+    for program in programs:
+        required_courses = program.required_courses
+        num_courses = len(required_courses)
+        for course in required_courses:
+            num_queries += _num_queries_from_course(course)
+        num_queries += 4 + (6 * num_courses) + 1
+    return num_queries
+
 
 @pytest.fixture()
 def programs():
@@ -187,50 +210,67 @@ def course_runs():
     return CourseRunFactory.create_batch(3)
 
 
-def test_get_programs(user_drf_client, programs):
+def test_get_programs(user_drf_client, course_catalog_api, django_assert_max_num_queries):
     """Test the view that handles requests for all Programs"""
-    resp = user_drf_client.get(reverse("programs_api-list"))
+    _, programs, _ = course_catalog_api(100, 15)
+    num_queries = _num_queries_from_programs(programs)
+    with django_assert_max_num_queries(num_queries) as context:
+        resp = user_drf_client.get(reverse("programs_api-list"))
+    duplicate_queries_check(context)
     programs_data = sorted(resp.json(), key=op.itemgetter("id"))
     assert len(programs_data) == len(programs)
     for program, program_data in zip(programs, programs_data):
-        assert_drf_json_equal(program_data, ProgramSerializer(program).data)
+        assert_drf_json_equal(program_data, ProgramSerializer(program).data, ignore_order=True)
 
 
-def test_get_program(user_drf_client, programs):
+def test_get_program(user_drf_client, course_catalog_api, django_assert_max_num_queries):
     """Test the view that handles a request for single Program"""
+    _, programs, _ = course_catalog_api(5, 1)
     program = programs[0]
-    resp = user_drf_client.get(
-        reverse("programs_api-detail", kwargs={"pk": program.id})
-    )
+    num_queries = _num_queries_from_programs([program])
+    with django_assert_max_num_queries(num_queries) as context:
+        resp = user_drf_client.get(
+            reverse("programs_api-detail", kwargs={"pk": program.id})
+        )
+    duplicate_queries_check(context)
     program_data = resp.json()
-    assert_drf_json_equal(program_data, ProgramSerializer(program).data)
+    assert_drf_json_equal(program_data, ProgramSerializer(program).data, ignore_order=True)
 
 
-def test_create_program(user_drf_client, programs):
+def test_create_program(user_drf_client, course_catalog_api, django_assert_max_num_queries):
     """Test the view that handles a request to create a Program"""
+    _, programs, _ = course_catalog_api(1, 1)
     program = programs[0]
     program_data = ProgramSerializer(program).data
     del program_data["id"]
     program_data["title"] = "New Program Title"
     request_url = reverse("programs_api-list")
-    resp = user_drf_client.post(request_url, program_data)
+    with django_assert_max_num_queries(1) as context:
+        resp = user_drf_client.post(request_url, program_data)
+    duplicate_queries_check(context)
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-def test_patch_program(user_drf_client, programs):
+def test_patch_program(user_drf_client, course_catalog_api, django_assert_max_num_queries):
     """Test the view that handles a request to patch a Program"""
+    _, programs, _ = course_catalog_api(1, 1)
     program = programs[0]
     request_url = reverse("programs_api-detail", kwargs={"pk": program.id})
-    resp = user_drf_client.patch(request_url, {"title": "New Program Title"})
+    with django_assert_max_num_queries(1) as context:
+        resp = user_drf_client.patch(request_url, {"title": "New Program Title"})
+    duplicate_queries_check(context)
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-def test_delete_program(user_drf_client, programs):
+def test_delete_program(user_drf_client, course_catalog_api, django_assert_max_num_queries):
     """Test the view that handles a request to delete a Program"""
+    _, programs, _ = course_catalog_api(1, 1)
     program = programs[0]
-    resp = user_drf_client.delete(
-        reverse("programs_api-detail", kwargs={"pk": program.id})
-    )
+    with django_assert_max_num_queries(1) as context:
+        resp = user_drf_client.delete(
+            reverse("programs_api-detail", kwargs={"pk": program.id})
+        )
+    duplicate_queries_check(context)
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
