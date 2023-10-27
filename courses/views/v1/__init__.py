@@ -1,4 +1,4 @@
-"""Course views verson 1"""
+"""Course views version 1"""
 import logging
 from typing import Optional, Tuple, Union
 
