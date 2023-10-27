@@ -132,10 +132,7 @@ def test_delete_program(user_drf_client, programs):
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [15], indirect=True)
 def test_get_courses(
-    user_drf_client,
-    mock_context,
-    django_assert_max_num_queries,
-    course_catalog_data
+    user_drf_client, mock_context, django_assert_max_num_queries, course_catalog_data
 ):
     """Test the view that handles requests for all Courses"""
     courses, _, _ = course_catalog_data
@@ -164,7 +161,7 @@ def test_get_courses(
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 def test_get_course(
     user_drf_client,
-   course_catalog_data,
+    course_catalog_data,
     mock_context,
     django_assert_max_num_queries,
 ):
