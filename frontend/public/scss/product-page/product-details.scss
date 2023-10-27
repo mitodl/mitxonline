@@ -269,9 +269,7 @@ body.new-design {
               padding-left: 36px;
             }
             button.more-dates-link {
-              color: $brand-darker-bg;
               font-size: 14px;
-              text-decoration-line: underline;
               border: 0;
               padding-left: 0;
               background-color: transparent;
@@ -279,8 +277,6 @@ body.new-design {
             button.more-dates-link.enrolled {
               color: $green-darker;
               cursor: default;
-              text-decoration-line: none;
-
             }
           }
         }

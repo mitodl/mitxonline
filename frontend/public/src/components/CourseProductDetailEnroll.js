@@ -60,8 +60,9 @@ type Props = {
   addProductToBasket: (user: number, productId: number) => Promise<any>,
   currentUser: User,
   createEnrollment: (runId: number) => Promise<any>,
-  deactivateEnrollment: (run: EnrollmentFlaggedCourseRun) => Promise<any>,
-  updateAddlFields: (currentUser: User) => Promise<any>
+  deactivateEnrollment: (runId: number) => Promise<any>,
+  updateAddlFields: (currentUser: User) => Promise<any>,
+  forceRequest: Function | null
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
@@ -79,6 +80,14 @@ export class CourseProductDetailEnroll extends React.Component<
     currentCourseRun:                  null,
     showAddlProfileFieldsModal:        false,
     destinationUrl:                    ""
+  }
+
+  resolveCurrentRun() {
+    const { courseRuns } = this.props
+
+    return !this.getCurrentCourseRun() && courseRuns
+      ? courseRuns[0]
+      : this.getCurrentCourseRun()
   }
 
   toggleAddlProfileFieldsModal() {
@@ -131,16 +140,61 @@ export class CourseProductDetailEnroll extends React.Component<
     }
   }
 
+  async checkAndCreateEnrollment(run: EnrollmentFlaggedCourseRun) {
+    // Only make an enrollment once the enrollments have been loaded, and check
+    // to make sure we're not enrolling in a course we're enrolled in.
+    const {
+      createEnrollment,
+      enrollmentsIsLoading,
+      enrollments,
+      forceRefresh
+    } = this.props
+
+    while (enrollmentsIsLoading);
+
+    if (
+      !enrollments.find(
+        (elem: RunEnrollment) => elem.run.course.id === run.course.id
+      )
+    ) {
+      createEnrollment(run)
+      forceRefresh()
+    }
+  }
+
+  async removeAndCreateEnrollment(run: EnrollmentFlaggedCourseRun) {
+    // Counterpoint to checkAndCreate: this instead removes the enrollments,
+    // then creates the new one.
+
+    const {
+      forceRefresh,
+      createEnrollment,
+      enrollmentsIsLoading,
+      enrollments,
+      deactivateEnrollment
+    } = this.props
+
+    while (enrollmentsIsLoading);
+
+    const priorEnrollment = enrollments.find(
+      (elem: RunEnrollment) =>
+        elem.run.course.id === run.course.id && elem.run.id !== run.id
+    )
+
+    if (priorEnrollment) {
+      deactivateEnrollment(priorEnrollment.id)
+    }
+
+    createEnrollment(run)
+    forceRefresh()
+  }
+
   toggleUpgradeDialogVisibility = () => {
     const { upgradeEnrollmentDialogVisibility } = this.state
-    const { createEnrollment, courseRuns } = this.props
-    const run =
-      !this.getCurrentCourseRun() && courseRuns
-        ? courseRuns[0]
-        : this.getCurrentCourseRun()
+    const run = this.resolveCurrentRun()
 
     if (!upgradeEnrollmentDialogVisibility) {
-      createEnrollment(run).then((data: any) => console.log(data))
+      this.checkAndCreateEnrollment(run)
     } else {
       window.location = "/dashboard/"
     }
@@ -156,6 +210,8 @@ export class CourseProductDetailEnroll extends React.Component<
     this.setState({
       currentCourseRun: courseRun
     })
+
+    this.removeAndCreateEnrollment(courseRun)
   }
 
   getFirstUnexpiredRun = () => {
@@ -183,12 +239,49 @@ export class CourseProductDetailEnroll extends React.Component<
       : null
   }
 
+  cancelEnrollment() {
+    const { enrollments, deactivateEnrollment } = this.props
+    const { upgradeEnrollmentDialogVisibility } = this.state
+
+    const run = this.resolveCurrentRun()
+
+    const priorEnrollment = enrollments.find(
+      (elem: RunEnrollment) => elem.run.id !== run.id
+    )
+
+    if (priorEnrollment) {
+      deactivateEnrollment(priorEnrollment.id)
+    }
+
+    this.setState({
+      upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
+    })
+  }
+
+  renderRunSelectorButtons(run: EnrollmentFlaggedCourseRun) {
+    const { courseRuns } = this.props
+
+    return (
+      <>
+        {courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
+          <button
+            onClick={() => this.setCurrentCourseRun(elem)}
+            key={`courserun-selection-${elem.id}`}
+            className={`btn btn-primary me-2 mb-2 btn-sm ${
+              elem.id !== run.id ? "outline" : ""
+            }`}
+          >
+            {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
+            {formatPrettyDate(moment(new Date(elem.end_date)))}
+          </button>
+        ))}
+      </>
+    )
+  }
+
   renderUpgradeEnrollmentDialog(showNewDesign: boolean) {
     const { courseRuns, courses } = this.props
-    const run =
-      !this.getCurrentCourseRun() && courseRuns
-        ? courseRuns[0]
-        : this.getCurrentCourseRun()
+    const run = this.resolveCurrentRun()
 
     const course =
       courses && courses.find((elem: any) => elem.id === run.course.id)
@@ -244,18 +337,7 @@ export class CourseProductDetailEnroll extends React.Component<
                   <strong>Dates:</strong>
 
                   <div className="date-selector-button-bar">
-                    {courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
-                      <button
-                        onClick={() => this.setCurrentCourseRun(elem)}
-                        key={`courserun-selection-${elem.id}`}
-                        className={`btn btn-primary me-2 mb-2 btn-sm ${
-                          elem.id !== run.id ? "outline" : ""
-                        }`}
-                      >
-                        {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
-                        {formatPrettyDate(moment(new Date(elem.end_date)))}
-                      </button>
-                    ))}
+                    {this.renderRunSelectorButtons(run)}
                   </div>
                 </div>
               </div>
@@ -375,7 +457,7 @@ export class CourseProductDetailEnroll extends React.Component<
                 {needFinancialAssistanceLink}
               </div>
             </div>
-            <div className="cancel-link">{this.getEnrollmentForm()}</div>
+            <div className="cancel-link">{this.getEnrollmentForm(run)}</div>
             <div className="faq-link">
               <a
                 href="https://mitxonline.zendesk.com/hc/en-us"
@@ -391,10 +473,9 @@ export class CourseProductDetailEnroll extends React.Component<
     ) : null
   }
 
-  getEnrollmentForm() {
+  getEnrollmentForm(run) {
     const csrfToken = getCookie("csrftoken")
-    const { courseRuns } = this.props
-    const run = courseRuns ? courseRuns[0] : null
+
     return (
       <div className="d-flex">
         <div className="flex-grow-1 w-auto">
@@ -407,16 +488,12 @@ export class CourseProductDetailEnroll extends React.Component<
           </form>
         </div>
         <div className="ml-auto">
-          <form action="/enrollments/" method="post">
-            <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
-            <input type="hidden" name="run" value={run ? run.id : ""} />
-            <button
-              type="submit"
-              className="btn enroll-now enroll-now-free cancel-enrollment-button"
-            >
-              Cancel Enrollment
-            </button>
-          </form>
+          <button
+            onClick={this.cancelEnrollment.bind(this)}
+            className="btn enroll-now enroll-now-free cancel-enrollment-button"
+          >
+            Cancel Enrollment
+          </button>
         </div>
       </div>
     )
@@ -568,29 +645,19 @@ export class CourseProductDetailEnroll extends React.Component<
       isLoading,
       courses,
       courseIsLoading,
-      currentUser
+      currentUser,
+      enrollments,
+      enrollmentsIsLoading
     } = this.props
     const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
 
     let run,
       product = null
+
     if (courseRuns) {
       run = this.getFirstUnexpiredRun()
       product = run && run.products ? run.products[0] : null
       this.updateDate(run)
-      const thisScope = this
-      courseRuns.map(courseRun => {
-        // $FlowFixMe
-        document.addEventListener("click", function(e) {
-          if (e.target && e.target.id === courseRun.courseware_id) {
-            thisScope.setCurrentCourseRun(courseRun)
-            run = thisScope.getCurrentCourseRun()
-            product = run && run.products ? run.products[0] : null
-            // $FlowFixMe
-            thisScope.updateDate(run)
-          }
-        })
-      })
     }
 
     return (
@@ -612,7 +679,10 @@ export class CourseProductDetailEnroll extends React.Component<
           <>
             {
               // $FlowFixMe: isLoading null or undefined
-              <Loader key="course_info_loader" isLoading={courseIsLoading}>
+              <Loader
+                key="course_info_loader"
+                isLoading={courseIsLoading || enrollmentsIsLoading}
+              >
                 <CourseInfoBox
                   courses={courses}
                   courseRuns={courseRuns}
@@ -621,6 +691,7 @@ export class CourseProductDetailEnroll extends React.Component<
                     this.toggleUpgradeDialogVisibility
                   }
                   setCurrentCourseRun={this.setCurrentCourseRun}
+                  enrollments={enrollments}
                 ></CourseInfoBox>
               </Loader>
             }
@@ -634,8 +705,8 @@ export class CourseProductDetailEnroll extends React.Component<
 const createEnrollment = (run: EnrollmentFlaggedCourseRun) =>
   mutateAsync(enrollmentMutation(run.id))
 
-const deactivateEnrollment = (run: EnrollmentFlaggedCourseRun) =>
-  mutateAsync(deactivateEnrollmentMutation(run.id))
+const deactivateEnrollment = (run: number) =>
+  mutateAsync(deactivateEnrollmentMutation(run))
 
 const updateAddlFields = (currentUser: User) => {
   const updatedUser = {
