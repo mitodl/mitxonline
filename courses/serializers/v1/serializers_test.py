@@ -25,7 +25,7 @@ from courses.models import (
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
-from courses.serializers import (
+from courses.serializers.v1 import (
     CourseSerializer,
     BaseCourseSerializer,
     BaseProgramSerializer,

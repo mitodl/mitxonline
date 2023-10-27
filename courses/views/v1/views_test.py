@@ -30,7 +30,7 @@ from courses.models import (
     ProgramRequirementNodeType,
     ProgramRequirement,
 )
-from courses.serializers import (
+from courses.serializers.v1 import (
     CourseRunEnrollmentSerializer,
     CourseRunSerializer,
     CourseWithCourseRunsSerializer,
@@ -588,7 +588,7 @@ def test_user_enrollments_create(
     run = CourseRunFactory.create(course=course)
     fake_enrollment = CourseRunEnrollmentFactory.create(run=run)
     patched_enroll = mocker.patch(
-        "courses.serializers.create_run_enrollments",
+        "courses.serializers.v1.create_run_enrollments",
         return_value=([fake_enrollment], True),
     )
     resp = user_drf_client.post(

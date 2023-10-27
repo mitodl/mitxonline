@@ -187,7 +187,7 @@ class CourseSerializer(BaseCourseSerializer):
 
     def get_programs(self, instance):
         if self.context.get("all_runs", False):
-            from courses.serializers import BaseProgramSerializer
+            from courses.serializers.v1 import BaseProgramSerializer
 
             return BaseProgramSerializer(instance.programs, many=True).data
 

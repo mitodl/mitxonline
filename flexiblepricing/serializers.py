@@ -2,7 +2,7 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework import serializers
 
 from courses.models import Course, Program
-from courses.serializers import BaseCourseSerializer, BaseProgramSerializer
+from courses.serializers.v1 import BaseCourseSerializer, BaseProgramSerializer
 from ecommerce.models import Discount
 from ecommerce.serializers import DiscountSerializer
 from flexiblepricing import models

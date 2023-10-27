@@ -38,7 +38,7 @@ from courses.models import (
     Program,
     ProgramEnrollment,
 )
-from courses.serializers import (
+from courses.serializers.v1 import (
     CourseRunEnrollmentSerializer,
     CourseRunWithCourseSerializer,
     CourseWithCourseRunsSerializer,
