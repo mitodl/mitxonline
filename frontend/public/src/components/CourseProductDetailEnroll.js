@@ -11,7 +11,7 @@ import { Modal, ModalBody, ModalHeader } from "reactstrap"
 import Loader from "./Loader"
 import { routes } from "../lib/urls"
 import { getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
-import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
+import { EnrollmentFlaggedCourseRun, RunEnrollment } from "../flow/courseTypes"
 import {
   courseRunsSelector,
   courseRunsQuery,
@@ -20,6 +20,11 @@ import {
   coursesQuery,
   coursesQueryKey
 } from "../lib/queries/courseRuns"
+import {
+  enrollmentsQuery,
+  enrollmentsQueryKey,
+  enrollmentsSelector
+} from "../lib/queries/enrollment"
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
@@ -29,7 +34,10 @@ import {
 } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import users, { currentUserSelector } from "../lib/queries/users"
-import { enrollmentMutation } from "../lib/queries/enrollment"
+import {
+  enrollmentMutation,
+  deactivateEnrollmentMutation
+} from "../lib/queries/enrollment"
 import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import CourseInfoBox from "./CourseInfoBox"
@@ -42,13 +50,17 @@ type Props = {
   isLoading: ?boolean,
   courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
   courses: ?Array<any>,
+  enrollments: ?Array<RunEnrollment>,
   status: ?number,
   courseIsLoading: ?boolean,
   courseStatus: ?number,
+  enrollmentsIsLoading: ?boolean,
+  enrollmentsStatus: ?number,
   upgradeEnrollmentDialogVisibility: boolean,
   addProductToBasket: (user: number, productId: number) => Promise<any>,
   currentUser: User,
   createEnrollment: (runId: number) => Promise<any>,
+  deactivateEnrollment: (run: EnrollmentFlaggedCourseRun) => Promise<any>,
   updateAddlFields: (currentUser: User) => Promise<any>
 }
 type ProductDetailState = {
@@ -128,7 +140,7 @@ export class CourseProductDetailEnroll extends React.Component<
         : this.getCurrentCourseRun()
 
     if (!upgradeEnrollmentDialogVisibility) {
-      createEnrollment(run)
+      createEnrollment(run).then((data: any) => console.log(data))
     } else {
       window.location = "/dashboard/"
     }
@@ -139,10 +151,13 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   setCurrentCourseRun = (courseRun: EnrollmentFlaggedCourseRun) => {
+    console.log(`we set the course run to ${courseRun.courseware_id}`)
+
     this.setState({
       currentCourseRun: courseRun
     })
   }
+
   getFirstUnexpiredRun = () => {
     const { courses, courseRuns } = this.props
     return courseRuns
@@ -213,29 +228,38 @@ export class CourseProductDetailEnroll extends React.Component<
                     Success! You've been enrolled in '{course.title}'.
                   </strong>
                   <br />
-                  Choose a date below or click '
-                  <strong>Cancel Enrollment</strong>' to unenroll.
+                  {courseRuns.length > 1 ? (
+                    <>Choose a date below or click</>
+                  ) : (
+                    <>Click</>
+                  )}{" "}
+                  '<strong>Cancel Enrollment</strong>' to unenroll.
                 </div>
               </div>
             </div>
 
-            <div className="row">
-              <div className="col-12">
-                <strong>Dates:</strong>
+            {courseRuns.length > 1 ? (
+              <div className="row">
+                <div className="col-12">
+                  <strong>Dates:</strong>
 
-                <div className="date-selector-button-bar">
-                  <button className="btn btn-primary me-2 mb-2 btn-sm">
-                    January 1, 2023 - May 1, 2023
-                  </button>
-                  <button className="btn btn-primary me-2 mb-2 btn-sm outline">
-                    May 1, 2023 - August 1, 2023
-                  </button>
-                  <button className="btn btn-primary me-2 mb-2 btn-sm outline">
-                    August 1, 2023 - December 1, 2023
-                  </button>
+                  <div className="date-selector-button-bar">
+                    {courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
+                      <button
+                        onClick={() => this.setCurrentCourseRun(elem)}
+                        key={`courserun-selection-${elem.id}`}
+                        className={`btn btn-primary me-2 mb-2 btn-sm ${
+                          elem.id !== run.id ? "outline" : ""
+                        }`}
+                      >
+                        {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
+                        {formatPrettyDate(moment(new Date(elem.end_date)))}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : null}
 
             <div className="row">
               <div className="col-12">
@@ -610,6 +634,9 @@ export class CourseProductDetailEnroll extends React.Component<
 const createEnrollment = (run: EnrollmentFlaggedCourseRun) =>
   mutateAsync(enrollmentMutation(run.id))
 
+const deactivateEnrollment = (run: EnrollmentFlaggedCourseRun) =>
+  mutateAsync(deactivateEnrollmentMutation(run.id))
+
 const updateAddlFields = (currentUser: User) => {
   const updatedUser = {
     name:          currentUser.name,
@@ -625,23 +652,32 @@ const updateAddlFields = (currentUser: User) => {
 }
 
 const mapStateToProps = createStructuredSelector({
-  courseRuns:      courseRunsSelector,
-  courses:         coursesSelector,
-  currentUser:     currentUserSelector,
-  isLoading:       pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
-  courseIsLoading: pathOr(true, ["queries", coursesQueryKey, "isPending"]),
-  status:          pathOr(null, ["queries", courseRunsQueryKey, "status"]),
-  courseStatus:    pathOr(true, ["queries", coursesQueryKey, "status"])
+  courseRuns:           courseRunsSelector,
+  courses:              coursesSelector,
+  currentUser:          currentUserSelector,
+  enrollments:          enrollmentsSelector,
+  isLoading:            pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
+  courseIsLoading:      pathOr(true, ["queries", coursesQueryKey, "isPending"]),
+  enrollmentsIsLoading: pathOr(true, [
+    "queries",
+    enrollmentsQueryKey,
+    "isPending"
+  ]),
+  status:            pathOr(null, ["queries", courseRunsQueryKey, "status"]),
+  courseStatus:      pathOr(true, ["queries", coursesQueryKey, "status"]),
+  enrollmentsStatus: pathOr(true, ["queries", enrollmentsQueryKey, "status"])
 })
 
 const mapPropsToConfig = props => [
   courseRunsQuery(props.courseId),
   coursesQuery(props.courseId),
+  enrollmentsQuery(),
   users.currentUserQuery()
 ]
 
 const mapDispatchToProps = {
   createEnrollment,
+  deactivateEnrollment,
   updateAddlFields
 }
 
