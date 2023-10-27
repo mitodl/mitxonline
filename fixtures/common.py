@@ -5,6 +5,7 @@ import os
 import pytest
 import responses
 from django.test.client import Client
+from nplusone.core import profiler
 from rest_framework.test import APIClient
 
 from courses.factories import CourseFactory, ProgramFactory, ProgramRequirementFactory
@@ -147,3 +148,12 @@ def webpack_stats(settings):
         loader_config["STATS_FILE"] = os.path.join(
             settings.BASE_DIR, directory, "default.json"
         )
+
+
+@pytest.fixture()
+def raise_nplusone(request):
+    if request.node.get_closest_marker("skip_nplusone"):
+        yield
+    else:
+        with profiler.Profiler():
+            yield
