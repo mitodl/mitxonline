@@ -14,6 +14,7 @@ from courses.models import (
     ProgramRequirement,
 )
 
+
 @pytest.fixture()
 def programs():
     """Fixture for a set of Programs in the database"""
@@ -31,13 +32,16 @@ def course_runs():
     """Fixture for a set of CourseRuns in the database"""
     return CourseRunFactory.create_batch(3)
 
+
 @pytest.fixture()
 def course_catalog_program_count(request):
     return getattr(request, "param", 5)
 
+
 @pytest.fixture()
 def course_catalog_course_count(request):
     return getattr(request, "param", 10)
+
 
 @pytest.fixture()
 def course_catalog_data(course_catalog_program_count, course_catalog_course_count):
@@ -107,4 +111,3 @@ def _create_program(courses):
             node_type=ProgramRequirementNodeType.COURSE, course=courses[0]
         )
     return program
-
