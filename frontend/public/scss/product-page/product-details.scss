@@ -387,6 +387,7 @@ body.new-design {
         height: 130px;
         align-items: start;
         padding: 20px;
+        z-index: 9;
 
         @include media-breakpoint-down(sm) {
           background-image: none;
