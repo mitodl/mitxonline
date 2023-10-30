@@ -62,7 +62,7 @@ type Props = {
   createEnrollment: (runId: number) => Promise<any>,
   deactivateEnrollment: (runId: number) => Promise<any>,
   updateAddlFields: (currentUser: User) => Promise<any>,
-  forceRequest: Function | null
+  forceRequest: ?Function
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
@@ -153,6 +153,7 @@ export class CourseProductDetailEnroll extends React.Component<
     while (enrollmentsIsLoading);
 
     if (
+      enrollments &&
       !enrollments.find(
         (elem: RunEnrollment) => elem.run.course.id === run.course.id
       )
@@ -176,10 +177,12 @@ export class CourseProductDetailEnroll extends React.Component<
 
     while (enrollmentsIsLoading);
 
-    const priorEnrollment = enrollments.find(
-      (elem: RunEnrollment) =>
-        elem.run.course.id === run.course.id && elem.run.id !== run.id
-    )
+    const priorEnrollment =
+      enrollments &&
+      enrollments.find(
+        (elem: RunEnrollment) =>
+          elem.run.course.id === run.course.id && elem.run.id !== run.id
+      )
 
     if (priorEnrollment) {
       deactivateEnrollment(priorEnrollment.id)
@@ -245,9 +248,9 @@ export class CourseProductDetailEnroll extends React.Component<
 
     const run = this.resolveCurrentRun()
 
-    const priorEnrollment = enrollments.find(
-      (elem: RunEnrollment) => elem.run.id !== run.id
-    )
+    const priorEnrollment =
+      enrollments &&
+      enrollments.find((elem: RunEnrollment) => elem.run.id !== run.id)
 
     if (priorEnrollment) {
       deactivateEnrollment(priorEnrollment.id)
@@ -263,18 +266,19 @@ export class CourseProductDetailEnroll extends React.Component<
 
     return (
       <>
-        {courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
-          <button
-            onClick={() => this.setCurrentCourseRun(elem)}
-            key={`courserun-selection-${elem.id}`}
-            className={`btn btn-primary me-2 mb-2 btn-sm ${
-              elem.id !== run.id ? "outline" : ""
-            }`}
-          >
-            {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
-            {formatPrettyDate(moment(new Date(elem.end_date)))}
-          </button>
-        ))}
+        {courseRuns &&
+          courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
+            <button
+              onClick={() => this.setCurrentCourseRun(elem)}
+              key={`courserun-selection-${elem.id}`}
+              className={`btn btn-primary me-2 mb-2 btn-sm ${
+                elem.id !== run.id ? "outline" : ""
+              }`}
+            >
+              {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
+              {formatPrettyDate(moment(new Date(elem.end_date)))}
+            </button>
+          ))}
       </>
     )
   }
@@ -318,10 +322,10 @@ export class CourseProductDetailEnroll extends React.Component<
               <div className="col-12">
                 <div className="alert alert-dark-success">
                   <strong>
-                    Success! You've been enrolled in '{course.title}'.
+                    Success! You've been enrolled in '{course && course.title}'.
                   </strong>
                   <br />
-                  {courseRuns.length > 1 ? (
+                  {courseRuns && courseRuns.length > 1 ? (
                     <>Choose a date below or click</>
                   ) : (
                     <>Click</>
@@ -331,7 +335,7 @@ export class CourseProductDetailEnroll extends React.Component<
               </div>
             </div>
 
-            {courseRuns.length > 1 ? (
+            {courseRuns && courseRuns.length > 1 ? (
               <div className="row">
                 <div className="col-12">
                   <strong>Dates:</strong>
@@ -473,7 +477,7 @@ export class CourseProductDetailEnroll extends React.Component<
     ) : null
   }
 
-  getEnrollmentForm(run) {
+  getEnrollmentForm(run: EnrollmentFlaggedCourseRun) {
     const csrfToken = getCookie("csrftoken")
 
     return (
