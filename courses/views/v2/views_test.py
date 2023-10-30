@@ -12,6 +12,7 @@ from courses.serializers.v2 import ProgramSerializer
 from courses.views.test_utils import (
     num_queries_from_programs,
 )
+from courses.views.v2 import Pagination
 from fixtures.common import raise_nplusone
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 
@@ -30,7 +31,7 @@ def test_get_programs(
         resp = user_drf_client.get(reverse("v2:programs_api-list"))
     duplicate_queries_check(context)
     programs_data = resp.json()["results"]
-    assert len(programs_data) == len(programs)
+    assert len(programs_data) == Pagination.page_size
     for program, program_data in zip(programs, programs_data):
         assert_drf_json_equal(
             program_data, ProgramSerializer(program).data, ignore_order=True
@@ -50,6 +51,7 @@ def test_get_program(
         resp = user_drf_client.get(
             reverse("v2:programs_api-detail", kwargs={"pk": program.id})
         )
+    print(resp.json())
     duplicate_queries_check(context)
     program_data = resp.json()
     assert_drf_json_equal(
@@ -104,3 +106,6 @@ def test_delete_program(
         )
     duplicate_queries_check(context)
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+def test_queries():
+    assert 'SELECT "courses_programrequirement"."id", "courses_programrequirement"."path", "courses_programrequirement"."depth", "courses_programrequirement"."numchild", "courses_programrequirement"."node_type", "courses_programrequirement"."operator", "courses_programrequirement"."operator_value", "courses_programrequirement"."program_id", "courses_programrequirement"."course_id", "courses_programrequirement"."title", "courses_programrequirement"."elective_flag" FROM "courses_programrequirement" WHERE ("courses_programrequirement"."depth" = 2 AND "courses_programrequirement"."program_id" = 5617) ORDER BY "courses_programrequirement"."path" ASC' == 'SELECT "courses_programrequirement"."id", "courses_programrequirement"."path", "courses_programrequirement"."depth", "courses_programrequirement"."numchild", "courses_programrequirement"."node_type", "courses_programrequirement"."operator", "courses_programrequirement"."operator_value", "courses_programrequirement"."program_id", "courses_programrequirement"."course_id", "courses_programrequirement"."title", "courses_programrequirement"."elective_flag" FROM "courses_programrequirement" WHERE ("courses_programrequirement"."depth" = 2 AND "courses_programrequirement"."program_id" = 5617) ORDER BY "courses_programrequirement"."path" ASC'
