@@ -12,7 +12,7 @@ from courses.models import (
 )
 
 
-def num_queries_from_course(course):
+def num_queries_from_course(course, version="v1"):
     """
     Generates approximately the number of queries we should expect to see, in a worst case scenario. This is
     difficult to predict without weighing down the test more as it traverses a bunch of wagtail and other related models.
@@ -35,13 +35,16 @@ def num_queries_from_course(course):
 
     Args:
         course (object): course object
+        version (str): version string (v1, v2)
     """
     num_programs = len(course.programs)
     num_course_runs = course.courseruns.count()
-    return (9 * num_programs) + (num_course_runs * 6) + 22
+    if version == "v1":
+        return (9 * num_programs) + (num_course_runs * 6) + 22
+    return num_programs + (num_course_runs * 6) + 22
 
 
-def num_queries_from_programs(programs):
+def num_queries_from_programs(programs, version="v1"):
     """
     Program sees around 160+ queries per program. This is largely dependent on how much related data there is, but the
     fixture always generates the same (3 course runs per course, no more than 3 courses per program.
@@ -53,16 +56,19 @@ def num_queries_from_programs(programs):
 
 
     Args:
-        program (object): program object
+        programs (list): List of Program objects
+        version (str): version string (v1, v2)
     """
     num_queries = 0
     for program in programs:
         required_courses = program.required_courses
         num_courses = len(required_courses)
-        for course in required_courses:
-            num_queries += num_queries_from_course(course)
+        if version == "v1":
+            for course in required_courses:
+                num_queries += num_queries_from_course(course)
         num_queries += 4 + (6 * num_courses) + 1
     return num_queries
+
 
 def populate_course_catalog_data(num_courses, num_programs):
     """

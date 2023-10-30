@@ -8,7 +8,7 @@ from django.urls import reverse
 from rest_framework import status
 
 from courses.serializers.v2 import ProgramSerializer
-from courses.views.test_utils import num_queries_from_course, num_queries_from_programs, populate_course_catalog_data
+from courses.views.test_utils import num_queries_from_programs, populate_course_catalog_data
 from fixtures.common import raise_nplusone
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 
