@@ -62,7 +62,7 @@ type Props = {
   createEnrollment: (runId: number) => Promise<any>,
   deactivateEnrollment: (runId: number) => Promise<any>,
   updateAddlFields: (currentUser: User) => Promise<any>,
-  forceRequest: ?Function
+  forceRequest: () => any
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
@@ -147,7 +147,7 @@ export class CourseProductDetailEnroll extends React.Component<
       createEnrollment,
       enrollmentsIsLoading,
       enrollments,
-      forceRefresh
+      forceRequest
     } = this.props
 
     while (enrollmentsIsLoading);
@@ -159,7 +159,7 @@ export class CourseProductDetailEnroll extends React.Component<
       )
     ) {
       createEnrollment(run)
-      forceRefresh()
+      forceRequest()
     }
   }
 
@@ -168,7 +168,7 @@ export class CourseProductDetailEnroll extends React.Component<
     // then creates the new one.
 
     const {
-      forceRefresh,
+      forceRequest,
       createEnrollment,
       enrollmentsIsLoading,
       enrollments,
@@ -189,7 +189,7 @@ export class CourseProductDetailEnroll extends React.Component<
     }
 
     createEnrollment(run)
-    forceRefresh()
+    forceRequest()
   }
 
   toggleUpgradeDialogVisibility = () => {
