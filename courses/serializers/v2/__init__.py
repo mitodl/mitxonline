@@ -6,7 +6,6 @@ import logging
 from rest_framework import serializers
 
 from courses.models import Program, ProgramRequirementNodeType
-from courses.constants import CONTENT_TYPE_MODEL_PROGRAM
 from courses.serializers import get_thumbnail_url, BaseProgramRequirementTreeSerializer
 from courses.serializers.v1 import ProgramPageSerializer
 from main.serializers import StrictFieldsSerializer

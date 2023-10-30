@@ -57,8 +57,8 @@ def course_catalog_data(course_catalog_program_count, course_catalog_course_coun
     Returns 3 separate lists to simulate what the tests received prior.
 
     Args:
-        num_courses(int): number of courses to generate.
-        num_programs(int): number of programs to generate.
+        course_catalog_course_count(int): number of courses to generate.
+        course_catalog_program_count(int): number of programs to generate.
     """
     programs = []
     courses = []

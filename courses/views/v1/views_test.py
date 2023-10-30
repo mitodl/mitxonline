@@ -35,7 +35,6 @@ from courses.serializers.v1 import (
 from courses.views.test_utils import (
     num_queries_from_course,
     num_queries_from_programs,
-    populate_course_catalog_data,
 )
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
@@ -66,7 +65,7 @@ def test_get_programs(
 ):
     """Test the view that handles requests for all Programs"""
     _, programs, _ = course_catalog_data
-    num_queries = num_queries_from_programs(programs)
+    num_queries = num_queries_from_programs(programs, "v1")
     with django_assert_max_num_queries(num_queries) as context:
         resp = user_drf_client.get(reverse("v1:programs_api-list"))
     duplicate_queries_check(context)
@@ -86,7 +85,7 @@ def test_get_program(
     """Test the view that handles a request for single Program"""
     _, programs, _ = course_catalog_data
     program = programs[0]
-    num_queries = num_queries_from_programs([program])
+    num_queries = num_queries_from_programs([program], "v1")
     with django_assert_max_num_queries(num_queries) as context:
         resp = user_drf_client.get(
             reverse("v1:programs_api-detail", kwargs={"pk": program.id})
@@ -160,7 +159,7 @@ def test_get_courses(
         courses_from_fixture.append(
             CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
         )
-        num_queries += num_queries_from_course(course)
+        num_queries += num_queries_from_course(course, "v1")
     with django_assert_max_num_queries(num_queries) as context:
         resp = user_drf_client.get(reverse("v1:courses_api-list"))
     #     This will become an assert rather than a warning in the future, for now this function is informational
@@ -186,7 +185,7 @@ def test_get_course(
     """Test the view that handles a request for single Course"""
     courses, _, _ = course_catalog_data
     course = courses[0]
-    num_queries = num_queries_from_course(course)
+    num_queries = num_queries_from_course(course, "v1")
     with django_assert_max_num_queries(num_queries) as context:
         resp = user_drf_client.get(
             reverse("v1:courses_api-detail", kwargs={"pk": course.id})
