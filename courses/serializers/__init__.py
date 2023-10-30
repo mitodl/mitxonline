@@ -7,6 +7,7 @@ from rest_framework import serializers
 
 from courses import models
 
+
 def get_thumbnail_url(page):
     """
     Get the thumbnail URL or else return a default image URL.
@@ -126,4 +127,3 @@ class BaseProgramRequirementTreeSerializer(serializers.ListSerializer):
         # here we're bypassing Serializer.data implementation because it coerces
         # the to_representation return value into a dict of its keys
         return models.ProgramRequirement.dump_bulk(parent=self.instance, keep_ids=True)
-

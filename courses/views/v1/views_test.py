@@ -32,7 +32,11 @@ from courses.serializers.v1 import (
     ProgramSerializer,
     CourseRunWithCourseSerializer,
 )
-from courses.views.test_utils import num_queries_from_course, num_queries_from_programs, populate_course_catalog_data
+from courses.views.test_utils import (
+    num_queries_from_course,
+    num_queries_from_programs,
+    populate_course_catalog_data,
+)
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order
@@ -53,8 +57,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
 
 
 EXAMPLE_URL = "http://example.com"
-
-
 
 
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
@@ -517,7 +519,9 @@ def test_user_enrollment_delete_other_fail(mocker, settings, user_drf_client, us
     )
     patched_deactivate = mocker.patch("courses.views.v1.deactivate_run_enrollment")
     resp = user_drf_client.delete(
-        reverse("v1:user-enrollments-api-detail", kwargs={"pk": other_user_enrollment.id})
+        reverse(
+            "v1:user-enrollments-api-detail", kwargs={"pk": other_user_enrollment.id}
+        )
     )
     assert resp.status_code == status.HTTP_404_NOT_FOUND
     patched_deactivate.assert_not_called()
