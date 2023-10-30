@@ -26,7 +26,8 @@ def test_get_programs(
     with django_assert_max_num_queries(num_queries) as context:
         resp = user_drf_client.get(reverse("v2:programs_api-list"))
     duplicate_queries_check(context)
-    programs_data = sorted(resp.json(), key=op.itemgetter("id"))
+    programs_data = resp.json()["results"]
+    print(programs_data)
     assert len(programs_data) == len(programs)
     for program, program_data in zip(programs, programs_data):
         assert_drf_json_equal(
