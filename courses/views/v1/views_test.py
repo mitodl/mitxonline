@@ -8,7 +8,6 @@ import pytest
 import reversion
 from django.db.models import Count, Q
 from django.urls import reverse
-from pytest_django.fixtures import django_assert_max_num_queries
 from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
 from rest_framework import status
@@ -58,31 +57,11 @@ EXAMPLE_URL = "http://example.com"
 
 
 
-@pytest.fixture()
-def programs():
-    """Fixture for a set of Programs in the database"""
-    return ProgramFactory.create_batch(3)
-
-
-@pytest.fixture()
-def courses():
-    """Fixture for a set of Courses in the database"""
-    return CourseFactory.create_batch(3)
-
-
-@pytest.fixture()
-def course_runs():
-    """Fixture for a set of CourseRuns in the database"""
-    return CourseRunFactory.create_batch(3)
-
-
-@pytest.mark.parametrize("num_courses", [100])
-@pytest.mark.parametrize("num_programs", [15])
-def test_get_programs(
-    user_drf_client, num_courses, num_programs, django_assert_max_num_queries
-):
+@pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
+def test_get_programs(user_drf_client, django_assert_max_num_queries, course_catalog_data):
     """Test the view that handles requests for all Programs"""
-    _, programs, _ = populate_course_catalog_data(num_courses, num_programs)
+    _, programs, _ = course_catalog_data
     num_queries = num_queries_from_programs(programs)
     with django_assert_max_num_queries(num_queries) as context:
         resp = user_drf_client.get(reverse("v1:programs_api-list"))
@@ -95,13 +74,13 @@ def test_get_programs(
         )
 
 
-@pytest.mark.parametrize("num_courses", [1])
-@pytest.mark.parametrize("num_programs", [1])
+@pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 def test_get_program(
-    user_drf_client, num_courses, num_programs, django_assert_max_num_queries
+    user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
     """Test the view that handles a request for single Program"""
-    _, programs, _ = populate_course_catalog_data(num_courses, num_programs)
+    _, programs, _ = course_catalog_data
     program = programs[0]
     num_queries = num_queries_from_programs([program])
     with django_assert_max_num_queries(num_queries) as context:
@@ -115,13 +94,13 @@ def test_get_program(
     )
 
 
-@pytest.mark.parametrize("num_courses", [1])
-@pytest.mark.parametrize("num_programs", [1])
+@pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 def test_create_program(
-    user_drf_client, num_courses, num_programs, django_assert_max_num_queries
+    user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
     """Test the view that handles a request to create a Program"""
-    _, programs, _ = populate_course_catalog_data(num_courses, num_programs)
+    _, programs, _ = course_catalog_data
     program = programs[0]
     program_data = ProgramSerializer(program).data
     del program_data["id"]
@@ -133,13 +112,13 @@ def test_create_program(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-@pytest.mark.parametrize("num_courses", [1])
-@pytest.mark.parametrize("num_programs", [1])
+@pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 def test_patch_program(
-    user_drf_client, num_courses, num_programs, django_assert_max_num_queries
+    user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
     """Test the view that handles a request to patch a Program"""
-    _, programs, _ = populate_course_catalog_data(num_courses, num_programs)
+    _, programs, _ = course_catalog_data
     program = programs[0]
     request_url = reverse("v1:programs_api-detail", kwargs={"pk": program.id})
     with django_assert_max_num_queries(1) as context:
@@ -148,13 +127,13 @@ def test_patch_program(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-@pytest.mark.parametrize("num_courses", [1])
-@pytest.mark.parametrize("num_programs", [1])
+@pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 def test_delete_program(
-    user_drf_client, num_courses, num_programs, django_assert_max_num_queries
+    user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
     """Test the view that handles a request to delete a Program"""
-    _, programs, _ = populate_course_catalog_data(num_courses, num_programs)
+    _, programs, _ = course_catalog_data
     program = programs[0]
     with django_assert_max_num_queries(1) as context:
         resp = user_drf_client.delete(
@@ -164,17 +143,13 @@ def test_delete_program(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-@pytest.mark.parametrize("num_courses", [100])
-@pytest.mark.parametrize("num_programs", [15])
+@pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [15], indirect=True)
 def test_get_courses(
-    user_drf_client,
-    mock_context,
-    django_assert_max_num_queries,
-    num_courses,
-    num_programs,
+    user_drf_client, mock_context, django_assert_max_num_queries, course_catalog_data
 ):
     """Test the view that handles requests for all Courses"""
-    courses, _, _ = populate_course_catalog_data(num_courses, num_programs)
+    courses, _, _ = course_catalog_data
     courses_from_fixture = []
     num_queries = 0
     for course in courses:
@@ -196,20 +171,16 @@ def test_get_courses(
     assert_drf_json_equal(courses_data, courses_from_fixture, ignore_order=True)
 
 
-@pytest.mark.parametrize("num_courses", [1])
-@pytest.mark.parametrize("num_programs", [1])
+@pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 def test_get_course(
     user_drf_client,
-    num_courses,
-    num_programs,
+    course_catalog_data,
     mock_context,
     django_assert_max_num_queries,
 ):
     """Test the view that handles a request for single Course"""
-    courses, _, _ = populate_course_catalog_data(
-        num_courses,
-        num_programs,
-    )
+    courses, _, _ = course_catalog_data
     course = courses[0]
     num_queries = num_queries_from_course(course)
     with django_assert_max_num_queries(num_queries) as context:
@@ -224,17 +195,16 @@ def test_get_course(
     assert_drf_json_equal(course_data, course_from_fixture, ignore_order=True)
 
 
-@pytest.mark.parametrize("num_courses", [1])
-@pytest.mark.parametrize("num_programs", [1])
+@pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 def test_create_course(
     user_drf_client,
-    num_courses,
-    num_programs,
+    course_catalog_data,
     mock_context,
     django_assert_max_num_queries,
 ):
     """Test the view that handles a request to create a Course"""
-    courses, _, _ = populate_course_catalog_data(num_courses, num_programs)
+    courses, _, _ = course_catalog_data
     course = courses[0]
     course_data = CourseWithCourseRunsSerializer(
         instance=course, context=mock_context
@@ -248,16 +218,13 @@ def test_create_course(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-@pytest.mark.parametrize("num_courses", [1])
-@pytest.mark.parametrize("num_programs", [1])
+@pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 def test_patch_course(
-    user_drf_client, num_courses, num_programs, django_assert_max_num_queries
+    user_drf_client, course_catalog_data, django_assert_max_num_queries
 ):
     """Test the view that handles a request to patch a Course"""
-    courses, _, _ = populate_course_catalog_data(
-        num_courses,
-        num_programs,
-    )
+    courses, _, _ = course_catalog_data
     course = courses[0]
     request_url = reverse("v1:courses_api-detail", kwargs={"pk": course.id})
     with django_assert_max_num_queries(1) as context:
@@ -266,16 +233,13 @@ def test_patch_course(
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
-@pytest.mark.parametrize("num_courses", [1])
-@pytest.mark.parametrize("num_programs", [1])
+@pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 def test_delete_course(
-    user_drf_client, num_courses, num_programs, django_assert_max_num_queries
+    user_drf_client, course_catalog_data, django_assert_max_num_queries
 ):
     """Test the view that handles a request to delete a Course"""
-    courses, _, _ = populate_course_catalog_data(
-        num_courses,
-        num_programs,
-    )
+    courses, _, _ = course_catalog_data
     course = courses[0]
     with django_assert_max_num_queries(1) as context:
         resp = user_drf_client.delete(
