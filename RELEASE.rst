@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.79.0
+--------------
+
+- Program API test updates (#1963)
+- Instructor popup modal mobile view (#1961)
+- Course API test updates (#1962)
+
 Version 0.78.0 (Released October 23, 2023)
 --------------
 
