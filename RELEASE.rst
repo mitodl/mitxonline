@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.79.0
+Version 0.79.0 (Released October 30, 2023)
 --------------
 
 - Program API test updates (#1963)
