@@ -59,7 +59,9 @@ EXAMPLE_URL = "http://example.com"
 
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
-def test_get_programs(user_drf_client, django_assert_max_num_queries, course_catalog_data):
+def test_get_programs(
+    user_drf_client, django_assert_max_num_queries, course_catalog_data
+):
     """Test the view that handles requests for all Programs"""
     _, programs, _ = course_catalog_data
     num_queries = num_queries_from_programs(programs)
