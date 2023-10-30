@@ -61,12 +61,12 @@ def num_queries_from_programs(programs, version="v1"):
     """
     num_queries = 0
     for program in programs:
-        required_courses = program.requirements
+        required_courses = program.courses_qset
         num_courses = len(required_courses)
         if version == "v1":
             for course in required_courses:
                 num_queries += num_queries_from_course(course)
             num_queries += 4 + (6 * num_courses) + 1
         if version == "v2":
-            num_queries += 4 + (4 * num_courses) + 1
+            num_queries += 6 + (11 * num_courses) + 1
     return num_queries

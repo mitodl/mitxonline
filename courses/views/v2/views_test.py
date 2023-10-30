@@ -51,7 +51,6 @@ def test_get_program(
         resp = user_drf_client.get(
             reverse("v2:programs_api-detail", kwargs={"pk": program.id})
         )
-    print(resp.json())
     duplicate_queries_check(context)
     program_data = resp.json()
     assert_drf_json_equal(
@@ -67,7 +66,7 @@ def test_create_program(
     """Test the view that handles a request to create a Program"""
     _, programs, _ = course_catalog_data
     program = programs[0]
-    program_data = ProgramSerializer(program, "v2").data
+    program_data = ProgramSerializer(program).data
     del program_data["id"]
     program_data["title"] = "New Program Title"
     request_url = reverse("v2:programs_api-list")
@@ -106,6 +105,3 @@ def test_delete_program(
         )
     duplicate_queries_check(context)
     assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
-
-def test_queries():
-    assert 'SELECT "courses_programrequirement"."id", "courses_programrequirement"."path", "courses_programrequirement"."depth", "courses_programrequirement"."numchild", "courses_programrequirement"."node_type", "courses_programrequirement"."operator", "courses_programrequirement"."operator_value", "courses_programrequirement"."program_id", "courses_programrequirement"."course_id", "courses_programrequirement"."title", "courses_programrequirement"."elective_flag" FROM "courses_programrequirement" WHERE ("courses_programrequirement"."depth" = 2 AND "courses_programrequirement"."program_id" = 5617) ORDER BY "courses_programrequirement"."path" ASC' == 'SELECT "courses_programrequirement"."id", "courses_programrequirement"."path", "courses_programrequirement"."depth", "courses_programrequirement"."numchild", "courses_programrequirement"."node_type", "courses_programrequirement"."operator", "courses_programrequirement"."operator_value", "courses_programrequirement"."program_id", "courses_programrequirement"."course_id", "courses_programrequirement"."title", "courses_programrequirement"."elective_flag" FROM "courses_programrequirement" WHERE ("courses_programrequirement"."depth" = 2 AND "courses_programrequirement"."program_id" = 5617) ORDER BY "courses_programrequirement"."path" ASC'
