@@ -432,7 +432,7 @@ def test_user_enrollments_create(
     run = CourseRunFactory.create(course=course)
     fake_enrollment = CourseRunEnrollmentFactory.create(run=run)
     patched_enroll = mocker.patch(
-        "courses.serializers.v1.create_run_enrollments",
+        "courses.api.create_run_enrollments",
         return_value=([fake_enrollment], True),
     )
     resp = user_drf_client.post(
@@ -534,7 +534,7 @@ def test_create_enrollments(mocker, user_client, api_request, product_exists):
     Unless api_request is set to True, in which case we should get a string back.
     """
     patched_create_enrollments = mocker.patch(
-        "courses.views.v1.create_run_enrollments",
+        "courses.api.create_run_enrollments",
         return_value=(None, True),
     )
     mock_fulfilled_order_filter = mocker.patch(
