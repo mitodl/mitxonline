@@ -11,6 +11,41 @@
   }
 }
 
+body.new-design {
+
+  .faculty-members {
+    li {
+      width: calc(50% - 20px);
+      margin: 0 10px 10px;
+      min-width: 275px;
+
+      img {
+        margin: 0 15px 0 0;
+      }
+    }
+    .member-card {
+      padding: 15px;
+
+      .member-info {
+        overflow: hidden;
+        margin: 0;
+
+        h3 {
+          font-size: 16px;
+          font-weight: 700;
+          line-height: normal;
+        }
+
+        h4 {
+          font-size: 13px;
+          font-weight: 400;
+          line-height: normal;
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+}
 .faculty-members {
   li {
     @include media-breakpoint-down(md) {
@@ -26,10 +61,6 @@
       border-radius: 4px !important;
       box-shadow: 0 1px 0 0 rgb(0 0 0 / 12%);
       display: flex;
-
-      @include media-breakpoint-down(sm) {
-        display: block;
-      }
 
       .member-info {
         margin-top: 7px;

@@ -185,7 +185,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
 
         program_list = []
 
-        for related_program in self.related_programs_qs.all():
+        for related_program in self.related_programs_qs.all().iterator():
             if related_program.first_program == self:
                 program_list.append(related_program.second_program)
             else:
