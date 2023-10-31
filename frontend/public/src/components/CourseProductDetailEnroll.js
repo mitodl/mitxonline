@@ -144,16 +144,13 @@ export class CourseProductDetailEnroll extends React.Component<
     // Find an existing enrollment - the default should be the audit enrollment
     // already have, so you can just upgrade in place. If you don't, you get the
     // current run (which should be the first available one).
-    const {
-      enrollmentsIsLoading,
-      enrollments
-    } = this.props
-
-    while (enrollmentsIsLoading);
+    const { enrollments } = this.props
 
     if (enrollments) {
       const firstAuditEnrollment = enrollments.find(
-        (elem: RunEnrollment) => elem.run.course.id === run.course.id && elem.enrollment_mode === 'audit'
+        (elem: RunEnrollment) =>
+          elem.run.course.id === run.course.id &&
+          elem.enrollment_mode === "audit"
       )
 
       if (firstAuditEnrollment) {
@@ -580,6 +577,7 @@ export class CourseProductDetailEnroll extends React.Component<
         <>
           {product && run.is_upgradable ? (
             <button
+              id="upgradeEnrollBtn"
               className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
               onClick={() => this.toggleUpgradeDialogVisibility()}
             >
