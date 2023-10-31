@@ -577,7 +577,7 @@ def test_create_enrollments_failed(mocker, settings, user_client):
     """
     settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
     patched_create_enrollments = mocker.patch(
-        "courses.views.v1.create_run_enrollments",
+        "courses.api.create_run_enrollments",
         return_value=(None, False),
     )
     run = CourseRunFactory.create()
@@ -722,7 +722,7 @@ def test_create_enrollments_with_existing_fulfilled_order(
     time.
     """
     patched_create_enrollments = mocker.patch(
-        "courses.views.v1.create_run_enrollments",
+        "courses.api.create_run_enrollments",
         return_value=(None, True),
     )
     run = CourseRunFactory.create()
