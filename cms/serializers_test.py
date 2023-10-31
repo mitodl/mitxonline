@@ -12,7 +12,12 @@ from cms.factories import (
 )
 from cms.models import FlexiblePricingRequestForm
 from cms.serializers import CoursePageSerializer
-from courses.factories import CourseFactory, ProgramFactory
+from courses.factories import (
+    CourseFactory,
+    ProgramFactory,
+    program_with_empty_requirements,
+    program_with_requirements,
+)
 from main.test_utils import assert_drf_json_equal
 
 pytestmark = [pytest.mark.django_db]
@@ -225,3 +230,77 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
             "effort": course_page.effort,
         },
     )
+
+
+@pytest.mark.parametrize(
+    "own_program_has_form,related_program,related_program_has_form",
+    [
+        [True, False, False],
+        [True, True, False],
+        [False, True, False],
+        [False, True, True],
+        [True, True, True],
+    ],
+)
+def test_serialized_course_finaid_form_url(
+    own_program_has_form, related_program, related_program_has_form
+):
+    """
+    Tests a few scenarios for financial assistance form URL retrieval to ensure
+    that the proper form is displayed. The FA form URL should prefer the form
+    that belongs to the program that the course is a member of; if that program
+    lacks a FA form, it should use the FA form of a related program.
+
+    - own_program_has_form flags whether or not the course under test's program
+    has its own financial assistance form. If this is set, then the course
+    should return back the form for the program it's in directly.
+
+    - related_program flags whether or not the course under test's program is
+    related to another program at all. (We also want to make sure the financial
+    assistance form for the other program isn't used by the course under test.)
+
+    - related_program_has_form flags whether or not the secondary related
+    program has a financial assistance form. This form will then be used only if
+    own_program_has_form is False.
+    """
+
+    program1 = ProgramFactory.create()
+    course1 = CourseFactory.create()
+    program1.add_requirement(course1)
+
+    program2 = ProgramFactory.create()
+    course2 = CourseFactory.create()
+    program2.add_requirement(course2)
+
+    if related_program:
+        program1.add_related_program(program2)
+
+    if own_program_has_form:
+        own_fa_page = FlexiblePricingFormFactory.create(
+            parent=program1.page, selected_program=program1
+        )
+
+        serialized_output = CoursePageSerializer(course1.page).data
+
+        assert own_fa_page.slug in serialized_output["financial_assistance_form_url"]
+    else:
+        serialized_output = CoursePageSerializer(course1.page).data
+
+        assert serialized_output["financial_assistance_form_url"] == ""
+
+    if related_program_has_form:
+        related_fa_page = FlexiblePricingFormFactory.create(
+            parent=program2.page, selected_program=program2
+        )
+
+        serialized_output = CoursePageSerializer(course1.page).data
+
+        if own_program_has_form:
+            assert (
+                own_fa_page.slug in serialized_output["financial_assistance_form_url"]
+            )
+        else:
+            assert (
+                related_fa_page.slug
+                in serialized_output["financial_assistance_form_url"]
+            )
