@@ -42,7 +42,7 @@ describe("CourseProductDetailEnroll", () => {
     helper = new IntegrationTestHelper()
     courseRun = makeCourseRunDetailWithProduct()
     course = makeCourseDetailWithRuns()
-    enrollment = makeCourseRunEnrollment({ run: courseRun })
+    enrollment = makeCourseRunEnrollment()
     currentUser = makeUser()
     renderPage = helper.configureHOCRenderer(
       CourseProductDetailEnroll,
