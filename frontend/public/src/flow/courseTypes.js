@@ -1,6 +1,7 @@
 import type { Product } from "./ecommerceTypes"
 import type { Page } from "./cmsTypes"
 import type { LearnerRecordUser } from "./authTypes"
+import {numbers} from "@material/top-app-bar/constants";
 
 export type CourseDetail = {
   id: number,
@@ -73,7 +74,7 @@ export type Program = {
   title: string,
   readable_id: string,
   program_type: string,
-  courses: Array<CourseDetailWithRuns>,
+  courses: Array<number>,
   requirements: ?ProgramEnrollments,
   req_tree: Array<ProgramRequirement>,
   page: ?Page,
