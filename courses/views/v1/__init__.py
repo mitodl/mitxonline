@@ -38,13 +38,12 @@ from courses.models import (
     Program,
     ProgramEnrollment,
 )
-from courses.serializers.v1 import (
+from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
     CourseRunWithCourseSerializer,
     CourseWithCourseRunsSerializer,
-    PartnerSchoolSerializer,
-    ProgramSerializer,
 )
+from courses.serializers.v1.programs import PartnerSchoolSerializer, ProgramSerializer
 from courses.serializers.v1.programs import (
     UserProgramEnrollmentDetailSerializer,
     LearnerRecordSerializer,

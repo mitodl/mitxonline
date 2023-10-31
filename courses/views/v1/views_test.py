@@ -25,12 +25,12 @@ from courses.models import (
     CourseRun,
     ProgramEnrollment,
 )
-from courses.serializers.v1 import (
+from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
     CourseWithCourseRunsSerializer,
-    ProgramSerializer,
     CourseRunWithCourseSerializer,
 )
+from courses.serializers.v1.programs import ProgramSerializer
 from courses.serializers.v1.courses import CourseRunSerializer
 from courses.views.test_utils import (
     num_queries_from_course,
