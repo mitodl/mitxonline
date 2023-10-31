@@ -27,11 +27,11 @@ from courses.models import (
 )
 from courses.serializers.v1 import (
     CourseRunEnrollmentSerializer,
-    CourseRunSerializer,
     CourseWithCourseRunsSerializer,
     ProgramSerializer,
     CourseRunWithCourseSerializer,
 )
+from courses.serializers.v1.courses import CourseRunSerializer
 from courses.views.test_utils import (
     num_queries_from_course,
     num_queries_from_programs,
