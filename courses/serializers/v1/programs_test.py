@@ -6,15 +6,27 @@ from django.utils.timezone import now
 from mitol.common.utils import now_in_utc
 
 from cms.serializers import ProgramPageSerializer
-from courses.factories import CourseRunFactory, ProgramFactory, CourseFactory, CourseRunEnrollmentFactory, \
-    CourseRunGradeFactory, program_with_empty_requirements
+from courses.factories import (
+    CourseRunFactory,
+    ProgramFactory,
+    CourseFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunGradeFactory,
+    program_with_empty_requirements,
+)
 from courses.models import Department, ProgramRequirementNodeType, ProgramRequirement
 from courses.serializers.v1.courses import CourseWithCourseRunsSerializer
-from courses.serializers.v1.programs import ProgramSerializer, LearnerRecordSerializer, ProgramRequirementSerializer, ProgramRequirementTreeSerializer
+from courses.serializers.v1.programs import (
+    ProgramSerializer,
+    LearnerRecordSerializer,
+    ProgramRequirementSerializer,
+    ProgramRequirementTreeSerializer,
+)
 from main.test_utils import assert_drf_json_equal
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE
 
 pytestmark = [pytest.mark.django_db]
+
 
 @pytest.mark.parametrize(
     "remove_tree",

@@ -45,7 +45,10 @@ from courses.serializers.v1 import (
     PartnerSchoolSerializer,
     ProgramSerializer,
 )
-from courses.serializers.v1.programs import UserProgramEnrollmentDetailSerializer, LearnerRecordSerializer
+from courses.serializers.v1.programs import (
+    UserProgramEnrollmentDetailSerializer,
+    LearnerRecordSerializer,
+)
 from courses.serializers.v1.departments import DepartmentWithCountSerializer
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment

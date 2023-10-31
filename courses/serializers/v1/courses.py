@@ -4,7 +4,12 @@ from rest_framework.exceptions import ValidationError
 from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
-from courses.serializers.v1.base import BaseCourseSerializer, BaseCourseRunEnrollmentSerializer, BaseCourseRunSerializer, ProductRelatedField
+from courses.serializers.v1.base import (
+    BaseCourseSerializer,
+    BaseCourseRunEnrollmentSerializer,
+    BaseCourseRunSerializer,
+    ProductRelatedField,
+)
 from courses.serializers.v1.departments import DepartmentSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
@@ -143,4 +148,3 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         fields = BaseCourseRunEnrollmentSerializer.Meta.fields + [
             "run_id",
         ]
-

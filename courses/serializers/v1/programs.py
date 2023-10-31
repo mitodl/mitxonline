@@ -6,10 +6,19 @@ from rest_framework.exceptions import ValidationError
 
 from cms.serializers import ProgramPageSerializer
 from courses import models
-from courses.serializers.base import get_thumbnail_url, BaseProgramRequirementTreeSerializer
+from courses.serializers.base import (
+    get_thumbnail_url,
+    BaseProgramRequirementTreeSerializer,
+)
 from courses.serializers.v1.departments import DepartmentSerializer
-from courses.serializers.v1.courses import CourseWithCourseRunsSerializer, CourseRunEnrollmentSerializer
-from courses.serializers.v1.base import CourseRunCertificateSerializer, CourseRunGradeSerializer
+from courses.serializers.v1.courses import (
+    CourseWithCourseRunsSerializer,
+    CourseRunEnrollmentSerializer,
+)
+from courses.serializers.v1.base import (
+    CourseRunCertificateSerializer,
+    CourseRunGradeSerializer,
+)
 from main.serializers import StrictFieldsSerializer
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
