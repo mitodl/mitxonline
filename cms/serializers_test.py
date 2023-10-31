@@ -246,10 +246,22 @@ def test_serialized_course_finaid_form_url(
     own_program_has_form, related_program, related_program_has_form
 ):
     """
-    Tests the financial assistance form URL returned for a course that's in a
-    program that has no financial assistance form and is related to a program
-    that does have a financial assistance form. (The course should get the
-    form URL for the program that does have the financial assistance form.)
+    Tests a few scenarios for financial assistance form URL retrieval to ensure
+    that the proper form is displayed. The FA form URL should prefer the form
+    that belongs to the program that the course is a member of; if that program
+    lacks a FA form, it should use the FA form of a related program.
+
+    - own_program_has_form flags whether or not the course under test's program
+    has its own financial assistance form. If this is set, then the course
+    should return back the form for the program it's in directly.
+
+    - related_program flags whether or not the course under test's program is
+    related to another program at all. (We also want to make sure the financial
+    assistance form for the other program isn't used by the course under test.)
+
+    - related_program_has_form flags whether or not the secondary related
+    program has a financial assistance form. This form will then be used only if
+    own_program_has_form is False.
     """
 
     program1 = ProgramFactory.create()
