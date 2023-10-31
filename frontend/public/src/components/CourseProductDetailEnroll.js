@@ -140,56 +140,29 @@ export class CourseProductDetailEnroll extends React.Component<
     }
   }
 
-  async checkAndCreateEnrollment(run: EnrollmentFlaggedCourseRun) {
-    // Only make an enrollment once the enrollments have been loaded, and check
-    // to make sure we're not enrolling in a course we're enrolled in.
+  async checkForExistingEnrollment(run: EnrollmentFlaggedCourseRun) {
+    // Find an existing enrollment - the default should be the audit enrollment
+    // already have, so you can just upgrade in place. If you don't, you get the
+    // current run (which should be the first available one).
     const {
-      createEnrollment,
       enrollmentsIsLoading,
-      enrollments,
-      forceRequest
+      enrollments
     } = this.props
 
     while (enrollmentsIsLoading);
 
-    if (
-      enrollments &&
-      !enrollments.find(
-        (elem: RunEnrollment) => elem.run.course.id === run.course.id
-      )
-    ) {
-      createEnrollment(run)
-      forceRequest()
-    }
-  }
-
-  async removeAndCreateEnrollment(run: EnrollmentFlaggedCourseRun) {
-    // Counterpoint to checkAndCreate: this instead removes the enrollments,
-    // then creates the new one.
-
-    const {
-      forceRequest,
-      createEnrollment,
-      enrollmentsIsLoading,
-      enrollments,
-      deactivateEnrollment
-    } = this.props
-
-    while (enrollmentsIsLoading);
-
-    const priorEnrollment =
-      enrollments &&
-      enrollments.find(
-        (elem: RunEnrollment) =>
-          elem.run.course.id === run.course.id && elem.run.id !== run.id
+    if (enrollments) {
+      const firstAuditEnrollment = enrollments.find(
+        (elem: RunEnrollment) => elem.run.course.id === run.course.id && elem.enrollment_mode === 'audit'
       )
 
-    if (priorEnrollment) {
-      deactivateEnrollment(priorEnrollment.id)
+      if (firstAuditEnrollment) {
+        this.setCurrentCourseRun(firstAuditEnrollment.run)
+        return
+      }
     }
 
-    createEnrollment(run)
-    forceRequest()
+    this.setCurrentCourseRun(run)
   }
 
   toggleUpgradeDialogVisibility = () => {
@@ -197,7 +170,7 @@ export class CourseProductDetailEnroll extends React.Component<
     const run = this.resolveCurrentRun()
 
     if (!upgradeEnrollmentDialogVisibility) {
-      this.checkAndCreateEnrollment(run)
+      this.checkForExistingEnrollment(run)
     } else {
       window.location = "/dashboard/"
     }
@@ -208,13 +181,9 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   setCurrentCourseRun = (courseRun: EnrollmentFlaggedCourseRun) => {
-    console.log(`we set the course run to ${courseRun.courseware_id}`)
-
     this.setState({
       currentCourseRun: courseRun
     })
-
-    this.removeAndCreateEnrollment(courseRun)
   }
 
   getFirstUnexpiredRun = () => {
@@ -243,18 +212,7 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   cancelEnrollment() {
-    const { enrollments, deactivateEnrollment } = this.props
     const { upgradeEnrollmentDialogVisibility } = this.state
-
-    const run = this.resolveCurrentRun()
-
-    const priorEnrollment =
-      enrollments &&
-      enrollments.find((elem: RunEnrollment) => elem.run.id !== run.id)
-
-    if (priorEnrollment) {
-      deactivateEnrollment(priorEnrollment.id)
-    }
 
     this.setState({
       upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
