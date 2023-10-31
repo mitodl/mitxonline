@@ -227,7 +227,9 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
     )
 
 
-def test_serialize_program_page(mocker, fully_configured_wagtail, staff_user, mock_context):
+def test_serialize_program_page(
+    mocker, fully_configured_wagtail, staff_user, mock_context
+):
     fake_image_src = "http://example.com/my.img"
     patched_get_wagtail_src = mocker.patch(
         "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
@@ -256,12 +258,13 @@ def test_serialize_program_page(mocker, fully_configured_wagtail, staff_user, mo
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
-        }
+        },
     )
 
 
-def test_serialize_program_page__with_related_financial_form(mocker, fully_configured_wagtail, staff_user,
-                                                           mock_context):
+def test_serialize_program_page__with_related_financial_form(
+    mocker, fully_configured_wagtail, staff_user, mock_context
+):
     fake_image_src = "http://example.com/my.img"
     patched_get_wagtail_src = mocker.patch(
         "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
@@ -293,12 +296,13 @@ def test_serialize_program_page__with_related_financial_form(mocker, fully_confi
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
-        }
+        },
     )
 
 
-def test_serialize_program_page__no_financial_form(mocker, fully_configured_wagtail, staff_user,
-                                                           mock_context):
+def test_serialize_program_page__no_financial_form(
+    mocker, fully_configured_wagtail, staff_user, mock_context
+):
     fake_image_src = "http://example.com/my.img"
     patched_get_wagtail_src = mocker.patch(
         "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
@@ -324,5 +328,5 @@ def test_serialize_program_page__no_financial_form(mocker, fully_configured_wagt
             "length": program_page.length,
             "effort": program_page.effort,
             "price": None,
-        }
+        },
     )

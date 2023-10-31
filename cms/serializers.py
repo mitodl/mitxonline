@@ -160,14 +160,22 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         """
         Returns URL of the Financial Assistance Form.
         """
-        financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
-            selected_program_id=instance.program.id
-        ).live().first()
-        if (financial_assistance_page is None) and (instance.get_children() is not None):
+        financial_assistance_page = (
+            FlexiblePricingRequestForm.objects.filter(
+                selected_program_id=instance.program.id
+            )
+            .live()
+            .first()
+        )
+        if (financial_assistance_page is None) and (
+            instance.get_children() is not None
+        ):
             financial_assistance_page = (
                 instance.get_children().type(FlexiblePricingRequestForm).live().first()
             )
-        if (financial_assistance_page is None) & (len(instance.program.related_programs) > 0):
+        if (financial_assistance_page is None) & (
+            len(instance.program.related_programs) > 0
+        ):
             financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
                 selected_program__in=instance.program.related_programs
             ).first()
@@ -176,7 +184,6 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             if financial_assistance_page
             else ""
         )
-
 
     class Meta:
         model = models.ProgramPage
