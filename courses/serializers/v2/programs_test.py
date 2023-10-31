@@ -3,11 +3,10 @@ from datetime import timedelta
 import pytest
 from django.utils.timezone import now
 
-
 from cms.serializers import ProgramPageSerializer
-from courses.factories import program_with_empty_requirements, CourseRunFactory
+from courses.factories import CourseRunFactory, program_with_empty_requirements
 from courses.models import Department
-from courses.serializers.v2 import ProgramRequirementTreeSerializer, ProgramSerializer
+from courses.serializers.v2.programs import ProgramSerializer, ProgramRequirementTreeSerializer
 from main.test_utils import assert_drf_json_equal
 
 pytestmark = [pytest.mark.django_db]

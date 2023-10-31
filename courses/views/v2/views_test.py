@@ -8,7 +8,7 @@ from django.urls import reverse
 from rest_framework import status
 
 from courses.conftest import course_catalog_data
-from courses.serializers.v2 import ProgramSerializer
+from courses.serializers.v2.programs import ProgramSerializer
 from courses.views.test_utils import (
     num_queries_from_programs,
 )
