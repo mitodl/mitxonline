@@ -32,6 +32,7 @@ export const coursesQuery = (courseKey: string = "") => ({
   }
 })
 
+// This will need to be updated to v2 once we get the courses endpoint to allow for multiple ID query
 export const programsQuery = (programKey: string = "") => ({
   queryKey:  programsQueryKey,
   url:       `/api/programs/?readable_id=${encodeURIComponent(programKey)}`,

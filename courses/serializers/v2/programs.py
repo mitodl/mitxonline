@@ -20,7 +20,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     requirements = serializers.SerializerMethodField()
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
-    departments = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    departments = serializers.StringRelatedField(many=True, read_only=True)
 
     def get_courses(self, instance):
         return [course[0].id for course in instance.courses if course[0].live]

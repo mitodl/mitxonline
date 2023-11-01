@@ -73,11 +73,11 @@ export type Program = {
   title: string,
   readable_id: string,
   program_type: string,
-  courses: Array<CourseDetailWithRuns>,
+  courses: Array<number>,
   requirements: ?ProgramEnrollments,
   req_tree: Array<ProgramRequirement>,
   page: ?Page,
-  departments: ?Array<Department>,
+  departments: ?Array<string>,
   live: boolean,
 }
 
@@ -146,5 +146,6 @@ export type LearnerRecord = {
 }
 
 export type Department = {
-  name: string
+  name: string,
+  id: number
 }

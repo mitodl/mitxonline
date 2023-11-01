@@ -77,83 +77,14 @@ const displayedCourse = {
 }
 
 const displayedProgram = {
-  title:       "P2",
-  readable_id: "P2",
-  id:          2,
-  courses:     [
-    {
-      id:          1,
-      title:       "Demonstration Course",
-      readable_id: "course-v1:edX+DemoX",
-      courseruns:  [
-        {
-          title:            "Demonstration Course",
-          start_date:       moment(),
-          end_date:         moment().add(2, "M"),
-          enrollment_start: null,
-          enrollment_end:   null,
-          expiration_date:  null,
-          courseware_url:
-            "http://edx.odl.local:18000/courses/course-v1:edX+DemoX+Demo_Course/",
-          courseware_id:    "course-v1:edX+DemoX+Demo_Course",
-          upgrade_deadline: null,
-          is_upgradable:    true,
-          is_self_paced:    true,
-          run_tag:          "Demo_Course",
-          id:               1,
-          live:             true,
-          products:         [
-            {
-              id:                     2,
-              price:                  "999.00",
-              description:            "course-v1:edX+DemoX+Demo_Course",
-              is_active:              true,
-              product_flexible_price: null
-            }
-          ],
-          page: {
-            feature_image_src:             "/static/images/mit-dome.png",
-            page_url:                      "/courses/course-v1:edX+DemoX/",
-            financial_assistance_form_url:
-              "/courses/course-v1:edX+DemoX/data-economics-and-development-policy-financial-assistance-form/",
-            description:   "Demonstration Course",
-            current_price: null,
-            instructors:   [],
-            live:          true
-          },
-          approved_flexible_price_exists: false
-        }
-      ],
-      next_run_id: null,
-      departments: [
-        {
-          name: "History"
-        }
-      ],
-      page: {
-        feature_image_src:             "/static/images/mit-dome.png",
-        page_url:                      "/courses/course-v1:edX+DemoX/",
-        financial_assistance_form_url:
-          "/courses/course-v1:edX+DemoX/data-economics-and-development-policy-financial-assistance-form/",
-        description:   "Demonstration Course",
-        current_price: null,
-        instructors:   [],
-        live:          true
-      },
-      feature_image_src:             "/static/images/mit-dome.png",
-      page_url:                      "/courses/course-v1:edX+DemoX/",
-      financial_assistance_form_url:
-        "/courses/course-v1:edX+DemoX/data-economics-and-development-policy-financial-assistance-form/",
-      description:   "Demonstration Course",
-      current_price: null,
-      instructors:   [],
-      live:          true
-    }
-  ],
+  title:        "P2",
+  readable_id:  "P2",
+  id:           2,
   requirements: {
     required:  [1],
     electives: []
   },
+  courses:  [1],
   req_tree: [
     {
       data: {
@@ -201,12 +132,8 @@ const displayedProgram = {
       "http://mitxonline.odl.local:8013/static/images/mit-dome.png"
   },
   program_type: "Series",
-  departments:  [
-    {
-      name: "Science"
-    }
-  ],
-  live: true
+  departments:  ["Science"],
+  live:         true
 }
 
 describe("CatalogPage", function() {
@@ -426,11 +353,11 @@ describe("CatalogPage", function() {
 
   it("renders catalog programs when filtered by department", async () => {
     const program1 = JSON.parse(JSON.stringify(displayedProgram))
-    program1.departments = [{ name: "Math" }]
+    program1.departments = ["Math"]
     const program2 = JSON.parse(JSON.stringify(displayedProgram))
-    program2.departments = [{ name: "History" }]
+    program2.departments = ["History"]
     const program3 = JSON.parse(JSON.stringify(displayedProgram))
-    program3.departments = [{ name: "History" }]
+    program3.departments = ["History"]
     const { inner } = await renderPage()
     programs = [program1, program2, program3]
     let programsFilteredByCriteriaAndDepartment = inner
@@ -978,7 +905,7 @@ describe("CatalogPage", function() {
 
     sinon.assert.calledWith(
       helper.handleRequestStub,
-      "/api/programs/?page=2&live=true",
+      "/api/v2/programs/?page=2&live=true",
       "GET"
     )
 

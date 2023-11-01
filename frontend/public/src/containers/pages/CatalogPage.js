@@ -404,7 +404,7 @@ export class CatalogPage extends React.Component<Props> {
       program =>
         selectedDepartment === ALL_DEPARTMENTS ||
         program.departments
-          .map(department => department.name)
+          .map(department => department)
           .includes(selectedDepartment)
     )
   }

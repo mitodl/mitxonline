@@ -12,3 +12,10 @@ export type InstructorPage = {
   instructor_bio_long: ?string,
   feature_image_src: string,
 }
+
+export type ProgramPage = {
+  id: number,
+  featured_image_src: string,
+  page_url: string,
+  live: boolean,
+}
