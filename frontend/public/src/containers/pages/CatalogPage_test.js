@@ -84,7 +84,7 @@ const displayedProgram = {
     required:  [1],
     electives: []
   },
-  courses:     [1],
+  courses:  [1],
   req_tree: [
     {
       data: {
