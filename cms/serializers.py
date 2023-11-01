@@ -149,6 +149,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     feature_image_src = serializers.SerializerMethodField()
     page_url = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
+    financial_assistance_form_url = serializers.SerializerMethodField()
 
     def get_feature_image_src(self, instance):
         """Serializes the source of the feature_image"""
@@ -164,11 +165,45 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     def get_price(self, instance):
         return instance.price[0].value["text"] if len(instance.price) > 0 else None
 
+    def get_financial_assistance_form_url(self, instance):
+        """
+        Returns URL of the Financial Assistance Form.
+        """
+        financial_assistance_page = (
+            FlexiblePricingRequestForm.objects.filter(
+                selected_program_id=instance.program.id
+            )
+            .live()
+            .first()
+        )
+        if (financial_assistance_page is None) and (
+            instance.get_children() is not None
+        ):
+            financial_assistance_page = (
+                instance.get_children().type(FlexiblePricingRequestForm).live().first()
+            )
+        if (financial_assistance_page is None) & (
+            len(instance.program.related_programs) > 0
+        ):
+            financial_assistance_page = (
+                FlexiblePricingRequestForm.objects.filter(
+                    selected_program__in=instance.program.related_programs
+                )
+                .live()
+                .first()
+            )
+        return (
+            f"{instance.get_url()}{financial_assistance_page.slug}/"
+            if financial_assistance_page
+            else ""
+        )
+
     class Meta:
         model = models.ProgramPage
         fields = [
             "feature_image_src",
             "page_url",
+            "financial_assistance_form_url",
             "description",
             "live",
             "length",

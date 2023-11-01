@@ -929,6 +929,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "EXCEPTION_HANDLER": "main.exceptions.exception_handler",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    "DEFAULT_VERSIONING": "rest_framework.versioning.NamespaceVersioning",
 }
 
 # Relative URL to be used by Djoser for the link in the password reset email
