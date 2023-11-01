@@ -8,7 +8,7 @@ import {
 import moment from "moment-timezone"
 
 import type { BaseCourseRun } from "../flow/courseTypes"
-import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
+import { EnrollmentFlaggedCourseRun, RunEnrollment } from "../flow/courseTypes"
 import { getCookie } from "../lib/api"
 import { isWithinEnrollmentPeriod } from "../lib/courseApi"
 import type { User } from "../flow/authTypes"
@@ -17,6 +17,7 @@ import { routes } from "../lib/urls"
 type CourseInfoBoxProps = {
   courses: Array<BaseCourseRun>,
   courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
+  enrollments: ?Array<RunEnrollment>,
   toggleUpgradeDialogVisibility: () => Promise<any>,
   setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>,
   currentUser: User
@@ -107,7 +108,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
   }
 
   render() {
-    const { courses, courseRuns } = this.props
+    const { courses, courseRuns, enrollments } = this.props
 
     if (!courses || courses.length < 1) {
       return null
@@ -131,7 +132,11 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         if (courseRun.id !== run.id) {
           startDates.push(
             <li key={index}>
-              {courseRun.is_enrolled
+              {courseRun.is_enrolled ||
+              enrollments.find(
+                (enrollment: RunEnrollment) =>
+                  enrollment.run.id === courseRun.id
+              )
                 ? this.renderEnrolledDateLink(courseRun)
                 : this.renderEnrollNowDateLink(courseRun)}
             </li>

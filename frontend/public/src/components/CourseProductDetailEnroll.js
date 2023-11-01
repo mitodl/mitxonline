@@ -11,7 +11,7 @@ import { Modal, ModalBody, ModalHeader } from "reactstrap"
 import Loader from "./Loader"
 import { routes } from "../lib/urls"
 import { getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
-import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
+import { EnrollmentFlaggedCourseRun, RunEnrollment } from "../flow/courseTypes"
 import {
   courseRunsSelector,
   courseRunsQuery,
@@ -20,6 +20,11 @@ import {
   coursesQuery,
   coursesQueryKey
 } from "../lib/queries/courseRuns"
+import {
+  enrollmentsQuery,
+  enrollmentsQueryKey,
+  enrollmentsSelector
+} from "../lib/queries/enrollment"
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
@@ -29,7 +34,10 @@ import {
 } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import users, { currentUserSelector } from "../lib/queries/users"
-import { enrollmentMutation } from "../lib/queries/enrollment"
+import {
+  enrollmentMutation,
+  deactivateEnrollmentMutation
+} from "../lib/queries/enrollment"
 import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import CourseInfoBox from "./CourseInfoBox"
@@ -42,14 +50,19 @@ type Props = {
   isLoading: ?boolean,
   courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
   courses: ?Array<any>,
+  enrollments: ?Array<RunEnrollment>,
   status: ?number,
   courseIsLoading: ?boolean,
   courseStatus: ?number,
+  enrollmentsIsLoading: ?boolean,
+  enrollmentsStatus: ?number,
   upgradeEnrollmentDialogVisibility: boolean,
   addProductToBasket: (user: number, productId: number) => Promise<any>,
   currentUser: User,
   createEnrollment: (runId: number) => Promise<any>,
-  updateAddlFields: (currentUser: User) => Promise<any>
+  deactivateEnrollment: (runId: number) => Promise<any>,
+  updateAddlFields: (currentUser: User) => Promise<any>,
+  forceRequest: () => any
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
@@ -67,6 +80,14 @@ export class CourseProductDetailEnroll extends React.Component<
     currentCourseRun:                  null,
     showAddlProfileFieldsModal:        false,
     destinationUrl:                    ""
+  }
+
+  resolveCurrentRun() {
+    const { courseRuns } = this.props
+
+    return !this.getCurrentCourseRun() && courseRuns
+      ? courseRuns[0]
+      : this.getCurrentCourseRun()
   }
 
   toggleAddlProfileFieldsModal() {
@@ -119,16 +140,34 @@ export class CourseProductDetailEnroll extends React.Component<
     }
   }
 
+  async checkForExistingEnrollment(run: EnrollmentFlaggedCourseRun) {
+    // Find an existing enrollment - the default should be the audit enrollment
+    // already have, so you can just upgrade in place. If you don't, you get the
+    // current run (which should be the first available one).
+    const { enrollments } = this.props
+
+    if (enrollments) {
+      const firstAuditEnrollment = enrollments.find(
+        (enrollment: RunEnrollment) =>
+          enrollment.run.course.id === run.course.id &&
+          enrollment.enrollment_mode === "audit"
+      )
+
+      if (firstAuditEnrollment) {
+        this.setCurrentCourseRun(firstAuditEnrollment.run)
+        return
+      }
+    }
+
+    this.setCurrentCourseRun(run)
+  }
+
   toggleUpgradeDialogVisibility = () => {
     const { upgradeEnrollmentDialogVisibility } = this.state
-    const { createEnrollment, courseRuns } = this.props
-    const run =
-      !this.getCurrentCourseRun() && courseRuns
-        ? courseRuns[0]
-        : this.getCurrentCourseRun()
+    const run = this.resolveCurrentRun()
 
     if (!upgradeEnrollmentDialogVisibility) {
-      createEnrollment(run)
+      this.checkForExistingEnrollment(run)
     } else {
       window.location = "/dashboard/"
     }
@@ -143,6 +182,22 @@ export class CourseProductDetailEnroll extends React.Component<
       currentCourseRun: courseRun
     })
   }
+
+  hndSetCourseRun = (event: any) => {
+    const { courseRuns } = this.props
+
+    const matchingCourseRun =
+      courseRuns &&
+      courseRuns.find(
+        (elem: EnrollmentFlaggedCourseRun) =>
+          elem.id === parseInt(event.target.value)
+      )
+
+    if (matchingCourseRun) {
+      this.setCurrentCourseRun(matchingCourseRun)
+    }
+  }
+
   getFirstUnexpiredRun = () => {
     const { courses, courseRuns } = this.props
     return courseRuns
@@ -168,12 +223,94 @@ export class CourseProductDetailEnroll extends React.Component<
       : null
   }
 
+  cancelEnrollment() {
+    const { upgradeEnrollmentDialogVisibility } = this.state
+
+    this.setState({
+      upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
+    })
+  }
+
+  renderRunSelectorButtons(run: EnrollmentFlaggedCourseRun) {
+    const { courseRuns } = this.props
+
+    return (
+      <>
+        {courseRuns && courseRuns.length > 1 ? (
+          <label htmlFor="choose-courserun">Choose a date:</label>
+        ) : (
+          <label htmlFor="choose-courserun">
+            There is one session available:
+          </label>
+        )}
+        <select
+          onChange={this.hndSetCourseRun.bind(this)}
+          className="form-control"
+        >
+          {courseRuns &&
+            courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
+              <option
+                selected={run.id === elem.id}
+                value={elem.id}
+                key={`courserun-selection-${elem.id}`}
+              >
+                {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
+                {formatPrettyDate(moment(new Date(elem.end_date)))}
+              </option>
+            ))}
+        </select>
+      </>
+    )
+  }
+
+  getEnrollmentForm(run: EnrollmentFlaggedCourseRun, showNewDesign: boolean) {
+    const csrfToken = getCookie("csrftoken")
+
+    return showNewDesign ? (
+      <form action="/enrollments/" method="post">
+        <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+        <input type="hidden" name="run" value={run ? run.id : ""} />
+        <button type="submit" className="btn enroll-now enroll-now-free">
+          <strong>Enroll for Free</strong> without a certificate
+        </button>
+      </form>
+    ) : (
+      <div className="d-flex">
+        <div className="flex-grow-1 w-auto">
+          <form action="/enrollments/" method="post">
+            <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+            <input type="hidden" name="run" value={run ? run.id : ""} />
+            <button type="submit" className="btn enroll-now enroll-now-free">
+              No thanks, I'll take the course for free without a certificate
+            </button>
+          </form>
+        </div>
+        <div className="ml-auto">
+          <button
+            onClick={this.cancelEnrollment.bind(this)}
+            className="btn enroll-now enroll-now-free cancel-enrollment-button"
+          >
+            Cancel Enrollment
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  updateDate(run: EnrollmentFlaggedCourseRun) {
+    let date = emptyOrNil(run.start_date)
+      ? undefined
+      : moment(new Date(run.start_date))
+    date = date ? date.utc() : date
+    const dateElem = document.getElementById("start_date")
+    if (dateElem) {
+      dateElem.innerHTML = `<strong>${formatPrettyDate(date)}</strong>`
+    }
+  }
+
   renderUpgradeEnrollmentDialog(showNewDesign: boolean) {
     const { courseRuns, courses } = this.props
-    const run =
-      !this.getCurrentCourseRun() && courseRuns
-        ? courseRuns[0]
-        : this.getCurrentCourseRun()
+    const run = this.resolveCurrentRun()
 
     const course =
       courses && courses.find((elem: any) => elem.id === run.course.id)
@@ -199,28 +336,24 @@ export class CourseProductDetailEnroll extends React.Component<
           id={`upgrade-enrollment-dialog`}
           className="upgrade-enrollment-modal"
           isOpen={upgradeEnrollmentDialogVisibility}
-          toggle={() => this.toggleUpgradeDialogVisibility()}
+          toggle={() => this.cancelEnrollment()}
           centered
         >
-          <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
+          <ModalHeader toggle={() => this.cancelEnrollment()}>
             {run.title}
           </ModalHeader>
           <ModalBody>
-            <div className="row">
-              <div className="col-12">
-                <p>
-                  Thank you for choosing an MITx Online course. By paying for
-                  this course, you're joining the most engaged and motivated
-                  learners on your path to a certificate from MITx.
-                </p>
+            {courseRuns ? (
+              <div className="row date-selector-button-bar">
+                <div className="col-12">
+                  <div>{this.renderRunSelectorButtons(run)}</div>
+                </div>
               </div>
-            </div>
+            ) : null}
 
-            <div className="row">
-              <div className="col-12">
-                <p className="acheiving-text">
-                  Acheiving a certificate has its advantages:
-                </p>
+            <div className="row upsell-messaging-header">
+              <div className="col-12 p-0 font-weight-bold">
+                Do you want to earn a certificate?
               </div>
             </div>
 
@@ -248,9 +381,12 @@ export class CourseProductDetailEnroll extends React.Component<
             </div>
 
             <div className="row certificate-pricing-row">
-              <div className="col-6 certificate-pricing">
+              <div className="col-6 certificate-pricing d-flex align-items-center">
+                <div className="certificate-pricing-logo">
+                  <img src="/static/images/certificates/certificate-logo.svg" />
+                </div>
                 <p>
-                  Certitficate track:{" "}
+                  Certificate track:{" "}
                   <strong id="certificate-price-info">
                     {product &&
                       formatLocalePrice(getFlexiblePriceForProduct(product))}
@@ -265,22 +401,23 @@ export class CourseProductDetailEnroll extends React.Component<
                     </>
                   ) : null}
                 </p>
-
-                <p>{needFinancialAssistanceLink}</p>
               </div>
-              <div className="col-6">
+              <div className="col-6 pr-0">
                 <form action="/cart/add/" method="get" className="text-center">
                   <input type="hidden" name="product_id" value={product.id} />
                   <button type="submit" className="btn btn-upgrade">
-                    <strong>Continue</strong>
+                    <strong>Enroll and Pay</strong>
                     <br />
-                    on the certificate track
+                    <span>for the certificate track</span>
                   </button>
                 </form>
               </div>
             </div>
 
-            <div className="cancel-link">{this.getEnrollmentForm()}</div>
+            <div className="row upgrade-options-row">
+              <div>{needFinancialAssistanceLink}</div>
+              <div>{this.getEnrollmentForm(run, showNewDesign)}</div>
+            </div>
           </ModalBody>
         </Modal>
       ) : (
@@ -330,7 +467,9 @@ export class CourseProductDetailEnroll extends React.Component<
                 {needFinancialAssistanceLink}
               </div>
             </div>
-            <div className="cancel-link">{this.getEnrollmentForm()}</div>
+            <div className="cancel-link">
+              {this.getEnrollmentForm(run, showNewDesign)}
+            </div>
             <div className="faq-link">
               <a
                 href="https://mitxonline.zendesk.com/hc/en-us"
@@ -344,32 +483,6 @@ export class CourseProductDetailEnroll extends React.Component<
         </Modal>
       )
     ) : null
-  }
-
-  getEnrollmentForm() {
-    const csrfToken = getCookie("csrftoken")
-    const { courseRuns } = this.props
-    const run = courseRuns ? courseRuns[0] : null
-    return (
-      <form action="/enrollments/" method="post">
-        <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
-        <input type="hidden" name="run" value={run ? run.id : ""} />
-        <button type="submit" className="btn enroll-now enroll-now-free">
-          No thanks, I'll take the free version
-        </button>
-      </form>
-    )
-  }
-
-  updateDate(run: EnrollmentFlaggedCourseRun) {
-    let date = emptyOrNil(run.start_date)
-      ? undefined
-      : moment(new Date(run.start_date))
-    date = date ? date.utc() : date
-    const dateElem = document.getElementById("start_date")
-    if (dateElem) {
-      dateElem.innerHTML = `<strong>${formatPrettyDate(date)}</strong>`
-    }
   }
 
   renderAddlProfileFieldsModal() {
@@ -480,6 +593,7 @@ export class CourseProductDetailEnroll extends React.Component<
         <>
           {product && run.is_upgradable ? (
             <button
+              id="upgradeEnrollBtn"
               className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
               onClick={() => this.toggleUpgradeDialogVisibility()}
             >
@@ -507,29 +621,22 @@ export class CourseProductDetailEnroll extends React.Component<
       isLoading,
       courses,
       courseIsLoading,
-      currentUser
+      currentUser,
+      enrollments,
+      enrollmentsIsLoading
     } = this.props
     const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
 
     let run,
       product = null
+
     if (courseRuns) {
       run = this.getFirstUnexpiredRun()
-      product = run && run.products ? run.products[0] : null
-      this.updateDate(run)
-      const thisScope = this
-      courseRuns.map(courseRun => {
-        // $FlowFixMe
-        document.addEventListener("click", function(e) {
-          if (e.target && e.target.id === courseRun.courseware_id) {
-            thisScope.setCurrentCourseRun(courseRun)
-            run = thisScope.getCurrentCourseRun()
-            product = run && run.products ? run.products[0] : null
-            // $FlowFixMe
-            thisScope.updateDate(run)
-          }
-        })
-      })
+
+      if (run) {
+        product = run && run.products ? run.products[0] : null
+        this.updateDate(run)
+      }
     }
 
     return (
@@ -551,7 +658,10 @@ export class CourseProductDetailEnroll extends React.Component<
           <>
             {
               // $FlowFixMe: isLoading null or undefined
-              <Loader key="course_info_loader" isLoading={courseIsLoading}>
+              <Loader
+                key="course_info_loader"
+                isLoading={courseIsLoading || enrollmentsIsLoading}
+              >
                 <CourseInfoBox
                   courses={courses}
                   courseRuns={courseRuns}
@@ -560,6 +670,7 @@ export class CourseProductDetailEnroll extends React.Component<
                     this.toggleUpgradeDialogVisibility
                   }
                   setCurrentCourseRun={this.setCurrentCourseRun}
+                  enrollments={enrollments}
                 ></CourseInfoBox>
               </Loader>
             }
@@ -572,6 +683,9 @@ export class CourseProductDetailEnroll extends React.Component<
 
 const createEnrollment = (run: EnrollmentFlaggedCourseRun) =>
   mutateAsync(enrollmentMutation(run.id))
+
+const deactivateEnrollment = (run: number) =>
+  mutateAsync(deactivateEnrollmentMutation(run))
 
 const updateAddlFields = (currentUser: User) => {
   const updatedUser = {
@@ -588,23 +702,32 @@ const updateAddlFields = (currentUser: User) => {
 }
 
 const mapStateToProps = createStructuredSelector({
-  courseRuns:      courseRunsSelector,
-  courses:         coursesSelector,
-  currentUser:     currentUserSelector,
-  isLoading:       pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
-  courseIsLoading: pathOr(true, ["queries", coursesQueryKey, "isPending"]),
-  status:          pathOr(null, ["queries", courseRunsQueryKey, "status"]),
-  courseStatus:    pathOr(true, ["queries", coursesQueryKey, "status"])
+  courseRuns:           courseRunsSelector,
+  courses:              coursesSelector,
+  currentUser:          currentUserSelector,
+  enrollments:          enrollmentsSelector,
+  isLoading:            pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
+  courseIsLoading:      pathOr(true, ["queries", coursesQueryKey, "isPending"]),
+  enrollmentsIsLoading: pathOr(true, [
+    "queries",
+    enrollmentsQueryKey,
+    "isPending"
+  ]),
+  status:            pathOr(null, ["queries", courseRunsQueryKey, "status"]),
+  courseStatus:      pathOr(true, ["queries", coursesQueryKey, "status"]),
+  enrollmentsStatus: pathOr(true, ["queries", enrollmentsQueryKey, "status"])
 })
 
 const mapPropsToConfig = props => [
   courseRunsQuery(props.courseId),
   coursesQuery(props.courseId),
+  enrollmentsQuery(),
   users.currentUserQuery()
 ]
 
 const mapDispatchToProps = {
   createEnrollment,
+  deactivateEnrollment,
   updateAddlFields
 }
 

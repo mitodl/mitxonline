@@ -465,8 +465,11 @@
   }
 
   .cancel-link, .faq-link {
-    text-align: center !important;
     margin: 20px 0;
+  }
+
+  .faq-link {
+    text-align: center !important;
   }
 
   .faq-link a {
@@ -488,8 +491,17 @@
     box-shadow: none;
     font-weight: bold;
   }
+
   form {
     margin-bottom: 20px;
+  }
+
+  .cancel-link button {
+    text-align: left;
+  }
+
+  .cancel-enrollment-button {
+    float: right;
   }
 }
 
