@@ -258,6 +258,51 @@ export class CourseProductDetailEnroll extends React.Component<
     )
   }
 
+  getEnrollmentForm(run: EnrollmentFlaggedCourseRun, showNewDesign: boolean) {
+    const csrfToken = getCookie("csrftoken")
+
+    return showNewDesign ? (
+      <form action="/enrollments/" method="post">
+        <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+        <input type="hidden" name="run" value={run ? run.id : ""} />
+        <button type="submit" className="btn enroll-now enroll-now-free">
+          Take the course for free without a certificate
+        </button>
+      </form>
+    ) : (
+      <div className="d-flex">
+        <div className="flex-grow-1 w-auto">
+          <form action="/enrollments/" method="post">
+            <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+            <input type="hidden" name="run" value={run ? run.id : ""} />
+            <button type="submit" className="btn enroll-now enroll-now-free">
+              No thanks, I'll take the course for free without a certificate
+            </button>
+          </form>
+        </div>
+        <div className="ml-auto">
+          <button
+            onClick={this.cancelEnrollment.bind(this)}
+            className="btn enroll-now enroll-now-free cancel-enrollment-button"
+          >
+            Cancel Enrollment
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  updateDate(run: EnrollmentFlaggedCourseRun) {
+    let date = emptyOrNil(run.start_date)
+      ? undefined
+      : moment(new Date(run.start_date))
+    date = date ? date.utc() : date
+    const dateElem = document.getElementById("start_date")
+    if (dateElem) {
+      dateElem.innerHTML = `<strong>${formatPrettyDate(date)}</strong>`
+    }
+  }
+
   renderUpgradeEnrollmentDialog(showNewDesign: boolean) {
     const { courseRuns, courses } = this.props
     const run = this.resolveCurrentRun()
@@ -286,30 +331,13 @@ export class CourseProductDetailEnroll extends React.Component<
           id={`upgrade-enrollment-dialog`}
           className="upgrade-enrollment-modal"
           isOpen={upgradeEnrollmentDialogVisibility}
-          toggle={() => this.toggleUpgradeDialogVisibility()}
+          toggle={() => this.cancelEnrollment()}
           centered
         >
-          <ModalHeader toggle={() => this.toggleUpgradeDialogVisibility()}>
+          <ModalHeader toggle={() => this.cancelEnrollment()}>
             {run.title}
           </ModalHeader>
           <ModalBody>
-            {/* <div className="row">
-              <div className="col-12">
-                <div className="alert alert-dark-success">
-                  <strong>
-                    Success! You've been enrolled in '{course && course.title}'.
-                  </strong>
-                  <br />
-                  {courseRuns && courseRuns.length > 1 ? (
-                    <>Choose a date below or click</>
-                  ) : (
-                    <>Click</>
-                  )}{" "}
-                  '<strong>Cancel Enrollment</strong>' to unenroll.
-                </div>
-              </div>
-            </div> */}
-
             {courseRuns && courseRuns.length > 1 ? (
               <div className="row date-selector-button-bar">
                 <div className="col-12">
@@ -363,11 +391,7 @@ export class CourseProductDetailEnroll extends React.Component<
               <div>
                 <p>{needFinancialAssistanceLink}</p>
               </div>
-              <div>
-                <p>
-                  <a href="#">Take the course for free without a certificate</a>
-                </p>
-              </div>
+              <div>{this.getEnrollmentForm(run, showNewDesign)}</div>
             </div>
 
             <div className="row upsell-messaging-header">
@@ -397,22 +421,6 @@ export class CourseProductDetailEnroll extends React.Component<
                   </li>
                 </ul>
               </div>
-            </div>
-
-            <div className="cancel-link">
-              <button
-                className="btn btn-secondary"
-                onClick={() =>
-                  this.setState({
-                    upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
-                  })
-                }
-              >
-                Cancel
-              </button>
-              <button className="btn btn-primary">
-                Proceed with Enrollment
-              </button>
             </div>
           </ModalBody>
         </Modal>
@@ -463,7 +471,9 @@ export class CourseProductDetailEnroll extends React.Component<
                 {needFinancialAssistanceLink}
               </div>
             </div>
-            <div className="cancel-link">{this.getEnrollmentForm(run)}</div>
+            <div className="cancel-link">
+              {this.getEnrollmentForm(run, showNewDesign)}
+            </div>
             <div className="faq-link">
               <a
                 href="https://mitxonline.zendesk.com/hc/en-us"
@@ -477,43 +487,6 @@ export class CourseProductDetailEnroll extends React.Component<
         </Modal>
       )
     ) : null
-  }
-
-  getEnrollmentForm(run: EnrollmentFlaggedCourseRun) {
-    const csrfToken = getCookie("csrftoken")
-
-    return (
-      <div className="d-flex">
-        <div className="flex-grow-1 w-auto">
-          <form action="/enrollments/" method="post">
-            <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
-            <input type="hidden" name="run" value={run ? run.id : ""} />
-            <button type="submit" className="btn enroll-now enroll-now-free">
-              No thanks, I'll take the course for free without a certificate
-            </button>
-          </form>
-        </div>
-        <div className="ml-auto">
-          <button
-            onClick={this.cancelEnrollment.bind(this)}
-            className="btn enroll-now enroll-now-free cancel-enrollment-button"
-          >
-            Cancel Enrollment
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  updateDate(run: EnrollmentFlaggedCourseRun) {
-    let date = emptyOrNil(run.start_date)
-      ? undefined
-      : moment(new Date(run.start_date))
-    date = date ? date.utc() : date
-    const dateElem = document.getElementById("start_date")
-    if (dateElem) {
-      dateElem.innerHTML = `<strong>${formatPrettyDate(date)}</strong>`
-    }
   }
 
   renderAddlProfileFieldsModal() {
@@ -663,8 +636,11 @@ export class CourseProductDetailEnroll extends React.Component<
 
     if (courseRuns) {
       run = this.getFirstUnexpiredRun()
-      product = run && run.products ? run.products[0] : null
-      this.updateDate(run)
+
+      if (run) {
+        product = run && run.products ? run.products[0] : null
+        this.updateDate(run)
+      }
     }
 
     return (
