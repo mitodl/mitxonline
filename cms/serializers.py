@@ -185,9 +185,13 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         if (financial_assistance_page is None) & (
             len(instance.program.related_programs) > 0
         ):
-            financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
-                selected_program__in=instance.program.related_programs
-            ).live().first()
+            financial_assistance_page = (
+                FlexiblePricingRequestForm.objects.filter(
+                    selected_program__in=instance.program.related_programs
+                )
+                .live()
+                .first()
+            )
         return (
             f"{instance.get_url()}{financial_assistance_page.slug}/"
             if financial_assistance_page
