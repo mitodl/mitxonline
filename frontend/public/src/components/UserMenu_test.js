@@ -13,7 +13,7 @@ describe("UserMenu component", () => {
     const userMenu = shallow(
       <UserMenu currentUser={user} useScreenOverlay={false} />
     )
-    assert.lengthOf(userMenu.find("MixedLink"), 4)
+    assert.lengthOf(userMenu.find("MixedLink"), 5)
     assert.lengthOf(userMenu.find("a"), 1)
   })
 
@@ -22,7 +22,7 @@ describe("UserMenu component", () => {
       shallow(<UserMenu currentUser={user} useScreenOverlay={true} />).find(
         "ul li"
       ),
-      5
+      6
     )
   })
 
