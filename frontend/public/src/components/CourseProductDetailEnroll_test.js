@@ -464,7 +464,7 @@ describe("CourseProductDetailEnroll", () => {
     )
   })
   ;[
-    ["does not show", "one", false],
+    ["shows", "one", false],
     ["shows", "multiple", true]
   ].forEach(([showsQualifier, runsQualifier, multiples]) => {
     it(`${showsQualifier} the course run selector for a course with ${runsQualifier} active run${
@@ -516,10 +516,13 @@ describe("CourseProductDetailEnroll", () => {
       assert.isTrue(upgradeForm.exists())
 
       const selectorControl = modal.find(".date-selector-button-bar").at(0)
+      assert.isTrue(selectorControl.exists())
+
+      const selectorControlItems = selectorControl.find("option")
       if (multiples) {
-        assert.isTrue(selectorControl.exists())
+        assert.isTrue(selectorControlItems.length === 2)
       } else {
-        assert.isNotTrue(selectorControl.exists())
+        assert.isTrue(selectorControlItems.length === 1)
       }
     })
   })
