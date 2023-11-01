@@ -431,7 +431,7 @@ def test_user_enrollments_create(
     run = CourseRunFactory.create(course=course)
     fake_enrollment = CourseRunEnrollmentFactory.create(run=run)
     patched_enroll = mocker.patch(
-        "courses.views.v1.create_run_enrollments",
+        "courses.serializers.v1.courses.create_run_enrollments",
         return_value=([fake_enrollment], True),
     )
     resp = user_drf_client.post(
