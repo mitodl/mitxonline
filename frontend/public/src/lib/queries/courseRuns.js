@@ -34,7 +34,7 @@ export const coursesQuery = (courseKey: string = "") => ({
 
 export const programsQuery = (programKey: string = "") => ({
   queryKey:  programsQueryKey,
-  url:       `/api/programs/?readable_id=${encodeURIComponent(programKey)}`,
+  url:       `/api/v2/programs/?readable_id=${encodeURIComponent(programKey)}`,
   transform: json => ({
     programs: json
   }),
