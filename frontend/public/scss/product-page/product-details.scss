@@ -319,12 +319,6 @@ body.new-design {
       }
     }
 
-    .acheiving-text {
-      font-weight: 600;
-      color: black;
-      margin-bottom: 1.5rem;
-    }
-
     ul { 
       padding: 0;
     }
@@ -403,7 +397,7 @@ body.new-design {
   }
 
   div.upgrade-options-row {
-    margin: 10px 1px 0px 1px;
+    margin: 30px 1px 20px 1px;
 
     display: flex;
     padding: 0px;
@@ -423,8 +417,8 @@ body.new-design {
         color: black;
       }
 
-      p {
-        padding: 12px 6px;
+      button {
+        padding: 0;
       }
     }
   }

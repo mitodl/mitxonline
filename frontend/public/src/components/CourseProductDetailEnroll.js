@@ -236,7 +236,13 @@ export class CourseProductDetailEnroll extends React.Component<
 
     return (
       <>
-        <label htmlFor="choose-courserun">Choose a date:</label>
+        {courseRuns && courseRuns.length > 1 ? (
+          <label htmlFor="choose-courserun">Choose a date:</label>
+        ) : (
+          <label htmlFor="choose-courserun">
+            There is one session available:
+          </label>
+        )}
         <select
           onChange={this.hndSetCourseRun.bind(this)}
           className="form-control"
@@ -265,7 +271,7 @@ export class CourseProductDetailEnroll extends React.Component<
         <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
         <input type="hidden" name="run" value={run ? run.id : ""} />
         <button type="submit" className="btn enroll-now enroll-now-free">
-          Or, Enroll for Free without a certificate
+          <strong>Enroll for Free</strong> without a certificate
         </button>
       </form>
     ) : (
@@ -337,7 +343,7 @@ export class CourseProductDetailEnroll extends React.Component<
             {run.title}
           </ModalHeader>
           <ModalBody>
-            {courseRuns && courseRuns.length > 1 ? (
+            {courseRuns ? (
               <div className="row date-selector-button-bar">
                 <div className="col-12">
                   <div>{this.renderRunSelectorButtons(run)}</div>
@@ -347,7 +353,7 @@ export class CourseProductDetailEnroll extends React.Component<
 
             <div className="row upsell-messaging-header">
               <div className="col-12 p-0 font-weight-bold">
-                Acheiving a certificate has its advantages:
+                Do you want to earn a certificate?
               </div>
             </div>
 
@@ -387,7 +393,7 @@ export class CourseProductDetailEnroll extends React.Component<
                   </svg>
                 </div>
                 <p>
-                  Certitficate track:{" "}
+                  Certificate track:{" "}
                   <strong id="certificate-price-info">
                     {product &&
                       formatLocalePrice(getFlexiblePriceForProduct(product))}
@@ -416,9 +422,7 @@ export class CourseProductDetailEnroll extends React.Component<
             </div>
 
             <div className="row upgrade-options-row">
-              <div>
-                <p>{needFinancialAssistanceLink}</p>
-              </div>
+              <div>{needFinancialAssistanceLink}</div>
               <div>{this.getEnrollmentForm(run, showNewDesign)}</div>
             </div>
           </ModalBody>
