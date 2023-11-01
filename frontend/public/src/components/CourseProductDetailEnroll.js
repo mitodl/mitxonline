@@ -183,15 +183,17 @@ export class CourseProductDetailEnroll extends React.Component<
     })
   }
 
-  hndSetCourseRun = (event: Event) => {
+  hndSetCourseRun = (event: SyntheticEvent<>) => {
     console.log("in hndSetCourseRun", event.target.value)
 
     const { courseRuns } = this.props
 
-    const matchingCourseRun = courseRuns.find(
-      (elem: EnrollmentFlaggedCourseRun) =>
-        elem.id === parseInt(event.target.value)
-    )
+    const matchingCourseRun =
+      courseRuns &&
+      courseRuns.find(
+        (elem: EnrollmentFlaggedCourseRun) =>
+          elem.id === parseInt(event.target.value)
+      )
 
     if (matchingCourseRun) {
       console.log("setting new course run", matchingCourseRun)
