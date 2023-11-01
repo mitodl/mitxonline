@@ -6,7 +6,7 @@ from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 
 from courses.models import Program
-from courses.serializers.v2 import ProgramSerializer
+from courses.serializers.v2.programs import ProgramSerializer
 
 
 class Pagination(PageNumberPagination):

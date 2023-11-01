@@ -25,13 +25,13 @@ from courses.models import (
     CourseRun,
     ProgramEnrollment,
 )
-from courses.serializers.v1 import (
+from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
-    CourseRunSerializer,
     CourseWithCourseRunsSerializer,
-    ProgramSerializer,
     CourseRunWithCourseSerializer,
 )
+from courses.serializers.v1.programs import ProgramSerializer
+from courses.serializers.v1.courses import CourseRunSerializer
 from courses.views.test_utils import (
     num_queries_from_course,
     num_queries_from_programs,
@@ -432,7 +432,7 @@ def test_user_enrollments_create(
     run = CourseRunFactory.create(course=course)
     fake_enrollment = CourseRunEnrollmentFactory.create(run=run)
     patched_enroll = mocker.patch(
-        "courses.serializers.v1.create_run_enrollments",
+        "courses.api.create_run_enrollments",
         return_value=([fake_enrollment], True),
     )
     resp = user_drf_client.post(
@@ -534,7 +534,7 @@ def test_create_enrollments(mocker, user_client, api_request, product_exists):
     Unless api_request is set to True, in which case we should get a string back.
     """
     patched_create_enrollments = mocker.patch(
-        "courses.views.v1.create_run_enrollments",
+        "courses.api.create_run_enrollments",
         return_value=(None, True),
     )
     mock_fulfilled_order_filter = mocker.patch(
@@ -577,7 +577,7 @@ def test_create_enrollments_failed(mocker, settings, user_client):
     """
     settings.FEATURES[features.IGNORE_EDX_FAILURES] = False
     patched_create_enrollments = mocker.patch(
-        "courses.views.v1.create_run_enrollments",
+        "courses.api.create_run_enrollments",
         return_value=(None, False),
     )
     run = CourseRunFactory.create()
@@ -722,7 +722,7 @@ def test_create_enrollments_with_existing_fulfilled_order(
     time.
     """
     patched_create_enrollments = mocker.patch(
-        "courses.views.v1.create_run_enrollments",
+        "courses.api.create_run_enrollments",
         return_value=(None, True),
     )
     run = CourseRunFactory.create()

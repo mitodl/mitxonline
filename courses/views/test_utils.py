@@ -68,5 +68,5 @@ def num_queries_from_programs(programs, version="v1"):
                 num_queries += num_queries_from_course(course)
             num_queries += 4 + (6 * num_courses) + 1
         if version == "v2":
-            num_queries += 6 + (11 * num_courses) + 1
+            num_queries += 6 + (12 * num_courses) + 1
     return num_queries

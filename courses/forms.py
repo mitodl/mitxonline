@@ -9,7 +9,7 @@ from courses.models import (
     ProgramRequirement,
     ProgramRequirementNodeType,
 )
-from courses.serializers.v1 import ProgramRequirementTreeSerializer
+from courses.serializers.v1.programs import ProgramRequirementTreeSerializer
 from courses.widgets import ProgramRequirementsInput
 
 

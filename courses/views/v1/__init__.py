@@ -38,16 +38,17 @@ from courses.models import (
     Program,
     ProgramEnrollment,
 )
-from courses.serializers.v1 import (
+from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
     CourseRunWithCourseSerializer,
     CourseWithCourseRunsSerializer,
-    DepartmentWithCountSerializer,
-    LearnerRecordSerializer,
-    PartnerSchoolSerializer,
-    ProgramSerializer,
-    UserProgramEnrollmentDetailSerializer,
 )
+from courses.serializers.v1.programs import PartnerSchoolSerializer, ProgramSerializer
+from courses.serializers.v1.programs import (
+    UserProgramEnrollmentDetailSerializer,
+    LearnerRecordSerializer,
+)
+from courses.serializers.v1.departments import DepartmentWithCountSerializer
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
 from ecommerce.models import FulfilledOrder, Order, PendingOrder, Product

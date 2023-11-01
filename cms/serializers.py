@@ -40,8 +40,17 @@ class CoursePageSerializer(serializers.ModelSerializer):
         """
         financial_assistance_page = None
         if instance.product.programs:
+            valid_program_objs = [program for program in instance.product.programs]
+            valid_related_programs = []
+
+            for valid_program in valid_program_objs:
+                for valid_related_program in valid_program.related_programs:
+                    valid_related_programs.append(valid_related_program)
+
+            valid_program_objs.extend(valid_related_programs)
+
             program_page = ProgramPage.objects.filter(
-                program_id__in=[program.id for program in instance.product.programs]
+                program_id__in=[program.id for program in valid_program_objs]
             ).first()
 
             # for courses in program, financial assistance form from program should take precedence if exist
@@ -56,7 +65,7 @@ class CoursePageSerializer(serializers.ModelSerializer):
                     return f"{program_page.get_url()}{financial_assistance_page.slug}/"
 
             financial_assistance_page = FlexiblePricingRequestForm.objects.filter(
-                selected_program=instance.product.programs[0]
+                selected_program__in=valid_program_objs
             ).first()
 
         if financial_assistance_page is None:
@@ -140,6 +149,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     feature_image_src = serializers.SerializerMethodField()
     page_url = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
+    financial_assistance_form_url = serializers.SerializerMethodField()
 
     def get_feature_image_src(self, instance):
         """Serializes the source of the feature_image"""
@@ -155,11 +165,45 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     def get_price(self, instance):
         return instance.price[0].value["text"] if len(instance.price) > 0 else None
 
+    def get_financial_assistance_form_url(self, instance):
+        """
+        Returns URL of the Financial Assistance Form.
+        """
+        financial_assistance_page = (
+            FlexiblePricingRequestForm.objects.filter(
+                selected_program_id=instance.program.id
+            )
+            .live()
+            .first()
+        )
+        if (financial_assistance_page is None) and (
+            instance.get_children() is not None
+        ):
+            financial_assistance_page = (
+                instance.get_children().type(FlexiblePricingRequestForm).live().first()
+            )
+        if (financial_assistance_page is None) & (
+            len(instance.program.related_programs) > 0
+        ):
+            financial_assistance_page = (
+                FlexiblePricingRequestForm.objects.filter(
+                    selected_program__in=instance.program.related_programs
+                )
+                .live()
+                .first()
+            )
+        return (
+            f"{instance.get_url()}{financial_assistance_page.slug}/"
+            if financial_assistance_page
+            else ""
+        )
+
     class Meta:
         model = models.ProgramPage
         fields = [
             "feature_image_src",
             "page_url",
+            "financial_assistance_form_url",
             "description",
             "live",
             "length",
