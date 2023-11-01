@@ -15,16 +15,18 @@ const AnonymousMenu = ({ mobileView }: Props) => {
   const newDesign = checkFeatureFlag("mitxonline-new-header")
   return (
     <ul>
-      <li>
-        <MixedLink
-          id={"login".concat(identifierPostfix)}
-          dest={routes.catalog}
-          className="top-nav-link"
-          aria-label="Catalog"
-        >
-          Catalog
-        </MixedLink>
-      </li>
+      {newDesign ?
+        <li>
+          <MixedLink
+            id={"login".concat(identifierPostfix)}
+            dest={routes.catalog}
+            className="top-nav-link"
+            aria-label="Catalog"
+          >
+            Catalog
+          </MixedLink>
+        </li> : null
+      }
       <li>
         <MixedLink
           id={"login".concat(identifierPostfix)}
