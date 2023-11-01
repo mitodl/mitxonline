@@ -78,7 +78,7 @@ export type Program = {
   requirements: ?ProgramEnrollments,
   req_tree: Array<ProgramRequirement>,
   page: ?Page,
-  departments: ?Array<Department>,
+  departments: ?Array<number>,
   live: boolean,
 }
 
@@ -147,5 +147,6 @@ export type LearnerRecord = {
 }
 
 export type Department = {
-  name: string
+  name: string,
+  id: number
 }

@@ -8,7 +8,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Department
-        fields = ["name"]
+        fields = ["name", "id"]
 
 
 class DepartmentWithCountSerializer(DepartmentSerializer):
