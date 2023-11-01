@@ -101,7 +101,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
   }
   renderEnrolledDateLink(run: EnrollmentFlaggedCourseRun) {
     return (
-      <button className="more-dates-link enrolled ">
+      <button className="more-dates-link enrolled">
         {getStartDateText(run)} - Enrolled
       </button>
     )
