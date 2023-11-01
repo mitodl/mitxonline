@@ -9,6 +9,7 @@ import type { Location } from "react-router"
 import NotificationContainer from "./NotificationContainer"
 
 import type { CurrentUser } from "../flow/authTypes"
+import MixedLink from "./MixedLink"
 
 type Props = {
   currentUser: CurrentUser,
@@ -53,7 +54,17 @@ const TopBar = ({ currentUser }: Props) => (
       >
         <div className="full-screen-top-menu">
           {currentUser.is_authenticated ? (
-            <UserMenu currentUser={currentUser} useScreenOverlay={false} />
+            <>
+              <MixedLink
+                id="catalog"
+                dest={routes.catalog}
+                className="top-nav-link"
+                aria-label="Catalog"
+              >
+                Catalog
+              </MixedLink>
+              <UserMenu currentUser={currentUser} useScreenOverlay={false} />
+            </>
           ) : (
             <AnonymousMenu mobileView={false} />
           )}

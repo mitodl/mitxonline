@@ -80,13 +80,15 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
             </span>
           </MixedLink>
         </li>
-        <li {...(menuChildProps.li || {})}>
-          <MixedLink dest={routes.catalog} aria-label="Catalog">
-            <span data-bs-target="#nav" data-bs-toggle="collapse">
-              Catalog
-            </span>
-          </MixedLink>
-        </li>
+        {showNewDesign && useScreenOverlay ? (
+          <li {...(menuChildProps.li || {})}>
+            <MixedLink dest={routes.catalog} aria-label="Catalog">
+              <span data-bs-target="#nav" data-bs-toggle="collapse">
+                Catalog
+              </span>
+            </MixedLink>
+          </li>
+        ) : null}
         <li {...(menuChildProps.li || {})}>
           <MixedLink dest={routes.dashboard} aria-label="Dashboard">
             <span data-bs-target="#nav" data-bs-toggle="collapse">

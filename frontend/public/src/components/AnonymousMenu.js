@@ -18,7 +18,7 @@ const AnonymousMenu = ({ mobileView }: Props) => {
       {newDesign ? (
         <li>
           <MixedLink
-            id={"login".concat(identifierPostfix)}
+            id="catalog"
             dest={routes.catalog}
             className="top-nav-link"
             aria-label="Catalog"

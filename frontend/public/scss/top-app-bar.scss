@@ -258,6 +258,7 @@ header.site-header {
 header.site-header.new-design {
   box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14);
   background-color: $white;
+  font-family: Inter;
 
   .navbar.top-navbar {
     display: flex;
@@ -280,9 +281,17 @@ header.site-header.new-design {
   font-size: 14px;
   line-height: 21px;
 
+  .top-nav-link {
+    padding: 13px 10px 13px 20px;
+    display: inline-block;
+    color: black;
+    text-decoration: none;
+  }
+
   .top-user-menu {
     border-left: 1px solid $home-page-border-grey;
     padding-left: 15px;
+    display: inline-block;
   }
 
   @include media-breakpoint-down(md) {
@@ -303,10 +312,6 @@ header.site-header.new-design {
         color: black;
         text-decoration: none;
         display: block;
-
-        &.top-nav-link {
-          padding: 13px 10px 13px 20px;
-        }
 
         &:hover {
           color: $primary;
@@ -382,10 +387,10 @@ header.site-header.new-design {
     display: block;
   }
 
-  li.mobile-dropdown-item {
+  li {
     display: block;
     padding: 10px 0;
-    margin: 0 auto;
+    margin: 0;
     max-width: 170px;
 
     a {
