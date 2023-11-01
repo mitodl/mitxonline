@@ -184,8 +184,6 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   hndSetCourseRun = (event: any) => {
-    console.log("in hndSetCourseRun", event.target.value)
-
     const { courseRuns } = this.props
 
     const matchingCourseRun =
@@ -196,7 +194,6 @@ export class CourseProductDetailEnroll extends React.Component<
       )
 
     if (matchingCourseRun) {
-      console.log("setting new course run", matchingCourseRun)
       this.setCurrentCourseRun(matchingCourseRun)
     }
   }
@@ -268,7 +265,7 @@ export class CourseProductDetailEnroll extends React.Component<
         <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
         <input type="hidden" name="run" value={run ? run.id : ""} />
         <button type="submit" className="btn enroll-now enroll-now-free">
-          Take the course for free without a certificate
+          Or, Enroll for Free without a certificate
         </button>
       </form>
     ) : (
@@ -348,6 +345,35 @@ export class CourseProductDetailEnroll extends React.Component<
               </div>
             ) : null}
 
+            <div className="row upsell-messaging-header">
+              <div className="col-12 p-0 font-weight-bold">
+                Acheiving a certificate has its advantages:
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-6">
+                <ul>
+                  <li> Certificate is signed by MIT faculty</li>
+                  <li>
+                    {" "}
+                    Demonstrates knowledge and skills taught in this course
+                  </li>
+                  <li> Enhance your college &amp; earn a promotion</li>
+                </ul>
+              </div>
+              <div className="col-6">
+                <ul>
+                  <li>Highlight on your resume/CV</li>
+                  <li>Share on your social channels &amp; LinkedIn</li>
+                  <li>
+                    Enhance your college application with an earned certificate
+                    from MIT
+                  </li>
+                </ul>
+              </div>
+            </div>
+
             <div className="row certificate-pricing-row">
               <div className="col-6 certificate-pricing d-flex align-items-center">
                 <div className="certificate-pricing-logo">
@@ -381,9 +407,9 @@ export class CourseProductDetailEnroll extends React.Component<
                 <form action="/cart/add/" method="get" className="text-center">
                   <input type="hidden" name="product_id" value={product.id} />
                   <button type="submit" className="btn btn-upgrade">
-                    <strong>Continue</strong>
+                    <strong>Enroll and Pay</strong>
                     <br />
-                    on the certificate track
+                    <span>for the certificate track</span>
                   </button>
                 </form>
               </div>
@@ -394,35 +420,6 @@ export class CourseProductDetailEnroll extends React.Component<
                 <p>{needFinancialAssistanceLink}</p>
               </div>
               <div>{this.getEnrollmentForm(run, showNewDesign)}</div>
-            </div>
-
-            <div className="row upsell-messaging-header">
-              <div className="col-12 p-0 font-weight-bold">
-                Acheiving a certificate has its advantages:
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-6">
-                <ul>
-                  <li> Certificate is signed by MIT faculty</li>
-                  <li>
-                    {" "}
-                    Demonstrates knowledge and skills taught in this course
-                  </li>
-                  <li> Enhance your college &amp; earn a promotion</li>
-                </ul>
-              </div>
-              <div className="col-6">
-                <ul>
-                  <li>Highlight on your resume/CV</li>
-                  <li>Share on your social channels &amp; LinkedIn</li>
-                  <li>
-                    Enhance your college application with an earned certificate
-                    from MIT
-                  </li>
-                </ul>
-              </div>
             </div>
           </ModalBody>
         </Modal>

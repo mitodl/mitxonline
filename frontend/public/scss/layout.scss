@@ -71,3 +71,27 @@ body {
     padding-bottom: 50px;
   }
 }
+
+body.new-design {
+  .modal-title {
+    font-family: Poppins, sans-serif;
+    font-weight: 700;
+  }
+
+  .modal-header {
+    .btn-close {
+      border-radius: 100px;
+      background: var(--Grey-Lite, #F0F5F7) url('data:image/svg+xml,<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="Icon"><path id="X" fill-rule="evenodd" clip-rule="evenodd" d="M5 4.1239L8.94245 0.181446C9.18438 -0.0604821 9.57662 -0.0604821 9.81855 0.181446C10.0605 0.423375 10.0605 0.815619 9.81855 1.05755L5.8761 5L9.81855 8.94245C10.0605 9.18438 10.0605 9.57662 9.81855 9.81855C9.57662 10.0605 9.18438 10.0605 8.94245 9.81855L5 5.8761L1.05755 9.81855C0.815619 10.0605 0.423375 10.0605 0.181446 9.81855C-0.0604821 9.57662 -0.0604821 9.18438 0.181446 8.94245L4.1239 5L0.181446 1.05755C-0.0604821 0.815619 -0.0604821 0.423375 0.181446 0.181446C0.423375 -0.0604821 0.815619 -0.0604821 1.05755 0.181446L5 4.1239Z" fill="%2303152D"/></g></svg>');
+      background-repeat: no-repeat;
+      background-position: center center;
+      background-size: 10px 10px;
+    }
+  }
+
+  select.form-control {
+    background-image: url('data:image/svg+xml,<svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.41 3.8147e-06L6 4.58L10.59 3.8147e-06L12 1.41L6 7.41L0 1.41L1.41 3.8147e-06Z" fill="%23344055"/></svg>');
+    background-repeat: no-repeat;
+    background-position: 97% center;
+    background-size: 12px auto;
+  }
+}
