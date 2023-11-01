@@ -114,12 +114,15 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
 
     const run = courseRuns ? courseRuns[0] : null
 
-    return !checkFeatureFlag("mitxonline-new-product-page", currentUser ? currentUser.id : "anon") ? (
+    return !checkFeatureFlag(
+      "mitxonline-new-product-page",
+      currentUser ? currentUser.id : "anon"
+    ) ? (
       // $FlowFixMe: isLoading null or undefined
-      <Loader isLoading={isLoading}>
-        {run ? this.renderUpgradeEnrollmentDialog(run) : null}
-      </Loader>
-    ) : null
+        <Loader isLoading={isLoading}>
+          {run ? this.renderUpgradeEnrollmentDialog(run) : null}
+        </Loader>
+      ) : null
   }
 }
 

@@ -29,7 +29,10 @@ const Header = ({ currentUser, location }: Props) => {
       scope.setUser(null)
     })
   }
-  const showNewDesign = checkFeatureFlag("mitxonline-new-header", currentUser ? currentUser.id : "anon")
+  const showNewDesign = checkFeatureFlag(
+    "mitxonline-new-header",
+    currentUser ? currentUser.id : "anon"
+  )
   if (showNewDesign) {
     return (
       <React.Fragment>

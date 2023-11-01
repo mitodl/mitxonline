@@ -268,8 +268,12 @@ export const intCheckFeatureFlag = (
 ) => {
   const params = new URLSearchParams(document.location.search)
   if (SETTINGS.posthog_api_host) {
-    if (uniqueID)
-    posthog.setPersonPropertiesForFlags({ environment: SETTINGS.environment, user_id: uniqueID ? uniqueID : "anon" })
+    if (uniqueID) {
+      posthog.setPersonPropertiesForFlags({
+        environment: SETTINGS.environment,
+        user_id:     uniqueID ? uniqueID : "anon"
+      })
+    }
   }
   return (
     (SETTINGS.posthog_api_host && posthog.isFeatureEnabled(flag)) ||

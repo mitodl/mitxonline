@@ -31,14 +31,17 @@ const expandExpandBlock = (event: MouseEvent) => {
 type Props = {
   courseId: ?string,
   programId: ?string,
-  userId: ?number,
+  userId: ?number
 }
 
 export class ProductDetailEnrollApp extends React.Component<Props> {
   render() {
     const { courseId, programId, userId } = this.props
 
-    const showNewDesign = checkFeatureFlag("mitxonline-new-product-page", userId ? userId : "anon")
+    const showNewDesign = checkFeatureFlag(
+      "mitxonline-new-product-page",
+      userId ? userId : "anon"
+    )
 
     if (showNewDesign) {
       document.querySelectorAll("a.expand_here_link").forEach(link => {

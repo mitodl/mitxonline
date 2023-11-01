@@ -39,11 +39,21 @@ const renderHeader = () => {
   )
 }
 
-const renderEnrollSection = (courseId, programId, userId, element, reduxStore) => {
+const renderEnrollSection = (
+  courseId,
+  programId,
+  userId,
+  element,
+  reduxStore
+) => {
   ReactDOM.render(
     <AppContainer>
       <Provider store={reduxStore}>
-        <ProductDetailEnrollApp courseId={courseId} programId={programId} userId={userId}/>
+        <ProductDetailEnrollApp
+          courseId={courseId}
+          programId={programId}
+          userId={userId}
+        />
       </Provider>
     </AppContainer>,
     element
