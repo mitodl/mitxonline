@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.79.1
+--------------
+
+- Change Catalog Page to use the new v2 programs endpoint (#1971)
+- Programs API v2 (#1966)
+- Instructor bio cards styles (#1967)
+- Updated get_financial_assistance_form_url to also consider related programs (#1940)
+
 Version 0.79.0 (Released October 30, 2023)
 --------------
 
