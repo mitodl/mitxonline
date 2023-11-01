@@ -18,6 +18,16 @@ const AnonymousMenu = ({ mobileView }: Props) => {
       <li>
         <MixedLink
           id={"login".concat(identifierPostfix)}
+          dest={routes.catalog}
+          className="top-nav-link"
+          aria-label="Catalog"
+        >
+          Catalog
+        </MixedLink>
+      </li>
+      <li>
+        <MixedLink
+          id={"login".concat(identifierPostfix)}
           dest={routes.login.begin}
           className="simple"
           aria-label="Sign In"
@@ -32,7 +42,7 @@ const AnonymousMenu = ({ mobileView }: Props) => {
           className="simple button"
           aria-label="Create Account"
         >
-          Create {newDesign && mobileView ? "" : "Account"}
+          Create Account
         </MixedLink>
       </li>
     </ul>

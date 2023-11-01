@@ -32,45 +32,40 @@ const TopBar = ({ currentUser }: Props) => (
           MITx Online
         </a>
       </div>
-      {currentUser.is_authenticated ? (
-        <>
-          <button
-            className="navbar-toggler nav-opener collapsed"
-            type="button"
-            data-bs-toggle="collapse"
-            data-bs-target="#nav"
-            aria-controls="nav"
-            aria-expanded="false"
-            aria-label="Toggle navigation"
-          >
-            <span className="bar" />
-            <span className="bar" />
-            <span className="bar" />
-          </button>
-          <div
-            id="nav"
-            className={`${
-              currentUser.is_authenticated ? "" : "collapse"
-            } user-menu-overlay px-0 justify-content-end`}
-          >
-            <div className="full-screen-top-menu">
-              <UserMenu currentUser={currentUser} useScreenOverlay={false} />
-            </div>
-            <div className="mobile-menu">
-              <UserMenu currentUser={currentUser} useScreenOverlay={true} />
-            </div>
-          </div>
-        </>
-      ) : (
-        <div className="justify-content-end">
-          <div className="full-screen-top-menu">
+      <button
+        className="navbar-toggler nav-opener collapsed"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#nav"
+        aria-controls="nav"
+        aria-expanded="false"
+        aria-label="Toggle navigation"
+      >
+        <span className="bar" />
+        <span className="bar" />
+        <span className="bar" />
+      </button>
+      <div
+        id="nav"
+        className={`${
+          currentUser.is_authenticated ? "" : "collapse"
+        } user-menu-overlay px-0 justify-content-end`}
+      >
+        <div className="full-screen-top-menu">
+          {currentUser.is_authenticated ? (
+            <UserMenu currentUser={currentUser} useScreenOverlay={false} />
+          ) : (
             <AnonymousMenu mobileView={false} />
-          </div>
-          <div className="mobile-auth-buttons">
-            <AnonymousMenu mobileView={true} />
-          </div>
+          )}
         </div>
-      )}
+        <div className="mobile-auth-buttons">
+          {currentUser.is_authenticated ? (
+            <UserMenu currentUser={currentUser} useScreenOverlay={true} />
+          ) : (
+            <AnonymousMenu mobileView={true} />
+          )}
+        </div>
+      </div>
     </nav>
   </header>
 )
