@@ -353,11 +353,11 @@ describe("CatalogPage", function() {
 
   it("renders catalog programs when filtered by department", async () => {
     const program1 = JSON.parse(JSON.stringify(displayedProgram))
-    program1.departments = [{ name: "Math" }]
+    program1.departments = ["Math"]
     const program2 = JSON.parse(JSON.stringify(displayedProgram))
-    program2.departments = [{ name: "History" }]
+    program2.departments = ["History"]
     const program3 = JSON.parse(JSON.stringify(displayedProgram))
-    program3.departments = [{ name: "History" }]
+    program3.departments = ["History"]
     const { inner } = await renderPage()
     programs = [program1, program2, program3]
     let programsFilteredByCriteriaAndDepartment = inner
