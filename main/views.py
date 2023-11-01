@@ -11,16 +11,14 @@ from django.views.decorators.cache import never_cache
 from rest_framework.pagination import LimitOffsetPagination
 from main import features
 
-from main.features import is_enabled
-
 
 def get_base_context(request):
     """
     Returns the template context key/values needed for the base template and all templates that extend it
     """
     context = {
-        "new_design": features.is_enabled(features.ENABLE_NEW_DESIGN, False),
-        "new_footer": features.is_enabled(features.ENABLE_NEW_FOOTER, False),
+        "new_design": features.is_enabled(features.ENABLE_NEW_DESIGN, False, request.user.id or "anon"),
+        "new_footer": features.is_enabled(features.ENABLE_NEW_FOOTER, False, request.user.id or "anon"),
     }
 
     if settings.GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE:
@@ -44,7 +42,7 @@ def catalog(request, **kwargs):
     """
     The catalog view.
     """
-    if features.is_enabled(features.ENABLE_NEW_DESIGN):
+    if features.is_enabled(features.ENABLE_NEW_DESIGN, False, request.user.id or "anon"):
         context = get_base_context(request)
         return render(request, "index.html", context=context)
     return handler404(request, Exception)

@@ -382,7 +382,7 @@ export class ProgramProductDetailEnroll extends React.Component<
       programEnrollmentsLoading
     } = this.props
 
-    const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
+    const showNewDesign = checkFeatureFlag("mitxonline-new-product-page", currentUser ? currentUser.id : "anon")
 
     let enrollment = undefined
 

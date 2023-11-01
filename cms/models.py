@@ -751,7 +751,7 @@ class HomePage(VideoPlayerConfigMixin):
 
     def get_context(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            user = request.user.email
+            user = request.user.id
         else:
             if "anonymous_session_id" not in request.session:
                 request.session["anonymous_session_id"] = str(uuid.uuid4())

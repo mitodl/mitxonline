@@ -39,11 +39,11 @@ const renderHeader = () => {
   )
 }
 
-const renderEnrollSection = (courseId, programId, element, reduxStore) => {
+const renderEnrollSection = (courseId, programId, userId, element, reduxStore) => {
   ReactDOM.render(
     <AppContainer>
       <Provider store={reduxStore}>
-        <ProductDetailEnrollApp courseId={courseId} programId={programId} />
+        <ProductDetailEnrollApp courseId={courseId} programId={programId} userId={userId}/>
       </Provider>
     </AppContainer>,
     element
@@ -68,13 +68,16 @@ document.addEventListener("DOMContentLoaded", function() {
   const upsellCardEl = document.getElementById("upsellCard")
   const courseIdEl = document.getElementById("courseId")
   const programIdEl = document.getElementById("programId")
+  const userIdEl = document.getElementById("userId")
   if (enrollSectionEl && (programIdEl || courseIdEl)) {
     const productDetailStore = configureStore()
     const courseId = courseIdEl ? courseIdEl.value : undefined
     const programId = programIdEl ? programIdEl.value : undefined
+    const userId = userIdEl ? userIdEl.value : undefined
     renderEnrollSection(
       courseId,
       programId,
+      userId,
       enrollSectionEl,
       productDetailStore
     )

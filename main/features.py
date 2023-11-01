@@ -41,7 +41,7 @@ def is_enabled(name, default=None, unique_id=settings.HOSTNAME):
         and posthog.feature_enabled(
             name,
             unique_id,
-            person_properties={"environment": settings.ENVIRONMENT},
+            person_properties={"environment": settings.ENVIRONMENT, "user_id": unique_id},
         )
     ) or settings.FEATURES.get(name, default or settings.FEATURES_DEFAULT)
 

@@ -262,12 +262,14 @@ export const getFlexiblePriceForProduct = (product: Product) => {
 
 export const intCheckFeatureFlag = (
   flag: string,
+  uniqueID: any,
   document: Object,
   settings: Object
 ) => {
   const params = new URLSearchParams(document.location.search)
   if (SETTINGS.posthog_api_host) {
-    posthog.setPersonPropertiesForFlags({ environment: SETTINGS.environment })
+    if (uniqueID)
+    posthog.setPersonPropertiesForFlags({ environment: SETTINGS.environment, user_id: uniqueID ? uniqueID : "anon" })
   }
   return (
     (SETTINGS.posthog_api_host && posthog.isFeatureEnabled(flag)) ||
@@ -276,6 +278,6 @@ export const intCheckFeatureFlag = (
   )
 }
 
-export const checkFeatureFlag = (flag: string) => {
-  return intCheckFeatureFlag(flag, document, SETTINGS)
+export const checkFeatureFlag = (flag: string, uniqueID: any) => {
+  return intCheckFeatureFlag(flag, uniqueID, document, SETTINGS)
 }
