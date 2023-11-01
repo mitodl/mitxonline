@@ -400,13 +400,12 @@ export class CatalogPage extends React.Component<Props> {
     selectedDepartment: string,
     programs: Array<Program>
   ) {
-    const selectedDepartmentObject = this.props.departments.find(department => department.name === selectedDepartment)
     return programs.filter(
       program =>
         selectedDepartment === ALL_DEPARTMENTS ||
         program.departments
           .map(department => department)
-          .includes(selectedDepartmentObject["id"])
+          .includes(selectedDepartment)
     )
   }
 
