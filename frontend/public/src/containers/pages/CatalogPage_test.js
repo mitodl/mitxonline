@@ -77,9 +77,9 @@ const displayedCourse = {
 }
 
 const displayedProgram = {
-  title:       "P2",
-  readable_id: "P2",
-  id:          2,
+  title:        "P2",
+  readable_id:  "P2",
+  id:           2,
   requirements: {
     required:  [1],
     electives: []
@@ -133,7 +133,7 @@ const displayedProgram = {
   },
   program_type: "Series",
   departments:  ["Science"],
-  live: true
+  live:         true
 }
 
 describe("CatalogPage", function() {

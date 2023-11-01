@@ -1,7 +1,6 @@
 import type { Product } from "./ecommerceTypes"
 import type { Page } from "./cmsTypes"
 import type { LearnerRecordUser } from "./authTypes"
-import {numbers} from "@material/top-app-bar/constants";
 
 export type CourseDetail = {
   id: number,
