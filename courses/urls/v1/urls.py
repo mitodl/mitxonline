@@ -1,4 +1,3 @@
-from django.urls import include, path, re_path
 from rest_framework import routers
 
 from courses.views import v1
@@ -9,6 +8,7 @@ router = routers.SimpleRouter()
 router.register(r"programs", v1.ProgramViewSet, basename="programs_api")
 router.register(r"courses", v1.CourseViewSet, basename="courses_api")
 router.register(r"course_runs", v1.CourseRunViewSet, basename="course_runs_api")
+router.register(r"departments", v1.DepartmentViewSet, basename="departments_api")
 router.register(
     r"enrollments", v1.UserEnrollmentsApiViewSet, basename="user-enrollments-api"
 )
@@ -20,6 +20,5 @@ router.register(
     v1.UserProgramEnrollmentsViewSet,
     basename="user_program_enrollments_api",
 )
-router.register(r"departments", v1.DepartmentViewSet, basename="departments_api")
 
 urlpatterns = router.urls
