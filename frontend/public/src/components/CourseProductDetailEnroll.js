@@ -183,7 +183,7 @@ export class CourseProductDetailEnroll extends React.Component<
     })
   }
 
-  hndSetCourseRun = (event: SyntheticEvent<>) => {
+  hndSetCourseRun = (event: any) => {
     console.log("in hndSetCourseRun", event.target.value)
 
     const { courseRuns } = this.props
