@@ -6,6 +6,7 @@ import courses.urls.v1.urls as urls_v1
 import courses.urls.v2.urls as urls_v2
 
 from courses.views import v1
+
 router = routers.SimpleRouter()
 
 
@@ -28,5 +29,4 @@ urlpatterns += [
 
 urlpatterns += [
     path("enrollments/", v1.create_enrollment_view, name="create-enrollment-via-form"),
-
 ]
