@@ -42,7 +42,10 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
   /* eslint-disable prefer-const */
   let menuChildProps: MenuChildProps
   let dropdownIdentifier = "dropdownMenuButton"
-  const showNewDesign = checkFeatureFlag("mitxonline-new-header")
+  const showNewDesign = checkFeatureFlag(
+    "mitxonline-new-header",
+    currentUser && currentUser.id ? currentUser.id : "anonymousUser"
+  )
   menuChildProps = useScreenOverlay
     ? {
       li:                 overlayListItemProps,

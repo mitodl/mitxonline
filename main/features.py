@@ -1,5 +1,6 @@
 """MITxOnline feature flags"""
 import os
+import uuid
 from functools import wraps
 
 from django.conf import settings
@@ -35,13 +36,15 @@ def is_enabled(name, default=None, unique_id=settings.HOSTNAME):
         import posthog
     else:
         posthog = None
-
     return (
         posthog
-        and posthog.feature_enabled(
+        and posthog.get_feature_flag(
             name,
             unique_id,
-            person_properties={"environment": settings.ENVIRONMENT},
+            person_properties={
+                "environment": settings.ENVIRONMENT,
+                "user_id": unique_id,
+            },
         )
     ) or settings.FEATURES.get(name, default or settings.FEATURES_DEFAULT)
 

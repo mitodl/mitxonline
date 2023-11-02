@@ -625,7 +625,10 @@ export class CourseProductDetailEnroll extends React.Component<
       enrollments,
       enrollmentsIsLoading
     } = this.props
-    const showNewDesign = checkFeatureFlag("mitxonline-new-product-page")
+    const showNewDesign = checkFeatureFlag(
+      "mitxonline-new-product-page",
+      currentUser && currentUser.id ? currentUser.id : "anonymousUser"
+    )
 
     let run,
       product = null
