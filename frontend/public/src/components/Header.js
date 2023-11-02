@@ -15,7 +15,9 @@ type Props = {
 }
 
 const Header = ({ currentUser, location }: Props) => {
+  let featureFlagUserId = "anonymousUser"
   if (currentUser && currentUser.is_authenticated) {
+    featureFlagUserId = currentUser.id
     Sentry.configureScope(scope => {
       scope.setUser({
         id:       currentUser.id,
@@ -31,7 +33,7 @@ const Header = ({ currentUser, location }: Props) => {
   }
   const showNewDesign = checkFeatureFlag(
     "mitxonline-new-header",
-    currentUser && currentUser.id ? currentUser.id : "anonymousUser"
+    featureFlagUserId
   )
   if (showNewDesign) {
     return (
