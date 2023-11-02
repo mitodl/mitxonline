@@ -12,6 +12,13 @@ body.new-design {
     margin-top: 1.5rem;
     background-color: white;
 
+    .row.align-center {
+      @include media-breakpoint-down(md) {
+          justify-content: center !important;
+      }
+    }
+
+
     section.course-description {
       font-size: 20px;
       color: var(--GreyText, #6F7175);
@@ -97,6 +104,10 @@ body.new-design {
       max-width: 400px;
       height: auto;
       border-radius: 5px;
+
+      @include media-breakpoint-down(md) {
+          margin-top: 1.5rem;
+        }
 
       strong {
         font-weight: 600;
