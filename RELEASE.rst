@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.79.3
+--------------
+
+- Removing final vestiges of clickable more dates selectors (#1977)
+
 Version 0.79.2 (Released November 02, 2023)
 --------------
 
