@@ -323,9 +323,16 @@ describe("utility functions", () => {
         intCheckFeatureFlag("test_flag", "anonymousUser", document, SETTINGS)
       )
       assert.isFalse(
-        intCheckFeatureFlag("other_test_flag", "anonymousUser", document, SETTINGS)
+        intCheckFeatureFlag(
+          "other_test_flag",
+          "anonymousUser",
+          document,
+          SETTINGS
+        )
       )
-      assert.isTrue(intCheckFeatureFlag("flagtwo", "anonymousUser", document, SETTINGS))
+      assert.isTrue(
+        intCheckFeatureFlag("flagtwo", "anonymousUser", document, SETTINGS)
+      )
     })
   })
 })

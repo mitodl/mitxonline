@@ -754,16 +754,24 @@ class HomePage(VideoPlayerConfigMixin):
         hubspot_home_page_form_guid = settings.HUBSPOT_HOME_PAGE_FORM_GUID
 
         show_new_featured_carousel = features.is_enabled(
-            features.ENABLE_NEW_HOME_PAGE_FEATURED, False, request.user.id if request.user.is_authenticated else "anonymousUser"
+            features.ENABLE_NEW_HOME_PAGE_FEATURED,
+            False,
+            request.user.id if request.user.is_authenticated else "anonymousUser",
         )
         show_new_design_hero = features.is_enabled(
-            features.ENABLE_NEW_HOME_PAGE_HERO, False, request.user.id if request.user.is_authenticated else "anonymousUser"
+            features.ENABLE_NEW_HOME_PAGE_HERO,
+            False,
+            request.user.id if request.user.is_authenticated else "anonymousUser",
         )
         show_home_page_video_component = features.is_enabled(
-            features.ENABLE_NEW_HOME_PAGE_VIDEO, False, request.user.id if request.user.is_authenticated else "anonymousUser"
+            features.ENABLE_NEW_HOME_PAGE_VIDEO,
+            False,
+            request.user.id if request.user.is_authenticated else "anonymousUser",
         )
         show_home_page_contact_form = features.is_enabled(
-            features.ENABLE_NEW_HOME_PAGE_CONTACT_FORM, False, request.user.id if request.user.is_authenticated else "anonymousUser"
+            features.ENABLE_NEW_HOME_PAGE_CONTACT_FORM,
+            False,
+            request.user.id if request.user.is_authenticated else "anonymousUser",
         )
 
         return {

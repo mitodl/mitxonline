@@ -10,7 +10,7 @@ import { checkFeatureFlag } from "../lib/util"
 import TopBar from "./TopBar"
 
 type Props = {
-  currentUser: currentUser,
+  currentUser: CurrentUser,
   location: ?Location
 }
 
