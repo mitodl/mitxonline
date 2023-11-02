@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.79.2
+Version 0.79.2 (Released November 02, 2023)
 --------------
 
 - Update how we call the posthog API to include another person identifier to allow for easier targetting (#1973)
