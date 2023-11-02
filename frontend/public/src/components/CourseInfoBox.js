@@ -17,9 +17,9 @@ import { routes } from "../lib/urls"
 type CourseInfoBoxProps = {
   courses: Array<BaseCourseRun>,
   courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
+  currentUser: CurrentUser,
   toggleUpgradeDialogVisibility: () => Promise<any>,
-  setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>,
-  currentUser: CurrentUser
+  setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>
 }
 
 const getStartDateText = (run: BaseCourseRun, isArchived: boolean = false) => {
