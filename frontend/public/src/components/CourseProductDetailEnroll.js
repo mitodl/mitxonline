@@ -402,7 +402,7 @@ export class CourseProductDetailEnroll extends React.Component<
                   ) : null}
                 </p>
               </div>
-              <div className="col-md-6 col-sm-12 pr-0">
+              <div className="col-md-6 col-sm-12 pr-0 enroll-and-pay">
                 <form action="/cart/add/" method="get" className="text-center">
                   <input type="hidden" name="product_id" value={product.id} />
                   <button type="submit" className="btn btn-upgrade">

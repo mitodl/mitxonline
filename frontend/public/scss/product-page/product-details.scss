@@ -588,8 +588,15 @@ body.new-design {
 
 @media screen and (max-width: 768px) {
   body.new-design {
-    div.certificate-pricing {
-      margin-bottom: 15px !important;
+    div.certificate-pricing-row {
+      div.certificate-pricing {
+        margin-bottom: 15px !important;
+      }
+
+      div.enroll-and-pay {
+        padding-left: 0px;
+        padding-right: 0px;
+      }
     }
 
     div.upgrade-options-row {
@@ -599,6 +606,7 @@ body.new-design {
         p {
           text-align: center;
         }
+        margin-bottom: 12px;
       }
     }
   }
