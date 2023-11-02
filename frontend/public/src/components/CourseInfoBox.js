@@ -51,11 +51,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
   }
 
   renderUnenrolledDateLink(run: EnrollmentFlaggedCourseRun) {
-    const { currentUser } = this.props
-
-    return !currentUser || !currentUser.id ? (
-      <>{getStartDateForRun(run)}</>
-    ) : null
+    return <>{getStartDateForRun(run)}</>
   }
   renderEnrolledDateLink(run: EnrollmentFlaggedCourseRun) {
     return (
