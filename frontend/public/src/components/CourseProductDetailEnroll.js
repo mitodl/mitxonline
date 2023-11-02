@@ -357,8 +357,8 @@ export class CourseProductDetailEnroll extends React.Component<
               </div>
             </div>
 
-            <div className="row">
-              <div className="col-6">
+            <div className="row d-sm-flex flex-md-row flex-sm-column">
+              <div className="col-md-6 col-sm-12">
                 <ul>
                   <li> Certificate is signed by MIT faculty</li>
                   <li>
@@ -368,7 +368,7 @@ export class CourseProductDetailEnroll extends React.Component<
                   <li> Enhance your college &amp; earn a promotion</li>
                 </ul>
               </div>
-              <div className="col-6">
+              <div className="col-md-6 col-sm-12">
                 <ul>
                   <li>Highlight on your resume/CV</li>
                   <li>Share on your social channels &amp; LinkedIn</li>
@@ -380,8 +380,8 @@ export class CourseProductDetailEnroll extends React.Component<
               </div>
             </div>
 
-            <div className="row certificate-pricing-row">
-              <div className="col-6 certificate-pricing d-flex align-items-center">
+            <div className="row certificate-pricing-row d-sm-flex flex-md-row flex-sm-column">
+              <div className="col-md-6 col-sm-12 certificate-pricing d-flex align-items-center">
                 <div className="certificate-pricing-logo">
                   <img src="/static/images/certificates/certificate-logo.svg" />
                 </div>
@@ -402,7 +402,7 @@ export class CourseProductDetailEnroll extends React.Component<
                   ) : null}
                 </p>
               </div>
-              <div className="col-6 pr-0">
+              <div className="col-md-6 col-sm-12 pr-0">
                 <form action="/cart/add/" method="get" className="text-center">
                   <input type="hidden" name="product_id" value={product.id} />
                   <button type="submit" className="btn btn-upgrade">

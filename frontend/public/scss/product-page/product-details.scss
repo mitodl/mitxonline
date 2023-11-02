@@ -344,7 +344,7 @@ body.new-design {
 
     select {
       display: flex;
-      width: 690px;
+      width: 100%;
       padding: 10px 10px;
       align-items: flex-start;
       gap: 10px;
@@ -582,6 +582,24 @@ body.new-design {
 
     a {
       font-weight: 400;
+    }
+  }
+}
+
+@media screen and (max-width: 768px) {
+  body.new-design {
+    div.certificate-pricing {
+      margin-bottom: 15px !important;
+    }
+
+    div.upgrade-options-row {
+      div {
+        width: 100%;
+        text-align: center;
+        p {
+          text-align: center;
+        }
+      }
     }
   }
 }
