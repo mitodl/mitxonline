@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.79.1
+Version 0.79.1 (Released November 02, 2023)
 --------------
 
 - Enrollment dialog WCAG fixes (#1965)
