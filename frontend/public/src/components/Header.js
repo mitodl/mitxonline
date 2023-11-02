@@ -28,12 +28,10 @@ const Header = ({ currentUser, location }: Props) => {
         name:     currentUser.name
       })
     })
-    posthog.identify(
-      currentUser.id, {
-        environment: SETTINGS.environment,
-        user_id:     currentUser.id
-      }
-    )
+    posthog.identify(currentUser.id, {
+      environment: SETTINGS.environment,
+      user_id:     currentUser.id
+    })
   } else {
     Sentry.configureScope(scope => {
       scope.setUser(null)
