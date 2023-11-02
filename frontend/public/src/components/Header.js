@@ -10,7 +10,7 @@ import { checkFeatureFlag } from "../lib/util"
 import TopBar from "./TopBar"
 
 type Props = {
-  currentUser: CurrentUser,
+  currentUser: currentUser,
   location: ?Location
 }
 
@@ -31,7 +31,7 @@ const Header = ({ currentUser, location }: Props) => {
   }
   const showNewDesign = checkFeatureFlag(
     "mitxonline-new-header",
-    currentUser ? currentUser.id : "anon"
+    currentUser && currentUser.id ? currentUser.id : "anonymousUser"
   )
   if (showNewDesign) {
     return (

@@ -116,7 +116,7 @@ export class UpsellCardApp extends React.Component<Props, ProductDetailState> {
 
     return !checkFeatureFlag(
       "mitxonline-new-product-page",
-      currentUser ? currentUser.id : "anon"
+      currentUser && currentUser.id ? currentUser.id : "anonymousUser"
     ) ? (
       // $FlowFixMe: isLoading null or undefined
         <Loader isLoading={isLoading}>

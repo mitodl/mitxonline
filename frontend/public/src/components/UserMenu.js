@@ -44,7 +44,7 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
   let dropdownIdentifier = "dropdownMenuButton"
   const showNewDesign = checkFeatureFlag(
     "mitxonline-new-header",
-    currentUser ? currentUser.id : "anon"
+    currentUser && currentUser.id ? currentUser.id : "anonymousUser"
   )
   menuChildProps = useScreenOverlay
     ? {

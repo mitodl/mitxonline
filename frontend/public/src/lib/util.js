@@ -271,7 +271,7 @@ export const intCheckFeatureFlag = (
     if (uniqueID) {
       posthog.setPersonPropertiesForFlags({
         environment: SETTINGS.environment,
-        user_id:     uniqueID ? uniqueID : "anon"
+        user_id:     uniqueID ? uniqueID : "anonymousUser"
       })
     }
   }

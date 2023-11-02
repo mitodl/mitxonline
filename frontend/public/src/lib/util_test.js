@@ -320,12 +320,12 @@ describe("utility functions", () => {
 
     it("returns the flag setting if the feature flag is set", () => {
       assert.isTrue(
-        intCheckFeatureFlag("test_flag", "anon", document, SETTINGS)
+        intCheckFeatureFlag("test_flag", "anonymousUser", document, SETTINGS)
       )
       assert.isFalse(
-        intCheckFeatureFlag("other_test_flag", "anon", document, SETTINGS)
+        intCheckFeatureFlag("other_test_flag", "anonymousUser", document, SETTINGS)
       )
-      assert.isTrue(intCheckFeatureFlag("flagtwo", "anon", document, SETTINGS))
+      assert.isTrue(intCheckFeatureFlag("flagtwo", "anonymousUser", document, SETTINGS))
     })
   })
 })

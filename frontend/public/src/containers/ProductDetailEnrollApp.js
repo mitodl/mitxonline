@@ -40,7 +40,7 @@ export class ProductDetailEnrollApp extends React.Component<Props> {
 
     const showNewDesign = checkFeatureFlag(
       "mitxonline-new-product-page",
-      userId ? userId : "anon"
+      userId ? userId : "anonymousUser"
     )
 
     if (showNewDesign) {

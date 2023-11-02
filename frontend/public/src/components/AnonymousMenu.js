@@ -12,7 +12,7 @@ type Props = {
 
 const AnonymousMenu = ({ mobileView }: Props) => {
   const identifierPostfix = mobileView ? "Mobile" : "Desktop"
-  const newDesign = checkFeatureFlag("mitxonline-new-header", "anon")
+  const newDesign = checkFeatureFlag("mitxonline-new-header", "anonymousUser")
   return (
     <ul>
       <li>
