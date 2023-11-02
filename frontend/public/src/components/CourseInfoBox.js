@@ -9,10 +9,7 @@ import moment from "moment-timezone"
 
 import type { BaseCourseRun } from "../flow/courseTypes"
 import { EnrollmentFlaggedCourseRun, RunEnrollment } from "../flow/courseTypes"
-import { getCookie } from "../lib/api"
-import { isWithinEnrollmentPeriod } from "../lib/courseApi"
 import type { CurrentUser } from "../flow/authTypes"
-import { routes } from "../lib/urls"
 
 type CourseInfoBoxProps = {
   courses: Array<BaseCourseRun>,
@@ -53,50 +50,11 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     this.props.toggleUpgradeDialogVisibility()
   }
 
-  renderEnrollNowDateLink(run: EnrollmentFlaggedCourseRun) {
-    const { currentUser } = this.props
-    const csrfToken = getCookie("csrftoken")
-
-    const product = run && run.products.length > 0 && run.products[0]
-
-    return currentUser && currentUser.id ? (
-      run && isWithinEnrollmentPeriod(run) ? (
-        <>
-          {product && run.is_upgradable ? (
-            <button
-              className="more-dates-link"
-              onClick={() => this.setRunEnrollDialog(run)}
-            >
-              {getStartDateForRun(run)}
-            </button>
-          ) : (
-            <form action="/enrollments/" method="post">
-              <input
-                type="hidden"
-                name="csrfmiddlewaretoken"
-                value={csrfToken}
-              />
-              <input type="hidden" name="run" value={run ? run.id : ""} />
-              <button type="submit" className="more-dates-link">
-                {getStartDateForRun(run)}
-              </button>
-            </form>
-          )}
-        </>
-      ) : null
-    ) : (
-      this.renderEnrollLoginDateLink(run)
-    )
-  }
-  renderEnrollLoginDateLink(run: EnrollmentFlaggedCourseRun) {
+  renderUnenrolledDateLink(run: EnrollmentFlaggedCourseRun) {
     const { currentUser } = this.props
 
     return !currentUser || !currentUser.id ? (
-      <>
-        <a href={routes.login} className="more-dates-link">
-          {getStartDateForRun(run)}
-        </a>
-      </>
+      <>{getStartDateForRun(run)}</>
     ) : null
   }
   renderEnrolledDateLink(run: EnrollmentFlaggedCourseRun) {
@@ -133,12 +91,13 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           startDates.push(
             <li key={index}>
               {courseRun.is_enrolled ||
-              enrollments.find(
-                (enrollment: RunEnrollment) =>
-                  enrollment.run.id === courseRun.id
-              )
+              (enrollments &&
+                enrollments.find(
+                  (enrollment: RunEnrollment) =>
+                    enrollment.run.id === courseRun.id
+                ))
                 ? this.renderEnrolledDateLink(courseRun)
-                : this.renderEnrollNowDateLink(courseRun)}
+                : this.renderUnenrolledDateLink(courseRun)}
             </li>
           )
         }
