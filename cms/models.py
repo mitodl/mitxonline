@@ -750,25 +750,20 @@ class HomePage(VideoPlayerConfigMixin):
         return page_data
 
     def get_context(self, request, *args, **kwargs):
-        if request.user.is_authenticated:
-            user = request.user.id
-        else:
-            if "anonymous_session_id" not in request.session:
-                request.session["anonymous_session_id"] = str(uuid.uuid4())
-            user = request.session["anonymous_session_id"]
         hubspot_portal_id = settings.HUBSPOT_PORTAL_ID
         hubspot_home_page_form_guid = settings.HUBSPOT_HOME_PAGE_FORM_GUID
+
         show_new_featured_carousel = features.is_enabled(
-            features.ENABLE_NEW_HOME_PAGE_FEATURED, False, user
+            features.ENABLE_NEW_HOME_PAGE_FEATURED, False, request.user.id if request.user.is_authenticated else "anonymousUser"
         )
         show_new_design_hero = features.is_enabled(
-            features.ENABLE_NEW_HOME_PAGE_HERO, False, user
+            features.ENABLE_NEW_HOME_PAGE_HERO, False, request.user.id if request.user.is_authenticated else "anonymousUser"
         )
         show_home_page_video_component = features.is_enabled(
-            features.ENABLE_NEW_HOME_PAGE_VIDEO, False, user
+            features.ENABLE_NEW_HOME_PAGE_VIDEO, False, request.user.id if request.user.is_authenticated else "anonymousUser"
         )
         show_home_page_contact_form = features.is_enabled(
-            features.ENABLE_NEW_HOME_PAGE_CONTACT_FORM, False, user
+            features.ENABLE_NEW_HOME_PAGE_CONTACT_FORM, False, request.user.id if request.user.is_authenticated else "anonymousUser"
         )
 
         return {

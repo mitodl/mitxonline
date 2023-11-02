@@ -170,8 +170,8 @@ def test_course_page_context(
             member.linked_instructor_page
             for member in course_page.linked_instructors.order_by("order").all()
         ],
-        "new_design": features.is_enabled("mitxonline-new-product-page", False, request.user.id or "anon"),
-        "new_footer": features.is_enabled("mitxonline-new-footer", False, request.user.id or "anon"),
+        "new_design": features.is_enabled("mitxonline-new-product-page", False, request.user.id if request.user.is_authenticated else "anonymousUser"),
+        "new_footer": features.is_enabled("mitxonline-new-footer", False, request.user.id if request.user.is_authenticated else "anonymousUser"),
     }
 
     context = course_page.get_context(request=request)
