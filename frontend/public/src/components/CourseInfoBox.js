@@ -11,7 +11,7 @@ import type { BaseCourseRun } from "../flow/courseTypes"
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import { getCookie } from "../lib/api"
 import { isWithinEnrollmentPeriod } from "../lib/courseApi"
-import type { User } from "../flow/authTypes"
+import type { CurrentUser } from "../flow/authTypes"
 import { routes } from "../lib/urls"
 
 type CourseInfoBoxProps = {
@@ -19,7 +19,7 @@ type CourseInfoBoxProps = {
   courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
   toggleUpgradeDialogVisibility: () => Promise<any>,
   setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>,
-  currentUser: User
+  currentUser: CurrentUser
 }
 
 const getStartDateText = (run: BaseCourseRun, isArchived: boolean = false) => {
