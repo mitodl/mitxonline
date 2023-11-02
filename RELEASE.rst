@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.79.2
+--------------
+
+- Update how we call the posthog API to include another person identifier to allow for easier targetting (#1973)
+- Fixing the mobile styling on the enrollment modal (#1975)
+- Course About Page: tablet and mobile view adjustments (#1960)
+
 Version 0.79.1 (Released November 02, 2023)
 --------------
 
