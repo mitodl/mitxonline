@@ -1,6 +1,8 @@
 // @flow
+/* global SETTINGS:false*/
 import React from "react"
 import * as Sentry from "@sentry/browser"
+import posthog from "posthog-js"
 
 import TopAppBar from "./TopAppBar"
 
@@ -26,6 +28,12 @@ const Header = ({ currentUser, location }: Props) => {
         name:     currentUser.name
       })
     })
+    posthog.identify(
+      currentUser.id, {
+        environment: SETTINGS.environment,
+        user_id:     currentUser.id
+      }
+    )
   } else {
     Sentry.configureScope(scope => {
       scope.setUser(null)
