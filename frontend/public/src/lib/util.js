@@ -262,7 +262,7 @@ export const getFlexiblePriceForProduct = (product: Product) => {
 
 export const intCheckFeatureFlag = (
   flag: string,
-  uniqueID: string|number,
+  uniqueID: string | number,
   document: Object,
   settings: Object
 ) => {
@@ -280,6 +280,6 @@ export const intCheckFeatureFlag = (
   )
 }
 
-export const checkFeatureFlag = (flag: string, uniqueID: string|number) => {
+export const checkFeatureFlag = (flag: string, uniqueID: string | number) => {
   return intCheckFeatureFlag(flag, uniqueID, document, SETTINGS)
 }
