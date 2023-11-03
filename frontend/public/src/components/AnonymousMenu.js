@@ -23,7 +23,9 @@ const AnonymousMenu = ({ mobileView }: Props) => {
             className="top-nav-link"
             aria-label="Catalog"
           >
-            Catalog
+            <span data-bs-target="#nav" data-bs-toggle="collapse">
+              Catalog
+            </span>
           </MixedLink>
         </li>
       ) : null}
@@ -34,7 +36,9 @@ const AnonymousMenu = ({ mobileView }: Props) => {
           className="simple"
           aria-label="Sign In"
         >
-          Sign In
+          <span data-bs-target="#nav" data-bs-toggle="collapse">
+            Sign In
+          </span>
         </MixedLink>
       </li>
       <li>
@@ -44,7 +48,9 @@ const AnonymousMenu = ({ mobileView }: Props) => {
           className="simple button"
           aria-label="Create Account"
         >
-          Create Account
+          <span data-bs-target="#nav" data-bs-toggle="collapse">
+            Create Account
+          </span>
         </MixedLink>
       </li>
     </ul>
