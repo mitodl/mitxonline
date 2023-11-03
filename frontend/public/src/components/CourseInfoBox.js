@@ -30,12 +30,6 @@ const getStartDateText = (run: BaseCourseRun, isArchived: boolean = false) => {
     : "Start Anytime"
 }
 
-const getStartDateForRun = (run: BaseCourseRun) => {
-  return run && !emptyOrNil(run.start_date) && !run.is_self_paced
-    ? formatPrettyDate(moment(new Date(run.start_date)))
-    : "Start Anytime"
-}
-
 export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProps> {
   state = {
     showMoreEnrollDates: false
@@ -50,9 +44,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     this.props.toggleUpgradeDialogVisibility()
   }
 
-  renderUnenrolledDateLink(run: EnrollmentFlaggedCourseRun) {
-    return <>{getStartDateForRun(run)}</>
-  }
   renderEnrolledDateLink(run: EnrollmentFlaggedCourseRun) {
     return (
       <button className="more-dates-link enrolled">
@@ -93,7 +84,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                     enrollment.run.id === courseRun.id
                 ))
                 ? this.renderEnrolledDateLink(courseRun)
-                : this.renderUnenrolledDateLink(courseRun)}
+                : this.getStartDateText(courseRun)}
             </li>
           )
         }
