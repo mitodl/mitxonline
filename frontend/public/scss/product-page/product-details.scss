@@ -18,6 +18,23 @@ body.new-design {
       }
     }
 
+    .breadcrumb-item {
+      color: var(--GreyText, #6F7175);
+      font-size: 14px;
+
+      a {
+        text-decoration: none;
+      }
+    }
+    span.badge-program-type {
+      background-color: $black;
+      color: white;
+      border-radius: 3px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-family: Poppins;
+    }
+
 
     section.course-description {
       font-size: 20px;
