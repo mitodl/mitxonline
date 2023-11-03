@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.79.3
+--------------
+
+- Fixing date to display if you're logged in (#1979)
+- Update header design and navigation (#1969)
+- Removing final vestiges of clickable more dates selectors (#1977)
+
 Version 0.79.2 (Released November 02, 2023)
 --------------
 
