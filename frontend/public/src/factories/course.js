@@ -24,6 +24,7 @@ import type {
   LearnerRecordProgram,
   LearnerRecordShare
 } from "../flow/courseTypes"
+import { CoursePage } from "../flow/cmsTypes"
 
 const genCourseRunId = incrementer()
 const genEnrollmentId = incrementer()
@@ -33,6 +34,17 @@ const genProductId = incrementer()
 const genProgramId = incrementer()
 const genPartnerSchoolId = incrementer()
 const genProgramRequirementId = incrementer()
+
+export const makeCoursePage = (): CoursePage => ({
+  financial_assistance_form_url: casual.url,
+  feature_image_src:             casual.url,
+  live:                          true,
+  description:                   casual.text,
+  current_price:                 casual.integer(),
+  instructors:                   [],
+  length:                        casual.text,
+  effort:                        casual.text
+})
 
 export const makeCourseRun = (): CourseRun => ({
   title:            casual.text,
@@ -95,16 +107,7 @@ const makeCourseDetail = (): CourseDetail => ({
   feature_image_src: casual.url,
   departments:       [makeDepartment()],
   live:              true,
-  page:              {
-    financial_assistance_form_url: casual.url,
-    feature_image_src:             casual.url,
-    live:                          true,
-    description:                   casual.text,
-    current_price:                 casual.integer(),
-    instructors:                   [],
-    length:                        casual.text,
-    effort:                        casual.text
-  }
+  page:              makeCoursePage()
 })
 
 const makeRequirementRootNode = (
@@ -221,7 +224,7 @@ const makeDEDPSampleRequirementsTree = (
 
 export const makeCourseDetailWithRuns = (): CourseDetailWithRuns => {
   return {
-    ...makeCourseRun(),
+    ...makeCourseDetail(),
     courseruns: [makeCourseRun()]
   }
 }

@@ -26,7 +26,7 @@ import {
 import * as courseApi from "../lib/courseApi"
 
 import sinon from "sinon"
-import { makeUser } from "../factories/user"
+import { makeUser, makeAnonymousUser } from "../factories/user"
 
 describe("CourseProductDetailEnroll", () => {
   let helper,
@@ -525,5 +525,99 @@ describe("CourseProductDetailEnroll", () => {
         assert.isTrue(selectorControlItems.length === 1)
       }
     })
+  })
+  ;[
+    [true, false],
+    [false, false],
+    [true, true],
+    [true, true]
+  ].forEach(([userExists, hasMoreDates]) => {
+    it(`renders the CourseInfoBox if the user ${
+      userExists ? "is logged in" : "is anonymous"
+    }`, async () => {
+      const entities = {
+        currentUser: userExists ? currentUser : makeAnonymousUser(),
+        enrollments: []
+      }
+
+      const { inner } = await renderPage({
+        entities: entities
+      })
+
+      assert.isTrue(inner.exists())
+      const infobox = inner.find("CourseInfoBox").dive()
+      assert.isTrue(infobox.exists())
+    })
+
+    it(`CourseInfoBox ${
+      hasMoreDates ? "renders" : "does not render"
+    } the date selector when the user ${
+      userExists ? "is logged in" : "is anonymous"
+    } and there is ${
+      hasMoreDates ? ">1 courserun" : "one courserun"
+    }`, async () => {
+      const courseRuns = [courseRun]
+
+      if (hasMoreDates) {
+        courseRuns.push(makeCourseRunDetail())
+      }
+
+      const entities = {
+        currentUser: userExists ? currentUser : makeAnonymousUser(),
+        enrollments: [],
+        courseRuns:  courseRuns
+      }
+
+      const { inner } = await renderPage({
+        entities: entities
+      })
+
+      assert.isTrue(inner.exists())
+      const infobox = inner.find("CourseInfoBox").dive()
+      assert.isTrue(infobox.exists())
+
+      const moreDatesLink = infobox.find("button.more-enrollment-info").first()
+
+      if (!hasMoreDates) {
+        assert.isFalse(moreDatesLink.exists())
+      } else {
+        assert.isTrue(moreDatesLink.exists())
+        await moreDatesLink.prop("onClick")()
+
+        const selectorBar = infobox.find(".more-dates-enrollment-list")
+        assert.isTrue(selectorBar.exists())
+      }
+    })
+  })
+
+  it("CourseInfoBox renders a date selector with Enrolled text if the user is enrolled in one", async () => {
+    const secondCourseRun = makeCourseRunDetail()
+    const enrollment = {
+      ...makeCourseRunEnrollment(),
+      run: secondCourseRun
+    }
+
+    const entities = {
+      currentUser: currentUser,
+      enrollments: [enrollment],
+      courseRuns:  [courseRun, secondCourseRun]
+    }
+
+    const { inner } = await renderPage({
+      entities: entities
+    })
+
+    assert.isTrue(inner.exists())
+    const infobox = inner.find("CourseInfoBox").dive()
+    assert.isTrue(infobox.exists())
+
+    const moreDatesLink = infobox.find("button.more-enrollment-info").first()
+    await moreDatesLink.prop("onClick")()
+
+    const selectorBar = infobox.find(".more-dates-enrollment-list")
+    assert.isTrue(selectorBar.exists())
+
+    const enrolledItem = infobox.find(".more-dates-link.enrolled")
+    assert.isTrue(enrolledItem.exists())
   })
 })
