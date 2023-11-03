@@ -258,6 +258,7 @@ header.site-header {
 header.site-header.new-design {
   box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14);
   background-color: $white;
+  font-family: Inter;
 
   .navbar.top-navbar {
     display: flex;
@@ -279,8 +280,19 @@ header.site-header.new-design {
   display: block;
   font-size: 14px;
   line-height: 21px;
-  border-left: 1px solid $home-page-border-grey;
-  padding-left: 15px;
+
+  .top-nav-link {
+    padding: 13px 10px 13px 20px;
+    display: inline-block;
+    color: black;
+    text-decoration: none;
+  }
+
+  .top-user-menu {
+    border-left: 1px solid $home-page-border-grey;
+    padding-left: 15px;
+    display: inline-block;
+  }
 
   @include media-breakpoint-down(md) {
     display: none;
@@ -300,7 +312,6 @@ header.site-header.new-design {
         color: black;
         text-decoration: none;
         display: block;
-
 
         &:hover {
           color: $primary;
@@ -376,52 +387,23 @@ header.site-header.new-design {
     display: block;
   }
 
-  ul {
-    display: flex;
-    list-style-type: none;
-    padding: 0;
+  li {
+    display: block;
+    padding: 10px 0;
     margin: 0;
+    max-width: 170px;
 
-    li {
-      font-size: 12px;
+    a {
+      color: white;
+      font-size: 18px;
       font-weight: 600;
-      padding: 0 0 0 8px;
+      line-height: 25px;
+      padding: 0;
+      margin-top: 5px;
 
-      a {
-        color: black;
-        text-decoration: none;
-        display: block;
-        border: 1px solid var(--BorderGrey, #DFE5EC);
-
-
-        &:hover {
-          color: $primary;
-        }
-
-        &.simple {
-          display: inline-flex;
-          padding: 8px 15px;
-          align-items: flex-start;
-          border-radius: 3px;
-        }
-
-        &.button {
-          transition: .25s;
-          background: #a31f34;
-          color: white;
-
-          @include media-breakpoint-up(md) {
-            background: $primary;
-            color: white;
-            box-shadow: inset 0 0 2px 0 rgba(255, 255, 255, 0.57);
-
-            &:hover {
-              background: black;
-            }
-          }
-        }
+      &:hover {
+        color: white;
       }
     }
   }
-
 }
