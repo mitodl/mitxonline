@@ -18,12 +18,18 @@
             <div class="text">
             <nav aria-label="breadcrumb">
               <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/catalog"><  Catalog</a></li>
+                <li class="breadcrumb-item">
+                    <a href="/catalog">
+                        <img alt="breadcrumb-arrow" src="/static/images/breadcrumb-arrow.svg"/>Catalog
+                    </a>
+                </li>
                 <li class="breadcrumb-item" aria-current="page">{% if page.is_program_page %}Program{% else %}Course{% endif %}</li>
               </ol>
             </nav>
             {% if page.is_program_page %}
-            <span class="badge-program-type">{{ page.product.program_type }}</span>
+                <div class="mb-2">
+                    <span class="badge-program-type">{{ page.product.program_type }}</span>
+                </div>
             {% endif %}
               <h1>{{ page.title }}</h1>
               {# Description field contents are already rendered wrapped in a <p> tag #}
