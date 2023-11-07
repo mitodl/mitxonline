@@ -9,7 +9,7 @@ import pytz
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
-from django.db import transaction
+from django.db import transaction, connection
 from django.db.models import Q
 from django.utils.text import slugify
 
@@ -109,21 +109,39 @@ def get_ordered_eligible_coursewares(courseware):
     Returns the courseware(s) eligible for a flexible pricing tier in order
     (program first, then course)
     """
+    query_count_start = len(connection.queries)
+
     if isinstance(courseware, CourseRun):
         # recurse using the course run's course ;-)
-        return get_ordered_eligible_coursewares(courseware.course)
+        retval = get_ordered_eligible_coursewares(courseware.course)
+        log.info(
+            f"get_ordered_eligible_courseware query count (but we recursed): {len(connection.queries) - query_count_start}"
+        )
+        return retval
     if isinstance(courseware, Course) and len(courseware.programs) > 0:
         program_relations = []
 
         for program in courseware.programs:
             program_relations += program.related_programs
 
-        return courseware.programs + [courseware] + program_relations
+        retval = courseware.programs + [courseware] + program_relations
+        log.info(
+            f"get_ordered_eligible_courseware query count (party time 1): {len(connection.queries) - query_count_start}"
+        )
+        return retval
     if isinstance(courseware, ProgramRun) and courseware.program is not None:
-        return [courseware.program] + [
+        retval = [courseware.program] + [
             program_tuple[0] for program_tuple in courseware.program.related_programs
         ]
-    return [courseware]
+        log.info(
+            f"get_ordered_eligible_courseware query count (party time 2): {len(connection.queries) - query_count_start}"
+        )
+        return retval
+    retval = [courseware]
+    log.info(
+        f"get_ordered_eligible_courseware query count (bottom): {len(connection.queries) - query_count_start}"
+    )
+    return retval
 
 
 def determine_tier_courseware(courseware, income):
@@ -304,7 +322,10 @@ def is_courseware_flexible_price_approved(course_run, user):
     if isinstance(user, AnonymousUser):
         return False
 
+    query_count = 0
+
     for eligible_courseware in get_ordered_eligible_coursewares(course_run):
+        query_count_start = len(connection.queries)
         content_type = ContentType.objects.get_for_model(eligible_courseware)
         flexible_price = FlexiblePrice.objects.filter(
             courseware_content_type=content_type,
@@ -312,14 +333,22 @@ def is_courseware_flexible_price_approved(course_run, user):
             user=user,
         ).first()
 
+        query_count += len(connection.queries) - query_count_start
+
         if (
             flexible_price
             and flexible_price.tier.current
             and flexible_price.status
             in (FlexiblePriceStatus.APPROVED, FlexiblePriceStatus.AUTO_APPROVED)
         ):
+            log.info(
+                f"is_courseware_flexible_price_approved: terminating on true, {query_count} queries"
+            )
             return True
 
+    log.info(
+        f"is_courseware_flexible_price_approved: terminating on false, {query_count} queries"
+    )
     return False
 
 

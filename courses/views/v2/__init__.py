@@ -4,9 +4,26 @@ Course API Views version 2
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
+import django_filters
+from django_filters.rest_framework import DjangoFilterBackend
+from mitol.common.utils import now_in_utc
+from django.db.models import Count, Prefetch, Q
 
-from courses.models import Program
+from courses.models import (
+    Course,
+    CourseRun,
+    CourseRunEnrollment,
+    Department,
+    LearnerProgramRecordShare,
+    PartnerSchool,
+    Program,
+    ProgramEnrollment,
+)
 from courses.serializers.v2.programs import ProgramSerializer
+from courses.serializers.v2.courses import (
+    CourseWithCourseRunsSerializer,
+    CourseSerializer,
+)
 
 
 class Pagination(PageNumberPagination):
@@ -28,3 +45,94 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["id", "live", "readable_id"]
     queryset = Program.objects.filter().prefetch_related("departments")
+
+
+class IdInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
+    pass
+
+
+class CourseFilterSet(django_filters.FilterSet):
+    courserun_is_enrollable = django_filters.BooleanFilter(
+        field_name="courserun_is_enrollable",
+        method="filter_courserun_is_enrollable",
+        label="Course Run Is Enrollable",
+    )
+    id = IdInFilter(field_name="id", lookup_expr="in", label="Course ID")
+
+    def filter_courserun_is_enrollable(self, queryset, _, value):
+        """
+        courserun_is_enrollable filter to narrow down runs that are open for
+        enrollments
+        """
+        now = now_in_utc()
+
+        if value is True:
+            enrollable_runs = CourseRun.objects.filter(
+                Q(live=True)
+                & Q(start_date__isnull=False)
+                & Q(enrollment_start__lt=now)
+                & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))
+            )
+            return (
+                queryset.prefetch_related(
+                    Prefetch("courseruns", queryset=enrollable_runs),
+                )
+                .prefetch_related("courseruns__course")
+                .filter(courseruns__id__in=enrollable_runs.values_list("id", flat=True))
+                .distinct()
+            )
+
+        else:
+            unenrollable_runs = CourseRun.objects.filter(
+                Q(live=False) | Q(start_date__isnull=True) | Q(enrollment_end__lte=now)
+            )
+            return (
+                queryset.prefetch_related(
+                    Prefetch("courseruns", queryset=unenrollable_runs)
+                )
+                .prefetch_related("courseruns__course")
+                .filter(
+                    courseruns__id__in=unenrollable_runs.values_list("id", flat=True)
+                )
+                .distinct()
+            )
+
+    class Meta:
+        model = Course
+        fields = ["id", "live", "readable_id", "page__live", "courserun_is_enrollable"]
+
+
+class CourseViewSet(viewsets.ReadOnlyModelViewSet):
+    """API view set for Courses"""
+
+    pagination_class = Pagination
+    permission_classes = []
+    filter_backends = [DjangoFilterBackend]
+    serializer_class = CourseWithCourseRunsSerializer
+    filterset_class = CourseFilterSet
+
+    def get_queryset(self):
+        return (
+            Course.objects.filter()
+            .select_related("page")
+            .prefetch_related("departments")
+            .all()
+        )
+
+    def get_serializer_context(self):
+        added_context = {}
+        if self.request.query_params.get("readable_id", None):
+            added_context["all_runs"] = True
+        if self.request.query_params.get("include_approved_financial_aid", None):
+            added_context["include_approved_financial_aid"] = True
+
+        return {**super().get_serializer_context(), **added_context}
+
+    def paginate_queryset(self, queryset):
+        """
+        Enable pagination if a 'page' parameter is included in the request,
+        otherwise, do not use pagination.
+        """
+        if self.paginator and self.request.query_params.get("page", None) is None:
+            return None
+        return super().paginate_queryset(queryset)
