@@ -7,22 +7,16 @@ from rest_framework.pagination import PageNumberPagination
 import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 from mitol.common.utils import now_in_utc
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Prefetch, Q
 
 from courses.models import (
     Course,
     CourseRun,
-    CourseRunEnrollment,
-    Department,
-    LearnerProgramRecordShare,
-    PartnerSchool,
     Program,
-    ProgramEnrollment,
 )
 from courses.serializers.v2.programs import ProgramSerializer
 from courses.serializers.v2.courses import (
     CourseWithCourseRunsSerializer,
-    CourseSerializer,
 )
 
 

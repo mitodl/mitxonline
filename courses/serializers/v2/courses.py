@@ -84,7 +84,6 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
     def get_approved_flexible_price_exists(self, instance):
         if not self.context or not self.context.get("include_approved_financial_aid"):
-            log.info("get_approved_flexible_price_exists: skipping")
             return False
 
         # Get the User object if it exists.

@@ -1,6 +1,5 @@
 """CMS app serializers"""
 import bleach
-from django.contrib.contenttypes.models import ContentType
 from django.templatetags.static import static
 from rest_framework import serializers
 
@@ -8,7 +7,6 @@ from cms import models
 from cms.api import get_wagtail_img_src
 from cms.models import FlexiblePricingRequestForm, ProgramPage
 from courses.constants import DEFAULT_COURSE_IMG_PATH
-from ecommerce.models import Product
 
 
 class BaseCoursePageSerializer(serializers.ModelSerializer):
@@ -58,6 +56,7 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
             "length",
             "effort",
         ]
+
 
 class CoursePageSerializer(BaseCoursePageSerializer):
     """Course page model serializer"""
