@@ -17,10 +17,10 @@ urlpatterns = [
 ]
 
 urlpatterns += [
-    re_path("api/records/program/<pk>/share/", v1.get_learner_record_share),
-    re_path("api/records/program/<pk>/revoke/", v1.revoke_learner_record_share),
-    re_path("api/records/program/<pk>/", v1.get_learner_record),
-    re_path(
+    path("api/records/program/<pk>/share/", v1.get_learner_record_share),
+    path("api/records/program/<pk>/revoke/", v1.revoke_learner_record_share),
+    path("api/records/program/<pk>/", v1.get_learner_record),
+    path(
         "api/records/shared/<uuid>/",
         v1.get_learner_record_from_uuid,
         name="shared_learner_record_from_uuid",
