@@ -33,7 +33,15 @@ class CourseSerializer(BaseCourseSerializer):
         if self.context.get("all_runs", False):
             from courses.serializers.v1.base import BaseProgramSerializer
 
-            return BaseProgramSerializer(instance.programs, many=True).data
+            programs = (
+                models.Program.objects.select_related("page")
+                .filter(pk__in=[program.id for program in instance.programs])
+                .filter(live=True)
+                .filter(page__live=True)
+                .all()
+            )
+
+            return BaseProgramSerializer(programs, many=True).data
 
         return None
 
