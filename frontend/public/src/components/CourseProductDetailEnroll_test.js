@@ -620,4 +620,57 @@ describe("CourseProductDetailEnroll", () => {
     const enrolledItem = infobox.find(".more-dates-link.enrolled")
     assert.isTrue(enrolledItem.exists())
   })
+
+  it("CourseInfoBox renders the archived message if the course is archived", async () => {
+    const courseRun = {
+      ...makeCourseRunDetail(),
+      is_self_paced:    true,
+      enrollment_end:   null,
+      enrollment_start: moment()
+        .subtract(1, "years")
+        .toISOString(),
+      start_date: moment()
+        .subtract(10, "months")
+        .toISOString(),
+      end_date: moment()
+        .subtract(7, "months")
+        .toISOString(),
+      upgrade_deadline: null
+    }
+    const course = {
+      ...makeCourseDetailWithRuns(),
+      courseruns: [courseRun]
+    }
+
+    console.log(course)
+
+    const entities = {
+      currentUser: currentUser,
+      enrollments: [],
+      courseRuns:  [courseRun],
+      courses:     [course]
+    }
+
+    const { inner } = await renderPage({
+      entities: entities
+    })
+
+    assert.isTrue(inner.exists())
+    const infobox = inner.find("CourseInfoBox").dive()
+    assert.isTrue(infobox.exists())
+
+    const archivedMessage = infobox.find("div.course-archived-message")
+    assert.isTrue(archivedMessage.exists())
+
+    const contentAvailabilityMessage = infobox.find(
+      "div.course-timing-message div.enrollment-info-text"
+    )
+    assert.isTrue(contentAvailabilityMessage.exists())
+    assert.isTrue(
+      contentAvailabilityMessage
+        .first()
+        .text()
+        .includes("Course content available anytime")
+    )
+  })
 })

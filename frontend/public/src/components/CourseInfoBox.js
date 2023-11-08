@@ -94,7 +94,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
       <>
         <div className="enrollment-info-box componentized">
           {isArchived ? (
-            <div className="row d-flex align-self-stretch callout callout-warning">
+            <div className="row d-flex align-self-stretch callout callout-warning course-archived-message">
               <i className="material-symbols-outlined warning">error</i>
               <p>
                 This course is no longer active, but you can still access
@@ -102,7 +102,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               </p>
             </div>
           ) : null}
-          <div className="row d-flex align-items-center">
+          <div className="row d-flex align-items-center course-timing-message">
             <div className="enrollment-info-icon">
               <img
                 src="/static/images/products/start-date.png"
@@ -127,7 +127,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             ) : null}
           </div>
           {course && course.page ? (
-            <div className="row d-flex align-items-top">
+            <div className="row d-flex align-items-top course-effort-message">
               <div className="enrollment-info-icon">
                 <img
                   src="/static/images/products/effort.png"
@@ -149,7 +149,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               </div>
             </div>
           ) : null}
-          <div className="row d-flex align-items-center">
+          <div className="row d-flex align-items-center course-pricing-message">
             <div className="enrollment-info-icon">
               <img src="/static/images/products/cost.png" alt="Cost" />
             </div>
@@ -157,7 +157,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               <b>Free</b>
             </div>
           </div>
-          <div className="row d-flex align-items-top">
+          <div className="row d-flex align-items-top course-certificate-message">
             <div className="enrollment-info-icon">
               <img
                 src="/static/images/products/certificate.png"
