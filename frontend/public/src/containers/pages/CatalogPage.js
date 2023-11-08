@@ -8,7 +8,7 @@ import {
   coursesNextPageSelector,
   coursesQuery,
   coursesQueryKey
-} from "../../lib/queries/courses"
+} from "../../lib/queries/catalogCourses"
 
 import {
   programsSelector,
