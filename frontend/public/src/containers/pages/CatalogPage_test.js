@@ -905,7 +905,7 @@ describe("CatalogPage", function() {
 
     sinon.assert.calledWith(
       helper.handleRequestStub,
-      "/api/v2/programs/?page=2&live=true",
+      "/api/v2/programs/?page=2&live=true&page__live=true",
       "GET"
     )
 
