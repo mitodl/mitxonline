@@ -200,12 +200,14 @@ def test_get_course(
 @pytest.mark.parametrize("course_catalog_course_count", [1], indirect=True)
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 @pytest.mark.parametrize("program_is_live", [True, False])
+@pytest.mark.parametrize("program_page_is_live", [True, False])
 def test_get_course_by_readable_id(
     user_drf_client,
     course_catalog_data,
     mock_context,
     django_assert_max_num_queries,
     program_is_live,
+    program_page_is_live,
 ):
     """Test the view that handles a request for single Course"""
     courses, _, _ = course_catalog_data
@@ -214,6 +216,10 @@ def test_get_course_by_readable_id(
     if not program_is_live:
         course.programs[0].live = False
         course.programs[0].save()
+
+    if not program_page_is_live:
+        course.programs[0].page.live = False
+        course.programs[0].page.save()
 
     num_queries = num_queries_from_course(course, "v1")
     with django_assert_max_num_queries(num_queries) as context:
@@ -234,7 +240,7 @@ def test_get_course_by_readable_id(
     )
     assert_drf_json_equal(course_data, [course_from_fixture], ignore_order=True)
 
-    if program_is_live:
+    if program_is_live and program_page_is_live:
         assert len(course_data[0]["programs"]) == 1
     else:
         assert course_data[0]["programs"] == []
