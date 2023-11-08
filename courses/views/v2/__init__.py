@@ -121,12 +121,3 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             added_context["include_approved_financial_aid"] = True
 
         return {**super().get_serializer_context(), **added_context}
-
-    def paginate_queryset(self, queryset):
-        """
-        Enable pagination if a 'page' parameter is included in the request,
-        otherwise, do not use pagination.
-        """
-        if self.paginator and self.request.query_params.get("page", None) is None:
-            return None
-        return super().paginate_queryset(queryset)

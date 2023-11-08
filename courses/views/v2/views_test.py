@@ -138,7 +138,10 @@ def test_get_courses(
         query_count_start = len(connection.queries)
         resp = user_drf_client.get(
             reverse("v2:courses_api-list"),
-            {"include_approved_financial_aid": include_finaid},
+            {
+                "include_approved_financial_aid": include_finaid,
+                "page_size": len(courses_from_fixture),
+            },
         )
         query_count_end = len(connection.queries)
         logger.info(
@@ -146,7 +149,7 @@ def test_get_courses(
         )
     #     This will become an assert rather than a warning in the future, for now this function is informational
     duplicate_queries_check(context)
-    courses_data = resp.json()
+    courses_data = resp.json()["results"]
     assert len(courses_data) == len(courses_from_fixture)
     """
     Due to the number of relations in our current course endpoint, and the potential for re-ordering of those nested
