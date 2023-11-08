@@ -184,11 +184,12 @@ class ProgramPageSerializer(serializers.ModelSerializer):
             .live()
             .first()
         )
+        page_children = instance.get_children()
         if (financial_assistance_page is None) and (
-            instance.get_children() is not None
+            page_children is not None
         ):
             financial_assistance_page = (
-                instance.get_children().type(FlexiblePricingRequestForm).live().first()
+                page_children.type(FlexiblePricingRequestForm).live().first()
             )
         if (financial_assistance_page is None) & (
             len(instance.program.related_programs) > 0
