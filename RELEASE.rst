@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.79.4 (Released November 08, 2023)
+--------------
+
+- Adding a test for archived courses (#1985)
+- Adds v2 of the courses API for the program page (#1983)
+
 Version 0.79.3 (Released November 08, 2023)
 --------------
 
