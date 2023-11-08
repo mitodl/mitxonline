@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.79.4
+Version 0.79.4 (Released November 08, 2023)
 --------------
 
 - Adding a test for archived courses (#1985)
