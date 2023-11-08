@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.79.3
+Version 0.79.3 (Released November 08, 2023)
 --------------
 
 - Change urls to not break (#1982)
