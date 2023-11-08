@@ -33,7 +33,9 @@ class CourseSerializer(BaseCourseSerializer):
         if self.context.get("all_runs", False):
             from courses.serializers.v1.base import BaseProgramSerializer
 
-            return BaseProgramSerializer(instance.programs, many=True).data
+            return BaseProgramSerializer(
+                [program for program in instance.programs if program.live], many=True
+            ).data
 
         return None
 
