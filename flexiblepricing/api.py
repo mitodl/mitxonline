@@ -9,7 +9,7 @@ import pytz
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
-from django.db import transaction
+from django.db import transaction, connection
 from django.db.models import Q
 from django.utils.text import slugify
 

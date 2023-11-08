@@ -1,6 +1,5 @@
 """CMS app serializers"""
 import bleach
-from django.contrib.contenttypes.models import ContentType
 from django.templatetags.static import static
 from rest_framework import serializers
 
@@ -8,18 +7,14 @@ from cms import models
 from cms.api import get_wagtail_img_src
 from cms.models import FlexiblePricingRequestForm, ProgramPage
 from courses.constants import DEFAULT_COURSE_IMG_PATH
-from ecommerce.models import Product
 
 
-class CoursePageSerializer(serializers.ModelSerializer):
+class BaseCoursePageSerializer(serializers.ModelSerializer):
     """Course page model serializer"""
 
     feature_image_src = serializers.SerializerMethodField()
     page_url = serializers.SerializerMethodField()
-    financial_assistance_form_url = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
-    current_price = serializers.SerializerMethodField()
-    instructors = serializers.SerializerMethodField()
     effort = serializers.SerializerMethodField()
     length = serializers.SerializerMethodField()
 
@@ -33,6 +28,42 @@ class CoursePageSerializer(serializers.ModelSerializer):
 
     def get_page_url(self, instance):
         return instance.get_url()
+
+    def get_description(self, instance):
+        return bleach.clean(instance.description, tags=[], strip=True)
+
+    def get_effort(self, instance):
+        return (
+            bleach.clean(instance.effort, tags=[], strip=True)
+            if instance.effort
+            else None
+        )
+
+    def get_length(self, instance):
+        return (
+            bleach.clean(instance.length, tags=[], strip=True)
+            if instance.length
+            else None
+        )
+
+    class Meta:
+        model = models.CoursePage
+        fields = [
+            "feature_image_src",
+            "page_url",
+            "description",
+            "live",
+            "length",
+            "effort",
+        ]
+
+
+class CoursePageSerializer(BaseCoursePageSerializer):
+    """Course page model serializer"""
+
+    financial_assistance_form_url = serializers.SerializerMethodField()
+    instructors = serializers.SerializerMethodField()
+    current_price = serializers.SerializerMethodField()
 
     def get_financial_assistance_form_url(self, instance):
         """
@@ -84,9 +115,6 @@ class CoursePageSerializer(serializers.ModelSerializer):
             else ""
         )
 
-    def get_description(self, instance):
-        return bleach.clean(instance.description, tags=[], strip=True)
-
     def get_current_price(self, instance):
         relevant_product = (
             instance.product.active_products.filter().order_by("-price").first()
@@ -114,32 +142,12 @@ class CoursePageSerializer(serializers.ModelSerializer):
 
         return returnable_members
 
-    def get_effort(self, instance):
-        return (
-            bleach.clean(instance.effort, tags=[], strip=True)
-            if instance.effort
-            else None
-        )
-
-    def get_length(self, instance):
-        return (
-            bleach.clean(instance.length, tags=[], strip=True)
-            if instance.length
-            else None
-        )
-
     class Meta:
         model = models.CoursePage
-        fields = [
-            "feature_image_src",
-            "page_url",
+        fields = BaseCoursePageSerializer.Meta.fields + [
             "financial_assistance_form_url",
-            "description",
             "current_price",
             "instructors",
-            "live",
-            "length",
-            "effort",
         ]
 
 
