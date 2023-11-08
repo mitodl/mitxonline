@@ -46,6 +46,15 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
     "mitxonline-new-header",
     currentUser && currentUser.id ? currentUser.id : "anonymousUser"
   )
+  const makeNavLink = (text: string) => {
+    return useScreenOverlay ? (
+      <span data-bs-target="#nav" data-bs-toggle="collapse">
+        {text}
+      </span>
+    ) : (
+      text
+    )
+  }
   menuChildProps = useScreenOverlay
     ? {
       li:                 overlayListItemProps,
@@ -78,39 +87,29 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
       >
         <li {...(menuChildProps.li || {})}>
           <MixedLink dest={routes.profile} aria-label="Profile">
-            <span data-bs-target="#nav" data-bs-toggle="collapse">
-              Profile
-            </span>
+            {makeNavLink("Profile")}
           </MixedLink>
         </li>
         {showNewDesign && useScreenOverlay ? (
           <li {...(menuChildProps.li || {})}>
             <MixedLink dest={routes.catalog} aria-label="Catalog">
-              <span data-bs-target="#nav" data-bs-toggle="collapse">
-                Catalog
-              </span>
+              {makeNavLink("Catalog")}
             </MixedLink>
           </li>
         ) : null}
         <li {...(menuChildProps.li || {})}>
           <MixedLink dest={routes.dashboard} aria-label="Dashboard">
-            <span data-bs-target="#nav" data-bs-toggle="collapse">
-              Dashboard
-            </span>
+            {makeNavLink("Dashboard")}
           </MixedLink>
         </li>
         <li {...(menuChildProps.li || {})}>
           <MixedLink dest={routes.accountSettings} aria-label="Account">
-            <span data-bs-target="#nav" data-bs-toggle="collapse">
-              Account
-            </span>
+            {makeNavLink("Account")}
           </MixedLink>
         </li>
         <li {...(menuChildProps.li || {})}>
           <MixedLink dest={routes.orderHistory} aria-label="Order History">
-            <span data-bs-target="#nav" data-bs-toggle="collapse">
-              Order History
-            </span>
+            {makeNavLink("Order History")}
           </MixedLink>
         </li>
         <li {...(menuChildProps.li || {})}>
