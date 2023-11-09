@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.79.5
+--------------
+
+- Change Catalog to use v2 API endpoint for courses (#1987)
+- Adding breadcrumb navigation and program type badge (#1981)
+- Updated v1 course API to only pull live programs; added tests (#1989)
+- Add page__live filter to programs API and update url in catalog page query (#1990)
+
 Version 0.79.4 (Released November 08, 2023)
 --------------
 
