@@ -3,9 +3,15 @@
 body.new-design {
   font-family: Inter;
 
-  h1, h2 {
-      font-family: Poppins;
+  h2 {
+    font-family: Poppins;
 
+  }
+  h1 {
+    font-family: Poppins;
+    @include media-breakpoint-up(lg) {
+      font-size: 45px;
+    }
   }
 
   .product-page {
@@ -16,6 +22,29 @@ body.new-design {
       @include media-breakpoint-down(md) {
           justify-content: center !important;
       }
+    }
+
+    .breadcrumb-item {
+      color: var(--GreyText, #6F7175);
+      font-size: 14px;
+
+      img {
+        margin-right: 10px;
+      }
+      a {
+        text-decoration: none;
+      }
+    }
+    span.badge-program-type {
+      background-color: $black;
+      color: white;
+      border-radius: 3px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-family: Poppins;
+      font-style: normal;
+      font-weight: 700;
+      line-height: normal;
     }
 
 
