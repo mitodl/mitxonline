@@ -1,9 +1,7 @@
 import React from "react"
 import { CSSTransition, TransitionGroup } from "react-transition-group"
 import moment from "moment"
-import {
-  getStartDateText
-} from "../../lib/util"
+import { getStartDateText } from "../../lib/util"
 
 import {
   coursesSelector,
@@ -301,15 +299,6 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Returns the text to be displayed on a course catalog card's tag.
-   * The rules for this are in the description of getStartDateText.
-   * @param {CourseDetailWithRuns} course The course being evaluated.
-   */
-  renderCatalogCardTagForCourse(course: CourseDetailWithRuns) {
-    return getStartDateText(course)
-  }
-
-  /**
    * Returns a filtered array of Course Runs which are live, define a start date,
    * enrollment start date is before the current date and time, and
    * enrollment end date is not defined or is after the current date and time.
@@ -395,7 +384,7 @@ export class CatalogPage extends React.Component<Props> {
           />
           <div className="catalog-item-description">
             <div className="start-date-description">
-              {this.renderCatalogCardTagForCourse(course)}
+              {getStartDateText(course)}
             </div>
             <div className="item-title">{course.title}</div>
           </div>
