@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.79.5
+Version 0.79.5 (Released November 13, 2023)
 --------------
 
 - Change Catalog to use v2 API endpoint for courses (#1987)
