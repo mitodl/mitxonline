@@ -3,7 +3,8 @@ import {
   formatPrettyDate,
   emptyOrNil,
   getFlexiblePriceForProduct,
-  formatLocalePrice
+  formatLocalePrice,
+  getStartDateText
 } from "../lib/util"
 import moment from "moment-timezone"
 
@@ -18,16 +19,6 @@ type CourseInfoBoxProps = {
   currentUser: CurrentUser,
   toggleUpgradeDialogVisibility: () => Promise<any>,
   setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>
-}
-
-const getStartDateText = (run: BaseCourseRun, isArchived: boolean = false) => {
-  if (isArchived) {
-    return "Course content available anytime"
-  }
-  return run && !emptyOrNil(run.start_date) && !run.is_self_paced
-    ? (run.start_date > moment() ? "Starts: " : "Started: ") +
-        formatPrettyDate(moment(new Date(run.start_date)))
-    : "Start Anytime"
 }
 
 export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProps> {
@@ -84,7 +75,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                     enrollment.run.id === courseRun.id
                 ))
                 ? this.renderEnrolledDateLink(courseRun)
-                : getStartDateText(courseRun)}
+                : getStartDateText(courseRun, false, true)}
             </li>
           )
         }

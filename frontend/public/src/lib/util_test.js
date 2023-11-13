@@ -26,7 +26,8 @@ import {
   isErrorResponse,
   isUnauthorizedResponse,
   formatLocalePrice,
-  intCheckFeatureFlag
+  intCheckFeatureFlag,
+  getStartDateText
 } from "./util"
 
 describe("utility functions", () => {
@@ -332,6 +333,74 @@ describe("utility functions", () => {
       )
       assert.isTrue(
         intCheckFeatureFlag("flagtwo", "anonymousUser", document, SETTINGS)
+      )
+    })
+  })
+
+  describe("getStartDateText", () => {
+    it("displays the Start Date text when the course run is in the future", () => {
+      const courseRun = {
+        start_date: moment().add(1, "days")
+      }
+      assert.isTrue(getStartDateText(courseRun).includes("Start Date:"))
+    })
+
+    it("displays the Start Date text when the course has a course run in the future", () => {
+      const course = {
+        courseruns: [
+          {
+            start_date: moment().add(1, "days")
+          }
+        ]
+      }
+      assert.isTrue(getStartDateText(course).includes("Start Date:"))
+    })
+
+    it("displays the Start Anytime text when the course run start date is in the past", () => {
+      const courseRun = {
+        start_date: moment().subtract(1, "months")
+      }
+      assert.isTrue(getStartDateText(courseRun).includes("Start Anytime"))
+    })
+
+    it("displays the Start Anytime text when the course has a course run start date is in the past", () => {
+      const course = {
+        courseruns: [
+          {
+            start_date: moment().subtract(1, "months")
+          }
+        ]
+      }
+      assert.isTrue(getStartDateText(course).includes("Start Anytime"))
+    })
+
+    it("displays the Start Anytime text when the course run is in the past but is Self-Paced", () => {
+      const courseRun = {
+        start_date:    moment().add(1, "days"),
+        is_self_paced: true
+      }
+      assert.isTrue(getStartDateText(courseRun).includes("Start Anytime"))
+    })
+
+    it("displays the Start Date text when the course run is completely in the past but showPast is true", () => {
+      const courseRun = {
+        start_date: moment().subtract(3, "months"),
+        end_date:   moment().subtract(2, "months")
+      }
+      assert.isTrue(
+        getStartDateText(courseRun, false, true).includes("Start Date")
+      )
+    })
+
+    it("displays the archived course message when isArchive flag is true", () => {
+      const courseRun = {
+        start_date: moment().subtract(3, "months"),
+        end_date:   moment().subtract(2, "months")
+      }
+      assert.isTrue(
+        getStartDateText(courseRun, true).includes(
+          "Course content available anytime"
+        )
       )
     })
   })

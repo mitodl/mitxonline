@@ -1,7 +1,9 @@
 import React from "react"
 import { CSSTransition, TransitionGroup } from "react-transition-group"
 import moment from "moment"
-import { parseDateString, formatPrettyDate } from "../../lib/util"
+import {
+  getStartDateText
+} from "../../lib/util"
 
 import {
   coursesSelector,
@@ -299,55 +301,12 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * This is a comparison method used to sort an array of Course Runs
-   * from earliest start date to latest start date.
-   * @param {BaseCourseRun} courseRunA The first Course Run to compare.
-   * @param {BaseCourseRun} courseRunB The second Course Run to compare.
-   */
-  compareCourseRunStartDates(
-    courseRunA: BaseCourseRun,
-    courseRunB: BaseCourseRun
-  ) {
-    if (moment(courseRunA.start_date).isBefore(courseRunB.start_date)) {
-      return -1
-    }
-    if (moment(courseRunA.start_date).isAfter(courseRunB.start_date)) {
-      return 1
-    }
-    // CourseRunA and CourseRunB share the same start date.
-    return 0
-  }
-
-  /**
    * Returns the text to be displayed on a course catalog card's tag.
-   * This text will either be "Start Anytime" or "Start Date: <most recent, future, start date for the course>".
-   * If the Course has at least one associated Course Run which is not self-paced, and
-   * Course Run start date is in the future, then return "Start Date: <most recent, future, start date for the course>".
-   * If the Course has at least one associated Course Run which is not self-paced, and
-   * Course Run start date is in the past, then return "Start Anytime".
-   * If the course only has Course Runs which are self-paced, display "Start Anytime".
+   * The rules for this are in the description of getStartDateText.
    * @param {CourseDetailWithRuns} course The course being evaluated.
    */
   renderCatalogCardTagForCourse(course: CourseDetailWithRuns) {
-    const nonSelfPacedCourseRuns = course.courseruns.filter(
-      courseRun => !courseRun.is_self_paced
-    )
-    if (nonSelfPacedCourseRuns.length > 0) {
-      const futureStartDateCourseRuns = nonSelfPacedCourseRuns.filter(
-        courseRun => moment(courseRun.start_date).isAfter(moment())
-      )
-      if (futureStartDateCourseRuns.length > 0) {
-        const startDate = parseDateString(
-          futureStartDateCourseRuns.sort(this.compareCourseRunStartDates)[0]
-            .start_date
-        )
-        return `Start Date: ${formatPrettyDate(startDate)}`
-      } else {
-        return "Start Anytime"
-      }
-    } else {
-      return "Start Anytime"
-    }
+    return getStartDateText(course)
   }
 
   /**

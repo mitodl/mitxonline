@@ -23,6 +23,7 @@ import posthog from "posthog-js"
 import type Moment from "moment"
 import type { HttpRespErrorMessage, HttpResponse } from "../flow/httpTypes"
 import type { Product } from "../flow/cartTypes"
+import type { BaseCourseRun, CourseDetailWithRuns } from "../flow/courseTypes"
 
 import {
   DISCOUNT_TYPE_DOLLARS_OFF,
@@ -282,4 +283,75 @@ export const intCheckFeatureFlag = (
 
 export const checkFeatureFlag = (flag: string, uniqueID: string | number) => {
   return intCheckFeatureFlag(flag, uniqueID, document, SETTINGS)
+}
+
+/**
+ * This is a comparison method used to sort an array of Course Runs
+ * from earliest start date to latest start date.
+ * @param {BaseCourseRun} courseRunA The first Course Run to compare.
+ * @param {BaseCourseRun} courseRunB The second Course Run to compare.
+ */
+export const compareCourseRunStartDates = (
+  courseRunA: BaseCourseRun,
+  courseRunB: BaseCourseRun
+) => {
+  if (moment(courseRunA.start_date).isBefore(courseRunB.start_date)) {
+    return -1
+  }
+  if (moment(courseRunA.start_date).isAfter(courseRunB.start_date)) {
+    return 1
+  }
+  // CourseRunA and CourseRunB share the same start date.
+  return 0
+}
+
+/**
+ * Returns the text to be displayed on a course catalog card's tag.
+ * This text will either be "Start Anytime" or "Start Date: <most recent, future, start date for the course>".
+ * If the Course has at least one associated Course Run which is not self-paced, and
+ * Course Run start date is in the future, then return "Start Date: <most recent, future, start date for the course>".
+ * If the Course has at least one associated Course Run which is not self-paced, and
+ * Course Run start date is in the past, then return "Start Anytime".
+ * If the course only has Course Runs which are self-paced, display "Start Anytime".
+ * If the isArchived flag is set, display "Course content available anytime".
+ * @param {CourseDetailWithRuns} course The course being evaluated.
+ * @param {isArchived} boolean Whether the course is archived or not.
+ * @param {showPast} boolean Render start dates for course start dates that are in the past.
+ */
+
+export const getStartDateText = (
+  courseware: BaseCourseRun | CourseDetailWithRuns,
+  isArchived: boolean = false,
+  showPast: boolean = false
+) => {
+  if (isArchived) {
+    return "Course content available anytime"
+  }
+
+  const nonSelfPacedCourseRuns = courseware.courseruns
+    ? courseware.courseruns.filter(courseRun => !courseRun.is_self_paced)
+    : courseware.is_self_paced
+      ? []
+      : [courseware]
+
+  if (nonSelfPacedCourseRuns.length > 0) {
+    const futureStartDateCourseRuns = nonSelfPacedCourseRuns.filter(courseRun =>
+      moment(courseRun.start_date).isAfter(moment())
+    )
+    if (futureStartDateCourseRuns.length > 0) {
+      const startDate = parseDateString(
+        futureStartDateCourseRuns.sort(compareCourseRunStartDates)[0].start_date
+      )
+      return `Start Date: ${formatPrettyDate(startDate)}`
+    } else {
+      if (showPast && nonSelfPacedCourseRuns.length > 0) {
+        return `Start Date: ${formatPrettyDate(
+          parseDateString(nonSelfPacedCourseRuns[0].start_date)
+        )}`
+      }
+      return "Start Anytime"
+    }
+  } else {
+    return "Start Anytime"
+  }
 }
