@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.80.0
+Version 0.80.0 (Released November 14, 2023)
 --------------
 
 - Header nav links fixes (#1988)
