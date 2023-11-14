@@ -336,7 +336,7 @@ export const reverseCompareCourseRunStartDates = (
  * Course Run start date is in the past, and showPast is true, then return "Start Date: <most recent start date for the course>".
  * If the course only has Course Runs which are self-paced, display "Start Anytime".
  * @param {CourseDetailWithRuns|BaseCourseRun} course The course being evaluated, or an individual course run to display the start text for.
- * @param {showPast} boolean Render start dates for course start dates that are in the past.
+ * @param {showPast} boolean If the start date for the course is in the past, and showPast is true, then render the most recent start date for the course.
  */
 
 export const getStartDateText = (
