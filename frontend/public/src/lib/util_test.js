@@ -357,7 +357,8 @@ describe("utility functions", () => {
               start_date:
                 datePosition === "future"
                   ? moment().add(1, "days")
-                  : moment().subtract(1, "days")
+                  : moment().subtract(1, "days"),
+              is_self_paced: false
             }
           ]
         }
