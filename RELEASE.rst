@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.80.1
+--------------
+
+- Fixes start date formatting in CourseInfoBox, refactors date display for reuse (#1992)
+
 Version 0.80.0 (Released November 14, 2023)
 --------------
 
