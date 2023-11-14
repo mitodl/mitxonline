@@ -26,7 +26,8 @@ import {
   isErrorResponse,
   isUnauthorizedResponse,
   formatLocalePrice,
-  intCheckFeatureFlag
+  intCheckFeatureFlag,
+  getStartDateText
 } from "./util"
 
 describe("utility functions", () => {
@@ -332,6 +333,105 @@ describe("utility functions", () => {
       )
       assert.isTrue(
         intCheckFeatureFlag("flagtwo", "anonymousUser", document, SETTINGS)
+      )
+    })
+  })
+
+  describe("getStartDateText", () => {
+    [
+      ["course", "past", false, "Start Anytime"],
+      ["course run", "past", false, "Start Anytime"],
+      ["course", "future", false, "Start Date"],
+      ["course run", "future", false, "Start Date"],
+      ["course", "past", true, "Start Anytime"],
+      ["course run", "past", true, "Start Anytime"],
+      ["course", "future", true, "Start Anytime"],
+      ["course run", "future", true, "Start Anytime"]
+    ].forEach(([coursewareType, datePosition, selfPaced, displayText]) => {
+      it(`displays the ${displayText} text when the ${coursewareType} is in the ${datePosition} and there ${
+        selfPaced ? "are" : "are no"
+      } self-paced courses`, () => {
+        const course = {
+          courseruns: [
+            {
+              start_date:
+                datePosition === "future"
+                  ? moment().add(1, "days")
+                  : moment().subtract(1, "days"),
+              is_self_paced: false
+            }
+          ]
+        }
+
+        if (selfPaced) {
+          course["courseruns"][0]["is_self_paced"] = true
+        }
+
+        assert.isTrue(
+          getStartDateText(
+            coursewareType === "course" ? course : course["courseruns"][0]
+          ).includes(displayText)
+        )
+      })
+    })
+
+    it("displays the closest start date if there are multiple future start dates", () => {
+      const startDates = [
+        moment().add(1, "days"),
+        moment().add(2, "days"),
+        moment().add(3, "days")
+      ]
+
+      const course = {
+        courseruns: [
+          {
+            start_date: startDates[0]
+          },
+          {
+            start_date: startDates[1]
+          },
+          {
+            start_date: startDates[2]
+          }
+        ]
+      }
+
+      assert.isTrue(getStartDateText(course).includes("Start Date"))
+      assert.isTrue(
+        getStartDateText(course).includes(formatPrettyDate(startDates[0]))
+      )
+      assert.isFalse(
+        getStartDateText(course).includes(formatPrettyDate(startDates[2]))
+      )
+    })
+
+    it("displays the closest start date if there are multiple past start dates and showPast is true", () => {
+      const startDates = [
+        moment().subtract(1, "days"),
+        moment().subtract(2, "days"),
+        moment().subtract(3, "days")
+      ]
+
+      const course = {
+        courseruns: [
+          {
+            start_date: startDates[2]
+          },
+          {
+            start_date: startDates[1]
+          },
+          {
+            start_date: startDates[0]
+          }
+        ]
+      }
+
+      assert.isTrue(getStartDateText(course, true).includes("Start Date"))
+      assert.isTrue(
+        getStartDateText(course, true).includes(formatPrettyDate(startDates[0]))
+      )
+      assert.isFalse(
+        getStartDateText(course, true).includes(formatPrettyDate(startDates[2]))
       )
     })
   })

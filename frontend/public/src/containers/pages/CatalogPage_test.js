@@ -4,7 +4,6 @@ import { expect } from "chai"
 import moment from "moment-timezone"
 import IntegrationTestHelper from "../../util/integration_test_helper"
 import CatalogPage, { CatalogPage as InnerCatalogPage } from "./CatalogPage"
-import { formatPrettyDate } from "../../lib/util"
 import sinon from "sinon"
 
 const displayedCourse = {
@@ -484,86 +483,6 @@ describe("CatalogPage", function() {
       .instance()
       .validateCoursesCourseRuns(courseRuns)
     expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-  })
-
-  it("renders catalog course card with Start Anytime label if non-self paced course runs exist and all course runs start date in the past", async () => {
-    const course = JSON.parse(JSON.stringify(displayedCourse))
-    const { inner } = await renderPage()
-    let catalogCardTagForCourse = inner
-      .instance()
-      .renderCatalogCardTagForCourse(course)
-    expect(catalogCardTagForCourse).equals("Start Anytime")
-    course.courseruns[0].start_date = moment().add(2, "M")
-    catalogCardTagForCourse = inner
-      .instance()
-      .renderCatalogCardTagForCourse(course)
-    expect(catalogCardTagForCourse).equals(
-      `Start Date: ${formatPrettyDate(course.courseruns[0].start_date)}`
-    )
-  })
-
-  it("renders catalog course card with start date label if non-self paced course runs exist and all course runs start in the future", async () => {
-    const course = JSON.parse(JSON.stringify(displayedCourse))
-    const { inner } = await renderPage()
-    let catalogCardTagForCourse = inner
-      .instance()
-      .renderCatalogCardTagForCourse(course)
-    expect(catalogCardTagForCourse).equals("Start Anytime")
-    course.courseruns[0].start_date = moment().add(2, "M")
-    catalogCardTagForCourse = inner
-      .instance()
-      .renderCatalogCardTagForCourse(course)
-    expect(catalogCardTagForCourse).equals(
-      `Start Date: ${formatPrettyDate(course.courseruns[0].start_date)}`
-    )
-  })
-
-  it("renders catalog course card with closest future start date label if non-self paced course runs exist and a course run start date is in the future", async () => {
-    const course = JSON.parse(JSON.stringify(displayedCourse))
-    // Associate a second course run with the course
-    course.courseruns.push(
-      JSON.parse(JSON.stringify(displayedCourse.courseruns[0]))
-    )
-    course.courseruns.push(
-      JSON.parse(JSON.stringify(displayedCourse.courseruns[0]))
-    )
-    course.courseruns.push(
-      JSON.parse(JSON.stringify(displayedCourse.courseruns[0]))
-    )
-    const { inner } = await renderPage()
-    let catalogCardTagForCourse = inner
-      .instance()
-      .renderCatalogCardTagForCourse(course)
-    expect(catalogCardTagForCourse).equals("Start Anytime")
-
-    // Update the start dates of each associated course run to be in the future.
-    course.courseruns[0].start_date = moment().add(2, "M")
-    course.courseruns[1].start_date = moment().add(3, "d")
-    course.courseruns[2].start_date = moment().add(2, "d")
-    course.courseruns[3].is_self_paced = true
-    catalogCardTagForCourse = inner
-      .instance()
-      .renderCatalogCardTagForCourse(course)
-    // Expect the closest future start date
-    expect(catalogCardTagForCourse).equals(
-      `Start Date: ${formatPrettyDate(course.courseruns[2].start_date)}`
-    )
-  })
-
-  it("renders catalog course card with Start Anytime if only self paced course runs exist, even if start date is in the future", async () => {
-    const course = JSON.parse(JSON.stringify(displayedCourse))
-    const { inner } = await renderPage()
-    let catalogCardTagForCourse = inner
-      .instance()
-      .renderCatalogCardTagForCourse(course)
-    expect(catalogCardTagForCourse).equals("Start Anytime")
-
-    course.courseruns[0].start_date = moment().add(2, "M")
-    course.courseruns[0].is_self_paced = true
-    catalogCardTagForCourse = inner
-      .instance()
-      .renderCatalogCardTagForCourse(course)
-    expect(catalogCardTagForCourse).equals("Start Anytime")
   })
 
   it("renders catalog courses based on selected department", async () => {
