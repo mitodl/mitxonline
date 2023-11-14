@@ -13,6 +13,15 @@ type Props = {
 const AnonymousMenu = ({ mobileView }: Props) => {
   const identifierPostfix = mobileView ? "Mobile" : "Desktop"
   const newDesign = checkFeatureFlag("mitxonline-new-header", "anonymousUser")
+  const makeNavLink = (text: string) => {
+    return mobileView ? (
+      <span data-bs-target="#nav" data-bs-toggle="collapse">
+        {text}
+      </span>
+    ) : (
+      text
+    )
+  }
   return (
     <ul>
       {newDesign ? (
@@ -23,9 +32,7 @@ const AnonymousMenu = ({ mobileView }: Props) => {
             className="top-nav-link"
             aria-label="Catalog"
           >
-            <span data-bs-target="#nav" data-bs-toggle="collapse">
-              Catalog
-            </span>
+            {makeNavLink("Catalog")}
           </MixedLink>
         </li>
       ) : null}
@@ -36,9 +43,7 @@ const AnonymousMenu = ({ mobileView }: Props) => {
           className="simple"
           aria-label="Sign In"
         >
-          <span data-bs-target="#nav" data-bs-toggle="collapse">
-            Sign In
-          </span>
+          {makeNavLink("Sign In")}
         </MixedLink>
       </li>
       <li>
@@ -48,9 +53,7 @@ const AnonymousMenu = ({ mobileView }: Props) => {
           className="simple button"
           aria-label="Create Account"
         >
-          <span data-bs-target="#nav" data-bs-toggle="collapse">
-            Create Account
-          </span>
+          {makeNavLink("Create Account")}
         </MixedLink>
       </li>
     </ul>
