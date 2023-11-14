@@ -299,15 +299,6 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Returns the text to be displayed on a course catalog card's tag.
-   * The rules for this are in the description of getStartDateText.
-   * @param {CourseDetailWithRuns} course The course being evaluated.
-   */
-  renderCatalogCardTagForCourse(course: CourseDetailWithRuns) {
-    return getStartDateText(course)
-  }
-
-  /**
    * Returns a filtered array of Course Runs which are live, define a start date,
    * enrollment start date is before the current date and time, and
    * enrollment end date is not defined or is after the current date and time.

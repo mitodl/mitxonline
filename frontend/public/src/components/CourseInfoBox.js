@@ -75,7 +75,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                     enrollment.run.id === courseRun.id
                 ))
                 ? this.renderEnrolledDateLink(courseRun)
-                : getStartDateText(courseRun, false, true)}
+                : getStartDateText(courseRun, true)}
             </li>
           )
         }
@@ -101,7 +101,9 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               />
             </div>
             <div className="enrollment-info-text">
-              {getStartDateText(run, isArchived)}
+              {isArchived
+                ? "Course content available anytime"
+                : getStartDateText(run)}
             </div>
             {!isArchived && moreEnrollableCourseRuns ? (
               <>
