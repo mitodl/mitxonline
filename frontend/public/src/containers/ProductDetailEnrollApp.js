@@ -22,7 +22,7 @@ const expandExpandBlock = (event: MouseEvent) => {
           requestAnimationFrame(() => {
             event.srcElement.innerText = "Show More"
             event.srcElement.classList.add("fade")
-            elem.classList.add("hide")
+            elem && elem.classList && elem.classList.add("hide")
           })
         }, 225) // timeout
       }
