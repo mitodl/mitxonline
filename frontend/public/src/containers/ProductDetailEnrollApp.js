@@ -15,12 +15,14 @@ const expandExpandBlock = (event: MouseEvent) => {
       elem && elem.classList && elem.classList.toggle("open")
       if (elem && elem.classList && elem.classList.contains("open")) {
         event.srcElement.innerText = "Show Less"
+        elem.classList.remove("hide")
       } else {
         event.srcElement.classList.remove("fade")
         setTimeout(() => {
           requestAnimationFrame(() => {
             event.srcElement.innerText = "Show More"
             event.srcElement.classList.add("fade")
+            elem.classList.add("hide")
           })
         }, 225) // timeout
       }
