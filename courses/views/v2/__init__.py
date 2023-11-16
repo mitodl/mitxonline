@@ -1,23 +1,34 @@
 """
 Course API Views version 2
 """
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 from mitol.common.utils import now_in_utc
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Q, Count
 
 from courses.models import (
     Course,
     CourseRun,
+    Department,
     Program,
 )
 from courses.serializers.v2.programs import ProgramSerializer
 from courses.serializers.v2.courses import (
     CourseWithCourseRunsSerializer,
 )
+from courses.serializers.v2.departments import DepartmentWithCountSerializer
+
+
+def get_enrollable_courseruns():
+    now = now_in_utc()
+    return CourseRun.objects.filter(
+        Q(live=True)
+        & Q(start_date__isnull=False)
+        & Q(enrollment_start__lt=now)
+        & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))
+    )
 
 
 class Pagination(PageNumberPagination):
@@ -61,12 +72,7 @@ class CourseFilterSet(django_filters.FilterSet):
         now = now_in_utc()
 
         if value is True:
-            enrollable_runs = CourseRun.objects.filter(
-                Q(live=True)
-                & Q(start_date__isnull=False)
-                & Q(enrollment_start__lt=now)
-                & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))
-            )
+            enrollable_runs = get_enrollable_courseruns()
             return (
                 queryset.prefetch_related(
                     Prefetch("courseruns", queryset=enrollable_runs),
@@ -121,3 +127,19 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             added_context["include_approved_financial_aid"] = True
 
         return {**super().get_serializer_context(), **added_context}
+
+
+class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
+    """API view set for Departments"""
+
+    serializer_class = DepartmentWithCountSerializer
+    pagination_class = Pagination
+    permission_classes = []
+
+    def get_queryset(self):
+        enrollable_runs = get_enrollable_courseruns()
+
+        return Department.objects.annotate(
+            courses=Count("course", filter=Q(course__live=True, course__page__live=True, course__courseruns__id__in=enrollable_runs.values_list("id", flat=True)), distinct=True),
+            programs=Count("program", filter=Q(program__live=True, program__page__live=True), distinct=True)
+        )
