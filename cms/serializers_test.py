@@ -409,3 +409,38 @@ def test_serialize_program_page__no_financial_form(
             "price": None,
         },
     )
+
+
+def test_serialize_program_page__with_related_program_no_financial_form(
+    mocker, fully_configured_wagtail, staff_user, mock_context
+):
+    fake_image_src = "http://example.com/my.img"
+    patched_get_wagtail_src = mocker.patch(
+        "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
+    )
+
+    program = ProgramFactory(page=None)
+    program_page = ProgramPageFactory(program=program)
+    other_program = ProgramFactory(page=None)
+    other_program_page = ProgramPageFactory(program=other_program)
+    program.add_related_program(other_program)
+    rf = RequestFactory()
+    request = rf.get("/")
+    request.user = staff_user
+
+    data = ProgramPageSerializer(
+        instance=program_page, context=program_page.get_context(request)
+    ).data
+    assert_drf_json_equal(
+        data,
+        {
+            "feature_image_src": fake_image_src,
+            "page_url": program_page.url,
+            "financial_assistance_form_url": "",
+            "description": bleach.clean(program_page.description, tags=[], strip=True),
+            "live": True,
+            "length": program_page.length,
+            "effort": program_page.effort,
+            "price": None,
+        },
+    )
