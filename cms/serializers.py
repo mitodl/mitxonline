@@ -196,9 +196,16 @@ class ProgramPageSerializer(serializers.ModelSerializer):
                 FlexiblePricingRequestForm.objects.filter(
                     selected_program__in=instance.program.related_programs
                 )
+                .select_related("selected_program")
                 .live()
                 .first()
             )
+
+            program_page = ProgramPage.objects.filter(
+                program=financial_assistance_page.selected_program
+            ).get()
+            return f"{program_page.get_url()}{financial_assistance_page.slug}/"
+
         return (
             f"{instance.get_url()}{financial_assistance_page.slug}/"
             if financial_assistance_page

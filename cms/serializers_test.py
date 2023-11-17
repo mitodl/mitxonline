@@ -369,7 +369,7 @@ def test_serialize_program_page__with_related_financial_form(
         {
             "feature_image_src": fake_image_src,
             "page_url": program_page.url,
-            "financial_assistance_form_url": f"{program_page.get_url()}{financial_assistance_form.slug}/",
+            "financial_assistance_form_url": f"{other_program_page.get_url()}{financial_assistance_form.slug}/",
             "description": bleach.clean(program_page.description, tags=[], strip=True),
             "live": True,
             "length": program_page.length,
