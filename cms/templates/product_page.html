@@ -14,9 +14,9 @@
     <div id="main" class="product-page">
       <div class="container">
         <div class="row d-flex flex-row align-center">
-        <div class="col d-block d-md-none">
-        {# Mobile only #}
-          <div class="text">
+          <div class="col d-block d-md-none flex-none">
+          {# Mobile only #}
+            <div class="text">
             <nav aria-label="breadcrumb">
               <ol class="breadcrumb">
                 <li class="breadcrumb-item">
@@ -39,7 +39,7 @@
                 {{ page.description | richtext }}
               </section>
         </div>
-        </div>
+          </div>
           <div class="col order-md-1 order-2 flex-grow-1" id="product-details">
             <div class="text">
               <div class="d-none d-md-block">
@@ -144,7 +144,7 @@
         
             </div>
           </div>
-          <div class="col" id="product-info-box">
+          <div class="col order-md-2 order-1" id="product-info-box">
             <div class="px-4 py-2 border align-items-center justify-items-top d-flex flex-column">
               <div class="hero-media">
                 {% if page.video_url %}
