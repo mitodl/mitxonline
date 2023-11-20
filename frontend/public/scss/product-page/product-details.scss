@@ -23,6 +23,9 @@ body.new-design {
           justify-content: center !important;
       }
     }
+    .col.flex-none {
+      flex: none;
+    }
 
     .breadcrumb-item {
       color: var(--GreyText, #6F7175);
