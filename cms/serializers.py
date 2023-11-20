@@ -201,6 +201,9 @@ class ProgramPageSerializer(serializers.ModelSerializer):
                 .first()
             )
 
+            if financial_assistance_page is None:
+                return ""
+
             program_page = ProgramPage.objects.filter(
                 program=financial_assistance_page.selected_program
             ).get()
