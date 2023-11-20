@@ -1,7 +1,6 @@
 """
 Course API Views version 2
 """
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 import django_filters
@@ -12,12 +11,14 @@ from django.db.models import Prefetch, Q
 from courses.models import (
     Course,
     CourseRun,
+    Department,
     Program,
 )
 from courses.serializers.v2.programs import ProgramSerializer
 from courses.serializers.v2.courses import (
     CourseWithCourseRunsSerializer,
 )
+from courses.serializers.v2.departments import DepartmentWithCountSerializer
 
 
 class Pagination(PageNumberPagination):
@@ -121,3 +122,14 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             added_context["include_approved_financial_aid"] = True
 
         return {**super().get_serializer_context(), **added_context}
+
+
+class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
+    """API view set for Departments"""
+
+    serializer_class = DepartmentWithCountSerializer
+    pagination_class = Pagination
+    permission_classes = []
+
+    def get_queryset(self):
+        return Department.objects.all().order_by("name")

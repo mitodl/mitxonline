@@ -1,4 +1,5 @@
 """Factories for creating course data in tests"""
+import string
 from types import SimpleNamespace
 
 import factory
@@ -16,6 +17,7 @@ from courses.models import (
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
+    Department,
     LearnerProgramRecordShare,
     PartnerSchool,
     Program,
@@ -30,6 +32,13 @@ from users.factories import UserFactory
 FAKE = faker.Factory.create()
 
 
+class DepartmentFactory(DjangoModelFactory):
+    name = factory.Sequence(lambda x: f"Testing - {x} Department")
+
+    class Meta:
+        model = Department
+
+
 class ProgramFactory(DjangoModelFactory):
     """Factory for Programs"""
 
@@ -40,6 +49,12 @@ class ProgramFactory(DjangoModelFactory):
     live = True
 
     page = factory.RelatedFactory("cms.factories.ProgramPageFactory", "program")
+
+    @factory.post_generation
+    def departments(self, create, extracted, **kwargs):
+        if not create or not extracted:
+            return
+        self.departments.add(*extracted)
 
     class Meta:
         model = Program
@@ -61,8 +76,15 @@ class CourseFactory(DjangoModelFactory):
     title = fuzzy.FuzzyText(prefix="Course ")
     readable_id = factory.Sequence("course-{0}".format)
     live = True
+    departments = factory.SubFactory(DepartmentFactory)
 
     page = factory.RelatedFactory("cms.factories.CoursePageFactory", "course")
+
+    @factory.post_generation
+    def departments(self, create, extracted, **kwargs):
+        if not create or not extracted:
+            return
+        self.departments.add(*extracted)
 
     class Meta:
         model = Course
