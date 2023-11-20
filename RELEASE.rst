@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.80.2
+Version 0.80.2 (Released November 20, 2023)
 --------------
 
 - Updates the onclick for the instructor name to activate on keyup, fixes an issue with financial assistance page serialization (#2001)
