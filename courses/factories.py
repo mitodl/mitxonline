@@ -33,7 +33,7 @@ FAKE = faker.Factory.create()
 
 
 class DepartmentFactory(DjangoModelFactory):
-    name = fuzzy.FuzzyText(length=6, chars=string.ascii_letters, prefix="Testing-", suffix=" Department")
+    name = factory.Sequence(lambda x: f"Testing - {x} Department")
 
     class Meta:
         model = Department

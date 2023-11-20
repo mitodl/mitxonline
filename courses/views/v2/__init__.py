@@ -132,4 +132,4 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = []
 
     def get_queryset(self):
-        return Department.objects.all()
+        return Department.objects.all().order_by("name")

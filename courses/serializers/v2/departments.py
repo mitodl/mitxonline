@@ -27,12 +27,19 @@ class DepartmentWithCountSerializer(DepartmentSerializer):
             & Q(live=True)
             & Q(start_date__isnull=False)
             & Q(enrollment_start__lt=now)
-            & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))).values_list("id", flat=True)
+            & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))
+        ).values_list("id", flat=True)
 
-        return related_courses.filter(courseruns__id__in=relevant_courseruns).distinct().count()
+        return (
+            related_courses.filter(courseruns__id__in=relevant_courseruns)
+            .distinct()
+            .count()
+        )
 
     def get_programs(self, instance):
-        return instance.program_set.filter(live=True, page__live=True).distinct().count()
+        return (
+            instance.program_set.filter(live=True, page__live=True).distinct().count()
+        )
 
     class Meta:
         model = Department

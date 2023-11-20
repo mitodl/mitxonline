@@ -2,6 +2,7 @@
 Tests for courses api views v2
 """
 import operator as op
+import random
 
 import pytest
 from django.urls import reverse
@@ -10,9 +11,15 @@ from django.db import connection
 import logging
 
 from courses.conftest import course_catalog_data
+from courses.factories import DepartmentFactory
 from courses.serializers.v2.programs import ProgramSerializer
 from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
-from courses.views.test_utils import num_queries_from_programs, num_queries_from_course
+from courses.serializers.v2.departments import DepartmentWithCountSerializer
+from courses.views.test_utils import (
+    num_queries_from_programs,
+    num_queries_from_course,
+    num_queries_from_department,
+)
 from courses.views.v2 import Pagination
 from fixtures.common import raise_nplusone
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
@@ -21,6 +28,50 @@ pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
 
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [15], indirect=True)
+def test_get_departments(
+    user_drf_client, mock_context, django_assert_max_num_queries, course_catalog_data
+):
+    departments = DepartmentFactory.create_batch(size=10)
+    empty_departments_from_fixture = []
+    for department in departments:
+        empty_departments_from_fixture.append(
+            DepartmentWithCountSerializer(
+                instance=department, context=mock_context
+            ).data
+        )
+    with django_assert_max_num_queries(
+        num_queries_from_department(len(departments))
+    ) as context:
+        resp = user_drf_client.get(reverse("v2:departments_api-list"))
+    duplicate_queries_check(context)
+    empty_departments_data = resp.json()["results"]
+    assert_drf_json_equal(
+        empty_departments_data, empty_departments_from_fixture, ignore_order=True
+    )
+
+    courses, programs, _ = course_catalog_data
+    for course in courses:
+        course.departments.add(random.choice(departments))
+    for program in programs:
+        program.departments.add(random.choice(departments))
+    with django_assert_max_num_queries(
+        num_queries_from_department(len(departments))
+    ) as context:
+        resp = user_drf_client.get(reverse("v2:departments_api-list"))
+    duplicate_queries_check(context)
+    departments_data = resp.json()["results"]
+    departments_from_fixture = []
+    for department in departments:
+        departments_from_fixture.append(
+            DepartmentWithCountSerializer(
+                instance=department, context=mock_context
+            ).data
+        )
+    assert_drf_json_equal(departments_data, departments_from_fixture, ignore_order=True)
 
 
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)

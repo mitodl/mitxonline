@@ -8,7 +8,10 @@ from courses.factories import (
     ProgramFactory,
     DepartmentFactory,
 )
-from courses.serializers.v2.departments import DepartmentSerializer, DepartmentWithCountSerializer
+from courses.serializers.v2.departments import (
+    DepartmentSerializer,
+    DepartmentWithCountSerializer,
+)
 
 from main.test_utils import assert_drf_json_equal
 
@@ -24,18 +27,24 @@ def test_serialize_department(mock_context):
 def test_serialize_department_with_courses_and_programs__no_related(mock_context):
     department = DepartmentFactory.create()
     data = DepartmentWithCountSerializer(instance=department, context=mock_context).data
-    assert_drf_json_equal(data, {"id": department.id, "name": department.name, "courses": 0, "programs": 0})
+    assert_drf_json_equal(
+        data,
+        {"id": department.id, "name": department.name, "courses": 0, "programs": 0},
+    )
 
     course = CourseFactory.create()
     CourseRunFactory.create(course=course, in_future=True)
     ProgramFactory.create()
     data = DepartmentWithCountSerializer(instance=department, context=mock_context).data
-    assert_drf_json_equal(data, {"id": department.id, "name": department.name, "courses": 0, "programs": 0})
+    assert_drf_json_equal(
+        data,
+        {"id": department.id, "name": department.name, "courses": 0, "programs": 0},
+    )
 
 
 @pytest.mark.parametrize(
     "valid_courses,valid_programs,invalid_courses,invalid_programs",
-    [(0, 0, 0, 0), (1, 1, 0, 0), (0, 0, 1, 1), (2, 2, 0, 0), (2, 2, 1, 1)]
+    [(0, 0, 0, 0), (1, 1, 0, 0), (0, 0, 1, 1), (2, 2, 0, 0), (2, 2, 1, 1)],
 )
 def test_serialize_department_with_courses_and_programs__with_multiples(
     mock_context,
@@ -70,10 +79,12 @@ def test_serialize_department_with_courses_and_programs__with_multiples(
         invalid_programs_list += [ProgramFactory.create()]
         invalid_programs -= 1
     data = DepartmentWithCountSerializer(instance=department, context=mock_context).data
-    assert_drf_json_equal(data,
-                          {
-                              "id": department.id,
-                              "name": department.name,
-                              "courses": valid_courses,
-                              "programs": valid_programs,
-                          })
+    assert_drf_json_equal(
+        data,
+        {
+            "id": department.id,
+            "name": department.name,
+            "courses": valid_courses,
+            "programs": valid_programs,
+        },
+    )

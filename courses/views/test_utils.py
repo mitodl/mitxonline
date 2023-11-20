@@ -70,3 +70,17 @@ def num_queries_from_programs(programs, version="v1"):
         if version == "v2":
             num_queries += 6 + (12 * num_courses) + 1
     return num_queries
+
+
+def num_queries_from_department(num_departments, version="v2"):
+    """
+    v2 only as this was not in use prior
+    each department gets a course query, a program query and there are 3 overall queries - s
+        - site
+        - department count
+        - department IDs
+    Args:
+        num_departments (int): Number of department objects
+        version (str): version string (v2)
+    """
+    return (num_departments * 2) + 3
