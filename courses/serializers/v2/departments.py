@@ -14,7 +14,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
 
 class DepartmentWithCountSerializer(DepartmentSerializer):
-    """CourseRun model serializer that includes the number of courses and programs associated with each departments"""
+    """Department model serializer that includes the number of courses and programs associated with each"""
 
     courses = serializers.SerializerMethodField()
     programs = serializers.SerializerMethodField()
