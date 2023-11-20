@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.80.2
+--------------
+
+- Updates the onclick for the instructor name to activate on keyup, fixes an issue with financial assistance page serialization (#2001)
+- Adding "text-break" so the browser will break long words into lines if it has to (#2000)
+- If the FA form is for a different program, pull that program's page URL as the root rather than the one we've been asked for (#1998)
+- Headings for required courses start date (#1995)
+- Product Page: Display none for hidden text (#1996)
+
 Version 0.80.1 (Released November 14, 2023)
 --------------
 
