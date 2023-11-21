@@ -109,6 +109,7 @@ body.new-design {
           margin-top: 20px;
           margin-bottom: 40px;
           flex-wrap: wrap;
+          align-items: flex-end;
           .hs_email {
             order: 1;
             width: 70%;
@@ -117,7 +118,7 @@ body.new-design {
               max-width: 100%;
             }
             label {
-              display: none;
+              font-size: 12px;
             }
             .input {
               .hs-input {
