@@ -375,21 +375,23 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderCourseCatalogCard(course: CourseDetailWithRuns) {
     return (
-      <a href={course.page.page_url} key={course.id}>
-        <div className="col catalog-item">
-          <img
-            src={course?.page?.feature_image_src}
-            key={course.id + course?.page?.feature_image_src}
-            alt=""
-          />
-          <div className="catalog-item-description">
-            <div className="start-date-description">
-              {getStartDateText(course)}
+      <li>
+        <a href={course.page.page_url} key={course.id}>
+          <div className="col catalog-item">
+            <img
+              src={course?.page?.feature_image_src}
+              key={course.id + course?.page?.feature_image_src}
+              alt=""
+            />
+            <div className="catalog-item-description">
+              <div className="start-date-description">
+                {getStartDateText(course)}
+              </div>
+              <div className="item-title">{course.title}</div>
             </div>
-            <div className="item-title">{course.title}</div>
           </div>
-        </div>
-      </a>
+        </a>
+      </li>
     )
   }
 
@@ -427,9 +429,9 @@ export class CatalogPage extends React.Component<Props> {
     renderCatalogCardFunction: Function
   ) {
     return (
-      <div id="catalog-grid">
+      <ul id="catalog-grid">
         {itemsInCatalog.map(x => renderCatalogCardFunction(x))}
-      </div>
+      </ul>
     )
   }
 
@@ -484,9 +486,9 @@ export class CatalogPage extends React.Component<Props> {
       )
     )
     return (
-      <div id="department-sidebar">
+      <nav id="department-sidebar" aria-label="department filters">
         <ul id="department-sidebar-link-list">{departmentSideBarListItems}</ul>
-      </div>
+      </nav>
     )
   }
 
@@ -496,7 +498,7 @@ export class CatalogPage extends React.Component<Props> {
         <div id="catalog-page">
           <div id="catalog-title">
             {/* Hidden on small screens. */}
-            <h2 className="d-none d-md-block">MITx Online Catalog</h2>
+            <h1 className="d-none d-md-block">MITx Online Catalog</h1>
             {/* Visible on small screens. */}
             <div className="d-block d-md-none" id="mobile-catalog-title">
               <button
@@ -506,14 +508,14 @@ export class CatalogPage extends React.Component<Props> {
                   )
                 }
               />
-              <h2>
+              <h1>
                 Catalog
                 <small>
                   {this.state.selectedDepartment === ALL_DEPARTMENTS
                     ? ""
                     : this.state.selectedDepartment}
                 </small>
-              </h2>
+              </h1>
             </div>
           </div>
           <div className="container">
@@ -585,12 +587,12 @@ export class CatalogPage extends React.Component<Props> {
                           timeout={300}
                           classNames="count"
                         >
-                          <div>
+                          <h2>
                             {/* Hidden on small screens. */}
                             {/* Could add logic to display only "course" if only 1 course is showing. */}
                             {this.renderNumberOfCatalogItems()}{" "}
                             {this.state.tabSelected}
-                          </div>
+                          </h2>
                         </CSSTransition>
                       </TransitionGroup>
                     </div>
