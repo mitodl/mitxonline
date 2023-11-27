@@ -578,7 +578,11 @@ export class CatalogPage extends React.Component<Props> {
                     </TransitionGroup>
                   </div>
                   <div className="col catalog-page-item-count d-none d-sm-block">
-                    <div className="catalog-count-animation" role="status" aria-atomic="true">
+                    <div
+                      className="catalog-count-animation"
+                      role="status"
+                      aria-atomic="true"
+                    >
                       <TransitionGroup id="count-animation-grid">
                         <CSSTransition
                           key={this.state.tabSelected}
