@@ -211,7 +211,7 @@ export class CatalogPage extends React.Component<Props> {
         return [
           ...new Set([
             ALL_DEPARTMENTS,
-            ...departments.flatMap(department =>
+            ...departments.results.flatMap(department =>
               department.courses > 0 ? department.name : []
             )
           ])
@@ -220,7 +220,7 @@ export class CatalogPage extends React.Component<Props> {
         return [
           ...new Set([
             ALL_DEPARTMENTS,
-            ...departments.flatMap(department =>
+            ...departments.results.flatMap(department =>
               department.programs > 0 ? department.name : []
             )
           ])

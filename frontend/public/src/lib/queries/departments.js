@@ -8,9 +8,9 @@ export const departmentsQueryKey = "departments"
 
 export const departmentsQuery = () => ({
   queryKey:  departmentsQueryKey,
-  url:       `/api/departments`,
+  url:       `/api/v2/departments`,
   transform: json => ({
-    departments: json
+    departments: json.results
   }),
   update: {
     departments: nextState
