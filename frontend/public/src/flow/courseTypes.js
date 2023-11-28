@@ -147,5 +147,7 @@ export type LearnerRecord = {
 
 export type Department = {
   name: string,
-  id: number
+  id: number,
+  courses: number,
+  programs: number,
 }
