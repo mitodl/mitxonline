@@ -4,6 +4,8 @@ import { nextState } from "./util"
 
 export const coursesSelector = pathOr(null, ["entities", "courses", "results"])
 
+export const coursesCountSelector = pathOr(null, ["entities", "courses", "count"])
+
 export const coursesNextPageSelector = pathOr(null, [
   "entities",
   "courses",

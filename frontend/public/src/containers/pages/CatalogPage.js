@@ -4,6 +4,7 @@ import moment from "moment"
 import { getStartDateText } from "../../lib/util"
 
 import {
+  coursesCountSelector,
   coursesSelector,
   coursesNextPageSelector,
   coursesQuery,
@@ -11,6 +12,7 @@ import {
 } from "../../lib/queries/catalogCourses"
 
 import {
+  programsCountSelector,
   programsSelector,
   programsNextPageSelector,
   programsQuery,
@@ -37,7 +39,10 @@ type Props = {
   programs: ?Array<Program>,
   forceRequest: () => Promise<*>,
   coursesNextPage: ?string,
-  programsNextPage: ?string
+  programsNextPage: ?string,
+  programsCount: number,
+  coursesCount: number,
+  departments: ?Array<Department>,
 }
 
 // Department filter name for all items.
@@ -211,7 +216,7 @@ export class CatalogPage extends React.Component<Props> {
         return [
           ...new Set([
             ALL_DEPARTMENTS,
-            ...departments.results.flatMap(department =>
+            ...departments.flatMap(department =>
               department.courses > 0 ? department.name : []
             )
           ])
@@ -220,7 +225,7 @@ export class CatalogPage extends React.Component<Props> {
         return [
           ...new Set([
             ALL_DEPARTMENTS,
-            ...departments.results.flatMap(department =>
+            ...departments.flatMap(department =>
               department.programs > 0 ? department.name : []
             )
           ])
@@ -361,11 +366,16 @@ export class CatalogPage extends React.Component<Props> {
    * Returns the number of courseRuns or programs based on the selected catalog tab.
    */
   renderNumberOfCatalogItems() {
-    const { coursesIsLoading, programsIsLoading } = this.props
-    if (this.state.tabSelected === COURSES_TAB && !coursesIsLoading) {
-      return this.state.filteredCourses.length
-    } else if (this.state.tabSelected === PROGRAMS_TAB && !programsIsLoading) {
-      return this.state.filteredPrograms.length
+    const { coursesCount, programsCount, departments } = this.props
+    if (this.state.tabSelected === PROGRAMS_TAB && this.state.selectedDepartment === ALL_DEPARTMENTS) {
+      return programsCount
+    } else if (this.state.tabSelected === PROGRAMS_TAB && this.state.selectedDepartment !== ALL_DEPARTMENTS) {
+      return departments.find(department => department.name === this.state.selectedDepartment).programs
+    }
+    if (this.state.tabSelected === COURSES_TAB && this.state.selectedDepartment === ALL_DEPARTMENTS) {
+      return coursesCount
+    } else if (this.state.tabSelected === COURSES_TAB && this.state.selectedDepartment !== ALL_DEPARTMENTS) {
+      return departments.find(department => department.name === this.state.selectedDepartment).courses
     }
   }
 
@@ -641,7 +651,7 @@ const getNextProgramPage = page =>
 const mapPropsToConfig = () => [
   coursesQuery(1),
   programsQuery(1),
-  departmentsQuery()
+  departmentsQuery(1)
 ]
 
 const mapDispatchToProps = {
@@ -651,8 +661,10 @@ const mapDispatchToProps = {
 
 const mapStateToProps = createStructuredSelector({
   courses:              coursesSelector,
+  coursesCount:         coursesCountSelector,
   coursesNextPage:      coursesNextPageSelector,
   programs:             programsSelector,
+  programsCount:        programsCountSelector,
   programsNextPage:     programsNextPageSelector,
   departments:          departmentsSelector,
   coursesIsLoading:     pathOr(true, ["queries", coursesQueryKey, "isPending"]),
