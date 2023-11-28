@@ -174,6 +174,7 @@ describe("CatalogPage", function() {
         },
         entities: {
           courses: {
+            count:   1,
             results: courses
           }
         }
@@ -213,9 +214,11 @@ describe("CatalogPage", function() {
         },
         entities: {
           courses: {
+            count:   1,
             results: courses
           },
           programs: {
+            count:   5,
             results: programs
           },
           departments: [
@@ -511,6 +514,7 @@ describe("CatalogPage", function() {
         },
         entities: {
           courses: {
+            count:   3,
             results: courses
           },
           programs: {
@@ -596,10 +600,12 @@ describe("CatalogPage", function() {
         },
         entities: {
           courses: {
+            count:   2,
             results: courses,
             next:    "http://fake.com/api/courses/?page=2"
           },
           programs: {
+            count:   2,
             results: programs
           }
         }
@@ -615,7 +621,8 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
       JSON.stringify(courses)
     )
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+    // one shows visually, but the total is 2
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
     expect(inner.state().courseQueryPage).equals(1)
 
     // Mock the second page of course API results.
@@ -636,7 +643,7 @@ describe("CatalogPage", function() {
       "GET"
     )
 
-    // Should expect 2 courses to be displayed in the catalog now.
+    // Should expect 2 courses to be visually displayed in the catalog now. Total count should stay 2.
     expect(inner.state().courseQueryPage).equals(2)
     expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
       JSON.stringify([displayedCourse, displayedCourse])
@@ -664,10 +671,12 @@ describe("CatalogPage", function() {
         },
         entities: {
           courses: {
+            count:   1,
             results: courses,
             next:    null
           },
           programs: {
+            count:   1,
             results: programs
           }
         }
@@ -718,10 +727,12 @@ describe("CatalogPage", function() {
         },
         entities: {
           courses: {
+            count:   1,
             results: courses,
             next:    "http://fake.com/api/courses/?page=2"
           },
           programs: {
+            count:   1,
             results: programs
           }
         }
@@ -777,10 +788,12 @@ describe("CatalogPage", function() {
         },
         entities: {
           courses: {
+            count:   1,
             results: courses,
             next:    "http://fake.com/api/courses/?page=2"
           },
           programs: {
+            count:   2,
             results: programs,
             next:    "http://fake.com/api/courses/?page=2"
           },
@@ -807,14 +820,16 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
       JSON.stringify(programs)
     )
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+    // While there is only one showing, there are still 2 total. The total should be shown.
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
     expect(inner.state().programQueryPage).equals(1)
 
     // Mock the second page of program API results.
     helper.handleRequestStub.returns({
       body: {
         next:    null,
-        results: programs
+        results: programs,
+        count:   2,
       }
     })
 
@@ -836,6 +851,7 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().filteredPrograms)).equals(
       JSON.stringify([displayedProgram, displayedProgram])
     )
+    // This should still be 2 because we haven't changed the filter - no matter if one or two have loaded, there are 2
     expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
   })
 })
