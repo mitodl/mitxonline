@@ -42,7 +42,7 @@ type Props = {
   programsNextPage: ?string,
   programsCount: number,
   coursesCount: number,
-  departments: ?Array<Department>,
+  departments: ?Array<Department>
 }
 
 // Department filter name for all items.
@@ -367,15 +367,31 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderNumberOfCatalogItems() {
     const { coursesCount, programsCount, departments } = this.props
-    if (this.state.tabSelected === PROGRAMS_TAB && this.state.selectedDepartment === ALL_DEPARTMENTS) {
+    if (
+      this.state.tabSelected === PROGRAMS_TAB &&
+      this.state.selectedDepartment === ALL_DEPARTMENTS
+    ) {
       return programsCount
-    } else if (this.state.tabSelected === PROGRAMS_TAB && this.state.selectedDepartment !== ALL_DEPARTMENTS) {
-      return departments.find(department => department.name === this.state.selectedDepartment).programs
+    } else if (
+      this.state.tabSelected === PROGRAMS_TAB &&
+      this.state.selectedDepartment !== ALL_DEPARTMENTS
+    ) {
+      return departments.find(
+        department => department.name === this.state.selectedDepartment
+      ).programs
     }
-    if (this.state.tabSelected === COURSES_TAB && this.state.selectedDepartment === ALL_DEPARTMENTS) {
+    if (
+      this.state.tabSelected === COURSES_TAB &&
+      this.state.selectedDepartment === ALL_DEPARTMENTS
+    ) {
       return coursesCount
-    } else if (this.state.tabSelected === COURSES_TAB && this.state.selectedDepartment !== ALL_DEPARTMENTS) {
-      return departments.find(department => department.name === this.state.selectedDepartment).courses
+    } else if (
+      this.state.tabSelected === COURSES_TAB &&
+      this.state.selectedDepartment !== ALL_DEPARTMENTS
+    ) {
+      return departments.find(
+        department => department.name === this.state.selectedDepartment
+      ).courses
     }
   }
 
