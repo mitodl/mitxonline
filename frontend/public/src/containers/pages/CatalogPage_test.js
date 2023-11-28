@@ -829,7 +829,7 @@ describe("CatalogPage", function() {
       body: {
         next:    null,
         results: programs,
-        count:   2,
+        count:   2
       }
     })
 
