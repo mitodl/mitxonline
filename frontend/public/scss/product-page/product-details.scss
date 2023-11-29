@@ -241,6 +241,11 @@ body.new-design {
         .enrollment-info-box, .program-info-box {
           margin: 10px 0;
           padding: 10px 0;
+
+          h3 {
+            font-size: 16px;
+            font-weight: 600;
+          }
         }
 
         .enrollment-info-box {
