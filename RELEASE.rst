@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.81.0
+Version 0.81.0 (Released November 29, 2023)
 --------------
 
 - Fix just the counts from Catalog (#2008)
