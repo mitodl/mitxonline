@@ -579,8 +579,8 @@ export class CatalogPage extends React.Component<Props> {
                               }
                               tabIndex="0"
                             >
-                              <strong>Courses</strong>{" "}
-                              <div className="d-inline-block d-sm-none">
+                              Courses{" "}
+                              <div className="product-number d-inline-block d-sm-none">
                                 ({this.state.filteredCourses.length})
                               </div>
                             </button>
@@ -601,8 +601,8 @@ export class CatalogPage extends React.Component<Props> {
                                 this.changeSelectedTab(PROGRAMS_TAB)
                               }
                             >
-                              <strong>Programs</strong>{" "}
-                              <div className="d-inline-block d-sm-none">
+                              Programs{" "}
+                              <div className="product-number d-inline-block d-sm-none">
                                 ({this.state.filteredPrograms.length})
                               </div>
                             </button>

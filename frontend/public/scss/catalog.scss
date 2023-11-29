@@ -272,9 +272,15 @@
                 #tabs {
                     align-items: flex-start;
                     font-size: 16px;
+                    font-weight: 700;
                     flex-direction: row;
                     flex-wrap: nowrap;
-        
+
+                    .product-number {
+                        font-size: 13px;
+                        font-style: normal;
+                        font-weight: 400;
+                    }
                     @include media-breakpoint-up(md) {
                         gap: 20px;
                     }
