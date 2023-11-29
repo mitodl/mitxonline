@@ -14,6 +14,12 @@ export const programsNextPageSelector = pathOr(null, [
   "next"
 ])
 
+export const programsCountSelector = pathOr(null, [
+  "entities",
+  "programs",
+  "count"
+])
+
 export const programsQueryKey = "programs"
 
 export const programsQuery = page => ({
