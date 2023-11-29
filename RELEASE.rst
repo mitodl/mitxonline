@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.81.0 (Released November 29, 2023)
+--------------
+
+- Fix just the counts from Catalog (#2008)
+- Announce course count change (#2006)
+- Updates CSS to add hover states on the program course cards (#2007)
+- Departments v2 endpoint - now with more course and program counts (#1997)
+- Reoder product info for mobile view (#1999)
+
 Version 0.80.2 (Released November 20, 2023)
 --------------
 
