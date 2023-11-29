@@ -579,7 +579,10 @@ export class CatalogPage extends React.Component<Props> {
                               }
                               tabIndex="0"
                             >
-                              Courses
+                              <strong>Courses</strong>{" "}
+                              <div className="d-inline-block d-sm-none">
+                                ({this.state.filteredCourses.length})
+                              </div>
                             </button>
                           </div>
                           <div
@@ -598,7 +601,10 @@ export class CatalogPage extends React.Component<Props> {
                                 this.changeSelectedTab(PROGRAMS_TAB)
                               }
                             >
-                              Programs
+                              <strong>Programs</strong>{" "}
+                              <div className="d-inline-block d-sm-none">
+                                ({this.state.filteredPrograms.length})
+                              </div>
                             </button>
                           </div>
                         </div>
