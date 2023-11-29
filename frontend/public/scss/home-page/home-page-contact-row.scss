@@ -117,7 +117,14 @@ body.new-design {
               max-width: 100%;
             }
             label {
-              display: none;
+              position:absolute;
+              width:1px;
+              height:1px;
+              overflow:hidden;
+
+              .hs-form-required {
+                display: none;
+              }
             }
             .input {
               .hs-input {
