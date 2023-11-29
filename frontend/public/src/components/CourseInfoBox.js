@@ -121,7 +121,11 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           </div>
           {course && course.page ? (
             <div className="row d-flex align-items-top course-effort-message">
-              <div className="enrollment-info-icon" aria-level="3" role="heading">
+              <div
+                className="enrollment-info-icon"
+                aria-level="3"
+                role="heading"
+              >
                 <img
                   src="/static/images/products/effort.png"
                   alt="Expected Length and Effort"
