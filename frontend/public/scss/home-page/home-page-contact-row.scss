@@ -121,6 +121,10 @@ body.new-design {
               width:1px;
               height:1px;
               overflow:hidden;
+
+              .hs-form-required {
+                display: none;
+              }
             }
             .input {
               .hs-input {
