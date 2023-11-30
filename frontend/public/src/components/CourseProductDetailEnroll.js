@@ -567,14 +567,14 @@ export class CourseProductDetailEnroll extends React.Component<
     const { currentUser } = this.props
 
     return !currentUser || !currentUser.id ? (
-      <>
+      <h2>
         <a
           href={routes.login}
           className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
         >
           Enroll now
         </a>
-      </>
+      </h2>
     ) : null
   }
 
@@ -590,7 +590,7 @@ export class CourseProductDetailEnroll extends React.Component<
       run &&
       !run.is_enrolled &&
       isWithinEnrollmentPeriod(run) ? (
-        <>
+        <h2>
           {product && run.is_upgradable ? (
             <button
               id="upgradeEnrollBtn"
@@ -611,7 +611,7 @@ export class CourseProductDetailEnroll extends React.Component<
               </button>
             </form>
           )}
-        </>
+        </h2>
       ) : null
   }
 

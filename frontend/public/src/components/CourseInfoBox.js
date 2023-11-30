@@ -94,7 +94,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             </div>
           ) : null}
           <div className="row d-flex align-items-center course-timing-message">
-            <div className="enrollment-info-icon">
+            <div className="enrollment-info-icon" aria-level="3" role="heading">
               <img
                 src="/static/images/products/start-date.png"
                 alt="Course Timing"
@@ -121,7 +121,11 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           </div>
           {course && course.page ? (
             <div className="row d-flex align-items-top course-effort-message">
-              <div className="enrollment-info-icon">
+              <div
+                className="enrollment-info-icon"
+                aria-level="3"
+                role="heading"
+              >
                 <img
                   src="/static/images/products/effort.png"
                   alt="Expected Length and Effort"
@@ -143,7 +147,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             </div>
           ) : null}
           <div className="row d-flex align-items-center course-pricing-message">
-            <div className="enrollment-info-icon">
+            <div className="enrollment-info-icon" aria-level="3" role="heading">
               <img src="/static/images/products/cost.png" alt="Cost" />
             </div>
             <div className="enrollment-info-text">
@@ -151,7 +155,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             </div>
           </div>
           <div className="row d-flex align-items-top course-certificate-message">
-            <div className="enrollment-info-icon">
+            <div className="enrollment-info-icon" aria-level="3" role="heading">
               <img
                 src="/static/images/products/certificate.png"
                 alt="Certificate Track Information"
@@ -199,10 +203,10 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         </div>
         {course && course.programs && course.programs.length > 0 ? (
           <div className="program-info-box">
-            <strong>
+            <h3>
               Part of the following program
               {course.programs.length === 1 ? null : "s"}
-            </strong>
+            </h3>
 
             <ul>
               {course.programs.map(elem => (
