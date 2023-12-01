@@ -12,6 +12,7 @@ import type Moment from "moment"
 import type {
   CourseRunDetail,
   CourseRun,
+  CourseDetail,
   RequirementNode,
   LearnerRecord,
   ProgramRequirement,
@@ -215,4 +216,53 @@ export const learnerProgramIsCompleted = (learnerRecord: LearnerRecord) => {
   const electivesDone = walkNodes(electiveCourses, learnerRecord)
 
   return requirementsDone && electivesDone
+}
+
+export const getFirstRelevantRun = (
+  course: CourseDetail,
+  courseRuns: Array<CourseRunDetail>
+) => {
+  /*
+   Finds the next most relevant course run:
+   - If the course has a next_run_id, return that run
+   - If there are future runs, return the run closer to now
+   - If all runs are in the past, return the most recently ended run
+   - If there are no runs, return null
+
+   Args:
+   course: CourseDetail - the course itself
+   courseRuns: Array<CourseRunDetail> - the course runs to search
+
+   Returns: CourseRunDetail
+  */
+
+  if (course.courseruns.length === 0 || courseRuns.length === 0) {
+    return null
+  }
+
+  if (course.next_run_id) {
+    return courseRuns.find(run => run.id === course.next_run_id)
+  }
+
+  const now = moment()
+
+  if (
+    courseRuns.some(
+      run => run.start_date && moment(run.start_date).isSameOrAfter(now)
+    )
+  ) {
+    return courseRuns
+      .filter(
+        run => run.start_date && moment(run.start_date).isSameOrAfter(now)
+      )
+      .reduce((prev, curr) =>
+        moment(curr.start_date).isBefore(moment(prev.start_date)) ? curr : prev
+      )
+  }
+
+  return courseRuns
+    .filter(run => run.start_date && moment(run.start_date).isBefore(now))
+    .reduce((prev, curr) =>
+      moment(curr.start_date).isBefore(moment(prev.start_date)) ? prev : curr
+    )
 }
