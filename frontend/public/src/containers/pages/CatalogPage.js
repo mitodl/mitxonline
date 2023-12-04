@@ -427,21 +427,23 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderProgramCatalogCard(program: Program) {
     return (
-      <a href={program.page.page_url} key={program.id}>
-        <div className="col catalog-item">
-          <div className="program-image-and-badge">
-            <img
-              src={program?.page?.feature_image_src}
-              key={program.id + program?.page?.feature_image_src}
-              alt=""
-            />
-            <div className="program-type-badge">{program.program_type}</div>
+      <li>
+        <a href={program.page.page_url} key={program.id}>
+          <div className="col catalog-item">
+            <div className="program-image-and-badge">
+              <img
+                src={program?.page?.feature_image_src}
+                key={program.id + program?.page?.feature_image_src}
+                alt=""
+              />
+              <div className="program-type-badge">{program.program_type}</div>
+            </div>
+            <div className="catalog-item-description">
+              <div className="item-title">{program.title}</div>
+            </div>
           </div>
-          <div className="catalog-item-description">
-            <div className="item-title">{program.title}</div>
-          </div>
-        </div>
-      </a>
+        </a>
+      </li>
     )
   }
 
