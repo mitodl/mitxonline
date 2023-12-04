@@ -298,6 +298,7 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   updateDate(run: EnrollmentFlaggedCourseRun) {
+    // for original design - not used in course infobox design
     let date = emptyOrNil(run.start_date)
       ? undefined
       : moment(new Date(run.start_date))
@@ -633,13 +634,22 @@ export class CourseProductDetailEnroll extends React.Component<
     let run,
       product = null
 
+    console.log("qq we think we have these course runs", courseRuns)
+
     if (courseRuns) {
       run = this.getFirstUnexpiredRun()
+
+      console.log("qq so for now we have this run", run)
 
       if (run) {
         product = run && run.products ? run.products[0] : null
         this.updateDate(run)
       }
+
+      console.log(
+        "qq we did some product searching and now we have this run",
+        run
+      )
     }
 
     return (

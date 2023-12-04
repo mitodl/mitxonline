@@ -6,6 +6,7 @@ import {
   formatLocalePrice,
   getStartDateText
 } from "../lib/util"
+import { getFirstRelevantRun } from "../lib/courseApi"
 import moment from "moment-timezone"
 
 import type { BaseCourseRun } from "../flow/courseTypes"
@@ -52,10 +53,20 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
 
     const course = courses[0]
 
+    const testRun = getFirstRelevantRun(courses, courseRuns)
+    console.log(
+      "qq infobox btw new thingy says this is the relevant run",
+      testRun
+    )
+
+    console.log("qq infobox thinks it has these courseruns", courseRuns)
+
     const run = course.next_run_id
       ? course.courseruns.find(elem => elem.id === course.next_run_id)
       : course.courseruns[0]
     const product = run && run.products.length > 0 && run.products[0]
+
+    console.log("qq the infobox thinks this one is the right courserun", run)
 
     const isArchived =
       moment().isAfter(run.end_date) &&
