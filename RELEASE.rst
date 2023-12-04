@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.82.0
+--------------
+
+- Mobile redesign: add course and program counts (#2011)
+- Accessibility: make CourseInfoBox discoverable (#2010)
+- Accessibility: Make label visible to screen reader (#2004)
+- Catalog Page: updating header and list elements (#2005)
+
 Version 0.81.0 (Released November 29, 2023)
 --------------
 
