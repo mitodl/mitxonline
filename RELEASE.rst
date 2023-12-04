@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.82.0
+Version 0.82.0 (Released December 04, 2023)
 --------------
 
 - Wraps the program cards (which are in a `ul`) in a `li` tag (#2013)
