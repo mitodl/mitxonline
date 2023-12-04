@@ -53,17 +53,16 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
 
     const course = courses[0]
 
-    const testRun = getFirstRelevantRun(courses, courseRuns)
+    console.log("qq infobox thinks it has these courseruns", courseRuns)
+    console.log("qq and infobox thinks this is the course", course)
+
+    const testRun = getFirstRelevantRun(course, courseRuns)
     console.log(
       "qq infobox btw new thingy says this is the relevant run",
       testRun
     )
 
-    console.log("qq infobox thinks it has these courseruns", courseRuns)
-
-    const run = course.next_run_id
-      ? course.courseruns.find(elem => elem.id === course.next_run_id)
-      : course.courseruns[0]
+    const run = getFirstRelevantRun(course, courseRuns)
     const product = run && run.products.length > 0 && run.products[0]
 
     console.log("qq the infobox thinks this one is the right courserun", run)
