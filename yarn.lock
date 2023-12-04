@@ -6293,7 +6293,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"combined-stream@npm:^1.0.6, combined-stream@npm:^1.0.8":
+"combined-stream@npm:^1.0.8":
   version: 1.0.8
   resolution: "combined-stream@npm:1.0.8"
   dependencies:
@@ -6369,13 +6369,6 @@ __metadata:
   version: 1.0.1
   resolution: "commondir@npm:1.0.1"
   checksum: 59715f2fc456a73f68826285718503340b9f0dd89bfffc42749906c5cf3d4277ef11ef1cca0350d0e79204f00f1f6d83851ececc9095dc88512a697ac0b9bdcb
-  languageName: node
-  linkType: hard
-
-"component-emitter@npm:^1.2.0":
-  version: 1.3.0
-  resolution: "component-emitter@npm:1.3.0"
-  checksum: b3c46de38ffd35c57d1c02488355be9f218e582aec72d72d1b8bbec95a3ac1b38c96cd6e03ff015577e68f550fbb361a3bfdbd9bb248be9390b7b3745691be6b
   languageName: node
   linkType: hard
 
@@ -6496,13 +6489,6 @@ __metadata:
   version: 0.4.2
   resolution: "cookie@npm:0.4.2"
   checksum: a00833c998bedf8e787b4c342defe5fa419abd96b32f4464f718b91022586b8f1bafbddd499288e75c037642493c83083da426c6a9080d309e3bd90fd11baa9b
-  languageName: node
-  linkType: hard
-
-"cookiejar@npm:^2.1.0":
-  version: 2.1.4
-  resolution: "cookiejar@npm:2.1.4"
-  checksum: c4442111963077dc0e5672359956d6556a195d31cbb35b528356ce5f184922b99ac48245ac05ed86cf993f7df157c56da10ab3efdadfed79778a0d9b1b092d5b
   languageName: node
   linkType: hard
 
@@ -9356,17 +9342,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"form-data@npm:^2.3.1":
-  version: 2.5.1
-  resolution: "form-data@npm:2.5.1"
-  dependencies:
-    asynckit: ^0.4.0
-    combined-stream: ^1.0.6
-    mime-types: ^2.1.12
-  checksum: 5134ada56cc246b293a1ac7678dba6830000603a3979cf83ff7b2f21f2e3725202237cfb89e32bcb38a1d35727efbd3c3a22e65b42321e8ade8eec01ce755d08
-  languageName: node
-  linkType: hard
-
 "form-data@npm:^3.0.0":
   version: 3.0.1
   resolution: "form-data@npm:3.0.1"
@@ -9375,13 +9350,6 @@ __metadata:
     combined-stream: ^1.0.8
     mime-types: ^2.1.12
   checksum: b019e8d35c8afc14a2bd8a7a92fa4f525a4726b6d5a9740e8d2623c30e308fbb58dc8469f90415a856698933c8479b01646a9dff33c87cc4e76d72aedbbf860d
-  languageName: node
-  linkType: hard
-
-"formidable@npm:^1.2.0":
-  version: 1.2.6
-  resolution: "formidable@npm:1.2.6"
-  checksum: 2b68ed07ba88302b9c63f8eda94f19a460cef6017bfda48348f09f41d2a36660c9353137991618e0e4c3db115b41e4b8f6fa63bc973b7a7c91dec66acdd02a56
   languageName: node
   linkType: hard
 
@@ -10364,6 +10332,13 @@ __metadata:
   dependencies:
     harmony-reflect: ^1.4.6
   checksum: 97559f8ea2aeaa1a880d279d8c49550dce01148321e00a2102cda5ddf9ce622fa1d7f3efc7bed63458af78889de888fdaebaf31c816312298bb3fdd0ef8aaf2c
+  languageName: node
+  linkType: hard
+
+"idx@npm:^2.5.6":
+  version: 2.5.6
+  resolution: "idx@npm:2.5.6"
+  checksum: e118528f0d175a39867c1ad5129fbd6b0d09c2d3c489ca72510f727a7263edc198a3a10b70a71284f04f3160622b09a85ed090207056c0c804f8859ae0f345ba
   languageName: node
   linkType: hard
 
@@ -12311,27 +12286,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lodash.identity@npm:^3.0.0":
-  version: 3.0.0
-  resolution: "lodash.identity@npm:3.0.0"
-  checksum: cd0365f99cafba23237e7c7d33123ac670ebbaacb4e9213fdddb7a68f317a261bedea93c9b57500942bbccb3fa2dc4e42a388c6024cc00a18937a922dacd68a1
-  languageName: node
-  linkType: hard
-
-"lodash.includes@npm:^4.3.0":
-  version: 4.3.0
-  resolution: "lodash.includes@npm:4.3.0"
-  checksum: 71092c130515a67ab3bd928f57f6018434797c94def7f46aafa417771e455ce3a4834889f4267b17887d7f75297dfabd96231bf704fd2b8c5096dc4a913568b6
-  languageName: node
-  linkType: hard
-
-"lodash.intersection@npm:^4.4.0":
-  version: 4.4.0
-  resolution: "lodash.intersection@npm:4.4.0"
-  checksum: 98935dcba1bbb981c3927e3822f6f6f344736c881df4b622e4e40ca4a125490425449e23179f46294a1b4c351de4e9a7bb60207cc6ddd65ecfd45ef727d35123
-  languageName: node
-  linkType: hard
-
 "lodash.isequal@npm:^4.5.0":
   version: 4.5.0
   resolution: "lodash.isequal@npm:4.5.0"
@@ -12360,27 +12314,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lodash.omit@npm:^4.5.0":
-  version: 4.5.0
-  resolution: "lodash.omit@npm:4.5.0"
-  checksum: 434645e49fe84ab315719bd5a9a3a585a0f624aa4160bc09157dd041a414bcc287c15840365c1379476a3f3eda41fbe838976c3f7bdecbbf4c5478e86c471a30
-  languageName: node
-  linkType: hard
-
-"lodash.pick@npm:^4.4.0":
-  version: 4.4.0
-  resolution: "lodash.pick@npm:4.4.0"
-  checksum: 2c36cab7da6b999a20bd3373b40e31a3ef81fa264f34a6979c852c5bc8ac039379686b27380f0cb8e3781610844fafec6949c6fbbebc059c98f8fa8570e3675f
-  languageName: node
-  linkType: hard
-
-"lodash.pickby@npm:^4.6.0":
-  version: 4.6.0
-  resolution: "lodash.pickby@npm:4.6.0"
-  checksum: a554d898c15bcd3218e4005b95b5146210bd862010c7d242d17106ee36aed9b9209a858ce974136ab1faadd86a82297761c206fda7f1886278bac827145c5536
-  languageName: node
-  linkType: hard
-
 "lodash.sortby@npm:^4.7.0":
   version: 4.7.0
   resolution: "lodash.sortby@npm:4.7.0"
@@ -12406,13 +12339,6 @@ __metadata:
   version: 4.5.0
   resolution: "lodash.uniq@npm:4.5.0"
   checksum: a4779b57a8d0f3c441af13d9afe7ecff22dd1b8ce1129849f71d9bbc8e8ee4e46dfb4b7c28f7ad3d67481edd6e51126e4e2a6ee276e25906d10f7140187c392d
-  languageName: node
-  linkType: hard
-
-"lodash.values@npm:^4.3.0":
-  version: 4.3.0
-  resolution: "lodash.values@npm:4.3.0"
-  checksum: 857e122ddf6edb50137887f0b834d471f96d66692ebb5de8b048ed277c8a3dd1bc8f85d82cf31b0f5c6dbc5b72c036a591205f76eec86bb11818a1a6f7e5a28c
   languageName: node
   linkType: hard
 
@@ -12971,7 +12897,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"methods@npm:^1.1.1, methods@npm:~1.1.2":
+"methods@npm:~1.1.2":
   version: 1.1.2
   resolution: "methods@npm:1.1.2"
   checksum: 0917ff4041fa8e2f2fda5425a955fe16ca411591fbd123c0d722fcf02b73971ed6f764d85f0a6f547ce49ee0221ce2c19a5fa692157931cecb422984f1dcd13a
@@ -13608,11 +13534,11 @@ __metadata:
     react-test-renderer: 16.14.0
     react-zendesk: 0.1.13
     reactstrap: 9.1.6
-    redux: 3.7.2
+    redux: 4.0.1
     redux-actions: 2.6.5
     redux-asserts: 0.0.10
     redux-logger: 3.0.6
-    redux-query: 2.3.1
+    redux-query: 3.3.1
     reselect: 4.1.5
     sanctuary: 0.13.2
     sass: 1.49.11
@@ -16113,7 +16039,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"qs@npm:^6.10.1, qs@npm:^6.5.1":
+"qs@npm:^6.10.1":
   version: 6.10.3
   resolution: "qs@npm:6.10.3"
   dependencies:
@@ -17484,7 +17410,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"readable-stream@npm:^2.0.1, readable-stream@npm:^2.2.2, readable-stream@npm:^2.3.5":
+"readable-stream@npm:^2.0.1, readable-stream@npm:^2.2.2":
   version: 2.3.7
   resolution: "readable-stream@npm:2.3.7"
   dependencies:
@@ -17623,28 +17549,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"redux-query@npm:2.3.1":
-  version: 2.3.1
-  resolution: "redux-query@npm:2.3.1"
+"redux-query@npm:3.3.1":
+  version: 3.3.1
+  resolution: "redux-query@npm:3.3.1"
   dependencies:
     backo: ^1.1.0
+    idx: ^2.5.6
     invariant: ^2.2.0
     json-stable-stringify: ^1.0.0
-    lodash.difference: ^4.5.0
-    lodash.get: ^4.4.2
-    lodash.identity: ^3.0.0
-    lodash.includes: ^4.3.0
-    lodash.intersection: ^4.4.0
-    lodash.omit: ^4.5.0
-    lodash.pick: ^4.4.0
-    lodash.pickby: ^4.6.0
-    lodash.values: ^4.3.0
-    prop-types: ^15.5.6
-    superagent: ^3.5.1
   peerDependencies:
-    react: ^0.14.0 || ^15.0.0-0 || ^16.0.0-rc
-    redux: ^2.0.0 || ^3.0.0 || ^4.0.0
-  checksum: 635b4363a7924579c631e9ca1bb0d87efac6da654fb631d862f61fa0ea231b867744e9d178250c8dcb7efe2f7175a641f158ed4e1c44ab2cba931a1625579a7f
+    redux: ^4.0.0
+  checksum: 0acee5563f833a96b746aaaba0c8836ab76e944d7171444c3a877727f3bcc7332161b9c953c8e078b1532eff5f6de71223793b6ca9bbc7e378076d1eb67c8e2b
   languageName: node
   linkType: hard
 
@@ -17657,7 +17572,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"redux@npm:3.7.2, redux@npm:^3.3.1":
+"redux@npm:4.0.1":
+  version: 4.0.1
+  resolution: "redux@npm:4.0.1"
+  dependencies:
+    loose-envify: ^1.4.0
+    symbol-observable: ^1.2.0
+  checksum: f3a4e19b0413cc73ccdbe9f71977292dca9760606ab783aed516c90ca04e931fa1af573c6c55bc506580a2805d4ec0d50edde0b14d7d854f0a66da40f36184b2
+  languageName: node
+  linkType: hard
+
+"redux@npm:^3.3.1":
   version: 3.7.2
   resolution: "redux@npm:3.7.2"
   dependencies:
@@ -19460,24 +19385,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"superagent@npm:^3.5.1":
-  version: 3.8.3
-  resolution: "superagent@npm:3.8.3"
-  dependencies:
-    component-emitter: ^1.2.0
-    cookiejar: ^2.1.0
-    debug: ^3.1.0
-    extend: ^3.0.0
-    form-data: ^2.3.1
-    formidable: ^1.2.0
-    methods: ^1.1.1
-    mime: ^1.4.1
-    qs: ^6.5.1
-    readable-stream: ^2.3.5
-  checksum: b13d0303259d76c9180bd40d97d9f0713760f5ced1aef089bdb2fcdf69cfaef89004cd6e986416d59bd9a2f0f9933d72521b5171fa26f89b781a2c3460c516fe
-  languageName: node
-  linkType: hard
-
 "supports-color@npm:8.1.1, supports-color@npm:^8.0.0":
   version: 8.1.1
   resolution: "supports-color@npm:8.1.1"
@@ -19576,7 +19483,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"symbol-observable@npm:^1.0.3, symbol-observable@npm:^1.0.4":
+"symbol-observable@npm:^1.0.3, symbol-observable@npm:^1.0.4, symbol-observable@npm:^1.2.0":
   version: 1.2.0
   resolution: "symbol-observable@npm:1.2.0"
   checksum: 48ffbc22e3d75f9853b3ff2ae94a44d84f386415110aea5effc24d84c502e03a4a6b7a8f75ebaf7b585780bda34eb5d6da3121f826a6f93398429d30032971b6
