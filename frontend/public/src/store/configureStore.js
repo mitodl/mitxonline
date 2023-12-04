@@ -1,7 +1,7 @@
 import { prop } from "ramda"
 import { compose, createStore, applyMiddleware } from "redux"
 import { createLogger } from "redux-logger"
-import { queryMiddlewareAdvanced } from "redux-query/advanced"
+import { queryMiddlewareAdvanced } from "redux-query"
 
 import { makeRequest } from "./network_interface"
 import rootReducer from "../reducers"
