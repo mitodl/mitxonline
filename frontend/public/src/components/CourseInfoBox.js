@@ -52,20 +52,8 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     }
 
     const course = courses[0]
-
-    console.log("qq infobox thinks it has these courseruns", courseRuns)
-    console.log("qq and infobox thinks this is the course", course)
-
-    const testRun = getFirstRelevantRun(course, courseRuns)
-    console.log(
-      "qq infobox btw new thingy says this is the relevant run",
-      testRun
-    )
-
     const run = getFirstRelevantRun(course, courseRuns)
     const product = run && run.products.length > 0 && run.products[0]
-
-    console.log("qq the infobox thinks this one is the right courserun", run)
 
     const isArchived =
       moment().isAfter(run.end_date) &&

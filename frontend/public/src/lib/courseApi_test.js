@@ -20,8 +20,7 @@ import {
   makeProgramWithOnlyElectives,
   makeProgramWithNoElectivesOrRequirements,
   makeProgram,
-  makeCourseDetailWithRuns,
-  makeCourseDetail
+  makeCourseDetailWithRuns
 } from "../factories/course"
 import { makeUser } from "../factories/user"
 
