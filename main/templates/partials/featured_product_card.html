@@ -6,18 +6,18 @@
       <div class="badge badge-program-type{% if not product.program_type %}-none{% endif %}">{% if product.program_type %}{{ product.program_type }}{% endif %}</div>
     </div>
     <div class="featured-product-info">
-      {% if product.start_date and not product.is_self_paced and not product.is_program %}
-      <p class="date">
-        Starts {{ product.start_date | date:"F j, Y" }}
-      </p>
-      {% elif not product.is_program %}
-        <p class="date">
-          Start Anytime
-        </p>
-      {% endif %}
       <h2 class="featured-product-card-title card-title{% if product.is_program %} program-title{% endif %}">
+          {% if product.start_date and not product.is_self_paced and not product.is_program %}
+          <p class="date">
+            Starts {{ product.start_date | date:"F j, Y" }}
+          </p>
+          {% elif not product.is_program %}
+            <p class="date">
+              Start Anytime
+            </p>
+          {% endif %}
           {{ product.title }}
       </h2>
     </div>
-    </div>
+  </div>
   </a>
