@@ -35,27 +35,32 @@ const closeInstructorModal = (event: MouseEvent | KeyboardEvent) => {
   event.preventDefault()
   event.stopImmediatePropagation()
 
-  const instructorId = event.target.getAttribute("data-close-instructor-id")
+  const target = event.target
 
-  if (
-    (instructorId && event.keyCode && event.keyCode === 13) ||
-    event.type === "click"
-  ) {
-    const modal = document.getElementById(`instructor-modal-${instructorId}`)
-    if (modal) {
-      $(modal)
-        .off("hidden.bs.modal")
-        .on("hidden.bs.modal", () => {
-          console.log("i'm in the hidden.bs.modal event")
-          document
-            .querySelector(
+  if (target instanceof HTMLElement) {
+    const instructorId: string =
+      target.getAttribute("data-close-instructor-id") || ""
+
+    if (
+      instructorId &&
+      ((event.keyCode && event.keyCode === 13) || event.type === "click")
+    ) {
+      const modal = document.getElementById(`instructor-modal-${instructorId}`)
+      if (modal) {
+        // $FlowFixMe
+        $(modal)
+          .off("hidden.bs.modal")
+          .on("hidden.bs.modal", () => {
+            const instructorImg = document.querySelector(
               `li.member-card-container img[data-instructor-id='${instructorId}']`
             )
-            .focus()
-        })
 
-      $(modal).modal("hide")
-      // document.querySelector(`div[data-instructor-id='${instructorId}'] h3`).focus()
+            if (instructorImg) instructorImg.focus()
+          })
+
+        // $FlowFixMe
+        $(modal).modal("hide")
+      }
     }
   }
 }
@@ -64,24 +69,29 @@ const openInstructorModal = (event: MouseEvent | KeyboardEvent) => {
   event.preventDefault()
   event.stopImmediatePropagation()
 
-  const instructorId = event.target.getAttribute("data-instructor-id")
+  const target = event.target
 
-  if (
-    (instructorId && event.keyCode && event.keyCode === 13) ||
-    event.type === "click"
-  ) {
-    const modal = document.getElementById(`instructor-modal-${instructorId}`)
-    if (modal) {
-      $(modal).modal("show")
+  if (target instanceof HTMLElement) {
+    const instructorId: string = target.getAttribute("data-instructor-id") || ""
 
-      document
-        .querySelectorAll(`div#instructor-modal-${instructorId} button.close`)
-        .forEach(button => {
-          button.removeEventListener("keyup", closeInstructorModal)
-          button.addEventListener("keyup", closeInstructorModal)
-          button.removeEventListener("click", closeInstructorModal)
-          button.addEventListener("click", closeInstructorModal)
-        })
+    if (
+      instructorId &&
+      ((event.keyCode && event.keyCode === 13) || event.type === "click")
+    ) {
+      const modal = document.getElementById(`instructor-modal-${instructorId}`)
+      if (modal) {
+        // $FlowFixMe
+        $(modal).modal("show")
+
+        document
+          .querySelectorAll(`div#instructor-modal-${instructorId} button.close`)
+          .forEach(button => {
+            button.removeEventListener("keyup", closeInstructorModal)
+            button.addEventListener("keyup", closeInstructorModal)
+            button.removeEventListener("click", closeInstructorModal)
+            button.addEventListener("click", closeInstructorModal)
+          })
+      }
     }
   }
 }
