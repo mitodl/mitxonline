@@ -1,4 +1,5 @@
 // @flow
+/* global $:false */
 import React from "react"
 import { checkFeatureFlag } from "../lib/util"
 
@@ -30,6 +31,61 @@ const expandExpandBlock = (event: MouseEvent) => {
   }
 }
 
+const closeInstructorModal = (event: MouseEvent | KeyboardEvent) => {
+  event.preventDefault()
+  event.stopImmediatePropagation()
+
+  const instructorId = event.target.getAttribute("data-close-instructor-id")
+
+  if (
+    (instructorId && event.keyCode && event.keyCode === 13) ||
+    event.type === "click"
+  ) {
+    const modal = document.getElementById(`instructor-modal-${instructorId}`)
+    if (modal) {
+      $(modal)
+        .off("hidden.bs.modal")
+        .on("hidden.bs.modal", () => {
+          console.log("i'm in the hidden.bs.modal event")
+          document
+            .querySelector(
+              `li.member-card-container img[data-instructor-id='${instructorId}']`
+            )
+            .focus()
+        })
+
+      $(modal).modal("hide")
+      // document.querySelector(`div[data-instructor-id='${instructorId}'] h3`).focus()
+    }
+  }
+}
+
+const openInstructorModal = (event: MouseEvent | KeyboardEvent) => {
+  event.preventDefault()
+  event.stopImmediatePropagation()
+
+  const instructorId = event.target.getAttribute("data-instructor-id")
+
+  if (
+    (instructorId && event.keyCode && event.keyCode === 13) ||
+    event.type === "click"
+  ) {
+    const modal = document.getElementById(`instructor-modal-${instructorId}`)
+    if (modal) {
+      $(modal).modal("show")
+
+      document
+        .querySelectorAll(`div#instructor-modal-${instructorId} button.close`)
+        .forEach(button => {
+          button.removeEventListener("keyup", closeInstructorModal)
+          button.addEventListener("keyup", closeInstructorModal)
+          button.removeEventListener("click", closeInstructorModal)
+          button.addEventListener("click", closeInstructorModal)
+        })
+    }
+  }
+}
+
 type Props = {
   courseId: ?string,
   programId: ?string,
@@ -49,6 +105,13 @@ export class ProductDetailEnrollApp extends React.Component<Props> {
       document.querySelectorAll("a.expand_here_link").forEach(link => {
         link.removeEventListener("click", expandExpandBlock)
         link.addEventListener("click", expandExpandBlock)
+      })
+
+      document.querySelectorAll("h3.instructor-name").forEach(link => {
+        link.removeEventListener("click", openInstructorModal)
+        link.addEventListener("click", openInstructorModal)
+        link.removeEventListener("keyup", openInstructorModal)
+        link.addEventListener("keyup", openInstructorModal)
       })
     }
 
