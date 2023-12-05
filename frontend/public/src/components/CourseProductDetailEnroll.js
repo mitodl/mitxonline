@@ -29,6 +29,7 @@ import {
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 import {
+  getFirstRelevantRun,
   isFinancialAssistanceAvailable,
   isWithinEnrollmentPeriod
 } from "../lib/courseApi"
@@ -196,15 +197,6 @@ export class CourseProductDetailEnroll extends React.Component<
     if (matchingCourseRun) {
       this.setCurrentCourseRun(matchingCourseRun)
     }
-  }
-
-  getFirstUnexpiredRun = () => {
-    const { courses, courseRuns } = this.props
-    return courseRuns
-      ? courses && courses[0].next_run_id
-        ? courseRuns.find(elem => elem.id === courses[0].next_run_id)
-        : courseRuns[0]
-      : null
   }
 
   getCurrentCourseRun = (): EnrollmentFlaggedCourseRun => {
@@ -634,8 +626,8 @@ export class CourseProductDetailEnroll extends React.Component<
     let run,
       product = null
 
-    if (courseRuns) {
-      run = this.getFirstUnexpiredRun()
+    if (courses && courseRuns) {
+      run = getFirstRelevantRun(courses[0], courseRuns)
 
       if (run) {
         product = run && run.products ? run.products[0] : null
@@ -643,7 +635,7 @@ export class CourseProductDetailEnroll extends React.Component<
       }
     }
 
-    return (
+    return run ? (
       <>
         {
           // $FlowFixMe: isLoading null or undefined
@@ -681,7 +673,7 @@ export class CourseProductDetailEnroll extends React.Component<
           </>
         ) : null}
       </>
-    )
+    ) : null
   }
 }
 
