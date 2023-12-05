@@ -28,7 +28,8 @@ import {
 import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { connectRequest, requestAsync } from "redux-query"
+import { requestAsync } from "redux-query"
+import { connectRequest } from "redux-query-react"
 import { pathOr } from "ramda"
 import CourseLoader from "../../components/CourseLoader"
 

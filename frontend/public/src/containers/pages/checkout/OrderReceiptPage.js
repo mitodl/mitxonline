@@ -5,7 +5,7 @@ import DocumentTitle from "react-document-title"
 import { ORDER_RECEIPT_DISPLAY_PAGE_TITLE } from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { connectRequest } from "redux-query"
+import { connectRequest } from "redux-query-react"
 
 import Loader from "../../../components/Loader"
 import { CartItemCard } from "../../../components/CartItemCard"

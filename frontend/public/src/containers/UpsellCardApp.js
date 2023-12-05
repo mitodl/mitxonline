@@ -4,7 +4,7 @@ import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { connectRequest } from "redux-query"
+import { connectRequest } from "redux-query-react"
 // $FlowFixMe
 import { Badge } from "reactstrap"
 

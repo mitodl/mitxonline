@@ -1,15 +1,16 @@
-import { prop } from "ramda"
 import { compose, createStore, applyMiddleware } from "redux"
 import { createLogger } from "redux-logger"
-import { queryMiddlewareAdvanced } from "redux-query/advanced"
+import { queryMiddleware } from "redux-query"
 
 import { makeRequest } from "./network_interface"
 import rootReducer from "../reducers"
 
 // Setup middleware
 export default function configureStore(initialState: Object) {
+  const getQueries = state => state.queries
+  const getEntities = state => state.entities
   const COMMON_MIDDLEWARE = [
-    queryMiddlewareAdvanced(makeRequest)(prop("queries"), prop("entities"))
+    queryMiddleware(makeRequest, getQueries, getEntities)
   ]
 
   // Store factory configuration

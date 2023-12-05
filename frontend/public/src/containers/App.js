@@ -3,7 +3,7 @@ import React from "react"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { Switch, Route } from "react-router"
-import { connectRequest } from "redux-query"
+import { connectRequest } from "redux-query-react"
 import { createStructuredSelector } from "reselect"
 import urljoin from "url-join"
 

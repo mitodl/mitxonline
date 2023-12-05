@@ -9,7 +9,8 @@ import {
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { Link } from "react-router-dom"
-import { connectRequest, mutateAsync, requestAsync } from "redux-query"
+import { mutateAsync, requestAsync } from "redux-query"
+import { connectRequest } from "redux-query-react"
 import { createStructuredSelector } from "reselect"
 
 import auth from "../../../lib/queries/auth"
