@@ -60,4 +60,5 @@ $(document).ready(function() {
     slidesToShow:   4,
     slidesToScroll: 4
   })
+  $(".slick-slide").removeAttr("tabindex")
 })
