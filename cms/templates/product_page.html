@@ -11,7 +11,7 @@
 
 {% block content %}
 {% if new_design %}
-    <div id="main" class="product-page">
+    <div id="main" class="product-page" data-spy="scroll" data-target="#tab-bar" data-offset="50">
       <div class="container">
         <div class="row d-flex flex-row align-center">
           <div class="col d-block d-md-none flex-none">
@@ -67,9 +67,9 @@
                   </section>
                 </div>
 
-              <nav id="tab-bar">
+              <nav id="tab-bar" class="sticky-top">
                 <ul class="nav">
-                  {% if page.about %}<a href="#about-this-class"><li class="nav-item">About</li></a>{% endif %}
+                  {% if page.about %}<a href="#about-this-class"><li class="nav-item active">About</li></a>{% endif %}
                   {% if page.is_program_page %}<a href="#program-courses"><li class="nav-item">Courses</li></a>{% endif %}
                   {% if page.what_you_learn %}<a href="#what-youll-learn"><li class="nav-item">What you'll learn</li></a>{% endif %}
                   {% if page.prerequisites %}<a href="#prerequisites"><li class="nav-item">Prerequisites</li></a>{% endif %}

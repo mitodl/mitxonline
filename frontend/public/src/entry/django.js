@@ -61,4 +61,9 @@ $(document).ready(function() {
     slidesToScroll: 4
   })
   $(".slick-slide").removeAttr("tabindex")
+
+  $('body').scrollspy({ target: '#tab-bar' })
+  $('[data-spy="scroll"]').on('activate.bs.scrollspy', function () {
+    console.log("here")
+  })
 })
