@@ -592,14 +592,17 @@ describe("CourseProductDetailEnroll", () => {
 
   it("CourseInfoBox renders a date selector with Enrolled text if the user is enrolled in one", async () => {
     const secondCourseRun = makeCourseRunDetail()
-    const enrollment = {
+    const enrollmentOne = {
       ...makeCourseRunEnrollment(),
       run: secondCourseRun
     }
-
+    const enrollmentTwo = {
+      ...makeCourseRunEnrollment(),
+      run: courseRun
+    }
     const entities = {
       currentUser: currentUser,
-      enrollments: [enrollment],
+      enrollments: [enrollmentOne, enrollmentTwo],
       courseRuns:  [courseRun, secondCourseRun]
     }
 
@@ -618,6 +621,7 @@ describe("CourseProductDetailEnroll", () => {
     assert.isTrue(selectorBar.exists())
 
     const enrolledItem = infobox.find(".more-dates-link.enrolled")
+
     assert.isTrue(enrolledItem.exists())
   })
 
@@ -641,8 +645,6 @@ describe("CourseProductDetailEnroll", () => {
       ...makeCourseDetailWithRuns(),
       courseruns: [courseRun]
     }
-
-    console.log(course)
 
     const entities = {
       currentUser: currentUser,
