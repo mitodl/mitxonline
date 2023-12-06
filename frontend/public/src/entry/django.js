@@ -62,5 +62,5 @@ $(document).ready(function() {
   })
   $(".slick-slide").removeAttr("tabindex")
 
-  $('body').scrollspy({ target: '#tab-bar' })
+  $("body").scrollspy({ target: "#tab-bar" })
 })
