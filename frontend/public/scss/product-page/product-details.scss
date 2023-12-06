@@ -61,19 +61,22 @@ body.new-design {
 
     #tab-bar {
       background-color: #edf2f4;
-      padding: 15px 19px;
+      padding: 0;
       margin: 2em 0;
+      border-bottom: 1px solid #DFE5EC;
 
-      ul li.nav-item {
-        padding: 0;
-        padding-right: 40px;
+      a {
         color: #35607a;
-        font-weight: normal;
+        text-decoration: none;
 
-        a {
-          color: #35607a;
-          text-decoration: none;
+        li.nav-item {
+          padding: 18px 20px;
+          font-size: 16px;
+          line-height: 19px;
         }
+      }
+      a:hover {
+        color: #061e2d;
       }
     }
 
