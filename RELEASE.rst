@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.82.1
+--------------
+
+- Fixes course run selection code and standardizes it (#2017)
+- Fixes the keyboard trap issue with instructor modals (#2019)
+- Accessibility: tabbing through featured products improvement (#2018)
+
 Version 0.82.0 (Released December 04, 2023)
 --------------
 
