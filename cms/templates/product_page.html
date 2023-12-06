@@ -11,7 +11,7 @@
 
 {% block content %}
 {% if new_design %}
-    <div id="main" class="product-page" data-spy="scroll" data-target="#tab-bar" data-offset="50">
+    <div id="main" class="product-page">
       <div class="container">
         <div class="row d-flex flex-row align-center">
           <div class="col d-block d-md-none flex-none">
@@ -67,17 +67,16 @@
                   </section>
                 </div>
 
-              <nav id="tab-bar" class="sticky-top">
-                <ul class="nav">
-                  {% if page.about %}<a href="#about-this-class"><li class="nav-item active">About</li></a>{% endif %}
+              <ul id="tab-bar" class="nav sticky-top">
+                  {% if page.about %}<a href="#about-this-class"><li class="nav-item">About</li></a>{% endif %}
                   {% if page.is_program_page %}<a href="#program-courses"><li class="nav-item">Courses</li></a>{% endif %}
                   {% if page.what_you_learn %}<a href="#what-youll-learn"><li class="nav-item">What you'll learn</li></a>{% endif %}
                   {% if page.prerequisites %}<a href="#prerequisites"><li class="nav-item">Prerequisites</li></a>{% endif %}
                   {% if instructors %}<a href="#instructors"><li class="nav-item">Instructors</li></a>{% endif %}
                   {% if page.faq_url %}<a href="{{page.faq_url}}" target="_blank"><li class="nav-item">FAQs</li></a>{% endif %}
-                </ul>
-              </nav>
+              </ul>
 
+            <div data-bs-spy="scroll" data-bs-target="#tab-bar" tabindex="0" data-bs-offset="0" class="scroll-spy-content">
               {% if page.about %}<section class="about-this-class about-richtext-container" id="about-this-class">
                 {{ page.about | richtext | expand }}
               </section>{% endif %}
@@ -133,6 +132,7 @@
                 </div>
               </section>
               {% endif %}
+            </div>
 
               <section class="ofac-message border">
                 <div class="container">

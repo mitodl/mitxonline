@@ -74,15 +74,24 @@ body.new-design {
           font-size: 16px;
           line-height: 19px;
         }
-        li.nav-item.active {
+      }
+
+      a.active {
+        li.nav-item {
           color: $primary;
           border-bottom: 1px solid $primary;
         }
       }
+
       a:hover {
         color: #061e2d;
       }
 
+    }
+    .scroll-spy-content {
+      height: fit-content;
+      overflow-y: scroll;
+      position: relative;
     }
 
     section.about-richtext-container {
