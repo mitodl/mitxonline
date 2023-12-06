@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.82.1
+Version 0.82.1 (Released December 06, 2023)
 --------------
 
 - Fixes course run selection code and standardizes it (#2017)
