@@ -47,11 +47,12 @@ body {
   display: flex;
   min-height: 100vh;
   flex-direction: column;
+  position: relative;
 
   .main-panel {
     flex: 1;
     min-height: calc(100vh - 351px);
-    position: relative;
+    position: static;
 
     // TODO: temporary fix for home page iamge size, please remove it after home page design
     p {
