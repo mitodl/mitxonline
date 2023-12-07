@@ -514,7 +514,11 @@ export class CatalogPage extends React.Component<Props> {
       )
     )
     return (
-      <nav id="department-sidebar" aria-label="department filters">
+      <nav
+        className="sticky-top"
+        id="department-sidebar"
+        aria-label="department filters"
+      >
         <ul id="department-sidebar-link-list">{departmentSideBarListItems}</ul>
       </nav>
     )
