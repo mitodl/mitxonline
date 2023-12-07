@@ -86,11 +86,22 @@ body.new-design {
       a:hover {
         color: #061e2d;
       }
-
     }
     .scroll-spy-content {
       height: fit-content;
       position: relative;
+      a:hover {
+        color: #061e2d;
+      }
+      .mobile-nav-dropdown {
+        padding: 15px 18px;
+
+        .dropdown-toggle {
+          border: 1px solid black;
+          padding: 5px;
+          background-color: white;
+        }
+      }
     }
 
     section.about-richtext-container {

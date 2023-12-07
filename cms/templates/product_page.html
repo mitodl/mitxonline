@@ -66,18 +66,34 @@
                     {{ page.description | richtext }}
                   </section>
                 </div>
-                <nav id="tab-bar-wrapper" class="sticky-top">
-                  <ul id="tab-bar" class="nav">
-                      {% if page.about %}<a href="#about-this-class"><li class="nav-item">About</li></a>{% endif %}
-                      {% if page.is_program_page %}<a href="#program-courses"><li class="nav-item">Courses</li></a>{% endif %}
-                      {% if page.what_you_learn %}<a href="#what-youll-learn"><li class="nav-item">What you'll learn</li></a>{% endif %}
-                      {% if page.prerequisites %}<a href="#prerequisites"><li class="nav-item">Prerequisites</li></a>{% endif %}
-                      {% if instructors %}<a href="#instructors"><li class="nav-item">Instructors</li></a>{% endif %}
-                      {% if page.faq_url %}<a href="{{page.faq_url}}" target="_blank"><li class="nav-item">FAQs</li></a>{% endif %}
-                  </ul>
+
+            <div data-bs-spy="scroll" data-bs-target="#tab-bar-wrapper" tabindex="0" data-bs-offset="100px" class="scroll-spy-content">
+              {# Non-Mobile only #}
+              <nav id="tab-bar" class="sticky-top d-none d-md-block">
+                <ul class="nav">
+                  {% if page.about %}<a href="#about-this-class"><li class="nav-item">About</li></a>{% endif %}
+                  {% if page.is_program_page %}<a href="#program-courses"><li class="nav-item">Courses</li></a>{% endif %}
+                  {% if page.what_you_learn %}<a href="#what-youll-learn"><li class="nav-item">What you'll learn</li></a>{% endif %}
+                  {% if page.prerequisites %}<a href="#prerequisites"><li class="nav-item">Prerequisites</li></a>{% endif %}
+                  {% if instructors %}<a href="#instructors"><li class="nav-item">Instructors</li></a>{% endif %}
+                  {% if page.faq_url %}<a href="{{page.faq_url}}" target="_blank"><li class="nav-item">FAQs</li></a>{% endif %}
+                </ul>
+              </nav>
+              {# Mobile only #}
+                <nav id="tab-bar" class="sticky-top d-block d-md-none">
+                  <div class="nav-item dropdown mobile-nav-dropdown">
+                      <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">About</a>
+                      <ul class="dropdown-menu">
+                        {% if page.about %}<li><a class="dropdown-item" href="#about-this-class">About</a></li>{% endif %}
+                        {% if page.is_program_page %}<li><a class="dropdown-item" href="#program-courses">Courses</a></li>{% endif %}
+                          {% if page.what_you_learn %}<li><a class="dropdown-item" href="#what-youll-learn">What you'll learn</a></li>{% endif %}
+                          {% if page.prerequisites %}<li><a class="dropdown-item" href="#prerequisites">Prerequisites</a></li>{% endif %}
+                          {% if instructors %}<li><a class="dropdown-item" href="#instructors">Instructors</a></li>{% endif %}
+                          {% if page.faq_url %}<li><a class="dropdown-item" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
+                      </ul>
+                    </div>
                 </nav>
 
-            <div data-bs-spy="scroll" data-bs-target="#tab-bar-wrapper" tabindex="0" data-bs-offset="100" class="scroll-spy-content">
               {% if page.about %}<section class="about-this-class about-richtext-container" id="about-this-class">
                 {{ page.about | richtext | expand }}
               </section>{% endif %}
