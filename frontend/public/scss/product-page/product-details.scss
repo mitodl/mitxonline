@@ -64,13 +64,15 @@ body.new-design {
       margin: 2em 0;
       border-bottom: 1px solid #DFE5EC;
       background-color: #EFF3F6;
+      box-shadow: 0 5px 10px 0 rgba(0, 0, 0, 0.1);
 
       @include media-breakpoint-down(md) {
         padding: 15px;
+        margin: 0 -15px;
       }
 
       a {
-        color: #35607a;
+        color: black;
         text-decoration: none;
 
         li.nav-item {
@@ -97,8 +99,13 @@ body.new-design {
       a:hover {
         color: #061e2d;
       }
+      .dropdown-menu {
+        box-shadow: 0 5px 3px 0 rgba(0, 0, 0, 0.1);
+        border: 1px solid #DFE5EC;
+        margin: -2px 0 0 0;
+      }
       .dropdown-toggle {
-        border: 1px solid black;
+        border: 1px solid #DFE5EC;
         padding: 10px 15px;
         background-color: white;
         width: 100%;
@@ -112,7 +119,7 @@ body.new-design {
         width: 100%;
       }
       .dropdown-item.active {
-        background-color: #EFF3F6;
+        background-color: #8c8a8a42;
         color: #061e2d;
       }
 
