@@ -64,7 +64,9 @@ $(document).ready(function() {
 
   $("body").scrollspy({ target: "#tab-bar" })
   $(".nav .nav-link").on("click", function() {
-    $(".nav").find(".active").removeClass("active")
+    $(".nav")
+      .find(".active")
+      .removeClass("active")
     $(this).addClass("active")
     $(".nav .dropdown-toggle").text($(this).text())
   })
