@@ -240,16 +240,18 @@ export class CourseProductDetailEnroll extends React.Component<
           className="form-control"
         >
           {courseRuns &&
-            courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
-              <option
-                selected={run.id === elem.id}
-                value={elem.id}
-                key={`courserun-selection-${elem.id}`}
-              >
-                {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
-                {formatPrettyDate(moment(new Date(elem.end_date)))}
-              </option>
-            ))}
+            courseRuns
+              .filter((elem: EnrollmentFlaggedCourseRun) => elem.is_upgradable)
+              .map((elem: EnrollmentFlaggedCourseRun) => (
+                <option
+                  selected={run.id === elem.id}
+                  value={elem.id}
+                  key={`courserun-selection-${elem.id}`}
+                >
+                  {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
+                  {formatPrettyDate(moment(new Date(elem.end_date)))}
+                </option>
+              ))}
         </select>
       </>
     )
@@ -322,6 +324,11 @@ export class CourseProductDetailEnroll extends React.Component<
         ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run.products ? run.products[0] : null
+    const upgradableCourseRuns = courseRuns
+      ? courseRuns.filter(
+        (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
+      )
+      : []
 
     return product ? (
       showNewDesign ? (
@@ -336,7 +343,7 @@ export class CourseProductDetailEnroll extends React.Component<
             {run.title}
           </ModalHeader>
           <ModalBody>
-            {courseRuns ? (
+            {upgradableCourseRuns.length > 1 ? (
               <div className="row date-selector-button-bar">
                 <div className="col-12">
                   <div>{this.renderRunSelectorButtons(run)}</div>
