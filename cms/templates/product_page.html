@@ -67,7 +67,7 @@
                   </section>
                 </div>
 
-            <div data-bs-spy="scroll" data-bs-target="#tab-bar-wrapper" tabindex="0" data-bs-offset="100px" class="scroll-spy-content">
+            <div data-bs-spy="scroll" data-bs-target="#tab-bar" tabindex="0" data-bs-offset=100 class="scroll-spy-content">
               {# Non-Mobile only #}
               <nav id="tab-bar" class="sticky-top d-none d-md-block">
                 <ul class="nav">
@@ -81,15 +81,15 @@
               </nav>
               {# Mobile only #}
                 <nav id="tab-bar" class="sticky-top d-block d-md-none">
-                  <div class="nav-item dropdown mobile-nav-dropdown">
-                      <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">About</a>
+                  <div class="nav dropdown">
+                      <a class="dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">About</a>
                       <ul class="dropdown-menu">
-                        {% if page.about %}<li><a class="dropdown-item" href="#about-this-class">About</a></li>{% endif %}
-                        {% if page.is_program_page %}<li><a class="dropdown-item" href="#program-courses">Courses</a></li>{% endif %}
-                          {% if page.what_you_learn %}<li><a class="dropdown-item" href="#what-youll-learn">What you'll learn</a></li>{% endif %}
-                          {% if page.prerequisites %}<li><a class="dropdown-item" href="#prerequisites">Prerequisites</a></li>{% endif %}
-                          {% if instructors %}<li><a class="dropdown-item" href="#instructors">Instructors</a></li>{% endif %}
-                          {% if page.faq_url %}<li><a class="dropdown-item" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
+                        {% if page.about %}<li class="nav-item"><a class="nav-link dropdown-item" href="#about-this-class">About</a></li>{% endif %}
+                        {% if page.is_program_page %}<li><a class="nav-link dropdown-item" href="#program-courses">Courses</a></li>{% endif %}
+                        {% if page.what_you_learn %}<li class="nav-item"><a class="nav-link dropdown-item" href="#what-youll-learn">What you'll learn</a></li>{% endif %}
+                        {% if page.prerequisites %}<li><a class="nav-link dropdown-item" href="#prerequisites">Prerequisites</a></li>{% endif %}
+                        {% if instructors %}<li><a class="nav-link dropdown-item" href="#instructors">Instructors</a></li>{% endif %}
+                        {% if page.faq_url %}<li><a class="nav-link dropdown-item" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
                       </ul>
                     </div>
                 </nav>

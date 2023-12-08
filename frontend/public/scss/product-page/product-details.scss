@@ -60,10 +60,14 @@ body.new-design {
     }
 
     #tab-bar {
-      background-color: #edf2f4;
       padding: 0;
       margin: 2em 0;
       border-bottom: 1px solid #DFE5EC;
+      background-color: #EFF3F6;
+
+      @include media-breakpoint-down(md) {
+        padding: 15px;
+      }
 
       a {
         color: #35607a;
@@ -93,15 +97,25 @@ body.new-design {
       a:hover {
         color: #061e2d;
       }
-      .mobile-nav-dropdown {
-        padding: 15px 18px;
-
-        .dropdown-toggle {
-          border: 1px solid black;
-          padding: 5px;
-          background-color: white;
-        }
+      .dropdown-toggle {
+        border: 1px solid black;
+        padding: 10px 15px;
+        background-color: white;
+        width: 100%;
+        color: #03152D;
+        text-align: left;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
       }
+      .dropdown-menu.show {
+        width: 100%;
+      }
+      .dropdown-item.active {
+        background-color: #EFF3F6;
+        color: #061e2d;
+      }
+
     }
 
     section.about-richtext-container {
