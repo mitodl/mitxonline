@@ -324,9 +324,11 @@ export class CourseProductDetailEnroll extends React.Component<
         ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run.products ? run.products[0] : null
-    const upgradableCourseRuns = courseRuns.filter(
-      (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
-    )
+    const upgradableCourseRuns = courseRuns
+      ? courseRuns.filter(
+        (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
+      )
+      : []
 
     return product ? (
       showNewDesign ? (
