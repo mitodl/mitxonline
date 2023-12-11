@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static wagtailimages_tags %}
 
-{% block title %}{{ site_name }} | Certificate for: {{ page.product_name }}{% endblock %}
+{% block title %}{{ site_name }} | Certificate for: {{ product_name }}{% endblock %}
 
 {% block seohead %}
     {{ block.super }}
@@ -9,8 +9,8 @@
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@MITxonedX" />
-    <meta property="og:title" content="{{ site_name }} | Certificate for: {{ page.product_name }}" />
-    <meta property="og:description" content="Certificate for {{ page.product_name }} awarded by {{ site_name }}." />
+    <meta property="og:title" content="{{ site_name }} | Certificate for: {{ product_name }}" />
+    <meta property="og:description" content="Certificate for {{ product_name }} awarded by {{ site_name }}." />
     <meta property="og:url" content="{{ request.build_absolute_uri }}" />
     <meta property="og:image:width" content="{{ share_image_width }}" />
     <meta property="og:image:height" content="{{ share_image_height }}" />
@@ -36,7 +36,7 @@
                             </a>
                         </li>
                         <li>
-                            <a href="https://www.linkedin.com/profile/add?startTask={{ page.product_name|urlencode }}" target="_blank">
+                            <a href="https://www.linkedin.com/profile/add?startTask={{ product_name|urlencode }}" target="_blank">
                                 <img src="{% static 'images/certificates/icon-linkedin.svg' %}" alt="Share to LinkedIn">
                             </a>
                         </li>
@@ -47,7 +47,7 @@
                         </li>
                     </ul>
                         <h2>Congratulations, {{ learner_name }}!</h2>
-                        <p>You have successfully completed {{ page.product_name }}. Share your accomplishment with your friends, family and colleagues. </p>
+                        <p>You have successfully completed {{ product_name }}. Share your accomplishment with your friends, family and colleagues. </p>
                     </div>
                 </div>
             </div>
@@ -67,7 +67,7 @@
                     <span class="certify-text">This is to certify that</span>
                     <span class="certify-name">{{ learner_name }}</span>
                     <span class="success-text">has successfully completed {% if is_program_certificate %}all courses and received passing grades to earn a MicroMasters program certificate in{% endif %}</span>
-                    <span class="degree-text">{{ page.product_name }}</span>
+                    <span class="degree-text">{{ product_name }}</span>
                     {% if is_program_certificate %}
                         <span class="success-text">a program of study offered by MITx, an online learning initiative of the Massachusetts Institute of Technology<br></span>
                     {% endif %}

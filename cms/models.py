@@ -439,9 +439,13 @@ class CertificatePage(CourseProgramChildPage):
             is_program_certificate = False
             if isinstance(self.certificate, ProgramCertificate):
                 is_program_certificate = True
+                product_name = self.parent.program.title
+            else:
+                product_name = self.parent.course.title
 
             context = {
                 "uuid": self.certificate.uuid,
+                "product_name": product_name,
                 "certificate_user": self.certificate.user,
                 "learner_name": self.certificate.user.get_full_name(),
                 "start_date": start_date,
@@ -458,7 +462,7 @@ class CertificatePage(CourseProgramChildPage):
             "share_image_width": "1665",
             "share_image_height": "1291",
             "share_text": "I just earned a certificate in {} from {}".format(
-                self.product_name, settings.SITE_NAME
+                product_name, settings.SITE_NAME
             ),
             **super().get_context(request, *args, **kwargs),
             **preview_context,
