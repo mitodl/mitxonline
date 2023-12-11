@@ -117,6 +117,21 @@ export default class IntegrationTestHelper {
       return { wrapper, inner, store }
     }
   }
+
+  configureRTLRenderer() {
+    const history = this.browserHistory
+    return async (WrappedComponent: Class<React.Component<*, *>>, extraProps = {}) => {
+      const wrapper = await mount(
+        <Router history={history}>
+          <WrappedComponent
+            {...extraProps}
+          />
+        </Router>,
+      )
+      return { wrapper }
+    }
+  }
+
   configureMountRenderer(
     WrappedComponent: Class<React.Component<*, *>>,
     InnerComponent: Class<React.Component<*, *>>,
