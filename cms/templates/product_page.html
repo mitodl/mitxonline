@@ -71,12 +71,12 @@
               {# Non-Mobile only #}
               <nav id="tab-bar" class="sticky-top d-none d-md-block">
                 <ul class="nav">
-                  {% if page.about %}<a href="#about-this-class"><li class="nav-item">About</li></a>{% endif %}
-                  {% if page.is_program_page %}<a href="#program-courses"><li class="nav-item">Courses</li></a>{% endif %}
-                  {% if page.what_you_learn %}<a href="#what-youll-learn"><li class="nav-item">What you'll learn</li></a>{% endif %}
-                  {% if page.prerequisites %}<a href="#prerequisites"><li class="nav-item">Prerequisites</li></a>{% endif %}
-                  {% if instructors %}<a href="#instructors"><li class="nav-item">Instructors</li></a>{% endif %}
-                  {% if page.faq_url %}<a href="{{page.faq_url}}" target="_blank"><li class="nav-item">FAQs</li></a>{% endif %}
+                  {% if page.about %}<li class="nav-item"><a href="#about-this-class">About</a></li>{% endif %}
+                  {% if page.is_program_page %}<li class="nav-item"><a href="#program-courses">Courses</a></li>{% endif %}
+                  {% if page.what_you_learn %}<li class="nav-item"><a href="#what-youll-learn">What you'll learn</a></li>{% endif %}
+                  {% if page.prerequisites %}<li class="nav-item"><a href="#prerequisites">Prerequisites</a></li>{% endif %}
+                  {% if instructors %}<li class="nav-item"><a href="#instructors">Instructors</a></li>{% endif %}
+                  {% if page.faq_url %}<li class="nav-item"><a href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
                 </ul>
               </nav>
               {# Mobile only #}
