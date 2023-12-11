@@ -27,7 +27,7 @@ describe("LoginPasswordPage", () => {
       state: STATE_LOGIN_PASSWORD
     })
 
-    renderPage = helper.configureHOCRenderer(
+    renderPage = helper.configureMountRenderer(
       LoginPasswordPage,
       InnerLoginPasswordPage,
       {

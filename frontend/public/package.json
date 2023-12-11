@@ -103,6 +103,7 @@
     "redux-actions": "2.6.5",
     "redux-asserts": "0.0.10",
     "redux-logger": "3.0.6",
+    "redux-mock-store": "^1.5.4",
     "redux-query": "3.3.1",
     "redux-query-interface-superagent": "3.3.1",
     "redux-query-react": "3.3.1",
@@ -152,5 +153,9 @@
   "packageManager": "yarn@3.2.0",
   "browserslist": [
     "> 1%"
-  ]
+  ],
+  "devDependencies": {
+    "@testing-library/jest-dom": "5.17.0",
+    "@testing-library/react": "11.0.0"
+  }
 }

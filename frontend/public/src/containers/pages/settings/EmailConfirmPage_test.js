@@ -11,7 +11,7 @@ describe("EmailConfirmPage", () => {
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
-    renderPage = helper.configureHOCRenderer(
+    renderPage = helper.configureMountRenderer(
       EmailConfirmPage,
       InnerEmailConfirmPage,
       {},

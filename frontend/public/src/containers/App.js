@@ -60,7 +60,7 @@ export class App extends React.Component<Props, void> {
 
   render() {
     const { match, currentUser, location } = this.props
-
+    console.log(currentUser)
     if (!currentUser) {
       // application is still loading
       return <div className="app" />

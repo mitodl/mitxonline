@@ -4,11 +4,10 @@ import { queryMiddleware } from "redux-query"
 
 import { makeRequest } from "./network_interface"
 import rootReducer from "../reducers"
+import {getEntities, getQueries} from "../lib/queries/util"
 
 // Setup middleware
 export default function configureStore(initialState: Object) {
-  const getQueries = state => state.queries
-  const getEntities = state => state.entities
   const COMMON_MIDDLEWARE = [
     queryMiddleware(makeRequest, getQueries, getEntities)
   ]

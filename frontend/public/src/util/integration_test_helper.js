@@ -1,6 +1,6 @@
 import React from "react"
 import R from "ramda"
-import { shallow } from "enzyme"
+import {mount, shallow} from "enzyme"
 import sinon from "sinon"
 import { createMemoryHistory } from "history"
 
@@ -8,6 +8,8 @@ import configureStoreMain from "../store/configureStore"
 
 import type { Sandbox } from "../flow/sinonTypes"
 import * as networkInterfaceFuncs from "../store/network_interface"
+import {Provider} from "react-redux"
+import {Route, Router} from "react-router"
 
 export default class IntegrationTestHelper {
   sandbox: Sandbox
@@ -113,6 +115,46 @@ export default class IntegrationTestHelper {
       inner = await inner.dive()
 
       return { wrapper, inner, store }
+    }
+  }
+  configureMountRenderer(
+    WrappedComponent: Class<React.Component<*, *>>,
+    InnerComponent: Class<React.Component<*, *>>,
+    defaultState: Object,
+    defaultProps = {}
+  ) {
+    const history = this.browserHistory
+    return async (
+      extraProps = {},
+      beforeRenderActions = [],
+      extraState = {},
+    ) => {
+      const initialState = R.mergeDeepRight(defaultState, extraState)
+      const store = configureStoreMain(initialState)
+      beforeRenderActions.forEach(action => store.dispatch(action))
+
+      const ComponentWithProps = () => (
+        <WrappedComponent
+          {...defaultProps}
+          {...extraProps}
+        />
+      )
+
+      const wrapper = mount(
+        <Provider store={store}>
+          <Router history={history}>
+            <Route path="*" component={ComponentWithProps} />
+          </Router>
+        </Provider>,
+      )
+      store.getLastAction = function() {
+        const actions = this.getActions()
+        return actions[actions.length - 1]
+      }
+
+      const inner = wrapper.find(InnerComponent)
+
+      return { inner, wrapper, store }
     }
   }
 }

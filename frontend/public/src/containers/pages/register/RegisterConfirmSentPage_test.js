@@ -20,7 +20,7 @@ describe("RegisterConfirmSentPage", () => {
 
     helper = new IntegrationTestHelper()
 
-    renderPage = helper.configureHOCRenderer(
+    renderPage = helper.configureMountRenderer(
       RegisterConfirmSentPage,
       InnerRegisterConfirmSentPage,
       {},

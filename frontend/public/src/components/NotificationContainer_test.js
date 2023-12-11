@@ -26,7 +26,7 @@ describe("NotificationContainer component", () => {
     getAlertPropsStub = helper.sandbox
       .stub(notificationsApi, "getNotificationAlertProps")
       .returns({})
-    render = helper.configureHOCRenderer(
+    render = helper.configureMountRenderer(
       NotificationContainer,
       InnerNotificationContainer,
       {

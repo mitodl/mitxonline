@@ -11,6 +11,7 @@ describe("Top-level HeaderApp", () => {
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
+    sinon.stub(axios, 'get').withArgs('http://mydomain/counter').returns(promise)
     getStoredUserMessageStub = helper.sandbox
       .stub(notificationsApi, "getStoredUserMessage")
       .returns(null)
@@ -18,17 +19,18 @@ describe("Top-level HeaderApp", () => {
       notificationsApi,
       "removeStoredUserMessage"
     )
-    renderPage = helper.configureHOCRenderer(HeaderApp, InnerHeaderApp, {}, {})
+    renderPage = helper.configureMountRenderer(HeaderApp, InnerHeaderApp, {}, {})
   })
 
   afterEach(() => {
     helper.cleanup()
   })
 
-  it("fetches user data on load and initially renders an empty element", async () => {
-    const { inner } = await renderPage()
-
-    assert.notExists(inner.find("div").prop("children"))
+  it("fetches user data on load and initially renders an empty element",  () => {
+    const { wrapper } = renderPage()
+    const contextType = HeaderApp.contextType
+    console.log(contextType)
+    assert.notExists(wrapper.find("div").first().prop("children"))
     sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
   })
 
@@ -38,9 +40,10 @@ describe("Top-level HeaderApp", () => {
       text: "some text"
     }
     getStoredUserMessageStub.returns(userMsg)
-    const { store } = await renderPage()
+    const { store, wrapper } = await renderPage()
 
     const { ui } = store.getState()
+    console.log(wrapper.debug())
     assert.deepEqual(ui.userNotifications, {
       "loaded-user-msg": {
         type:  userMsg.type,

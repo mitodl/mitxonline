@@ -44,7 +44,7 @@ describe("CourseProductDetailEnroll", () => {
     course = makeCourseDetailWithRuns()
     enrollment = makeCourseRunEnrollment()
     currentUser = makeUser()
-    renderPage = helper.configureHOCRenderer(
+    renderPage = helper.configureMountRenderer(
       CourseProductDetailEnroll,
       InnerCourseProductDetailEnroll,
       {

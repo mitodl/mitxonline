@@ -18,3 +18,6 @@ export const getCsrfOptions = () => ({
     "X-CSRFTOKEN": getCookie("csrftoken")
   }
 })
+
+export const getQueries = (state: Object) => state.queries
+export const getEntities = (state: Object) => state.entities
