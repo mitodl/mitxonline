@@ -33,6 +33,7 @@ describe("Top-level HeaderApp", () => {
     helper.handleRequestStub.returns({
       id: null, username: "", email: null, legal_address: null, user_profile: null, is_anonymous: true, is_authenticated: false, is_staff: false, is_superuser: false, grants: [], is_active: false})
     const { inner } = await renderPage()
+    inner.update()
     // So we look to be sure the next child is there, which is <Header />
     assert.exists(inner.find("Header"))
     sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
@@ -44,7 +45,6 @@ describe("Top-level HeaderApp", () => {
     assert.notExists(inner.find("div").prop("children"))
     sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
   })
-
 
   it("adds a user notification if a stored message is found in cookies", async () => {
     const userMsg = {

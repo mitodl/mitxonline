@@ -58,7 +58,7 @@ export default class IntegrationTestHelper {
     this.sandbox.restore()
   }
 
-  configureHOCRenderer(
+  configureShallowRenderer(
     WrappedComponent: Class<React.Component<*, *>>,
     InnerComponent: Class<React.Component<*, *>>,
     defaultState: Object,
@@ -69,7 +69,7 @@ export default class IntegrationTestHelper {
       const initialState = R.mergeDeepRight(defaultState, extraState)
       const store = configureStoreMain(initialState)
       const wrapper = await shallow(
-        <WrappedComponent
+        <InnerComponent
           store={store}
           dispatch={store.dispatch}
           history={history}
@@ -91,44 +91,10 @@ export default class IntegrationTestHelper {
       }
 
       // dive through layers of HOCs until we reach the desired inner component
-      let inner = wrapper
-      while (!inner.is(InnerComponent)) {
-        // determine the type before we dive
-        const cls = inner.type()
-        if (InnerComponent === cls.WrappedComponent) {
-          break
-        }
+      const inner = wrapper
 
-        // shallow render this component
-        inner = await inner.dive()
-
-        // if it defines WrappedComponent, find() that so we skip over any intermediaries
-        if (
-          cls &&
-          cls.hasOwnProperty("WrappedComponent") && // eslint-disable-line no-prototype-builtins
-          inner.find(cls.WrappedComponent).length
-        ) {
-          inner = inner.find(cls.WrappedComponent)
-        }
-      }
-      // one more time to shallow render the InnerComponent
-      inner = await inner.dive()
-
+      console.log(inner)
       return { wrapper, inner, store }
-    }
-  }
-
-  configureRTLRenderer() {
-    const history = this.browserHistory
-    return async (WrappedComponent: Class<React.Component<*, *>>, extraProps = {}) => {
-      const wrapper = await mount(
-        <Router history={history}>
-          <WrappedComponent
-            {...extraProps}
-          />
-        </Router>,
-      )
-      return { wrapper }
     }
   }
 
@@ -140,20 +106,21 @@ export default class IntegrationTestHelper {
   ) {
     const history = this.browserHistory
     return async (
-      extraProps = {},
-      beforeRenderActions = [],
       extraState = {},
+      extraProps = {}
     ) => {
       const initialState = R.mergeDeepRight(defaultState, extraState)
       const store = configureStoreMain(initialState)
-      beforeRenderActions.forEach(action => store.dispatch(action))
 
+      console.log(InnerComponent)
       const ComponentWithProps = () => (
         <WrappedComponent
           {...defaultProps}
           {...extraProps}
         />
       )
+
+      console.log(ComponentWithProps)
 
       const wrapper = mount(
         <Provider store={store}>

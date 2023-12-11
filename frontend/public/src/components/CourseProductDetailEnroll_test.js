@@ -31,6 +31,7 @@ import { makeUser, makeAnonymousUser } from "../factories/user"
 describe("CourseProductDetailEnroll", () => {
   let helper,
     renderPage,
+    shallowRenderPage,
     isWithinEnrollmentPeriodStub,
     isFinancialAssistanceAvailableStub,
     courseRun,
@@ -57,6 +58,12 @@ describe("CourseProductDetailEnroll", () => {
       },
       {}
     )
+    shallowRenderPage = helper.configureShallowRenderer(
+      CourseProductDetailEnroll,
+      InnerCourseProductDetailEnroll,
+      {},
+      {}
+    )
     SETTINGS.features = {
       "mitxonline-new-product-page": true
     }
@@ -76,14 +83,14 @@ describe("CourseProductDetailEnroll", () => {
   })
 
   it("renders a Loader component", async () => {
-    const { inner } = await renderPage({
+    const { inner } = await shallowRenderPage({
       queries: {
         courseRuns: {
           isPending: true
         }
       }
-    })
-
+    }, {isLoading: true})
+    console.log(inner.debug())
     const loader = inner.find("Loader").first()
     assert.isOk(loader.exists())
     assert.isTrue(loader.props().isLoading)

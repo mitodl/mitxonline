@@ -626,6 +626,8 @@ export class CourseProductDetailEnroll extends React.Component<
       enrollments,
       enrollmentsIsLoading
     } = this.props
+    console.log(`courseRuns ${courseRuns}`)
+    console.log(`courses ${courses}`)
     const showNewDesign = checkFeatureFlag(
       "mitxonline-new-product-page",
       currentUser && currentUser.id ? currentUser.id : "anonymousUser"
