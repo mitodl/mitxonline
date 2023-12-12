@@ -20,7 +20,7 @@ describe("PrivateRoute component", () => {
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
-    renderComponent = helper.configureMountRenderer(
+    renderComponent = helper.configureHOCRenderer(
       PrivateRoute,
       InnerPrivateRoute,
       {},

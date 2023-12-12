@@ -151,7 +151,7 @@ describe("CatalogPage", function() {
     helper = new IntegrationTestHelper()
     window.IntersectionObserver = mockIntersectionObserver
 
-    renderPage = helper.configureMountRenderer(CatalogPage, InnerCatalogPage)
+    renderPage = helper.configureHOCRenderer(CatalogPage, InnerCatalogPage)
 
     SETTINGS.features = {
       "mitxonline-new-product-page": true

@@ -45,7 +45,7 @@ describe("CourseProductDetailEnroll", () => {
     course = makeCourseDetailWithRuns()
     enrollment = makeCourseRunEnrollment()
     currentUser = makeUser()
-    renderPage = helper.configureMountRenderer(
+    renderPage = helper.configureHOCRenderer(
       CourseProductDetailEnroll,
       InnerCourseProductDetailEnroll,
       {
@@ -289,6 +289,7 @@ describe("CourseProductDetailEnroll", () => {
     const enrollBtn = inner.find("form > button.enroll-now")
     assert.isTrue(enrollBtn.exists())
   })
+
   ;[
     [true, 201],
     [false, 400]

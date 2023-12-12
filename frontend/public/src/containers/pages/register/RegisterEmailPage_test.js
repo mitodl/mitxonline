@@ -29,7 +29,7 @@ describe("RegisterEmailPage", () => {
     setSubmittingStub = helper.sandbox.stub()
     setErrorsStub = helper.sandbox.stub()
 
-    renderPage = helper.configureMountRenderer(
+    renderPage = helper.configureHOCRenderer(
       RegisterEmailPage,
       InnerRegisterEmailPage,
       {},

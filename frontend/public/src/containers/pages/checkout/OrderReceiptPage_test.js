@@ -13,7 +13,7 @@ describe("OrderReceiptPage", () => {
   beforeEach(() => {
     helper = new IntegrationTestHelper()
 
-    renderPage = helper.configureMountRenderer(
+    renderPage = helper.configureHOCRenderer(
       OrderReceiptPage,
       InnerOrderReceiptPage,
       {

@@ -17,7 +17,7 @@ describe("RegisterConfirmPage", () => {
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
-    renderPage = helper.configureMountRenderer(
+    renderPage = helper.configureHOCRenderer(
       RegisterConfirmPage,
       InnerRegisterConfirmPage,
       {},

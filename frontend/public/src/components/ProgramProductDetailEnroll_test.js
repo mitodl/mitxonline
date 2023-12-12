@@ -33,7 +33,7 @@ describe("ProgramProductDetailEnroll", () => {
     programs = [makeProgramWithReqTree()]
     programEnrollments = [makeProgramEnrollment()]
 
-    renderPage = helper.configureMountRenderer(
+    renderPage = helper.configureHOCRenderer(
       ProgramProductDetailEnroll,
       InnerProgramProductDetailEnroll,
       {

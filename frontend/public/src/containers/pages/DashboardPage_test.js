@@ -17,7 +17,7 @@ describe("DashboardPage", () => {
     userEnrollments = [makeCourseRunEnrollment(), makeCourseRunEnrollment()]
     currentUser = makeUser()
 
-    renderPage = helper.configureMountRenderer(
+    renderPage = helper.configureHOCRenderer(
       DashboardPage,
       InnerDashboardPage,
       {

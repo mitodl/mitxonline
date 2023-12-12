@@ -19,7 +19,7 @@ describe("Top-level App", () => {
       notificationsApi,
       "removeStoredUserMessage"
     )
-    renderPage = helper.configureMountRenderer(
+    renderPage = helper.configureHOCRenderer(
       App,
       InnerApp,
       {},
