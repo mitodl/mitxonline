@@ -238,9 +238,9 @@ export class ProgramProductDetailEnroll extends React.Component<
           <div className="row">
             <div className="col-12">
               <p>
-                Thank you for choosing an MITx online course. By paying for this
-                course, you're joining the most engaged and motivated learners
-                on your path to a certificate from MITx.
+                Thank you for choosing an MITx online program. To complete your enrollment in
+                this program, you must choose a course to start with. You can enroll now for
+                free, but you will need to pay for a certificate in order to earn the program credential.
               </p>
             </div>
           </div>
