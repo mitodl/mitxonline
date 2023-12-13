@@ -70,13 +70,11 @@ $(document).ready(function() {
   $(".nav .nav-link").on("click", function() {
     $(".nav .dropdown-toggle").text($(this).text())
     const self = this
-    setTimeout(
-      function() {
-        $(".nav")
-          .find(".active")
-          .removeClass("active")
-        $(self).addClass("active")
-      },
-      300)
+    setTimeout(function() {
+      $(".nav")
+        .find(".active")
+        .removeClass("active")
+      $(self).addClass("active")
+    }, 300)
   })
 })
