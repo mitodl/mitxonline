@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.82.2
+--------------
+
+- add styles to the navbar on product page (#2020)
+- Certificate: using product title (#2024)
+- Updating the program enrollment  dialog text (#2025)
+- Filter out courseruns that can't be upgraded when displaying the upsell dialog (#2023)
+- Make department sidebar sticky on mobile (#2015)
+
 Version 0.82.1 (Released December 06, 2023)
 --------------
 
