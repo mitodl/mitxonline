@@ -16,7 +16,7 @@ describe("EditProfilePage", () => {
   beforeEach(() => {
     helper = new IntegrationTestHelper()
 
-    renderPage = helper.configureHOCRenderer(
+    renderPage = helper.configureShallowRenderer(
       EditProfilePage,
       InnerEditProfilePage,
       {

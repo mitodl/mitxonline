@@ -19,7 +19,7 @@ describe("RegisterDeniedPage", () => {
 
     helper = new IntegrationTestHelper()
 
-    renderPage = helper.configureHOCRenderer(
+    renderPage = helper.configureShallowRenderer(
       RegisterDeniedPage,
       InnerRegisterDeniedPage,
       {},

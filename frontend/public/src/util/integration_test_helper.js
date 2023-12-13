@@ -77,46 +77,6 @@ export default class IntegrationTestHelper {
     return async (extraState = {}, extraProps = {}) => {
       const initialState = R.mergeDeepRight(defaultState, extraState)
       const store = configureStoreMain(initialState)
-      const wrapper = await shallow(
-        <InnerComponent
-          store={store}
-          dispatch={store.dispatch}
-          history={history}
-          {...defaultProps}
-          {...extraProps}
-        />,
-        {
-          context: {
-            // TODO: should be removed in the near future after upgrading enzyme
-            store
-          }
-        }
-      )
-
-      // just a little convenience method
-      store.getLastAction = function() {
-        const actions = this.getActions()
-        return actions[actions.length - 1]
-      }
-
-      // dive through layers of HOCs until we reach the desired inner component
-      const inner = wrapper
-
-      console.log(inner)
-      return { wrapper, inner, store }
-    }
-  }
-
-  configureHOCRenderer(
-    WrappedComponent: Class<React.Component<*, *>>,
-    InnerComponent: Class<React.Component<*, *>>,
-    defaultState: Object,
-    defaultProps = {}
-  ) {
-    const history = this.browserHistory
-    return async (extraState = {}, extraProps = {}) => {
-      const initialState = R.mergeDeepRight(defaultState, extraState)
-      const store = configureStoreMain(initialState)
 
       const useContextFake = this.sandbox.stub(React, "useContext")
       useContextFake.callsFake(context => {
@@ -144,7 +104,6 @@ export default class IntegrationTestHelper {
           },
         }
       )
-
 
       // just a little convenience method
       store.getLastAction = function() {
@@ -177,54 +136,6 @@ export default class IntegrationTestHelper {
       inner = await inner.dive()
 
       return { wrapper, inner, store }
-    }
-  }
-
-  configureMountRenderer(
-    WrappedComponent: Class<React.Component<*, *>>,
-    InnerComponent: Class<React.Component<*, *>>,
-    defaultState: Object,
-    defaultProps = {}
-  ) {
-    const history = this.browserHistory
-    return async (
-      extraState = {},
-      extraProps = {}
-    ) => {
-      const initialState = R.mergeDeepRight(defaultState, extraState)
-      const store = configureStoreMain(initialState)
-
-      console.log(InnerComponent)
-      const ComponentWithProps = () => {
-        console.log("state")
-        console.log(store.getState())
-        return (
-          <WrappedComponent
-            history={history}
-            store={store}
-            {...defaultProps}
-            {...extraProps}
-          />
-        )
-      }
-
-      console.log(ComponentWithProps)
-
-      const wrapper = mount(
-        <Provider store={store}>
-          <Router history={history}>
-            <Route path="*" component={ComponentWithProps} />
-          </Router>
-        </Provider>,
-      )
-      store.getLastAction = function() {
-        const actions = this.getActions()
-        return actions[actions.length - 1]
-      }
-
-      const inner = wrapper.find(InnerComponent)
-
-      return { inner, wrapper, store }
     }
   }
 }

@@ -24,7 +24,7 @@ describe("AccountSettingsPage", () => {
 
     setSubmittingStub = helper.sandbox.stub()
 
-    renderPage = helper.configureHOCRenderer(
+    renderPage = helper.configureShallowRenderer(
       AccountSettingsPage,
       InnerAccountSettingsPage,
       {},
