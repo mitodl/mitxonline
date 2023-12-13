@@ -67,16 +67,15 @@
                   </section>
                 </div>
 
-            <div data-bs-spy="scroll" data-bs-target="#tab-bar" tabindex="0" data-bs-offset=100 class="scroll-spy-content">
               {# Non-Mobile only #}
               <nav id="tab-bar" class="sticky-top d-none d-md-block">
                 <ul class="nav">
-                  {% if page.about %}<li class="nav-item"><a href="#about-this-class">About</a></li>{% endif %}
-                  {% if page.is_program_page %}<li class="nav-item"><a href="#program-courses">Courses</a></li>{% endif %}
-                  {% if page.what_you_learn %}<li class="nav-item"><a href="#what-youll-learn">What you'll learn</a></li>{% endif %}
-                  {% if page.prerequisites %}<li class="nav-item"><a href="#prerequisites">Prerequisites</a></li>{% endif %}
-                  {% if instructors %}<li class="nav-item"><a href="#instructors">Instructors</a></li>{% endif %}
-                  {% if page.faq_url %}<li class="nav-item"><a href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
+                  {% if page.about %}<li class="nav-item"><a class="nav-link" href="#about-this-class">About</a></li>{% endif %}
+                  {% if page.is_program_page %}<li class="nav-item"><a class="nav-link" href="#program-courses">Courses</a></li>{% endif %}
+                  {% if page.what_you_learn %}<li class="nav-item"><a class="nav-link" href="#what-youll-learn">What you'll learn</a></li>{% endif %}
+                  {% if page.prerequisites %}<li class="nav-item"><a class="nav-link" href="#prerequisites">Prerequisites</a></li>{% endif %}
+                  {% if instructors %}<li class="nav-item"><a class="nav-link" href="#instructors">Instructors</a></li>{% endif %}
+                  {% if page.faq_url %}<li class="nav-item"><a class="nav-link" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
                 </ul>
               </nav>
               {# Mobile only #}
@@ -93,7 +92,7 @@
                       </ul>
                     </div>
                 </nav>
-
+            <div class="scroll-spy-content">
               {% if page.about %}<section class="about-this-class about-richtext-container" id="about-this-class">
                 {{ page.about | richtext | expand }}
               </section>{% endif %}

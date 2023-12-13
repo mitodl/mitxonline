@@ -62,7 +62,7 @@ $(document).ready(function() {
   })
   $(".slick-slide").removeAttr("tabindex")
 
-  $("body").scrollspy({ target: "#tab-bar" })
+  $("body").scrollspy({ target: "#tab-bar", offset: 100})
   $(".nav .nav-link").on("click", function() {
     $(".nav")
       .find(".active")

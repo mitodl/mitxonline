@@ -29,7 +29,7 @@
     {% endblock %}
     {% endspaceless %}
   </head>
-  <body class="{% block bodyclass %}{% endblock %}">
+  <body class="{% block bodyclass %}{% endblock %}" data-bs-spy="scroll" data-bs-target="#tab-bar" data-bs-offset="0" tabindex="0" data-bs-smooth-scroll="true">
   <div class="main-panel">
     <a href="#main" class="visually-hidden visually-hidden-focusable">Skip to main content</a>
     {% include "partials/gtm_body.html" %}

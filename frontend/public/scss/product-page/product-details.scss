@@ -75,7 +75,6 @@ body.new-design {
       }
 
       li.nav-item {
-        padding: 16px 0;
         a {
           color: #2A6D87;
           text-decoration: none;
@@ -93,8 +92,7 @@ body.new-design {
       }
     }
     .scroll-spy-content {
-      height: fit-content;
-      position: relative;
+
       a:hover {
         color: #061e2d;
       }

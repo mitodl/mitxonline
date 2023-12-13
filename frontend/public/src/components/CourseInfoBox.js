@@ -210,12 +210,10 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
 
             <ul>
               {course.programs.map(elem => (
-                <>
-                  <li>
-                    {" "}
-                    <a href={`/programs/${elem.readable_id}/`}>{elem.title}</a>
-                  </li>
-                </>
+                <li key={elem.readable_id}>
+                  {" "}
+                  <a href={`/programs/${elem.readable_id}/`}>{elem.title}</a>
+                </li>
               ))}
             </ul>
           </div>
