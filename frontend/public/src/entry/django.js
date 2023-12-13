@@ -68,10 +68,15 @@ $(document).ready(function() {
     rootMargin:   "0px 0px 0px 0px"
   })
   $(".nav .nav-link").on("click", function() {
-    $(".nav")
-      .find(".active")
-      .removeClass("active")
-    $(this).addClass("active")
     $(".nav .dropdown-toggle").text($(this).text())
+    const self = this
+    setTimeout(
+      function() {
+        $(".nav")
+          .find(".active")
+          .removeClass("active")
+        $(self).addClass("active")
+      },
+      300)
   })
 })
