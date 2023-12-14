@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.82.2
+Version 0.82.2 (Released December 14, 2023)
 --------------
 
 - add styles to the navbar on product page (#2020)
