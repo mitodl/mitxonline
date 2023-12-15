@@ -287,6 +287,9 @@ export class CatalogPage extends React.Component<Props> {
    * @param {string} selectedDepartment The department name to set selectedDepartment to and filter courses by.
    */
   changeSelectedDepartment = (selectedDepartment: string) => {
+    if (this.props.coursesIsLoading) {
+      return
+    }
     this.setState({ selectedDepartment: selectedDepartment })
     this.setState({
       filteredCourses: this.filteredCoursesBasedOnCourseRunCriteria(

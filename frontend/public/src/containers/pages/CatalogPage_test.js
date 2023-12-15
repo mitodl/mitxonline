@@ -487,6 +487,28 @@ describe("CatalogPage", function() {
       .validateCoursesCourseRuns(courseRuns)
     expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
   })
+  it("does not filter courses if not loaded", async () => {
+    const { inner } = await renderPage({
+      queries: {
+        courses: {
+          isPending: true,
+          status:    200
+        },
+        entities: {
+          departments: [
+            {
+              name:     "History",
+              courses:  2,
+              programs: 1
+            }
+          ]
+        }
+      }
+    })
+    expect(inner.state().selectedDepartment).equals("All Departments")
+    inner.instance().changeSelectedDepartment("History", "courses")
+    expect(inner.state().selectedDepartment).equals("All Departments")
+  })
 
   it("renders catalog courses based on selected department", async () => {
     const course1 = JSON.parse(JSON.stringify(displayedCourse))
