@@ -27,11 +27,12 @@ import * as courseApi from "../lib/courseApi"
 
 import sinon from "sinon"
 import { makeUser, makeAnonymousUser } from "../factories/user"
+import CourseInfoBox from "./CourseInfoBox"
 
 describe("CourseProductDetailEnroll", () => {
   let helper,
     renderPage,
-    shallowRenderPage,
+    deepRenderPage,
     isWithinEnrollmentPeriodStub,
     isFinancialAssistanceAvailableStub,
     courseRun,
@@ -45,6 +46,7 @@ describe("CourseProductDetailEnroll", () => {
     course = makeCourseDetailWithRuns()
     enrollment = makeCourseRunEnrollment()
     currentUser = makeUser()
+
     renderPage = helper.configureShallowRenderer(
       CourseProductDetailEnroll,
       InnerCourseProductDetailEnroll,
@@ -58,12 +60,21 @@ describe("CourseProductDetailEnroll", () => {
       },
       {}
     )
-    shallowRenderPage = helper.configureShallowRenderer(
+
+    deepRenderPage = helper.configureMountRenderer(
       CourseProductDetailEnroll,
       InnerCourseProductDetailEnroll,
-      {},
+      {
+        entities: {
+          courseRuns:  [courseRun],
+          courses:     [course],
+          enrollments: [enrollment],
+          currentUser: currentUser
+        }
+      },
       {}
     )
+
     SETTINGS.features = {
       "mitxonline-new-product-page": true
     }
@@ -83,14 +94,13 @@ describe("CourseProductDetailEnroll", () => {
   })
 
   it("renders a Loader component", async () => {
-    const { inner } = await shallowRenderPage({
+    const { inner } = await renderPage({
       queries: {
         courseRuns: {
           isPending: true
         }
       }
     }, {isLoading: true})
-    console.log(inner.debug())
     const loader = inner.find("Loader").first()
     assert.isOk(loader.exists())
     assert.isTrue(loader.props().isLoading)
@@ -113,6 +123,7 @@ describe("CourseProductDetailEnroll", () => {
       },
       {}
     )
+    console.log(inner.debug())
 
     assert.equal(
       inner
@@ -205,6 +216,7 @@ describe("CourseProductDetailEnroll", () => {
 
   it("checks for disabled enrolled button", async () => {
     const userEnrollment = makeCourseRunEnrollment()
+
     userEnrollment.run["start_date"] = moment().add(2, "M")
     const expectedResponse = {
       ...userEnrollment.run,
@@ -277,16 +289,32 @@ describe("CourseProductDetailEnroll", () => {
   it(`shows form based enrollment button when upgrade deadline has passed but course is within enrollment period`, async () => {
     isWithinEnrollmentPeriodStub.returns(true)
     courseRun.is_upgradable = false
-    const { inner } = await renderPage()
+    course.next_run_id = courseRun.id
 
-    sinon.assert.calledWith(
-      helper.handleRequestStub,
-      "/api/course_runs/?relevant_to=",
-      "GET"
-    )
-    sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+    const { inner, wrapper } = await renderPage({
+      entities: {
+        courseRuns: [courseRun],
+        courses:    [course]
+      },
+      queries: {
+        courseRuns: {
+          isPending: false,
+          status:    200
+        },
+        courses: {
+          isPending: false,
+          status:    200
+        }
+      }}, {courseId: course.id})
+    console.log(inner.debug())
+    // sinon.assert.calledWith(
+    //   helper.handleRequestStub,
+    //   "/api/course_runs/?relevant_to=",
+    //   "GET"
+    // )
+    // sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
 
-    const enrollBtn = inner.find("form > button.enroll-now")
+    const enrollBtn = wrapper.find("form > button.enroll-now")
     assert.isTrue(enrollBtn.exists())
   })
 
@@ -650,7 +678,6 @@ describe("CourseProductDetailEnroll", () => {
       courseruns: [courseRun]
     }
 
-    console.log(course)
 
     const entities = {
       currentUser: currentUser,

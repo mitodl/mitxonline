@@ -45,15 +45,13 @@ export default class IntegrationTestHelper {
           const resText = (response && response.text) || undefined
           const resHeaders = (response && response.header) || undefined
 
-          // console.log(`Responding to request ${method} ${url} with`)
-          // console.log(resBody)
-
           callback(err, resStatus, resBody, resText, resHeaders)
         },
         abort: () => {
           throw new Error("Aborts currently unhandled")
         }
       }))
+    //
   }
 
   cleanup() {
@@ -136,6 +134,45 @@ export default class IntegrationTestHelper {
       inner = await inner.dive()
 
       return { wrapper, inner, store }
+    }
+  }
+
+  configureMountRenderer(
+    WrappedComponent: Class<React.Component<*, *>>,
+    InnerComponent: Class<React.Component<*, *>>,
+    defaultState: Object,
+    defaultProps = {}
+  ) {
+    const history = this.browserHistory
+    return async (
+      extraState = {},
+      extraProps = {}
+    ) => {
+      const initialState = R.mergeDeepRight(defaultState, extraState)
+      const store = configureStoreMain(initialState)
+      const state = store.getState()
+      const ComponentWithProps = () => (
+        <WrappedComponent
+          {...defaultProps}
+          {...extraProps}
+        />
+      )
+
+      const wrapper = mount(
+        <Provider store={store}>
+          <Router history={history}>
+            <Route path="*" component={ComponentWithProps} />
+          </Router>
+        </Provider>,
+      )
+      store.getLastAction = function() {
+        const actions = this.getActions()
+        return actions[actions.length - 1]
+      }
+
+      const inner = wrapper.find(InnerComponent)
+
+      return { inner, wrapper, store }
     }
   }
 }
