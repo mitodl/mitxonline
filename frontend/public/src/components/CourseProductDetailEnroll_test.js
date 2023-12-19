@@ -270,281 +270,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     assert.equal(courseRunsSelector(store.getState())[0], expectedResponse)
   })
 
-  it(`shows form based enrollment button when upgrade deadline has passed but course is within enrollment period`, async () => {
-    isWithinEnrollmentPeriodStub.returns(true)
-    courseRun.is_upgradable = false
-    course.next_run_id = courseRun.id
-
-    const { inner, wrapper } = await renderPage({
-      entities: {
-        courseRuns: [courseRun],
-        courses:    [course]
-      },
-      queries: {
-        courseRuns: {
-          isPending: false,
-          status:    200
-        },
-        courses: {
-          isPending: false,
-          status:    200
-        }
-      }}, {courseId: course.id})
-    // sinon.assert.calledWith(
-    //   helper.handleRequestStub,
-    //   "/api/course_runs/?relevant_to=",
-    //   "GET"
-    // )
-    // sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-
-    const enrollBtn = wrapper.find("form > button.enroll-now")
-    assert.isTrue(enrollBtn.exists())
-  })
-
-  ;[
-    [true, 201],
-    [false, 400]
-  ].forEach(([__success, returnedStatusCode]) => {
-    it(`shows dialog to upgrade user enrollment with flexible dollars-off discount and handles ${returnedStatusCode} response`, async () => {
-      courseRun["products"] = [
-        {
-          id:                     1,
-          price:                  10,
-          product_flexible_price: {
-            amount:        1,
-            discount_type: DISCOUNT_TYPE_DOLLARS_OFF
-          }
-        }
-      ]
-      isWithinEnrollmentPeriodStub.returns(true)
-      const { inner } = await renderPage()
-
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/course_runs/?relevant_to=",
-        "GET"
-      )
-      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-
-      const enrollBtn = inner.find(".enroll-now").at(0)
-      assert.isTrue(enrollBtn.exists())
-      enrollBtn.prop("onClick")()
-
-      const modal = inner.find(".upgrade-enrollment-modal")
-      const upgradeForm = modal.find("form").at(0)
-      assert.isTrue(upgradeForm.exists())
-
-      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
-
-      assert.equal(
-        inner
-          .find("#certificate-price-info")
-          .at(0)
-          .text(),
-        "$9.00"
-      )
-    })
-    it(`shows dialog to upgrade user enrollment with flexible percent-off discount and handles ${returnedStatusCode} response`, async () => {
-      courseRun["products"] = [
-        {
-          id:                     1,
-          price:                  10,
-          product_flexible_price: {
-            amount:        10,
-            discount_type: DISCOUNT_TYPE_PERCENT_OFF
-          }
-        }
-      ]
-      isWithinEnrollmentPeriodStub.returns(true)
-      const { inner } = await renderPage()
-
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/course_runs/?relevant_to=",
-        "GET"
-      )
-      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-
-      const enrollBtn = inner.find(".enroll-now").at(0)
-      assert.isTrue(enrollBtn.exists())
-      await enrollBtn.prop("onClick")()
-
-      const modal = inner.find(".upgrade-enrollment-modal")
-      const upgradeForm = modal.find("form").at(0)
-      assert.isTrue(upgradeForm.exists())
-
-      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
-
-      assert.equal(
-        inner
-          .find("#certificate-price-info")
-          .at(0)
-          .text()
-          .at(1),
-        "9"
-      )
-    })
-    it(`shows dialog to upgrade user enrollment with flexible fixed-price discount and handles ${returnedStatusCode} response`, async () => {
-      courseRun["products"] = [
-        {
-          id:                     1,
-          price:                  10,
-          product_flexible_price: {
-            amount:        9,
-            discount_type: DISCOUNT_TYPE_FIXED_PRICE
-          }
-        }
-      ]
-      isWithinEnrollmentPeriodStub.returns(true)
-      isFinancialAssistanceAvailableStub.returns(false)
-      const { inner } = await renderPage()
-
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/course_runs/?relevant_to=",
-        "GET"
-      )
-      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-
-      const enrollBtn = inner.find(".enroll-now").at(0)
-      assert.isTrue(enrollBtn.exists())
-      await enrollBtn.prop("onClick")()
-
-      const modal = inner.find(".upgrade-enrollment-modal")
-      const upgradeForm = modal.find("form").at(0)
-      assert.isTrue(upgradeForm.exists())
-
-      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
-
-      assert.equal(
-        inner
-          .find("#certificate-price-info")
-          .at(0)
-          .text()
-          .at(1),
-        "9"
-      )
-    })
-  })
-  ;[[true], [false]].forEach(([flexPriceApproved]) => {
-    it(`shows the flexible pricing available link if the user does not have approved flexible pricing for the course run`, async () => {
-      courseRun["approved_flexible_price_exists"] = flexPriceApproved
-      courseRun["course"] = {
-        page: {
-          financial_assistance_form_url: "google.com"
-        }
-      }
-      isWithinEnrollmentPeriodStub.returns(true)
-      isFinancialAssistanceAvailableStub.returns(true)
-      const { inner } = await renderPage()
-
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/course_runs/?relevant_to=",
-        "GET"
-      )
-      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-
-      const enrollBtn = inner.find(".enroll-now").at(0)
-      assert.isTrue(enrollBtn.exists())
-      await enrollBtn.prop("onClick")()
-
-      const modal = inner.find(".upgrade-enrollment-modal")
-
-      const flexiblePricingLink = modal.find(".financial-assistance-link").at(0)
-      if (flexPriceApproved) {
-        assert.isFalse(flexiblePricingLink.exists())
-      } else {
-        assert.isTrue(flexiblePricingLink.exists())
-      }
-    })
-  })
-
-  it(`shows the enroll button and upsell message, and checks for enrollments when the enroll button is clicked`, async () => {
-    courseRun["products"] = [
-      {
-        id:                     1,
-        price:                  10,
-        product_flexible_price: {}
-      }
-    ]
-    isWithinEnrollmentPeriodStub.returns(true)
-
-    const { inner } = await renderPage()
-
-    const enrollBtn = inner.find(".enroll-now").at(0)
-    assert.isTrue(enrollBtn.exists())
-    await enrollBtn.prop("onClick")()
-
-    sinon.assert.calledWith(
-      helper.handleRequestStub,
-      "/api/enrollments/",
-      "GET"
-    )
-  })
-  ;[
-    ["shows", "one", false],
-    ["shows", "multiple", true]
-  ].forEach(([showsQualifier, runsQualifier, multiples]) => {
-    it(`${showsQualifier} the course run selector for a course with ${runsQualifier} active run${
-      multiples ? "s" : ""
-    }`, async () => {
-      courseRun["products"] = [
-        {
-          id:                     1,
-          price:                  10,
-          product_flexible_price: {
-            amount:        10,
-            discount_type: DISCOUNT_TYPE_PERCENT_OFF
-          }
-        }
-      ]
-      const courseRuns = [courseRun]
-      if (multiples) {
-        courseRuns.push(courseRun)
-      }
-
-      isWithinEnrollmentPeriodStub.returns(true)
-      const { inner } = await renderPage({
-        entities: {
-          courseRuns:  courseRuns,
-          courses:     [course],
-          enrollments: [enrollment],
-          currentUser: currentUser
-        }
-      })
-
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/course_runs/?relevant_to=",
-        "GET"
-      )
-      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/enrollments/",
-        "GET"
-      )
-
-      const enrollBtn = inner.find(".enroll-now").at(0)
-      assert.isTrue(enrollBtn.exists())
-      await enrollBtn.prop("onClick")()
-
-      const modal = inner.find(".upgrade-enrollment-modal")
-      const upgradeForm = modal.find("form").at(0)
-      assert.isTrue(upgradeForm.exists())
-
-      const selectorControl = modal.find(".date-selector-button-bar").at(0)
-      assert.isTrue(selectorControl.exists())
-
-      const selectorControlItems = selectorControl.find("option")
-      if (multiples) {
-        assert.isTrue(selectorControlItems.length === 2)
-      } else {
-        assert.isTrue(selectorControlItems.length === 1)
-      }
-    })
-  })
   ;[
     [true, false],
     [false, false],
@@ -740,6 +465,288 @@ describe("CourseProductDetailEnrollDeepRender", () => {
   })
   afterEach(() => {
     helper.cleanup()
+  })
+
+
+  it(`shows form based enrollment button when upgrade deadline has passed but course is within enrollment period`, async () => {
+    isWithinEnrollmentPeriodStub.returns(true)
+    courseRun.is_upgradable = false
+    course.next_run_id = courseRun.id
+
+    const { inner, wrapper } = await renderPage({
+      entities: {
+        courseRuns: [courseRun],
+        courses:    [course]
+      },
+      queries: {
+        courseRuns: {
+          isPending: false,
+          status:    200
+        },
+        courses: {
+          isPending: false,
+          status:    200
+        }
+      }}, {courseId: course.id})
+    // sinon.assert.calledWith(
+    //   helper.handleRequestStub,
+    //   "/api/course_runs/?relevant_to=",
+    //   "GET"
+    // )
+    // sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+
+    const enrollBtn = wrapper.find("form > button.enroll-now")
+    assert.isTrue(enrollBtn.exists())
+  })
+
+
+  ;[
+    [true, 201],
+    [false, 400]
+  ].forEach(([__success, returnedStatusCode]) => {
+    it(`shows dialog to upgrade user enrollment with flexible dollars-off discount and handles ${returnedStatusCode} response`, async () => {
+      courseRun["products"] = [
+        {
+          id:                     1,
+          price:                  10,
+          product_flexible_price: {
+            amount:        1,
+            discount_type: DISCOUNT_TYPE_DOLLARS_OFF
+          }
+        }
+      ]
+      isWithinEnrollmentPeriodStub.returns(true)
+      const { inner } = await renderPage()
+
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        "/api/course_runs/?relevant_to=",
+        "GET"
+      )
+      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      enrollBtn.prop("onClick")()
+
+      const modal = inner.find(".upgrade-enrollment-modal")
+      const upgradeForm = modal.find("form").at(0)
+      assert.isTrue(upgradeForm.exists())
+
+      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
+
+      assert.equal(
+        inner
+          .find("#certificate-price-info")
+          .at(0)
+          .text(),
+        "$9.00"
+      )
+    })
+    it(`shows dialog to upgrade user enrollment with flexible percent-off discount and handles ${returnedStatusCode} response`, async () => {
+      courseRun["products"] = [
+        {
+          id:                     1,
+          price:                  10,
+          product_flexible_price: {
+            amount:        10,
+            discount_type: DISCOUNT_TYPE_PERCENT_OFF
+          }
+        }
+      ]
+      isWithinEnrollmentPeriodStub.returns(true)
+      const { inner } = await renderPage()
+
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        "/api/course_runs/?relevant_to=",
+        "GET"
+      )
+      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      await enrollBtn.prop("onClick")()
+
+      const modal = inner.find(".upgrade-enrollment-modal")
+      const upgradeForm = modal.find("form").at(0)
+      assert.isTrue(upgradeForm.exists())
+
+      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
+
+      assert.equal(
+        inner
+          .find("#certificate-price-info")
+          .at(0)
+          .text()
+          .at(1),
+        "9"
+      )
+    })
+    it(`shows dialog to upgrade user enrollment with flexible fixed-price discount and handles ${returnedStatusCode} response`, async () => {
+      courseRun["products"] = [
+        {
+          id:                     1,
+          price:                  10,
+          product_flexible_price: {
+            amount:        9,
+            discount_type: DISCOUNT_TYPE_FIXED_PRICE
+          }
+        }
+      ]
+      isWithinEnrollmentPeriodStub.returns(true)
+      isFinancialAssistanceAvailableStub.returns(false)
+      const { inner } = await renderPage()
+
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        "/api/course_runs/?relevant_to=",
+        "GET"
+      )
+      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      await enrollBtn.prop("onClick")()
+
+      const modal = inner.find(".upgrade-enrollment-modal")
+      const upgradeForm = modal.find("form").at(0)
+      assert.isTrue(upgradeForm.exists())
+
+      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
+
+      assert.equal(
+        inner
+          .find("#certificate-price-info")
+          .at(0)
+          .text()
+          .at(1),
+        "9"
+      )
+    })
+  })
+
+  ;[[true], [false]].forEach(([flexPriceApproved]) => {
+    it(`shows the flexible pricing available link if the user does not have approved flexible pricing for the course run`, async () => {
+      courseRun["approved_flexible_price_exists"] = flexPriceApproved
+      courseRun["course"] = {
+        page: {
+          financial_assistance_form_url: "google.com"
+        }
+      }
+      isWithinEnrollmentPeriodStub.returns(true)
+      isFinancialAssistanceAvailableStub.returns(true)
+      const { inner } = await renderPage()
+
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        "/api/course_runs/?relevant_to=",
+        "GET"
+      )
+      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      await enrollBtn.prop("onClick")()
+
+      const modal = inner.find(".upgrade-enrollment-modal")
+
+      const flexiblePricingLink = modal.find(".financial-assistance-link").at(0)
+      if (flexPriceApproved) {
+        assert.isFalse(flexiblePricingLink.exists())
+      } else {
+        assert.isTrue(flexiblePricingLink.exists())
+      }
+    })
+  })
+
+
+  it(`shows the enroll button and upsell message, and checks for enrollments when the enroll button is clicked`, async () => {
+    courseRun["products"] = [
+      {
+        id:                     1,
+        price:                  10,
+        product_flexible_price: {}
+      }
+    ]
+    isWithinEnrollmentPeriodStub.returns(true)
+
+    const { inner } = await renderPage()
+
+    const enrollBtn = inner.find(".enroll-now").at(0)
+    assert.isTrue(enrollBtn.exists())
+    await enrollBtn.prop("onClick")()
+
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/enrollments/",
+      "GET"
+    )
+  })
+
+
+  ;[
+    ["shows", "one", false],
+    ["shows", "multiple", true]
+  ].forEach(([showsQualifier, runsQualifier, multiples]) => {
+    it(`${showsQualifier} the course run selector for a course with ${runsQualifier} active run${
+      multiples ? "s" : ""
+    }`, async () => {
+      courseRun["products"] = [
+        {
+          id:                     1,
+          price:                  10,
+          product_flexible_price: {
+            amount:        10,
+            discount_type: DISCOUNT_TYPE_PERCENT_OFF
+          }
+        }
+      ]
+      const courseRuns = [courseRun]
+      if (multiples) {
+        courseRuns.push(courseRun)
+      }
+
+      isWithinEnrollmentPeriodStub.returns(true)
+      const { inner } = await renderPage({
+        entities: {
+          courseRuns:  courseRuns,
+          courses:     [course],
+          enrollments: [enrollment],
+          currentUser: currentUser
+        }
+      })
+
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        "/api/course_runs/?relevant_to=",
+        "GET"
+      )
+      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+      sinon.assert.calledWith(
+        helper.handleRequestStub,
+        "/api/enrollments/",
+        "GET"
+      )
+
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      await enrollBtn.prop("onClick")()
+
+      const modal = inner.find(".upgrade-enrollment-modal")
+      const upgradeForm = modal.find("form").at(0)
+      assert.isTrue(upgradeForm.exists())
+
+      const selectorControl = modal.find(".date-selector-button-bar").at(0)
+      assert.isTrue(selectorControl.exists())
+
+      const selectorControlItems = selectorControl.find("option")
+      if (multiples) {
+        assert.isTrue(selectorControlItems.length === 2)
+      } else {
+        assert.isTrue(selectorControlItems.length === 1)
+      }
+    })
   })
 })
 
