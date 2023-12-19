@@ -18,7 +18,7 @@ describe("Top-level HeaderApp", () => {
       notificationsApi,
       "removeStoredUserMessage"
     )
-    renderPage = helper.configureShallowRenderer(HeaderApp, InnerHeaderApp, {}, {})
+    renderPage = helper.configureMountRenderer(HeaderApp, InnerHeaderApp, {}, {})
   })
 
   afterEach(() => {

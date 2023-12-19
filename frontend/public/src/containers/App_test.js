@@ -8,7 +8,7 @@ import * as notificationsApi from "../lib/notificationsApi"
 import IntegrationTestHelper from "../util/integration_test_helper"
 
 describe("Top-level App", () => {
-  let helper, renderPage, getStoredUserMessageStub, removeStoredUserMessageStub
+  let helper, renderPage, deepRenderPage, getStoredUserMessageStub, removeStoredUserMessageStub
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
@@ -19,7 +19,7 @@ describe("Top-level App", () => {
       notificationsApi,
       "removeStoredUserMessage"
     )
-    renderPage = helper.configureShallowRenderer(
+    renderPage = helper.configureMountRenderer(
       App,
       InnerApp,
       {},
