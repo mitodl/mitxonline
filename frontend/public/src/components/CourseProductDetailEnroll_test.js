@@ -27,13 +27,11 @@ import * as courseApi from "../lib/courseApi"
 
 import sinon from "sinon"
 import { makeUser, makeAnonymousUser } from "../factories/user"
-import CourseInfoBox from "./CourseInfoBox"
 
 describe("CourseProductDetailEnrollShallowRender", () => {
   let helper,
     renderPage,
     isWithinEnrollmentPeriodStub,
-    isFinancialAssistanceAvailableStub,
     courseRun,
     course,
     enrollment,
@@ -473,7 +471,7 @@ describe("CourseProductDetailEnrollDeepRender", () => {
     courseRun.is_upgradable = false
     course.next_run_id = courseRun.id
 
-    const { inner, wrapper } = await renderPage({
+    const { wrapper } = await renderPage({
       entities: {
         courseRuns: [courseRun],
         courses:    [course]

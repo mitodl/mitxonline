@@ -150,7 +150,7 @@ export default class IntegrationTestHelper {
     ) => {
       const initialState = R.mergeDeepRight(defaultState, extraState)
       const store = configureStoreMain(initialState)
-      const state = store.getState()
+
       const ComponentWithProps = () => (
         <WrappedComponent
           {...defaultProps}

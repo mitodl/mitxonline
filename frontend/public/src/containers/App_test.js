@@ -8,7 +8,7 @@ import * as notificationsApi from "../lib/notificationsApi"
 import IntegrationTestHelper from "../util/integration_test_helper"
 
 describe("Top-level App", () => {
-  let helper, renderPage, deepRenderPage, getStoredUserMessageStub, removeStoredUserMessageStub
+  let helper, renderPage, getStoredUserMessageStub, removeStoredUserMessageStub
 
   beforeEach(() => {
     helper = new IntegrationTestHelper()
