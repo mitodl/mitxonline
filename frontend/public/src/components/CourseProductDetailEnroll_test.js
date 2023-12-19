@@ -29,10 +29,9 @@ import sinon from "sinon"
 import { makeUser, makeAnonymousUser } from "../factories/user"
 import CourseInfoBox from "./CourseInfoBox"
 
-describe("CourseProductDetailEnroll", () => {
+describe("CourseProductDetailEnrollShallowRender", () => {
   let helper,
     renderPage,
-    deepRenderPage,
     isWithinEnrollmentPeriodStub,
     isFinancialAssistanceAvailableStub,
     courseRun,
@@ -48,20 +47,6 @@ describe("CourseProductDetailEnroll", () => {
     currentUser = makeUser()
 
     renderPage = helper.configureShallowRenderer(
-      CourseProductDetailEnroll,
-      InnerCourseProductDetailEnroll,
-      {
-        entities: {
-          courseRuns:  [courseRun],
-          courses:     [course],
-          enrollments: [enrollment],
-          currentUser: currentUser
-        }
-      },
-      {}
-    )
-
-    deepRenderPage = helper.configureMountRenderer(
       CourseProductDetailEnroll,
       InnerCourseProductDetailEnroll,
       {
@@ -123,7 +108,6 @@ describe("CourseProductDetailEnroll", () => {
       },
       {}
     )
-    console.log(inner.debug())
 
     assert.equal(
       inner
@@ -306,7 +290,6 @@ describe("CourseProductDetailEnroll", () => {
           status:    200
         }
       }}, {courseId: course.id})
-    console.log(inner.debug())
     // sinon.assert.calledWith(
     //   helper.handleRequestStub,
     //   "/api/course_runs/?relevant_to=",
@@ -709,3 +692,54 @@ describe("CourseProductDetailEnroll", () => {
     )
   })
 })
+
+
+describe("CourseProductDetailEnrollDeepRender", () => {
+  let helper,
+    renderPage,
+    isWithinEnrollmentPeriodStub,
+    isFinancialAssistanceAvailableStub,
+    courseRun,
+    course,
+    enrollment,
+    currentUser
+
+  beforeEach(() => {
+    helper = new IntegrationTestHelper()
+    courseRun = makeCourseRunDetailWithProduct()
+    course = makeCourseDetailWithRuns()
+    enrollment = makeCourseRunEnrollment()
+    currentUser = makeUser()
+
+    renderPage = helper.configureMountRenderer(
+      CourseProductDetailEnroll,
+      InnerCourseProductDetailEnroll,
+      {
+        entities: {
+          courseRuns:  [courseRun],
+          courses:     [course],
+          enrollments: [enrollment],
+          currentUser: currentUser
+        }
+      },
+      {}
+    )
+
+    SETTINGS.features = {
+      "mitxonline-new-product-page": true
+    }
+
+    isWithinEnrollmentPeriodStub = helper.sandbox.stub(
+      courseApi,
+      "isWithinEnrollmentPeriod"
+    )
+    isFinancialAssistanceAvailableStub = helper.sandbox.stub(
+      courseApi,
+      "isFinancialAssistanceAvailable"
+    )
+  })
+  afterEach(() => {
+    helper.cleanup()
+  })
+})
+

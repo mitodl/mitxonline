@@ -201,9 +201,6 @@ export class CourseProductDetailEnroll extends React.Component<
 
   getFirstUnexpiredRun = () => {
     const { courses, courseRuns } = this.props
-    console.log("courses, courseruns", courses, courseRuns)
-    console.log("courses[0].next_run_id && ?", courses[0].next_run_id)
-    console.log(courseRuns)
     return courseRuns
       ? courses && courses[0].next_run_id
         ? courseRuns.find(elem => elem.id === courses[0].next_run_id)
@@ -588,7 +585,6 @@ export class CourseProductDetailEnroll extends React.Component<
   ) {
     const { currentUser } = this.props
     const csrfToken = getCookie("csrftoken")
-    console.log("renderEnrollNowButton", run, product, currentUser)
 
     return currentUser &&
       currentUser.id &&
@@ -640,14 +636,12 @@ export class CourseProductDetailEnroll extends React.Component<
 
     if (courseRuns) {
       run = this.getFirstUnexpiredRun()
-      console.log(run)
 
       if (run) {
         product = run && run.products ? run.products[0] : null
         this.updateDate(run)
       }
     }
-    console.log("runs", courseRuns)
 
     return (
       <>

@@ -145,7 +145,6 @@ export class ProgramProductDetailEnroll extends React.Component<
   }
 
   renderCertificateInfoPanel() {
-    console.log("rendering")
     const { currentCourseRun: run } = this.state
 
     const product = run && run.products ? run.products[0] : null
