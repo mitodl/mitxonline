@@ -1,3 +1,5 @@
+// Ignore - scratch file I used for moving things around at one point mentally. Will remove, but keeping until done done.
+
 import React from "react"
 import type {Sandbox} from "../flow/sinonTypes"
 import sinon from "sinon"
