@@ -1,6 +1,6 @@
 import React from "react"
 import R from "ramda"
-import {mount, shallow} from "enzyme"
+import { mount, shallow } from "enzyme"
 import sinon from "sinon"
 import { createMemoryHistory } from "history"
 
@@ -8,8 +8,8 @@ import configureStoreMain from "../store/configureStore"
 
 import type { Sandbox } from "../flow/sinonTypes"
 import * as networkInterfaceFuncs from "../store/network_interface"
-import {Provider, ReactReduxContext} from "react-redux"
-import {Route, Router} from "react-router"
+import { Provider, ReactReduxContext } from "react-redux"
+import { Route, Router } from "react-router"
 
 export default class IntegrationTestHelper {
   sandbox: Sandbox
@@ -99,7 +99,7 @@ export default class IntegrationTestHelper {
           context: {
             // TODO: should be removed in the near future after upgrading enzyme
             store
-          },
+          }
         }
       )
 
@@ -144,18 +144,12 @@ export default class IntegrationTestHelper {
     defaultProps = {}
   ) {
     const history = this.browserHistory
-    return async (
-      extraState = {},
-      extraProps = {}
-    ) => {
+    return async (extraState = {}, extraProps = {}) => {
       const initialState = R.mergeDeepRight(defaultState, extraState)
       const store = configureStoreMain(initialState)
 
       const ComponentWithProps = () => (
-        <WrappedComponent
-          {...defaultProps}
-          {...extraProps}
-        />
+        <WrappedComponent {...defaultProps} {...extraProps} />
       )
 
       const wrapper = mount(
@@ -163,7 +157,7 @@ export default class IntegrationTestHelper {
           <Router history={history}>
             <Route path="*" component={ComponentWithProps} />
           </Router>
-        </Provider>,
+        </Provider>
       )
       store.getLastAction = function() {
         const actions = this.getActions()

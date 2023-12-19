@@ -73,13 +73,16 @@ describe("CourseProductDetailEnrollShallowRender", () => {
   })
 
   it("renders a Loader component", async () => {
-    const { inner } = await renderPage({
-      queries: {
-        courseRuns: {
-          isPending: true
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courseRuns: {
+            isPending: true
+          }
         }
-      }
-    }, {isLoading: true})
+      },
+      { isLoading: true }
+    )
     const loader = inner.find("Loader").first()
     assert.isOk(loader.exists())
     assert.isTrue(loader.props().isLoading)
@@ -263,7 +266,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     assert.equal(item.text(), "Enrolled ✓")
     assert.equal(courseRunsSelector(store.getState())[0], expectedResponse)
   })
-
   ;[
     [true, false],
     [false, false],
@@ -380,7 +382,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       courseruns: [courseRun]
     }
 
-
     const entities = {
       currentUser: currentUser,
       enrollments: [],
@@ -411,7 +412,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     )
   })
 })
-
 
 describe("CourseProductDetailEnrollDeepRender", () => {
   let helper,
@@ -461,27 +461,30 @@ describe("CourseProductDetailEnrollDeepRender", () => {
     helper.cleanup()
   })
 
-
   it(`shows form based enrollment button when upgrade deadline has passed but course is within enrollment period`, async () => {
     isWithinEnrollmentPeriodStub.returns(true)
     courseRun.is_upgradable = false
     course.next_run_id = courseRun.id
 
-    const { wrapper } = await renderPage({
-      entities: {
-        courseRuns: [courseRun],
-        courses:    [course]
-      },
-      queries: {
-        courseRuns: {
-          isPending: false,
-          status:    200
+    const { wrapper } = await renderPage(
+      {
+        entities: {
+          courseRuns: [courseRun],
+          courses:    [course]
         },
-        courses: {
-          isPending: false,
-          status:    200
+        queries: {
+          courseRuns: {
+            isPending: false,
+            status:    200
+          },
+          courses: {
+            isPending: false,
+            status:    200
+          }
         }
-      }}, {courseId: course.id})
+      },
+      { courseId: course.id }
+    )
     sinon.assert.calledWith(
       helper.handleRequestStub,
       "/api/course_runs/?relevant_to=",
@@ -492,8 +495,6 @@ describe("CourseProductDetailEnrollDeepRender", () => {
     const enrollBtn = wrapper.find("form > button.enroll-now")
     assert.isTrue(enrollBtn.exists())
   })
-
-
   ;[
     [true, 201],
     [false, 400]
@@ -619,7 +620,6 @@ describe("CourseProductDetailEnrollDeepRender", () => {
       )
     })
   })
-
   ;[[true], [false]].forEach(([flexPriceApproved]) => {
     it(`shows the flexible pricing available link if the user does not have approved flexible pricing for the course run`, async () => {
       courseRun["approved_flexible_price_exists"] = flexPriceApproved
@@ -654,7 +654,6 @@ describe("CourseProductDetailEnrollDeepRender", () => {
     })
   })
 
-
   it(`shows the enroll button and upsell message, and checks for enrollments when the enroll button is clicked`, async () => {
     courseRun["products"] = [
       {
@@ -677,8 +676,6 @@ describe("CourseProductDetailEnrollDeepRender", () => {
       "GET"
     )
   })
-
-
   ;[
     ["shows", "one", false],
     ["shows", "multiple", true]
@@ -743,4 +740,3 @@ describe("CourseProductDetailEnrollDeepRender", () => {
     })
   })
 })
-

@@ -127,10 +127,7 @@ describe("NotificationContainer component", () => {
     await timeoutPromise
     wrapper.update()
     // Due to changes in rendering due to enzyme, this now returns as undefined. Future test updates should
-    assert.deepEqual(
-      wrapper.prop("userNotifications"),
-      undefined
-    )
+    assert.deepEqual(wrapper.prop("userNotifications"), undefined)
     assert.deepEqual(inner.state(), { hiddenNotifications: new Set() })
   })
 })

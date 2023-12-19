@@ -4,7 +4,7 @@ import { queryMiddleware } from "redux-query"
 
 import { makeRequest } from "./network_interface"
 import rootReducer from "../reducers"
-import {getEntities, getQueries} from "../lib/queries/util"
+import { getEntities, getQueries } from "../lib/queries/util"
 
 // Setup middleware
 export default function configureStore(initialState: Object) {
