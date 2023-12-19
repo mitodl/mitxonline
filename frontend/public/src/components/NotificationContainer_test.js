@@ -1,6 +1,5 @@
 // @flow
 import { assert } from "chai"
-import { omit } from "ramda"
 
 import NotificationContainer, {
   NotificationContainer as InnerNotificationContainer

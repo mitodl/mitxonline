@@ -66,10 +66,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       courseApi,
       "isWithinEnrollmentPeriod"
     )
-    isFinancialAssistanceAvailableStub = helper.sandbox.stub(
-      courseApi,
-      "isFinancialAssistanceAvailable"
-    )
   })
 
   afterEach(() => {
@@ -486,12 +482,12 @@ describe("CourseProductDetailEnrollDeepRender", () => {
           status:    200
         }
       }}, {courseId: course.id})
-    // sinon.assert.calledWith(
-    //   helper.handleRequestStub,
-    //   "/api/course_runs/?relevant_to=",
-    //   "GET"
-    // )
-    // sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/course_runs/?relevant_to=",
+      "GET"
+    )
+    sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
 
     const enrollBtn = wrapper.find("form > button.enroll-now")
     assert.isTrue(enrollBtn.exists())
