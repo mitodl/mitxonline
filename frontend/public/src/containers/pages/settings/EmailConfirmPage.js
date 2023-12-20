@@ -22,7 +22,7 @@ import { qsVerificationCodeSelector } from "../../../lib/selectors"
 import type { RouterHistory, Location } from "react-router"
 import type { updateEmailResponse } from "../../../flow/authTypes"
 import users from "../../../lib/queries/users"
-import type { Response } from "redux-query"
+import type { QueryResponse } from "redux-query/types.js.flow"
 import type { User } from "../../../flow/authTypes"
 
 type Props = {
@@ -31,7 +31,7 @@ type Props = {
   location: Location,
   history: RouterHistory,
   updateEmail: ?updateEmailResponse,
-  getCurrentUser: () => Promise<Response<User>>
+  getCurrentUser: () => Promise<QueryResponse<User>>
 }
 
 export class EmailConfirmPage extends React.Component<Props> {

@@ -3,7 +3,7 @@ import { nthArg } from "ramda"
 
 import { getCookie } from "../api"
 
-import type { QueryState } from "redux-query"
+import type { QueryState } from "redux-query-react/src/types.js"
 
 // replace the previous state with the next state without merging
 export const nextState = nthArg(1)
