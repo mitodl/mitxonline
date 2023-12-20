@@ -28,7 +28,7 @@ authors  = ["MIT ODL"]
 
 
 [tool.poetry.dependencies]
-python = "3.9.6"
+python = "3.9.18"
 beautifulsoup4 = "^4.8.2"
 celery = "^5.2.2"
 celery-redbeat = "^2.0.0"
