@@ -4,7 +4,7 @@
   "private": true,
   "dependencies": {
     "@ant-design/icons": "^5.0.0",
-    "@craco/craco": "6.4.3",
+    "@craco/craco": "6.4.5",
     "@pankod/refine-antd": "3.22.1",
     "@pankod/refine-core": "3.22.1",
     "@pankod/refine-react-router-v6": "3.22.1",

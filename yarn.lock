@@ -1754,9 +1754,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@craco/craco@npm:6.4.3":
-  version: 6.4.3
-  resolution: "@craco/craco@npm:6.4.3"
+"@craco/craco@npm:6.4.5":
+  version: 6.4.5
+  resolution: "@craco/craco@npm:6.4.5"
   dependencies:
     cosmiconfig: ^7.0.1
     cosmiconfig-typescript-loader: ^1.0.0
@@ -1768,7 +1768,7 @@ __metadata:
     react-scripts: ^4.0.0
   bin:
     craco: bin/craco.js
-  checksum: f177f0c15c32cb80ed5c25a62af7e0754268580bfdf2790f48f3d0399ae33288630ddcf3823e3f29b9f0010fef231eb48c91ba0371af6bac75ebc9e0e04b5a01
+  checksum: 7a8865fee9ab670a8fc6771971e6ab53ab6fb536feec414d9a69a09008e2e2437f2133aa70f2f7ffd3748af448d43f42007dc325b1c7ab0648ef5fc9d6a9f61c
   languageName: node
   linkType: hard
 
@@ -13647,7 +13647,7 @@ __metadata:
   resolution: "mitx-online-staff-dashboard@workspace:frontend/staff-dashboard"
   dependencies:
     "@ant-design/icons": ^5.0.0
-    "@craco/craco": 6.4.3
+    "@craco/craco": 6.4.5
     "@pankod/refine-antd": 3.22.1
     "@pankod/refine-core": 3.22.1
     "@pankod/refine-react-router-v6": 3.22.1
