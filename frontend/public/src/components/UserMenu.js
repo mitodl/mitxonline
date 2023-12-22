@@ -77,7 +77,6 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
         aria-haspopup="true"
         aria-expanded="false"
         type="button"
-        role="menu"
       >
         {currentUser.name}
       </button>
