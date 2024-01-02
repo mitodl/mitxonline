@@ -13727,6 +13727,9 @@ __metadata:
   resolution: "mitx-online-root@workspace:."
   dependencies:
     react-content-loader: ^6.2.1
+    redux-query: 3.3.1
+    redux-query-interface-superagent: 3.3.1
+    redux-query-react: 3.3.1
   languageName: unknown
   linkType: soft
 
