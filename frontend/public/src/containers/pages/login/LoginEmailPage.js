@@ -19,15 +19,14 @@ import EmailForm from "../../../components/forms/EmailForm"
 
 import type { RouterHistory, Location } from "react-router"
 
-// $FlowFixMe: redux-query response type does not exist
-import type { Response } from "redux-query/src/types"
+import type { QueryResponse } from "redux-query/types.js.flow"
 import type { AuthResponse, EmailFormValues } from "../../../flow/authTypes"
 import { Link } from "react-router-dom"
 
 type Props = {
   location: Location,
   history: RouterHistory,
-  loginEmail: (email: string, next: ?string) => Promise<Response<AuthResponse>>
+  loginEmail: (email: string, next: ?string) => Promise<QueryResponse<AuthResponse>>
 }
 
 export class LoginEmailPage extends React.Component<Props> {
