@@ -20,7 +20,7 @@ import EmailForm from "../../../components/forms/EmailForm"
 import type { RouterHistory, Location } from "react-router"
 
 // $FlowFixMe: redux-query response type does not exist
-import type { Response } from "redux-query"
+import type { Response } from "redux-query/src/types"
 import type { AuthResponse, EmailFormValues } from "../../../flow/authTypes"
 import { Link } from "react-router-dom"
 
