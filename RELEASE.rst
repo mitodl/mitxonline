@@ -1,6 +1,22 @@
 Release Notes
 =============
 
+Version 0.82.3
+--------------
+
+- Check to make sure the end date and upgrade deadline haven't passed before grabbing your audit enrollment (#2044)
+- fix(deps): update dependency posthog to v3.1.0 (#2032)
+- Program enrollment: choose courses (#2028)
+- fix(deps): update dependency boto3 to v1.34.5 (#1803)
+- Update dependency enzyme-adapter-react-16 to v1.15.7 (#1806)
+- Update dependency chai to v4.3.10 (#1804)
+- Update dependency celery to v5.3.6 (#2029)
+- Update dependency @sentry/browser to v6.19.7 (#1802)
+- Update dependency @craco/craco to v6.4.5 (#1801)
+- chore: Bump Python patch release and generate Poetry lock (#2041)
+- Update dependency dayjs to v1.11.10 (#1805)
+- Update dependency postcss to v8.4.31 [SECURITY] (#1943)
+
 Version 0.82.2 (Released December 14, 2023)
 --------------
 
