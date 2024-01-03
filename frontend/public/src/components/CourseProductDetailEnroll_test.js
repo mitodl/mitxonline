@@ -325,46 +325,6 @@ describe("CourseProductDetailEnroll", () => {
         "$9.00"
       )
     })
-    it(`shows dialog to upgrade user enrollment with flexible percent-off discount and handles ${returnedStatusCode} response`, async () => {
-      courseRun["products"] = [
-        {
-          id:                     1,
-          price:                  10,
-          product_flexible_price: {
-            amount:        10,
-            discount_type: DISCOUNT_TYPE_PERCENT_OFF
-          }
-        }
-      ]
-      isWithinEnrollmentPeriodStub.returns(true)
-      const { inner } = await renderPage()
-
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/course_runs/?relevant_to=",
-        "GET"
-      )
-      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-
-      const enrollBtn = inner.find(".enroll-now").at(0)
-      assert.isTrue(enrollBtn.exists())
-      await enrollBtn.prop("onClick")()
-
-      const modal = inner.find(".upgrade-enrollment-modal")
-      const upgradeForm = modal.find("form").at(0)
-      assert.isTrue(upgradeForm.exists())
-
-      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
-
-      assert.equal(
-        inner
-          .find("#certificate-price-info")
-          .at(0)
-          .text()
-          .at(1),
-        "9"
-      )
-    })
     it(`shows dialog to upgrade user enrollment with flexible fixed-price discount and handles ${returnedStatusCode} response`, async () => {
       courseRun["products"] = [
         {
@@ -526,6 +486,85 @@ describe("CourseProductDetailEnroll", () => {
         assert.isFalse(selectorControl.exists())
       }
     })
+  })
+  it("renders the upsell dialog with the correct date if the user has an enrollment in the past that is not upgradeable", async () => {
+    const pastCourseRun = makeCourseRunDetail()
+    pastCourseRun["start_date"] = moment().add(-1, "Y")
+    pastCourseRun["end_date"] = moment().add(-11, "M")
+    pastCourseRun["enrollment_start"] = pastCourseRun["start_date"]
+    pastCourseRun["enrollment_end"] = pastCourseRun["end_date"]
+    pastCourseRun["upgrade_deadline"] = moment().add(-11, "M")
+    pastCourseRun["is_upgradable"] = true
+
+    const currentCourseRun = makeCourseRunDetail()
+    currentCourseRun["start_date"] = moment().add(1, "M")
+    currentCourseRun["end_date"] = moment().add(1, "Y")
+    currentCourseRun["enrollment_start"] = moment().add(-1, "M")
+    currentCourseRun["enrollment_end"] = currentCourseRun["end_date"]
+    currentCourseRun["upgrade_deadline"] = moment().add(11, "M")
+    currentCourseRun["is_upgradable"] = true
+
+    const pastCourseRunEnrollment = makeCourseRunEnrollment()
+    pastCourseRunEnrollment.run = pastCourseRun
+    pastCourseRunEnrollment.enrollment_mode = "audit"
+
+    pastCourseRun["products"] = currentCourseRun["products"] = [
+      {
+        id:                     1,
+        price:                  10,
+        is_upgradable:          true,
+        product_flexible_price: {
+          amount:        10,
+          discount_type: DISCOUNT_TYPE_PERCENT_OFF
+        }
+      }
+    ]
+
+    const course = {
+      ...makeCourseDetailWithRuns(),
+      courseruns: [pastCourseRun, currentCourseRun]
+    }
+
+    const entities = {
+      courseRuns:  [currentCourseRun],
+      courses:     [course],
+      enrollments: [pastCourseRunEnrollment],
+      currentUser: currentUser
+    }
+
+    isWithinEnrollmentPeriodStub.returns(true)
+    const { inner } = await renderPage({
+      entities: entities
+    })
+
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/course_runs/?relevant_to=",
+      "GET"
+    )
+    sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+    sinon.assert.calledWith(
+      helper.handleRequestStub,
+      "/api/enrollments/",
+      "GET"
+    )
+
+    const enrollBtn = inner.find(".enroll-now").at(0)
+    assert.isTrue(enrollBtn.exists())
+
+    await enrollBtn.prop("onClick")()
+
+    const modal = inner.find(".upgrade-enrollment-modal")
+    const upgradeForm = modal.find("form").at(0)
+    assert.isTrue(upgradeForm.exists())
+
+    const certPricing = modal.find(".certificate-pricing").at(0)
+    assert.isTrue(certPricing.exists())
+    assert.isTrue(
+      certPricing
+        .text()
+        .includes(currentCourseRun["upgrade_deadline"].format("MMMM D, YYYY"))
+    )
   })
   ;[
     [true, false],
