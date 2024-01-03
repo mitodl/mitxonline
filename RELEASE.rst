@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.82.3
+Version 0.82.3 (Released January 03, 2024)
 --------------
 
 - Check to make sure the end date and upgrade deadline haven't passed before grabbing your audit enrollment (#2044)
