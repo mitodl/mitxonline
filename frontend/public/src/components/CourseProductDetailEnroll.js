@@ -83,11 +83,26 @@ export class CourseProductDetailEnroll extends React.Component<
     destinationUrl:                    ""
   }
 
+  resolveFirstEnrollableRun() {
+    const { courseRuns } = this.props
+
+    const enrollableRun = courseRuns.find((run: EnrollmentFlaggedCourseRun) => {
+      return (
+        (run.enrollment_start === null ||
+          moment(run.enrollment_start).isBefore(moment.now())) &&
+        (run.enrollment_end === null ||
+          moment(run.enrollment_end).isAfter(moment.now()))
+      )
+    })
+
+    return enrollableRun
+  }
+
   resolveCurrentRun() {
     const { courseRuns } = this.props
 
     return !this.getCurrentCourseRun() && courseRuns
-      ? courseRuns[0]
+      ? this.resolveFirstEnrollableRun()
       : this.getCurrentCourseRun()
   }
 
