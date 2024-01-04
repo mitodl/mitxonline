@@ -86,7 +86,7 @@ export class CourseProductDetailEnroll extends React.Component<
   resolveFirstEnrollableRun() {
     const { courseRuns } = this.props
 
-    const enrollableRun = courseRuns
+    const enrollableRun = courseRuns && courseRuns
       .sort((a: EnrollmentFlaggedCourseRun, b: EnrollmentFlaggedCourseRun) => {
         if (moment(a.enrollment_start).isBefore(moment(b.enrollment_start))) {
           return -1
@@ -107,7 +107,7 @@ export class CourseProductDetailEnroll extends React.Component<
         )
       })
 
-    return enrollableRun
+    return enrollableRun || courseRuns[0]
   }
 
   resolveCurrentRun() {
