@@ -86,14 +86,26 @@ export class CourseProductDetailEnroll extends React.Component<
   resolveFirstEnrollableRun() {
     const { courseRuns } = this.props
 
-    const enrollableRun = courseRuns.find((run: EnrollmentFlaggedCourseRun) => {
-      return (
-        (run.enrollment_start === null ||
-          moment(run.enrollment_start).isBefore(moment.now())) &&
-        (run.enrollment_end === null ||
-          moment(run.enrollment_end).isAfter(moment.now()))
-      )
-    })
+    const enrollableRun = courseRuns
+      .sort((a: EnrollmentFlaggedCourseRun, b: EnrollmentFlaggedCourseRun) => {
+        if (moment(a.enrollment_start).isBefore(moment(b.enrollment_start))) {
+          return -1
+        } else if (
+          moment(a.enrollment_start).isAfter(moment(b.enrollment_start))
+        ) {
+          return 1
+        } else {
+          return 0
+        }
+      })
+      .find((run: EnrollmentFlaggedCourseRun) => {
+        return (
+          (run.enrollment_start === null ||
+            moment(run.enrollment_start).isBefore(moment.now())) &&
+          (run.enrollment_end === null ||
+            moment(run.enrollment_end).isAfter(moment.now()))
+        )
+      })
 
     return enrollableRun
   }
