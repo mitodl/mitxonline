@@ -107,7 +107,7 @@ export class CourseProductDetailEnroll extends React.Component<
         )
       })
 
-    return enrollableRun || courseRuns[0]
+    return enrollableRun || (courseRuns && courseRuns[0])
   }
 
   resolveCurrentRun() {
