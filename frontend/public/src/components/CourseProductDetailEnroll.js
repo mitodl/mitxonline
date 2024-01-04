@@ -362,7 +362,7 @@ export class CourseProductDetailEnroll extends React.Component<
       )
       : []
 
-    return product ? (
+    return run && product ? (
       showNewDesign ? (
         <Modal
           id={`upgrade-enrollment-dialog`}
