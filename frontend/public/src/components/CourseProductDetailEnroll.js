@@ -86,26 +86,32 @@ export class CourseProductDetailEnroll extends React.Component<
   resolveFirstEnrollableRun() {
     const { courseRuns } = this.props
 
-    const enrollableRun = courseRuns && courseRuns
-      .sort((a: EnrollmentFlaggedCourseRun, b: EnrollmentFlaggedCourseRun) => {
-        if (moment(a.enrollment_start).isBefore(moment(b.enrollment_start))) {
-          return -1
-        } else if (
-          moment(a.enrollment_start).isAfter(moment(b.enrollment_start))
-        ) {
-          return 1
-        } else {
-          return 0
-        }
-      })
-      .find((run: EnrollmentFlaggedCourseRun) => {
-        return (
-          (run.enrollment_start === null ||
-            moment(run.enrollment_start).isBefore(moment.now())) &&
-          (run.enrollment_end === null ||
-            moment(run.enrollment_end).isAfter(moment.now()))
+    const enrollableRun =
+      courseRuns &&
+      courseRuns
+        .sort(
+          (a: EnrollmentFlaggedCourseRun, b: EnrollmentFlaggedCourseRun) => {
+            if (
+              moment(a.enrollment_start).isBefore(moment(b.enrollment_start))
+            ) {
+              return -1
+            } else if (
+              moment(a.enrollment_start).isAfter(moment(b.enrollment_start))
+            ) {
+              return 1
+            } else {
+              return 0
+            }
+          }
         )
-      })
+        .find((run: EnrollmentFlaggedCourseRun) => {
+          return (
+            (run.enrollment_start === null ||
+              moment(run.enrollment_start).isBefore(moment.now())) &&
+            (run.enrollment_end === null ||
+              moment(run.enrollment_end).isAfter(moment.now()))
+          )
+        })
 
     return enrollableRun || (courseRuns && courseRuns[0])
   }
@@ -340,8 +346,12 @@ export class CourseProductDetailEnroll extends React.Component<
     const run = this.resolveCurrentRun()
 
     const course =
-      courses && courses.find((elem: any) => elem.id === run.course.id)
+      courses &&
+      courses.find(
+        (elem: any) => run && run.course && elem.id === run.course.id
+      )
     const needFinancialAssistanceLink =
+      run &&
       isFinancialAssistanceAvailable(run) &&
       !run.approved_flexible_price_exists ? (
           <p className="financial-assistance-link">
@@ -355,7 +365,7 @@ export class CourseProductDetailEnroll extends React.Component<
           </p>
         ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
-    const product = run.products ? run.products[0] : null
+    const product = run && run.products ? run.products[0] : null
     const upgradableCourseRuns = courseRuns
       ? courseRuns.filter(
         (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
