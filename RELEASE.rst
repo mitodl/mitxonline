@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.82.4
+--------------
+
+- When resolving the current run, make sure it's also enrollable (#2046)
+
 Version 0.82.3 (Released January 03, 2024)
 --------------
 
