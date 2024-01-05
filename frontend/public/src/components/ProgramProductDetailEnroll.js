@@ -266,7 +266,7 @@ export class ProgramProductDetailEnroll extends React.Component<
                       key={`selectable-courserun-${run.id}`}
                       value={run.courseware_id}
                     >
-                      {run.title} - {run.courseware_id}
+                      {run.title} - {run.course_number}
                     </option>
                   ))}
                 </select>
