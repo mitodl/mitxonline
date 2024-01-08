@@ -27,7 +27,7 @@ import RegisterEmailForm from "../../../components/forms/RegisterEmailForm"
 import { routes } from "../../../lib/urls"
 
 import type { RouterHistory, Location } from "react-router"
-import type { Response } from "redux-query"
+import type { HttpResponse } from "../../../flow/httpTypes"
 import type { AuthResponse } from "../../../flow/authTypes"
 import type { RegisterEmailFormValues } from "../../../components/forms/RegisterEmailForm"
 
@@ -39,7 +39,7 @@ type Props = {
     email: string,
     recaptcha: ?string,
     next: ?string
-  ) => Promise<Response<AuthResponse>>,
+  ) => Promise<HttpResponse<AuthResponse>>,
   addUserNotification: Function
 }
 

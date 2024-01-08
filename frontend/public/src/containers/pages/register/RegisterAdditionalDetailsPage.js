@@ -19,7 +19,7 @@ import {
   AddlProfileFields
 } from "../../../components/forms/ProfileFormFields"
 
-import type { Response } from "redux-query"
+import type { HttpResponse } from "../../../flow/httpTypes"
 import type { User } from "../../../flow/authTypes"
 import { addUserNotification } from "../../../actions"
 
@@ -28,8 +28,8 @@ type StateProps = {|
 |}
 
 type DispatchProps = {|
-  editProfile: (userProfileData: User) => Promise<Response<User>>,
-  getCurrentUser: () => Promise<Response<User>>
+  editProfile: (userProfileData: User) => Promise<HttpResponse<User>>,
+  getCurrentUser: () => Promise<HttpResponse<User>>
 |}
 
 type Props = {|

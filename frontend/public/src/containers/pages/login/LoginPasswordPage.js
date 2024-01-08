@@ -16,12 +16,12 @@ import { STATE_ERROR, handleAuthResponse } from "../../../lib/auth"
 import LoginPasswordForm from "../../../components/forms/LoginPasswordForm"
 
 import type { RouterHistory, Location } from "react-router"
-import type { Response } from "redux-query"
 import type {
   AuthResponse,
   User,
   PasswordFormValues
 } from "../../../flow/authTypes"
+import type { HttpResponse } from "../../../flow/httpTypes"
 
 type Props = {
   location: Location,
@@ -30,8 +30,8 @@ type Props = {
   loginPassword: (
     password: string,
     partialToken: string
-  ) => Promise<Response<AuthResponse>>,
-  getCurrentUser: () => Promise<Response<User>>
+  ) => Promise<HttpResponse<AuthResponse>>,
+  getCurrentUser: () => Promise<HttpResponse<User>>
 }
 
 export class LoginPasswordPage extends React.Component<Props> {

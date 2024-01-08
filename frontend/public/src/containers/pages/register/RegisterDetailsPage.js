@@ -29,7 +29,7 @@ import RegisterDetailsForm from "../../../components/forms/RegisterDetailsForm"
 import { addUserNotification } from "../../../actions"
 
 import type { RouterHistory, Location } from "react-router"
-import type { Response } from "redux-query"
+import type { HttpResponse } from "../../../flow/httpTypes"
 import type {
   AuthResponse,
   LegalAddress,
@@ -57,8 +57,8 @@ type DispatchProps = {|
     userProfile: UserProfile,
     partialToken: string,
     next: ?string
-  ) => Promise<Response<AuthResponse>>,
-  getCurrentUser: () => Promise<Response<User>>,
+  ) => Promise<HttpResponse<AuthResponse>>,
+  getCurrentUser: () => Promise<HttpResponse<User>>,
   addUserNotification: Function
 |}
 
