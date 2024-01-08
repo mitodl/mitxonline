@@ -611,7 +611,9 @@ export class CourseProductDetailEnroll extends React.Component<
     return !currentUser || !currentUser.id ? (
       <h2>
         <a
-          href={routes.login}
+          href={`${routes.login}?next=${encodeURIComponent(
+            window.location.pathname
+          )}`}
           className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
         >
           Enroll now
