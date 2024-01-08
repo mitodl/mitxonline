@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.83.0
+--------------
+
+- add next parameter to course and program enrollment pages for unauthenticated users (#2050)
+- display course number on program enroll modal (#2048)
+
 Version 0.82.4 (Released January 04, 2024)
 --------------
 
