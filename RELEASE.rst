@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.83.0
+Version 0.83.0 (Released January 09, 2024)
 --------------
 
 - add next parameter to course and program enrollment pages for unauthenticated users (#2050)
