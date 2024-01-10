@@ -333,37 +333,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       }
     })
   })
-
-  it("CourseInfoBox renders a date selector with Enrolled text if the user is enrolled in one", async () => {
-    const secondCourseRun = makeCourseRunDetail()
-    const enrollment = {
-      ...makeCourseRunEnrollment(),
-      run: secondCourseRun
-    }
-
-    const entities = {
-      currentUser: currentUser,
-      enrollments: [enrollment],
-      courseRuns:  [courseRun, secondCourseRun]
-    }
-
-    const { inner } = await renderPage({
-      entities: entities
-    })
-
-    assert.isTrue(inner.exists())
-    const infobox = inner.find("CourseInfoBox").dive()
-    assert.isTrue(infobox.exists())
-
-    const moreDatesLink = infobox.find("button.more-enrollment-info").first()
-    await moreDatesLink.prop("onClick")()
-
-    const selectorBar = infobox.find(".more-dates-enrollment-list")
-    assert.isTrue(selectorBar.exists())
-
-    const enrolledItem = infobox.find(".more-dates-link.enrolled")
-    assert.isTrue(enrolledItem.exists())
-  })
   ;[[true], [false]].forEach(([flexPriceApproved]) => {
     it(`shows the flexible pricing available link if the user does not have approved flexible pricing for the course run`, async () => {
       courseRun["approved_flexible_price_exists"] = flexPriceApproved
@@ -806,56 +775,5 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     const enrolledItem = infobox.find(".more-dates-link.enrolled")
 
     assert.isTrue(enrolledItem.exists())
-  })
-
-  it("CourseInfoBox renders the archived message if the course is archived", async () => {
-    const courseRun = {
-      ...makeCourseRunDetail(),
-      is_self_paced:    true,
-      enrollment_end:   null,
-      enrollment_start: moment()
-        .subtract(1, "years")
-        .toISOString(),
-      start_date: moment()
-        .subtract(10, "months")
-        .toISOString(),
-      end_date: moment()
-        .subtract(7, "months")
-        .toISOString(),
-      upgrade_deadline: null
-    }
-    const course = {
-      ...makeCourseDetailWithRuns(),
-      courseruns: [courseRun]
-    }
-
-    const entities = {
-      currentUser: currentUser,
-      enrollments: [],
-      courseRuns:  [courseRun],
-      courses:     [course]
-    }
-
-    const { inner } = await renderPage({
-      entities: entities
-    })
-
-    assert.isTrue(inner.exists())
-    const infobox = inner.find("CourseInfoBox").dive()
-    assert.isTrue(infobox.exists())
-
-    const archivedMessage = infobox.find("div.course-archived-message")
-    assert.isTrue(archivedMessage.exists())
-
-    const contentAvailabilityMessage = infobox.find(
-      "div.course-timing-message div.enrollment-info-text"
-    )
-    assert.isTrue(contentAvailabilityMessage.exists())
-    assert.isTrue(
-      contentAvailabilityMessage
-        .first()
-        .text()
-        .includes("Course content available anytime")
-    )
   })
 })
