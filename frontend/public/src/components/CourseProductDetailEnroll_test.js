@@ -24,9 +24,6 @@ import {
 } from "../constants"
 
 import * as courseApi from "../lib/courseApi"
-import * as reduxqueryreact from "redux-query-react"
-
-import sinon from "sinon"
 import { makeUser, makeAnonymousUser } from "../factories/user"
 
 describe("CourseProductDetailEnrollShallowRender", () => {
