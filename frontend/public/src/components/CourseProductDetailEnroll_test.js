@@ -367,7 +367,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     const enrolledItem = infobox.find(".more-dates-link.enrolled")
     assert.isTrue(enrolledItem.exists())
   })
-
   ;[[true], [false]].forEach(([flexPriceApproved]) => {
     it(`shows the flexible pricing available link if the user does not have approved flexible pricing for the course run`, async () => {
       courseRun["approved_flexible_price_exists"] = flexPriceApproved
@@ -578,7 +577,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       )
     })
   })
-
 
   it(`shows the enroll button and upsell message, and checks for enrollments when the enroll button is clicked`, async () => {
     courseRun["products"] = [

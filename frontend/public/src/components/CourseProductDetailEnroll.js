@@ -648,7 +648,6 @@ export class CourseProductDetailEnroll extends React.Component<
 
               {currentUser ? this.renderAddlProfileFieldsModal() : null}
               {run ? this.renderUpgradeEnrollmentDialog(showNewDesign) : null}
-
             </>
           </Loader>
         }
