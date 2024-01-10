@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.83.1
+--------------
+
+- fix flow (#2053)
+- Remove role menu (#2043)
+- fix(deps): update dependency ipython to v8 (#2036)
+
 Version 0.83.0 (Released January 09, 2024)
 --------------
 
