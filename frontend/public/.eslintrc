@@ -8,7 +8,8 @@
   "rules": {
     "no-unused-vars": [
       "error", {
-        "argsIgnorePattern": "^__"
+        "argsIgnorePattern": "^__",
+        "ignoreRestSiblings": true
         }
       ],
     // module importing pattern have huge impact over performance, especially when it comes to lodash

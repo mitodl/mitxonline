@@ -113,8 +113,12 @@ const mapStateToProps = createStructuredSelector({
   qsParams: qsSelector
 })
 
-const mapPropsToConfig = ({ qsParams }) =>
-  mutateAsync(queries.auth.registerConfirmEmailMutation(qsParams))
+const mapPropsToConfig = ({ qsParams }) => {
+  const { type, ...config } = mutateAsync(
+    queries.auth.registerConfirmEmailMutation(qsParams)
+  )
+  return config
+}
 
 const mapDispatchToProps = {
   addUserNotification

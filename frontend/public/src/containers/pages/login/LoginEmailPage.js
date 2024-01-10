@@ -19,14 +19,17 @@ import EmailForm from "../../../components/forms/EmailForm"
 
 import type { RouterHistory, Location } from "react-router"
 
-import type { QueryResponse } from "redux-query/types.js.flow"
+import type { HttpResponse } from "../../../flow/httpTypes"
 import type { AuthResponse, EmailFormValues } from "../../../flow/authTypes"
 import { Link } from "react-router-dom"
 
 type Props = {
   location: Location,
   history: RouterHistory,
-  loginEmail: (email: string, next: ?string) => Promise<QueryResponse<AuthResponse>>
+  loginEmail: (
+    email: string,
+    next: ?string
+  ) => Promise<HttpResponse<AuthResponse>>
 }
 
 export class LoginEmailPage extends React.Component<Props> {
