@@ -397,6 +397,10 @@ body.new-design {
       font-size: 16px;
       font-weight: 400;
     }
+    .enroll-now-free:focus-visible {
+      border-radius: 0;
+      outline: 2px #28977e solid;
+    }
 
     form {
       margin-bottom: 0;
@@ -411,6 +415,11 @@ body.new-design {
         background-repeat: no-repeat;
         padding: 11px 22px;
       }
+      .btn-upgrade:focus-visible {
+          border-color: #82192a;
+          outline: 0;
+          box-shadow: 0 0 0 0.25rem rgba(177, 65, 82, .5);
+        }
     }
 
     ul {
