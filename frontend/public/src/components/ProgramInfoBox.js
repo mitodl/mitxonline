@@ -133,23 +133,8 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
               <div className="enrollment-info-text">
                 {program.page.length}
                 {run && run.is_self_paced ? (
-                  <>
-                    <span className="badge badge-pacing">SELF-PACED</span>
-                    <a className="pacing-faq-link float-right" href="/">
-                      What's this?
-                    </a>
-                  </>
-                ) : (
-                  <>
-                    <span className="badge badge-pacing">INSTRUCTOR-PACED</span>
-                    <a
-                      className="pacing-faq-link float-right"
-                      href="https://google.com"
-                    >
-                      What's this?
-                    </a>
-                  </>
-                )}
+                  <span className="badge badge-pacing">SELF-PACED</span>
+                ) : null}
                 {program.page.effort ? (
                   <>
                     <div className="enrollment-effort">
