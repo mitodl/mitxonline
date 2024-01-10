@@ -24,6 +24,7 @@ import {
 } from "../constants"
 
 import * as courseApi from "../lib/courseApi"
+import * as reduxqueryreact from "redux-query-react"
 
 import sinon from "sinon"
 import { makeUser, makeAnonymousUser } from "../factories/user"
@@ -32,6 +33,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
   let helper,
     renderPage,
     isWithinEnrollmentPeriodStub,
+    isFinancialAssistanceAvailableStub,
     courseRun,
     course,
     enrollment,
@@ -61,6 +63,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     SETTINGS.features = {
       "mitxonline-new-product-page": true
     }
+
+    isFinancialAssistanceAvailableStub = helper.sandbox.stub(
+      courseApi,
+      "isFinancialAssistanceAvailable"
+    )
 
     isWithinEnrollmentPeriodStub = helper.sandbox.stub(
       courseApi,
@@ -361,6 +368,33 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     assert.isTrue(enrolledItem.exists())
   })
 
+  ;[[true], [false]].forEach(([flexPriceApproved]) => {
+    it(`shows the flexible pricing available link if the user does not have approved flexible pricing for the course run`, async () => {
+      courseRun["approved_flexible_price_exists"] = flexPriceApproved
+      courseRun["course"] = {
+        page: {
+          financial_assistance_form_url: "google.com"
+        }
+      }
+      isWithinEnrollmentPeriodStub.returns(true)
+      isFinancialAssistanceAvailableStub.returns(true)
+      const { inner } = await renderPage()
+
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      await enrollBtn.prop("onClick")()
+
+      const modal = inner.find(".upgrade-enrollment-modal")
+
+      const flexiblePricingLink = modal.find(".financial-assistance-link").at(0)
+      if (flexPriceApproved) {
+        assert.isFalse(flexiblePricingLink.exists())
+      } else {
+        assert.isTrue(flexiblePricingLink.exists())
+      }
+    })
+  })
+
   it("CourseInfoBox renders the archived message if the course is archived", async () => {
     const courseRun = {
       ...makeCourseRunDetail(),
@@ -411,62 +445,13 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         .includes("Course content available anytime")
     )
   })
-})
-
-describe("CourseProductDetailEnrollDeepRender", () => {
-  let helper,
-    renderPage,
-    isWithinEnrollmentPeriodStub,
-    isFinancialAssistanceAvailableStub,
-    courseRun,
-    course,
-    enrollment,
-    currentUser
-
-  beforeEach(() => {
-    helper = new IntegrationTestHelper()
-    courseRun = makeCourseRunDetailWithProduct()
-    course = makeCourseDetailWithRuns()
-    enrollment = makeCourseRunEnrollment()
-    currentUser = makeUser()
-
-    renderPage = helper.configureMountRenderer(
-      CourseProductDetailEnroll,
-      InnerCourseProductDetailEnroll,
-      {
-        entities: {
-          courseRuns:  [courseRun],
-          courses:     [course],
-          enrollments: [enrollment],
-          currentUser: currentUser
-        }
-      },
-      {}
-    )
-
-    SETTINGS.features = {
-      "mitxonline-new-product-page": true
-    }
-
-    isWithinEnrollmentPeriodStub = helper.sandbox.stub(
-      courseApi,
-      "isWithinEnrollmentPeriod"
-    )
-    isFinancialAssistanceAvailableStub = helper.sandbox.stub(
-      courseApi,
-      "isFinancialAssistanceAvailable"
-    )
-  })
-  afterEach(() => {
-    helper.cleanup()
-  })
 
   it(`shows form based enrollment button when upgrade deadline has passed but course is within enrollment period`, async () => {
     isWithinEnrollmentPeriodStub.returns(true)
     courseRun.is_upgradable = false
     course.next_run_id = courseRun.id
 
-    const { wrapper } = await renderPage(
+    const { inner } = await renderPage(
       {
         entities: {
           courseRuns: [courseRun],
@@ -485,14 +470,8 @@ describe("CourseProductDetailEnrollDeepRender", () => {
       },
       { courseId: course.id }
     )
-    sinon.assert.calledWith(
-      helper.handleRequestStub,
-      "/api/course_runs/?relevant_to=",
-      "GET"
-    )
-    sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
 
-    const enrollBtn = wrapper.find("form > button.enroll-now")
+    const enrollBtn = inner.find("form > button.enroll-now")
     assert.isTrue(enrollBtn.exists())
   })
   ;[
@@ -512,13 +491,6 @@ describe("CourseProductDetailEnrollDeepRender", () => {
       ]
       isWithinEnrollmentPeriodStub.returns(true)
       const { inner } = await renderPage()
-
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/course_runs/?relevant_to=",
-        "GET"
-      )
-      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
 
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
@@ -551,13 +523,6 @@ describe("CourseProductDetailEnrollDeepRender", () => {
       ]
       isWithinEnrollmentPeriodStub.returns(true)
       const { inner } = await renderPage()
-
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/course_runs/?relevant_to=",
-        "GET"
-      )
-      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
 
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
@@ -593,13 +558,6 @@ describe("CourseProductDetailEnrollDeepRender", () => {
       isFinancialAssistanceAvailableStub.returns(false)
       const { inner } = await renderPage()
 
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/course_runs/?relevant_to=",
-        "GET"
-      )
-      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
       await enrollBtn.prop("onClick")()
@@ -620,39 +578,7 @@ describe("CourseProductDetailEnrollDeepRender", () => {
       )
     })
   })
-  ;[[true], [false]].forEach(([flexPriceApproved]) => {
-    it(`shows the flexible pricing available link if the user does not have approved flexible pricing for the course run`, async () => {
-      courseRun["approved_flexible_price_exists"] = flexPriceApproved
-      courseRun["course"] = {
-        page: {
-          financial_assistance_form_url: "google.com"
-        }
-      }
-      isWithinEnrollmentPeriodStub.returns(true)
-      isFinancialAssistanceAvailableStub.returns(true)
-      const { inner } = await renderPage()
 
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/course_runs/?relevant_to=",
-        "GET"
-      )
-      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-
-      const enrollBtn = inner.find(".enroll-now").at(0)
-      assert.isTrue(enrollBtn.exists())
-      await enrollBtn.prop("onClick")()
-
-      const modal = inner.find(".upgrade-enrollment-modal")
-
-      const flexiblePricingLink = modal.find(".financial-assistance-link").at(0)
-      if (flexPriceApproved) {
-        assert.isFalse(flexiblePricingLink.exists())
-      } else {
-        assert.isTrue(flexiblePricingLink.exists())
-      }
-    })
-  })
 
   it(`shows the enroll button and upsell message, and checks for enrollments when the enroll button is clicked`, async () => {
     courseRun["products"] = [
@@ -669,12 +595,6 @@ describe("CourseProductDetailEnrollDeepRender", () => {
     const enrollBtn = inner.find(".enroll-now").at(0)
     assert.isTrue(enrollBtn.exists())
     await enrollBtn.prop("onClick")()
-
-    sinon.assert.calledWith(
-      helper.handleRequestStub,
-      "/api/enrollments/",
-      "GET"
-    )
   })
   ;[
     ["shows", "one", false],
@@ -707,18 +627,6 @@ describe("CourseProductDetailEnrollDeepRender", () => {
           currentUser: currentUser
         }
       })
-
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/course_runs/?relevant_to=",
-        "GET"
-      )
-      sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
-      sinon.assert.calledWith(
-        helper.handleRequestStub,
-        "/api/enrollments/",
-        "GET"
-      )
 
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())

@@ -312,7 +312,6 @@ export class CourseProductDetailEnroll extends React.Component<
   renderUpgradeEnrollmentDialog(showNewDesign: boolean) {
     const { courseRuns, courses } = this.props
     const run = this.resolveCurrentRun()
-
     const course =
       courses && courses.find((elem: any) => elem.id === run.course.id)
     const needFinancialAssistanceLink =
@@ -330,7 +329,6 @@ export class CourseProductDetailEnroll extends React.Component<
         ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run.products ? run.products[0] : null
-
     return product ? (
       showNewDesign ? (
         <Modal
@@ -535,7 +533,6 @@ export class CourseProductDetailEnroll extends React.Component<
       </p>
     ) : null
     const disableEnrolledBtn = moment().isBefore(startDate) ? "disabled" : ""
-
     return run && run.is_enrolled ? (
       <>
         <Fragment>
@@ -566,7 +563,6 @@ export class CourseProductDetailEnroll extends React.Component<
 
   renderEnrollLoginButton() {
     const { currentUser } = this.props
-
     return !currentUser || !currentUser.id ? (
       <h2>
         <a
@@ -585,7 +581,6 @@ export class CourseProductDetailEnroll extends React.Component<
   ) {
     const { currentUser } = this.props
     const csrfToken = getCookie("csrftoken")
-
     return currentUser &&
       currentUser.id &&
       run &&
@@ -636,13 +631,11 @@ export class CourseProductDetailEnroll extends React.Component<
 
     if (courseRuns) {
       run = this.getFirstUnexpiredRun()
-
       if (run) {
         product = run && run.products ? run.products[0] : null
         this.updateDate(run)
       }
     }
-
     return (
       <>
         {
@@ -655,6 +648,7 @@ export class CourseProductDetailEnroll extends React.Component<
 
               {currentUser ? this.renderAddlProfileFieldsModal() : null}
               {run ? this.renderUpgradeEnrollmentDialog(showNewDesign) : null}
+
             </>
           </Loader>
         }
