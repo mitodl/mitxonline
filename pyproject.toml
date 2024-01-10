@@ -28,7 +28,7 @@ authors  = ["MIT ODL"]
 
 
 [tool.poetry.dependencies]
-python = "3.9.6"
+python = "3.9.18"
 beautifulsoup4 = "^4.8.2"
 celery = "^5.2.2"
 celery-redbeat = "^2.0.0"
@@ -59,7 +59,7 @@ django-storages = "^1.11.1"
 djoser = "^2.1.0"
 edx-api-client = "^1.8.0"
 hubspot-api-client = "^6.1.0"
-ipython = "^7.31.1"
+ipython = "^8.0.0"
 mitol-django-common = "2.7.0"
 mitol-django-hubspot-api = "2023.5.22"
 mitol-django-mail = "3.3.0"

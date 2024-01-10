@@ -60,4 +60,21 @@ $(document).ready(function() {
     slidesToShow:   4,
     slidesToScroll: 4
   })
+  $(".slick-slide").removeAttr("tabindex")
+
+  $("body").scrollspy({
+    target:       "#tab-bar",
+    smoothScroll: true,
+    rootMargin:   "0px 0px 0px 0px"
+  })
+  $(".nav .nav-link").on("click", function() {
+    $(".nav .dropdown-toggle").text($(this).text())
+    const self = this
+    setTimeout(function() {
+      $(".nav")
+        .find(".active")
+        .removeClass("active")
+      $(self).addClass("active")
+    }, 300)
+  })
 })

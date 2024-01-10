@@ -1,6 +1,49 @@
 Release Notes
 =============
 
+Version 0.83.0 (Released January 09, 2024)
+--------------
+
+- add next parameter to course and program enrollment pages for unauthenticated users (#2050)
+- display course number on program enroll modal (#2048)
+
+Version 0.82.4 (Released January 04, 2024)
+--------------
+
+- When resolving the current run, make sure it's also enrollable (#2046)
+
+Version 0.82.3 (Released January 03, 2024)
+--------------
+
+- Check to make sure the end date and upgrade deadline haven't passed before grabbing your audit enrollment (#2044)
+- fix(deps): update dependency posthog to v3.1.0 (#2032)
+- Program enrollment: choose courses (#2028)
+- fix(deps): update dependency boto3 to v1.34.5 (#1803)
+- Update dependency enzyme-adapter-react-16 to v1.15.7 (#1806)
+- Update dependency chai to v4.3.10 (#1804)
+- Update dependency celery to v5.3.6 (#2029)
+- Update dependency @sentry/browser to v6.19.7 (#1802)
+- Update dependency @craco/craco to v6.4.5 (#1801)
+- chore: Bump Python patch release and generate Poetry lock (#2041)
+- Update dependency dayjs to v1.11.10 (#1805)
+- Update dependency postcss to v8.4.31 [SECURITY] (#1943)
+
+Version 0.82.2 (Released December 14, 2023)
+--------------
+
+- add styles to the navbar on product page (#2020)
+- Certificate: using product title (#2024)
+- Updating the program enrollment  dialog text (#2025)
+- Filter out courseruns that can't be upgraded when displaying the upsell dialog (#2023)
+- Make department sidebar sticky on mobile (#2015)
+
+Version 0.82.1 (Released December 06, 2023)
+--------------
+
+- Fixes course run selection code and standardizes it (#2017)
+- Fixes the keyboard trap issue with instructor modals (#2019)
+- Accessibility: tabbing through featured products improvement (#2018)
+
 Version 0.82.0 (Released December 04, 2023)
 --------------
 

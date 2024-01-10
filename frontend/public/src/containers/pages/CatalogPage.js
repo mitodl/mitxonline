@@ -402,7 +402,7 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderCourseCatalogCard(course: CourseDetailWithRuns) {
     return (
-      <li>
+      <li key={`course-card-${course.id}`}>
         <a href={course.page.page_url} key={course.id}>
           <div className="col catalog-item">
             <img
@@ -428,7 +428,7 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderProgramCatalogCard(program: Program) {
     return (
-      <li>
+      <li key={`program-card-${program.id}`}>
         <a href={program.page.page_url} key={program.id}>
           <div className="col catalog-item">
             <div className="program-image-and-badge">
@@ -515,7 +515,11 @@ export class CatalogPage extends React.Component<Props> {
       )
     )
     return (
-      <nav id="department-sidebar" aria-label="department filters">
+      <nav
+        className="sticky-top"
+        id="department-sidebar"
+        aria-label="department filters"
+      >
         <ul id="department-sidebar-link-list">{departmentSideBarListItems}</ul>
       </nav>
     )

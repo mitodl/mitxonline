@@ -210,7 +210,7 @@
               p.date {
                 color: $home-page-grey-text;
                 font-size: 12px;
-                margin-bottom: 5px;
+                margin-bottom: 7px;
                 overflow: hidden;
                 align-self: stretch;
                 text-overflow: ellipsis;
@@ -218,7 +218,6 @@
               }
 
               h2.featured-product-card-title {
-                height: 38px;
                 align-self: stretch;
                 color: $home-page-header-blue;
                 font-size: 0.875rem;
@@ -229,9 +228,6 @@
                 -webkit-box-orient: vertical;
                 overflow: hidden;
                 line-height: 18px;
-              }
-              h2.featured-product-card-title.program-title {
-                height: 57.953px;
               }
             }
           }

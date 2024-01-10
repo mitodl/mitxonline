@@ -6,6 +6,7 @@ import {
   formatLocalePrice,
   getStartDateText
 } from "../lib/util"
+import { getFirstRelevantRun } from "../lib/courseApi"
 import moment from "moment-timezone"
 
 import type { BaseCourseRun } from "../flow/courseTypes"
@@ -51,10 +52,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     }
 
     const course = courses[0]
-
-    const run = course.next_run_id
-      ? course.courseruns.find(elem => elem.id === course.next_run_id)
-      : course.courseruns[0]
+    const run = getFirstRelevantRun(course, courseRuns)
     const product = run && run.products.length > 0 && run.products[0]
 
     const isArchived =
@@ -134,8 +132,24 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               <div className="enrollment-info-text">
                 {course.page.length}
                 {run && run.is_self_paced ? (
-                  <span className="badge badge-pacing">SELF-PACED</span>
-                ) : null}
+                  <>
+                    <span className="badge badge-pacing">SELF-PACED</span>
+                    <a className="pacing-faq-link float-right" href="/">
+                      What's this?
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <span className="badge badge-pacing">INSTRUCTOR-PACED</span>
+                    <a
+                      className="pacing-faq-link float-right"
+                      href="https://google.com"
+                    >
+                      What's this?
+                    </a>
+                  </>
+                )}
+
                 {course.page.effort ? (
                   <>
                     <div className="enrollment-effort">
@@ -210,12 +224,10 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
 
             <ul>
               {course.programs.map(elem => (
-                <>
-                  <li>
-                    {" "}
-                    <a href={`/programs/${elem.readable_id}/`}>{elem.title}</a>
-                  </li>
-                </>
+                <li key={elem.readable_id}>
+                  {" "}
+                  <a href={`/programs/${elem.readable_id}/`}>{elem.title}</a>
+                </li>
               ))}
             </ul>
           </div>

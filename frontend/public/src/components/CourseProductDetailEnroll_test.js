@@ -592,7 +592,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     await enrollBtn.prop("onClick")()
   })
   ;[
-    ["shows", "one", false],
+    ["does not show", "one", false],
     ["shows", "multiple", true]
   ].forEach(([showsQualifier, runsQualifier, multiples]) => {
     it(`${showsQualifier} the course run selector for a course with ${runsQualifier} active run${
@@ -602,6 +602,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         {
           id:                     1,
           price:                  10,
+          is_upgradable:          true,
           product_flexible_price: {
             amount:        10,
             discount_type: DISCOUNT_TYPE_PERCENT_OFF
@@ -632,14 +633,229 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       assert.isTrue(upgradeForm.exists())
 
       const selectorControl = modal.find(".date-selector-button-bar").at(0)
-      assert.isTrue(selectorControl.exists())
 
-      const selectorControlItems = selectorControl.find("option")
       if (multiples) {
+        assert.isTrue(selectorControl.exists())
+        const selectorControlItems = selectorControl.find("option")
         assert.isTrue(selectorControlItems.length === 2)
       } else {
-        assert.isTrue(selectorControlItems.length === 1)
+        assert.isFalse(selectorControl.exists())
       }
     })
+  })
+  it("renders the upsell dialog with the correct date if the user has an enrollment in the past that is not upgradeable", async () => {
+    const pastCourseRun = makeCourseRunDetail()
+    pastCourseRun["start_date"] = moment().add(-1, "Y")
+    pastCourseRun["end_date"] = moment().add(-11, "M")
+    pastCourseRun["enrollment_start"] = pastCourseRun["start_date"]
+    pastCourseRun["enrollment_end"] = pastCourseRun["end_date"]
+    pastCourseRun["upgrade_deadline"] = moment().add(-11, "M")
+    pastCourseRun["is_upgradable"] = true
+
+    const currentCourseRun = makeCourseRunDetail()
+    currentCourseRun["start_date"] = moment().add(1, "M")
+    currentCourseRun["end_date"] = moment().add(1, "Y")
+    currentCourseRun["enrollment_start"] = moment().add(-1, "M")
+    currentCourseRun["enrollment_end"] = currentCourseRun["end_date"]
+    currentCourseRun["upgrade_deadline"] = moment().add(11, "M")
+    currentCourseRun["is_upgradable"] = true
+
+    const pastCourseRunEnrollment = makeCourseRunEnrollment()
+    pastCourseRunEnrollment.run = pastCourseRun
+    pastCourseRunEnrollment.enrollment_mode = "audit"
+
+    pastCourseRun["products"] = currentCourseRun["products"] = [
+      {
+        id:                     1,
+        price:                  10,
+        is_upgradable:          true,
+        product_flexible_price: {
+          amount:        10,
+          discount_type: DISCOUNT_TYPE_PERCENT_OFF
+        }
+      }
+    ]
+
+    const course = {
+      ...makeCourseDetailWithRuns(),
+      courseruns: [pastCourseRun, currentCourseRun]
+    }
+
+    const entities = {
+      courseRuns:  [currentCourseRun],
+      courses:     [course],
+      enrollments: [pastCourseRunEnrollment],
+      currentUser: currentUser
+    }
+
+    isWithinEnrollmentPeriodStub.returns(true)
+    const { inner } = await renderPage({
+      entities: entities
+    })
+    const enrollBtn = inner.find(".enroll-now").at(0)
+    assert.isTrue(enrollBtn.exists())
+
+    await enrollBtn.prop("onClick")()
+
+    const modal = inner.find(".upgrade-enrollment-modal")
+    const upgradeForm = modal.find("form").at(0)
+    assert.isTrue(upgradeForm.exists())
+
+    const certPricing = modal.find(".certificate-pricing").at(0)
+    assert.isTrue(certPricing.exists())
+    assert.isTrue(
+      certPricing
+        .text()
+        .includes(currentCourseRun["upgrade_deadline"].format("MMMM D, YYYY"))
+    )
+  })
+  ;[
+    [true, false],
+    [false, false],
+    [true, true],
+    [true, true]
+  ].forEach(([userExists, hasMoreDates]) => {
+    it(`renders the CourseInfoBox if the user ${
+      userExists ? "is logged in" : "is anonymous"
+    }`, async () => {
+      const entities = {
+        currentUser: userExists ? currentUser : makeAnonymousUser(),
+        enrollments: []
+      }
+
+      const { inner } = await renderPage({
+        entities: entities
+      })
+
+      assert.isTrue(inner.exists())
+      const infobox = inner.find("CourseInfoBox").dive()
+      assert.isTrue(infobox.exists())
+    })
+
+    it(`CourseInfoBox ${
+      hasMoreDates ? "renders" : "does not render"
+    } the date selector when the user ${
+      userExists ? "is logged in" : "is anonymous"
+    } and there is ${
+      hasMoreDates ? ">1 courserun" : "one courserun"
+    }`, async () => {
+      const courseRuns = [courseRun]
+
+      if (hasMoreDates) {
+        courseRuns.push(makeCourseRunDetail())
+      }
+
+      const entities = {
+        currentUser: userExists ? currentUser : makeAnonymousUser(),
+        enrollments: [],
+        courseRuns:  courseRuns
+      }
+
+      const { inner } = await renderPage({
+        entities: entities
+      })
+
+      assert.isTrue(inner.exists())
+      const infobox = inner.find("CourseInfoBox").dive()
+      assert.isTrue(infobox.exists())
+
+      const moreDatesLink = infobox.find("button.more-enrollment-info").first()
+
+      if (!hasMoreDates) {
+        assert.isFalse(moreDatesLink.exists())
+      } else {
+        assert.isTrue(moreDatesLink.exists())
+        await moreDatesLink.prop("onClick")()
+
+        const selectorBar = infobox.find(".more-dates-enrollment-list")
+        assert.isTrue(selectorBar.exists())
+      }
+    })
+  })
+
+  it("CourseInfoBox renders a date selector with Enrolled text if the user is enrolled in one", async () => {
+    const secondCourseRun = makeCourseRunDetail()
+    const enrollmentOne = {
+      ...makeCourseRunEnrollment(),
+      run: secondCourseRun
+    }
+    const enrollmentTwo = {
+      ...makeCourseRunEnrollment(),
+      run: courseRun
+    }
+    const entities = {
+      currentUser: currentUser,
+      enrollments: [enrollmentOne, enrollmentTwo],
+      courseRuns:  [courseRun, secondCourseRun]
+    }
+
+    const { inner } = await renderPage({
+      entities: entities
+    })
+
+    assert.isTrue(inner.exists())
+    const infobox = inner.find("CourseInfoBox").dive()
+    assert.isTrue(infobox.exists())
+
+    const moreDatesLink = infobox.find("button.more-enrollment-info").first()
+    await moreDatesLink.prop("onClick")()
+
+    const selectorBar = infobox.find(".more-dates-enrollment-list")
+    assert.isTrue(selectorBar.exists())
+
+    const enrolledItem = infobox.find(".more-dates-link.enrolled")
+
+    assert.isTrue(enrolledItem.exists())
+  })
+
+  it("CourseInfoBox renders the archived message if the course is archived", async () => {
+    const courseRun = {
+      ...makeCourseRunDetail(),
+      is_self_paced:    true,
+      enrollment_end:   null,
+      enrollment_start: moment()
+        .subtract(1, "years")
+        .toISOString(),
+      start_date: moment()
+        .subtract(10, "months")
+        .toISOString(),
+      end_date: moment()
+        .subtract(7, "months")
+        .toISOString(),
+      upgrade_deadline: null
+    }
+    const course = {
+      ...makeCourseDetailWithRuns(),
+      courseruns: [courseRun]
+    }
+
+    const entities = {
+      currentUser: currentUser,
+      enrollments: [],
+      courseRuns:  [courseRun],
+      courses:     [course]
+    }
+
+    const { inner } = await renderPage({
+      entities: entities
+    })
+
+    assert.isTrue(inner.exists())
+    const infobox = inner.find("CourseInfoBox").dive()
+    assert.isTrue(infobox.exists())
+
+    const archivedMessage = infobox.find("div.course-archived-message")
+    assert.isTrue(archivedMessage.exists())
+
+    const contentAvailabilityMessage = infobox.find(
+      "div.course-timing-message div.enrollment-info-text"
+    )
+    assert.isTrue(contentAvailabilityMessage.exists())
+    assert.isTrue(
+      contentAvailabilityMessage
+        .first()
+        .text()
+        .includes("Course content available anytime")
+    )
   })
 })

@@ -238,9 +238,10 @@ export class ProgramProductDetailEnroll extends React.Component<
           <div className="row">
             <div className="col-12">
               <p>
-                Thank you for choosing an MITx online course. By paying for this
-                course, you're joining the most engaged and motivated learners
-                on your path to a certificate from MITx.
+                Thank you for choosing an MITx online program. To complete your
+                enrollment in this program, you must choose a course to start
+                with. You can enroll now for free, but you will need to pay for
+                a certificate in order to earn the program credential.
               </p>
             </div>
           </div>
@@ -265,7 +266,7 @@ export class ProgramProductDetailEnroll extends React.Component<
                       key={`selectable-courserun-${run.id}`}
                       value={run.courseware_id}
                     >
-                      {run.courseware_id} - {run.title}
+                      {run.title} - {run.course_number}
                     </option>
                   ))}
                 </select>
@@ -419,7 +420,9 @@ export class ProgramProductDetailEnroll extends React.Component<
                 <Fragment>
                   {currentUser && !currentUser.id ? (
                     <a
-                      href={routes.login}
+                      href={`${routes.login}?next=${encodeURIComponent(
+                        window.location.pathname
+                      )}`}
                       className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
                     >
                       Enroll now

@@ -30,6 +30,7 @@ import {
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 import {
+  getFirstRelevantRun,
   isFinancialAssistanceAvailable,
   isWithinEnrollmentPeriod
 } from "../lib/courseApi"
@@ -83,11 +84,44 @@ export class CourseProductDetailEnroll extends React.Component<
     destinationUrl:                    ""
   }
 
+  resolveFirstEnrollableRun() {
+    const { courseRuns } = this.props
+
+    const enrollableRun =
+      courseRuns &&
+      courseRuns
+        .sort(
+          (a: EnrollmentFlaggedCourseRun, b: EnrollmentFlaggedCourseRun) => {
+            if (
+              moment(a.enrollment_start).isBefore(moment(b.enrollment_start))
+            ) {
+              return -1
+            } else if (
+              moment(a.enrollment_start).isAfter(moment(b.enrollment_start))
+            ) {
+              return 1
+            } else {
+              return 0
+            }
+          }
+        )
+        .find((run: EnrollmentFlaggedCourseRun) => {
+          return (
+            (run.enrollment_start === null ||
+              moment(run.enrollment_start).isBefore(moment.now())) &&
+            (run.enrollment_end === null ||
+              moment(run.enrollment_end).isAfter(moment.now()))
+          )
+        })
+
+    return enrollableRun || (courseRuns && courseRuns[0])
+  }
+
   resolveCurrentRun() {
     const { courseRuns } = this.props
 
     return !this.getCurrentCourseRun() && courseRuns
-      ? courseRuns[0]
+      ? this.resolveFirstEnrollableRun()
       : this.getCurrentCourseRun()
   }
 
@@ -145,13 +179,18 @@ export class CourseProductDetailEnroll extends React.Component<
     // Find an existing enrollment - the default should be the audit enrollment
     // already have, so you can just upgrade in place. If you don't, you get the
     // current run (which should be the first available one).
+    // This was changed to also make sure the run you're enrolled in is upgradeable.
     const { enrollments } = this.props
 
     if (enrollments) {
       const firstAuditEnrollment = enrollments.find(
         (enrollment: RunEnrollment) =>
           enrollment.run.course.id === run.course.id &&
-          enrollment.enrollment_mode === "audit"
+          enrollment.enrollment_mode === "audit" &&
+          enrollment.run.enrollment_end !== null &&
+          enrollment.run.enrollment_end > moment.now() &&
+          (enrollment.run.upgrade_deadline === null ||
+            enrollment.run.upgrade_deadline > moment.now())
       )
 
       if (firstAuditEnrollment) {
@@ -199,15 +238,6 @@ export class CourseProductDetailEnroll extends React.Component<
     }
   }
 
-  getFirstUnexpiredRun = () => {
-    const { courses, courseRuns } = this.props
-    return courseRuns
-      ? courses && courses[0].next_run_id
-        ? courseRuns.find(elem => elem.id === courses[0].next_run_id)
-        : courseRuns[0]
-      : null
-  }
-
   getCurrentCourseRun = (): EnrollmentFlaggedCourseRun => {
     return this.state.currentCourseRun
   }
@@ -249,16 +279,18 @@ export class CourseProductDetailEnroll extends React.Component<
           className="form-control"
         >
           {courseRuns &&
-            courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
-              <option
-                selected={run.id === elem.id}
-                value={elem.id}
-                key={`courserun-selection-${elem.id}`}
-              >
-                {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
-                {formatPrettyDate(moment(new Date(elem.end_date)))}
-              </option>
-            ))}
+            courseRuns
+              .filter((elem: EnrollmentFlaggedCourseRun) => elem.is_upgradable)
+              .map((elem: EnrollmentFlaggedCourseRun) => (
+                <option
+                  selected={run.id === elem.id}
+                  value={elem.id}
+                  key={`courserun-selection-${elem.id}`}
+                >
+                  {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
+                  {formatPrettyDate(moment(new Date(elem.end_date)))}
+                </option>
+              ))}
         </select>
       </>
     )
@@ -299,6 +331,7 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   updateDate(run: EnrollmentFlaggedCourseRun) {
+    // for original design - not used in course infobox design
     let date = emptyOrNil(run.start_date)
       ? undefined
       : moment(new Date(run.start_date))
@@ -313,8 +346,12 @@ export class CourseProductDetailEnroll extends React.Component<
     const { courseRuns, courses } = this.props
     const run = this.resolveCurrentRun()
     const course =
-      courses && courses.find((elem: any) => elem.id === run.course.id)
+      courses &&
+      courses.find(
+        (elem: any) => run && run.course && elem.id === run.course.id
+      )
     const needFinancialAssistanceLink =
+      run &&
       isFinancialAssistanceAvailable(run) &&
       !run.approved_flexible_price_exists ? (
           <p className="financial-assistance-link">
@@ -328,8 +365,14 @@ export class CourseProductDetailEnroll extends React.Component<
           </p>
         ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
-    const product = run.products ? run.products[0] : null
-    return product ? (
+    const product = run && run.products ? run.products[0] : null
+    const upgradableCourseRuns = courseRuns
+      ? courseRuns.filter(
+        (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
+      )
+      : []
+
+    return run && product ? (
       showNewDesign ? (
         <Modal
           id={`upgrade-enrollment-dialog`}
@@ -342,7 +385,7 @@ export class CourseProductDetailEnroll extends React.Component<
             {run.title}
           </ModalHeader>
           <ModalBody>
-            {courseRuns ? (
+            {upgradableCourseRuns.length > 1 ? (
               <div className="row date-selector-button-bar">
                 <div className="col-12">
                   <div>{this.renderRunSelectorButtons(run)}</div>
@@ -566,7 +609,9 @@ export class CourseProductDetailEnroll extends React.Component<
     return !currentUser || !currentUser.id ? (
       <h2>
         <a
-          href={routes.login}
+          href={`${routes.login}?next=${encodeURIComponent(
+            window.location.pathname
+          )}`}
           className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
         >
           Enroll now
@@ -629,14 +674,16 @@ export class CourseProductDetailEnroll extends React.Component<
     let run,
       product = null
 
-    if (courseRuns) {
-      run = this.getFirstUnexpiredRun()
+    if (courses && courseRuns) {
+      run = getFirstRelevantRun(courses[0], courseRuns)
+
       if (run) {
         product = run && run.products ? run.products[0] : null
         this.updateDate(run)
       }
     }
-    return (
+
+    return run ? (
       <>
         {
           // $FlowFixMe: isLoading null or undefined
@@ -674,7 +721,7 @@ export class CourseProductDetailEnroll extends React.Component<
           </>
         ) : null}
       </>
-    )
+    ) : null
   }
 }
 
