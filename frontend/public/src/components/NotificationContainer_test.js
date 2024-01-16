@@ -67,7 +67,6 @@ describe("NotificationContainer component", () => {
     assert.lengthOf(alerts, Object.keys(messages).length)
     assert.equal(alerts.at(0).prop("children").type, TextNotification)
   })
-
   ;[
     [undefined, "info"],
     ["danger", "danger"]
