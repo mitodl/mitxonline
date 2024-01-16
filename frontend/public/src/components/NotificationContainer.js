@@ -83,7 +83,6 @@ export class NotificationContainer extends React.Component<Props, State> {
               closeClassName="btn-close-white"
             >
               <AlertBodyComponent
-                aria-live="assertive"
                 dismiss={dismiss}
                 {...notification.props}
               />
