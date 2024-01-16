@@ -68,7 +68,6 @@ describe("NotificationContainer component", () => {
     assert.equal(alerts.at(0).prop("children").type, TextNotification)
   })
 
-  //
   ;[
     [undefined, "info"],
     ["danger", "danger"]
@@ -126,7 +125,8 @@ describe("NotificationContainer component", () => {
 
     await timeoutPromise
     wrapper.update()
-    // Due to changes in rendering due to enzyme, this now returns as undefined. Future test updates should
+    // Due to changes in rendering due to enzyme, this now returns as undefined. Once Enzyme is no longer in use,
+    // This should be modified to expect the same return value as we see when rendered by React.
     assert.deepEqual(wrapper.prop("userNotifications"), undefined)
     assert.deepEqual(inner.state(), { hiddenNotifications: new Set() })
   })
