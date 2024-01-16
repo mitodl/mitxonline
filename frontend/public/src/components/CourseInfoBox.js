@@ -131,10 +131,15 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               </div>
               <div className="enrollment-info-text">
                 {course.page.length}
-                {run && run.is_self_paced ? (
+                {isArchived ? (<>
+                    <span className="badge badge-pacing">ARCHIVED</span>
+                    <a className="pacing-faq-link float-right" href="https://mitxonline.zendesk.com/hc/en-us/articles/21995114519067-What-are-Archived-courses-on-MITx-Online-">
+                      What's this?
+                    </a>
+                  </>) : run && run.is_self_paced ? (
                   <>
                     <span className="badge badge-pacing">SELF-PACED</span>
-                    <a className="pacing-faq-link float-right" href="/">
+                    <a className="pacing-faq-link float-right" href="https://mitxonline.zendesk.com/hc/en-us/articles/21994872904475-What-are-Self-Paced-courses-on-MITx-Online-">
                       What's this?
                     </a>
                   </>
@@ -143,12 +148,13 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                     <span className="badge badge-pacing">INSTRUCTOR-PACED</span>
                     <a
                       className="pacing-faq-link float-right"
-                      href="https://google.com"
+                      href="https://mitxonline.zendesk.com/hc/en-us/articles/21994938130075-What-are-Instructor-Paced-courses-on-MITx-Online-"
                     >
                       What's this?
                     </a>
                   </>
-                )}
+                ) }
+
 
                 {course.page.effort ? (
                   <>
