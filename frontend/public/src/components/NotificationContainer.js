@@ -94,7 +94,7 @@ export class NotificationContainer extends React.Component<Props, State> {
   }
 }
 
-const mapStateToProps = (state) => ({
+const mapStateToProps = state => ({
   userNotifications: state.ui.userNotifications,
 })
 
