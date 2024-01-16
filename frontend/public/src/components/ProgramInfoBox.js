@@ -135,7 +135,10 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
                 {run && run.is_self_paced ? (
                   <>
                     <span className="badge badge-pacing">SELF-PACED</span>
-                    <a className="pacing-faq-link float-right" href="https://mitxonline.zendesk.com/hc/en-us/articles/21994872904475-What-are-Self-Paced-courses-on-MITx-Online-">
+                    <a
+                      className="pacing-faq-link float-right"
+                      href="https://mitxonline.zendesk.com/hc/en-us/articles/21994872904475-What-are-Self-Paced-courses-on-MITx-Online-"
+                    >
                       What's this?
                     </a>
                   </>
