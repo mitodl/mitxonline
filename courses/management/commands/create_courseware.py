@@ -227,7 +227,7 @@ class Command(BaseCommand):
                 live=kwargs["live"],
             )
 
-            if add_depts:
+            if "add_depts" in locals():
                 new_program.departments.add(*add_depts)
                 new_program.save()
 
@@ -285,7 +285,7 @@ class Command(BaseCommand):
                 live=kwargs["live"],
             )
 
-            if add_depts:
+            if "add_depts" in locals():
                 new_course.departments.add(*add_depts)
                 new_course.save()
 
