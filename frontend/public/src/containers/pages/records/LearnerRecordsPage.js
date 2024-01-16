@@ -78,7 +78,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
   }
 
   getOnlyProgramId() {
-    return parseInt(this.props.match.params.program.length)
+    return parseInt(this.props.match.params.program)
   }
 
   // Renders program's courses table.
