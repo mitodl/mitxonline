@@ -13,7 +13,7 @@ import MixedLink from "./MixedLink"
 
 type Props = {
   currentUser: CurrentUser,
-  location: ?Location
+  location: ?Location,
 }
 
 const TopBar = ({ currentUser }: Props) => {
@@ -28,7 +28,9 @@ const TopBar = ({ currentUser }: Props) => {
 
   return (
     <header className="site-header new-design d-flex d-flex flex-column">
-      {showComponent ? <NotificationContainer id="notifications-container" /> : null}
+      {showComponent ? (
+        <NotificationContainer id="notifications-container" />
+      ) : null}
       <nav
         className={`order-1 sub-nav navbar navbar-expand-md top-navbar ${
           currentUser.is_authenticated ? "nowrap login" : ""
@@ -40,7 +42,7 @@ const TopBar = ({ currentUser }: Props) => {
           </a>
           <div className="divider-grey" />
           <a href={routes.root} className="mitx-online-link">
-          MITx Online
+            MITx Online
           </a>
         </div>
         <button
@@ -71,7 +73,7 @@ const TopBar = ({ currentUser }: Props) => {
                   className="top-nav-link"
                   aria-label="Catalog"
                 >
-                Catalog
+                  Catalog
                 </MixedLink>
                 <UserMenu currentUser={currentUser} useScreenOverlay={false} />
               </>
@@ -91,6 +93,5 @@ const TopBar = ({ currentUser }: Props) => {
     </header>
   )
 }
-
 
 export default TopBar
