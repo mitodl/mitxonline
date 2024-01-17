@@ -16,7 +16,8 @@ import {
 import { partial, pathOr } from "ramda"
 import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
-import { connectRequest, mutateAsync } from "redux-query"
+import { mutateAsync } from "redux-query"
+import { connectRequest } from "redux-query-react"
 import { connect } from "react-redux"
 
 import {

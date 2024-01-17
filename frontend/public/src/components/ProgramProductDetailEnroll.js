@@ -4,7 +4,8 @@ import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { connectRequest, mutateAsync } from "redux-query"
+import { mutateAsync } from "redux-query"
+import { connectRequest } from "redux-query-react"
 // $FlowFixMe
 import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
@@ -144,7 +145,6 @@ export class ProgramProductDetailEnroll extends React.Component<
   }
 
   renderCertificateInfoPanel() {
-    console.log("rendering")
     const { currentCourseRun: run } = this.state
 
     const product = run && run.products ? run.products[0] : null

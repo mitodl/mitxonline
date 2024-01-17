@@ -20,7 +20,7 @@ describe("LoginForgotPasswordPage", () => {
 
     setSubmittingStub = helper.sandbox.stub()
 
-    renderPage = helper.configureHOCRenderer(
+    renderPage = helper.configureShallowRenderer(
       LoginForgotPasswordPage,
       InnerLoginForgotPasswordPage,
       {},

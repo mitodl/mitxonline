@@ -1,6 +1,6 @@
 import React from "react"
 import R from "ramda"
-import { shallow } from "enzyme"
+import { mount, shallow } from "enzyme"
 import sinon from "sinon"
 import { createMemoryHistory } from "history"
 
@@ -8,6 +8,8 @@ import configureStoreMain from "../store/configureStore"
 
 import type { Sandbox } from "../flow/sinonTypes"
 import * as networkInterfaceFuncs from "../store/network_interface"
+import { Provider, ReactReduxContext } from "react-redux"
+import { Route, Router } from "react-router"
 
 export default class IntegrationTestHelper {
   sandbox: Sandbox
@@ -49,14 +51,21 @@ export default class IntegrationTestHelper {
           throw new Error("Aborts currently unhandled")
         }
       }))
+    //
   }
 
   cleanup() {
     this.actions = []
     this.sandbox.restore()
+
+    if (this.wrapper) {
+      this.wrapper.unmount()
+      delete this.wrapper
+      this.wrapper = null
+    }
   }
 
-  configureHOCRenderer(
+  configureShallowRenderer(
     WrappedComponent: Class<React.Component<*, *>>,
     InnerComponent: Class<React.Component<*, *>>,
     defaultState: Object,
@@ -66,6 +75,18 @@ export default class IntegrationTestHelper {
     return async (extraState = {}, extraProps = {}) => {
       const initialState = R.mergeDeepRight(defaultState, extraState)
       const store = configureStoreMain(initialState)
+
+      const useContextFake = this.sandbox.stub(React, "useContext")
+      useContextFake.callsFake(context => {
+        if (context === ReactReduxContext) return { store }
+        const msg = [
+          "useContext called in enzyme shallow render with un-mocked return",
+          "value. See See https://github.com/enzymejs/enzyme/issues/2176#issuecomment-532361526",
+          "for more."
+        ].join(" ")
+        throw new Error(msg)
+      })
+
       const wrapper = await shallow(
         <WrappedComponent
           store={store}
@@ -113,6 +134,39 @@ export default class IntegrationTestHelper {
       inner = await inner.dive()
 
       return { wrapper, inner, store }
+    }
+  }
+
+  configureMountRenderer(
+    WrappedComponent: Class<React.Component<*, *>>,
+    InnerComponent: Class<React.Component<*, *>>,
+    defaultState: Object,
+    defaultProps = {}
+  ) {
+    const history = this.browserHistory
+    return async (extraState = {}, extraProps = {}) => {
+      const initialState = R.mergeDeepRight(defaultState, extraState)
+      const store = configureStoreMain(initialState)
+
+      const ComponentWithProps = () => (
+        <WrappedComponent {...defaultProps} {...extraProps} />
+      )
+
+      const wrapper = mount(
+        <Provider store={store}>
+          <Router history={history}>
+            <Route path="*" component={ComponentWithProps} />
+          </Router>
+        </Provider>
+      )
+      store.getLastAction = function() {
+        const actions = this.getActions()
+        return actions[actions.length - 1]
+      }
+
+      const inner = wrapper.find(InnerComponent)
+
+      return { inner, wrapper, store }
     }
   }
 }

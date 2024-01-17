@@ -3,7 +3,7 @@ import React from "react"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { Switch, Route } from "react-router"
-import { connectRequest } from "redux-query"
+import { connectRequest } from "redux-query-react"
 import { createStructuredSelector } from "reselect"
 import urljoin from "url-join"
 
@@ -60,7 +60,6 @@ export class App extends React.Component<Props, void> {
 
   render() {
     const { match, currentUser, location } = this.props
-
     if (!currentUser) {
       // application is still loading
       return <div className="app" />

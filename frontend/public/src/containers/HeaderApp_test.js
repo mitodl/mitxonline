@@ -18,16 +18,46 @@ describe("Top-level HeaderApp", () => {
       notificationsApi,
       "removeStoredUserMessage"
     )
-    renderPage = helper.configureHOCRenderer(HeaderApp, InnerHeaderApp, {}, {})
+    renderPage = helper.configureMountRenderer(
+      HeaderApp,
+      InnerHeaderApp,
+      {},
+      {}
+    )
   })
 
   afterEach(() => {
     helper.cleanup()
   })
 
-  it("fetches user data on load and initially renders an empty element", async () => {
+  /* Because mount will automatically call componentDidMount, I'm simulating a null response from the server
+   * to test the loading state.  Until the component gets a positive response, it will continue to not render the header.
+   * This includes it receiving no parseable response.  I do have a new test after to show what a positive response does.
+   */
+  it("fetches user data on load and renders user in the header", async () => {
+    helper.handleRequestStub.returns({
+      id:               null,
+      username:         "",
+      email:            null,
+      legal_address:    null,
+      user_profile:     null,
+      is_anonymous:     true,
+      is_authenticated: false,
+      is_staff:         false,
+      is_superuser:     false,
+      grants:           [],
+      is_active:        false
+    })
     const { inner } = await renderPage()
+    inner.update()
+    // So we look to be sure the next child is there, which is <Header />
+    assert.exists(inner.find("Header"))
+    sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
+  })
 
+  it("tries to fetch user data and no response or an incorrect response renders nothing", async () => {
+    helper.handleRequestStub.returns({})
+    const { inner } = await renderPage()
     assert.notExists(inner.find("div").prop("children"))
     sinon.assert.calledWith(helper.handleRequestStub, "/api/users/me", "GET")
   })

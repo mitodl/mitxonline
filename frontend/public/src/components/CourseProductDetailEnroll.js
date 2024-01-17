@@ -4,7 +4,8 @@ import { createStructuredSelector } from "reselect"
 import { pathOr } from "ramda"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { connectRequest, mutateAsync } from "redux-query"
+import { mutateAsync } from "redux-query"
+import { connectRequest } from "redux-query-react"
 // $FlowFixMe
 import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
@@ -344,7 +345,6 @@ export class CourseProductDetailEnroll extends React.Component<
   renderUpgradeEnrollmentDialog(showNewDesign: boolean) {
     const { courseRuns, courses } = this.props
     const run = this.resolveCurrentRun()
-
     const course =
       courses &&
       courses.find(
@@ -576,7 +576,6 @@ export class CourseProductDetailEnroll extends React.Component<
       </p>
     ) : null
     const disableEnrolledBtn = moment().isBefore(startDate) ? "disabled" : ""
-
     return run && run.is_enrolled ? (
       <>
         <Fragment>
@@ -607,7 +606,6 @@ export class CourseProductDetailEnroll extends React.Component<
 
   renderEnrollLoginButton() {
     const { currentUser } = this.props
-
     return !currentUser || !currentUser.id ? (
       <h2>
         <a
@@ -628,7 +626,6 @@ export class CourseProductDetailEnroll extends React.Component<
   ) {
     const { currentUser } = this.props
     const csrfToken = getCookie("csrftoken")
-
     return currentUser &&
       currentUser.id &&
       run &&

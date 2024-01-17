@@ -24,7 +24,7 @@ describe("LoginEmailPage", () => {
     setSubmittingStub = helper.sandbox.stub()
     setErrorsStub = helper.sandbox.stub()
 
-    renderPage = helper.configureHOCRenderer(
+    renderPage = helper.configureShallowRenderer(
       LoginEmailPage,
       InnerLoginEmailPage,
       {},

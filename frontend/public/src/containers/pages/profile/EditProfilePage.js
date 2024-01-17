@@ -5,14 +5,15 @@ import DocumentTitle from "react-document-title"
 import { EDIT_PROFILE_PAGE_TITLE } from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
-import { connectRequest, mutateAsync, requestAsync } from "redux-query"
+import { mutateAsync, requestAsync } from "redux-query"
+import { connectRequest } from "redux-query-react"
 import { createStructuredSelector } from "reselect"
 
 import users, { currentUserSelector } from "../../../lib/queries/users"
 import queries from "../../../lib/queries"
 import EditProfileForm from "../../../components/forms/EditProfileForm"
 
-import type { Response } from "redux-query"
+import type { HttpResponse } from "../../../flow/httpTypes"
 import type { Country, User } from "../../../flow/authTypes"
 import type { RouterHistory } from "react-router"
 
@@ -22,8 +23,8 @@ type StateProps = {|
 |}
 
 type DispatchProps = {|
-  editProfile: (userProfileData: User) => Promise<Response<User>>,
-  getCurrentUser: () => Promise<Response<User>>
+  editProfile: (userProfileData: User) => Promise<HttpResponse<User>>,
+  getCurrentUser: () => Promise<HttpResponse<User>>
 |}
 
 type ProfileProps = {|

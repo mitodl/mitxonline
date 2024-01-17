@@ -6,7 +6,8 @@ import { REGISTER_CONFIRM_PAGE_TITLE } from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { Link } from "react-router-dom"
-import { mutateAsync, connectRequest } from "redux-query"
+import { mutateAsync } from "redux-query"
+import { connectRequest } from "redux-query-react"
 import { path } from "ramda"
 import { createStructuredSelector } from "reselect"
 
@@ -112,8 +113,12 @@ const mapStateToProps = createStructuredSelector({
   qsParams: qsSelector
 })
 
-const mapPropsToConfig = ({ qsParams }) =>
-  mutateAsync(queries.auth.registerConfirmEmailMutation(qsParams))
+const mapPropsToConfig = ({ qsParams }) => {
+  const { type, ...config } = mutateAsync(
+    queries.auth.registerConfirmEmailMutation(qsParams)
+  )
+  return config
+}
 
 const mapDispatchToProps = {
   addUserNotification

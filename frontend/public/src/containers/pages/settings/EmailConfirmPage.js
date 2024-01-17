@@ -6,7 +6,8 @@ import { EMAIL_CONFIRM_PAGE_TITLE } from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { Link } from "react-router-dom"
-import { mutateAsync, connectRequest, requestAsync } from "redux-query"
+import { mutateAsync, requestAsync } from "redux-query"
+import { connectRequest } from "redux-query-react"
 import { path, pathOr } from "ramda"
 import { createStructuredSelector } from "reselect"
 
@@ -21,7 +22,7 @@ import { qsVerificationCodeSelector } from "../../../lib/selectors"
 import type { RouterHistory, Location } from "react-router"
 import type { updateEmailResponse } from "../../../flow/authTypes"
 import users from "../../../lib/queries/users"
-import type { Response } from "redux-query"
+import type { HttpResponse } from "../../../flow/httpTypes"
 import type { User } from "../../../flow/authTypes"
 
 type Props = {
@@ -30,7 +31,7 @@ type Props = {
   location: Location,
   history: RouterHistory,
   updateEmail: ?updateEmailResponse,
-  getCurrentUser: () => Promise<Response<User>>
+  getCurrentUser: () => Promise<HttpResponse<User>>
 }
 
 export class EmailConfirmPage extends React.Component<Props> {
@@ -117,8 +118,10 @@ const getCurrentUser = () =>
 const confirmEmail = (code: string) =>
   mutateAsync(queries.auth.confirmEmailMutation(code))
 
-const mapPropsToConfig = ({ params: { verificationCode } }) =>
-  confirmEmail(verificationCode)
+const mapPropsToConfig = ({ params: { verificationCode } }) => {
+  const { type, ...others } = confirmEmail(verificationCode)
+  return others
+}
 
 const mapDispatchToProps = {
   addUserNotification,

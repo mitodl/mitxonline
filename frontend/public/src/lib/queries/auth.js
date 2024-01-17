@@ -19,7 +19,7 @@ export const updateEmailSelector = pathOr(null, ["entities", "updateEmail"])
 const nextState = nthArg(1)
 
 const DEFAULT_OPTIONS = {
-  transform: (auth: AuthResponse) => ({ auth }),
+  transform: (auth: ?AuthResponse) => ({ auth }),
   update:    {
     auth: nextState
   },
@@ -154,7 +154,7 @@ export default {
   confirmEmailMutation: (code: string) => ({
     queryKey:  "updateEmail",
     url:       `/api/change-emails/${code}/`,
-    transform: (json: updateEmailResponse) => ({
+    transform: (json: ?updateEmailResponse) => ({
       updateEmail: json
     }),
     update: {
