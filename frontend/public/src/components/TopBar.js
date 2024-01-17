@@ -13,7 +13,7 @@ import MixedLink from "./MixedLink"
 
 type Props = {
   currentUser: CurrentUser,
-  location: ?Location,
+  location: ?Location
 }
 
 const TopBar = ({ currentUser }: Props) => {

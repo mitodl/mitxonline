@@ -11,7 +11,7 @@ import {
   firstNotNil,
   newSetWith,
   newSetWithout,
-  timeoutPromise,
+  timeoutPromise
 } from "../lib/util"
 import { getNotificationAlertProps } from "../lib/notificationsApi"
 import { notificationTypeMap, TextNotification } from "./notifications"
@@ -23,16 +23,16 @@ const DEFAULT_REMOVE_DELAY_MS = 1000
 type Props = {
   userNotifications: UserNotificationMapping,
   removeUserNotification: Function,
-  messageRemoveDelayMs?: number,
+  messageRemoveDelayMs?: number
 }
 
 type State = {
-  hiddenNotifications: Set<string>,
+  hiddenNotifications: Set<string>
 }
 
 export class NotificationContainer extends React.Component<Props, State> {
   state = {
-    hiddenNotifications: new Set(),
+    hiddenNotifications: new Set()
   }
 
   onDismiss = (notificationKey: string) => {
@@ -44,15 +44,12 @@ export class NotificationContainer extends React.Component<Props, State> {
     // The message could be simply removed from the global state to get rid of it, but the
     // local state and the delay gives the Alert a chance to animate the message out.
     this.setState({
-      hiddenNotifications: newSetWith(hiddenNotifications, notificationKey),
+      hiddenNotifications: newSetWith(hiddenNotifications, notificationKey)
     })
     return timeoutPromise(() => {
       removeUserNotification(notificationKey)
       this.setState({
-        hiddenNotifications: newSetWithout(
-          hiddenNotifications,
-          notificationKey
-        ),
+        hiddenNotifications: newSetWithout(hiddenNotifications, notificationKey)
       })
     }, messageRemoveDelayMs || DEFAULT_REMOVE_DELAY_MS)
   }
@@ -70,7 +67,7 @@ export class NotificationContainer extends React.Component<Props, State> {
           const color = firstNotNil([
             notification.color,
             alertProps.color,
-            "info",
+            "info"
           ])
           const AlertBodyComponent =
             notificationTypeMap[notification.type] || TextNotification
@@ -95,7 +92,7 @@ export class NotificationContainer extends React.Component<Props, State> {
 }
 
 const mapStateToProps = state => ({
-  userNotifications: state.ui.userNotifications,
+  userNotifications: state.ui.userNotifications
 })
 
 export default compose(connect(mapStateToProps, { removeUserNotification }))(
