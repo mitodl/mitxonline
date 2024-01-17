@@ -17,11 +17,13 @@ type Props = {
 }
 
 const TopBar = ({ currentUser }: Props) => {
+  // Delay any alert displayed on page-load by 500ms in order to
+  // ensure the alert is read by screen readers.
   const [showComponent, setShowComponent] = useState(false)
   useEffect(() => {
     const timeout = setTimeout(() => {
       setShowComponent(true)
-    }, 3000)
+    }, 500)
 
     return () => clearTimeout(timeout)
   }, [])
