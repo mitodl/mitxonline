@@ -261,6 +261,30 @@ export const getFlexiblePriceForProduct = (product: Product) => {
   }
 }
 
+export const intCheckFeatureFlag = (
+  flag: string,
+  uniqueID: string | number,
+  document: Object,
+  settings: Object
+) => {
+  const params = new URLSearchParams(document.location.search)
+  if (SETTINGS.posthog_api_host) {
+    posthog.setPersonPropertiesForFlags({
+      environment: SETTINGS.environment,
+      user_id:     uniqueID
+    })
+  }
+  return (
+    (SETTINGS.posthog_api_host && posthog.isFeatureEnabled(flag)) ||
+    params.get(flag) !== null ||
+    (settings && settings.features && settings.features[flag])
+  )
+}
+
+export const checkFeatureFlag = (flag: string, uniqueID: string | number) => {
+  return intCheckFeatureFlag(flag, uniqueID, document, SETTINGS)
+}
+
 /**
  * This is a comparison method used to sort an array of Course Runs
  * from earliest start date to latest start date.
