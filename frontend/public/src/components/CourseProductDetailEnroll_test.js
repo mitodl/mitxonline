@@ -8,7 +8,6 @@ import CourseProductDetailEnroll, {
   CourseProductDetailEnroll as InnerCourseProductDetailEnroll
 } from "./CourseProductDetailEnroll"
 
-import { courseRunsSelector } from "../lib/queries/courseRuns"
 import {
   makeCourseDetailWithRuns,
   makeCourseRunDetail,
