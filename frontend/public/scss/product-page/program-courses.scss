@@ -79,6 +79,7 @@ body.new-design {
                 .program-course-card-info {
                     overflow: hidden;
                     padding: 15px;
+                    cursor: pointer;
 
                     @include media-breakpoint-down(md) {
                         margin-top: 20px;
@@ -87,7 +88,7 @@ body.new-design {
                     .start-date {
                         font-weight: 400;
                         font-size: 12px;
-                        color: rgba(112, 114, 117, 0.5);
+                        color: var(--GreyDark, #58585A);
                         margin-bottom: 0.5rem;
                         transition: $product-page-hover-time;
                     }
@@ -96,21 +97,12 @@ body.new-design {
                         font-size: 14px;
                         font-weight: 600;
                         line-height: 16px;
-                        color: rgba(3, 21, 45, 0.5);
+                        color: var(--GreyDark, #58585A);
                         transition: $product-page-hover-time;
                     }
                 }
 
                 &:hover {
-                    .start-date {
-                        color: rgba(112, 114, 117, 1);
-                        transition: $product-page-hover-time;
-                    }
-
-                    h3 {
-                        color: rgba(3, 21, 45, 1);
-                        transition: $product-page-hover-time;
-                    }
 
                     img {
                         opacity: 1;
