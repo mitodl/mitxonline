@@ -93,11 +93,11 @@ export class CourseProductDetailEnroll extends React.Component<
         .sort(
           (a: EnrollmentFlaggedCourseRun, b: EnrollmentFlaggedCourseRun) => {
             if (
-              moment(a.enrollment_start).isBefore(moment(b.enrollment_start))
+              moment(a.start_date).isBefore(moment(b.start_date))
             ) {
               return -1
             } else if (
-              moment(a.enrollment_start).isAfter(moment(b.enrollment_start))
+              moment(a.start_date).isAfter(moment(b.start_date))
             ) {
               return 1
             } else {
@@ -565,44 +565,6 @@ export class CourseProductDetailEnroll extends React.Component<
     )
   }
 
-  renderEnrolledButton(run: EnrollmentFlaggedCourseRun) {
-    const startDate =
-      run && !emptyOrNil(run.start_date)
-        ? moment(new Date(run.start_date))
-        : null
-    const waitingForCourseToBeginMessage = moment().isBefore(startDate) ? (
-      <p style={{ fontSize: "16px" }}>
-        Enrolled and waiting for the course to begin.
-      </p>
-    ) : null
-    const disableEnrolledBtn = moment().isBefore(startDate) ? "disabled" : ""
-    return run && run.is_enrolled ? (
-      <>
-        <Fragment>
-          {run.courseware_url ? (
-            <a
-              href={run.courseware_url}
-              onClick={ev =>
-                run ? this.redirectToCourseHomepage(run.courseware_url, ev) : ev
-              }
-              className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Enrolled &#10003;
-            </a>
-          ) : (
-            <div
-              className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline ${disableEnrolledBtn}`}
-            >
-              Enrolled &#10003;
-            </div>
-          )}
-          {waitingForCourseToBeginMessage}
-        </Fragment>
-      </>
-    ) : null
-  }
 
   renderEnrollLoginButton() {
     const { currentUser } = this.props
@@ -629,7 +591,6 @@ export class CourseProductDetailEnroll extends React.Component<
     return currentUser &&
       currentUser.id &&
       run &&
-      !run.is_enrolled &&
       isWithinEnrollmentPeriod(run) ? (
         <h2>
           {product && run.is_upgradable ? (
@@ -689,7 +650,6 @@ export class CourseProductDetailEnroll extends React.Component<
           // $FlowFixMe: isLoading null or undefined
           <Loader key="product_detail_enroll_loader" isLoading={isLoading}>
             <>
-              {this.renderEnrolledButton(run)}
               {this.renderEnrollLoginButton()}
               {this.renderEnrollNowButton(run, product)}
 
