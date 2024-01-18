@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.84.0
+Version 0.84.0 (Released January 18, 2024)
 --------------
 
 - Explain Course Formats (#2054)
