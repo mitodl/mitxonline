@@ -11,7 +11,7 @@ describe("AnonymousMenu component", () => {
     assert.equal(
       shallow(<AnonymousMenu mobileView={false} />)
         .find("MixedLink")
-        .at(0)
+        .at(1)
         .prop("dest"),
       routes.login
     )
@@ -21,7 +21,7 @@ describe("AnonymousMenu component", () => {
     assert.equal(
       shallow(<AnonymousMenu mobileView={false} />)
         .find("MixedLink")
-        .at(1)
+        .at(2)
         .prop("dest"),
       routes.register.begin
     )
@@ -31,7 +31,7 @@ describe("AnonymousMenu component", () => {
     assert.equal(
       shallow(<AnonymousMenu mobileView={true} />)
         .find("MixedLink")
-        .at(1)
+        .at(2)
         .prop("dest"),
       routes.register.begin
     )

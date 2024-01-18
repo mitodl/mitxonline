@@ -7,10 +7,9 @@ import { mount } from "enzyme"
 import EditProfileForm from "./EditProfileForm"
 import { findFormikFieldByName } from "../../lib/test_utils"
 import { makeCountries, makeUser } from "../../factories/user"
-import * as utils from "../../lib/util"
 
 describe("EditProfileForm", () => {
-  let sandbox, onSubmitStub, checkFeatureFlagStub
+  let sandbox, onSubmitStub
 
   const countries = makeCountries()
   const user = makeUser()
@@ -27,12 +26,9 @@ describe("EditProfileForm", () => {
   beforeEach(() => {
     sandbox = sinon.createSandbox()
     onSubmitStub = sandbox.stub()
-    checkFeatureFlagStub = sandbox.stub(utils, "checkFeatureFlag").returns(true)
   })
 
-  afterEach(() => {
-    checkFeatureFlagStub.restore()
-  })
+  afterEach(() => {})
 
   it("passes onSubmit to Formik", () => {
     const wrapper = renderForm()
