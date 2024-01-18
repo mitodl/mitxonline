@@ -92,13 +92,9 @@ export class CourseProductDetailEnroll extends React.Component<
       courseRuns
         .sort(
           (a: EnrollmentFlaggedCourseRun, b: EnrollmentFlaggedCourseRun) => {
-            if (
-              moment(a.start_date).isBefore(moment(b.start_date))
-            ) {
+            if (moment(a.start_date).isBefore(moment(b.start_date))) {
               return -1
-            } else if (
-              moment(a.start_date).isAfter(moment(b.start_date))
-            ) {
+            } else if (moment(a.start_date).isAfter(moment(b.start_date))) {
               return 1
             } else {
               return 0
@@ -564,7 +560,6 @@ export class CourseProductDetailEnroll extends React.Component<
       </Modal>
     )
   }
-
 
   renderEnrollLoginButton() {
     const { currentUser } = this.props
