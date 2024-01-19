@@ -339,14 +339,17 @@ describe("utility functions", () => {
 
   describe("getStartDateText", () => {
     [
-      ["course", "past", "Start Anytime"],
-      ["course run", "past", "Start Anytime"],
-      ["course", "future", "Start Date"],
-      ["course run", "future", "Start Date"],
-      ["course", "past", "Start Anytime"],
-      ["course run", "past", "Start Anytime"],
-    ].forEach(([coursewareType, datePosition, displayText]) => {
-      it(`displays the ${displayText} text when the ${coursewareType} is in the ${datePosition} and there
+      ["course", "past", false, "Start Anytime"],
+      ["course run", "past", false, "Start Anytime"],
+      ["course", "future", false, "Start Date"],
+      ["course run", "future", false, "Start Date"],
+      ["course", "past", true, "Start Anytime"],
+      ["course run", "past", true, "Start Anytime"],
+      ["course", "future", true, "Start Anytime"],
+      ["course run", "future", true, "Start Anytime"]
+    ].forEach(([coursewareType, datePosition, selfPaced, displayText]) => {
+      it(`displays the ${displayText} text when the ${coursewareType} is in the ${datePosition} and there ${
+        selfPaced ? "are" : "are no"
       } self-paced courses`, () => {
         const course = {
           courseruns: [
@@ -358,6 +361,10 @@ describe("utility functions", () => {
               is_self_paced: false
             }
           ]
+        }
+
+        if (selfPaced) {
+          course["courseruns"][0]["is_self_paced"] = true
         }
 
         assert.isTrue(
