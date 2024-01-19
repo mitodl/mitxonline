@@ -73,7 +73,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                     enrollment.run.id === courseRun.id
                 ))
                 ? this.renderEnrolledDateLink(courseRun)
-                : getStartDateText(courseRun, true)}
+                : getStartDateText(courseRun)}
             </li>
           )
         }
