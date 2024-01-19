@@ -70,8 +70,9 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
     isRevoking:                    false,
     isEnablingSharing:             false
   }
-  isProgramRecordShared() {
-    return this.props.match.params.program.length !== 36
+  //when the record is in the shared view the program parameter is a 36 char UUID
+  isSharedRecordView() {
+    return this.props.match.params.program.length === 36
   }
 
   getProgramId() {
@@ -572,8 +573,6 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
   render() {
     const { learnerRecord, isLoading } = this.props
     const { isRevoking, isEnablingSharing } = this.state
-
-    const isSharedRecord = this.isProgramRecordShared()
     const hasSharingEnabled = this.hasSharingEnabled(learnerRecord)
 
     return (
@@ -581,7 +580,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
         <Loader isLoading={isLoading}>
           <div className="std-page-body container">
             <div className="d-flex flex-row-reverse mb-4">
-              {isSharedRecord ? (
+              {!this.isSharedRecordView() ? (
                 <div className="d-flex learner-record-sharing-controls mb-2">
                   {!hasSharingEnabled ? (
                     <button
