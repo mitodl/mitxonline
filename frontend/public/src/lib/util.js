@@ -342,9 +342,7 @@ export const getStartDateText = (
   courseware: BaseCourseRun | CourseDetailWithRuns,
   showPast: boolean = false
 ) => {
-  const CourseRuns = courseware.courseruns
-    ? courseware.courseruns
-    : [courseware]
+  const CourseRuns = courseware.courseruns ? courseware.courseruns : [courseware]
 
   if (CourseRuns.length > 0) {
     const futureStartDateCourseRuns = CourseRuns.filter(courseRun =>
@@ -359,7 +357,8 @@ export const getStartDateText = (
       if (showPast) {
         return `Start Date: ${formatPrettyDate(
           parseDateString(
-            CourseRuns.sort(reverseCompareCourseRunStartDates)[0].start_date
+            CourseRuns.sort(reverseCompareCourseRunStartDates)[0]
+              .start_date
           )
         )}`
       }
