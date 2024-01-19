@@ -31,16 +31,3 @@ def test_never_cache_react_views(staff_client, url_name):
         response.headers["Cache-Control"]
         == "max-age=0, no-cache, no-store, must-revalidate, private"
     )
-
-
-@pytest.mark.parametrize("enable_new_design", [True, False])
-def test_catalog_page_feature_flag(client, settings, enable_new_design):
-    """
-    Test that our react views instruct any clients not to cache the response
-    """
-    settings.FEATURES[features.ENABLE_NEW_DESIGN] = enable_new_design
-    response = client.get("/catalog", follow=True)
-    if enable_new_design:
-        assert response.status_code == status.HTTP_200_OK
-    else:
-        assert response.status_code == status.HTTP_404_NOT_FOUND

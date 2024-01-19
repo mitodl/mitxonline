@@ -11,7 +11,6 @@ import configureStore from "../store/configureStore"
 import { AppTypeContext, MIXED_APP_CONTEXT } from "../contextDefinitions"
 import HeaderApp from "../containers/HeaderApp"
 import ProductDetailEnrollApp from "../containers/ProductDetailEnrollApp"
-import UpsellCardApp from "../containers/UpsellCardApp"
 // Object.entries polyfill
 import entries from "object.entries"
 
@@ -60,22 +59,10 @@ const renderEnrollSection = (
   )
 }
 
-const renderUpsellCard = (courseId, element, reduxStore) => {
-  ReactDOM.render(
-    <AppContainer>
-      <Provider store={reduxStore}>
-        <UpsellCardApp courseId={courseId} />
-      </Provider>
-    </AppContainer>,
-    element
-  )
-}
-
 renderHeader()
 
 document.addEventListener("DOMContentLoaded", function() {
   const enrollSectionEl = document.getElementById("productDetailEnrollment")
-  const upsellCardEl = document.getElementById("upsellCard")
   const courseIdEl = document.getElementById("courseId")
   const programIdEl = document.getElementById("programId")
   const userIdEl = document.getElementById("userId")
@@ -91,9 +78,5 @@ document.addEventListener("DOMContentLoaded", function() {
       enrollSectionEl,
       productDetailStore
     )
-
-    if (upsellCardEl) {
-      renderUpsellCard(courseId, upsellCardEl, productDetailStore)
-    }
   }
 })

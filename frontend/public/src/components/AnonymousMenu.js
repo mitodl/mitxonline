@@ -4,7 +4,6 @@ import React from "react"
 
 import MixedLink from "./MixedLink"
 import { routes } from "../lib/urls"
-import { checkFeatureFlag } from "../lib/util"
 
 type Props = {
   mobileView: boolean
@@ -12,7 +11,6 @@ type Props = {
 
 const AnonymousMenu = ({ mobileView }: Props) => {
   const identifierPostfix = mobileView ? "Mobile" : "Desktop"
-  const newDesign = checkFeatureFlag("mitxonline-new-header", "anonymousUser")
   const makeNavLink = (text: string) => {
     return mobileView ? (
       <span data-bs-target="#nav" data-bs-toggle="collapse">
@@ -24,18 +22,16 @@ const AnonymousMenu = ({ mobileView }: Props) => {
   }
   return (
     <ul>
-      {newDesign ? (
-        <li>
-          <MixedLink
-            id="catalog"
-            dest={routes.catalog}
-            className="top-nav-link"
-            aria-label="Catalog"
-          >
-            {makeNavLink("Catalog")}
-          </MixedLink>
-        </li>
-      ) : null}
+      <li>
+        <MixedLink
+          id="catalog"
+          dest={routes.catalog}
+          className="top-nav-link"
+          aria-label="Catalog"
+        >
+          {makeNavLink("Catalog")}
+        </MixedLink>
+      </li>
       <li>
         <MixedLink
           id={"login".concat(identifierPostfix)}
