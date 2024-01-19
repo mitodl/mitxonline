@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { CSSTransition, TransitionGroup } from "react-transition-group"
 import moment from "moment"
 import { getStartDateText } from "../../lib/util"
@@ -74,12 +74,136 @@ function CatalogPage(props) {
   const [programQueryPage, setProgramQueryPage] = useState(1)
   const [isLoadingMoreItems, setIsLoadingMoreItems] = useState(false)
 
+  const courseLoaderGrid = (
+  <div id="catalog-grid">
+    <CourseLoader />
+    <CourseLoader />
+    <CourseLoader />
+  </div>
+)
+  let io = null
+  let container
+  container = React.createRef(null)
+
+  useEffect(() => {
+    if (io) {
+      return () => {
+        io.disconnect()
+      }
+    }
+    else {
+      return () => {
+        console.log("Nothing to disconnect")
+      }
+    }
+  }, [])
+
+    /**
+   * Makes another API call to the courses or programs endpoint if there is
+   * a next page defined in the prior request.
+   * Appends the courses or programs from the API call to the current allCoursesRetrieved
+   * or allProgramsRetrieved state variable.  Increments the courseQueryPage or programQueryPage
+   * state variable.  Updates the filteredCourses or filteredPrograms state variable using the
+   * updated allCoursesRetrieved or allProgramsRetrieved state variable.
+   */
+  const bottomOfLoadedCatalogCallback = async entries => {
+    const [entry] = entries
+    if (entry.isIntersecting) {
+      if (tabSelected === COURSES_TAB) {
+        // Only request the next page if a next page exists (coursesNextPage)
+        // and if we aren't already requesting the next page (isLoadingMoreItems).
+        if (props.coursesNextPage && !isLoadingMoreItems) {
+          setIsLoadingMoreItems(true)
+          setCourseQueryPage(courseQueryPage + 1)
+          const response = await props.getNextCoursePage(courseQueryPage)
+          setIsLoadingMoreItems(false)
+          if (response.body.results) {
+            const filteredCoursesByDepartment = filteredCoursesBasedOnCourseRunCriteria(
+              selectedDepartment,
+              [...allCoursesRetrieved, ...response.body.results]
+            )
+            setFilteredCourses(filteredCoursesByDepartment)
+            setAllCoursesRetrieved([
+                ...allCoursesRetrieved,
+                ...response.body.results
+              ]
+            )
+          }
+        }
+      } else {
+        if (props.programsNextPage) {
+          setIsLoadingMoreItems(true)
+          const response = await props.getNextProgramPage(
+            programQueryPage + 1
+          )
+          setIsLoadingMoreItems(false)
+          setProgramQueryPage(programQueryPage + 1)
+          if (response.body.results) {
+            const filteredProgramsByDepartment = filteredProgramsByDepartmentAndCriteria(
+              selectedDepartment,
+              [...allProgramsRetrieved, ...response.body.results]
+            )
+            setFilteredPrograms(filteredProgramsByDepartment)
+            setAllProgramsRetrieved([
+                ...allProgramsRetrieved,
+                ...response.body.results
+              ])
+          }
+        }
+      }
+    }
+  }
   /**
-   * Updates this.state.selectedDepartment to {ALL_DEPARTMENTS},
-   * updates this.state.tabSelected to the parameter,
-   * updates this.state.filteredDepartments
+   * Updates the filteredCourses state variable
+   * once coursesIsLoading is false..  Adds an observer to detect when
+   * the learner has scrolled to the bottom of the visible catalog items.
+   * Updates the filteredDepartments state variable once departmentsIsLoading
+   * is false.
+   */
+    useEffect(() => {
+
+    if (!props.coursesIsLoading && !filterCoursesCalled) {
+      setFilterCoursesCalled(true)
+      setAllCoursesRetrieved(props.courses)
+
+      const filteredCoursesByDepartment = filteredCoursesBasedOnCourseRunCriteria(
+        selectedDepartment,
+        props.courses
+      )
+      setFilteredCourses(filteredCoursesByDepartment)
+
+      // Detect when the bottom of the catalog page has been reached and display more catalog items.
+      io = new window.IntersectionObserver(
+        bottomOfLoadedCatalogCallback,
+        { threshold: 1.0 }
+      )
+      io.observe(container.current)
+    }
+
+    if (
+      !props.departmentsIsLoading &&
+      !filterDepartmentsCalled
+    ) {
+      setFilterDepartmentsCalled(true)
+      setFilteredDepartments(filterDepartmentsByTabName(tabSelected))
+    }
+    if (!props.programsIsLoading && !filterProgramsCalled) {
+      setFilterProgramsCalled(true )
+      setAllProgramsRetrieved(props.programs)
+      const filteredProgramsByDepartment = filteredProgramsByDepartmentAndCriteria(
+        selectedDepartment,
+        props.programs
+      )
+      setFilteredPrograms(filteredProgramsByDepartment)
+    }
+  })
+
+  /**
+   * Updates selectedDepartment to {ALL_DEPARTMENTS},
+   * updates tabSelected to the parameter,
+   * updates filteredDepartments
    * names from the catalog items in the selected tab,
-   * updates this.state.filteredPrograms to equal the programs
+   * updates filteredPrograms to equal the programs
    * which meet the criteria to be displayed in the catalog.
    * @param {string} selectTabName The name of the tab that was selected.
    */
@@ -138,8 +262,8 @@ function CatalogPage(props) {
   }
 
   /**
-   * Set the value of this.state.mobileFilterWindowExpanded.
-   * @param {boolean} expanded The value that this.state.mobileFilterWindowExpanded will be set to.
+   * Set the value of mobileFilterWindowExpanded.
+   * @param {boolean} expanded The value that mobileFilterWindowExpanded will be set to.
    */
   const toggleMobileFilterWindowExpanded = (expanded: boolean) => {
     setMobileFilterWindowExpanded(expanded)
@@ -195,7 +319,7 @@ function CatalogPage(props) {
             .includes(selectedDepartment)) &&
         course?.page?.live &&
         course.courseruns.length > 0 &&
-        this.validateCoursesCourseRuns(course.courseruns).length > 0
+        validateCoursesCourseRuns(course.courseruns).length > 0
     )
   }
 
@@ -276,226 +400,11 @@ function CatalogPage(props) {
     )
   }
 
-
-  return (
-    <div>
-      <div id="catalog-page">
-        <div id="catalog-title">
-          {/* Hidden on small screens. */}
-          <h1 className="d-none d-md-block">MITx Online Catalog</h1>
-          {/* Visible on small screens. */}
-          <div className="d-block d-md-none" id="mobile-catalog-title">
-            <button
-              onClick={() =>
-                toggleMobileFilterWindowExpanded(
-                  !this.state.mobileFilterWindowExpanded
-                )
-              }
-            />
-            <h1>
-              Catalog
-              <small>
-                {this.state.selectedDepartment === ALL_DEPARTMENTS
-                  ? ""
-                  : this.state.selectedDepartment}
-              </small>
-            </h1>
-          </div>
-        </div>
-        <div className="container">
-          <div id="course-catalog-navigation">
-            {/* Only visible on small screen when mobileFilterWindowExpanded is true. */}
-            <div
-              className={`mobile-filter-overlay ${
-                this.state.mobileFilterWindowExpanded
-                  ? "slide-mobile-filter-overlay"
-                  : "hidden-mobile-filter-overlay"
-              }`}
-            >
-              {this.renderDepartmentSideBarList()}
-            </div>
-            <div className="container-fluid">
-              <div className="row" id="tab-row">
-                <div className="col catalog-animation d-sm-flex d-md-inline-flex">
-                  <TransitionGroup id="tab-animation-grid">
-                    <CSSTransition
-                      key={this.state.tabSelected}
-                      timeout={300}
-                      classNames="messageout"
-                    >
-                      <div className="row" id="tabs">
-                        <div
-                          className={`col ${
-                            this.state.tabSelected === COURSES_TAB
-                              ? "selected-tab"
-                              : "unselected-tab"
-                          }`}
-                        >
-                          <button
-                            onClick={() =>
-                              this.changeSelectedTab(COURSES_TAB)
-                            }
-                            tabIndex="0"
-                          >
-                            Courses{" "}
-                            <div className="product-number d-inline-block d-sm-none">
-                              ({this.state.filteredCourses.length})
-                            </div>
-                          </button>
-                        </div>
-                        <div
-                          className={`col ${
-                            this.state.tabSelected === PROGRAMS_TAB
-                              ? "selected-tab"
-                              : "unselected-tab"
-                          } ${
-                            this.state.filteredPrograms.length
-                              ? ""
-                              : "display-none"
-                          }`}
-                        >
-                          <button
-                            onClick={() =>
-                              this.changeSelectedTab(PROGRAMS_TAB)
-                            }
-                          >
-                            Programs{" "}
-                            <div className="product-number d-inline-block d-sm-none">
-                              ({this.state.filteredPrograms.length})
-                            </div>
-                          </button>
-                        </div>
-                      </div>
-                    </CSSTransition>
-                  </TransitionGroup>
-                </div>
-                <div className="col catalog-page-item-count d-none d-sm-block">
-                  <div
-                    className="catalog-count-animation"
-                    role="status"
-                    aria-atomic="true"
-                  >
-                    <TransitionGroup id="count-animation-grid">
-                      <CSSTransition
-                        key={this.state.tabSelected}
-                        timeout={300}
-                        classNames="count"
-                      >
-                        <h2>
-                          {/* Hidden on small screens. */}
-                          {/* Could add logic to display only "course" if only 1 course is showing. */}
-                          {this.renderNumberOfCatalogItems()}{" "}
-                          {this.state.tabSelected}
-                        </h2>
-                      </CSSTransition>
-                    </TransitionGroup>
-                  </div>
-                </div>
-              </div>
-              <div className="catalog-animation">
-                <TransitionGroup>
-                  <CSSTransition
-                    key={this.state.tabSelected}
-                    timeout={300}
-                    classNames="messageout"
-                  >
-                    <div>{this.renderCatalog()}</div>
-                  </CSSTransition>
-                </TransitionGroup>
-              </div>
-              {this.state.isLoadingMoreItems ? courseLoaderGrid : null}
-              {/* span is used to detect when the learner has scrolled to the bottom of the catalog page. */}
-              <span ref={this.container}></span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-export class CatalogPage {
-  state = {
-    tabSelected:                COURSES_TAB,
-    allCoursesRetrieved:        [],
-    allProgramsRetrieved:       [],
-    filteredCourses:            [],
-    filteredPrograms:           [],
-    filterProgramsCalled:       false,
-    filterCoursesCalled:        false,
-    filteredDepartments:        [],
-    filterDepartmentsCalled:    false,
-    selectedDepartment:         ALL_DEPARTMENTS,
-    mobileFilterWindowExpanded: false,
-    items_per_row:              3,
-    courseQueryPage:            1,
-    programQueryPage:           1,
-    isLoadingMoreItems:         false
-  }
-
-  /**
-   * Updates the filteredCourses state variable
-   * once coursesIsLoading is false..  Adds an observer to detect when
-   * the learner has scrolled to the bottom of the visible catalog items.
-   * Updates the filteredDepartments state variable once departmentsIsLoading
-   * is false.
-   */
-  componentDidUpdate = () => {
-    const {
-      courses,
-      coursesIsLoading,
-      programsIsLoading,
-      programs
-    } = this.props
-    if (!coursesIsLoading && !this.state.filterCoursesCalled) {
-      this.setState({ filterCoursesCalled: true })
-      this.setState({ allCoursesRetrieved: courses })
-      const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
-        this.state.selectedDepartment,
-        courses
-      )
-      this.setState({ filteredCourses: filteredCourses })
-
-      // Detect when the bottom of the catalog page has been reached and display more catalog items.
-      this.io = new window.IntersectionObserver(
-        this.bottomOfLoadedCatalogCallback,
-        { threshold: 1.0 }
-      )
-      this.io.observe(this.container.current)
-    }
-
-    if (
-      !this.props.departmentsIsLoading &&
-      !this.state.filterDepartmentsCalled
-    ) {
-      this.setState({ filterDepartmentsCalled: true })
-      this.setState({
-        filteredDepartments: this.filterDepartmentsByTabName(
-          this.state.tabSelected
-        )
-      })
-    }
-    if (!programsIsLoading && !this.state.filterProgramsCalled) {
-      this.setState({ filterProgramsCalled: true })
-      this.setState({ allProgramsRetrieved: programs })
-      const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
-        this.state.selectedDepartment,
-        programs
-      )
-      this.setState({
-        filteredPrograms: filteredPrograms
-      })
-    }
-  }
-
-
-
-
-
   /**
    * Renders a single program catalog card.
    * @param {Program} program The program instance used to populate the card.
    */
-  renderProgramCatalogCard(program: Program) {
+  const renderProgramCatalogCard = (program: Program) => {
     return (
       <li key={`program-card-${program.id}`}>
         <a href={program.page.page_url} key={program.id}>
@@ -517,15 +426,15 @@ export class CatalogPage {
     )
   }
 
-  /**
+    /**
    * Dynamically renders rows of cards in the catalog.  Each row can contain up to {ITEMS_PER_ROW} course or program cards.
    * @param {Array<CourseDetailWithRuns | Program>} itemsInCatalog The items associated with the currently selected catalog page.
    * @param {Function} renderCatalogCardFunction The card render function that will be used for each item on the current catalog page.
    */
-  renderCatalogRows(
+  const renderCatalogRows = (
     itemsInCatalog: Array<CourseDetailWithRuns | Program>,
     renderCatalogCardFunction: Function
-  ) {
+  ) => {
     return (
       <ul id="catalog-grid">
         {itemsInCatalog.map(x => renderCatalogCardFunction(x))}
@@ -536,46 +445,44 @@ export class CatalogPage {
   /**
    * Renders the entire catalog of course or program cards based on the catalog tab selected.
    */
-  renderCatalog() {
-    const { filteredCourses, filteredPrograms, tabSelected } = this.state
-
+  const renderCatalog = () => {
     if (
       filteredCourses.length === 0 &&
-      (this.props.coursesIsLoading || this.props.programsIsLoading)
+      (props.coursesIsLoading || props.programsIsLoading)
     ) {
       return courseLoaderGrid
     }
     if (tabSelected === COURSES_TAB && filteredCourses.length > 0) {
-      return this.renderCatalogRows(
+      return renderCatalogRows(
         filteredCourses,
-        this.renderCourseCatalogCard.bind(this)
+        renderCourseCatalogCard
       )
     } else if (tabSelected === PROGRAMS_TAB) {
-      return this.renderCatalogRows(
+      return renderCatalogRows(
         filteredPrograms,
-        this.renderProgramCatalogCard.bind(this)
+        renderProgramCatalogCard
       )
     }
   }
 
-  /**
+    /**
    * Returns the rendering of the Department sidebar.
    */
-  renderDepartmentSideBarList() {
+  const renderDepartmentSideBarList = () => {
     const departmentSideBarListItems = []
-    this.state.filteredDepartments.forEach(department =>
+    filteredDepartments.forEach(department =>
       departmentSideBarListItems.push(
         <li
           className={`sidebar-link ${
-            this.state.selectedDepartment === department
+            selectedDepartment === department
               ? "department-selected-link"
               : "department-link"
           }`}
-          key={this.state.tabSelected + department}
+          key={tabSelected + department}
         >
           <button
             onClick={() =>
-              this.changeSelectedDepartment(department, this.state.tabSelected)
+              changeSelectedDepartment(department, tabSelected)
             }
           >
             {department}
@@ -594,17 +501,144 @@ export class CatalogPage {
     )
   }
 
-  render() {
-
-  }
+  return (
+    <div>
+      <div id="catalog-page">
+        <div id="catalog-title">
+          {/* Hidden on small screens. */}
+          <h1 className="d-none d-md-block">MITx Online Catalog</h1>
+          {/* Visible on small screens. */}
+          <div className="d-block d-md-none" id="mobile-catalog-title">
+            <button
+              onClick={() =>
+                toggleMobileFilterWindowExpanded(
+                  !mobileFilterWindowExpanded
+                )
+              }
+            />
+            <h1>
+              Catalog
+              <small>
+                {selectedDepartment === ALL_DEPARTMENTS
+                  ? ""
+                  : selectedDepartment}
+              </small>
+            </h1>
+          </div>
+        </div>
+        <div className="container">
+          <div id="course-catalog-navigation">
+            {/* Only visible on small screen when mobileFilterWindowExpanded is true. */}
+            <div
+              className={`mobile-filter-overlay ${
+                mobileFilterWindowExpanded
+                  ? "slide-mobile-filter-overlay"
+                  : "hidden-mobile-filter-overlay"
+              }`}
+            >
+              {renderDepartmentSideBarList()}
+            </div>
+            <div className="container-fluid">
+              <div className="row" id="tab-row">
+                <div className="col catalog-animation d-sm-flex d-md-inline-flex">
+                  <TransitionGroup id="tab-animation-grid">
+                    <CSSTransition
+                      key={tabSelected}
+                      timeout={300}
+                      classNames="messageout"
+                    >
+                      <div className="row" id="tabs">
+                        <div
+                          className={`col ${
+                            tabSelected === COURSES_TAB
+                              ? "selected-tab"
+                              : "unselected-tab"
+                          }`}
+                        >
+                          <button
+                            onClick={() =>
+                              changeSelectedTab(COURSES_TAB)
+                            }
+                            tabIndex="0"
+                          >
+                            Courses{" "}
+                            <div className="product-number d-inline-block d-sm-none">
+                              ({filteredCourses.length})
+                            </div>
+                          </button>
+                        </div>
+                        <div
+                          className={`col ${
+                            tabSelected === PROGRAMS_TAB
+                              ? "selected-tab"
+                              : "unselected-tab"
+                          } ${
+                            filteredPrograms.length
+                              ? ""
+                              : "display-none"
+                          }`}
+                        >
+                          <button
+                            onClick={() =>
+                              changeSelectedTab(PROGRAMS_TAB)
+                            }
+                          >
+                            Programs{" "}
+                            <div className="product-number d-inline-block d-sm-none">
+                              ({filteredPrograms.length})
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                    </CSSTransition>
+                  </TransitionGroup>
+                </div>
+                <div className="col catalog-page-item-count d-none d-sm-block">
+                  <div
+                    className="catalog-count-animation"
+                    role="status"
+                    aria-atomic="true"
+                  >
+                    <TransitionGroup id="count-animation-grid">
+                      <CSSTransition
+                        key={tabSelected}
+                        timeout={300}
+                        classNames="count"
+                      >
+                        <h2>
+                          {/* Hidden on small screens. */}
+                          {/* Could add logic to display only "course" if only 1 course is showing. */}
+                          {renderNumberOfCatalogItems()}{" "}
+                          {tabSelected}
+                        </h2>
+                      </CSSTransition>
+                    </TransitionGroup>
+                  </div>
+                </div>
+              </div>
+              <div className="catalog-animation">
+                <TransitionGroup>
+                  <CSSTransition
+                    key={tabSelected}
+                    timeout={300}
+                    classNames="messageout"
+                  >
+                    <div>{renderCatalog()}</div>
+                  </CSSTransition>
+                </TransitionGroup>
+              </div>
+              {isLoadingMoreItems ? courseLoaderGrid : null}
+              {/* span is used to detect when the learner has scrolled to the bottom of the catalog page. */}
+              <span ref={container}></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
-const courseLoaderGrid = (
-  <div id="catalog-grid">
-    <CourseLoader />
-    <CourseLoader />
-    <CourseLoader />
-  </div>
-)
+
+
 
 const mapPropsToConfig = () => [
   coursesQuery(1),
