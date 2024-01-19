@@ -346,8 +346,7 @@ describe("utility functions", () => {
       ["course", "past", "Start Anytime"],
       ["course run", "past", "Start Anytime"]
     ].forEach(([coursewareType, datePosition, displayText]) => {
-      it(`displays the ${displayText} text when the ${coursewareType} is in the ${datePosition} and there
-      } self-paced courses`, () => {
+      it(`displays the ${displayText} text when the ${coursewareType} is in the ${datePosition}`, () => {
         const course = {
           courseruns: [
             {

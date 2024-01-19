@@ -346,24 +346,22 @@ export const getStartDateText = (
     ? courseware.courseruns
     : [courseware]
 
-  if (CourseRuns.length > 0) {
-    const futureStartDateCourseRuns = CourseRuns.filter(courseRun =>
-      moment(courseRun.start_date).isAfter(moment())
+  const futureStartDateCourseRuns = CourseRuns.filter(courseRun =>
+    moment(courseRun.start_date).isAfter(moment())
+  )
+  if (futureStartDateCourseRuns.length > 0) {
+    const startDate = parseDateString(
+      futureStartDateCourseRuns.sort(compareCourseRunStartDates)[0].start_date
     )
-    if (futureStartDateCourseRuns.length > 0) {
-      const startDate = parseDateString(
-        futureStartDateCourseRuns.sort(compareCourseRunStartDates)[0].start_date
-      )
-      return `Start Date: ${formatPrettyDate(startDate)}`
-    } else {
-      if (showPast) {
-        return `Start Date: ${formatPrettyDate(
-          parseDateString(
-            CourseRuns.sort(reverseCompareCourseRunStartDates)[0].start_date
-          )
-        )}`
-      }
-      return "Start Anytime"
+    return `Start Date: ${formatPrettyDate(startDate)}`
+  } else {
+    if (showPast) {
+      return `Start Date: ${formatPrettyDate(
+        parseDateString(
+          CourseRuns.sort(reverseCompareCourseRunStartDates)[0].start_date
+        )
+      )}`
     }
+    return "Start Anytime"
   }
 }
