@@ -2,13 +2,16 @@
     {% for card in cards %}
     <li onClick="javascript:window.open('{{card.course.page.url}}');"> 
         <div class="program-course-card">
-        <img src="{{card.featured_image}}" alt="">
-        <div class="program-course-card-info">
-            <div class="start-date">
-            {{card.start_descriptor}}
+            <div class="image">
+                <img src="{{card.featured_image}}" alt="">
+                <div class="overlay"></div>
             </div>
-            <h3 class="title">{{card.course.title}}</h3>
-        </div>
+            <div class="program-course-card-info">
+                <div class="start-date">
+                {{card.start_descriptor}}
+                </div>
+                <h3 class="title">{{card.course.title}}</h3>
+            </div>
         </div>
     </li>
     {% endfor %}

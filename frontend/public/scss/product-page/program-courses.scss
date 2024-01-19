@@ -59,27 +59,44 @@ body.new-design {
                 height: 259px;
                 transition: .25s;
 
-                img {
-                    max-width: 262px;
-                    max-height: 171px;
-                    height: 171px;
-                    object-fit: cover;
-                    object-position: center;
-                    background: rgba(0, 0, 0, 0.50);
-                    opacity: 0.5;
-                    transition: .25s;
-              
-                    @include media-breakpoint-down(sm) {
-                        display: block;
-                        float: none;
-                        margin: 0 auto 10px;
+                .image {
+                    position: relative;
+                    img {
+                        max-width: 262px;
+                        max-height: 171px;
+                        height: 171px;
+                        object-fit: cover;
+                        object-position: center;
+                        @include media-breakpoint-down(sm) {
+                            display: block;
+                            float: none;
+                            margin: 0 auto 10px;
+                        }
                     }
+
+                    .overlay {
+                        max-width: 262px;
+                        max-height: 171px;
+                        height: 171px;
+                        object-fit: cover;
+                        object-position: center;
+                        z-index: 101;
+                        background: black;
+                        transition: .25s;
+                        top: 0;
+                        left: 0;
+                        bottom: 0;
+                        right: 0;
+                        position: absolute;
+                        opacity: .5;
+                    }
+
                 }
+
 
                 .program-course-card-info {
                     overflow: hidden;
                     padding: 15px;
-                    cursor: pointer;
 
                     @include media-breakpoint-down(md) {
                         margin-top: 20px;
@@ -88,7 +105,7 @@ body.new-design {
                     .start-date {
                         font-weight: 400;
                         font-size: 12px;
-                        color: var(--GreyDark, #58585A);
+                        color: #58585A;
                         margin-bottom: 0.5rem;
                         transition: $product-page-hover-time;
                     }
@@ -97,16 +114,28 @@ body.new-design {
                         font-size: 14px;
                         font-weight: 600;
                         line-height: 16px;
-                        color: var(--GreyDark, #58585A);
+                        color: #58585A;
                         transition: $product-page-hover-time;
                     }
                 }
 
                 &:hover {
+                    .program-course-card-info {
+                        .start-date {
+                            color: #03152D;
+                        }
+                    }
+                    .start-date {
+                        color: #03152D;
+                    }
 
-                    img {
-                        opacity: 1;
-                        transition: $product-page-hover-time;
+                    h3 {
+                        color: #03152D;
+                    }
+                    .image {
+                        .overlay {
+                            opacity: 0;
+                        }
                     }
                 }
             }
