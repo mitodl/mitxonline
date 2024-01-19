@@ -328,9 +328,12 @@ export const reverseCompareCourseRunStartDates = (
 /**
  * Returns the text to be displayed on a course catalog card's tag.
  * This text will either be "Start Anytime" or "Start Date: <most recent, future, start date for the course>".
- * If the course run with the earliest start date, and associated with the course, has a start date that is in the future, return 'Start Date: <earliest course run start date>'.
- * If the course run with the earliest start date, and associated with the course, has a start date in the past and is self paced, return 'Start Anytime'.
- * If the course run with the earliest start date, and associated with the course, has a start date in the past and is NOT self paced, return 'Started: <earliest course run start date>'.
+ * If the course run with the earliest start date, and associated with the course,
+ * has a start date that is in the future, return 'Starts: <earliest course run start date>'.
+ * If the course run with the earliest start date, and associated with the course,
+ * has a start date in the past and is self paced, return 'Start Anytime'.
+ * If the course run with the earliest start date, and associated with the course,
+ * has a start date in the past and is NOT self paced, return 'Started: <earliest course run start date>'.
  * @param {CourseDetailWithRuns|BaseCourseRun} course The course being evaluated, or an individual course run to display the start text for.
  */
 
