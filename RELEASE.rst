@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.85.0
+Version 0.85.0 (Released January 22, 2024)
 --------------
 
 - 3382: self paced courses with future start dates show start anytime (#2066)
