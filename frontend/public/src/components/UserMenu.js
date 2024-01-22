@@ -5,7 +5,6 @@ import MixedLink from "./MixedLink"
 import { routes } from "../lib/urls"
 
 import type { User } from "../flow/authTypes"
-import { checkFeatureFlag } from "../lib/util"
 
 type Props = {
   /* This is here for future use when we have custom profile avatars */
@@ -13,9 +12,6 @@ type Props = {
   useScreenOverlay: boolean
 }
 
-const desktopMenuContainerProps = {
-  className: "user-menu dropdown"
-}
 const newDesktopMenuContainerProps = {
   className: "top-user-menu dropdown"
 }
@@ -42,10 +38,6 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
   /* eslint-disable prefer-const */
   let menuChildProps: MenuChildProps
   let dropdownIdentifier = "dropdownMenuButton"
-  const showNewDesign = checkFeatureFlag(
-    "mitxonline-new-header",
-    currentUser && currentUser.id ? currentUser.id : "anonymousUser"
-  )
   const makeNavLink = (text: string) => {
     return useScreenOverlay ? (
       <span data-bs-target="#nav" data-bs-toggle="collapse">
@@ -61,9 +53,7 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
       dropdownIdentifier: dropdownIdentifier.concat("Mobile")
     }
     : {
-      container: showNewDesign
-        ? newDesktopMenuContainerProps
-        : desktopMenuContainerProps,
+      container:          newDesktopMenuContainerProps,
       ul:                 desktopUListProps,
       li:                 desktopListItemProps,
       dropdownIdentifier: dropdownIdentifier.concat("Desktop")
@@ -77,7 +67,6 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
         aria-haspopup="true"
         aria-expanded="false"
         type="button"
-        role="menu"
       >
         {currentUser.name}
       </button>
@@ -90,7 +79,7 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
             {makeNavLink("Profile")}
           </MixedLink>
         </li>
-        {showNewDesign && useScreenOverlay ? (
+        {useScreenOverlay ? (
           <li {...(menuChildProps.li || {})}>
             <MixedLink dest={routes.catalog} aria-label="Catalog">
               {makeNavLink("Catalog")}

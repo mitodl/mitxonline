@@ -1,7 +1,6 @@
 // @flow
 /* global $:false */
 import React from "react"
-import { checkFeatureFlag } from "../lib/util"
 
 import CourseProductDetailEnroll from "../components/CourseProductDetailEnroll"
 import ProgramProductDetailEnroll from "../components/ProgramProductDetailEnroll"
@@ -104,28 +103,21 @@ type Props = {
 
 export class ProductDetailEnrollApp extends React.Component<Props> {
   render() {
-    const { courseId, programId, userId } = this.props
+    const { courseId, programId } = this.props
 
-    const showNewDesign = checkFeatureFlag(
-      "mitxonline-new-product-page",
-      userId ? userId : "anonymousUser"
-    )
+    document.querySelectorAll("a.expand_here_link").forEach(link => {
+      link.removeEventListener("click", expandExpandBlock)
+      link.addEventListener("click", expandExpandBlock)
+    })
 
-    if (showNewDesign) {
-      document.querySelectorAll("a.expand_here_link").forEach(link => {
-        link.removeEventListener("click", expandExpandBlock)
-        link.addEventListener("click", expandExpandBlock)
-      })
+    document.querySelectorAll("h3.instructor-name").forEach(link => {
+      link.removeEventListener("click", openInstructorModal)
+      link.addEventListener("click", openInstructorModal)
+      link.removeEventListener("keyup", openInstructorModal)
+      link.addEventListener("keyup", openInstructorModal)
+    })
 
-      document.querySelectorAll("h3.instructor-name").forEach(link => {
-        link.removeEventListener("click", openInstructorModal)
-        link.addEventListener("click", openInstructorModal)
-        link.removeEventListener("keyup", openInstructorModal)
-        link.addEventListener("keyup", openInstructorModal)
-      })
-    }
-
-    return programId && showNewDesign ? (
+    return programId ? (
       <ProgramProductDetailEnroll
         programId={programId}
       ></ProgramProductDetailEnroll>

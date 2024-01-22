@@ -22,7 +22,7 @@ describe("UserMenu component", () => {
       shallow(<UserMenu currentUser={user} useScreenOverlay={true} />).find(
         "ul li"
       ),
-      5
+      6
     )
   })
 

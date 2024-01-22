@@ -328,48 +328,31 @@ export const reverseCompareCourseRunStartDates = (
 /**
  * Returns the text to be displayed on a course catalog card's tag.
  * This text will either be "Start Anytime" or "Start Date: <most recent, future, start date for the course>".
- * If the Course has at least one associated Course Run which is not self-paced, and
- * Course Run start date is in the future, then return "Start Date: <most recent, future, start date for the course>".
- * If the Course has at least one associated Course Run which is not self-paced, and
- * Course Run start date is in the past, and showPast is not true, then return "Start Anytime".
- * If the Course has at least one associated Course Run which is not self-paced, and
- * Course Run start date is in the past, and showPast is true, then return "Start Date: <most recent start date for the course>".
- * If the course only has Course Runs which are self-paced, display "Start Anytime".
+ * If the course run with the earliest start date, and associated with the course,
+ * has a start date that is in the future, return 'Starts: <earliest course run start date>'.
+ * If the course run with the earliest start date, and associated with the course,
+ * has a start date in the past and is self paced, return 'Start Anytime'.
+ * If the course run with the earliest start date, and associated with the course,
+ * has a start date in the past and is NOT self paced, return 'Started: <earliest course run start date>'.
  * @param {CourseDetailWithRuns|BaseCourseRun} course The course being evaluated, or an individual course run to display the start text for.
- * @param {showPast} boolean If the start date for the course is in the past, and showPast is true, then render the most recent start date for the course.
  */
 
 export const getStartDateText = (
-  courseware: BaseCourseRun | CourseDetailWithRuns,
-  showPast: boolean = false
+  courseware: BaseCourseRun | CourseDetailWithRuns
 ) => {
-  const nonSelfPacedCourseRuns = courseware.courseruns
-    ? courseware.courseruns.filter(courseRun => !courseRun.is_self_paced)
-    : courseware.is_self_paced
-      ? []
-      : [courseware]
+  const courseRun = courseware.courseruns
+    ? courseware.courseruns.sort(compareCourseRunStartDates)[0]
+    : courseware
 
-  if (nonSelfPacedCourseRuns.length > 0) {
-    const futureStartDateCourseRuns = nonSelfPacedCourseRuns.filter(courseRun =>
-      moment(courseRun.start_date).isAfter(moment())
-    )
-    if (futureStartDateCourseRuns.length > 0) {
-      const startDate = parseDateString(
-        futureStartDateCourseRuns.sort(compareCourseRunStartDates)[0].start_date
-      )
-      return `Start Date: ${formatPrettyDate(startDate)}`
-    } else {
-      if (showPast) {
-        return `Start Date: ${formatPrettyDate(
-          parseDateString(
-            nonSelfPacedCourseRuns.sort(reverseCompareCourseRunStartDates)[0]
-              .start_date
-          )
-        )}`
-      }
-      return "Start Anytime"
-    }
+  if (moment(courseRun.start_date).isAfter(moment())) {
+    return `Starts: ${formatPrettyDate(parseDateString(courseRun.start_date))}`
   } else {
-    return "Start Anytime"
+    if (courseRun.is_self_paced) {
+      return "Start Anytime"
+    } else {
+      return `Started: ${formatPrettyDate(
+        parseDateString(courseRun.start_date)
+      )}`
+    }
   }
 }

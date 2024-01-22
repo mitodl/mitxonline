@@ -46,20 +46,6 @@ def index(request, **kwargs):
     return render(request, "index.html", context=context)
 
 
-def catalog(request, **kwargs):
-    """
-    The catalog view.
-    """
-    if features.is_enabled(
-        features.ENABLE_NEW_DESIGN,
-        False,
-        request.user.id if request.user.is_authenticated else "anonymousUser",
-    ):
-        context = get_base_context(request)
-        return render(request, "index.html", context=context)
-    return handler404(request, Exception)
-
-
 @never_cache
 def refine(request, **kwargs):
     """

@@ -2,14 +2,12 @@
 // @flow
 import { assert } from "chai"
 import moment from "moment-timezone"
-import React from "react"
 
 import IntegrationTestHelper from "../util/integration_test_helper"
 import CourseProductDetailEnroll, {
   CourseProductDetailEnroll as InnerCourseProductDetailEnroll
 } from "./CourseProductDetailEnroll"
 
-import { courseRunsSelector } from "../lib/queries/courseRuns"
 import {
   makeCourseDetailWithRuns,
   makeCourseRunDetail,
@@ -198,64 +196,170 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       "Enroll now"
     )
   })
+  ;[
+    [true, false],
+    [false, false],
+    [true, true],
+    [true, true]
+  ].forEach(([userExists, hasMoreDates]) => {
+    it(`renders the CourseInfoBox if the user ${
+      userExists ? "is logged in" : "is anonymous"
+    }`, async () => {
+      const entities = {
+        currentUser: userExists ? currentUser : makeAnonymousUser(),
+        enrollments: []
+      }
 
-  it("checks for disabled enrolled button", async () => {
-    const userEnrollment = makeCourseRunEnrollment()
+      const { inner } = await renderPage({
+        entities: entities
+      })
 
-    userEnrollment.run["start_date"] = moment().add(2, "M")
-    const expectedResponse = {
-      ...userEnrollment.run,
-      is_enrolled: true
-    }
+      assert.isTrue(inner.exists())
+      const infobox = inner.find("CourseInfoBox").dive()
+      assert.isTrue(infobox.exists())
+    })
 
-    const { inner, store } = await renderPage(
-      {
-        entities: {
-          courseRuns: [expectedResponse]
-        },
-        queries: {
-          courseRuns: {
-            isPending: false,
-            status:    200
-          }
+    it(`CourseInfoBox ${
+      hasMoreDates ? "renders" : "does not render"
+    } the date selector when the user ${
+      userExists ? "is logged in" : "is anonymous"
+    } and there is ${
+      hasMoreDates ? ">1 courserun" : "one courserun"
+    }`, async () => {
+      const courseRuns = [courseRun]
+
+      if (hasMoreDates) {
+        courseRuns.push(makeCourseRunDetail())
+      }
+
+      const entities = {
+        currentUser: userExists ? currentUser : makeAnonymousUser(),
+        enrollments: [],
+        courseRuns:  courseRuns
+      }
+
+      const { inner } = await renderPage({
+        entities: entities
+      })
+
+      assert.isTrue(inner.exists())
+      const infobox = inner.find("CourseInfoBox").dive()
+      assert.isTrue(infobox.exists())
+
+      const moreDatesLink = infobox.find("button.more-enrollment-info").first()
+
+      if (!hasMoreDates) {
+        assert.isFalse(moreDatesLink.exists())
+      } else {
+        assert.isTrue(moreDatesLink.exists())
+        await moreDatesLink.prop("onClick")()
+
+        const selectorBar = infobox.find(".more-dates-enrollment-list")
+        assert.isTrue(selectorBar.exists())
+      }
+    })
+  })
+  ;[[true], [false]].forEach(([flexPriceApproved]) => {
+    it(`shows the flexible pricing available link if the user does not have approved flexible pricing for the course run`, async () => {
+      courseRun["approved_flexible_price_exists"] = flexPriceApproved
+      courseRun["course"] = {
+        page: {
+          financial_assistance_form_url: "google.com"
         }
-      },
-      {}
-    )
+      }
+      isWithinEnrollmentPeriodStub.returns(true)
+      isFinancialAssistanceAvailableStub.returns(true)
+      const { inner } = await renderPage()
 
-    const item = inner.find("a").first()
-    assert.isTrue(item.hasClass("disabled"))
-    assert.isTrue(
-      inner.containsMatchingElement(
-        <p>Enrolled and waiting for the course to begin.</p>
-      )
-    )
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      await enrollBtn.prop("onClick")()
 
-    assert.equal(item.text(), "Enrolled ✓")
-    assert.equal(courseRunsSelector(store.getState())[0], expectedResponse)
+      const modal = inner.find(".upgrade-enrollment-modal")
+
+      const flexiblePricingLink = modal.find(".financial-assistance-link").at(0)
+      if (flexPriceApproved) {
+        assert.isFalse(flexiblePricingLink.exists())
+      } else {
+        assert.isTrue(flexiblePricingLink.exists())
+      }
+    })
   })
 
-  it("checks for enrolled button", async () => {
-    const userEnrollment = makeCourseRunEnrollment()
-    userEnrollment.run["start_date"] = moment().add(-2, "M")
-    const expectedResponse = {
-      ...userEnrollment.run,
-      is_enrolled: true
+  it("CourseInfoBox renders the archived message if the course is archived", async () => {
+    const courseRun = {
+      ...makeCourseRunDetail(),
+      is_self_paced:    true,
+      enrollment_end:   null,
+      enrollment_start: moment()
+        .subtract(1, "years")
+        .toISOString(),
+      start_date: moment()
+        .subtract(10, "months")
+        .toISOString(),
+      end_date: moment()
+        .subtract(7, "months")
+        .toISOString(),
+      upgrade_deadline: null
+    }
+    const course = {
+      ...makeCourseDetailWithRuns(),
+      courseruns: [courseRun]
     }
 
-    const { inner, store } = await renderPage(
+    const entities = {
+      currentUser: currentUser,
+      enrollments: [],
+      courseRuns:  [courseRun],
+      courses:     [course]
+    }
+
+    const { inner } = await renderPage({
+      entities: entities
+    })
+
+    assert.isTrue(inner.exists())
+    const infobox = inner.find("CourseInfoBox").dive()
+    assert.isTrue(infobox.exists())
+
+    const archivedMessage = infobox.find("div.course-archived-message")
+    assert.isTrue(archivedMessage.exists())
+
+    const contentAvailabilityMessage = infobox.find(
+      "div.course-timing-message div.enrollment-info-text"
+    )
+    assert.isTrue(contentAvailabilityMessage.exists())
+    assert.isTrue(
+      contentAvailabilityMessage
+        .first()
+        .text()
+        .includes("Course content available anytime")
+    )
+  })
+
+  it(`shows form based enrollment button when upgrade deadline has passed but course is within enrollment period`, async () => {
+    isWithinEnrollmentPeriodStub.returns(true)
+    courseRun.is_upgradable = false
+    course.next_run_id = courseRun.id
+
+    const { inner } = await renderPage(
       {
         entities: {
-          courseRuns: [expectedResponse]
+          courseRuns: [courseRun],
+          courses:    [course]
         },
         queries: {
           courseRuns: {
             isPending: false,
             status:    200
+          },
+          courses: {
+            isPending: false,
+            status:    200
           }
         }
       },
-      {}
+      { courseId: course.id }
     )
 
     const item = inner.find("a").first()

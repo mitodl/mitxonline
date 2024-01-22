@@ -10,413 +10,231 @@
 {% block title %}{{ page.title }} | {{ site_name }}{% endblock %}
 
 {% block content %}
-{% if new_design %}
-    <div id="main" class="product-page">
-      <div class="container">
-        <div class="row d-flex flex-row align-center">
-          <div class="col d-block d-md-none flex-none">
-          {# Mobile only #}
-            <div class="text">
-            <nav aria-label="breadcrumb">
-              <ol class="breadcrumb">
-                <li class="breadcrumb-item">
-                    <a href="/catalog">
-                        <img alt="breadcrumb-arrow" src="/static/images/breadcrumb-arrow.svg"/>Catalog
-                    </a>
-                </li>
-                <li class="breadcrumb-item" aria-current="page">{% if page.is_program_page %}Program{% else %}Course{% endif %}</li>
-              </ol>
-            </nav>
-            {% if page.is_program_page %}
-                <div class="mb-2">
-                    <span class="badge-program-type">{{ page.product.program_type }}</span>
-                </div>
-            {% endif %}
-              <h1 class="text-break">{{ page.title }}</h1>
-              {# Description field contents are already rendered wrapped in a <p> tag #}
-
-              <section class="course-description">
-                {{ page.description | richtext }}
-              </section>
-        </div>
-          </div>
-          <div class="col order-md-1 order-2 flex-grow-1" id="product-details">
-            <div class="text">
-              <div class="d-none d-md-block">
-                {# Non-Mobile only #}
-                <nav aria-label="breadcrumb">
-                  <ol class="breadcrumb">
-                    <li class="breadcrumb-item">
-                      <a href="/catalog">
-                        <img alt="breadcrumb-arrow" src="/static/images/breadcrumb-arrow.svg"/>Catalog
-                      </a>
-                    </li>
-                    <li class="breadcrumb-item" aria-current="page">{% if page.is_program_page %}Program{% else %}Course{% endif %}</li>
-                  </ol>
-                </nav>
-                {% if page.is_program_page %}
-                    <div class="mb-2">
-                        <span class="badge-program-type">{{ page.product.program_type }}</span>
-                    </div>
-                {% endif %}
-                  <h1>{{ page.title }}</h1>
-                  {# Description field contents are already rendered wrapped in a <p> tag #}
-
-                  <section class="course-description">
-                    {{ page.description | richtext }}
-                  </section>
-                </div>
-
-              {# Non-Mobile only #}
-              <nav id="tab-bar" class="sticky-top d-none d-md-block">
-                <ul class="nav">
-                  {% if page.about %}<li class="nav-item"><a class="nav-link" href="#about-this-class">About</a></li>{% endif %}
-                  {% if page.is_program_page %}<li class="nav-item"><a class="nav-link" href="#program-courses">Courses</a></li>{% endif %}
-                  {% if page.what_you_learn %}<li class="nav-item"><a class="nav-link" href="#what-youll-learn">What you'll learn</a></li>{% endif %}
-                  {% if page.prerequisites %}<li class="nav-item"><a class="nav-link" href="#prerequisites">Prerequisites</a></li>{% endif %}
-                  {% if instructors %}<li class="nav-item"><a class="nav-link" href="#instructors">Instructors</a></li>{% endif %}
-                  {% if page.faq_url %}<li class="nav-item"><a class="nav-link" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
-                </ul>
-              </nav>
-              {# Mobile only #}
-                <nav id="tab-bar" class="sticky-top d-block d-md-none">
-                  <div class="nav dropdown">
-                      <a class="dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">About</a>
-                      <ul class="dropdown-menu">
-                        {% if page.about %}<li class="nav-item"><a class="nav-link dropdown-item" href="#about-this-class">About</a></li>{% endif %}
-                        {% if page.is_program_page %}<li class="nav-item"><a class="nav-link dropdown-item" href="#program-courses">Courses</a></li>{% endif %}
-                        {% if page.what_you_learn %}<li class="nav-item"><a class="nav-link dropdown-item" href="#what-youll-learn">What you'll learn</a></li>{% endif %}
-                        {% if page.prerequisites %}<li class="nav-item"><a class="nav-link dropdown-item" href="#prerequisites">Prerequisites</a></li>{% endif %}
-                        {% if instructors %}<li class="nav-item"><a class="nav-link dropdown-item" href="#instructors">Instructors</a></li>{% endif %}
-                        {% if page.faq_url %}<li class="nav-item"><a class="nav-link dropdown-item" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
-                      </ul>
-                    </div>
-                </nav>
-            <div class="scroll-spy-content">
-              {% if page.about %}<section class="about-this-class about-richtext-container" id="about-this-class">
-                {{ page.about | richtext | expand }}
-              </section>{% endif %}
-
-              {% if page.is_program_page %}
-              <section class="program-courses-container about-richtext-container" id="program-courses">
-              {% if page.product.required_courses %}
-                <h2>{{ page.product.required_title }}</h2>
-
-                {% course_list page.product.required_courses %}
-              {% endif %}
-
-              {% if page.product.elective_courses %}
-                <h2 class="electives-title">{{ page.product.elective_title }}</h2>
-
-                {% course_list page.product.elective_courses %}
-              {% endif %}
-
-              </section>
-              {% endif %}
-
-              {% if page.what_you_learn %}<section class="what-youll-learn about-richtext-container" id="what-youll-learn">
-                <h2>What you&apos;ll learn</h2>
-                {{ page.what_you_learn |richtext }}
-              </section>{% endif %}
-              {% if page.prerequisites %}<section class="prerequisites about-richtext-container" id="prerequisites">
-                <h2>Prerequisites</h2>
-                {{ page.prerequisites |richtext }}
-                </section>{% endif %}
-    
-              {% if instructors or page.faculty_members %}
-              <section class="faculty-section" id="instructors">
-                <div class="container">
-                  <h2>{{ page.faculty_section_title }}</h2>
-                  <ul class="faculty-members card-listing">
-                    {% if instructors %}
-                    {% for member in instructors %}
-                      <li class="member-card-container">
-                        <div class="member-card highlight-card">
-                          <img tabindex="0" src="{% feature_img_src member.feature_image %}" alt="Featured image for {{ member.instructor_name }}" data-instructor-id="{{ member.id }}">
-                          <div class="member-info">
-                            <h3 id="instructor-name-{{ member.id }}" data-instructor-id="{{ member.id }}" class="name instructor-name" role="button" tabindex="0">
-                                {{ member.instructor_name }}
-                            </h3>
-                            {% if member.instructor_title %}<h4 class="title">{{ member.instructor_title }}</h4>{% endif %}
-                            <div class="description">{{ member.instructor_bio_short|safe }}</div>
-                          </div>
-                        </div>
-                      </li>
-                    {% endfor %}
-                    {% endif %}
-                  </ul>
-                </div>
-              </section>
-              {% endif %}
-            </div>
-
-              <section class="ofac-message border">
-                <div class="container">
-                  <h2>Who can take this course?</h2>
-        
-                  <p>Because of U.S. Office of Foreign Assets Control (OFAC) restrictions and other U.S. federal regulations, learners residing in one or more of the following countries or regions will not be able to register for this course: Iran, Cuba, Syria, North Korea and the Crimea, Donetsk People's Republic and Luhansk People's Republic regions of Ukraine.</p>
-                </div>
-              </section>
-        
-            </div>
-          </div>
-          <div class="col order-md-2 order-1" id="product-info-box">
-            <div class="px-4 py-2 border align-items-center justify-items-top d-flex flex-column">
-              <div class="hero-media">
-                {% if page.video_url %}
-                  {% videojs page %}
-                {% else %}
-                <img src="{% feature_img_src page.feature_image %}" alt="">
-                {% endif %}
+  <div id="main" class="product-page">
+    <div class="container">
+      <div class="row d-flex flex-row align-center">
+        <div class="col d-block d-md-none flex-none">
+        {# Mobile only #}
+          <div class="text">
+          <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+              <li class="breadcrumb-item">
+                  <a href="/catalog">
+                      <img alt="breadcrumb-arrow" src="/static/images/breadcrumb-arrow.svg"/>Catalog
+                  </a>
+              </li>
+              <li class="breadcrumb-item" aria-current="page">{% if page.is_program_page %}Program{% else %}Course{% endif %}</li>
+            </ol>
+          </nav>
+          {% if page.is_program_page %}
+              <div class="mb-2">
+                  <span class="badge-program-type">{{ page.product.program_type }}</span>
               </div>
-
-              <div class="stats-row product-info-box-body">
-                {% if page.is_course_page %}
-                <input id="courseId" type="hidden" value="{{page.course.readable_id}}" />
-                {% endif %}
-
-                {% if page.is_program_page %}
-                <input id="programId" type="hidden" value="{{page.program.readable_id}}" />
-                {% endif %}
-                <input id="userId" type="hidden" value="{{ user.id }}" />
-
-                <div class="w-100" id="productDetailEnrollment"></div>
-              </div>
-
-              {% if page.is_course_page %}
-              <div class="stats-row">
-                <div class="w-100" id="upsellCard"></div>
-              </div>
-              {% endif %}
-            </div>
-          </div>
-
-          {% if instructors %}
-          {% for member in instructors %}
-          <div class="modal instructor-modal" tabindex="-1" id="instructor-modal-{{ member.id }}" data-keyboard="true">
-            <div class="modal-dialog modal-dialog-centered">
-              <div class="modal-content">
-                <div class="modal-header">
-                  <h5 class="modal-title">{{ member.instructor_name }}</h5>
-                  <button type="button" class="close" data-close-instructor-id="{{ member.id }}" aria-label="Close">
-                    <span aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10" fill="none">
-<path fill-rule="evenodd" clip-rule="evenodd" d="M5 4.1239L8.94245 0.181446C9.18438 -0.0604821 9.57662 -0.0604821 9.81855 0.181446C10.0605 0.423375 10.0605 0.815619 9.81855 1.05755L5.8761 5L9.81855 8.94245C10.0605 9.18438 10.0605 9.57662 9.81855 9.81855C9.57662 10.0605 9.18438 10.0605 8.94245 9.81855L5 5.8761L1.05755 9.81855C0.815619 10.0605 0.423375 10.0605 0.181446 9.81855C-0.0604821 9.57662 -0.0604821 9.18438 0.181446 8.94245L4.1239 5L0.181446 1.05755C-0.0604821 0.815619 -0.0604821 0.423375 0.181446 0.181446C0.423375 -0.0604821 0.815619 -0.0604821 1.05755 0.181446L5 4.1239Z" fill="#03152D"/>
-</svg>
-                    </span>
-                  </button>
-                </div>
-                <div class="modal-body">
-                  <div class="row d-flex">
-                    <div class="col col-instructor-photo">
-                      <img class="img-thumbnail" src="{% feature_img_src member.feature_image %}" alt="Photo for {{member.instructor_name}}" />
-                    </div>
-                    <div class="col col-instructor-title flex-grow-1">
-                      <h2>{{member.instructor_name}}</h2>
-                      {% if member.instructor_title %}<h3>{{member.instructor_title}}</h3>{% endif %}
-        
-                      <p>{{member.instructor_bio_short|safe}}</p>
-                    </div>
-                  </div>
-                  <div class="row row-instructor-body">
-                    <div class="col">
-                      {% if member.instructor_bio_long %}
-                        {{ member.instructor_bio_long|safe }}
-                      {% endif %}
-                      {% if not member.instructor_bio_long %}
-                        {{ member.instructor_bio_short|safe}}
-                      {% endif %}
-                    </div>
-                  </div>        
-                </div>
-              </div>
-            </div>
-          </div>
-          {% endfor %}
           {% endif %}
+            <h1 class="text-break">{{ page.title }}</h1>
+            {# Description field contents are already rendered wrapped in a <p> tag #}
 
+            <section class="course-description">
+              {{ page.description | richtext }}
+            </section>
+      </div>
         </div>
-      </section>
-    </div>
-{% else %}
-    <div id="main" class="product-page">
-      <section class="hero-block">
-        <div class="container">
-          <div class="content-row">
-            <div class="content-col">
-              <div class="text">
+        <div class="col order-md-1 order-2 flex-grow-1" id="product-details">
+          <div class="text">
+            <div class="d-none d-md-block">
+              {# Non-Mobile only #}
+              <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                  <li class="breadcrumb-item">
+                    <a href="/catalog">
+                      <img alt="breadcrumb-arrow" src="/static/images/breadcrumb-arrow.svg"/>Catalog
+                    </a>
+                  </li>
+                  <li class="breadcrumb-item" aria-current="page">{% if page.is_program_page %}Program{% else %}Course{% endif %}</li>
+                </ol>
+              </nav>
+              {% if page.is_program_page %}
+                  <div class="mb-2">
+                      <span class="badge-program-type">{{ page.product.program_type }}</span>
+                  </div>
+              {% endif %}
                 <h1>{{ page.title }}</h1>
                 {# Description field contents are already rendered wrapped in a <p> tag #}
-                {{ page.description | richtext }}
-                {% if page.course %}
-                <input id="courseId" type="hidden" value="{{page.course.readable_id}}" />
-                <div id="productDetailEnrollment"></div>
-                {% endif %}
+
+                <section class="course-description">
+                  {{ page.description | richtext }}
+                </section>
               </div>
-            </div>
-            <div class="content-col hero-media">
+
+            {# Non-Mobile only #}
+            <nav id="tab-bar" class="sticky-top d-none d-md-block">
+              <ul class="nav">
+                {% if page.about %}<li class="nav-item"><a class="nav-link" href="#about-this-class">About</a></li>{% endif %}
+                {% if page.is_program_page %}<li class="nav-item"><a class="nav-link" href="#program-courses">Courses</a></li>{% endif %}
+                {% if page.what_you_learn %}<li class="nav-item"><a class="nav-link" href="#what-youll-learn">What you'll learn</a></li>{% endif %}
+                {% if page.prerequisites %}<li class="nav-item"><a class="nav-link" href="#prerequisites">Prerequisites</a></li>{% endif %}
+                {% if instructors %}<li class="nav-item"><a class="nav-link" href="#instructors">Instructors</a></li>{% endif %}
+                {% if page.faq_url %}<li class="nav-item"><a class="nav-link" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
+              </ul>
+            </nav>
+            {# Mobile only #}
+              <nav id="tab-bar" class="sticky-top d-block d-md-none">
+                <div class="nav dropdown">
+                    <a class="dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">About</a>
+                    <ul class="dropdown-menu">
+                      {% if page.about %}<li class="nav-item"><a class="nav-link dropdown-item" href="#about-this-class">About</a></li>{% endif %}
+                      {% if page.is_program_page %}<li class="nav-item"><a class="nav-link dropdown-item" href="#program-courses">Courses</a></li>{% endif %}
+                      {% if page.what_you_learn %}<li class="nav-item"><a class="nav-link dropdown-item" href="#what-youll-learn">What you'll learn</a></li>{% endif %}
+                      {% if page.prerequisites %}<li class="nav-item"><a class="nav-link dropdown-item" href="#prerequisites">Prerequisites</a></li>{% endif %}
+                      {% if instructors %}<li class="nav-item"><a class="nav-link dropdown-item" href="#instructors">Instructors</a></li>{% endif %}
+                      {% if page.faq_url %}<li class="nav-item"><a class="nav-link dropdown-item" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
+                    </ul>
+                  </div>
+              </nav>
+          <div class="scroll-spy-content">
+            {% if page.about %}<section class="about-this-class about-richtext-container" id="about-this-class">
+              {{ page.about | richtext | expand }}
+            </section>{% endif %}
+
+            {% if page.is_program_page %}
+            <section class="program-courses-container about-richtext-container" id="program-courses">
+            {% if page.product.required_courses %}
+              <h2>{{ page.product.required_title }}</h2>
+
+              {% course_list page.product.required_courses %}
+            {% endif %}
+
+            {% if page.product.elective_courses %}
+              <h2 class="electives-title">{{ page.product.elective_title }}</h2>
+
+              {% course_list page.product.elective_courses %}
+            {% endif %}
+
+            </section>
+            {% endif %}
+
+            {% if page.what_you_learn %}<section class="what-youll-learn about-richtext-container" id="what-youll-learn">
+              <h2>What you&apos;ll learn</h2>
+              {{ page.what_you_learn |richtext }}
+            </section>{% endif %}
+            {% if page.prerequisites %}<section class="prerequisites about-richtext-container" id="prerequisites">
+              <h2>Prerequisites</h2>
+              {{ page.prerequisites |richtext }}
+              </section>{% endif %}
+  
+            {% if instructors or page.faculty_members %}
+            <section class="faculty-section" id="instructors">
+              <div class="container">
+                <h2>{{ page.faculty_section_title }}</h2>
+                <ul class="faculty-members card-listing">
+                  {% if instructors %}
+                  {% for member in instructors %}
+                    <li class="member-card-container">
+                      <div class="member-card highlight-card">
+                        <img tabindex="0" src="{% feature_img_src member.feature_image %}" alt="Featured image for {{ member.instructor_name }}" data-instructor-id="{{ member.id }}">
+                        <div class="member-info">
+                          <h3 id="instructor-name-{{ member.id }}" data-instructor-id="{{ member.id }}" class="name instructor-name" role="button" tabindex="0">
+                              {{ member.instructor_name }}
+                          </h3>
+                          {% if member.instructor_title %}<h4 class="title">{{ member.instructor_title }}</h4>{% endif %}
+                          <div class="description">{{ member.instructor_bio_short|safe }}</div>
+                        </div>
+                      </div>
+                    </li>
+                  {% endfor %}
+                  {% endif %}
+                </ul>
+              </div>
+            </section>
+            {% endif %}
+          </div>
+
+            <section class="ofac-message border">
+              <div class="container">
+                <h2>Who can take this course?</h2>
+      
+                <p>Because of U.S. Office of Foreign Assets Control (OFAC) restrictions and other U.S. federal regulations, learners residing in one or more of the following countries or regions will not be able to register for this course: Iran, Cuba, Syria, North Korea and the Crimea, Donetsk People's Republic and Luhansk People's Republic regions of Ukraine.</p>
+              </div>
+            </section>
+      
+          </div>
+        </div>
+        <div class="col order-md-2 order-1" id="product-info-box">
+          <div class="px-4 py-2 border align-items-center justify-items-top d-flex flex-column">
+            <div class="hero-media">
               {% if page.video_url %}
-              <video-js
-                class="vjs-default-skin vjs-big-play-centered"
-                controls
-                data-setup="{{page.video_player_config}}"
-                preload="metadata"
-              >
-              </video-js>
+                {% videojs page %}
               {% else %}
               <img src="{% feature_img_src page.feature_image %}" alt="">
               {% endif %}
             </div>
-          </div>
-        </div>
-      </section>
-      <section class="info-block">
-        <div class="container">
-          <div class="stats-row">
-            {% if start_date %}
-            <div class="stat-col">
-              <div class="title">start date</div>
-              <div class="date-links-text text" id="start_date">
-                <strong>{{ start_date|date:"F j, Y" }}</strong>
-              </div>
-              {% if course_runs|length > 1 %}
-                <strong class="more-dates">
-                  <button class="dates-tooltip" id="datesPopover" data-bs-trigger="click" data-bs-toggle="popover" data-bs-placement="auto" title="More dates available" data-bs-html="true"
-                    data-bs-content="
-                      <div>
-                        <p>Click below to enroll in one of these dates</p>
-                      </div>
-                      {% for course_run in course_runs %}
-                          <div>
-                            {% if course_run.is_not_beyond_enrollment %}
-                              <button class='date-link' id='{{ course_run.courseware_id }}' >Start Date {{ course_run.start_date|date:'F j, Y' }}</button>
-                            {% else %}
-                              <p class='date-link-disabled' id='{{ course_run.courseware_id }}' >{{ course_run.start_date|date:'F j, Y' }}(enrollment opens {{ course_run.enrollment_start|date:'F j, Y' }})</p>
-                            {% endif %}
-                          </div>
-                      {% endfor %}
-                    ">
-                    More Dates
-                  </button>
-                </strong>
+
+            <div class="stats-row product-info-box-body">
+              {% if page.is_course_page %}
+              <input id="courseId" type="hidden" value="{{page.course.readable_id}}" />
               {% endif %}
+
+              {% if page.is_program_page %}
+              <input id="programId" type="hidden" value="{{page.program.readable_id}}" />
+              {% endif %}
+              <input id="userId" type="hidden" value="{{ user.id }}" />
+
+              <div class="w-100" id="productDetailEnrollment"></div>
             </div>
-            {% endif %}
-            {% if page.length %}
-            <div class="stat-col small">
-              <div class="title">length</div>
-              <div class="text">
-                <strong>{{ page.length }}</strong>
-              </div>
-            </div>
-            {% endif %}
-            {% if page.effort %}
-            <div class="stat-col">
-              <div class="title">effort</div>
-              <div class="text">
-                <strong>{{ page.effort }}</strong>
-              </div>
-            </div>
-            {% endif %}
-            {% if finaid_price %}
-            <div class="stat-col small">
-              <div class="title">price</div>
-              <div class="text">
-                <strong>
-                  <a target="_blank" href="{% url 'checkout-product' %}?product_id={{product.id}}">
-                    ${{finaid_price.1}}
-                  </a>
-                </strong>
-              </div>
-            </div>
-            {% endif %}
-            {% if not finaid_price and page.price %}
-            <div class="stat-col small">
-              <div class="title">price</div>
-              <div class="text">
-                <strong>
-                  {% if page.price.0.value.link %}
-                    <a target="_blank" href={{page.price.0.value.link}}>{{page.price.0.value.text}}</a>
-                  {% else %}
-                  {{page.price.0.value.text}}
-                  {% endif %}
-                </strong>
-              </div>
+
+            {% if page.is_course_page %}
+            <div class="stats-row">
+              <div class="w-100" id="upsellCard"></div>
             </div>
             {% endif %}
           </div>
         </div>
-      </section>
-      <section class="text-block">
-        <div class="container">
-          <div id="upsellCard"></div>
 
-          <div class="text-holder">
-            {% if page.about %}
-            <div class="content-data">
-              <h2>About this course</h2>
-              {{ page.about |richtext }}
-            </div>
-            {% endif %}
-            {% if page.what_you_learn %}
-            <div class="content-data">
-              <h2>What you’ll learn</h2>
-              {{ page.what_you_learn |richtext }}
-            </div>
-            {% endif %}
-            {% if page.prerequisites %}
-              <div class="content-data">
-                <h2>Prerequisites</h2>
-                {{ page.prerequisites |richtext }}
+        {% if instructors %}
+        {% for member in instructors %}
+        <div class="modal instructor-modal" tabindex="-1" id="instructor-modal-{{ member.id }}" data-keyboard="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">{{ member.instructor_name }}</h5>
+                <button type="button" class="close" data-close-instructor-id="{{ member.id }}" aria-label="Close">
+                  <span aria-hidden="true">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10" fill="none">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M5 4.1239L8.94245 0.181446C9.18438 -0.0604821 9.57662 -0.0604821 9.81855 0.181446C10.0605 0.423375 10.0605 0.815619 9.81855 1.05755L5.8761 5L9.81855 8.94245C10.0605 9.18438 10.0605 9.57662 9.81855 9.81855C9.57662 10.0605 9.18438 10.0605 8.94245 9.81855L5 5.8761L1.05755 9.81855C0.815619 10.0605 0.423375 10.0605 0.181446 9.81855C-0.0604821 9.57662 -0.0604821 9.18438 0.181446 8.94245L4.1239 5L0.181446 1.05755C-0.0604821 0.815619 -0.0604821 0.423375 0.181446 0.181446C0.423375 -0.0604821 0.815619 -0.0604821 1.05755 0.181446L5 4.1239Z" fill="#03152D"/>
+</svg>
+                  </span>
+                </button>
               </div>
-            {% endif %}
+              <div class="modal-body">
+                <div class="row d-flex">
+                  <div class="col col-instructor-photo">
+                    <img class="img-thumbnail" src="{% feature_img_src member.feature_image %}" alt="Photo for {{member.instructor_name}}" />
+                  </div>
+                  <div class="col col-instructor-title flex-grow-1">
+                    <h2>{{member.instructor_name}}</h2>
+                    {% if member.instructor_title %}<h3>{{member.instructor_title}}</h3>{% endif %}
+      
+                    <p>{{member.instructor_bio_short|safe}}</p>
+                  </div>
+                </div>
+                <div class="row row-instructor-body">
+                  <div class="col">
+                    {% if member.instructor_bio_long %}
+                      {{ member.instructor_bio_long|safe }}
+                    {% endif %}
+                    {% if not member.instructor_bio_long %}
+                      {{ member.instructor_bio_short|safe}}
+                    {% endif %}
+                  </div>
+                </div>        
+              </div>
+            </div>
           </div>
         </div>
-      </section>
-      {% if instructors or page.faculty_members %}
-      <section class="faculty-section">
-        <div class="container">
-          <h2>{{ page.faculty_section_title }}</h2>
-          <ul class="faculty-members card-listing">
-            {% if instructors %}
-            {% for member in instructors %}
-              <li>
-                <div class="member-card highlight-card">
-                  <img src="{% feature_img_src member.feature_image %}" alt="">
-                  <div class="member-info">
-                    <h3 class="name">{{ member.instructor_name }}</h3>
-                    {% if member.instructor_title %}<h4 class="title">{{ member.instructor_title }}</h4>{% endif %}
-                    <div class="description">{{ member.instructor_bio_short|safe }}</div>
-                  </div>
-                </div>
-              </li>
-            {% endfor %}
-            {% endif %}
+        {% endfor %}
+        {% endif %}
 
-            {% if page.faculty_members %}
-            {% for member in page.faculty_members %}
-              <li>
-                <div class="member-card highlight-card">
-                  <img src="{% wagtail_img_src member.value.image %}" alt="{{ member.name }}">
-                  <div class="member-info">
-                    <h3 class="name">{{ member.value.name }}</h3>
-                    <div class="description">{{ member.value.description }}</div>
-                  </div>
-                </div>
-              </li>
-            {% endfor %}
-            {% endif %}
-          </ul>
-        </div>
-      </section>
-      {% endif %}
-      <section class="ofac-message">
-        <div class="container">
-          <p><em>Who can take this course?</em></p>
-
-          <p>Because of U.S. Office of Foreign Assets Control (OFAC) restrictions and other U.S. federal regulations, learners residing in one or more of the following countries or regions will not be able to register for this course: Iran, Cuba, Syria, North Korea and the Crimea, Donetsk People's Republic and Luhansk People's Republic regions of Ukraine.</p>
-        </div>
-      </section>
-    </div>
-{% endif %}
+      </div>
+    </section>
+  </div>
 {% endblock %}

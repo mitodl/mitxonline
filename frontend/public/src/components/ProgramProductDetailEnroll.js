@@ -33,7 +33,6 @@ import { isFinancialAssistanceAvailable } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import type { User } from "../flow/authTypes"
 import users, { currentUserSelector } from "../lib/queries/users"
-import { checkFeatureFlag } from "../lib/util"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import ProgramInfoBox from "./ProgramInfoBox"
 import type { ProgramEnrollment, Program } from "../flow/courseTypes"
@@ -383,11 +382,6 @@ export class ProgramProductDetailEnroll extends React.Component<
       programEnrollmentsLoading
     } = this.props
 
-    const showNewDesign = checkFeatureFlag(
-      "mitxonline-new-product-page",
-      currentUser && currentUser.id ? currentUser.id : "anonymousUser"
-    )
-
     let enrollment = undefined
 
     if (!programEnrollmentsLoading) {
@@ -444,16 +438,14 @@ export class ProgramProductDetailEnroll extends React.Component<
             </>
           </Loader>
         }
-        {showNewDesign ? (
-          <>
-            {
-              // $FlowFixMe: isLoading null or undefined
-              <Loader key="program_info_loader" isLoading={programIsLoading}>
-                <ProgramInfoBox programs={programs}></ProgramInfoBox>
-              </Loader>
-            }
-          </>
-        ) : null}
+        <>
+          {
+            // $FlowFixMe: isLoading null or undefined
+            <Loader key="program_info_loader" isLoading={programIsLoading}>
+              <ProgramInfoBox programs={programs}></ProgramInfoBox>
+            </Loader>
+          }
+        </>
         {currentUser ? this.renderAddlProfileFieldsModal() : null}
       </>
     )
