@@ -55,32 +55,31 @@ const PROGRAMS_TAB = "programs"
 // Course tab name.
 const COURSES_TAB = "courses"
 
-
 function CatalogPage(props) {
   const [tabSelected, setTabSelected] = useState(COURSES_TAB)
   const [allCoursesRetrieved, setAllCoursesRetrieved] = useState([])
   const [allProgramsRetrieved, setAllProgramsRetrieved] = useState([])
   const [filteredCourses, setFilteredCourses] = useState([])
   const [filteredPrograms, setFilteredPrograms] = useState([])
-  const [filterProgramsCalled, setFilterProgramsCalled] =  useState(false)
+  const [filterProgramsCalled, setFilterProgramsCalled] = useState(false)
   const [filterCoursesCalled, setFilterCoursesCalled] = useState(false)
   const [filteredDepartments, setFilteredDepartments] = useState([])
   const [filterDepartmentsCalled, setFilterDepartmentsCalled] = useState(false)
   const [selectedDepartment, setSelectedDepartment] = useState(ALL_DEPARTMENTS)
-  const [mobileFilterWindowExpanded, setMobileFilterWindowExpanded] = useState(false)
-  // is this still in use?
-  const [itemsPerRow, setItemsPerRow] = useState(3)
+  const [mobileFilterWindowExpanded, setMobileFilterWindowExpanded] = useState(
+    false
+  )
   const [courseQueryPage, setCourseQueryPage] = useState(1)
   const [programQueryPage, setProgramQueryPage] = useState(1)
   const [isLoadingMoreItems, setIsLoadingMoreItems] = useState(false)
 
   const courseLoaderGrid = (
-  <div id="catalog-grid">
-    <CourseLoader />
-    <CourseLoader />
-    <CourseLoader />
-  </div>
-)
+    <div id="catalog-grid">
+      <CourseLoader />
+      <CourseLoader />
+      <CourseLoader />
+    </div>
+  )
   let io = null
   let container
   container = React.createRef(null)
@@ -90,15 +89,14 @@ function CatalogPage(props) {
       return () => {
         io.disconnect()
       }
-    }
-    else {
+    } else {
       return () => {
         console.log("Nothing to disconnect")
       }
     }
   }, [])
 
-    /**
+  /**
    * Makes another API call to the courses or programs endpoint if there is
    * a next page defined in the prior request.
    * Appends the courses or programs from the API call to the current allCoursesRetrieved
@@ -124,18 +122,15 @@ function CatalogPage(props) {
             )
             setFilteredCourses(filteredCoursesByDepartment)
             setAllCoursesRetrieved([
-                ...allCoursesRetrieved,
-                ...response.body.results
-              ]
-            )
+              ...allCoursesRetrieved,
+              ...response.body.results
+            ])
           }
         }
       } else {
         if (props.programsNextPage) {
           setIsLoadingMoreItems(true)
-          const response = await props.getNextProgramPage(
-            programQueryPage + 1
-          )
+          const response = await props.getNextProgramPage(programQueryPage + 1)
           setIsLoadingMoreItems(false)
           setProgramQueryPage(programQueryPage + 1)
           if (response.body.results) {
@@ -145,9 +140,9 @@ function CatalogPage(props) {
             )
             setFilteredPrograms(filteredProgramsByDepartment)
             setAllProgramsRetrieved([
-                ...allProgramsRetrieved,
-                ...response.body.results
-              ])
+              ...allProgramsRetrieved,
+              ...response.body.results
+            ])
           }
         }
       }
@@ -160,8 +155,7 @@ function CatalogPage(props) {
    * Updates the filteredDepartments state variable once departmentsIsLoading
    * is false.
    */
-    useEffect(() => {
-
+  useEffect(() => {
     if (!props.coursesIsLoading && !filterCoursesCalled) {
       setFilterCoursesCalled(true)
       setAllCoursesRetrieved(props.courses)
@@ -173,22 +167,18 @@ function CatalogPage(props) {
       setFilteredCourses(filteredCoursesByDepartment)
 
       // Detect when the bottom of the catalog page has been reached and display more catalog items.
-      io = new window.IntersectionObserver(
-        bottomOfLoadedCatalogCallback,
-        { threshold: 1.0 }
-      )
+      io = new window.IntersectionObserver(bottomOfLoadedCatalogCallback, {
+        threshold: 1.0
+      })
       io.observe(container.current)
     }
 
-    if (
-      !props.departmentsIsLoading &&
-      !filterDepartmentsCalled
-    ) {
+    if (!props.departmentsIsLoading && !filterDepartmentsCalled) {
       setFilterDepartmentsCalled(true)
       setFilteredDepartments(filterDepartmentsByTabName(tabSelected))
     }
     if (!props.programsIsLoading && !filterProgramsCalled) {
-      setFilterProgramsCalled(true )
+      setFilterProgramsCalled(true)
       setAllProgramsRetrieved(props.programs)
       const filteredProgramsByDepartment = filteredProgramsByDepartmentAndCriteria(
         selectedDepartment,
@@ -232,7 +222,7 @@ function CatalogPage(props) {
     setFilteredDepartments(filterDepartmentsByTabName(selectTabName))
   }
 
-    /**
+  /**
    * Returns an array of departments names which have one or more course(s) or program(s)
    * related to them depending on the currently selected tab.
    * @param {string} selectedTabName the name of the currently selected tab.
@@ -269,7 +259,7 @@ function CatalogPage(props) {
     setMobileFilterWindowExpanded(expanded)
   }
 
-    /**
+  /**
    * Changes the selectedDepartment state variable and, depending on the value of tabSelected, updates either
    * the filteredCourses or filteredPrograms state variable.
    * @param {string} selectedDepartment The department name to set selectedDepartment to and filter courses by.
@@ -277,9 +267,17 @@ function CatalogPage(props) {
   const changeSelectedDepartment = (selectedDepartment: string) => {
     setSelectedDepartment(selectedDepartment)
     setFilteredCourses(
-      filteredCoursesBasedOnCourseRunCriteria(selectedDepartment, allCoursesRetrieved)
+      filteredCoursesBasedOnCourseRunCriteria(
+        selectedDepartment,
+        allCoursesRetrieved
+      )
     )
-    setFilteredPrograms(filteredProgramsByDepartmentAndCriteria(selectedDepartment, allProgramsRetrieved))
+    setFilteredPrograms(
+      filteredProgramsByDepartmentAndCriteria(
+        selectedDepartment,
+        allProgramsRetrieved
+      )
+    )
     toggleMobileFilterWindowExpanded(false)
   }
 
@@ -342,7 +340,7 @@ function CatalogPage(props) {
     )
   }
 
-    /**
+  /**
    * Returns the number of courseRuns or programs based on the selected catalog tab.
    */
   const renderNumberOfCatalogItems = () => {
@@ -359,10 +357,7 @@ function CatalogPage(props) {
         department => department.name === selectedDepartment
       ).programs
     }
-    if (
-      tabSelected === COURSES_TAB &&
-      selectedDepartment === ALL_DEPARTMENTS
-    ) {
+    if (tabSelected === COURSES_TAB && selectedDepartment === ALL_DEPARTMENTS) {
       return props.coursesCount
     } else if (
       tabSelected === COURSES_TAB &&
@@ -426,7 +421,7 @@ function CatalogPage(props) {
     )
   }
 
-    /**
+  /**
    * Dynamically renders rows of cards in the catalog.  Each row can contain up to {ITEMS_PER_ROW} course or program cards.
    * @param {Array<CourseDetailWithRuns | Program>} itemsInCatalog The items associated with the currently selected catalog page.
    * @param {Function} renderCatalogCardFunction The card render function that will be used for each item on the current catalog page.
@@ -453,19 +448,13 @@ function CatalogPage(props) {
       return courseLoaderGrid
     }
     if (tabSelected === COURSES_TAB && filteredCourses.length > 0) {
-      return renderCatalogRows(
-        filteredCourses,
-        renderCourseCatalogCard
-      )
+      return renderCatalogRows(filteredCourses, renderCourseCatalogCard)
     } else if (tabSelected === PROGRAMS_TAB) {
-      return renderCatalogRows(
-        filteredPrograms,
-        renderProgramCatalogCard
-      )
+      return renderCatalogRows(filteredPrograms, renderProgramCatalogCard)
     }
   }
 
-    /**
+  /**
    * Returns the rendering of the Department sidebar.
    */
   const renderDepartmentSideBarList = () => {
@@ -481,9 +470,7 @@ function CatalogPage(props) {
           key={tabSelected + department}
         >
           <button
-            onClick={() =>
-              changeSelectedDepartment(department, tabSelected)
-            }
+            onClick={() => changeSelectedDepartment(department, tabSelected)}
           >
             {department}
           </button>
@@ -511,9 +498,7 @@ function CatalogPage(props) {
           <div className="d-block d-md-none" id="mobile-catalog-title">
             <button
               onClick={() =>
-                toggleMobileFilterWindowExpanded(
-                  !mobileFilterWindowExpanded
-                )
+                toggleMobileFilterWindowExpanded(!mobileFilterWindowExpanded)
               }
             />
             <h1>
@@ -556,9 +541,7 @@ function CatalogPage(props) {
                           }`}
                         >
                           <button
-                            onClick={() =>
-                              changeSelectedTab(COURSES_TAB)
-                            }
+                            onClick={() => changeSelectedTab(COURSES_TAB)}
                             tabIndex="0"
                           >
                             Courses{" "}
@@ -572,16 +555,10 @@ function CatalogPage(props) {
                             tabSelected === PROGRAMS_TAB
                               ? "selected-tab"
                               : "unselected-tab"
-                          } ${
-                            filteredPrograms.length
-                              ? ""
-                              : "display-none"
-                          }`}
+                          } ${filteredPrograms.length ? "" : "display-none"}`}
                         >
                           <button
-                            onClick={() =>
-                              changeSelectedTab(PROGRAMS_TAB)
-                            }
+                            onClick={() => changeSelectedTab(PROGRAMS_TAB)}
                           >
                             Programs{" "}
                             <div className="product-number d-inline-block d-sm-none">
@@ -608,8 +585,7 @@ function CatalogPage(props) {
                         <h2>
                           {/* Hidden on small screens. */}
                           {/* Could add logic to display only "course" if only 1 course is showing. */}
-                          {renderNumberOfCatalogItems()}{" "}
-                          {tabSelected}
+                          {renderNumberOfCatalogItems()} {tabSelected}
                         </h2>
                       </CSSTransition>
                     </TransitionGroup>
@@ -638,8 +614,6 @@ function CatalogPage(props) {
   )
 }
 
-
-
 const mapPropsToConfig = () => [
   coursesQuery(1),
   programsQuery(1),
@@ -647,7 +621,7 @@ const mapPropsToConfig = () => [
 ]
 
 const mapDispatchToProps = {
-  getNextCoursePage:  getNextCoursePage,
+  getNextCoursePage:  props.getNextCoursePage,
   getNextProgramPage: getNextProgramPage
 }
 
