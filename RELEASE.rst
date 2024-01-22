@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.85.0
+--------------
+
+- 3382: self paced courses with future start dates show start anytime (#2066)
+- 3400 remove enrolled state and modal default (#2065)
+- Removes instances where we've feature flagged the new (current) design (#2064)
+- Delay alert when rendering the page in order to engage screen reader alert (#2059)
+- 3362: No opacity on program card, pointer when hovering (#2062)
+- Show More link on product about page accessibility (#2063)
+- Update react-redux and related packages to facilitate catalog changes (#2030)
+
 Version 0.84.0 (Released January 18, 2024)
 --------------
 
