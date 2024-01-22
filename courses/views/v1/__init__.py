@@ -34,6 +34,7 @@ from courses.models import (
     CourseRunEnrollment,
     Department,
     LearnerProgramRecordShare,
+    PaidCourseRun,
     PartnerSchool,
     Program,
     ProgramEnrollment,
@@ -60,8 +61,9 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_ENROLLED,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
 )
-from main.utils import encode_json_cookie_value
+from main.utils import encode_json_cookie_value, redirect_with_user_message
 from openedx.api import (
     subscribe_to_edx_course_emails,
     sync_enrollments_with_edx,
@@ -267,6 +269,12 @@ def _validate_enrollment_post_request(
                 }
             ),
             max_age=USER_MSG_COOKIE_MAX_AGE,
+        )
+        return resp, None, None
+    if PaidCourseRun.fulfilled_paid_course_run_exists(user, run):
+        resp = redirect_with_user_message(
+            reverse("user-dashboard"),
+            {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},
         )
         return resp, None, None
     return None, user, run
