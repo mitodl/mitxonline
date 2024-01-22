@@ -339,23 +339,23 @@ describe("utility functions", () => {
 
   describe("getStartDateText", () => {
     [
-      ["course", "past", false, "Start Anytime"],
-      ["course run", "past", false, "Start Anytime"],
-      ["course", "future", false, "Start Date"],
-      ["course run", "future", false, "Start Date"],
+      ["course", "past", false, "Started"],
+      ["course run", "past", false, "Started"],
+      ["course", "future", false, "Starts"],
+      ["course run", "future", false, "Starts"],
       ["course", "past", true, "Start Anytime"],
       ["course run", "past", true, "Start Anytime"],
-      ["course", "future", true, "Start Anytime"],
-      ["course run", "future", true, "Start Anytime"]
-    ].forEach(([coursewareType, datePosition, selfPaced, displayText]) => {
-      it(`displays the ${displayText} text when the ${coursewareType} is in the ${datePosition} and there ${
+      ["course", "future", true, "Starts"],
+      ["course run", "future", true, "Starts"]
+    ].forEach(([coursewareType, startDatePosition, selfPaced, displayText]) => {
+      it(`displays the ${displayText} text when the ${coursewareType} has a start date in the ${startDatePosition} and there ${
         selfPaced ? "are" : "are no"
       } self-paced courses`, () => {
         const course = {
           courseruns: [
             {
               start_date:
-                datePosition === "future"
+                startDatePosition === "future"
                   ? moment().add(1, "days")
                   : moment().subtract(1, "days"),
               is_self_paced: false
@@ -375,7 +375,7 @@ describe("utility functions", () => {
       })
     })
 
-    it("displays the closest start date if there are multiple future start dates", () => {
+    it("displays the earliest start date if there are multiple future start dates", () => {
       const startDates = [
         moment().add(1, "days"),
         moment().add(2, "days"),
@@ -396,7 +396,7 @@ describe("utility functions", () => {
         ]
       }
 
-      assert.isTrue(getStartDateText(course).includes("Start Date"))
+      assert.isTrue(getStartDateText(course).includes("Starts"))
       assert.isTrue(
         getStartDateText(course).includes(formatPrettyDate(startDates[0]))
       )
@@ -405,7 +405,7 @@ describe("utility functions", () => {
       )
     })
 
-    it("displays the closest start date if there are multiple past start dates and showPast is true", () => {
+    it("displays the earliest start date if there are multiple past start dates", () => {
       const startDates = [
         moment().subtract(1, "days"),
         moment().subtract(2, "days"),
@@ -426,12 +426,12 @@ describe("utility functions", () => {
         ]
       }
 
-      assert.isTrue(getStartDateText(course, true).includes("Start Date"))
+      assert.isTrue(getStartDateText(course).includes("Started"))
       assert.isTrue(
-        getStartDateText(course, true).includes(formatPrettyDate(startDates[0]))
+        getStartDateText(course).includes(formatPrettyDate(startDates[2]))
       )
       assert.isFalse(
-        getStartDateText(course, true).includes(formatPrettyDate(startDates[2]))
+        getStartDateText(course).includes(formatPrettyDate(startDates[0]))
       )
     })
   })
