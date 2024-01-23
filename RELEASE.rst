@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.85.1
+Version 0.85.1 (Released January 23, 2024)
 --------------
 
 - Fix program id retrieval when sharing (#2061)
