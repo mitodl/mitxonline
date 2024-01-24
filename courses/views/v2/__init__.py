@@ -39,7 +39,7 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = Pagination
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["id", "live", "readable_id", "page__live"]
-    queryset = Program.objects.filter().prefetch_related("departments")
+    queryset = Program.objects.filter().order_by("title").prefetch_related("departments")
 
 
 class IdInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
@@ -112,6 +112,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
             .select_related("page")
             .prefetch_related("departments")
             .all()
+            .order_by("title")
         )
 
     def get_serializer_context(self):
