@@ -371,22 +371,31 @@ def test_create_transaction_with_no_transaction_id():
 
 
 @pytest.mark.parametrize(
-    "discount_type, less_than_zero",
+    "discount_type, less_than_zero_or_discount",
     [
         [DISCOUNT_TYPE_DOLLARS_OFF, False],
         [DISCOUNT_TYPE_DOLLARS_OFF, True],
         [DISCOUNT_TYPE_FIXED_PRICE, False],
+        [DISCOUNT_TYPE_FIXED_PRICE, True],
         [DISCOUNT_TYPE_PERCENT_OFF, False],
     ],
 )
 def test_discount_product_calculation(
-    user, unlimited_discount, discount_type, less_than_zero
+    user, unlimited_discount, discount_type, less_than_zero_or_discount
 ):
     product = ProductFactory.create()
     unlimited_discount.discount_type = discount_type
 
-    if less_than_zero and discount_type == DISCOUNT_TYPE_DOLLARS_OFF:
+    if less_than_zero_or_discount and discount_type == DISCOUNT_TYPE_DOLLARS_OFF:
+        # If set, test that the discount is ignored when the product price would result
+        # in the discounted amount being less than zero.
         unlimited_discount.amount += product.price
+
+    if less_than_zero_or_discount and discount_type == DISCOUNT_TYPE_FIXED_PRICE:
+        # If set, test that the discount is ignored when the product price is under the
+        # fixed price.
+        product.price = Decimal(unlimited_discount.amount * 0.5)
+        product.save()
 
     discounted_amount = unlimited_discount.discount_product(product)
 
@@ -395,7 +404,11 @@ def test_discount_product_calculation(
         calculated_amount = 0 if calculated_amount < 0 else calculated_amount
         assert discounted_amount == calculated_amount
     elif unlimited_discount.discount_type == DISCOUNT_TYPE_FIXED_PRICE:
-        assert discounted_amount == unlimited_discount.amount
+        assert (
+            discounted_amount == product.price
+            if less_than_zero_or_discount
+            else unlimited_discount.amount
+        )
     elif unlimited_discount.discount_type == DISCOUNT_TYPE_PERCENT_OFF:
         assert discounted_amount == Decimal(
             product.price - (product.price * Decimal(unlimited_discount.amount / 100))
