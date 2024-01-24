@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.85.2
+--------------
+
+- Update Publish Documentation to newer versions of stuff so it runs (#2070)
+- Updated fixed price test to be less flaky (#2069)
+
 Version 0.85.1 (Released January 23, 2024)
 --------------
 
