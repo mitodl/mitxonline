@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.85.2
+Version 0.85.2 (Released January 24, 2024)
 --------------
 
 - Update Publish Documentation to newer versions of stuff so it runs (#2070)
