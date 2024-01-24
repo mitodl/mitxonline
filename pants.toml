@@ -5,7 +5,7 @@ backend_packages = [
   # local plugins
   "mitol.docs"
 ]
-pants_version = "2.18.2"
+pants_version = "2.17.1"
 pythonpath = ["%(buildroot)s/pants-plugins"]
 
 [anonymous-telemetry]
