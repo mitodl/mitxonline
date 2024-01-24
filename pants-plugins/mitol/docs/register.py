@@ -1,3 +1,6 @@
+import logging
+from dataclasses import dataclass
+
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.interpreter_constraints import (
     InterpreterConstraints,
@@ -9,21 +12,17 @@ from pants.backend.python.util_rules.pex import (
     PexRequirements,
 )
 from pants.core.util_rules.distdir import DistDir
-from pants.engine.fs import Digest, Workspace, MergeDigests, PathGlobs
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, goal_rule, collect_rules, rule
+from pants.engine.fs import Digest, MergeDigests, PathGlobs, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.process import FallibleProcessResult
+from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.target import (
-    Target,
-    Tags,
     COMMON_TARGET_FIELDS,
-    Targets,
-    Sources,
-    StringField,
     FieldSet,
+    StringField,
+    Target,
+    Targets,
 )
-from dataclasses import dataclass
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +34,7 @@ class DocsGoalSubsystem(GoalSubsystem):
 
 class Docs(Goal):
     subsystem_cls = DocsGoalSubsystem
+    environment_behavior = None
 
 
 class SphinxSources(StringField):
@@ -55,7 +55,6 @@ class SphinxDocs(Target):
 
 @goal_rule
 async def build_docs(targets: Targets, dist_dir: DistDir, workspace: Workspace) -> Docs:
-
     pex = await Get(
         Pex,
         PexRequest(
