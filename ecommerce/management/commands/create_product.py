@@ -2,6 +2,8 @@
 Creates a product for the given courseware ID. This only supports course runs
 for right now (since we don't really do program runs).
 """
+
+import reversion
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
 
@@ -56,12 +58,13 @@ class Command(BaseCommand):
         if "description" in kwargs and kwargs["description"] is not None:
             description = kwargs["description"]
 
-        product = Product.objects.create(
-            object_id=courserun.id,
-            content_type=content_type,
-            price=kwargs["price"],
-            description=description,
-            is_active=kwargs["inactive"],
-        )
+        with reversion.create_revision():
+            product = Product.objects.create(
+                object_id=courserun.id,
+                content_type=content_type,
+                price=kwargs["price"],
+                description=description,
+                is_active=kwargs["inactive"],
+            )
 
         self.stdout.write(f"Created product {product}.")
