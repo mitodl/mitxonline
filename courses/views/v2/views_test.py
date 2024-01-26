@@ -2,7 +2,6 @@
 Tests for courses api views v2
 """
 import logging
-import operator as op
 import random
 
 import pytest
@@ -10,7 +9,6 @@ from django.db import connection
 from django.urls import reverse
 from rest_framework import status
 
-from courses.conftest import course_catalog_data
 from courses.factories import DepartmentFactory
 from courses.models import Program
 from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
@@ -22,7 +20,6 @@ from courses.views.test_utils import (
     num_queries_from_programs,
 )
 from courses.views.v2 import Pagination
-from fixtures.common import raise_nplusone
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
