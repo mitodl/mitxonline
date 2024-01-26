@@ -75,7 +75,7 @@ def test_get_departments(
 
 
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
-@pytest.mark.parametrize("course_catalog_program_count", [15], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [12], indirect=True)
 def test_get_programs(
     user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
