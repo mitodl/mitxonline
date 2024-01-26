@@ -42,10 +42,6 @@ const TopBar = ({ currentUser }: Props) => {
           <a href="https://mit.edu" className="logo-link">
             <InstituteLogo />
           </a>
-          <div className="divider-grey" />
-          <a href={routes.root} className="mitx-online-link">
-            MITx Online
-          </a>
         </div>
         <button
           className="navbar-toggler nav-opener collapsed"
