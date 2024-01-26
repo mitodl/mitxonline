@@ -1,24 +1,25 @@
 """
 Tests for courses api views v2
 """
+import logging
 import operator as op
 import random
 
 import pytest
+from django.db import connection
 from django.urls import reverse
 from rest_framework import status
-from django.db import connection
-import logging
 
 from courses.conftest import course_catalog_data
 from courses.factories import DepartmentFactory
-from courses.serializers.v2.programs import ProgramSerializer
+from courses.models import Program
 from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
 from courses.serializers.v2.departments import DepartmentWithCountSerializer
+from courses.serializers.v2.programs import ProgramSerializer
 from courses.views.test_utils import (
-    num_queries_from_programs,
     num_queries_from_course,
     num_queries_from_department,
+    num_queries_from_programs,
 )
 from courses.views.v2 import Pagination
 from fixtures.common import raise_nplusone
@@ -80,7 +81,11 @@ def test_get_programs(
     user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
     """Test the view that handles requests for all Programs"""
-    _, programs, _ = course_catalog_data
+    course_catalog_data
+
+    # Fetch programs after running the fixture so they're in the right order
+    programs = Program.objects.order_by("title").prefetch_related("departments").all()
+
     num_queries = num_queries_from_programs(programs, "v2")
     with django_assert_max_num_queries(num_queries) as context:
         resp = user_drf_client.get(reverse("v2:programs_api-list"))
