@@ -11,7 +11,7 @@ describe("InstituteLogo component", () => {
 
     const title = wrapper.find("title")
     assert.exists(title)
-    assert.equal(title.text(), "Institute Logo")
+    assert.equal(title.text(), "MITx Online Logo")
     const desc = wrapper.find("desc")
     assert.exists(desc)
     assert.equal(desc.text(), "MIT Logo")
