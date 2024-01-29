@@ -1,5 +1,5 @@
 #learner-record-school-name img {
-  width: 245px;
+  width: 200px;
 }
 
 .badge.badge-partially-completed {
@@ -30,6 +30,7 @@ div.learner-record-user-profile {
 div.learner-record {
   @media (min-width:960px) { 
     border: 1px solid #c2c2c2;
+    background-color: #fff;
     border-radius: 8px;
     padding: 30px;
     margin-top: 1em;
