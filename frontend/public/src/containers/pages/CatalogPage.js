@@ -83,13 +83,17 @@ export class CatalogPage extends React.Component<Props> {
     super(props)
   }
 
-  componentDidMount() {
+  // eslint-disable-next-line camelcase
+  UNSAFE_componentWillMount() {
     this.loadMoreCourses().then(() => {
       console.log("loaded more courses")
     })
     this.loadMorePrograms().then(() => {
       console.log("loaded more programs")
     })
+  }
+
+  componentDidMount() {
   }
 
   /**
@@ -422,9 +426,9 @@ export class CatalogPage extends React.Component<Props> {
               ...response.body.results
             ]
           })
-          if (response.body.next === null) {
-            this.setState({moreCoursesToRetrieve: false})
-          }
+        }
+        if (response.body.next === null) {
+          this.setState({moreCoursesToRetrieve: false})
         }
       }
     }
