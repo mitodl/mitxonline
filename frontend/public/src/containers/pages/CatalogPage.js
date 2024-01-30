@@ -32,6 +32,7 @@ import { requestAsync } from "redux-query"
 import { connectRequest } from "redux-query-react"
 import { pathOr } from "ramda"
 import CourseLoader from "../../components/CourseLoader"
+import {PAGE_SIZE} from "../../constants"
 
 type Props = {
   coursesIsLoading: ?boolean,
@@ -60,6 +61,7 @@ export class CatalogPage extends React.Component<Props> {
     tabSelected:                COURSES_TAB,
     allCoursesRetrieved:        [],
     allProgramsRetrieved:       [],
+    allDepartmentsRetrieved:    [],
     filteredCourses:            [],
     filteredPrograms:           [],
     filterProgramsCalled:       false,
@@ -71,75 +73,23 @@ export class CatalogPage extends React.Component<Props> {
     items_per_row:              3,
     courseQueryPage:            1,
     programQueryPage:           1,
-    isLoadingMoreItems:         false
+    isLoadingMoreItems:         false,
+    moreCoursesToRetrieve:      true,
+    moreProgramsToRetrieve:     true,
+    moreDepartmentsToRetrieve:  true
   }
 
   constructor(props) {
     super(props)
   }
 
-  componentDidMount() {}
-
-  /**
-   * Makes another API call to the courses or programs endpoint if there is
-   * a next page defined in the prior request.
-   * Appends the courses or programs from the API call to the current allCoursesRetrieved
-   * or allProgramsRetrieved state variable.  Increments the courseQueryPage or programQueryPage
-   * state variable.  Updates the filteredCourses or filteredPrograms state variable using the
-   * updated allCoursesRetrieved or allProgramsRetrieved state variable.
-   */
-  bottomOfLoadedCatalogCallback = async entries => {
-    const [entry] = entries
-    if (entry.isIntersecting) {
-      if (this.state.tabSelected === COURSES_TAB) {
-        const { getNextCoursePage, coursesNextPage } = this.props
-
-        // Only request the next page if a next page exists (coursesNextPage)
-        // and if we aren't already requesting the next page (isLoadingMoreItems).
-        if (coursesNextPage && !this.state.isLoadingMoreItems) {
-          this.setState({ isLoadingMoreItems: true })
-          this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
-          const response = await getNextCoursePage(this.state.courseQueryPage)
-          this.setState({ isLoadingMoreItems: false })
-          if (response.body.results) {
-            const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
-              this.state.selectedDepartment,
-              [...this.state.allCoursesRetrieved, ...response.body.results]
-            )
-            this.setState({ filteredCourses: filteredCourses })
-            this.setState({
-              allCoursesRetrieved: [
-                ...this.state.allCoursesRetrieved,
-                ...response.body.results
-              ]
-            })
-          }
-        }
-      } else {
-        const { getNextProgramPage, programsNextPage } = this.props
-        if (programsNextPage) {
-          this.setState({ isLoadingMoreItems: true })
-          const response = await getNextProgramPage(
-            this.state.programQueryPage + 1
-          )
-          this.setState({ isLoadingMoreItems: false })
-          this.setState({ programQueryPage: this.state.programQueryPage + 1 })
-          if (response.body.results) {
-            const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
-              this.state.selectedDepartment,
-              [...this.state.allProgramsRetrieved, ...response.body.results]
-            )
-            this.setState({ filteredPrograms: filteredPrograms })
-            this.setState({
-              allProgramsRetrieved: [
-                ...this.state.allProgramsRetrieved,
-                ...response.body.results
-              ]
-            })
-          }
-        }
-      }
-    }
+  componentDidMount() {
+    this.loadMoreCourses().then(() => {
+      console.log("loaded more courses")
+    })
+    this.loadMorePrograms().then(() => {
+      console.log("loaded more programs")
+    })
   }
 
   /**
@@ -164,29 +114,7 @@ export class CatalogPage extends React.Component<Props> {
         courses
       )
       this.setState({ filteredCourses: filteredCourses })
-      while (this.state.allCoursesRetrieved.length() < this.props.coursesCount) {
-        if (this.props.coursesNextPage && !this.state.isLoadingMoreItems) {
-          this.setState({ isLoadingMoreItems: true })
-          this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
-          const response = getNextCoursePage(this.state.courseQueryPage)
-          this.setState({ isLoadingMoreItems: false })
-          if (response.body.results) {
-            const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
-              this.state.selectedDepartment,
-              [...this.state.allCoursesRetrieved, ...response.body.results]
-            )
-            this.setState({ filteredCourses: filteredCourses })
-            this.setState({
-              allCoursesRetrieved: [
-                ...this.state.allCoursesRetrieved,
-                ...response.body.results
-              ]
-            })
-          }
-        }
-      }
     }
-
     if (
       !this.props.departmentsIsLoading &&
       !this.state.filterDepartmentsCalled
@@ -471,6 +399,66 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
+   * Loads more items into the catalog before render to ensure we have all available.
+   */
+  async loadMoreCourses() {
+    if (this.props.coursesCount <= PAGE_SIZE) {
+      this.setState({moreCoursesToRetrieve: false})
+    } else {
+      while (this.state.moreCoursesToRetrieve) {
+        this.setState({isLoadingMoreItems: true})
+        this.setState({courseQueryPage: this.state.courseQueryPage + 1})
+        const response = await getNextCoursePage(this.state.courseQueryPage)
+        this.setState({isLoadingMoreItems: false})
+        if (response.body.results) {
+          const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+            this.state.selectedDepartment,
+            [...this.state.allCoursesRetrieved, ...response.body.results]
+          )
+          this.setState({filteredCourses: filteredCourses})
+          this.setState({
+            allCoursesRetrieved: [
+              ...this.state.allCoursesRetrieved,
+              ...response.body.results
+            ]
+          })
+          if (response.body.next === null) {
+            this.setState({moreCoursesToRetrieve: false})
+          }
+        }
+      }
+    }
+  }
+  async loadMorePrograms() {
+    if (this.props.programsCount <= PAGE_SIZE) {
+      this.setState({moreProgramsToRetrieve: false})
+    } else {
+      while (this.state.moreProgramsToRetrieve) {
+        this.setState({isLoadingMoreItems: true})
+        this.setState({programQueryPage: this.state.programQueryPage + 1})
+        const response = await getNextProgramPage(this.state.programQueryPage)
+        this.setState({isLoadingMoreItems: false})
+        if (response.body.results) {
+          const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
+            this.state.selectedDepartment,
+            [...this.state.allProgramsRetrieved, ...response.body.results]
+          )
+          this.setState({filteredPrograms: filteredPrograms})
+          this.setState({
+            allProgramsRetrieved: [
+              ...this.state.allProgramsRetrieved,
+              ...response.body.results
+            ]
+          })
+          if (response.body.next === null) {
+            this.setState({moreProgramsToRetrieve: false})
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Renders the entire catalog of course or program cards based on the catalog tab selected.
    */
   renderCatalog() {
@@ -669,6 +657,7 @@ export class CatalogPage extends React.Component<Props> {
     )
   }
 }
+
 const courseLoaderGrid = (
   <div id="catalog-grid">
     <CourseLoader />
