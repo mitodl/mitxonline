@@ -1,6 +1,7 @@
 import { pathOr } from "ramda"
 
 import { nextState } from "./util"
+import {PAGE_SIZE} from "../../constants"
 
 export const programsSelector = pathOr(null, [
   "entities",
@@ -24,7 +25,7 @@ export const programsQueryKey = "programs"
 
 export const programsQuery = page => ({
   queryKey:  programsQueryKey,
-  url:       `/api/v2/programs/?page=${page}&live=true&page__live=true`,
+  url:       `/api/v2/programs/?page=${page}&live=true&page__live=true&page_size=${PAGE_SIZE}`,
   transform: json => ({
     programs: json
   }),

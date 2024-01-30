@@ -76,14 +76,6 @@ export class CatalogPage extends React.Component<Props> {
 
   constructor(props) {
     super(props)
-    this.io = null
-    this.container = React.createRef(null)
-  }
-
-  componentWillUnmount() {
-    if (this.io) {
-      this.io.disconnect()
-    }
   }
 
   componentDidMount() {}
@@ -172,13 +164,27 @@ export class CatalogPage extends React.Component<Props> {
         courses
       )
       this.setState({ filteredCourses: filteredCourses })
-
-      // Detect when the bottom of the catalog page has been reached and display more catalog items.
-      this.io = new window.IntersectionObserver(
-        this.bottomOfLoadedCatalogCallback,
-        { threshold: 1.0 }
-      )
-      this.io.observe(this.container.current)
+      while (this.state.allCoursesRetrieved.length() < this.props.coursesCount) {
+        if (this.props.coursesNextPage && !this.state.isLoadingMoreItems) {
+          this.setState({ isLoadingMoreItems: true })
+          this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
+          const response = getNextCoursePage(this.state.courseQueryPage)
+          this.setState({ isLoadingMoreItems: false })
+          if (response.body.results) {
+            const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+              this.state.selectedDepartment,
+              [...this.state.allCoursesRetrieved, ...response.body.results]
+            )
+            this.setState({ filteredCourses: filteredCourses })
+            this.setState({
+              allCoursesRetrieved: [
+                ...this.state.allCoursesRetrieved,
+                ...response.body.results
+              ]
+            })
+          }
+        }
+      }
     }
 
     if (

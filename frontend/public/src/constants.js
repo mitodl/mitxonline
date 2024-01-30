@@ -178,3 +178,5 @@ export const NODETYPE_COURSE = "course"
 
 export const NODEOPER_ALL = "all_of"
 export const NODEOPER_MIN = "min_number_of"
+
+export const PAGE_SIZE = 12
