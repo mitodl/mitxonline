@@ -70,15 +70,13 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
     isRevoking:                    false,
     isEnablingSharing:             false
   }
-
-  getProgramId() {
-    return this.props.match.params.program.length !== 36
-      ? this.props.match.params.program
-      : false
+  //when the record is in the shared view the program parameter is a 36 char UUID
+  isSharedRecordView() {
+    return this.props.match.params.program.length === 36
   }
 
-  getOnlyProgramId() {
-    return parseInt(this.props.match.params.program.length)
+  getProgramId() {
+    return parseInt(this.props.match.params.program)
   }
 
   // Renders program's courses table.
@@ -306,18 +304,12 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
   async onEnableRecordSharing() {
     const { enableRecordSharing, addUserNotification } = this.props
 
-    this.setState({ isEnablingSharing: true })
-
-    const programId = this.getProgramId()
-
-    if (programId === null) {
+    if (this.props.match.params.program === null) {
       return
     }
+    this.setState({ isEnablingSharing: true })
 
-    const sharingResponse = await enableRecordSharing(
-      this.getOnlyProgramId(),
-      null
-    )
+    const sharingResponse = await enableRecordSharing(this.getProgramId(), null)
 
     this.setState({ isEnablingSharing: false })
 
@@ -340,16 +332,13 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
   async onSubmitPartnerSchoolShare(values: any) {
     const { enableRecordSharing, addUserNotification } = this.props
 
-    this.setState({ isEnablingSharing: true })
-
-    const programId = this.getProgramId()
-
-    if (programId === null) {
+    if (this.props.match.params.program === null) {
       return
     }
+    this.setState({ isEnablingSharing: true })
 
     const sharingResponse = await enableRecordSharing(
-      this.getOnlyProgramId(),
+      this.getProgramId(),
       values.partnerSchool
     )
 
@@ -401,15 +390,12 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
   async onRevokeSharing() {
     const { revokeRecordSharing, addUserNotification } = this.props
 
-    this.setState({ isRevoking: true })
-
-    const programId = this.getProgramId()
-
-    if (programId === null) {
+    if (this.props.match.params.program === null) {
       return
     }
+    this.setState({ isRevoking: true })
 
-    const sharingResponse = await revokeRecordSharing(this.getOnlyProgramId())
+    const sharingResponse = await revokeRecordSharing(this.getProgramId())
 
     this.setState({ isRevoking: false })
 
@@ -587,8 +573,6 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
   render() {
     const { learnerRecord, isLoading } = this.props
     const { isRevoking, isEnablingSharing } = this.state
-
-    const isSharedRecord = this.getProgramId() ? true : false
     const hasSharingEnabled = this.hasSharingEnabled(learnerRecord)
 
     return (
@@ -596,7 +580,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
         <Loader isLoading={isLoading}>
           <div className="std-page-body container">
             <div className="d-flex flex-row-reverse mb-4">
-              {isSharedRecord ? (
+              {!this.isSharedRecordView() ? (
                 <div className="d-flex learner-record-sharing-controls mb-2">
                   {!hasSharingEnabled ? (
                     <button

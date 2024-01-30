@@ -1,6 +1,28 @@
 Release Notes
 =============
 
+Version 0.85.2 (Released January 24, 2024)
+--------------
+
+- Update Publish Documentation to newer versions of stuff so it runs (#2070)
+- Updated fixed price test to be less flaky (#2069)
+
+Version 0.85.1 (Released January 23, 2024)
+--------------
+
+- Fix program id retrieval when sharing (#2061)
+
+Version 0.85.0 (Released January 22, 2024)
+--------------
+
+- 3382: self paced courses with future start dates show start anytime (#2066)
+- 3400 remove enrolled state and modal default (#2065)
+- Removes instances where we've feature flagged the new (current) design (#2064)
+- Delay alert when rendering the page in order to engage screen reader alert (#2059)
+- 3362: No opacity on program card, pointer when hovering (#2062)
+- Show More link on product about page accessibility (#2063)
+- Update react-redux and related packages to facilitate catalog changes (#2030)
+
 Version 0.84.0 (Released January 18, 2024)
 --------------
 
