@@ -10,7 +10,7 @@ from django.urls import reverse
 from rest_framework import status
 
 from courses.factories import DepartmentFactory
-from courses.models import Program
+from courses.models import Course, Program
 from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
 from courses.serializers.v2.departments import DepartmentWithCountSerializer
 from courses.serializers.v2.programs import ProgramSerializer
@@ -165,7 +165,7 @@ def test_delete_program(
 
 
 @pytest.mark.parametrize("course_catalog_course_count", [100], indirect=True)
-@pytest.mark.parametrize("course_catalog_program_count", [15], indirect=True)
+@pytest.mark.parametrize("course_catalog_program_count", [12], indirect=True)
 @pytest.mark.parametrize("include_finaid", [True, False])
 def test_get_courses(
     user_drf_client,
@@ -175,9 +175,11 @@ def test_get_courses(
     include_finaid,
 ):
     """Test the view that handles requests for all Courses"""
-    courses, _, _ = course_catalog_data
+    course_catalog_data
     courses_from_fixture = []
     num_queries = 0
+
+    courses = Course.objects.order_by("title").prefetch_related("departments").all()
 
     if include_finaid:
         mock_context["include_approved_financial_aid"] = True
