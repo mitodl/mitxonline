@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.85.3
+--------------
+
+- Fixes use of "redemption_type" when generating discount codes in bulk, fixes test error (#2077)
+- Wrapping product creation in a create_version block so versions happen like they should (#2073)
+- Catalog: sorting courses and programs by title (#2071)
+
 Version 0.85.2 (Released January 24, 2024)
 --------------
 
