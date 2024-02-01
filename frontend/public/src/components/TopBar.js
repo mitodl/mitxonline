@@ -39,7 +39,7 @@ const TopBar = ({ currentUser }: Props) => {
         }`}
       >
         <div className="top-branding">
-          <a href="https://mit.edu" className="logo-link">
+          <a href="https://openlearning.mit.edu" className="logo-link">
             <InstituteLogo />
           </a>
         </div>
