@@ -20,6 +20,7 @@ from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
 from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
     ALL_PAYMENT_TYPES,
+    ALL_REDEMPTION_TYPES,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
     REDEMPTION_TYPE_ONE_TIME,
@@ -671,9 +672,13 @@ def generate_discount_code(**kwargs):
     UUID - if you want one (the convention is a -), you need to ensure it's
     there in the prefix (and that counts against the limit)
 
+    If you specify redemption_type, specifying one_time or one_time_per_user will not be
+    honored.
+
     Keyword Args:
     * discount_type - one of the valid discount types
     * payment_type - one of the valid payment types
+    * redemption_type - one of the valid redemption types (overrules use of the flags)
     * amount - the value of the discount
     * one_time - boolean; discount can only be redeemed once
     * one_time_per_user - boolean; discount can only be redeemed once per user
@@ -729,6 +734,12 @@ def generate_discount_code(**kwargs):
 
     if "once_per_user" in kwargs and kwargs["once_per_user"]:
         redemption_type = REDEMPTION_TYPE_ONE_TIME_PER_USER
+
+    if (
+        "redemption_type" in kwargs
+        and kwargs["redemption_type"] in ALL_REDEMPTION_TYPES
+    ):
+        redemption_type = kwargs["redemption_type"]
 
     if "expires" in kwargs and kwargs["expires"] is not None:
         expiration_date = parse_supplied_date(kwargs["expires"])

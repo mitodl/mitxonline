@@ -1037,22 +1037,30 @@ def test_start_checkout_with_zero_value(settings, user, user_client, products):
     )
 
 
-def test_bulk_discount_create(admin_drf_client):
+@pytest.mark.parametrize("use_redemption_type_flags", [True, False])
+def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
     """
     Try to make some bulk discounts.
     """
 
+    test_payload = {
+        "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
+        "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
+        "count": 5,
+        "amount": 50,
+        "prefix": "Generated-Code-",
+        "expires": "2030-01-01T00:00:00",
+        "one_time": True,
+    }
+
+    if use_redemption_type_flags:
+        test_payload["one_time"] = True
+    else:
+        test_payload["redemption_type"] = REDEMPTION_TYPE_ONE_TIME
+
     resp = admin_drf_client.post(
         reverse("discounts_api-create_batch"),
-        {
-            "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
-            "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
-            "count": 5,
-            "amount": 50,
-            "prefix": "Generated-Code-",
-            "expires": "2030-01-01T00:00:00",
-            "one_time": True,
-        },
+        test_payload,
     )
 
     assert resp.status_code == 201
@@ -1064,5 +1072,6 @@ def test_bulk_discount_create(admin_drf_client):
     assert len(discounts) == 5
 
     assert discounts[0].discount_type == DISCOUNT_TYPE_PERCENT_OFF
+    assert discounts[0].redemption_type == REDEMPTION_TYPE_ONE_TIME
     assert discounts[0].amount == 50
     assert discounts[0].is_bulk
