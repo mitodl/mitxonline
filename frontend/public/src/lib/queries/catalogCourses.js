@@ -1,7 +1,7 @@
 import { pathOr } from "ramda"
 
 import { nextState } from "./util"
-import {PAGE_SIZE} from "../../constants"
+import { PAGE_SIZE } from "../../constants"
 
 export const coursesSelector = pathOr(null, ["entities", "courses", "results"])
 

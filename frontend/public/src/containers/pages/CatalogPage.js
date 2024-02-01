@@ -32,7 +32,7 @@ import { requestAsync } from "redux-query"
 import { connectRequest } from "redux-query-react"
 import { pathOr } from "ramda"
 import CourseLoader from "../../components/CourseLoader"
-import {PAGE_SIZE} from "../../constants"
+import { PAGE_SIZE } from "../../constants"
 
 type Props = {
   coursesIsLoading: ?boolean,
@@ -93,8 +93,7 @@ export class CatalogPage extends React.Component<Props> {
     })
   }
 
-  componentDidMount() {
-  }
+  componentDidMount() {}
 
   /**
    * Updates the filteredCourses state variable
@@ -407,19 +406,19 @@ export class CatalogPage extends React.Component<Props> {
    */
   async loadMoreCourses() {
     if (this.props.coursesCount <= PAGE_SIZE) {
-      this.setState({moreCoursesToRetrieve: false})
+      this.setState({ moreCoursesToRetrieve: false })
     } else {
       while (this.state.moreCoursesToRetrieve) {
-        this.setState({isLoadingMoreItems: true})
-        this.setState({courseQueryPage: this.state.courseQueryPage + 1})
+        this.setState({ isLoadingMoreItems: true })
+        this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
         const response = await getNextCoursePage(this.state.courseQueryPage)
-        this.setState({isLoadingMoreItems: false})
+        this.setState({ isLoadingMoreItems: false })
         if (response.body.results) {
           const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
             this.state.selectedDepartment,
             [...this.state.allCoursesRetrieved, ...response.body.results]
           )
-          this.setState({filteredCourses: filteredCourses})
+          this.setState({ filteredCourses: filteredCourses })
           this.setState({
             allCoursesRetrieved: [
               ...this.state.allCoursesRetrieved,
@@ -428,26 +427,26 @@ export class CatalogPage extends React.Component<Props> {
           })
         }
         if (response.body.next === null) {
-          this.setState({moreCoursesToRetrieve: false})
+          this.setState({ moreCoursesToRetrieve: false })
         }
       }
     }
   }
   async loadMorePrograms() {
     if (this.props.programsCount <= PAGE_SIZE) {
-      this.setState({moreProgramsToRetrieve: false})
+      this.setState({ moreProgramsToRetrieve: false })
     } else {
       while (this.state.moreProgramsToRetrieve) {
-        this.setState({isLoadingMoreItems: true})
-        this.setState({programQueryPage: this.state.programQueryPage + 1})
+        this.setState({ isLoadingMoreItems: true })
+        this.setState({ programQueryPage: this.state.programQueryPage + 1 })
         const response = await getNextProgramPage(this.state.programQueryPage)
-        this.setState({isLoadingMoreItems: false})
+        this.setState({ isLoadingMoreItems: false })
         if (response.body.results) {
           const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
             this.state.selectedDepartment,
             [...this.state.allProgramsRetrieved, ...response.body.results]
           )
-          this.setState({filteredPrograms: filteredPrograms})
+          this.setState({ filteredPrograms: filteredPrograms })
           this.setState({
             allProgramsRetrieved: [
               ...this.state.allProgramsRetrieved,
@@ -455,7 +454,7 @@ export class CatalogPage extends React.Component<Props> {
             ]
           })
           if (response.body.next === null) {
-            this.setState({moreProgramsToRetrieve: false})
+            this.setState({ moreProgramsToRetrieve: false })
           }
         }
       }

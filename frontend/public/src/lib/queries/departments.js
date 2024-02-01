@@ -1,13 +1,23 @@
 import { pathOr } from "ramda"
 
 import { nextState } from "./util"
-import {
-  PAGE_SIZE
-} from "../../constants"
+import { PAGE_SIZE } from "../../constants"
 
-export const departmentsSelector = pathOr(null, ["entities", "departments", "results"])
-export const departmentsCountSelector = pathOr(null, ["entities", "departments", "count"])
-export const departmentsNextPageSelector = pathOr(null, ["entities", "departments", "next"])
+export const departmentsSelector = pathOr(null, [
+  "entities",
+  "departments",
+  "results"
+])
+export const departmentsCountSelector = pathOr(null, [
+  "entities",
+  "departments",
+  "count"
+])
+export const departmentsNextPageSelector = pathOr(null, [
+  "entities",
+  "departments",
+  "next"
+])
 
 export const departmentsQueryKey = "departments"
 
