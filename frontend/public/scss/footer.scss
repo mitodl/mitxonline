@@ -13,21 +13,24 @@
   .new-footer-container {
     display:flex;
 
+    @include media-breakpoint-up(lg) {
+      flex-basis: 75%;
+    }
     @include media-breakpoint-down(md) {
-       flex-direction: column-reverse;
-       padding-left: 10px;
+      flex-direction: column-reverse;
+      padding-left: 10px;
     }
   }
 
   .copyright-container {
        padding: 40px 0;
-       width:47%;
+       flex-basis:40%;
        flex-wrap: wrap;
        flex-direction: row-reverse;
 
       @include media-breakpoint-down(md) {
          width:100%;
-         padding-top: 0;
+         padding-top: 10px;
          display: inline-flex;
          flex-direction: column;
       }
@@ -76,14 +79,14 @@
   }
 
   .help-contact-container{
-    width:55%;
-    margin-top: 30px;
-    margin-bottom: 20px;
+    flex-basis:60%;
+    margin: auto;
     opacity: 0.6;
 
     @include media-breakpoint-down(sm) {
       padding-left: 12px;
-      width:100%;
+      width: 100%;
+      padding-top: 30px;
       .links > li {
         width: calc(100% / 3);
         padding: 5px 0;
@@ -93,6 +96,7 @@
     @include media-breakpoint-between(sm, md) {
       padding-left: 0;
       width:100%;
+      padding-top: 30px;
     }
 
     .help-contact-row {
