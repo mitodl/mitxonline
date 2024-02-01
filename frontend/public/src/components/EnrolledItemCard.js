@@ -255,8 +255,10 @@ export class EnrolledItemCard extends React.Component<
               enrollmentId:    enrollment.id,
               courseNumber:    enrollment.run.course_number
             }}
-            render={({ values }) => (
-              <Form className="text-center">
+            render={({ values, handleSubmit }) => (
+              <Form className="text-center"
+                onSubmit={handleSubmit}
+              >
                 <section>
                   <Field
                     type="hidden"
@@ -276,7 +278,6 @@ export class EnrolledItemCard extends React.Component<
                   />{" "}
                   <label
                     id={`verified-unenrollment-${values.enrollmentId}-email-checkbox`}
-                    check
                   >
                     Receive course emails
                   </label>
