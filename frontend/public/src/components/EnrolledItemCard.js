@@ -276,7 +276,6 @@ export class EnrolledItemCard extends React.Component<
                   />{" "}
                   <label
                     id={`verified-unenrollment-${values.enrollmentId}-email-checkbox`}
-                    check
                   >
                     Receive course emails
                   </label>
@@ -534,7 +533,6 @@ export class EnrolledItemCard extends React.Component<
                     >
                       Unenroll
                     </DropdownItem>
-                    {this.renderRunUnenrollmentModal(enrollment)}
                   </span>
                   <span id="subscribeButtonWrapper">
                     <DropdownItem
@@ -543,10 +541,11 @@ export class EnrolledItemCard extends React.Component<
                     >
                       Email Settings
                     </DropdownItem>
-                    {this.renderEmailSettingsDialog(enrollment)}
                   </span>
                 </DropdownMenu>
               </Dropdown>
+              {this.renderRunUnenrollmentModal(enrollment)}
+              {this.renderEmailSettingsDialog(enrollment)}
             </div>
             <div className="detail pt-1">
               {courseId}
