@@ -237,20 +237,12 @@ header.site-header {
 }
 
 .svg-site-logo {
-  height: 35px !important;
-  width: 65px !important;
+  width: 121px !important;
+  height: 33px !important;
 
   @include media-breakpoint-down(sm) {
-    width: 46px !important;
-    height: 25px !important;
-  }
-
-  g {
-    transform: scale(0.2);
-
-    @include media-breakpoint-down(sm) {
-      transform: scale(0.15);
-    }
+    width: 81px !important;
+    height: 22px !important;
   }
 }
 
@@ -263,7 +255,7 @@ header.site-header.new-design {
   .navbar.top-navbar {
     display: flex;
     justify-content: space-between;
-    padding: 12px 15px;
+    padding: 15px;
 
     @include media-breakpoint-down(md) {
       position: static;
@@ -347,19 +339,6 @@ header.site-header.new-design {
   display: inline-flex;
   align-items: center;
   padding: 0;
-
-  .mitx-online-link {
-    font-family: Poppins;
-    color: var(--Blue-Dark, #03152D);
-    font-size: 18px;
-    font-weight: 700;
-    text-decoration: none;
-
-    @include media-breakpoint-down(md) {
-      font-size: 14px;
-      line-height: 18px;
-    }
-  }
 
   .logo-link {
     @include media-breakpoint-down(md) {

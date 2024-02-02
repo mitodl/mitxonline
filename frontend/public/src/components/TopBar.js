@@ -39,12 +39,8 @@ const TopBar = ({ currentUser }: Props) => {
         }`}
       >
         <div className="top-branding">
-          <a href="https://mit.edu" className="logo-link">
+          <a href="https://mitxonline.mit.edu" className="logo-link">
             <InstituteLogo />
-          </a>
-          <div className="divider-grey" />
-          <a href={routes.root} className="mitx-online-link">
-            MITx Online
           </a>
         </div>
         <button
