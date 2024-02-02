@@ -658,10 +658,10 @@ export class EnrolledItemCard extends React.Component<
                     >
                       Unenroll
                     </DropdownItem>
-                    {this.renderProgramUnenrollmentModal(enrollment)}
                   </span>
                 </DropdownMenu>
               </Dropdown>
+              {this.renderProgramUnenrollmentModal(enrollment)}
             </div>
             <div className="detail pt-1">
               {startDateDescription === null}
