@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.85.3 (Released February 05, 2024)
+--------------
+
+- New MITxOnline Logo (#2074)
+- Fix for program unenrollment modal (#2081)
+- 2075: some dialogs email settings unenroll not keyboard navigable (#2079)
+- Fixes use of "redemption_type" when generating discount codes in bulk, fixes test error (#2077)
+- Wrapping product creation in a create_version block so versions happen like they should (#2073)
+- Catalog: sorting courses and programs by title (#2071)
+
 Version 0.85.2 (Released January 24, 2024)
 --------------
 
