@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.85.3
+Version 0.85.3 (Released February 05, 2024)
 --------------
 
 - New MITxOnline Logo (#2074)
