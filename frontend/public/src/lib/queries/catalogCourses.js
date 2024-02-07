@@ -26,6 +26,7 @@ export const coursesQuery = page => ({
     courses: json
   }),
   update: {
-    courses: nextState
-  }
+    courses: (prev, next) => ({...prev, ...next})
+  },
+  force: true,
 })

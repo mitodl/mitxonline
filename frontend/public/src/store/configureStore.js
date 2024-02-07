@@ -1,5 +1,6 @@
 import { compose, createStore, applyMiddleware } from "redux"
 import { createLogger } from "redux-logger"
+import { thunk } from "redux-thunk"
 import { queryMiddleware } from "redux-query"
 
 import { makeRequest } from "./network_interface"
@@ -9,7 +10,7 @@ import { getEntities, getQueries } from "../lib/queries/util"
 // Setup middleware
 export default function configureStore(initialState: Object) {
   const COMMON_MIDDLEWARE = [
-    queryMiddleware(makeRequest, getQueries, getEntities)
+    queryMiddleware(makeRequest, getQueries, getEntities), thunk
   ]
 
   // Store factory configuration

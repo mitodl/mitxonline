@@ -88,8 +88,10 @@ export class CatalogPage extends React.Component<Props> {
     super(props)
   }
 
-  componentDidMount() {}
-
+  async componentDidMount() {
+    const { forceRequest } = this.props
+    await forceRequest()
+  }
   /**
    * Updates the filteredCourses state variable
    * once coursesIsLoading is false..  Adds an observer to detect when
@@ -97,27 +99,21 @@ export class CatalogPage extends React.Component<Props> {
    * Updates the filteredDepartments state variable once departmentsIsLoading
    * is false.
    */
-  componentDidUpdate = prevProps => {
+  async componentDidUpdate(prevProps, prevState)  {
     const {
       courses,
-      coursesCount,
       coursesIsLoading,
-      departmentsCount,
-      departmentsIsLoading,
       programsIsLoading,
       programs,
-      programsCount
     } = this.props
-    if (this.state.moreCoursesToRetrieve) {
-      if (prevProps.coursesIsLoading !== coursesIsLoading) {
-        if (coursesCount <= PAGE_SIZE) {
-          this.setState({ moreCoursesToRetrieve: false })
-        } else if (!this.state.isLoadingMoreItems) {
-          this.loadMoreCourses().then(() => {
-            console.log("loaded more courses")
-          })
-        }
+    console.log("gets here")
+    if (!coursesIsLoading) {
+      if (this.props.courses.length < this.props.coursesCount) {
+        const response = await getNextCoursePage(this.state.courseQueryPage + 1)
+        console.log(response)
+        this.setState({courseQueryPage: this.state.courseQueryPage + 1})
       }
+      this.setState({ isLoadingMoreItems: false })
     }
     if (!coursesIsLoading && !this.state.isLoadingMoreItems) {
       if (!this.state.filterCoursesCalled) {
@@ -130,17 +126,6 @@ export class CatalogPage extends React.Component<Props> {
         this.setState({ filteredCourses: filteredCourses })
       }
     }
-    if (this.state.moreDepartmentsToRetrieve) {
-      if (prevProps.departmentsIsLoading !== departmentsIsLoading) {
-        if (departmentsCount <= PAGE_SIZE) {
-          this.setState({ moreDepartmentsToRetrieve: false })
-        } else if (!this.state.isLoadingMoreItems) {
-          this.loadMoreDepartments().then(() => {
-            console.log("loaded more departments")
-          })
-        }
-      }
-    }
     if (
       !this.props.departmentsIsLoading &&
       !this.state.filterDepartmentsCalled
@@ -151,17 +136,6 @@ export class CatalogPage extends React.Component<Props> {
           this.state.tabSelected
         )
       })
-    }
-    if (this.state.moreProgramsToRetrieve) {
-      if (prevProps.programsIsLoading !== programsIsLoading) {
-        if (programsCount <= PAGE_SIZE) {
-          this.setState({ moreProgramsToRetrieve: false })
-        } else if (!this.state.isLoadingMoreItems) {
-          this.loadMorePrograms().then(() => {
-            console.log("loaded more programs")
-          })
-        }
-      }
     }
     if (!programsIsLoading && !this.state.filterProgramsCalled) {
       this.setState({ filterProgramsCalled: true })
@@ -435,99 +409,8 @@ export class CatalogPage extends React.Component<Props> {
     )
   }
 
-  /**
-   * Loads more items into the catalog before render to ensure we have all available.
-   */
-  async loadMoreCourses() {
-    console.log("1", this.props.coursesIsLoading)
-    this.setState({ isLoadingMoreItems: true })
-    this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
-    console.log("2", this.props.coursesIsLoading)
-    const response = await getNextCoursePage(this.state.courseQueryPage)
-    console.log("3", this.props.coursesIsLoading)
-    if (!this.props.coursesIsLoading) {
-      console.log("4", this.props.coursesIsLoading)
-      if (response.body.results) {
-        const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
-          this.state.selectedDepartment,
-          [...this.state.allCoursesRetrieved, ...response.body.results]
-        )
-        this.setState({ filteredCourses: filteredCourses })
-        this.setState({
-          allCoursesRetrieved: [
-            ...this.state.allCoursesRetrieved,
-            ...response.body.results
-          ]
-        })
-        if (!response.body.next) {
-          this.setState({ moreCoursesToRetrieve: false })
-        }
-      }
-      this.setState({ isLoadingMoreItems: false })
-    }
-  }
-
-  async loadMoreDepartments() {
-    if (this.props.departments.length <= PAGE_SIZE) {
-      this.setState({ moreDepartmentsToRetrieve: false })
-    } else {
-      while (this.state.moreDepartmentsToRetrieve) {
-        this.setState({ isLoadingMoreItems: true })
-        this.setState({
-          departmentQueryPage: this.state.departmentQueryPage + 1
-        })
-        const response = await getNextDepartmentPage(
-          this.state.departmentQueryPage
-        )
-        this.setState({ isLoadingMoreItems: false })
-        if (response.body.results) {
-          const filteredDepartments = this.filterDepartmentsByTabName(
-            this.state.tabSelected
-          )
-          this.setState({ filteredDepartments: filteredDepartments })
-          this.setState({
-            allDepartmentsRetrieved: [
-              ...this.state.allDepartmentsRetrieved,
-              ...response.body.results
-            ]
-          })
-          if (response.body.next === null) {
-            this.setState({ moreDepartmentsToRetrieve: false })
-          }
-        }
-      }
-    }
-  }
-
   async loadMorePrograms() {
-    if (this.props.programsCount <= PAGE_SIZE) {
-      this.setState({ moreProgramsToRetrieve: false })
-    } else {
-      while (this.state.moreProgramsToRetrieve) {
-        this.setState({ isLoadingMoreItems: true })
-        this.setState({ programQueryPage: this.state.programQueryPage + 1 })
-        const [response] = await Promise.all([
-          getNextProgramPage(this.state.programQueryPage)
-        ])
-        this.setState({ isLoadingMoreItems: false })
-        if (response.body.results) {
-          const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
-            this.state.selectedDepartment,
-            [...this.state.allProgramsRetrieved, ...response.body.results]
-          )
-          this.setState({ filteredPrograms: filteredPrograms })
-          this.setState({
-            allProgramsRetrieved: [
-              ...this.state.allProgramsRetrieved,
-              ...response.body.results
-            ]
-          })
-          if (response.body.next === null) {
-            this.setState({ moreProgramsToRetrieve: false })
-          }
-        }
-      }
-    }
+
   }
 
   /**
@@ -762,8 +645,9 @@ const mapPropsToConfig = () => [
 ]
 
 const mapDispatchToProps = {
-  getNextCoursePage:  getNextCoursePage,
-  getNextProgramPage: getNextProgramPage
+  getNextCoursePage:     getNextCoursePage,
+  getNextProgramPage:    getNextProgramPage,
+  getNextDepartmentPage: getNextDepartmentPage,
 }
 
 const mapStateToProps = createStructuredSelector({

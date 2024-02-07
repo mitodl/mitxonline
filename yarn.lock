@@ -13971,6 +13971,7 @@ __metadata:
     redux-query: 3.3.1
     redux-query-interface-superagent: 3.3.1
     redux-query-react: 3.3.1
+    redux-thunk: ^3.1.0
     reselect: 4.1.5
     sanctuary: 0.13.2
     sass: 1.49.11
@@ -18100,6 +18101,15 @@ __metadata:
   peerDependencies:
     redux: ^4
   checksum: af5abb425fb9dccda02e5f387d6f3003997f62d906542a3d35fc9420088f550dc1a018bdc246c7d23ee852b4d4ab8b5c64c5be426e45a328d791c4586a3c6b6e
+  languageName: node
+  linkType: hard
+
+"redux-thunk@npm:^3.1.0":
+  version: 3.1.0
+  resolution: "redux-thunk@npm:3.1.0"
+  peerDependencies:
+    redux: ^5.0.0
+  checksum: bea96f8233975aad4c9f24ca1ffd08ac7ec91eaefc26e7ba9935544dc55d7f09ba2aa726676dab53dc79d0c91e8071f9729cddfea927f4c41839757d2ade0f50
   languageName: node
   linkType: hard
 
