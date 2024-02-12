@@ -64,10 +64,8 @@ export class LoginEmailPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${LOGIN_EMAIL_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page">
-          <div className="auth-card card-shadow auth-form">
-            <div className="auth-header">
-              <h1>Sign in</h1>
-            </div>
+          <div className="std-card auth-form">
+            <h1>Sign in</h1>
             <EmailForm onSubmit={this.onSubmit.bind(this)}>
               <React.Fragment>
                 <span>Don't have an account? </span>
