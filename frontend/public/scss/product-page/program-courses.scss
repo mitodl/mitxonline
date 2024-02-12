@@ -57,6 +57,7 @@ body.new-design {
                 max-width: 243px;
                 max-height: 222px;
                 height: 222px;
+                width: 243px;
                 transition: .25s;
                 cursor: pointer;
 
@@ -67,6 +68,7 @@ body.new-design {
                         max-width: 243px;
                         max-height: 136px;
                         height: 136px;
+                        width: 243px;
                         object-fit: cover;
                         object-position: center;
                         @include media-breakpoint-down(sm) {
@@ -99,10 +101,6 @@ body.new-design {
                 .program-course-card-info {
                     overflow: hidden;
                     padding: 15px;
-
-                    @include media-breakpoint-down(md) {
-                        margin-top: 20px;
-                    }
 
                     .start-date {
                         font-weight: 400;
