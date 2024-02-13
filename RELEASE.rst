@@ -1,6 +1,21 @@
 Release Notes
 =============
 
+Version 0.86.0
+--------------
+
+- Fix the width of course image (#2099)
+- Program certificate for different program types (#2096)
+- Updating favicon (#2097)
+- Program courses cards styles (#2095)
+- Lock file maintenance (#2042)
+- Update dependency wagtail to v5.2.3 (#2088)
+- Update dependency video.js to v7.21.5 (#2087)
+- Update dependency pylint-django to v2.5.5 (#2085)
+- Update dependency pylint to v2.17.7 (#2084)
+- Update dependency django-redis to v5.4.0 (#2086)
+- Update dependency django to v3.2.23 (#2083)
+
 Version 0.85.3 (Released February 05, 2024)
 --------------
 
