@@ -133,10 +133,12 @@
                       <div class="member-card highlight-card">
                         <img tabindex="0" src="{% feature_img_src member.feature_image %}" alt="Featured image for {{ member.instructor_name }}" data-instructor-id="{{ member.id }}">
                         <div class="member-info">
-                          <h3 id="instructor-name-{{ member.id }}" data-instructor-id="{{ member.id }}" class="name instructor-name" role="button" tabindex="0">
+                          <div role="heading" aria-level="3">
+                            <button id="instructor-name-{{ member.id }}" data-instructor-id="{{ member.id }}" class="name instructor-name" role="button" tabindex="0">
                               {{ member.instructor_name }}
-                          </h3>
-                          {% if member.instructor_title %}<h4 class="title">{{ member.instructor_title }}</h4>{% endif %}
+                            </button>
+                            {% if member.instructor_title %}<div class="title">{{ member.instructor_title }}</div>{% endif %}
+                          </div>
                           <div class="description">{{ member.instructor_bio_short|safe }}</div>
                         </div>
                       </div>
