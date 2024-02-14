@@ -191,13 +191,18 @@ class ProgramEnrollmentAuditAdmin(TimestampedModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+
 class CourseRunEnrollmentAuditInline(admin.TabularInline):
     """Inline editor for CourseRunEnrollmentAudit"""
 
     model = CourseRunEnrollmentAudit
-    readonly_fields = ["enrollment_id", "created_on", ]
+    readonly_fields = [
+        "enrollment_id",
+        "created_on",
+    ]
     min_num = 0
     extra = 0
+
 
 class CourseRunEnrollmentAdmin(AuditableModelAdmin):
     """Admin for CourseRunEnrollment"""
@@ -221,7 +226,9 @@ class CourseRunEnrollmentAdmin(AuditableModelAdmin):
         "user",
         "run",
     )
-    inlines = [CourseRunEnrollmentAuditInline,]
+    inlines = [
+        CourseRunEnrollmentAuditInline,
+    ]
 
     def get_queryset(self, request):
         """
