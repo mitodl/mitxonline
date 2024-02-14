@@ -110,7 +110,7 @@ export class ProductDetailEnrollApp extends React.Component<Props> {
       link.addEventListener("click", expandExpandBlock)
     })
 
-    document.querySelectorAll("h3.instructor-name").forEach(link => {
+    document.querySelectorAll(".instructor-name").forEach(link => {
       link.removeEventListener("click", openInstructorModal)
       link.addEventListener("click", openInstructorModal)
       link.removeEventListener("keyup", openInstructorModal)
