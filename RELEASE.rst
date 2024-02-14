@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.86.0
+Version 0.86.0 (Released February 14, 2024)
 --------------
 
 - Fix the width of course image (#2099)
