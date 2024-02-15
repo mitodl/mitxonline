@@ -37,21 +37,20 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${REGISTER_CONFIRM_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page">
-          <div className="auth-card card-shadow auth-form">
-            <div className="auth-header">
-              <h1 tabIndex="0" ref={this.headingRef}>
-                Thank you!
-              </h1>
-            </div>
+          <div className="std-card">
+            <h1 tabIndex="0" ref={this.headingRef}>
+              Thank you!
+            </h1>
+
             <p>
               We sent an email to <b>{email}</b>, please verify your address to
               continue.
             </p>
             <p>
-              <b>
+              <strong>
                 If you do NOT receive your verification email, here's what to
                 do:
-              </b>
+              </strong>
             </p>
             <ul>
               <li>
@@ -68,16 +67,14 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
                 again.
               </li>
             </ul>
-            <div className="contact-support">
-              <hr />
-              <b>Still no verification email? </b>
+
+            <div>
+              <p><b>Still no verification email? </b>
               <br />
               Please contact our {` ${SETTINGS.site_name} `}
               <a href={`mailto:${SETTINGS.support_email}`}>
                 Customer Support Center.
-              </a>
-              <br />
-              <br />
+              </a></p>
             </div>
           </div>
         </div>
