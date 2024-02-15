@@ -199,9 +199,17 @@ class CourseRunEnrollmentAuditInline(admin.TabularInline):
     readonly_fields = [
         "enrollment_id",
         "created_on",
+        "acting_user",
+        "data_before",
+        "data_after",
     ]
     min_num = 0
     extra = 0
+    can_delete = False
+    can_add = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 class CourseRunEnrollmentAdmin(AuditableModelAdmin):
