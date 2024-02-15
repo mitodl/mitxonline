@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.86.1
+Version 0.86.1 (Released February 15, 2024)
 --------------
 
 - Admin improvements to CourseRunEnrollmentAudit model (#2103)
