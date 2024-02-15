@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.86.1
+--------------
+
+- Admin improvements to CourseRunEnrollmentAudit model (#2103)
+- Accessibility: updating intructors info (#2101)
+
 Version 0.86.0 (Released February 14, 2024)
 --------------
 
