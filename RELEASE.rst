@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.86.2
+--------------
+
+- Create certs only for live programs (#2108)
+- fix course card not keyboard accessible issue (#2105)
+- Update dependency pytest to v6.2.5 (#2106)
+
 Version 0.86.1 (Released February 15, 2024)
 --------------
 
