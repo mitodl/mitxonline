@@ -1,20 +1,20 @@
 <ul>
     {% for card in cards %}
     <li>
+      <a href="{{card.course.page.url}}" class="program-course-card-link">
         <div class="program-course-card">
-            <a href="{{card.course.page.url}}" class="program-course-card-link">
-                <div class="image">
-                    <img src="{{card.featured_image}}" alt="">
-                    <div class="overlay"></div>
+            <div class="image">
+                <img src="{{card.featured_image}}" alt="">
+                <div class="overlay"></div>
+            </div>
+            <div class="program-course-card-info">
+                <div class="start-date">
+                {{card.start_descriptor}}
                 </div>
-                <div class="program-course-card-info">
-                    <div class="start-date">
-                    {{card.start_descriptor}}
-                    </div>
-                    <h3 class="title">{{card.course.title}}</h3>
-                </div>
-            </a>
+                <h3 class="title">{{card.course.title}}</h3>
+            </div>
         </div>
+      </a>
     </li>
     {% endfor %}
 </ul>
