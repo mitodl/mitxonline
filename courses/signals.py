@@ -27,7 +27,9 @@ def handle_create_course_run_certificate(
         user = instance.user
         course = instance.course_run.course
         programs = list(
-            Program.objects.filter(all_requirements__course=course, live=True).distinct()
+            Program.objects.filter(
+                all_requirements__course=course, live=True
+            ).distinct()
         )
         if programs:
             transaction.on_commit(
