@@ -100,52 +100,52 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
         title={`${SETTINGS.site_name} | ${FORGOT_PASSWORD_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page">
-          <div className="auth-card card-shadow auth-form">
-            <div className="auth-header">
+          <div className="std-card std-card-auth">
+            <div className="std-card-body">
               <h1>{titleText}</h1>
+              {this.state.isError ? (
+                <React.Fragment>
+                  {getCustomerSupportLayout(true)}
+                  <EmailForm onSubmit={this.onSubmit.bind(this)} />
+                </React.Fragment>
+              ) : this.state.forgotEmailSent ? (
+                <React.Fragment>
+                  {this.state.text}
+                  <p>
+                    <b>
+                      If you do NOT receive your password reset email, here's what
+                      to do:
+                    </b>
+                  </p>
+                  <ul>
+                    <li>
+                      <b>Wait a few moments.</b> It might take several minutes to
+                      receive your password reset email.
+                    </li>
+                    <li>
+                      <b>Check your spam folder.</b> It might be there.
+                    </li>
+                    <li>
+                      <b>Is your email correct?</b> If you made a typo, no
+                      problem, just try to{" "}
+                      <Link
+                        to={routes.login.forgot.begin}
+                        onClick={this.resetEmailLinkSent.bind(this)}
+                      >
+                        reset your password
+                      </Link>{" "}
+                      again.
+                    </li>
+                  </ul>
+                  {getCustomerSupportLayout(false)}
+                </React.Fragment>
+              ) : (
+                <React.Fragment>
+                  <p>Enter your email to receive a password reset link.</p>
+                  <EmailForm onSubmit={this.onSubmit.bind(this)} />
+                </React.Fragment>
+              )}
             </div>
-            {this.state.isError ? (
-              <React.Fragment>
-                {getCustomerSupportLayout(true)}
-                <EmailForm onSubmit={this.onSubmit.bind(this)} />
-              </React.Fragment>
-            ) : this.state.forgotEmailSent ? (
-              <React.Fragment>
-                {this.state.text}
-                <p>
-                  <b>
-                    If you do NOT receive your password reset email, here's what
-                    to do:
-                  </b>
-                </p>
-                <ul>
-                  <li>
-                    <b>Wait a few moments.</b> It might take several minutes to
-                    receive your password reset email.
-                  </li>
-                  <li>
-                    <b>Check your spam folder.</b> It might be there.
-                  </li>
-                  <li>
-                    <b>Is your email correct?</b> If you made a typo, no
-                    problem, just try to{" "}
-                    <Link
-                      to={routes.login.forgot.begin}
-                      onClick={this.resetEmailLinkSent.bind(this)}
-                    >
-                      reset your password
-                    </Link>{" "}
-                    again.
-                  </li>
-                </ul>
-                {getCustomerSupportLayout(false)}
-              </React.Fragment>
-            ) : (
-              <React.Fragment>
-                <p>Enter your email to receive a password reset link.</p>
-                <EmailForm onSubmit={this.onSubmit.bind(this)} />
-              </React.Fragment>
-            )}
           </div>
         </div>
       </DocumentTitle>

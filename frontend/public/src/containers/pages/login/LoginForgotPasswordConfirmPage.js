@@ -86,8 +86,8 @@ export class LoginForgotPasswordConfirmPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${FORGOT_PASSWORD_CONFIRM_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page">
-          <div className="auth-card card-shadow auth-form">
-            <div className="auth-header">
+          <div className="std-card std-card-auth">
+            <div className="std-card-body">
               <h1>Password Reset!</h1>
               <p>Enter a new password for your account.</p>
             </div>

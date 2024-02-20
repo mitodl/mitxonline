@@ -37,44 +37,51 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${REGISTER_CONFIRM_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page">
-          <div className="std-card">
-            <h1 tabIndex="0" ref={this.headingRef}>
-              Thank you!
-            </h1>
+          <div className="std-card std-card-auth">
+            <div className="std-card-body">
+              <h1 tabIndex="0" ref={this.headingRef}>
+                Thank you!
+              </h1>
 
-            <p>
-              We sent an email to <b>{email}</b>, please verify your address to
-              continue.
-            </p>
-            <p>
-              <strong>
-                If you do NOT receive your verification email, here's what to
-                do:
-              </strong>
-            </p>
-            <ul>
-              <li>
-                <b>Wait a few moments.</b> It might take several minutes to
-                receive your verification email.
-              </li>
-              <li>
-                <b>Check your spam folder.</b> It might be there.
-              </li>
-              <li>
-                <b>Is your email correct?</b> If you made a typo, no problem,
-                just try{" "}
-                <Link to={routes.register.begin}>creating an account</Link>{" "}
-                again.
-              </li>
-            </ul>
+              <div>
+                <p>
+                  We sent an email to <b>{email}</b>, please verify your address to
+                  continue.
+                </p>
+              </div>
+              <div>
+                <p>
+                  <strong>
+                    If you do NOT receive your verification email, here's what to
+                    do:
+                  </strong>
+                </p>
+              </div>
+              <ul>
+                <li>
+                  <b>Wait a few moments.</b> It might take several minutes to
+                  receive your verification email.
+                </li>
+                <li>
+                  <b>Check your spam folder.</b> It might be there.
+                </li>
+                <li>
+                  <b>Is your email correct?</b> If you made a typo, no problem,
+                  just try{" "}
+                  <Link to={routes.register.begin}>creating an account</Link>{" "}
+                  again.
+                </li>
+              </ul>
 
-            <div>
-              <p><b>Still no verification email? </b>
-              <br />
-              Please contact our {` ${SETTINGS.site_name} `}
-              <a href={`mailto:${SETTINGS.support_email}`}>
-                Customer Support Center.
-              </a></p>
+              <div>
+                <p><b>Still no verification email? </b>
+                  <br />
+                  Please contact our {` ${SETTINGS.site_name} `}
+                  <a href={`mailto:${SETTINGS.support_email}`}>
+                    Customer Support Center.
+                  </a>
+                </p>
+              </div>
             </div>
           </div>
         </div>

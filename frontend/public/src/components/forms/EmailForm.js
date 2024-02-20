@@ -23,7 +23,7 @@ const EmailForm = ({ onSubmit, children }: EmailFormProps) => (
     validateOnBlur={false}
     render={({ isSubmitting }) => (
       <Form>
-        <div className="form-group">
+        <div className="form-group small-gap">
           <label htmlFor="email">Email</label>
           <Field
             name="email"

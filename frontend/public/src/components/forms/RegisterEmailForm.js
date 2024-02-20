@@ -46,12 +46,10 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
             aria-describedby="emailError"
             required
           />
-        </div>
-        <div>
+
           <p>
             By creating an account I agree to the
-          </p>
-          <p>
+            <br />
             <a
               href={routes.informationLinks.honorCode}
               target="_blank"

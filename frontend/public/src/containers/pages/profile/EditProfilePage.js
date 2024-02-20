@@ -70,15 +70,15 @@ export class EditProfilePage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${EDIT_PROFILE_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page">
-          <div className="auth-card card-shadow auth-form">
-            <div className="auth-header">
-              <h1>Edit Profile</h1>
+          <div className="std-card std-card-auth">
+            <div className="std-card-body edit-profile-page">
+              <h1>Profile Information</h1>
+              <EditProfileForm
+                countries={countries}
+                user={currentUser}
+                onSubmit={this.onSubmit.bind(this)}
+              />
             </div>
-            <EditProfileForm
-              countries={countries}
-              user={currentUser}
-              onSubmit={this.onSubmit.bind(this)}
-            />
           </div>
         </div>
       </DocumentTitle>

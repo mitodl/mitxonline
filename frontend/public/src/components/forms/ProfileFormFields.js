@@ -163,9 +163,8 @@ const renderYearOfBirthField = () => {
   return (
     <div>
       <label htmlFor="user_profile.year_of_birth" className="fw-bold">
-        Year of Birth
+        Year of Birth<span className="required">*</span>
       </label>
-      <span className="required">*</span>
       <Field
         component="select"
         name="user_profile.year_of_birth"
@@ -193,11 +192,11 @@ export const LegalAddressFields = ({
 }: LegalAddressProps) => (
   <React.Fragment>
     <div className="form-group">
-      <label htmlFor="legal_address.first_name" className="row">
-        <div className="col-auto fw-bold">
+      <label htmlFor="legal_address.first_name" className="label-helptext">
+        <div className="fw-bold">
           First Name<span className="required">*</span>
         </div>
-        <div id="first-name-subtitle" className="col-auto subtitle">
+        <div id="first-name-subtitle" className="subtitle">
           Name that will appear on emails
         </div>
       </label>
@@ -216,9 +215,8 @@ export const LegalAddressFields = ({
     </div>
     <div className="form-group">
       <label htmlFor="legal_address.last_name" className="fw-bold">
-        Last Name
+        Last Name<span className="required">*</span>
       </label>
-      <span className="required">*</span>
       <Field
         type="text"
         name="legal_address.last_name"
@@ -231,11 +229,11 @@ export const LegalAddressFields = ({
       />
     </div>
     <div className="form-group">
-      <label htmlFor="name" className="row">
-        <div className="col-auto fw-bold">
+      <label htmlFor="name" className="label-helptext">
+        <div className="fw-bold">
           Full Name<span className="required">*</span>
         </div>
-        <div id="full-name-subtitle" className="col-auto subtitle">
+        <div id="full-name-subtitle" className="subtitle">
           Name that will appear on your certificate
         </div>
       </label>
@@ -255,11 +253,11 @@ export const LegalAddressFields = ({
     {isNewAccount ? (
       <React.Fragment>
         <div className="form-group">
-          <label htmlFor="username" className="row">
-            <div className="col-auto fw-bold">
+          <label htmlFor="username" className="label-helptext">
+            <div className="fw-bold">
               Public Username<span className="required">*</span>
             </div>
-            <div id="username-subtitle" className="col-auto subtitle">
+            <div id="username-subtitle" className="subtitle">
               Name that will identify you in courses
             </div>
           </label>
@@ -279,9 +277,8 @@ export const LegalAddressFields = ({
         </div>
         <div className="form-group">
           <label htmlFor="password" className="fw-bold">
-            Password
+            Password<span className="required">*</span>
           </label>
-          <span className="required">*</span>
           <Field
             type="password"
             name="password"
@@ -302,9 +299,8 @@ export const LegalAddressFields = ({
     ) : null}
     <div className="form-group">
       <label htmlFor="legal_address.country" className="fw-bold">
-        Country
+        Country<span className="required">*</span>
       </label>
-      <span className="required">*</span>
       <Field
         component="select"
         name="legal_address.country"
@@ -327,9 +323,8 @@ export const LegalAddressFields = ({
     {findStates(values.legal_address.country, countries) ? (
       <div className="form-group">
         <label htmlFor="legal_address.state" className="fw-bold">
-          State
+          State<span className="required">*</span>
         </label>
-        <span className="required">*</span>
         <Field
           component="select"
           name="legal_address.state"
@@ -423,9 +418,8 @@ export const AddlProfileFields = ({
     </div>
     <div className="form-group">
       <label id="occupation-label" className="fw-bold">
-        Are you a
+        Are you a{requireAddlFields ? <span className="required">*</span> : ""}
       </label>
-      {requireAddlFields ? <span className="required">*</span> : ""}
       <div className="row">
         <div className="col-6">
           <div className="form-check">
