@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.86.2
+Version 0.86.2 (Released February 21, 2024)
 --------------
 
 - Create certs only for live programs (#2108)
