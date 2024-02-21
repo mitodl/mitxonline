@@ -1,3 +1,27 @@
+div.std-page-header {
+    display: flex;
+    width: 100%;
+    padding: 0 60px;
+    align-items: flex-start;
+    background: $home-page-header-blue;
+    box-shadow: 0px 15px 25px 0px rgba(3, 21, 45, 0.25);
+
+    h1 {
+        margin: 0;
+        color: white;
+        font-family: Poppins;
+        font-size: 28px;
+        font-style: normal;
+        font-weight: 700;
+        line-height: normal;
+        padding: 18px 0;
+    }
+}
+
+div.std-page-header + div.std-page-body {
+    padding-top: 40px !important;
+}
+
 div.std-card {
     display: flex;
     padding: 0;
@@ -36,6 +60,12 @@ div.std-card {
             font-weight: 600;
             margin-bottom: 25px;
             line-height: 25px;
+        }
+
+        hr {
+            margin: 26px 0 30px 0;
+            
+            border-bottom: 1px solid $home-page-border-grey;
         }
 
         p, li {
@@ -78,7 +108,6 @@ div.std-card {
                 color: $footer-blue-bg;
                 font-family: Inter;
                 font-size: 14px;
-                font-weight: 600;
                 line-height: 18px; /* 128.571% */ 
                 margin-bottom: 10px;
             }
@@ -103,6 +132,10 @@ div.std-card {
 
         div.small-gap {
             margin-bottom: 10px !important;
+
+            div.col, div.col-6, div.col-5, div.col-4, div.col-3, div.col-2, div.col-1 {
+                margin-bottom: 0 !important;
+            }
         }
 
         button {
@@ -131,27 +164,37 @@ div.std-card {
         form {
             width: 100%;
             gap: 30px;
-
-            input[type=checkbox] {
-                width: 20px;
-                height: 20px;
-                flex-shrink: 0;
-                border-radius: 3px;
-                margin-right: 10px;
-            }
-
-            input[type=checkbox]:checked {
-                border: 1px solid $brand-darker-bg;
-                background: $brand-darker-bg;
-                background-image: url('/static/images/checkbox-checked.svg');
-                background-repeat: no-repeat;
-                background-position: center;
-            }
         }
 
-        &.edit-profile-page {
+        input {
+            padding-left: .5em;
+            padding-right: .5em;
+        }
+
+        input[type=checkbox] {
+            width: 20px !important;
+            height: 20px !important;
+            flex-shrink: 0;
+            border-radius: 3px;
+            margin-right: 10px;
+            padding: 0;
+        }
+
+        input[type=checkbox]:checked {
+            border: 1px solid $brand-darker-bg;
+            background: $brand-darker-bg;
+            background-image: url('/static/images/checkbox-checked.svg');
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        &.edit-profile-page, &.create-account-page, &.my-account-page {
             div.form-group {
                 margin-bottom: 16px; 
+            }
+
+            div.form-check {
+                margin-bottom: 10px;
             }
 
             label.label-helptext {
@@ -175,6 +218,12 @@ div.std-card {
                     font-weight: 400;
                     line-height: 18px; /* 150% */
                 }
+            }
+        }
+
+        &.my-account-page {
+            label.label-helptext {
+                margin-bottom: 10px;
             }
         }
     }

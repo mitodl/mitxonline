@@ -120,20 +120,26 @@ export class AccountSettingsPage extends React.Component<Props> {
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${ACCOUNT_SETTINGS_PAGE_TITLE}`}
       >
-        <div className="std-page-body container auth-page account-settings-page">
-          <div className="auth-card card-shadow auth-form">
-            <div className="auth-header">
-              <h1>Account</h1>
+        <>
+          { currentUser ? <div role="banner" className="std-page-header">
+            <h1>{ACCOUNT_SETTINGS_PAGE_TITLE}</h1>
+          </div> : null }
+
+          <div className="std-page-body container auth-page">
+            <div className="std-card std-card-auth">
+              <div className="std-card-body my-account-page">
+                <ChangeEmailForm
+                  user={currentUser}
+                  onSubmit={this.onSubmitEmailForm.bind(this)}
+                />
+                <hr />
+                <ChangePasswordForm
+                  onSubmit={this.onSubmitPasswordForm.bind(this)}
+                />
+              </div>
             </div>
-            <ChangeEmailForm
-              user={currentUser}
-              onSubmit={this.onSubmitEmailForm.bind(this)}
-            />
-            <ChangePasswordForm
-              onSubmit={this.onSubmitPasswordForm.bind(this)}
-            />
           </div>
-        </div>
+        </>
       </DocumentTitle>
     )
   }

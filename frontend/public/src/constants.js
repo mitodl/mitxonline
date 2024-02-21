@@ -137,8 +137,8 @@ export const LOGIN_PASSWORD_PAGE_TITLE = LOGIN_EMAIL_PAGE_TITLE
 export const FORGOT_PASSWORD_PAGE_TITLE = "Forgot Password"
 export const FORGOT_PASSWORD_CONFIRM_PAGE_TITLE = FORGOT_PASSWORD_PAGE_TITLE
 
-export const EDIT_PROFILE_PAGE_TITLE = "Edit Profile"
-export const VIEW_PROFILE_PAGE_TITLE = "View Profile"
+export const EDIT_PROFILE_PAGE_TITLE = "Profile Information"
+export const VIEW_PROFILE_PAGE_TITLE = "Profile Information"
 
 export const REGISTER_EMAIL_PAGE_TITLE = "Register"
 export const REGISTER_CONFIRM_PAGE_TITLE = REGISTER_EMAIL_PAGE_TITLE
@@ -148,7 +148,7 @@ export const REGISTER_EXTRA_DETAILS_PAGE_TITLE = REGISTER_EMAIL_PAGE_TITLE
 export const REGISTER_ERROR_PAGE_TITLE = "Registration Error"
 export const REGISTER_DENIED_PAGE_TITLE = REGISTER_ERROR_PAGE_TITLE
 
-export const ACCOUNT_SETTINGS_PAGE_TITLE = "Account Settings"
+export const ACCOUNT_SETTINGS_PAGE_TITLE = "My Account"
 export const EMAIL_CONFIRM_PAGE_TITLE = "Confirm Email Change"
 
 export const CART_DISPLAY_PAGE_TITLE = "Checkout"

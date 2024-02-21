@@ -239,47 +239,52 @@ export class DashboardPage extends React.Component<
 
     return (
       <DocumentTitle title={`${SETTINGS.site_name} | ${DASHBOARD_PAGE_TITLE}`}>
-        <div className="std-page-body dashboard container">
-          <Loader isLoading={isLoading}>
-            <nav className="tabs" aria-controls="enrollment-items">
-              {programEnrollmentsLength === 0 ? (
-                <>
-                  <strong style={{ fontSize: "75%" }}>My Courses</strong>
-                </>
-              ) : (
-                <>
-                  <button
-                    className={myCourseClasses}
-                    onClick={() => this.toggleTab(DashboardTab.courses)}
-                  >
-                    My Courses
-                  </button>
-                  <button
-                    className={programsClasses}
-                    onClick={() => this.toggleTab(DashboardTab.programs)}
-                  >
-                    My Programs
-                  </button>
-                </>
-              )}
-            </nav>
-            <div id="enrollment-items" className="enrolled-items">
-              {this.renderCurrentTab()}
-            </div>
+        <>
+          <div role="banner" className="std-page-header">
+            <h1>{DASHBOARD_PAGE_TITLE}</h1>
+          </div>
+          <div className="std-page-body dashboard container">
+            <Loader isLoading={isLoading}>
+              <nav className="tabs" aria-controls="enrollment-items">
+                {programEnrollmentsLength === 0 ? (
+                  <>
+                    <strong style={{ fontSize: "75%" }}>My Courses</strong>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className={myCourseClasses}
+                      onClick={() => this.toggleTab(DashboardTab.courses)}
+                    >
+                      My Courses
+                    </button>
+                    <button
+                      className={programsClasses}
+                      onClick={() => this.toggleTab(DashboardTab.programs)}
+                    >
+                      My Programs
+                    </button>
+                  </>
+                )}
+              </nav>
+              <div id="enrollment-items" className="enrolled-items">
+                {this.renderCurrentTab()}
+              </div>
 
-            <ProgramEnrollmentDrawer
-              isHidden={this.state.programDrawerVisibility}
-              enrollment={this.state.programDrawerEnrollments}
-              showDrawer={() =>
-                this.setState({ programDrawerVisibility: false })
-              }
-              redirectToCourseHomepage={this.redirectToCourseHomepage}
-              onUnenroll={forceRequest}
-            ></ProgramEnrollmentDrawer>
+              <ProgramEnrollmentDrawer
+                isHidden={this.state.programDrawerVisibility}
+                enrollment={this.state.programDrawerEnrollments}
+                showDrawer={() =>
+                  this.setState({ programDrawerVisibility: false })
+                }
+                redirectToCourseHomepage={this.redirectToCourseHomepage}
+                onUnenroll={forceRequest}
+              ></ProgramEnrollmentDrawer>
 
-            {this.renderAddlProfileFieldsModal()}
-          </Loader>
-        </div>
+              {this.renderAddlProfileFieldsModal()}
+            </Loader>
+          </div>
+        </>
       </DocumentTitle>
     )
   }

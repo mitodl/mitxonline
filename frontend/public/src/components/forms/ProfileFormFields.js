@@ -354,9 +354,9 @@ export const LegalAddressFields = ({
 
 export const ProfileFields = () => (
   <React.Fragment>
-    <div className="form-group">
-      <div className="row">
-        <div className="col">
+    <div className="row small-gap">
+      <div className="col">
+        <div className="form-group">
           <label htmlFor="user_profile.gender" className="fw-bold">
             Gender
           </label>
@@ -381,7 +381,11 @@ export const ProfileFields = () => (
             component={FormError}
           />
         </div>
-        <div className="col">{renderYearOfBirthField()}</div>
+      </div>
+      <div className="col">
+        <div className="form-group">
+          {renderYearOfBirthField()}
+        </div>
       </div>
     </div>
   </React.Fragment>
@@ -416,96 +420,92 @@ export const AddlProfileFields = ({
         </div>
       </div>
     </div>
-    <div className="form-group">
-      <label id="occupation-label" className="fw-bold">
+    <div className="form-group small-gap">
+      <label id="occupation-label">
         Are you a{requireAddlFields ? <span className="required">*</span> : ""}
       </label>
-      <div className="row">
-        <div className="col-6">
-          <div className="form-check">
-            <Field
-              type="checkbox"
-              name="user_profile.type_is_student"
-              id="user_profile.type_is_student"
-              className="form-check-input"
-              aria-labelledby="occupation-label student-label"
-              defaultChecked={values.user_profile.type_is_student}
-              required={false}
-            />
-            <label
-              className="form-check-label"
-              htmlFor="user_profile.type_is_student"
-              id="student-label"
-            >
-              {" "}
-              Student
-            </label>
-          </div>
-          <div className="form-check">
-            <Field
-              type="checkbox"
-              name="user_profile.type_is_professional"
-              id="user_profile.type_is_professional"
-              className="form-check-input"
-              aria-labelledby="occupation-label professional-label"
-              defaultChecked={values.user_profile.type_is_professional}
-            />
-            <label
-              className="form-check-label"
-              htmlFor="user_profile.type_is_professional"
-              id="professional-label"
-            >
-              {" "}
-              Professional
-            </label>
-          </div>
+      <ErrorMessage
+        name="user_profile.type_is_student"
+        id="user_profile.type_is_student_Error"
+        component={FormError}
+      />
+    </div>
+    <div className="row small-gap">
+      <div className="col-6">
+        <div className="form-check">
+          <Field
+            type="checkbox"
+            name="user_profile.type_is_student"
+            id="user_profile.type_is_student"
+            className="form-check-input"
+            aria-labelledby="occupation-label student-label"
+            defaultChecked={values.user_profile.type_is_student}
+            required={false}
+          />
+          <label
+            className="form-check-label"
+            htmlFor="user_profile.type_is_student"
+            id="student-label"
+          >
+            {" "}
+            Student
+          </label>
         </div>
-        <div className="col-6">
-          <div className="form-check">
-            <Field
-              type="checkbox"
-              name="user_profile.type_is_educator"
-              id="user_profile.type_is_educator"
-              className="form-check-input"
-              aria-labelledby="occupation-label educator-label"
-              defaultChecked={values.user_profile.type_is_educator}
-            />
-            <label
-              className="form-check-label"
-              htmlFor="user_profile.type_is_educator"
-              id="educator-label"
-            >
-              {" "}
-              Educator
-            </label>
-          </div>
-          <div className="form-check">
-            <Field
-              type="checkbox"
-              name="user_profile.type_is_other"
-              id="user_profile.type_is_other"
-              className="form-check-input"
-              aria-labelledby="occupation-label other-label"
-              defaultChecked={values.user_profile.type_is_other}
-            />
-            <label
-              className="form-check-label"
-              htmlFor="user_profile.type_is_other"
-              id="other-label"
-            >
-              {" "}
-              Other
-            </label>
-          </div>
+        <div className="form-check">
+          <Field
+            type="checkbox"
+            name="user_profile.type_is_professional"
+            id="user_profile.type_is_professional"
+            className="form-check-input"
+            aria-labelledby="occupation-label professional-label"
+            defaultChecked={values.user_profile.type_is_professional}
+          />
+          <label
+            className="form-check-label"
+            htmlFor="user_profile.type_is_professional"
+            id="professional-label"
+          >
+            {" "}
+            Professional
+          </label>
         </div>
       </div>
-      <div className="row">
-        <div className="col-12">
-          <ErrorMessage
-            name="user_profile.type_is_student"
-            id="user_profile.type_is_student_Error"
-            component={FormError}
+      <div className="col-5">
+        <div className="form-check">
+          <Field
+            type="checkbox"
+            name="user_profile.type_is_educator"
+            id="user_profile.type_is_educator"
+            className="form-check-input"
+            aria-labelledby="occupation-label educator-label"
+            defaultChecked={values.user_profile.type_is_educator}
           />
+          <label
+            className="form-check-label"
+            htmlFor="user_profile.type_is_educator"
+            id="educator-label"
+          >
+            {" "}
+            Educator
+          </label>
+        </div>
+        <div className="form-check">
+          <Field
+            type="checkbox"
+            name="user_profile.type_is_other"
+            id="user_profile.type_is_other"
+            className="form-check-input"
+            aria-labelledby="occupation-label other-label"
+            defaultChecked={values.user_profile.type_is_other}
+          />
+          <label
+            className="form-check-label"
+            htmlFor="user_profile.type_is_other"
+            id="other-label"
+          >
+            {" "}
+            Other
+          </label>
         </div>
       </div>
     </div>
@@ -534,7 +534,7 @@ export const AddlProfileFields = ({
             component={FormError}
           />
         </div>
-        <div className="row">
+        <div className="row small-gap">
           <div className="col">
             <div className="form-group">
               <label htmlFor="user_profile.job_title" className="fw-bold">
@@ -576,7 +576,7 @@ export const AddlProfileFields = ({
             </div>
           </div>
         </div>
-        <div className="row">
+        <div className="row small-gap">
           <div className="col">
             <div className="form-group">
               <label htmlFor="user_profile.industry" className="fw-bold">
@@ -618,7 +618,7 @@ export const AddlProfileFields = ({
             </div>
           </div>
         </div>
-        <div className="row">
+        <div className="row small-gap">
           <div className="col">
             <div className="form-group">
               <label
@@ -668,5 +668,6 @@ export const AddlProfileFields = ({
         </div>
       </React.Fragment>
     ) : null}
+    <div className="row small-gap"></div>
   </React.Fragment>
 )

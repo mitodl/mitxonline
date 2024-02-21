@@ -431,18 +431,18 @@ export class EnrolledItemCard extends React.Component<
         ) : null
 
     const certificateLinksStyles = isProgramCard
-      ? "upgrade-item-description detail d-md-flex justify-content-between pb-2 flex-column px-4"
-      : "upgrade-item-description detail d-md-flex justify-content-between pb-2"
+      ? "upgrade-item-description d-md-flex justify-content-between flex-column"
+      : "upgrade-item-description d-md-flex justify-content-between"
     const certificateLinksIntStyles = isProgramCard
-      ? "enrollment-extra-links d-flex d-md-flex w-100 justify-content-center"
-      : "enrollment-extra-links d-flex d-md-flex col-auto pe-0 justify-content-end"
+      ? "d-flex d-md-flex flex-column justify-content-center"
+      : "d-flex d-md-flex flex-column justify-content-end"
 
     const certificateLinks =
       enrollment.run.products.length > 0 &&
       enrollment.enrollment_mode === "audit" &&
       enrollment.run.is_upgradable ? (
           <div className={certificateLinksStyles}>
-            <div className="mr-0">
+            <div className="certificate-upgrade-message">
               <p>
                 <strong>Upgrade today</strong> and, upon passing, receive your
               certificate signed by MIT faculty to highlight the knowledge and
@@ -450,10 +450,10 @@ export class EnrolledItemCard extends React.Component<
               </p>
             </div>
             <div className={certificateLinksIntStyles}>
-              <div className="pe-4 my-auto">{financialAssistanceLink}</div>
-              <div className="my-auto">
+              <div className="">
                 <GetCertificateButton productId={enrollment.run.products[0].id} />
               </div>
+              <div className="">{financialAssistanceLink}</div>
             </div>
           </div>
         ) : null
@@ -510,7 +510,7 @@ export class EnrolledItemCard extends React.Component<
                     ) : null}
                 </div>
 
-                <h2 className="my-0 mr-3">{title}</h2>
+                <h2>{title}</h2>
               </div>
               <Dropdown
                 isOpen={menuVisibility}
@@ -547,7 +547,7 @@ export class EnrolledItemCard extends React.Component<
               {this.renderRunUnenrollmentModal(enrollment)}
               {this.renderEmailSettingsDialog(enrollment)}
             </div>
-            <div className="detail pt-1">
+            <div className="detail">
               {courseId}
               {startDateDescription === null}
               {courseRunStatusMessageText}
@@ -572,8 +572,8 @@ export class EnrolledItemCard extends React.Component<
             </div>
           </div>
         </div>
-        <div className="row flex-grow-1 pt-3">
-          <div className="col pe-0 ps-0">{certificateLinks}</div>
+        <div className="row flex-grow-1">
+          <div className="col certificate-container">{certificateLinks}</div>
         </div>
       </div>
     )
@@ -663,7 +663,7 @@ export class EnrolledItemCard extends React.Component<
               </Dropdown>
               {this.renderProgramUnenrollmentModal(enrollment)}
             </div>
-            <div className="detail pt-1">
+            <div className="detail detail-program">
               {startDateDescription === null}
               {courseRunStatusMessageText}
               <div className="enrollment-extra-links d-flex pe-2">

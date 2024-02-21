@@ -92,47 +92,47 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${REGISTER_EXTRA_DETAILS_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page registration-page">
-          <div className="auth-card card-shadow auth-form">
-            <div className="auth-header">
+          <div className="std-card std-card-auth">
+            <div className="std-card-body">
               <h1>About You</h1>
-            </div>
-            <div className="form-group">
-              Please tell us a bit about yourself. The data you provide here
-              will assist us in our research pursuits. All fields are optional.
-            </div>
-            <hr className="hr-class-margin" />
-            <div className="auth-form">
-              <Formik
-                onSubmit={this.onSubmit.bind(this)}
-                validationSchema={addlProfileFieldsValidation}
-                initialValues={getInitialValues(currentUser)}
-                render={({
-                  isSubmitting,
-                  setFieldValue,
-                  setFieldTouched,
-                  values
-                }) => (
-                  <Form>
-                    <AddlProfileFields
-                      setFieldValue={setFieldValue}
-                      setFieldTouched={setFieldTouched}
-                      values={values}
-                      isNewAccount={false}
-                    />
-                    <div className="row submit-row no-gutters">
-                      <div className="col d-flex justify-content-end">
-                        <button
-                          type="submit"
-                          className="btn btn-primary"
-                          disabled={isSubmitting}
-                        >
-                          Submit
-                        </button>
+              <div className="form-group">
+                Please tell us a bit about yourself. The data you provide here
+                will assist us in our research pursuits. All fields are optional.
+              </div>
+              <hr className="hr-class-margin" />
+              <div className="auth-form">
+                <Formik
+                  onSubmit={this.onSubmit.bind(this)}
+                  validationSchema={addlProfileFieldsValidation}
+                  initialValues={getInitialValues(currentUser)}
+                  render={({
+                    isSubmitting,
+                    setFieldValue,
+                    setFieldTouched,
+                    values
+                  }) => (
+                    <Form>
+                      <AddlProfileFields
+                        setFieldValue={setFieldValue}
+                        setFieldTouched={setFieldTouched}
+                        values={values}
+                        isNewAccount={false}
+                      />
+                      <div className="row submit-row no-gutters">
+                        <div className="col d-flex justify-content-end">
+                          <button
+                            type="submit"
+                            className="btn btn-primary"
+                            disabled={isSubmitting}
+                          >
+                            Submit
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  </Form>
-                )}
-              />
+                    </Form>
+                  )}
+                />
+              </div>
             </div>
           </div>
         </div>
