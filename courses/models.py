@@ -898,10 +898,8 @@ class CourseRunCertificate(TimestampedModel, BaseCertificate):
 
     @property
     def start_end_dates(self):
-        """Returns the start and end date for courseware object duration"""
-        if self.course_run.is_self_paced:
-            return self.course_run.start_date, self.created_on
-        return self.course_run.start_date, self.course_run.end_date
+        """Returns the start date for courseware object and certificate creation date"""
+        return self.course_run.start_date, self.created_on
 
     def __str__(self):
         return (
