@@ -490,7 +490,7 @@ def test_course_run_certificate_start_end_dates_and_page_revision():
     )
     start_date, end_date = certificate.start_end_dates
     assert start_date == certificate.course_run.start_date
-    assert end_date == certificate.course_run.end_date
+    assert end_date == certificate.created_on
     certificate_page = certificate.course_run.course.page.certificate_page
     assert (
         certificate_page.get_latest_revision() == certificate.certificate_page_revision
