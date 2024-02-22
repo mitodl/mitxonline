@@ -594,7 +594,7 @@ export class CatalogPage extends React.Component<Props> {
                             >
                               Courses{" "}
                               <div className="product-number d-inline-block d-sm-none">
-                                ({this.state.filteredCourses.length})
+                                ({this.props.coursesCount})
                               </div>
                             </button>
                           </div>
@@ -604,7 +604,7 @@ export class CatalogPage extends React.Component<Props> {
                                 ? "selected-tab"
                                 : "unselected-tab"
                             } ${
-                              this.state.filteredPrograms.length
+                              this.props.programsCount
                                 ? ""
                                 : "display-none"
                             }`}
@@ -616,7 +616,7 @@ export class CatalogPage extends React.Component<Props> {
                             >
                               Programs{" "}
                               <div className="product-number d-inline-block d-sm-none">
-                                ({this.state.filteredPrograms.length})
+                                ({this.props.programsCount})
                               </div>
                             </button>
                           </div>
