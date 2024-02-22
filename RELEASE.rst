@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.86.3
+Version 0.86.3 (Released February 22, 2024)
 --------------
 
 - Change the callback to respond on programs page as well (#2111)
