@@ -125,7 +125,7 @@ export class CatalogPage extends React.Component<Props> {
         }
       } else {
         const { getNextProgramPage, programsNextPage } = this.props
-        if (programsNextPage) {
+        if (programsNextPage && !this.state.isLoadingMoreItems) {
           this.setState({ isLoadingMoreItems: true })
           const response = await getNextProgramPage(
             this.state.programQueryPage + 1
@@ -202,6 +202,12 @@ export class CatalogPage extends React.Component<Props> {
       this.setState({
         filteredPrograms: filteredPrograms
       })
+      // Detect when the bottom of the catalog page has been reached and display more catalog items.
+      this.io = new window.IntersectionObserver(
+        this.bottomOfLoadedCatalogCallback,
+        { threshold: 1.0 }
+      )
+      this.io.observe(this.container.current)
     }
   }
 
