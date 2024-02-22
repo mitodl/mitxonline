@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.86.3
+--------------
+
+- Change the callback to respond on programs page as well (#2111)
+- Certificate Page: End date should be certificate creation date (#2110)
+
 Version 0.86.2 (Released February 21, 2024)
 --------------
 
