@@ -125,7 +125,7 @@ export class CatalogPage extends React.Component<Props> {
         }
       } else {
         const { getNextProgramPage, programsNextPage } = this.props
-        if (programsNextPage) {
+        if (programsNextPage && !this.state.isLoadingMoreItems) {
           this.setState({ isLoadingMoreItems: true })
           const response = await getNextProgramPage(
             this.state.programQueryPage + 1
