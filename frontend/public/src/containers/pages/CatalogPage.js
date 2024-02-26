@@ -374,13 +374,9 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderNumberOfCatalogCourses() {
     const { coursesCount, departments } = this.props
-    if (
-      this.state.selectedDepartment === ALL_DEPARTMENTS
-    ) {
+    if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
       return coursesCount
-    } else if (
-      this.state.selectedDepartment !== ALL_DEPARTMENTS
-    ) {
+    } else if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
       return departments.find(
         department => department.name === this.state.selectedDepartment
       ).courses
@@ -389,13 +385,9 @@ export class CatalogPage extends React.Component<Props> {
 
   renderNumberOfCatalogPrograms() {
     const { programsCount, departments } = this.props
-    if (
-      this.state.selectedDepartment === ALL_DEPARTMENTS
-    ) {
+    if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
       return programsCount
-    } else if (
-      this.state.selectedDepartment !== ALL_DEPARTMENTS
-    ) {
+    } else if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
       return departments.find(
         department => department.name === this.state.selectedDepartment
       ).programs
@@ -604,9 +596,7 @@ export class CatalogPage extends React.Component<Props> {
                                 ? "selected-tab"
                                 : "unselected-tab"
                             } ${
-                              this.props.programsCount
-                                ? ""
-                                : "display-none"
+                              this.props.programsCount ? "" : "display-none"
                             }`}
                           >
                             <button
@@ -639,7 +629,9 @@ export class CatalogPage extends React.Component<Props> {
                           <h2>
                             {/* Hidden on small screens. */}
                             {/* Could add logic to display only "course" if only 1 course is showing. */}
-                            {this.state.tabSelected === PROGRAMS_TAB ? this.renderNumberOfCatalogPrograms() : this.renderNumberOfCatalogCourses()}{" "}
+                            {this.state.tabSelected === PROGRAMS_TAB
+                              ? this.renderNumberOfCatalogPrograms()
+                              : this.renderNumberOfCatalogCourses()}{" "}
                             {this.state.tabSelected}
                           </h2>
                         </CSSTransition>
