@@ -37,7 +37,9 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
         <section className="email-section">
           <h1>Change Password</h1>
           <div className="form-group">
-            <label htmlFor="oldPassword" className="fw-bold">Old Password<span className="required">*</span></label>
+            <label htmlFor="oldPassword" className="fw-bold">
+              Old Password<span className="required">*</span>
+            </label>
 
             <Field
               name="oldPassword"
@@ -70,7 +72,9 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
             />
           </div>
           <div className="form-group">
-            <label htmlFor="confirmPassword" className="fw-bold">Confirm Password<span className="required">*</span></label>
+            <label htmlFor="confirmPassword" className="fw-bold">
+              Confirm Password<span className="required">*</span>
+            </label>
             <Field
               name="confirmPassword"
               id="confirmPassword"

@@ -33,7 +33,10 @@ $enrolled-passed-fg: #ffffff;
     width: 1px;
   }
   .card {
+    border-radius: 5px;
     display: flex;
+    box-shadow: 0px 2px 3px 0px rgba(18, 38, 49, 0.15); 
+    margin-bottom: 30px;
 
     &.no-enrollments {
       flex-direction: column;
@@ -98,6 +101,12 @@ $enrolled-passed-fg: #ffffff;
       }
     }
 
+    div.enrollment-details-container {
+      margin: 0;
+      margin-left: 20px;
+      padding: 0;
+    }
+
     div.detail {
       padding: 0;
       margin-top: 20px;
@@ -119,6 +128,10 @@ $enrolled-passed-fg: #ffffff;
 
     strong.active-enrollment-text {
       color: #139556;
+    }
+
+    .enrolled-item-info {
+      padding: 30px;
     }
   }
 
@@ -176,12 +189,14 @@ $enrolled-passed-fg: #ffffff;
   .upgrade-item-description {
     width: 100%;
     flex-direction: row;
-    padding: 20px 30px;
+    padding: 25px 30px ;
     border-top: $home-page-border-grey;
     background: $home-page-grey-lite;
 
     div.certificate-upgrade-message {
       width: 80%;
+      height: 30px;
+
       font-size: 16px;
       line-height: 30px;
 
@@ -234,6 +249,18 @@ $enrolled-passed-fg: #ffffff;
     }
   }
 
+  .get-cert-button-container button, .finaid-link-container {
+    font-size: 14px !important;
+  }
+
+  .finaid-link-container {
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    margin-top: 10px;
+    text-align: center;
+    color: $brand-darker-bg;
+  }
 }
 
 .dashboard {

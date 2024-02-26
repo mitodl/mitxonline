@@ -97,7 +97,8 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
               <h1>About You</h1>
               <div className="form-group">
                 Please tell us a bit about yourself. The data you provide here
-                will assist us in our research pursuits. All fields are optional.
+                will assist us in our research pursuits. All fields are
+                optional.
               </div>
               <hr className="hr-class-margin" />
               <div className="auth-form">

@@ -69,21 +69,25 @@ export class EditProfilePage extends React.Component<Props> {
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${EDIT_PROFILE_PAGE_TITLE}`}
       >
-        <>{ currentUser ? <div role="banner" className="std-page-header">
-          <h1>{EDIT_PROFILE_PAGE_TITLE}</h1>
-        </div> : null }
-        <div className="std-page-body container auth-page">
-          <div className="std-card std-card-auth">
-            <div className="std-card-body edit-profile-page">
-              <h1>Profile Information</h1>
-              <EditProfileForm
-                countries={countries}
-                user={currentUser}
-                onSubmit={this.onSubmit.bind(this)}
-              />
+        <>
+          {currentUser ? (
+            <div role="banner" className="std-page-header">
+              <h1>{EDIT_PROFILE_PAGE_TITLE}</h1>
+            </div>
+          ) : null}
+          <div className="std-page-body container auth-page">
+            <div className="std-card std-card-auth">
+              <div className="std-card-body edit-profile-page">
+                <h1>Profile Information</h1>
+                <EditProfileForm
+                  countries={countries}
+                  user={currentUser}
+                  onSubmit={this.onSubmit.bind(this)}
+                />
+              </div>
             </div>
           </div>
-        </div></>
+        </>
       </DocumentTitle>
     ) : null
   }

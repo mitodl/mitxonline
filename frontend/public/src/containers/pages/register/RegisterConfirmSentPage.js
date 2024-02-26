@@ -45,15 +45,15 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
 
               <div>
                 <p>
-                  We sent an email to <b>{email}</b>, please verify your address to
-                  continue.
+                  We sent an email to <b>{email}</b>, please verify your address
+                  to continue.
                 </p>
               </div>
               <div>
                 <p>
                   <strong>
-                    If you do NOT receive your verification email, here's what to
-                    do:
+                    If you do NOT receive your verification email, here's what
+                    to do:
                   </strong>
                 </p>
               </div>
@@ -74,7 +74,8 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
               </ul>
 
               <div>
-                <p><b>Still no verification email? </b>
+                <p>
+                  <b>Still no verification email? </b>
                   <br />
                   Please contact our {` ${SETTINGS.site_name} `}
                   <a href={`mailto:${SETTINGS.support_email}`}>

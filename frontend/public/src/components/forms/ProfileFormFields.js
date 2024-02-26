@@ -383,9 +383,7 @@ export const ProfileFields = () => (
         </div>
       </div>
       <div className="col">
-        <div className="form-group">
-          {renderYearOfBirthField()}
-        </div>
+        <div className="form-group">{renderYearOfBirthField()}</div>
       </div>
     </div>
   </React.Fragment>

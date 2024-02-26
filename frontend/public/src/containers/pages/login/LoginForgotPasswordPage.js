@@ -113,14 +113,14 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
                   {this.state.text}
                   <p>
                     <b>
-                      If you do NOT receive your password reset email, here's what
-                      to do:
+                      If you do NOT receive your password reset email, here's
+                      what to do:
                     </b>
                   </p>
                   <ul>
                     <li>
-                      <b>Wait a few moments.</b> It might take several minutes to
-                      receive your password reset email.
+                      <b>Wait a few moments.</b> It might take several minutes
+                      to receive your password reset email.
                     </li>
                     <li>
                       <b>Check your spam folder.</b> It might be there.

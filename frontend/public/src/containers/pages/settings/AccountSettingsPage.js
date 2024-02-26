@@ -121,9 +121,11 @@ export class AccountSettingsPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${ACCOUNT_SETTINGS_PAGE_TITLE}`}
       >
         <>
-          { currentUser ? <div role="banner" className="std-page-header">
-            <h1>{ACCOUNT_SETTINGS_PAGE_TITLE}</h1>
-          </div> : null }
+          {currentUser ? (
+            <div role="banner" className="std-page-header">
+              <h1>{ACCOUNT_SETTINGS_PAGE_TITLE}</h1>
+            </div>
+          ) : null}
 
           <div className="std-page-body container auth-page">
             <div className="std-card std-card-auth">

@@ -32,7 +32,9 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
           <section className="email-section">
             <h1>Change Email</h1>
             <div className="form-group">
-              <label htmlFor="email" className="fw-bold">Email<span className="required">*</span></label>
+              <label htmlFor="email" className="fw-bold">
+                Email<span className="required">*</span>
+              </label>
               <Field
                 name="email"
                 id="email"
