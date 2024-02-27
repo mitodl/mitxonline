@@ -372,34 +372,26 @@ export class CatalogPage extends React.Component<Props> {
   /**
    * Returns the number of courseRuns or programs based on the selected catalog tab.
    */
-  renderNumberOfCatalogItems() {
-    const { coursesCount, programsCount, departments } = this.props
-    if (
-      this.state.tabSelected === PROGRAMS_TAB &&
-      this.state.selectedDepartment === ALL_DEPARTMENTS
-    ) {
-      return programsCount
-    } else if (
-      this.state.tabSelected === PROGRAMS_TAB &&
-      this.state.selectedDepartment !== ALL_DEPARTMENTS
-    ) {
-      return departments.find(
-        department => department.name === this.state.selectedDepartment
-      ).programs
-    }
-    if (
-      this.state.tabSelected === COURSES_TAB &&
-      this.state.selectedDepartment === ALL_DEPARTMENTS
-    ) {
+  renderNumberOfCatalogCourses() {
+    const { coursesCount, departments } = this.props
+    if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
       return coursesCount
-    } else if (
-      this.state.tabSelected === COURSES_TAB &&
-      this.state.selectedDepartment !== ALL_DEPARTMENTS
-    ) {
+    } else if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
       return departments.find(
         department => department.name === this.state.selectedDepartment
       ).courses
     }
+  }
+
+  renderNumberOfCatalogPrograms() {
+    const { programsCount, departments } = this.props
+    if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
+      return programsCount
+    } else if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
+      return departments.find(
+        department => department.name === this.state.selectedDepartment
+      ).programs
+    } else return 0
   }
 
   /**
@@ -594,7 +586,7 @@ export class CatalogPage extends React.Component<Props> {
                             >
                               Courses{" "}
                               <div className="product-number d-inline-block d-sm-none">
-                                ({this.state.filteredCourses.length})
+                                ({this.renderNumberOfCatalogCourses()})
                               </div>
                             </button>
                           </div>
@@ -604,9 +596,7 @@ export class CatalogPage extends React.Component<Props> {
                                 ? "selected-tab"
                                 : "unselected-tab"
                             } ${
-                              this.state.filteredPrograms.length
-                                ? ""
-                                : "display-none"
+                              this.props.programsCount ? "" : "display-none"
                             }`}
                           >
                             <button
@@ -616,7 +606,7 @@ export class CatalogPage extends React.Component<Props> {
                             >
                               Programs{" "}
                               <div className="product-number d-inline-block d-sm-none">
-                                ({this.state.filteredPrograms.length})
+                                ({this.renderNumberOfCatalogPrograms()})
                               </div>
                             </button>
                           </div>
@@ -639,7 +629,9 @@ export class CatalogPage extends React.Component<Props> {
                           <h2>
                             {/* Hidden on small screens. */}
                             {/* Could add logic to display only "course" if only 1 course is showing. */}
-                            {this.renderNumberOfCatalogItems()}{" "}
+                            {this.state.tabSelected === PROGRAMS_TAB
+                              ? this.renderNumberOfCatalogPrograms()
+                              : this.renderNumberOfCatalogCourses()}{" "}
                             {this.state.tabSelected}
                           </h2>
                         </CSSTransition>
