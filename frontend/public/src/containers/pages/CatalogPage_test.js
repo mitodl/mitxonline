@@ -190,7 +190,7 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
       JSON.stringify(courses)
     )
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+    expect(inner.instance().renderNumberOfCatalogCourses()).equals(1)
   })
 
   it("updates state from changeSelectedTab when selecting program tab", async () => {
@@ -247,7 +247,7 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
       JSON.stringify(programs)
     )
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(5)
+    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(5)
   })
 
   it("renders catalog department filter for courses and programs tabs", async () => {
@@ -554,14 +554,14 @@ describe("CatalogPage", function() {
       JSON.stringify(courses)
     )
     // Number of catalog items should match the number of visible courses.
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(3)
+    expect(inner.instance().renderNumberOfCatalogCourses()).equals(3)
 
     // Select a department to filter by.
     inner.instance().changeSelectedDepartment("History", "courses")
     // Confirm the state updated to reflect the selected department.
     expect(inner.state().selectedDepartment).equals("History")
     // Confirm the number of catalog items updated to reflect the items filtered by department.
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
+    expect(inner.instance().renderNumberOfCatalogCourses()).equals(2)
     // Confirm the courses filtered are those which have a department name matching the selected department.
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify([course2, course3])
@@ -622,7 +622,7 @@ describe("CatalogPage", function() {
       JSON.stringify(courses)
     )
     // one shows visually, but the total is 2
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
+    expect(inner.instance().renderNumberOfCatalogCourses()).equals(2)
     expect(inner.state().courseQueryPage).equals(1)
 
     // Mock the second page of course API results.
@@ -651,7 +651,7 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify([displayedCourse, displayedCourse])
     )
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
+    expect(inner.instance().renderNumberOfCatalogCourses()).equals(2)
   })
 
   it("do not load more at the bottom of the courses catalog page if next page is null", async () => {
@@ -692,7 +692,7 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
       JSON.stringify(courses)
     )
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+    expect(inner.instance().renderNumberOfCatalogCourses()).equals(1)
     expect(inner.state().courseQueryPage).equals(1)
 
     // Simulate the user reaching the bottom of the catalog page.
@@ -707,7 +707,7 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
     )
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+    expect(inner.instance().renderNumberOfCatalogCourses()).equals(1)
   })
 
   it("do not load more at the bottom of the courses catalog page if isLoadingMoreItems is true", async () => {
@@ -745,7 +745,7 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
     )
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+    expect(inner.instance().renderNumberOfCatalogCourses()).equals(1)
     expect(inner.state().courseQueryPage).equals(1)
 
     // Simulate the user reaching the bottom of the catalog page.
@@ -764,7 +764,7 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
     )
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
+    expect(inner.instance().renderNumberOfCatalogCourses()).equals(1)
   })
 
   it("load more at the bottom of the programs catalog page, all departments filter", async () => {
@@ -821,7 +821,7 @@ describe("CatalogPage", function() {
       JSON.stringify(programs)
     )
     // While there is only one showing, there are still 2 total. The total should be shown.
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
+    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(2)
     expect(inner.state().programQueryPage).equals(1)
 
     // Mock the second page of program API results.
@@ -851,7 +851,8 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().filteredPrograms)).equals(
       JSON.stringify([displayedProgram, displayedProgram])
     )
+
     // This should still be 2 because we haven't changed the filter - no matter if one or two have loaded, there are 2
-    expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
+    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(2)
   })
 })
