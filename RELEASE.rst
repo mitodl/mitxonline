@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.87.0
+--------------
+
+- Fix mobile counts on catalog (#2114)
+
 Version 0.86.3 (Released February 22, 2024)
 --------------
 
