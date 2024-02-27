@@ -248,7 +248,12 @@ export class DashboardPage extends React.Component<
               <nav className="tabs" aria-controls="enrollment-items">
                 {programEnrollmentsLength === 0 ? (
                   <>
-                    <strong style={{ fontSize: "75%" }}>My Courses</strong>
+                    <button
+                      className={myCourseClasses}
+                      onClick={() => this.toggleTab(DashboardTab.courses)}
+                    >
+                      My Courses
+                    </button>
                   </>
                 ) : (
                   <>
