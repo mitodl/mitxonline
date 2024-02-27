@@ -39,6 +39,11 @@ div.std-card {
         width: 535px;
     }
 
+    &.std-card-finasst {
+        width: 90%;
+        margin: 0 auto 40px;
+    }
+
     div.std-card-body {
         margin: 30px;
         padding: 0;
@@ -128,6 +133,18 @@ div.std-card {
                 color: $brand-darker-bg;
             }
 
+            &.checkbox-long-label {
+                display: flex;
+
+                input[type=checkbox], span {
+                    display: block;
+                }
+
+                span {
+                    font-family: "Source Sans Pro", sans-serif;
+                    font-size: 14px;
+                }
+            }
         }
 
         div.small-gap {
@@ -188,7 +205,7 @@ div.std-card {
             background-position: center;
         }
 
-        &.edit-profile-page, &.create-account-page, &.my-account-page {
+        &.edit-profile-page, &.create-account-page, &.my-account-page, &.financial-assistance-page {
             div.form-group {
                 margin-bottom: 16px; 
             }

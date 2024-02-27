@@ -1,6 +1,5 @@
 {% load static %}
 
-{% if new_footer %}
 <footer class="new-footer">
   <div class="new-footer-container">
       <div class="copyright-container">
@@ -55,68 +54,3 @@
       </div>
   </div>
 </footer>
-
-{% else %}
-<footer class="footer">
-  <div class="support-links">
-    <div class="container content-holder">
-      <div class="row">
-        <div class="col-sm-6 clearfix">
-          <img src={% static 'images/help.png' %} alt="Help" loading="lazy"/>
-          <div class="info">
-            <a href=" https://mitxonline.zendesk.com/hc/en-us">
-              <h2>Help & FAQ</h2>
-            </a>
-            <p>Find answers to your questions.</p>
-          </div>
-        </div>
-        <div class="col-sm-6 clearfix">
-          <img src={% static 'images/contact.png' %} alt="Contact Us" loading="lazy"/>
-          <div class="info">
-            <a href="https://mitxonline.zendesk.com/hc/en-us/requests/new">
-              <h2>Contact Us</h2>
-            </a>
-            <p>Let us know how we can assist you.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="container">
-    <div class="footer-top">
-      <div class="mit-info">
-        <img src="{% static 'images/mit.png' %}" width="78" height="41" alt="MIT" loading="lazy"/>
-        <address>
-          Massachusetts Institute of Technology <br />77 Massachusetts Avenue
-          <br />Cambridge, MA 02139
-        </address>
-      </div>
-      <div class="right-info">
-      </div>
-    </div>
-    <div class="row footer-bottom">
-      <div class="col-xl-8 col-lg-7 col-md-6 cold-sm-12">
-        <ul class="footer-sub-nav">
-          <li><a href="/about-us/">About Us</a></li>
-          <li><a href="/terms-of-service/">Terms of Service</a></li>
-          <li><a href="/privacy-policy/">Privacy Policy</a></li>
-          <li><a href="/honor-code/">Honor Code</a></li>
-          <li>
-            <a
-              target="_blank"
-              href="https://accessibility.mit.edu/"
-              rel="noopener noreferrer"
-              >Accessibility</a
-            >
-          </li>
-        </ul>
-      </div>
-      <div class="col-xl-4 col-lg-5 col-md-6 cold-sm-12">
-        {% block copyright %}
-          {% include "copyright.html" %}
-        {% endblock %}
-      </div>
-    </div>
-  </div>
-</footer>
-{% endif %}

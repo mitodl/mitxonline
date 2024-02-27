@@ -1,55 +1,71 @@
 {% extends "base.html" %}
+
 {% load wagtailcore_tags %}
+{% load static wagtail_img_src feature_img_src %}
 
 {% block title %}{{ site_name }} | {{ page.title }}{% endblock %}
 
 {% block content %}
-<div id="main" class="main-page-content container">
-  <div class="std-page-body">
+<div id="main" class="main-page-content financial-assistance-page">
   {% if user.is_authenticated %}{# is logged in #}
     {% if prior_request is None or prior_request.is_reset %}{# has submission #}
-      <div class="flexible-pricing-head">
+      <div role="banner" class="std-page-header">
         <h1>{{ page.title|richtext }}</h1>
-        {{ page.intro|richtext }}
       </div>
-      <div class="container auth-page">
-        <div class="auth-card card-shadow auth-form flexible-pricing-form">
-          <div class="auth-header">
-            <h4 class="tell-us-about-your-income">Tell us about your income</h4>
-            <form action="{% pageurl page %}" method="POST">
-              {% csrf_token %}
-              <div class="form-group">
-                <label for="your_income" id="your_income_label">Yearly Income</label>
-                {%if form.fields.your_income.required %}<span class="required">*</span>{% endif %}
-                <input type="number" name="your_income" step="any" class="form-control {%if form.your_income.errors %}errored{% endif %}" id="your_income" aria-describedby="your_incomeError" required>
-                {% for error in form.your_income.errors %}
-                  <div class="form-error" id="your_incomeError" role="alert">{{error}}</div>
-                {% endfor %}
-              </div>
-              <div class="form-group">
-                <label for="income_currency">Income Currency</label>
-                {%if form.fields.income_currency.required %}<span class="required">*</span>{% endif %}
-                <span class="income_currency_label" id="income-currency-subtitle">The currency you’re paid in.</span>
-                <select name="income_currency" id="income_currency" class="form-control {%if form.income_currency.errors %}errored{% endif %}" aria-describedby="income-currency-subtitle" required>
-                  <option value="">Choose</option>
-                  {% for choice in form.fields.income_currency.choices %}
-                    <option value="{{ choice.0 }}">{{ choice.1 }}</option>
-                  {%  endfor %}
-                </select>
-                {% for error in form.income_currency.errors %}
-                  <div class="form-error" id="income_currencyError" role="alert">{{error}}</div>
-                {% endfor %}
-              </div>
-              <div class="form-group">
-                <input id="" type="checkbox" required aria-label="financial assistance attestation" aria-describedby="financial-assist-testify"/>
-                <span id="financial-assist-testify" class="financial-assist-testify">I testify that the income I reported is true and accurate. I am aware that I may be asked to verify the reported income with documentation.</span>
-              </div>
-              <div class="row submit-row no-gutters justify-content-center">
-                <button type="submit" class="btn btn-primary btn-gradient-red large">Submit request</button>
-              </div>
-            </form>
+      <div class="std-page-body">
+
+        <div class="std-card std-card-finasst">
+          <div class="std-card-body">
+            {{ page.intro|richtext }}
           </div>
         </div>
+        <div class="container auth-page">
+          <div class="std-card std-card-auth">
+            <div class="std-card-body">
+              <h1 class="tell-us-about-your-income">Tell us about your income</h1>
+              <form action="{% pageurl page %}" method="POST">
+                {% csrf_token %}
+                <div class="form-group">
+                  <label for="your_income" id="your_income_label" class="fw-bold">Yearly Income</label>
+                  {%if form.fields.your_income.required %}<span class="required">*</span>{% endif %}
+                  <input type="number" name="your_income" step="any" class="form-control {%if form.your_income.errors %}errored{% endif %}" id="your_income" aria-describedby="your_incomeError" required>
+                  {% for error in form.your_income.errors %}
+                    <div class="form-error" id="your_incomeError" role="alert">{{error}}</div>
+                  {% endfor %}
+                </div>
+                <div class="form-group">
+                  <label for="income_currency" class="label-helptext">
+                    <div class="fw-bold">
+                      Income Currency
+                      {%if form.fields.income_currency.required %}<span class="required">*</span>{% endif %}
+                    </div>
+                    <div class="subtitle">
+                      The currency you’re paid in.
+                    </div>
+                  </label>
+                  
+                  <select name="income_currency" id="income_currency" class="form-control {%if form.income_currency.errors %}errored{% endif %}" aria-describedby="income-currency-subtitle" required>
+                    <option value="">Choose</option>
+                    {% for choice in form.fields.income_currency.choices %}
+                      <option value="{{ choice.0 }}">{{ choice.1 }}</option>
+                    {%  endfor %}
+                  </select>
+                  {% for error in form.income_currency.errors %}
+                    <div class="form-error" id="income_currencyError" role="alert">{{error}}</div>
+                  {% endfor %}
+                </div>
+                <div class="form-group checkbox-long-label">
+                  <input id="" type="checkbox" required aria-label="financial assistance attestation" aria-describedby="financial-assist-testify"/>
+                  <span id="financial-assist-testify" class="financial-assist-testify">I testify that the income I reported is true and accurate. I am aware that I may be asked to verify the reported income with documentation.</span>
+                </div>
+                <div class="row submit-row no-gutters justify-content-center">
+                  <button type="submit" class="btn btn-primary btn-gradient-red large">Submit request</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
       </div>
     {% else %}
       {% if prior_request.is_approved %}{# request status #}
@@ -65,7 +81,7 @@
 
           {% if page.selected_course %}
             {% if product %}{# product and unexpired course run exist #}
-              <form action="/cart/add" method="get" className="text-center">
+              <form action="/cart/add" method="get" class="text-center">
                 <input type="hidden" name="product_id" value={{ product.id }} />
                 <button
                   type="submit"
@@ -99,22 +115,19 @@
     {{ page.guest_text|richtext }}
   {% endif %} {# is logged in #}
   </div>
-
 </div>
-{% endblock %}
 
-{% block scripts %}
-    <script type="text/javascript">
-          $(document).ready(function() {
-                $("#your_income").on("focus", function() {
-                    $(this).on("keydown", function(e) {
-                        //disable up/down keyboard for increment
-                        if (e.keyCode === 38 || e.keyCode === 40) {
-                            e.preventDefault();
-                        }
-                    });
-                });
-
+<script type="text/javascript">
+  $(document).ready(function() {
+        $("#your_income").on("focus", function() {
+            $(this).on("keydown", function(e) {
+                //disable up/down keyboard for increment
+                if (e.keyCode === 38 || e.keyCode === 40) {
+                    e.preventDefault();
+                }
             });
-    </script>
+        });
+
+    });
+</script>
 {% endblock %}
