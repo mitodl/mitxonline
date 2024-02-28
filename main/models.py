@@ -69,7 +69,7 @@ class AuditableModel(Model):
         raise NotImplementedError
 
     @transaction.atomic
-    def save_and_log(self, acting_user, *args, **kwargs):
+    def save_and_log(self, acting_user, modified_by, *args, **kwargs):
         """
         Saves the object and creates an audit object.
 

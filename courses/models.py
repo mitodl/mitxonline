@@ -5,6 +5,7 @@ import logging
 import operator as op
 import uuid
 from decimal import ROUND_HALF_EVEN, Decimal
+from django.db import transaction
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
@@ -1117,6 +1118,31 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
         self.enrollment_mode = mode
         return self.save_and_log(None if no_user else self.user)
 
+    @transaction.atomic
+    def save_and_log(self, acting_user, modified_by, *args, **kwargs):
+        """
+        Saves the object and creates an audit object.
+
+        Args:
+            acting_user (User):
+                The user who made the change to the model. May be None if inapplicable.
+            modified_by (str):
+                The command or task where the update was initiated
+        """
+        before_obj = self.objects_for_audit().filter(id=self.id).first()
+        self.save(*args, **kwargs)
+        self.refresh_from_db()
+        before_dict = None
+        if before_obj is not None:
+            before_dict = before_obj.to_dict()
+
+        audit_kwargs = dict(
+            acting_user=acting_user, modified_by=modified_by, data_before=before_dict, data_after=self.to_dict()
+        )
+        audit_class = self.get_audit_class()
+        audit_kwargs[audit_class.get_related_field_name()] = self
+        audit_class.objects.create(**audit_kwargs)
+
 
 class CourseRunEnrollment(EnrollmentModel):
     """
@@ -1191,6 +1217,9 @@ class CourseRunEnrollmentAudit(AuditModel):
 
     enrollment = models.ForeignKey(
         CourseRunEnrollment, null=True, on_delete=models.CASCADE
+    )
+    modified_by = models.CharField(
+        default="", max_length=30, null=True, blank=True
     )
 
     @classmethod
