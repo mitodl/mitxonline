@@ -1135,7 +1135,7 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
         if before_obj is not None:
             before_dict = before_obj.to_dict()
 
-        call_stack = ''.join(traceback.format_stack()[:5])
+        call_stack = ''.join(traceback.format_stack()[-6:-2])
 
         audit_kwargs = dict(
             acting_user=acting_user, modified_by=call_stack, data_before=before_dict, data_after=self.to_dict()
