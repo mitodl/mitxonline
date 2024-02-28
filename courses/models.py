@@ -3,6 +3,7 @@ Course models
 """
 import logging
 import operator as op
+import traceback
 import uuid
 from decimal import ROUND_HALF_EVEN, Decimal
 from django.db import transaction
@@ -1119,15 +1120,13 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
         return self.save_and_log(None if no_user else self.user)
 
     @transaction.atomic
-    def save_and_log(self, acting_user, modified_by, *args, **kwargs):
+    def save_and_log(self, acting_user, *args, **kwargs):
         """
         Saves the object and creates an audit object.
 
         Args:
             acting_user (User):
                 The user who made the change to the model. May be None if inapplicable.
-            modified_by (str):
-                The command or task where the update was initiated
         """
         before_obj = self.objects_for_audit().filter(id=self.id).first()
         self.save(*args, **kwargs)
@@ -1136,8 +1135,10 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
         if before_obj is not None:
             before_dict = before_obj.to_dict()
 
+        call_stack = ''.join(traceback.format_stack()[:5])
+
         audit_kwargs = dict(
-            acting_user=acting_user, modified_by=modified_by, data_before=before_dict, data_after=self.to_dict()
+            acting_user=acting_user, modified_by=call_stack, data_before=before_dict, data_after=self.to_dict()
         )
         audit_class = self.get_audit_class()
         audit_kwargs[audit_class.get_related_field_name()] = self
@@ -1219,7 +1220,7 @@ class CourseRunEnrollmentAudit(AuditModel):
         CourseRunEnrollment, null=True, on_delete=models.CASCADE
     )
     modified_by = models.CharField(
-        default="", max_length=30, null=True, blank=True
+        default="", max_length=500, null=True, blank=True
     )
 
     @classmethod
