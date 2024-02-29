@@ -1222,7 +1222,6 @@ class CourseRunEnrollmentAudit(AuditModel):
     enrollment = models.ForeignKey(
         CourseRunEnrollment, null=True, on_delete=models.CASCADE
     )
-    modified_by = models.CharField(default="", max_length=1000, null=True, blank=True)
 
     @classmethod
     def get_related_field_name(cls):
