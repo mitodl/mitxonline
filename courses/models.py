@@ -1135,10 +1135,13 @@ class EnrollmentModel(TimestampedModel, AuditableModel):
         if before_obj is not None:
             before_dict = before_obj.to_dict()
 
-        call_stack = ''.join(traceback.format_stack()[-6:-2])
+        call_stack = "".join(traceback.format_stack()[-6:-2])
 
         audit_kwargs = dict(
-            acting_user=acting_user, modified_by=call_stack, data_before=before_dict, data_after=self.to_dict()
+            acting_user=acting_user,
+            modified_by=call_stack,
+            data_before=before_dict,
+            data_after=self.to_dict(),
         )
         audit_class = self.get_audit_class()
         audit_kwargs[audit_class.get_related_field_name()] = self
@@ -1219,9 +1222,7 @@ class CourseRunEnrollmentAudit(AuditModel):
     enrollment = models.ForeignKey(
         CourseRunEnrollment, null=True, on_delete=models.CASCADE
     )
-    modified_by = models.CharField(
-        default="", max_length=500, null=True, blank=True
-    )
+    modified_by = models.CharField(default="", max_length=1000, null=True, blank=True)
 
     @classmethod
     def get_related_field_name(cls):

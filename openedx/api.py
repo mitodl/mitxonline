@@ -799,11 +799,13 @@ def sync_enrollments_with_edx(
         if local_enrollment.active and not edx_enrollment.is_active:
             local_enrollment.deactivate_and_save(
                 change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-                called_from="sync_enrollments_with_edx"
+                called_from="sync_enrollments_with_edx",
             )
             results.deactivated.append(local_enrollment)
         elif not local_enrollment.active and edx_enrollment.is_active:
-            local_enrollment.reactivate_and_save(called_from="sync_enrollments_with_edx")
+            local_enrollment.reactivate_and_save(
+                called_from="sync_enrollments_with_edx"
+            )
             results.reactivated.append(local_enrollment)
     # Create enrollment records for any enrollments that exist in edX but not locally
     if edx_only_ids:
