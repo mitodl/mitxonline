@@ -171,58 +171,62 @@ export class OrderHistory extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${ORDER_HISTORY_DISPLAY_PAGE_TITLE}`}
       >
         <Loader isLoading={isLoading}>
-          <div className="std-page-body cart container">
-            <div className="row">
-              <div className="col-12 d-flex justify-content-between">
-                <h1 className="flex-grow-1">Order History</h1>
-              </div>
-            </div>
-            <div className="d-md-none">
-              <div className="row d-flex p-3 mt-4 bg-light border-bottom border-2 border-dark">
-                {ORDER_HISTORY_COLUMN_TITLES.map((value: string) => (
-                  <div key={value} className="col">
-                    <strong>{value}</strong>
+          <div role="banner" className="std-page-header">
+            <h1>{ORDER_HISTORY_DISPLAY_PAGE_TITLE}</h1>
+          </div>
+          <div className="std-page-body container order-history-page">
+            <div className="std-card">
+              <div className="std-card-body">
+                <div className="d-md-none">
+                  <div className="row d-flex p-3 mt-4 border-bottom border-2 border-dark">
+                    {ORDER_HISTORY_COLUMN_TITLES.map((value: string) => (
+                      <div key={value} className="col">
+                        <strong>{value}</strong>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              {orderHistory && orderHistory.results.length > 0
-                ? orderHistory.results.map(
-                  this.renderMobileOrderCard.bind(this)
-                )
-                : null}
-            </div>
-            <div className="d-none d-md-block">
-              <div className="row">
-                <div className="col-12 d-flex bg-light justify-content-between">
-                  <table title="Order History" className="order-history-table">
-                    <thead className="border-bottom border-2 border-dark">
-                      <tr>{columns}</tr>
-                    </thead>
-                    <tbody>
-                      {orderHistory && orderHistory.results.length > 0
-                        ? orderHistory.results.map(
-                          this.renderOrderCard.bind(this)
-                        )
-                        : null}
-                      <tr className="border-top border-2 border-dark">
-                        <td>
-                          Page {this.offset + 1} of{" "}
-                          {orderHistory
-                            ? Math.ceil(orderHistory.count / 10)
-                            : 0}{" "}
-                          | {orderHistory ? orderHistory.count : "0"} orders
-                          total
-                        </td>
-                        <td />
-                        <td />
-                        <td />
-                        <td className="col text-right">
-                          {this.renderPaginationPrevious()} |{" "}
-                          {this.renderPaginationNext()}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  {orderHistory && orderHistory.results.length > 0
+                    ? orderHistory.results.map(
+                      this.renderMobileOrderCard.bind(this)
+                    )
+                    : null}
+                </div>
+                <div className="d-none d-md-block">
+                  <div className="row">
+                    <div className="col-12 d-flex justify-content-between">
+                      <table title="Order History" className="order-history-table">
+                        <thead className="border-bottom border-2 border-dark">
+                          <tr>{columns}</tr>
+                        </thead>
+                        <tbody>
+                          {orderHistory && orderHistory.results.length > 0
+                            ? orderHistory.results.map(
+                              this.renderOrderCard.bind(this)
+                            )
+                            : null}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td>
+                              Page {this.offset + 1} of{" "}
+                              {orderHistory
+                                ? Math.ceil(orderHistory.count / 10)
+                                : 0}{" "}
+                              | {orderHistory ? orderHistory.count : "0"} orders
+                              total
+                            </td>
+                            <td />
+                            <td />
+                            <td />
+                            <td className="col text-end pagination-controls">
+                              {this.renderPaginationPrevious()} |{" "}
+                              {this.renderPaginationNext()}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

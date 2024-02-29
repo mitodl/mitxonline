@@ -419,7 +419,7 @@ export const AddlProfileFields = ({
       </div>
     </div>
     <div className="form-group small-gap">
-      <label id="occupation-label">
+      <label id="occupation-label" className="fw-bold">
         Are you a{requireAddlFields ? <span className="required">*</span> : ""}
       </label>
       <ErrorMessage
