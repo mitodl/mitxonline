@@ -1,6 +1,7 @@
 """
 Course API Views version 2
 """
+
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 import django_filters
@@ -18,7 +19,9 @@ from courses.serializers.v2.programs import ProgramSerializer
 from courses.serializers.v2.courses import (
     CourseWithCourseRunsSerializer,
 )
-from courses.serializers.v2.departments import DepartmentWithCoursesAndProgramsSerializer
+from courses.serializers.v2.departments import (
+    DepartmentWithCoursesAndProgramsSerializer,
+)
 
 
 class Pagination(PageNumberPagination):
