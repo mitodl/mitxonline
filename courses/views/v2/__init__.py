@@ -18,7 +18,7 @@ from courses.serializers.v2.programs import ProgramSerializer
 from courses.serializers.v2.courses import (
     CourseWithCourseRunsSerializer,
 )
-from courses.serializers.v2.departments import DepartmentWithCountSerializer
+from courses.serializers.v2.departments import DepartmentWithCoursesAndProgramsSerializer
 
 
 class Pagination(PageNumberPagination):
@@ -130,7 +130,7 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for Departments"""
 
-    serializer_class = DepartmentWithCountSerializer
+    serializer_class = DepartmentWithCoursesAndProgramsSerializer
     pagination_class = Pagination
     permission_classes = []
 

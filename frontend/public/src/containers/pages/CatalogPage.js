@@ -224,7 +224,7 @@ export class CatalogPage extends React.Component<Props> {
           ...new Set([
             ALL_DEPARTMENTS,
             ...departments.flatMap(department =>
-              department.courses > 0 ? department.name : []
+              department.course_ids.length > 0 ? department.name : []
             )
           ])
         ]
@@ -233,7 +233,7 @@ export class CatalogPage extends React.Component<Props> {
           ...new Set([
             ALL_DEPARTMENTS,
             ...departments.flatMap(department =>
-              department.programs > 0 ? department.name : []
+              department.program_ids.length > 0 ? department.name : []
             )
           ])
         ]
@@ -311,8 +311,8 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Returns a filtered array of Course Runs which are live, define a start date,
-   * enrollment start date is before the current date and time, and
+   * Returns a filtered array of Course Runs which are live, define a start date
+   * and enrollment start date that is before the current date and time, and
    * enrollment end date is not defined or is after the current date and time.
    * @param {Array<BaseCourseRun>} courseRuns The array of Course Runs apply the filter to.
    */
@@ -379,7 +379,7 @@ export class CatalogPage extends React.Component<Props> {
     } else if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
       return departments.find(
         department => department.name === this.state.selectedDepartment
-      ).courses
+      ).course_ids.length
     }
   }
 
@@ -390,7 +390,7 @@ export class CatalogPage extends React.Component<Props> {
     } else if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
       return departments.find(
         department => department.name === this.state.selectedDepartment
-      ).programs
+      ).program_ids.length
     } else return 0
   }
 
