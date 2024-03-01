@@ -20,10 +20,10 @@ const ApplyCouponForm = ({ onSubmit, couponCode, discounts }: Props) => (
     initialValues={getInitialValues(couponCode, discounts)}
     render={() => (
       <Form>
-        <div className="row g-0">
-          <div className="col-12 mt-4 px-3 py-3 py-md-0">
-            <label htmlFor="couponCode">
-              <span>Coupon code</span>
+        <div className="row g-0 coupon-form">
+          <div className="col-12">
+            <label htmlFor="couponCode" className="fw-bold">
+              Coupon code
             </label>
             <div className="d-flex justify-content-between flex-sm-column flex-md-row">
               <div className="col-sm-6 col-md-8">
@@ -45,7 +45,7 @@ const ApplyCouponForm = ({ onSubmit, couponCode, discounts }: Props) => (
 
               <div className="col-6 col-md-4">
                 <button
-                  className="btn btn-primary btn-red btn-halfsize mx-2 highlight font-weight-normal"
+                  className="btn btn-primary btn-red btn-halfsize mx-2 highlight font-weight-normal w-100"
                   type="submit"
                   aria-label="Apply coupon"
                 >

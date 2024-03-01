@@ -50,7 +50,7 @@ div.std-card {
         align-self: stretch;
         width: auto;
 
-        div, h1, h2, h3, h4, h5, h6, p, a, button, ul, li {
+        div, h1, h2, h3, h4, h5, h6, p, a:not(.btn), button, ul, li {
             color: #000;
             font-size: 14px;
             font-family: Inter;
@@ -236,10 +236,22 @@ div.std-card {
             }
         }
 
-        &.my-account-page {
+        &.my-account-page, &.financial-assistance-page {
             label.label-helptext {
                 margin-bottom: 10px;
             }
+        }
+
+        &.financial-assistance-page {
+            a.btn {
+                margin: 20px 0 0 0;
+                font-family: "Inter", sans-serif;
+                font-size: 20px;
+            }
+        }
+
+        button.flexible-price-certificate-btn {
+            width: auto;
         }
     }
 }

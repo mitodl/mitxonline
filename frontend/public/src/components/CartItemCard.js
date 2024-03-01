@@ -54,17 +54,20 @@ export class CartItemCard extends React.Component<Props> {
 
     return (
       <div
-        className="enrolled-item container card mb-4 rounded-0 flex-grow-1"
+        className="enrolled-item container card"
         key={cardKey}
       >
-        <div className="row d-flex flex-md-columm p-md-3">
-          <div className="img-container">{courseImage}</div>
+        <div className="row flex-grow-1 enrolled-item-info">
+          <div className="col-12 col-md-auto p-0">
+            <div className="img-container">
+              {courseImage}
+            </div>
+          </div>
 
-          <div className="flex-grow-1 d-md-flex flex-column w-50 mx-3">
-            <h5 className="">{title}</h5>
+          <div className="col-12 col-md enrollment-details-container">
+            <h2 className="">{title}</h2>
             <div className="detail">
-              {readableId}
-              <br />
+              {readableId} |{" "}
               {startDateDescription !== null && startDateDescription.active ? (
                 <span>Starts - {startDateDescription.datestr}</span>
               ) : (
