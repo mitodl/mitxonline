@@ -313,7 +313,7 @@ export class CatalogPage extends React.Component<Props> {
   /**
    * Returns a filtered array of Course Runs which are live and:
    * - Have a start_date before the current date and time
-   * - Have an enrollment_start_date that is before the current date and time 
+   * - Have an enrollment_start_date that is before the current date and time
    * - Has an enrollment_end_date that is not defined or is after the current date and time.
    * @param {Array<BaseCourseRun>} courseRuns The array of Course Runs apply the filter to.
    */
