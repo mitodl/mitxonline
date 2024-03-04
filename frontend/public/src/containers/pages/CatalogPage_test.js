@@ -225,7 +225,7 @@ describe("CatalogPage", function() {
             {
               name:        "History",
               course_ids:  [],
-              program_ids: [2, 2, 2, 2, 2]
+              program_ids: [1, 2, 3, 4, 5]
             },
             {
               name:        "Science",
