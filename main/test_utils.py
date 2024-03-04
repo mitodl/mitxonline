@@ -1,5 +1,5 @@
 """Testing utils"""
-import abc
+
 import csv
 import json
 import logging
@@ -7,7 +7,6 @@ import tempfile
 import traceback
 from collections import Counter
 from contextlib import contextmanager
-from unittest.mock import Mock
 
 import pytest
 from deepdiff import DeepDiff

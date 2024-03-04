@@ -223,14 +223,14 @@ describe("CatalogPage", function() {
           },
           departments: [
             {
-              name:     "History",
-              courses:  0,
-              programs: 5
+              name:        "History",
+              course_ids:  [],
+              program_ids: [1, 2, 3, 4, 5]
             },
             {
-              name:     "Science",
-              courses:  1,
-              programs: 0
+              name:        "Science",
+              course_ids:  [2],
+              program_ids: []
             }
           ]
         }
@@ -262,24 +262,24 @@ describe("CatalogPage", function() {
         entities: {
           departments: [
             {
-              name:     "department1",
-              courses:  1,
-              programs: 0
+              name:        "department1",
+              course_ids:  [1],
+              program_ids: []
             },
             {
-              name:     "department2",
-              courses:  1,
-              programs: 1
+              name:        "department2",
+              course_ids:  [1],
+              program_ids: [1]
             },
             {
-              name:     "department3",
-              courses:  0,
-              programs: 1
+              name:        "department3",
+              course_ids:  [],
+              program_ids: [1]
             },
             {
-              name:     "department4",
-              courses:  0,
-              programs: 0
+              name:        "department4",
+              course_ids:  [],
+              program_ids: []
             }
           ]
         }
@@ -522,19 +522,19 @@ describe("CatalogPage", function() {
           },
           departments: [
             {
-              name:     "History",
-              courses:  2,
-              programs: 1
+              name:        "History",
+              course_ids:  [1, 2],
+              program_ids: [1]
             },
             {
-              name:     "Math",
-              courses:  3,
-              programs: 0
+              name:        "Math",
+              course_ids:  [1, 2, 3],
+              program_ids: []
             },
             {
-              name:     "department4",
-              courses:  0,
-              programs: 0
+              name:        "department4",
+              course_ids:  [],
+              program_ids: []
             }
           ]
         }
@@ -799,9 +799,9 @@ describe("CatalogPage", function() {
           },
           departments: [
             {
-              name:     "History",
-              courses:  1,
-              programs: 1
+              name:        "History",
+              course_ids:  [1],
+              program_ids: [1]
             }
           ]
         }
