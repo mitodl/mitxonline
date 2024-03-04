@@ -37,22 +37,23 @@ const passwordResetText = (email: string) => (
 
 const getCustomerSupportLayout = (isError: boolean) => {
   return (
-    <div className="contact-support">
-      {isError ? (
-        <h3 className="error-label">
+    <div>
+      <p>
+        {isError ? (
+          <h3 className="error-label">
           Sorry, there was an error sending the email.
-        </h3>
-      ) : (
-        <>
-          <hr />
-          <b>Still no password reset email? </b>
-        </>
-      )}
-      Please {isError ? "try again or" : ""} contact our{" "}
-      {` ${SETTINGS.site_name} `}
-      <a href={`mailto:${SETTINGS.support_email}`}>Customer Support Center.</a>
-      <br />
-      <br />
+          </h3>
+        ) : (
+          <>
+            <b>Still no password reset email? </b>
+          </>
+        )}
+        <br />
+          Please contact our {` ${SETTINGS.site_name} `}
+        <a href={`mailto:${SETTINGS.support_email}`}>
+            Customer Support Center.
+        </a>
+      </p>
     </div>
   )
 }
@@ -93,7 +94,7 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
   render() {
     const titleText = this.state.forgotEmailSent
       ? "Forgot Password"
-      : "Password reset!"
+      : "Password Reset"
 
     return (
       <DocumentTitle
@@ -111,12 +112,14 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
               ) : this.state.forgotEmailSent ? (
                 <React.Fragment>
                   {this.state.text}
-                  <p>
-                    <b>
-                      If you do NOT receive your password reset email, here's
-                      what to do:
-                    </b>
-                  </p>
+                  <div>
+                    <p>
+                      <b>
+                        If you do NOT receive your password reset email, here's
+                        what to do:
+                      </b>
+                    </p>
+                  </div>
                   <ul>
                     <li>
                       <b>Wait a few moments.</b> It might take several minutes

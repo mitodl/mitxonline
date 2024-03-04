@@ -88,10 +88,10 @@ export class LoginForgotPasswordConfirmPage extends React.Component<Props> {
         <div className="std-page-body container auth-page">
           <div className="std-card std-card-auth">
             <div className="std-card-body">
-              <h1>Password Reset!</h1>
+              <h1>Password Reset</h1>
               <p>Enter a new password for your account.</p>
+              <ResetPasswordForm onSubmit={this.onSubmit.bind(this)} />
             </div>
-            <ResetPasswordForm onSubmit={this.onSubmit.bind(this)} />
           </div>
         </div>
       </DocumentTitle>
