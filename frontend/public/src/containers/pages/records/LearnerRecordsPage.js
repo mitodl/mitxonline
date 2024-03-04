@@ -97,19 +97,13 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
           </div>
         </td>
         <td className="learner-record-table-course-id">
-          <div>
-            {course.readable_id.split("+")[1] || course.readable_id}
-          </div>
+          <div>{course.readable_id.split("+")[1] || course.readable_id}</div>
         </td>
         <td className="learner-record-table-highest-grade">
-          <div>
-            {course.grade ? course.grade.grade_percent : ""}
-          </div>
+          <div>{course.grade ? course.grade.grade_percent : ""}</div>
         </td>
         <td className="learner-record-table-grade">
-          <div>
-            {course.grade ? course.grade.letter_grade : ""}
-          </div>
+          <div>{course.grade ? course.grade.letter_grade : ""}</div>
         </td>
         <td className="learner-record-cert-status learner-record-table-status">
           <div>
@@ -161,15 +155,12 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
     const { learnerRecord } = this.props
     // Only display the leaner info if the current user is different from the leanerRecord's user
     // or the visitor is not logged in.
-    return learnerRecord &&
-      learnerRecord.user ? (
-        <div className="learner-record-user-profile">
-          <h2 className="learner-record-user-name">
-            {learnerRecord.user.name}
-          </h2>
-          {learnerRecord.user.username} | {learnerRecord.user.email}
-        </div>
-      ) : null
+    return learnerRecord && learnerRecord.user ? (
+      <div className="learner-record-user-profile">
+        <h2 className="learner-record-user-name">{learnerRecord.user.name}</h2>
+        {learnerRecord.user.username} | {learnerRecord.user.email}
+      </div>
+    ) : null
   }
 
   renderSharingLinkDialog(learnerRecord: LearnerRecord) {
@@ -550,20 +541,31 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                 <table className="learner-record-table">
                   <thead>
                     <tr>
-                      <th scope="col" className="learner-record-table-course-name">
+                      <th
+                        scope="col"
+                        className="learner-record-table-course-name"
+                      >
                         <div>Course Name</div>
                       </th>
-                      <th scope="col" className="learner-record-table-course-id"><div>Course ID</div></th>
+                      <th
+                        scope="col"
+                        className="learner-record-table-course-id"
+                      >
+                        <div>Course ID</div>
+                      </th>
                       <th className="learner-record-table-highest-grade">
-                        <div>Highest
-                        Grade
-                        <br />
-                        Earned</div>
+                        <div>
+                          Highest Grade
+                          <br />
+                          Earned
+                        </div>
                       </th>
                       <th className="learner-record-table-grade">
                         <div>Letter Grade</div>
                       </th>
-                      <th className="learner-record-table-status"><div>Status</div></th>
+                      <th className="learner-record-table-status">
+                        <div>Status</div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -620,9 +622,11 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                             key="sendlearnerrecord"
                             className="btn btn-primary"
                             type="button"
-                            onClick={() => this.togglePartnerSchoolSharingDialog()}
+                            onClick={() =>
+                              this.togglePartnerSchoolSharingDialog()
+                            }
                           >
-                              Send Learner Record
+                            Send Learner Record
                           </button>
                           <button
                             key="sharingdialog"
@@ -630,7 +634,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                             type="button"
                             onClick={() => this.toggleSharingLinkDialog()}
                           >
-                              Share
+                            Share
                           </button>
                           <button
                             key="revokesharing"
@@ -656,7 +660,9 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                 {learnerRecord
                   ? this.renderPartnerSchoolSharingDialog(learnerRecord)
                   : null}
-                {learnerRecord ? this.renderSharingLinkDialog(learnerRecord) : null}
+                {learnerRecord
+                  ? this.renderSharingLinkDialog(learnerRecord)
+                  : null}
               </div>
             </div>
           </div>

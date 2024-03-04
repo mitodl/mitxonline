@@ -178,9 +178,7 @@ export class CartPage extends React.Component<Props, CartState> {
               </div>
               <div className="col-lg-4 summary-cards">
                 <div className="d-md-flex cart-helptext">
-                  <div>
-                    {this.renderFinancialAssistanceOffer()}
-                  </div>
+                  <div>{this.renderFinancialAssistanceOffer()}</div>
                   <div className="text-right ms-auto">
                     <a
                       href="https://mitxonline.zendesk.com/hc/en-us"
@@ -192,7 +190,6 @@ export class CartPage extends React.Component<Props, CartState> {
                   </div>
                 </div>
                 {this.renderOrderSummaryCard()}
-
               </div>
             </div>
           </div>

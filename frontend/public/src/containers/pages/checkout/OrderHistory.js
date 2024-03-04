@@ -194,7 +194,10 @@ export class OrderHistory extends React.Component<Props> {
                 <div className="d-none d-md-block">
                   <div className="row">
                     <div className="col-12 d-flex justify-content-between">
-                      <table title="Order History" className="order-history-table">
+                      <table
+                        title="Order History"
+                        className="order-history-table"
+                      >
                         <thead className="border-bottom border-2 border-dark">
                           <tr>{columns}</tr>
                         </thead>

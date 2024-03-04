@@ -53,15 +53,10 @@ export class CartItemCard extends React.Component<Props> {
     const cardKey = `cartsummarycard_${product.id}`
 
     return (
-      <div
-        className="enrolled-item container card"
-        key={cardKey}
-      >
+      <div className="enrolled-item container card" key={cardKey}>
         <div className="row flex-grow-1 enrolled-item-info">
           <div className="col-12 col-md-auto p-0">
-            <div className="img-container">
-              {courseImage}
-            </div>
+            <div className="img-container">{courseImage}</div>
           </div>
 
           <div className="col-12 col-md enrollment-details-container">

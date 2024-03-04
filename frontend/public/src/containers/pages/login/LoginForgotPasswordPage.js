@@ -41,7 +41,7 @@ const getCustomerSupportLayout = (isError: boolean) => {
       <p>
         {isError ? (
           <h3 className="error-label">
-          Sorry, there was an error sending the email.
+            Sorry, there was an error sending the email.
           </h3>
         ) : (
           <>
@@ -49,9 +49,9 @@ const getCustomerSupportLayout = (isError: boolean) => {
           </>
         )}
         <br />
-          Please contact our {` ${SETTINGS.site_name} `}
+        Please contact our {` ${SETTINGS.site_name} `}
         <a href={`mailto:${SETTINGS.support_email}`}>
-            Customer Support Center.
+          Customer Support Center.
         </a>
       </p>
     </div>
