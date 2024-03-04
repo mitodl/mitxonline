@@ -169,7 +169,7 @@ export const DISCOUNT_TYPE_FIXED_PRICE = "fixed-price"
 export const DISCOUNT_TYPE_DOLLARS_OFF = "dollars-off"
 export const DISCOUNT_TYPE_PERCENT_OFF = "percent-off"
 
-export const RECORDS_PAGE_TITLE = "MITx Online Program Record"
+export const RECORDS_PAGE_TITLE = "Program Record"
 
 /* Program Requirements constants */
 export const NODETYPE_ROOT = "program_root"
