@@ -78,7 +78,10 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
                   <b>Still no verification email? </b>
                   <br />
                   Please contact our {` ${SETTINGS.site_name} `}
-                  <a href={`mailto:${SETTINGS.support_email}`}>
+                  <a
+                    className="support-email"
+                    href={`mailto:${SETTINGS.support_email}`}
+                  >
                     Customer Support Center.
                   </a>
                 </p>

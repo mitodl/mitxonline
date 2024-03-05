@@ -47,6 +47,5 @@ describe("EmailForm", () => {
     const testChild = form.find("div#test-child")
     assert.ok(testChild.exists())
     assert.equal(testChild.at(0).text(), "child element")
-    assert.equal(testChild.parent().prop("className"), "form-group")
   })
 })

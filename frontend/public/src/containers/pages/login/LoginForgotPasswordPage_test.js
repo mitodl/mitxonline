@@ -82,7 +82,7 @@ describe("LoginForgotPasswordPage", () => {
     const onSubmit = inner.find("EmailForm").prop("onSubmit")
     await onSubmit({ email }, { setSubmitting: setSubmittingStub })
     assert.equal(
-      inner.find(".contact-support > a").prop("href"),
+      inner.find("a.support-email").prop("href"),
       `mailto:${supportEmail}`
     )
   })

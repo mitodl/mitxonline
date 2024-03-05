@@ -50,7 +50,7 @@ const getCustomerSupportLayout = (isError: boolean) => {
         )}
         <br />
         Please contact our {` ${SETTINGS.site_name} `}
-        <a href={`mailto:${SETTINGS.support_email}`}>
+        <a className="support-email" href={`mailto:${SETTINGS.support_email}`}>
           Customer Support Center.
         </a>
       </p>

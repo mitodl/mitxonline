@@ -39,7 +39,7 @@ describe("RegisterConfirmSentPage", () => {
   it("displays a link to email support", async () => {
     const { inner } = await renderPage()
     assert.equal(
-      inner.find(".contact-support > a").prop("href"),
+      inner.find("a.support-email").prop("href"),
       `mailto:${supportEmail}`
     )
   })
@@ -57,6 +57,6 @@ describe("RegisterConfirmSentPage", () => {
 
   it("displays user's email on the page", async () => {
     const { inner } = await renderPage()
-    assert.include(inner.find(".auth-card").text(), userEmail)
+    assert.include(inner.find(".std-card-body").text(), userEmail)
   })
 })

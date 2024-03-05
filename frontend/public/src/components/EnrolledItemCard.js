@@ -425,7 +425,10 @@ export class EnrolledItemCard extends React.Component<
     const financialAssistanceLink =
       isFinancialAssistanceAvailable(enrollment.run) &&
       !enrollment.approved_flexible_price_exists ? (
-          <a href={enrollment.run.course.page.financial_assistance_form_url}>
+          <a
+            className="finaid-link"
+            href={enrollment.run.course.page.financial_assistance_form_url}
+          >
           Financial assistance?
           </a>
         ) : null
