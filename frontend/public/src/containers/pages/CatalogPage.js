@@ -71,7 +71,8 @@ export class CatalogPage extends React.Component<Props> {
     items_per_row:              3,
     courseQueryPage:            1,
     programQueryPage:           1,
-    isLoadingMoreItems:         false
+    isLoadingMoreItems:         false,
+    queryIDList:                [],
   }
 
   constructor(props) {
@@ -157,13 +158,30 @@ export class CatalogPage extends React.Component<Props> {
    * Updates the filteredDepartments state variable once departmentsIsLoading
    * is false.
    */
-  componentDidUpdate = () => {
+  componentDidUpdate = prevState => {
     const {
       courses,
       coursesIsLoading,
       programsIsLoading,
-      programs
+      programs,
+      departments,
+      departmentsIsLoading,
     } = this.props
+    console.log(prevState.selectedDepartment, this.state.selectedDepartment)
+    if ((prevState.selectedDepartment !== this.state.selectedDepartment) && (this.state.selectedDepartment != ALL_DEPARTMENTS)) {
+      if (!departmentsIsLoading && departments.length > 0) {
+        const newDepartment = departments.find(
+          department => department.name === this.state.selectedDepartment
+        )
+        if (this.state.tabSelected === COURSES_TAB) {
+          this.setState({courseQueryPage: 1})
+          this.setState({queryIDList: newDepartment.course_ids})
+        } else {
+          this.setState({programQueryPage: 1})
+          this.setState({queryIDList: newDepartment.program_ids})
+        }
+      }
+    }
     if (!coursesIsLoading && !this.state.filterCoursesCalled) {
       this.setState({ filterCoursesCalled: true })
       this.setState({ allCoursesRetrieved: courses })
@@ -670,9 +688,9 @@ const courseLoaderGrid = (
   </div>
 )
 
-const getNextCoursePage = page =>
+const getNextCoursePage = (page, ids) =>
   requestAsync({
-    ...coursesQuery(page),
+    ...coursesQuery(page, ids),
     force: true
   })
 
