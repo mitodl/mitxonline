@@ -168,17 +168,27 @@ export class CatalogPage extends React.Component<Props> {
       departmentsIsLoading,
     } = this.props
     console.log(prevState.selectedDepartment, this.state.selectedDepartment)
-    if ((prevState.selectedDepartment !== this.state.selectedDepartment) && (this.state.selectedDepartment != ALL_DEPARTMENTS)) {
-      if (!departmentsIsLoading && departments.length > 0) {
-        const newDepartment = departments.find(
-          department => department.name === this.state.selectedDepartment
-        )
-        if (this.state.tabSelected === COURSES_TAB) {
+    if (prevState.selectedDepartment !== this.state.selectedDepartment) {
+      if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
+        if (this.state.tabSelected === COURSES_TAB && this.state.queryIDList.length > 0) {
           this.setState({courseQueryPage: 1})
-          this.setState({queryIDList: newDepartment.course_ids})
-        } else {
+          this.setState({queryIDList: []})
+        } else if (this.state.tabSelected === PROGRAMS_TAB && this.state.queryIDList.length > 0) {
           this.setState({programQueryPage: 1})
-          this.setState({queryIDList: newDepartment.program_ids})
+          this.setState({queryIDList: []})
+        }
+      } else {
+        if (!departmentsIsLoading && departments.length > 0) {
+          const newDepartment = departments.find(
+            department => department.name === this.state.selectedDepartment
+          )
+          if (this.state.tabSelected === COURSES_TAB) {
+            this.setState({courseQueryPage: 1})
+            this.setState({queryIDList: newDepartment.course_ids})
+          } else {
+            this.setState({programQueryPage: 1})
+            this.setState({queryIDList: newDepartment.program_ids})
+          }
         }
       }
     }
