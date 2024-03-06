@@ -102,6 +102,7 @@ export class CatalogPage extends React.Component<Props> {
     if (entry.isIntersecting) {
       if (this.state.tabSelected === COURSES_TAB) {
         const { getNextCoursePage, coursesNextPage } = this.props
+        console.log(coursesNextPage)
         // Only request the next page if a next page exists (coursesNextPage)
         // and if we aren't already requesting the next page (isLoadingMoreItems).
         if (coursesNextPage && !this.state.isLoadingMoreItems) {

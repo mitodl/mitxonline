@@ -18,9 +18,12 @@ export const coursesNextPageSelector = pathOr(null, [
 
 export const coursesQueryKey = "courses"
 
-export const coursesQuery = page => ({
+export const coursesQuery = (page, ids) => ({
   queryKey:  coursesQueryKey,
-  url:       `/api/v2/courses/?page=${page}&live=true&page__live=true&courserun_is_enrollable=true`,
+  url:
+    ids.length > 0
+      ? `/api/v2/courses/?page=${page}&live=true&page__live=true&courserun_is_enrollable=true&id=${ids}`
+      : `/api/v2/courses/?page=${page}&live=true&page__live=true&courserun_is_enrollable=true`,
   transform: json => ({
     courses: json
   }),
