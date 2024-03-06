@@ -72,7 +72,7 @@ export class CatalogPage extends React.Component<Props> {
     courseQueryPage:            1,
     programQueryPage:           1,
     isLoadingMoreItems:         false,
-    queryIDListString:          "",
+    queryIDListString:          ""
   }
 
   constructor(props) {
@@ -107,7 +107,10 @@ export class CatalogPage extends React.Component<Props> {
         if (coursesNextPage && !this.state.isLoadingMoreItems) {
           this.setState({ isLoadingMoreItems: true })
           this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
-          const response = await getNextCoursePage(this.state.courseQueryPage, this.state.queryIDListString)
+          const response = await getNextCoursePage(
+            this.state.courseQueryPage,
+            this.state.queryIDListString
+          )
           this.setState({ isLoadingMoreItems: false })
           if (response.body.results) {
             const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
@@ -165,10 +168,10 @@ export class CatalogPage extends React.Component<Props> {
       programsIsLoading,
       programs,
       departments,
-      departmentsIsLoading,
+      departmentsIsLoading
     } = this.props
     if (!departmentsIsLoading && !this.state.filterDepartmentsCalled) {
-      this.setState({filterDepartmentsCalled: true})
+      this.setState({ filterDepartmentsCalled: true })
       this.setState({
         filteredDepartments: this.filterDepartmentsByTabName(
           this.state.tabSelected
@@ -177,13 +180,13 @@ export class CatalogPage extends React.Component<Props> {
     }
     if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
       if (this.state.queryIDListString.length > 0) {
-        this.setState({courseQueryPage: 1})
-        this.setState({programQueryPage: 1})
-        this.setState({queryIDListString: ""})
+        this.setState({ courseQueryPage: 1 })
+        this.setState({ programQueryPage: 1 })
+        this.setState({ queryIDListString: "" })
       }
       this.io = new window.IntersectionObserver(
         this.bottomOfLoadedCatalogCallback,
-        {threshold: 1.0}
+        { threshold: 1.0 }
       )
       this.io.observe(this.container.current)
     } else if (!departmentsIsLoading && departments.length > 0) {
@@ -191,30 +194,30 @@ export class CatalogPage extends React.Component<Props> {
         department => department.name === this.state.selectedDepartment
       )
       if (!coursesIsLoading && !this.state.filterCoursesCalled) {
-        this.setState({filterCoursesCalled: true})
-        this.setState({allCoursesRetrieved: courses})
+        this.setState({ filterCoursesCalled: true })
+        this.setState({ allCoursesRetrieved: courses })
         const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
           this.state.selectedDepartment,
           courses
         )
-        this.setState({filteredCourses: filteredCourses})
+        this.setState({ filteredCourses: filteredCourses })
         // If the number of courses is equal to the number of expected courses on filter, no need to grab more data
         if (filteredCourses.length !== newDepartment.course_ids.length) {
           const remainingIDs = newDepartment.course_ids.filter(
             id => !this.state.queryIDListString.includes(id)
           )
-          this.setState({courseQueryPage: 1})
-          this.setState({queryIDListString: remainingIDs.toString()})
+          this.setState({ courseQueryPage: 1 })
+          this.setState({ queryIDListString: remainingIDs.toString() })
         }
         this.io = new window.IntersectionObserver(
           this.bottomOfLoadedCatalogCallback,
-          {threshold: 1.0}
+          { threshold: 1.0 }
         )
         this.io.observe(this.container.current)
       }
       if (!programsIsLoading && !this.state.filterProgramsCalled) {
-        this.setState({filterProgramsCalled: true})
-        this.setState({allProgramsRetrieved: programs})
+        this.setState({ filterProgramsCalled: true })
+        this.setState({ allProgramsRetrieved: programs })
         const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
           this.state.selectedDepartment,
           programs
@@ -226,13 +229,13 @@ export class CatalogPage extends React.Component<Props> {
           const remainingIDs = newDepartment.program_ids.filter(
             id => !this.state.queryIDListString.includes(id)
           )
-          this.setState({programQueryPage: 1})
-          this.setState({queryIDListString: remainingIDs.toString()})
+          this.setState({ programQueryPage: 1 })
+          this.setState({ queryIDListString: remainingIDs.toString() })
         }
         // Detect when the bottom of the catalog page has been reached and display more catalog items.
         this.io = new window.IntersectionObserver(
           this.bottomOfLoadedCatalogCallback,
-          {threshold: 1.0}
+          { threshold: 1.0 }
         )
         this.io.observe(this.container.current)
       }
