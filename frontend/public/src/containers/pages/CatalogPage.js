@@ -179,13 +179,6 @@ export class CatalogPage extends React.Component<Props> {
         )
       })
     }
-    if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
-      const newDepartment = departments.find(
-        department => department.name === this.state.selectedDepartment
-      )
-    } else {
-      const newDepartment = undefined
-    }
     if (!departmentsIsLoading && departments.length > 0) {
       if (!coursesIsLoading && !this.state.filterCoursesCalled) {
         this.setState({filterCoursesCalled: true})
@@ -197,12 +190,17 @@ export class CatalogPage extends React.Component<Props> {
         this.setState({filteredCourses: filteredCourses})
         if (this.state.selectedDepartment !== ALL_DEPARTMENTS && this.state.selectedDepartment !== "") {
           // If the number of courses is equal to the number of expected courses on filter, no need to grab more data
-          if (filteredCourses.length !== newDepartment.course_ids.length) {
-            const remainingIDs = newDepartment.course_ids.filter(
-              id => !this.state.queryIDListString.includes(id)
+          if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
+            const newDepartment = departments.find(
+              department => department.name === this.state.selectedDepartment
             )
-            this.setState({courseQueryPage: 0})
-            this.setState({queryIDListString: remainingIDs.toString()})
+            if (filteredCourses.length !== newDepartment.course_ids.length) {
+              const remainingIDs = newDepartment.course_ids.filter(
+                id => !this.state.queryIDListString.includes(id)
+              )
+              this.setState({courseQueryPage: 0})
+              this.setState({queryIDListString: remainingIDs.toString()})
+            }
           }
         }
         this.io = new window.IntersectionObserver(
@@ -222,6 +220,9 @@ export class CatalogPage extends React.Component<Props> {
           filteredPrograms: filteredPrograms
         })
         if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
+          const newDepartment = departments.find(
+            department => department.name === this.state.selectedDepartment
+          )
           if (filteredPrograms.length !== newDepartment.program_ids.length) {
             const remainingIDs = newDepartment.program_ids.filter(
               id => !this.state.queryIDListString.includes(id)
