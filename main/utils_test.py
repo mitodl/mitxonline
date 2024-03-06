@@ -25,6 +25,7 @@ def test_get_field_names():
         "acting_user",
         "created_on",
         "updated_on",
+        "call_stack",
     }
 
 
