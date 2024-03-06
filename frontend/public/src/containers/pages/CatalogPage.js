@@ -72,7 +72,7 @@ export class CatalogPage extends React.Component<Props> {
     courseQueryPage:            1,
     programQueryPage:           1,
     isLoadingMoreItems:         false,
-    queryIDList:                [],
+    queryIDListString:          "",
   }
 
   constructor(props) {
@@ -102,13 +102,12 @@ export class CatalogPage extends React.Component<Props> {
     if (entry.isIntersecting) {
       if (this.state.tabSelected === COURSES_TAB) {
         const { getNextCoursePage, coursesNextPage } = this.props
-
         // Only request the next page if a next page exists (coursesNextPage)
         // and if we aren't already requesting the next page (isLoadingMoreItems).
         if (coursesNextPage && !this.state.isLoadingMoreItems) {
           this.setState({ isLoadingMoreItems: true })
           this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
-          const response = await getNextCoursePage(this.state.courseQueryPage)
+          const response = await getNextCoursePage(this.state.courseQueryPage, this.state.queryIDListString)
           this.setState({ isLoadingMoreItems: false })
           if (response.body.results) {
             const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
@@ -129,7 +128,8 @@ export class CatalogPage extends React.Component<Props> {
         if (programsNextPage && !this.state.isLoadingMoreItems) {
           this.setState({ isLoadingMoreItems: true })
           const response = await getNextProgramPage(
-            this.state.programQueryPage + 1
+            this.state.programQueryPage + 1,
+            this.state.queryIDListString
           )
           this.setState({ isLoadingMoreItems: false })
           this.setState({ programQueryPage: this.state.programQueryPage + 1 })
@@ -158,7 +158,7 @@ export class CatalogPage extends React.Component<Props> {
    * Updates the filteredDepartments state variable once departmentsIsLoading
    * is false.
    */
-  componentDidUpdate = prevState => {
+  componentDidUpdate = () => {
     const {
       courses,
       coursesIsLoading,
@@ -167,75 +167,75 @@ export class CatalogPage extends React.Component<Props> {
       departments,
       departmentsIsLoading,
     } = this.props
-    console.log(prevState.selectedDepartment, this.state.selectedDepartment)
-    if (prevState.selectedDepartment !== this.state.selectedDepartment) {
-      if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
-        if (this.state.tabSelected === COURSES_TAB && this.state.queryIDList.length > 0) {
-          this.setState({courseQueryPage: 1})
-          this.setState({queryIDList: []})
-        } else if (this.state.tabSelected === PROGRAMS_TAB && this.state.queryIDList.length > 0) {
-          this.setState({programQueryPage: 1})
-          this.setState({queryIDList: []})
-        }
-      } else {
-        if (!departmentsIsLoading && departments.length > 0) {
-          const newDepartment = departments.find(
-            department => department.name === this.state.selectedDepartment
-          )
-          if (this.state.tabSelected === COURSES_TAB) {
-            this.setState({courseQueryPage: 1})
-            this.setState({queryIDList: newDepartment.course_ids})
-          } else {
-            this.setState({programQueryPage: 1})
-            this.setState({queryIDList: newDepartment.program_ids})
-          }
-        }
-      }
-    }
-    if (!coursesIsLoading && !this.state.filterCoursesCalled) {
-      this.setState({ filterCoursesCalled: true })
-      this.setState({ allCoursesRetrieved: courses })
-      const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
-        this.state.selectedDepartment,
-        courses
-      )
-      this.setState({ filteredCourses: filteredCourses })
-
-      // Detect when the bottom of the catalog page has been reached and display more catalog items.
-      this.io = new window.IntersectionObserver(
-        this.bottomOfLoadedCatalogCallback,
-        { threshold: 1.0 }
-      )
-      this.io.observe(this.container.current)
-    }
-
-    if (
-      !this.props.departmentsIsLoading &&
-      !this.state.filterDepartmentsCalled
-    ) {
-      this.setState({ filterDepartmentsCalled: true })
+    if (!departmentsIsLoading && !this.state.filterDepartmentsCalled) {
+      this.setState({filterDepartmentsCalled: true})
       this.setState({
         filteredDepartments: this.filterDepartmentsByTabName(
           this.state.tabSelected
         )
       })
     }
-    if (!programsIsLoading && !this.state.filterProgramsCalled) {
-      this.setState({ filterProgramsCalled: true })
-      this.setState({ allProgramsRetrieved: programs })
-      const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
-        this.state.selectedDepartment,
-        programs
-      )
-      this.setState({
-        filteredPrograms: filteredPrograms
-      })
-      // Detect when the bottom of the catalog page has been reached and display more catalog items.
+    if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
+      if (this.state.queryIDListString.length > 0) {
+        this.setState({courseQueryPage: 1})
+        this.setState({programQueryPage: 1})
+        this.setState({queryIDListString: ""})
+      }
       this.io = new window.IntersectionObserver(
         this.bottomOfLoadedCatalogCallback,
-        { threshold: 1.0 }
+        {threshold: 1.0}
       )
       this.io.observe(this.container.current)
+    } else if (!departmentsIsLoading && departments.length > 0) {
+      const newDepartment = departments.find(
+        department => department.name === this.state.selectedDepartment
+      )
+      if (!coursesIsLoading && !this.state.filterCoursesCalled) {
+        this.setState({filterCoursesCalled: true})
+        this.setState({allCoursesRetrieved: courses})
+        const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+          this.state.selectedDepartment,
+          courses
+        )
+        this.setState({filteredCourses: filteredCourses})
+        // If the number of courses is equal to the number of expected courses on filter, no need to grab more data
+        if (filteredCourses.length !== newDepartment.course_ids.length) {
+          const remainingIDs = newDepartment.course_ids.filter(
+            id => !this.state.queryIDListString.includes(id)
+          )
+          this.setState({courseQueryPage: 1})
+          this.setState({queryIDListString: remainingIDs.toString()})
+        }
+        this.io = new window.IntersectionObserver(
+          this.bottomOfLoadedCatalogCallback,
+          {threshold: 1.0}
+        )
+        this.io.observe(this.container.current)
+      }
+      if (!programsIsLoading && !this.state.filterProgramsCalled) {
+        this.setState({filterProgramsCalled: true})
+        this.setState({allProgramsRetrieved: programs})
+        const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
+          this.state.selectedDepartment,
+          programs
+        )
+        this.setState({
+          filteredPrograms: filteredPrograms
+        })
+        if (filteredPrograms.length !== newDepartment.program_ids.length) {
+          const remainingIDs = newDepartment.program_ids.filter(
+            id => !this.state.queryIDListString.includes(id)
+          )
+          this.setState({programQueryPage: 1})
+          this.setState({queryIDListString: remainingIDs.toString()})
+        }
+        // Detect when the bottom of the catalog page has been reached and display more catalog items.
+        this.io = new window.IntersectionObserver(
+          this.bottomOfLoadedCatalogCallback,
+          {threshold: 1.0}
+        )
+        this.io.observe(this.container.current)
+      }
     }
   }
 
@@ -704,16 +704,16 @@ const getNextCoursePage = (page, ids) =>
     force: true
   })
 
-const getNextProgramPage = page =>
+const getNextProgramPage = (page, ids) =>
   requestAsync({
-    ...programsQuery(page),
+    ...programsQuery(page, ids),
     force: true
   })
 
 const mapPropsToConfig = () => [
-  coursesQuery(1),
-  programsQuery(1),
-  departmentsQuery(1)
+  coursesQuery(1, ""),
+  programsQuery(1, ""),
+  departmentsQuery(1, "")
 ]
 
 const mapDispatchToProps = {
