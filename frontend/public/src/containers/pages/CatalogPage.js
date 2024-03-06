@@ -324,17 +324,16 @@ export class CatalogPage extends React.Component<Props> {
    * @param {string} selectedDepartment The department name to set selectedDepartment to and filter courses by.
    */
   changeSelectedDepartment = (selectedDepartment: string) => {
+    const {departments} = this.props
     if (selectedDepartment === ALL_DEPARTMENTS) {
       this.setState({courseQueryPage: 1})
       this.setState({programQueryPage: 1})
       this.setState({queryIDListString: ""})
     }
     this.setState({ selectedDepartment: selectedDepartment })
+    const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(selectedDepartment, this.state.allCoursesRetrieved)
     this.setState({
-      filteredCourses: this.filteredCoursesBasedOnCourseRunCriteria(
-        selectedDepartment,
-        this.state.allCoursesRetrieved
-      )
+      filteredCourses: filteredCourses
     })
     this.setState({
       filteredPrograms: this.filteredProgramsByDepartmentAndCriteria(
@@ -343,6 +342,17 @@ export class CatalogPage extends React.Component<Props> {
       )
     })
     this.toggleMobileFilterWindowExpanded(false)
+    const newDepartment = departments.find(
+      department => department.name === this.state.selectedDepartment
+    )
+    if (filteredCourses.length !== newDepartment.course_ids.length) {
+      const remainingIDs = newDepartment.course_ids.filter(
+        id => !this.state.queryIDListString.includes(id)
+      )
+      this.setState({courseQueryPage: 0})
+      this.setState({queryIDListString: remainingIDs.toString()})
+      getNextCoursePage(this.state.courseQueryPage, this.state.queryIDListString)
+    }
   }
 
   /**
