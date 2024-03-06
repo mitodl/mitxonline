@@ -1,6 +1,8 @@
 """
 Common model classes
 """
+import traceback
+
 from django.conf import settings
 from django.db import transaction
 from django.db.models import (
@@ -19,7 +21,7 @@ class AuditModel(TimestampedModel):
     """An abstract base class for audit models"""
 
     acting_user = ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=CASCADE)
-    modified_by = CharField(default="", max_length=750, null=True, blank=True)
+    call_stack = CharField(default="", max_length=750, null=True, blank=True)
     data_before = JSONField(blank=True, null=True)
     data_after = JSONField(blank=True, null=True)
 
@@ -86,8 +88,13 @@ class AuditableModel(Model):
         if before_obj is not None:
             before_dict = before_obj.to_dict()
 
+        call_stack = "".join(traceback.format_stack()[-6:-2])
+
         audit_kwargs = dict(
-            acting_user=acting_user, data_before=before_dict, data_after=self.to_dict()
+            acting_user=acting_user,
+            call_stack=call_stack,
+            data_before=before_dict,
+            data_after=self.to_dict(),
         )
         audit_class = self.get_audit_class()
         audit_kwargs[audit_class.get_related_field_name()] = self

@@ -200,7 +200,7 @@ class CourseRunEnrollmentAuditInline(admin.TabularInline):
         "enrollment_id",
         "created_on",
         "acting_user",
-        "modified_by",
+        "call_stack",
         "data_before",
         "data_after",
     ]
