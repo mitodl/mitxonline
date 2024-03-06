@@ -25,7 +25,7 @@ def test_get_field_names():
         "acting_user",
         "created_on",
         "updated_on",
-        "modified_by",
+        "call_stack",
     }
 
 
