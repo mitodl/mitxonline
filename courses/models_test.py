@@ -523,7 +523,7 @@ def test_program_certificate_start_end_dates_and_page_revision(user):
     certificate = ProgramCertificateFactory.create(program=program, user=user)
     program_start_date, program_end_date = certificate.start_end_dates
     assert program_start_date == early_course_run.start_date
-    assert program_end_date == later_course_run.end_date
+    assert program_end_date == certificate.created_on
     certificate_page = certificate.program.page.certificate_page
     assert (
         certificate_page.get_latest_revision() == certificate.certificate_page_revision
