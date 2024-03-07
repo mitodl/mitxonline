@@ -998,10 +998,9 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
         dates = CourseRunCertificate.objects.filter(
             user_id=self.user_id, course_run__course_id__in=course_ids
         ).aggregate(
-            start_date=models.Min("course_run__start_date"),
-            end_date=models.Max("course_run__end_date"),
+            start_date=models.Min("course_run__start_date")
         )
-        return dates["start_date"], dates["end_date"]
+        return dates["start_date"], self.created_on
 
     def __str__(self):
         return 'ProgramCertificate for user={user}, program={program} ({uuid})"'.format(
