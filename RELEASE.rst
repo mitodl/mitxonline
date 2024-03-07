@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.87.1
+--------------
+
+- adding enrollment change tracking (#2117)
+- 3689: add department filter to the api endpoints for courses and programs (#2118)
+
 Version 0.87.0 (Released February 29, 2024)
 --------------
 
