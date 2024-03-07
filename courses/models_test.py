@@ -499,7 +499,9 @@ def test_course_run_certificate_start_end_dates_and_page_revision():
 
 def test_program_certificate_start_end_dates_and_page_revision(user):
     """
-    Test that the ProgramCertificate start_end_dates property works properly
+    Test that the ProgramCertificate start_end_dates property works properly.
+    The start date is the start date of the first course run passed.
+    The end date is the date the user received the program certificate.
     """
     now = now_in_utc()
     start_date = now + timedelta(days=1)
