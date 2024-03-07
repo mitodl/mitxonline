@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.87.1
+Version 0.87.1 (Released March 07, 2024)
 --------------
 
 - adding enrollment change tracking (#2117)
