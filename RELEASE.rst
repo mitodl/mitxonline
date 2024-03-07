@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.87.2
+Version 0.87.2 (Released March 07, 2024)
 --------------
 
 - Change program end date to certificate creation date (#2121)
