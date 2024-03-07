@@ -30,7 +30,7 @@ import { compose } from "redux"
 import { connect } from "react-redux"
 import { requestAsync } from "redux-query"
 import { connectRequest } from "redux-query-react"
-import { pathOr } from "ramda"
+import {mergeDeepRight, pathOr} from "ramda"
 import CourseLoader from "../../components/CourseLoader"
 
 type Props = {
@@ -102,7 +102,6 @@ export class CatalogPage extends React.Component<Props> {
     if (entry.isIntersecting) {
       if (this.state.tabSelected === COURSES_TAB) {
         const { getNextCoursePage, coursesNextPage } = this.props
-        console.log(coursesNextPage)
         // Only request the next page if a next page exists (coursesNextPage)
         // and if we aren't already requesting the next page (isLoadingMoreItems).
         if (coursesNextPage && !this.state.isLoadingMoreItems) {
@@ -162,7 +161,7 @@ export class CatalogPage extends React.Component<Props> {
    * Updates the filteredDepartments state variable once departmentsIsLoading
    * is false.
    */
-  componentDidUpdate = () => {
+  componentDidUpdate = prevState => {
     const {
       courses,
       coursesIsLoading,
@@ -180,6 +179,13 @@ export class CatalogPage extends React.Component<Props> {
       })
     }
     if (!departmentsIsLoading && departments.length > 0) {
+      if (!coursesIsLoading && this.state.filteredCoursesCalled) {
+        if (this.state.selectedDepartment !== prevState.selectedDepartment) {
+          this.setState({courseQueryPage: 1})
+          this.setState({queryIDListString: ""})
+          this.setState({filteredCoursesCalled: false})
+        }
+      }
       if (!coursesIsLoading && !this.state.filterCoursesCalled) {
         this.setState({filterCoursesCalled: true})
         this.setState({allCoursesRetrieved: courses})
@@ -200,6 +206,8 @@ export class CatalogPage extends React.Component<Props> {
               )
               this.setState({courseQueryPage: 0})
               this.setState({queryIDListString: remainingIDs.toString()})
+              console.log(this.state.queryIDListString)
+              this.props.getNextCoursePage(this.state.courseQueryPage, this.state.queryIDListString)
             }
           }
         }
@@ -229,6 +237,7 @@ export class CatalogPage extends React.Component<Props> {
             )
             this.setState({programQueryPage: 1})
             this.setState({queryIDListString: remainingIDs.toString()})
+            this.props.getNextProgramPage(this.state.programQueryPage, this.state.queryIDListString)
           }
           // Detect when the bottom of the catalog page has been reached and display more catalog items.
           this.io = new window.IntersectionObserver(
@@ -324,6 +333,7 @@ export class CatalogPage extends React.Component<Props> {
    * @param {string} selectedDepartment The department name to set selectedDepartment to and filter courses by.
    */
   changeSelectedDepartment = (selectedDepartment: string) => {
+    console.log("this fires")
     const {departments} = this.props
     if (selectedDepartment === ALL_DEPARTMENTS) {
       this.setState({courseQueryPage: 1})
@@ -342,16 +352,34 @@ export class CatalogPage extends React.Component<Props> {
       )
     })
     this.toggleMobileFilterWindowExpanded(false)
-    const newDepartment = departments.find(
-      department => department.name === this.state.selectedDepartment
-    )
-    if (filteredCourses.length !== newDepartment.course_ids.length) {
-      const remainingIDs = newDepartment.course_ids.filter(
-        id => !this.state.queryIDListString.includes(id)
+    if (selectedDepartment !== ALL_DEPARTMENTS) {
+      console.log(selectedDepartment, "selectedDepartment")
+      const newDepartment = departments.find(
+        department => department.name === selectedDepartment
       )
-      this.setState({courseQueryPage: 0})
-      this.setState({queryIDListString: remainingIDs.toString()})
-      getNextCoursePage(this.state.courseQueryPage, this.state.queryIDListString)
+      if (filteredCourses.length !== newDepartment.course_ids.length) {
+        console.log("we don't have enoguh")
+        const remainingIDs = newDepartment.course_ids.filter(
+          id => !this.state.queryIDListString.includes(id)
+        )
+        this.setState({courseQueryPage: 0})
+        this.setState({queryIDListString: remainingIDs.toString()})
+        console.log("getnextcoursepage")
+        this.setState({isLoadingMoreItems: true})
+        this.props.getNextCoursePage(1, remainingIDs.toString()).then(
+          response => {
+            this.setState({isLoadingMoreItems: false})
+            const allCourses = [...response.body.results, ...this.state.allCoursesRetrieved]
+            this.setState({allCoursesRetrieved: allCourses})
+            this.setState({filterProgramsCalled: true})
+            const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+              this.state.selectedDepartment,
+              allCourses
+            )
+            this.setState({filteredCourses: filteredCourses})
+          }
+        )
+      }
     }
   }
 
@@ -384,6 +412,7 @@ export class CatalogPage extends React.Component<Props> {
     selectedDepartment: string,
     courses: Array<CourseDetailWithRuns>
   ) {
+    console.log(courses, "whyyyy")
     return courses.filter(
       course =>
         (selectedDepartment === ALL_DEPARTMENTS ||

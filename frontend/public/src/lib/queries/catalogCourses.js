@@ -21,7 +21,7 @@ export const coursesQueryKey = "courses"
 export const coursesQuery = (page, ids) => ({
   queryKey:  coursesQueryKey,
   url:
-    ids.length > 0
+    (ids && ids.length > 0)
       ? `/api/v2/courses/?page=${page}&live=true&page__live=true&courserun_is_enrollable=true&id=${ids}`
       : `/api/v2/courses/?page=${page}&live=true&page__live=true&courserun_is_enrollable=true`,
   transform: json => ({
