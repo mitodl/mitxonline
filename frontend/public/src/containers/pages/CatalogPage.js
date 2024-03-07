@@ -206,7 +206,6 @@ export class CatalogPage extends React.Component<Props> {
               )
               this.setState({courseQueryPage: 0})
               this.setState({queryIDListString: remainingIDs.toString()})
-              console.log(this.state.queryIDListString)
               this.props.getNextCoursePage(this.state.courseQueryPage, this.state.queryIDListString)
             }
           }
@@ -333,7 +332,6 @@ export class CatalogPage extends React.Component<Props> {
    * @param {string} selectedDepartment The department name to set selectedDepartment to and filter courses by.
    */
   changeSelectedDepartment = (selectedDepartment: string) => {
-    console.log("this fires")
     const {departments} = this.props
     if (selectedDepartment === ALL_DEPARTMENTS) {
       this.setState({courseQueryPage: 1})
@@ -353,18 +351,15 @@ export class CatalogPage extends React.Component<Props> {
     })
     this.toggleMobileFilterWindowExpanded(false)
     if (selectedDepartment !== ALL_DEPARTMENTS) {
-      console.log(selectedDepartment, "selectedDepartment")
       const newDepartment = departments.find(
         department => department.name === selectedDepartment
       )
       if (filteredCourses.length !== newDepartment.course_ids.length) {
-        console.log("we don't have enoguh")
         const remainingIDs = newDepartment.course_ids.filter(
           id => !this.state.queryIDListString.includes(id)
         )
         this.setState({courseQueryPage: 0})
         this.setState({queryIDListString: remainingIDs.toString()})
-        console.log("getnextcoursepage")
         this.setState({isLoadingMoreItems: true})
         this.props.getNextCoursePage(1, remainingIDs.toString()).then(
           response => {
@@ -412,7 +407,6 @@ export class CatalogPage extends React.Component<Props> {
     selectedDepartment: string,
     courses: Array<CourseDetailWithRuns>
   ) {
-    console.log(courses, "whyyyy")
     return courses.filter(
       course =>
         (selectedDepartment === ALL_DEPARTMENTS ||
