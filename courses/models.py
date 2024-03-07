@@ -992,7 +992,7 @@ class ProgramCertificate(TimestampedModel, BaseCertificate):
     def start_end_dates(self):
         """
         Start date: earliest course run start date
-        End date: latest course run end date
+        End date: program certificate creation date
         """
         course_ids = [course[0].id for course in self.program.courses]
         dates = CourseRunCertificate.objects.filter(
