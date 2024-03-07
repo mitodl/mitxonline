@@ -53,7 +53,7 @@ const RegisterDetailsForm = ({ onSubmit, countries }: Props) => (
           <div className="col d-flex justify-content-end">
             <button
               type="submit"
-              className="btn btn-primary btn-gradient-red large"
+              className="btn btn-primary btn-gradient-red-to-blue large"
               disabled={isSubmitting}
             >
               Continue

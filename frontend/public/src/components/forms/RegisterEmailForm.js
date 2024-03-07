@@ -87,7 +87,7 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
         ) : null}
         <button
           type="submit"
-          className="btn btn-primary btn-gradient-red large"
+          className="btn btn-primary btn-gradient-red-to-blue large"
           disabled={isSubmitting}
         >
           Continue

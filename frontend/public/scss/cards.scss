@@ -60,6 +60,14 @@ div.std-card {
             padding: 0;
         }
 
+        a:not(.btn) {
+            color: $home-page-header-blue;
+
+            &:hover {
+                color: $brand-darker-bg;
+            }
+        }
+
         h1 {
             font-size: 25px;
             font-weight: 600;
@@ -81,6 +89,11 @@ div.std-card {
             padding: 0;
             margin: 0;
             margin-bottom: 10px;
+        }
+
+        input:active, input:focus {
+            border: 1px solid $home-page-header-blue !important;
+            box-shadow: none !important;
         }
 
         ul {
@@ -168,15 +181,6 @@ div.std-card {
             color: white;
         }
 
-        button.btn-gradient-red {
-            color: white;
-        }
-
-        button.btn-gradient-red:hover {
-            background-color: $home-page-header-blue !important;
-            border-color: $home-page-header-blue;
-        }
-
         form {
             width: 100%;
             gap: 30px;
@@ -255,3 +259,16 @@ div.std-card {
         }
     }
 }
+
+button.btn.btn-gradient-red-to-blue, a.btn.btn-gradient-red-to-blue {
+    color: white;
+    border: 1px solid $brand-darker-bg;
+    background: $brand-darker-bg !important;
+    transition: 0.25s;
+}
+
+button.btn.btn-gradient-red-to-blue:hover, a.btn.btn-gradient-red-to-blue:hover {
+    border-color: $home-page-header-blue;
+    background: $home-page-header-blue !important;
+}
+

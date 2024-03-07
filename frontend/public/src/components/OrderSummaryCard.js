@@ -189,7 +189,7 @@ export class OrderSummaryCard extends React.Component<Props> {
             <div className="col-12 text-center mt-4 mb-4">
               <Button
                 type="link"
-                className="btn btn-primary btn-gradient-red highlight fw-bold w-100"
+                className="btn btn-primary btn-gradient-red-to-blue highlight fw-bold w-100"
                 onClick={() => (window.location = "/checkout/to_payment")}
               >
                 Place your order
