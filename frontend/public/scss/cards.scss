@@ -75,6 +75,20 @@ div.std-card {
             line-height: 25px;
         }
 
+        h3 {
+            font-size: 25px;
+            font-weight: 600;
+            margin-bottom: 25px;
+            line-height: 25px;
+        }
+
+        h5 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            line-height: 18px;
+        }
+
         hr {
             margin: 26px 0 30px 0;
             
@@ -207,7 +221,7 @@ div.std-card {
             background-position: center;
         }
 
-        &.edit-profile-page, &.create-account-page, &.my-account-page, &.financial-assistance-page {
+        &.edit-profile-page, &.create-account-page, &.my-account-page, &.financial-assistance-page, &.checkout-page {
             div.form-group {
                 margin-bottom: 16px; 
             }
@@ -254,9 +268,59 @@ div.std-card {
             }
         }
 
+        &.checkout-page {
+            h3, div {
+                margin-bottom: 20px;
+            }
+
+            h5 {
+                margin-bottom: 0;
+            }
+            
+            div.order-pricing-info{
+                padding: 10px 0px 0px 0px; 
+
+                border-bottom: 1px solid $home-page-border-grey; 
+
+                div {
+                    font-size: 16px;
+                    margin-bottom: 15px;
+
+                    div {
+                        margin-bottom: 0;
+                        line-height: 18px;
+                    }
+                }
+            }
+
+            div.coupon-info {
+                line-height: 20px;
+            }
+
+            div.coupon-form {
+                div.form-group, input {
+                    margin-bottom: 0;
+                }
+
+                button.btn-apply-coupon {
+                    padding: 12px 20px !important;
+                    width: auto;
+                    font-weight: 600;
+                }    
+            }
+    
+            button.btn-place-order#place-order-button {
+                width: 100%;
+                font-weight: 700;
+                font-size: 20px !important;
+            }
+        }
+
         button.flexible-price-certificate-btn {
             width: auto;
         }
+
+
     }
 }
 
