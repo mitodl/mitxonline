@@ -358,7 +358,7 @@ export class CourseProductDetailEnroll extends React.Component<
           {run.title}
         </ModalHeader>
         <ModalBody>
-          {courseRuns.length > 1 ? (
+          {courseRuns && courseRuns.length > 1 ? (
             <div className="row date-selector-button-bar">
               <div className="col-12">
                 <div>{this.renderRunSelectorButtons(run)}</div>
@@ -509,12 +509,8 @@ export class CourseProductDetailEnroll extends React.Component<
     ) : null
   }
 
-  renderEnrollNowButton(
-    run: EnrollmentFlaggedCourseRun,
-    product: Product | null
-  ) {
+  renderEnrollNowButton(run: EnrollmentFlaggedCourseRun) {
     const { currentUser } = this.props
-    const csrfToken = getCookie("csrftoken")
     return currentUser &&
       currentUser.id &&
       run &&
@@ -560,7 +556,7 @@ export class CourseProductDetailEnroll extends React.Component<
           <Loader key="product_detail_enroll_loader" isLoading={isLoading}>
             <>
               {this.renderEnrollLoginButton()}
-              {this.renderEnrollNowButton(run, product)}
+              {this.renderEnrollNowButton(run)}
 
               {currentUser ? this.renderAddlProfileFieldsModal() : null}
               {run ? this.renderUpgradeEnrollmentDialog() : null}
