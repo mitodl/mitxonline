@@ -32,107 +32,14 @@ $enrolled-passed-fg: #ffffff;
     position: absolute;
     width: 1px;
   }
-  .card {
-    border-radius: 5px;
-    display: flex;
-    box-shadow: 0px 2px 3px 0px rgba(18, 38, 49, 0.15); 
-    margin-bottom: 30px;
 
-    &.no-enrollments {
-      flex-direction: column;
+  .no-enrollments h2 {
+    font-size: 25px !important;
+    margin-bottom: 30px !important;
+  }
 
-      a {
-        color: $footer-blue-bg;
-        text-decoration: underline;
-      }
-
-      p {
-        margin: 0;
-      }
-    }
-
-    h2 {
-      font-size: 20px;
-      line-height: 20px;
-      margin: 0;
-
-      a {
-        text-decoration: none;
-  
-        &:hover{
-          text-decoration: underline;
-        }
-      }
-    }
-
-    h5 a {
-      text-decoration: none;
-      &:hover{
-        text-decoration: underline;
-      }
-    }
-
-    @include media-breakpoint-up(md) {
-      .row {
-        height: auto;
-
-        > * {
-          height: 100%;
-        }
-      }
-    }
-
-    .img-container {
-      @include media-breakpoint-down(sm)  {
-        width: 100%;
-        height: $featureImgMobileHeight;
-      }
-
-      width: $featureImgWidth;
-      height: 100%;
-      overflow: hidden;
-      border-radius: 5px; 
-
-      img {
-        width: $featureImgWidth;
-        max-height: $featureImgHeight;
-        display: block;
-        object-fit: cover;
-      }
-    }
-
-    div.enrollment-details-container {
-      margin: 0;
-      margin-left: 20px;
-      padding: 0;
-    }
-
-    div.detail {
-      padding: 0;
-      margin-top: 20px;
-      line-height: 16px;
-
-      &.detail-program {
-        margin-top: 0;
-      }
-    }
-
-
-    .detail {
-      color: $gray;
-
-      strong {
-        color: $primary;
-      }
-    }
-
-    strong.active-enrollment-text {
-      color: #139556;
-    }
-
-    .enrolled-item-info {
-      padding: 30px;
-    }
+  .no-enrollments p {
+    margin-bottom: 0 !important;
   }
 
   button.dot-menu {
