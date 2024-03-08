@@ -274,18 +274,17 @@ export class CourseProductDetailEnroll extends React.Component<
           className="form-control"
         >
           {courseRuns &&
-            courseRuns
-              .map((elem: EnrollmentFlaggedCourseRun) => (
-                <option
-                  selected={run.id === elem.id}
-                  value={elem.id}
-                  key={`courserun-selection-${elem.id}`}
-                >
-                  {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
-                  {formatPrettyDate(moment(new Date(elem.end_date)))} {" "}
-                  {elem.is_upgradable ? "(can upgrade)" : ""}
-                </option>
-              ))}
+            courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
+              <option
+                selected={run.id === elem.id}
+                value={elem.id}
+                key={`courserun-selection-${elem.id}`}
+              >
+                {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
+                {formatPrettyDate(moment(new Date(elem.end_date)))}{" "}
+                {elem.is_upgradable ? "(can upgrade)" : ""}
+              </option>
+            ))}
         </select>
       </>
     )
@@ -390,8 +389,8 @@ export class CourseProductDetailEnroll extends React.Component<
                     <li>Highlight on your resume/CV</li>
                     <li>Share on your social channels &amp; LinkedIn</li>
                     <li>
-                      Enhance your college application with an earned certificate
-                      from MIT
+                      Enhance your college application with an earned
+                      certificate from MIT
                     </li>
                   </ul>
                 </div>
@@ -411,16 +410,33 @@ export class CourseProductDetailEnroll extends React.Component<
                       <br />
                       {product && run.upgrade_deadline ? (
                         <span className="text-danger">
-                        Payment date:{" "}
+                          Payment date:{" "}
                           {formatPrettyDate(moment(run.upgrade_deadline))}
-                        </span>) : <strong id="certificate-price-info">not available</strong>}
+                        </span>
+                      ) : (
+                        <strong id="certificate-price-info">
+                          not available
+                        </strong>
+                      )}
                     </>
                   </p>
                 </div>
                 <div className="col-md-6 col-sm-12 pr-0 enroll-and-pay">
-                  <form action="/cart/add/" method="get" className="text-center">
-                    <input type="hidden" name="product_id" value={product && product.id} />
-                    <button type="submit" className="btn btn-upgrade">
+                  <form
+                    action="/cart/add/"
+                    method="get"
+                    className="text-center"
+                  >
+                    <input
+                      type="hidden"
+                      name="product_id"
+                      value={product && product.id}
+                    />
+                    <button
+                      type="submit"
+                      className="btn btn-upgrade"
+                      disabled={!product}
+                    >
                       <strong>Enroll and Pay</strong>
                       <br />
                       <span>for the certificate track</span>
@@ -428,7 +444,8 @@ export class CourseProductDetailEnroll extends React.Component<
                   </form>
                 </div>
               </div>
-            </>) : null}
+            </>
+          ) : null}
           <div className="row upgrade-options-row">
             <div>{needFinancialAssistanceLink}</div>
             <div>{this.getEnrollmentForm(run)}</div>
