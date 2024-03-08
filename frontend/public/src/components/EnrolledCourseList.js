@@ -38,7 +38,10 @@ export class EnrolledCourseList extends React.Component<EnrolledCourseListProps>
           <h2>Enroll Now</h2>
           <p>
             You are not enrolled in any courses yet. Please{" "}
-            <a className="fw-bold" href={routes.root}>browse our courses</a>.
+            <a className="fw-bold" href={routes.root}>
+              browse our courses
+            </a>
+            .
           </p>
         </div>
       </div>
