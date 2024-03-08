@@ -44,7 +44,6 @@ import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import CourseInfoBox from "./CourseInfoBox"
 
 import type { User } from "../flow/authTypes"
-import type { Product } from "../flow/cartTypes"
 
 type Props = {
   courseId: ?string,
@@ -537,14 +536,12 @@ export class CourseProductDetailEnroll extends React.Component<
       enrollments,
       enrollmentsIsLoading
     } = this.props
-    let run,
-      product = null
+    let run = null
 
     if (courses && courseRuns) {
       run = getFirstRelevantRun(courses[0], courseRuns)
 
       if (run) {
-        product = run && run.products ? run.products[0] : null
         this.updateDate(run)
       }
     }
