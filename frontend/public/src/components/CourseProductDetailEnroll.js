@@ -509,19 +509,33 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   renderEnrollNowButton(run: EnrollmentFlaggedCourseRun) {
-    const { currentUser } = this.props
+    const { currentUser, courseRuns } = this.props
+    const csrfToken = getCookie("csrftoken")
     return currentUser &&
       currentUser.id &&
       run &&
       isWithinEnrollmentPeriod(run) ? (
         <h2>
-          <button
-            id="upgradeEnrollBtn"
-            className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
-            onClick={() => this.toggleUpgradeDialogVisibility()}
-          >
-          Enroll now
-          </button>
+          {courseRuns && courseRuns.length > 1 ? (
+            <button
+              id="upgradeEnrollBtn"
+              className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
+              onClick={() => this.toggleUpgradeDialogVisibility()}
+            >
+            Enroll now
+            </button>
+          ) : (
+            <form action="/enrollments/" method="post">
+              <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+              <input type="hidden" name="run" value={run ? run.id : ""} />
+              <button
+                type="submit"
+                className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+              >
+              Enroll now
+              </button>
+            </form>
+          )}
         </h2>
       ) : null
   }
