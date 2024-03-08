@@ -275,7 +275,6 @@ export class CourseProductDetailEnroll extends React.Component<
         >
           {courseRuns &&
             courseRuns
-              .filter((elem: EnrollmentFlaggedCourseRun) => elem.is_upgradable)
               .map((elem: EnrollmentFlaggedCourseRun) => (
                 <option
                   selected={run.id === elem.id}
@@ -283,7 +282,8 @@ export class CourseProductDetailEnroll extends React.Component<
                   key={`courserun-selection-${elem.id}`}
                 >
                   {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
-                  {formatPrettyDate(moment(new Date(elem.end_date)))}
+                  {formatPrettyDate(moment(new Date(elem.end_date)))} {" "}
+                  {elem.is_upgradable ? "(can upgrade)" : ""}
                 </option>
               ))}
         </select>
@@ -347,7 +347,7 @@ export class CourseProductDetailEnroll extends React.Component<
       )
       : []
 
-    return run && product ? (
+    return run ? (
       <Modal
         id={`upgrade-enrollment-dialog`}
         className="upgrade-enrollment-modal"
@@ -359,7 +359,7 @@ export class CourseProductDetailEnroll extends React.Component<
           {run.title}
         </ModalHeader>
         <ModalBody>
-          {upgradableCourseRuns.length > 1 ? (
+          {courseRuns.length > 1 ? (
             <div className="row date-selector-button-bar">
               <div className="col-12">
                 <div>{this.renderRunSelectorButtons(run)}</div>
@@ -367,69 +367,68 @@ export class CourseProductDetailEnroll extends React.Component<
             </div>
           ) : null}
 
-          <div className="row upsell-messaging-header">
-            <div className="col-12 p-0 font-weight-bold">
-              Do you want to earn a certificate?
-            </div>
-          </div>
-
-          <div className="row d-sm-flex flex-md-row flex-sm-column">
-            <div className="col-md-6 col-sm-12">
-              <ul>
-                <li> Certificate is signed by MIT faculty</li>
-                <li>
-                  {" "}
-                  Demonstrates knowledge and skills taught in this course
-                </li>
-                <li> Enhance your college &amp; earn a promotion</li>
-              </ul>
-            </div>
-            <div className="col-md-6 col-sm-12">
-              <ul>
-                <li>Highlight on your resume/CV</li>
-                <li>Share on your social channels &amp; LinkedIn</li>
-                <li>
-                  Enhance your college application with an earned certificate
-                  from MIT
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="row certificate-pricing-row d-sm-flex flex-md-row flex-sm-column">
-            <div className="col-md-6 col-sm-12 certificate-pricing d-flex align-items-center">
-              <div className="certificate-pricing-logo">
-                <img src="/static/images/certificates/certificate-logo.svg" />
+          {upgradableCourseRuns.length > 0 ? (
+            <>
+              <div className="row upsell-messaging-header">
+                <div className="col-12 p-0 font-weight-bold">
+                  Do you want to earn a certificate?
+                </div>
               </div>
-              <p>
-                Certificate track:{" "}
-                <strong id="certificate-price-info">
-                  {product &&
-                    formatLocalePrice(getFlexiblePriceForProduct(product))}
-                </strong>
-                {run.upgrade_deadline ? (
-                  <>
-                    <br />
-                    <span className="text-danger">
-                      Payment date:{" "}
-                      {formatPrettyDate(moment(run.upgrade_deadline))}
-                    </span>
-                  </>
-                ) : null}
-              </p>
-            </div>
-            <div className="col-md-6 col-sm-12 pr-0 enroll-and-pay">
-              <form action="/cart/add/" method="get" className="text-center">
-                <input type="hidden" name="product_id" value={product.id} />
-                <button type="submit" className="btn btn-upgrade">
-                  <strong>Enroll and Pay</strong>
-                  <br />
-                  <span>for the certificate track</span>
-                </button>
-              </form>
-            </div>
-          </div>
-
+              <div className="row d-sm-flex flex-md-row flex-sm-column">
+                <div className="col-md-6 col-sm-12">
+                  <ul>
+                    <li> Certificate is signed by MIT faculty</li>
+                    <li>
+                      {" "}
+                      Demonstrates knowledge and skills taught in this course
+                    </li>
+                    <li> Enhance your college &amp; earn a promotion</li>
+                  </ul>
+                </div>
+                <div className="col-md-6 col-sm-12">
+                  <ul>
+                    <li>Highlight on your resume/CV</li>
+                    <li>Share on your social channels &amp; LinkedIn</li>
+                    <li>
+                      Enhance your college application with an earned certificate
+                      from MIT
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div className="row certificate-pricing-row d-sm-flex flex-md-row flex-sm-column">
+                <div className="col-md-6 col-sm-12 certificate-pricing d-flex align-items-center">
+                  <div className="certificate-pricing-logo">
+                    <img src="/static/images/certificates/certificate-logo.svg" />
+                  </div>
+                  <p>
+                    Certificate track:{" "}
+                    <strong id="certificate-price-info">
+                      {product &&
+                        formatLocalePrice(getFlexiblePriceForProduct(product))}
+                    </strong>
+                    <>
+                      <br />
+                      {product && run.upgrade_deadline ? (
+                        <span className="text-danger">
+                        Payment date:{" "}
+                          {formatPrettyDate(moment(run.upgrade_deadline))}
+                        </span>) : <strong id="certificate-price-info">not available</strong>}
+                    </>
+                  </p>
+                </div>
+                <div className="col-md-6 col-sm-12 pr-0 enroll-and-pay">
+                  <form action="/cart/add/" method="get" className="text-center">
+                    <input type="hidden" name="product_id" value={product && product.id} />
+                    <button type="submit" className="btn btn-upgrade">
+                      <strong>Enroll and Pay</strong>
+                      <br />
+                      <span>for the certificate track</span>
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </>) : null}
           <div className="row upgrade-options-row">
             <div>{needFinancialAssistanceLink}</div>
             <div>{this.getEnrollmentForm(run)}</div>
@@ -504,26 +503,13 @@ export class CourseProductDetailEnroll extends React.Component<
       run &&
       isWithinEnrollmentPeriod(run) ? (
         <h2>
-          {product && run.is_upgradable ? (
-            <button
-              id="upgradeEnrollBtn"
-              className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
-              onClick={() => this.toggleUpgradeDialogVisibility()}
-            >
-            Enroll now
-            </button>
-          ) : (
-            <form action="/enrollments/" method="post">
-              <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
-              <input type="hidden" name="run" value={run ? run.id : ""} />
-              <button
-                type="submit"
-                className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
-              >
-              Enroll now
-              </button>
-            </form>
-          )}
+          <button
+            id="upgradeEnrollBtn"
+            className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
+            onClick={() => this.toggleUpgradeDialogVisibility()}
+          >
+          Enroll now
+          </button>
         </h2>
       ) : null
   }
