@@ -372,7 +372,7 @@ export class CatalogPage extends React.Component<Props> {
       )
       if (filteredCourses.length !== newDepartment.course_ids.length && !this.state.isLoadingMoreItems) {
         const remainingIDs = newDepartment.course_ids.filter(
-          id => !this.state.queryIDListString.includes(id)
+          id => !this.state.allCoursesRetrieved.map(course => course.id).includes(id)
         )
         this.setState({ courseQueryPage: 0 })
         this.setState({ queryIDListString: remainingIDs.toString() })
