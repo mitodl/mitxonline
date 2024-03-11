@@ -52,7 +52,13 @@ from cms.constants import (
 )
 from cms.forms import CertificatePageForm
 from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset
-from courses.models import Course, CourseRunCertificate, Program, ProgramCertificate
+from courses.models import (
+    Course,
+    CourseRun,
+    CourseRunCertificate,
+    Program,
+    ProgramCertificate,
+)
 from flexiblepricing.api import (
     determine_auto_approval,
     determine_courseware_flexible_price_discount,
@@ -714,6 +720,25 @@ class HomePage(VideoPlayerConfigMixin):
         """Gets the first child page of the given type if it exists"""
         child = self.get_children().type(cls).live().first()
         return child.specific if child else None
+
+    @property
+    def get_featured_products(self):
+        """Gets the featured products for the home page"""
+        # start_of_day and end_of_day should actually be the time that the cron runs, and the time it will next run
+        start_of_day = now_in_utc() - timedelta(days=1)
+        end_of_day = now_in_utc() + timedelta(days=1)
+        relevant_course_runs = (
+            CourseRun.objects.filter(live=True)
+            .filter(course__page__live=True)
+            .filter(enrollment_start__gte=start_of_day)
+            .filter(enrollment_start__lte=end_of_day)
+            .prefetch_related("course")
+        )
+        relevant_courses = relevant_course_runs.values_list("course", flat=True)
+        relevant_programs = Program.objects.filter(live=True).filter(
+            courses__contains=relevant_courses
+        )
+        return relevant_courses, relevant_programs
 
     @property
     def products(self):
