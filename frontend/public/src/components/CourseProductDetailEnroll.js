@@ -69,6 +69,7 @@ type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
   showAddlProfileFieldsModal: boolean,
   currentCourseRun: ?EnrollmentFlaggedCourseRun,
+  isUserSelectedCourseRun: boolean,
   destinationUrl: string
 }
 
@@ -79,6 +80,7 @@ export class CourseProductDetailEnroll extends React.Component<
   state = {
     upgradeEnrollmentDialogVisibility: false,
     currentCourseRun:                  null,
+    isUserSelectedCourseRun:           false,
     showAddlProfileFieldsModal:        false,
     destinationUrl:                    ""
   }
@@ -230,6 +232,9 @@ export class CourseProductDetailEnroll extends React.Component<
 
     if (matchingCourseRun) {
       this.setCurrentCourseRun(matchingCourseRun)
+      this.setState({
+        isUserSelectedCourseRun: true
+      })
     }
   }
 
