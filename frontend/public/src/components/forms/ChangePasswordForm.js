@@ -10,6 +10,7 @@ import {
   passwordFieldErrorMessage,
   changePasswordFormValidation
 } from "../../lib/validation"
+import CardLabel from "../input/CardLabel"
 
 type Props = {
   onSubmit: Function
@@ -37,10 +38,11 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
         <section className="email-section">
           <h1>Change Password</h1>
           <div className="form-group">
-            <label htmlFor="oldPassword" className="fw-bold">
-              Old Password<span className="required">*</span>
-            </label>
-
+            <CardLabel
+              htmlFor="oldPassword"
+              isRequired={true}
+              label="Old Password"
+            />
             <Field
               name="oldPassword"
               id="oldPassword"
@@ -51,9 +53,11 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
             />
           </div>
           <div className="form-group">
-            <label htmlFor="newPassword" className="fw-bold">
-              New Password<span className="required">*</span>
-            </label>
+            <CardLabel
+              htmlFor="newPassword"
+              isRequired={true}
+              label="New Password"
+            />
             <Field
               name="newPassword"
               id="newPassword"
@@ -72,9 +76,11 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
             />
           </div>
           <div className="form-group">
-            <label htmlFor="confirmPassword" className="fw-bold">
-              Confirm Password<span className="required">*</span>
-            </label>
+            <CardLabel
+              htmlFor="confirmPassword"
+              isRequired={true}
+              label="Confirm Password"
+            />
             <Field
               name="confirmPassword"
               id="confirmPassword"

@@ -4,6 +4,7 @@ import React from "react"
 import { Formik, Field, Form } from "formik"
 
 import { PasswordInput, EmailInput } from "./elements/inputs"
+import CardLabel from "../input/CardLabel"
 
 import type { User } from "../../flow/authTypes"
 
@@ -32,9 +33,7 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
           <section className="email-section">
             <h1>Change Email</h1>
             <div className="form-group">
-              <label htmlFor="email" className="fw-bold">
-                Email<span className="required">*</span>
-              </label>
+              <CardLabel htmlFor="email" isRequired={true} label="Email" />
               <Field
                 name="email"
                 id="email"
@@ -47,14 +46,12 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
               />
             </div>
             <div className="form-group">
-              <label htmlFor="confirmPassword" className="label-helptext">
-                <div className="fw-bold">
-                  Confirm Password<span className="required">*</span>
-                </div>
-                <div className="subtitle">
-                  Password required to change email address
-                </div>
-              </label>
+              <CardLabel
+                htmlFor="confirmPassword"
+                isRequired={true}
+                label="Confirm Password"
+                subLabel="Password required to change email address"
+              />
               <Field
                 id="confirmPassword"
                 name="confirmPassword"
