@@ -508,7 +508,7 @@ export class CourseProductDetailEnroll extends React.Component<
     ) : null
   }
 
-  renderEnrollNowButton(run: EnrollmentFlaggedCourseRun) {
+  renderEnrollNowButton(run: EnrollmentFlaggedCourseRun, product: Product | null) {
     const { currentUser, courseRuns } = this.props
     const csrfToken = getCookie("csrftoken")
     return currentUser &&
@@ -516,7 +516,7 @@ export class CourseProductDetailEnroll extends React.Component<
       run &&
       isWithinEnrollmentPeriod(run) ? (
         <h2>
-          {courseRuns && courseRuns.length > 1 ? (
+          {(product && run.is_upgradable) || (courseRuns && courseRuns.length > 1) ? (
             <button
               id="upgradeEnrollBtn"
               className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
@@ -550,7 +550,7 @@ export class CourseProductDetailEnroll extends React.Component<
       enrollments,
       enrollmentsIsLoading
     } = this.props
-    let run = null
+    let run, product = null
 
     if (courses && courseRuns) {
       run = getFirstRelevantRun(courses[0], courseRuns)
@@ -567,7 +567,7 @@ export class CourseProductDetailEnroll extends React.Component<
           <Loader key="product_detail_enroll_loader" isLoading={isLoading}>
             <>
               {this.renderEnrollLoginButton()}
-              {this.renderEnrollNowButton(run)}
+              {this.renderEnrollNowButton(run, product)}
 
               {currentUser ? this.renderAddlProfileFieldsModal() : null}
               {run ? this.renderUpgradeEnrollmentDialog() : null}
