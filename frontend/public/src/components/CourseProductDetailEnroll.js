@@ -346,7 +346,7 @@ export class CourseProductDetailEnroll extends React.Component<
       )
       : []
 
-    return run ? (
+    return run && isWithinEnrollmentPeriod(run) ? (
       <Modal
         id={`upgrade-enrollment-dialog`}
         className="upgrade-enrollment-modal"

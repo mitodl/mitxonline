@@ -134,7 +134,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       },
       {}
     )
-
     assert.isNotOk(
       inner
         .find(".enroll-now")
