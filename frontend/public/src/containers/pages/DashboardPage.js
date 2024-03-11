@@ -160,7 +160,7 @@ export class DashboardPage extends React.Component<
       } else {
         return (
           <div>
-            <h1 className="hide-element">Programs</h1>
+            <h2 className="hide-element">Programs</h2>
             <EnrolledProgramList
               key={"enrolled-programs"}
               enrollments={programEnrollments}
@@ -175,7 +175,7 @@ export class DashboardPage extends React.Component<
 
     return (
       <div>
-        <h1 className="hide-element">My Courses</h1>
+        <h2 className="hide-element">My Courses</h2>
         <EnrolledCourseList
           key={"enrolled-courses"}
           enrollments={enrollments}

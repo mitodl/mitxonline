@@ -31,7 +31,7 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
       render={({ isSubmitting }) => (
         <Form>
           <section className="email-section">
-            <h1>Change Email</h1>
+            <h2>Change Email</h2>
             <div className="form-group">
               <CardLabel htmlFor="email" isRequired={true} label="Email" />
               <Field

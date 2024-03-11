@@ -78,7 +78,7 @@ export class EditProfilePage extends React.Component<Props> {
           <div className="std-page-body container auth-page">
             <div className="std-card std-card-auth">
               <div className="std-card-body edit-profile-page">
-                <h1>Profile Information</h1>
+                <h2>Profile Information</h2>
                 <EditProfileForm
                   countries={countries}
                   user={currentUser}

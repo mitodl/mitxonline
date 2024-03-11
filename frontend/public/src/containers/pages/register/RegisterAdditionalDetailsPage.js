@@ -94,7 +94,7 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
         <div className="std-page-body container auth-page registration-page">
           <div className="std-card std-card-auth">
             <div className="std-card-body">
-              <h1>About You</h1>
+              <h2>About You</h2>
               <div className="form-group">
                 Please tell us a bit about yourself. The data you provide here
                 will assist us in our research pursuits. All fields are

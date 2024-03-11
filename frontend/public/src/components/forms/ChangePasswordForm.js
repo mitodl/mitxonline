@@ -36,7 +36,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
     render={({ isSubmitting }) => (
       <Form>
         <section className="email-section">
-          <h1>Change Password</h1>
+          <h2>Change Password</h2>
           <div className="form-group">
             <CardLabel
               htmlFor="oldPassword"

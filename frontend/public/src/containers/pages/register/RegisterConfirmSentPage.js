@@ -39,9 +39,9 @@ export class RegisterConfirmSentPage extends React.Component<Props> {
         <div className="std-page-body container auth-page">
           <div className="std-card std-card-auth">
             <div className="std-card-body">
-              <h1 tabIndex="0" ref={this.headingRef}>
+              <h2 tabIndex="0" ref={this.headingRef}>
                 Thank you!
-              </h1>
+              </h2>
 
               <div>
                 <p>
