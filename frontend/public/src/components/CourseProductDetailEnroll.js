@@ -44,6 +44,7 @@ import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import CourseInfoBox from "./CourseInfoBox"
 
 import type { User } from "../flow/authTypes"
+import type { Product } from "../flow/cartTypes"
 
 type Props = {
   courseId: ?string,
@@ -508,7 +509,10 @@ export class CourseProductDetailEnroll extends React.Component<
     ) : null
   }
 
-  renderEnrollNowButton(run: EnrollmentFlaggedCourseRun, product: Product | null) {
+  renderEnrollNowButton(
+    run: EnrollmentFlaggedCourseRun,
+    product: Product | null
+  ) {
     const { currentUser, courseRuns } = this.props
     const csrfToken = getCookie("csrftoken")
     return currentUser &&
@@ -516,26 +520,27 @@ export class CourseProductDetailEnroll extends React.Component<
       run &&
       isWithinEnrollmentPeriod(run) ? (
         <h2>
-          {(product && run.is_upgradable) || (courseRuns && courseRuns.length > 1) ? (
-            <button
-              id="upgradeEnrollBtn"
-              className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
-              onClick={() => this.toggleUpgradeDialogVisibility()}
-            >
-            Enroll now
-            </button>
-          ) : (
-            <form action="/enrollments/" method="post">
-              <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
-              <input type="hidden" name="run" value={run ? run.id : ""} />
+          {(product && run.is_upgradable) ||
+        (courseRuns && courseRuns.length > 1) ? (
               <button
-                type="submit"
-                className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+                id="upgradeEnrollBtn"
+                className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
+                onClick={() => this.toggleUpgradeDialogVisibility()}
               >
-              Enroll now
+            Enroll now
               </button>
-            </form>
-          )}
+            ) : (
+              <form action="/enrollments/" method="post">
+                <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+                <input type="hidden" name="run" value={run ? run.id : ""} />
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+                >
+              Enroll now
+                </button>
+              </form>
+            )}
         </h2>
       ) : null
   }
@@ -550,12 +555,14 @@ export class CourseProductDetailEnroll extends React.Component<
       enrollments,
       enrollmentsIsLoading
     } = this.props
-    let run, product = null
+    let run,
+      product = null
 
     if (courses && courseRuns) {
       run = getFirstRelevantRun(courses[0], courseRuns)
 
       if (run) {
+        product = run && run.products ? run.products[0] : null
         this.updateDate(run)
       }
     }
