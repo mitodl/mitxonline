@@ -30,7 +30,7 @@ import { compose } from "redux"
 import { connect } from "react-redux"
 import { requestAsync } from "redux-query"
 import { connectRequest } from "redux-query-react"
-import { mergeDeepRight, pathOr } from "ramda"
+import { pathOr } from "ramda"
 import CourseLoader from "../../components/CourseLoader"
 
 type Props = {
@@ -59,7 +59,9 @@ export class CatalogPage extends React.Component<Props> {
   state = {
     tabSelected:                COURSES_TAB,
     allCoursesRetrieved:        [],
+    allCoursesCount:            0,
     allProgramsRetrieved:       [],
+    allProgramsCount:           0,
     filteredCourses:            [],
     filteredPrograms:           [],
     filterProgramsCalled:       false,
@@ -164,9 +166,11 @@ export class CatalogPage extends React.Component<Props> {
   componentDidUpdate = prevState => {
     const {
       courses,
+      coursesCount,
       coursesIsLoading,
       programsIsLoading,
       programs,
+      programsCount,
       departments,
       departmentsIsLoading
     } = this.props
@@ -177,6 +181,13 @@ export class CatalogPage extends React.Component<Props> {
           this.state.tabSelected
         )
       })
+    }
+    if (this.state.allCoursesCount === 0) {
+      console.log("changing allCoursesCount")
+      this.setState({ allCoursesCount: coursesCount })
+    }
+    if (this.state.allProgramsCount === 0) {
+      this.setState({ allProgramsCount: programsCount })
     }
     if (!departmentsIsLoading && departments.length > 0) {
       if (!coursesIsLoading && this.state.filteredCoursesCalled) {
@@ -461,9 +472,9 @@ export class CatalogPage extends React.Component<Props> {
    * Returns the number of courseRuns or programs based on the selected catalog tab.
    */
   renderNumberOfCatalogCourses() {
-    const { coursesCount, departments } = this.props
+    const { departments } = this.props
     if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
-      return coursesCount
+      return this.state.allCoursesCount
     } else if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
       return departments.find(
         department => department.name === this.state.selectedDepartment
@@ -472,9 +483,9 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   renderNumberOfCatalogPrograms() {
-    const { programsCount, departments } = this.props
+    const { departments } = this.props
     if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
-      return programsCount
+      return this.state.allProgramsCount
     } else if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
       return departments.find(
         department => department.name === this.state.selectedDepartment
