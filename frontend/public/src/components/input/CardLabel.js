@@ -4,12 +4,12 @@
 import React from "react"
 
 type CardLabelProps = {
-  children: React$Element<*>,
   htmlFor: string,
   label: string,
   subLabel?: string,
   isRequired?: boolean,
-  className?: string
+  className?: string,
+  children?: React$Element<*>
 }
 
 const CardLabel = ({
