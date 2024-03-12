@@ -133,8 +133,7 @@ export class CatalogPage extends React.Component<Props> {
         if (programsNextPage && !this.state.isLoadingMoreItems) {
           this.setState({ isLoadingMoreItems: true })
           const response = await getNextProgramPage(
-            this.state.programQueryPage + 1,
-            this.state.queryIDListString
+            this.state.programQueryPage + 1
           )
           this.setState({ isLoadingMoreItems: false })
           this.setState({ programQueryPage: this.state.programQueryPage + 1 })
@@ -182,11 +181,10 @@ export class CatalogPage extends React.Component<Props> {
         )
       })
     }
-    if (this.state.allCoursesCount === 0) {
-      console.log("changing allCoursesCount")
+    if (this.state.allCoursesCount === 0 && !coursesIsLoading) {
       this.setState({ allCoursesCount: coursesCount })
     }
-    if (this.state.allProgramsCount === 0) {
+    if (this.state.allProgramsCount === 0 && !programsIsLoading) {
       this.setState({ allProgramsCount: programsCount })
     }
     if (!departmentsIsLoading && departments.length > 0) {
@@ -250,15 +248,10 @@ export class CatalogPage extends React.Component<Props> {
             department => department.name === this.state.selectedDepartment
           )
           if (filteredPrograms.length !== newDepartment.program_ids.length && !this.state.isLoadingMoreItems) {
-            const remainingIDs = newDepartment.program_ids.filter(
-              id => !this.state.queryIDListString.includes(id)
-            )
             this.setState({ isLoadingMoreItems: true })
             this.setState({ programQueryPage: 1 })
-            this.setState({ queryIDListString: remainingIDs.toString() })
             this.props.getNextProgramPage(
-              this.state.programQueryPage,
-              this.state.queryIDListString
+              this.state.programQueryPage
             )
             this.setState({ isLoadingMoreItems: false })
           }
@@ -359,7 +352,6 @@ export class CatalogPage extends React.Component<Props> {
     const { departments } = this.props
     if (selectedDepartment === ALL_DEPARTMENTS) {
       this.setState({ courseQueryPage: 1 })
-      this.setState({ programQueryPage: 1 })
       this.setState({ queryIDListString: "" })
     }
     this.setState({ selectedDepartment: selectedDepartment })
@@ -382,28 +374,48 @@ export class CatalogPage extends React.Component<Props> {
         department => department.name === selectedDepartment
       )
       if (filteredCourses.length !== newDepartment.course_ids.length && !this.state.isLoadingMoreItems) {
-        const remainingIDs = newDepartment.course_ids.filter(
-          id => !this.state.allCoursesRetrieved.map(course => course.id).includes(id)
-        )
-        this.setState({ courseQueryPage: 0 })
-        this.setState({ queryIDListString: remainingIDs.toString() })
-        this.setState({ isLoadingMoreItems: true })
-        this.props
-          .getNextCoursePage(1, remainingIDs.toString())
-          .then(response => {
-            this.setState({ isLoadingMoreItems: false })
-            const allCourses = [
-              ...response.body.results,
-              ...this.state.allCoursesRetrieved
-            ]
-            this.setState({ allCoursesRetrieved: allCourses })
-            this.setState({ filterProgramsCalled: true })
-            const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
-              this.state.selectedDepartment,
-              allCourses
-            )
-            this.setState({ filteredCourses: filteredCourses })
-          })
+        if (this.state.tabSelected === COURSES_TAB) {
+          const remainingIDs = newDepartment.course_ids.filter(
+            id => !this.state.allCoursesRetrieved.map(course => course.id).includes(id)
+          )
+          this.setState({courseQueryPage: 0})
+          this.setState({queryIDListString: remainingIDs.toString()})
+          this.setState({isLoadingMoreItems: true})
+          this.props
+            .getNextCoursePage(1, remainingIDs.toString())
+            .then(response => {
+              this.setState({isLoadingMoreItems: false})
+              const allCourses = [
+                ...response.body.results,
+                ...this.state.allCoursesRetrieved
+              ]
+              this.setState({allCoursesRetrieved: allCourses})
+              this.setState({filterProgramsCalled: true})
+              const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+                this.state.selectedDepartment,
+                allCourses
+              )
+              this.setState({filteredCourses: filteredCourses})
+            })
+        } else if (this.state.tabSelected === PROGRAMS_TAB) {
+          this.setState({isLoadingMoreItems: true})
+          this.props
+            .getNextProgramPage(this.state.programQueryPage)
+            .then(response => {
+              this.setState({isLoadingMoreItems: false})
+              const allPrograms = [
+                ...response.body.results,
+                ...this.state.allProgramsRetrieved
+              ]
+              this.setState({allProgramsRetrieved: allPrograms})
+              this.setState({filterProgramsCalled: true})
+              const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
+                this.state.selectedDepartment,
+                allPrograms
+              )
+              this.setState({filteredPrograms: filteredPrograms})
+            })
+        }
       }
     }
   }
