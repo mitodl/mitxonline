@@ -64,7 +64,10 @@ export class CartItemCard extends React.Component<Props> {
             <div className="detail">
               {readableId} |{" "}
               {startDateDescription !== null && startDateDescription.active ? (
-                <span>Starts - {startDateDescription.datestr}</span>
+                <span>
+                  <strong className="text-dark">Starts</strong>{" "}
+                  {startDateDescription.datestr}
+                </span>
               ) : (
                 <span>
                   {startDateDescription === null ? null : (

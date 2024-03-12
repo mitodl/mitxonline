@@ -64,7 +64,7 @@ export const courseRunStatusMessage = (run: CourseRun) => {
         return (
           <span>
             {" "}
-            | <strong>Ended</strong> - {formatPrettyDateTimeAmPmTz(dateString)}
+            | <strong>Ended</strong> {formatPrettyDateTimeAmPmTz(dateString)}
           </span>
         )
       } else {

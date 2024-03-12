@@ -570,19 +570,20 @@ export class EnrolledItemCard extends React.Component<
                   </a>
                 ) : null}
               </div>
-              <br />
             </div>
           </div>
         </div>
-        <div className="row flex-grow-1">
-          <div
-            className={`col certificate-container ${
-              financialAssistanceLink ? "finaid-link-margin" : ""
-            }`}
-          >
-            {certificateLinks}
+        {certificateLinks ? (
+          <div className="certificate-row row flex-grow-1">
+            <div
+              className={`col certificate-container ${
+                financialAssistanceLink ? "finaid-link-margin" : ""
+              }`}
+            >
+              {certificateLinks}
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     )
   }

@@ -60,13 +60,6 @@ div.std-card {
             padding: 0;
         }
 
-        a:not(.btn) {
-            color: $home-page-header-blue;
-
-            &:hover {
-                color: $brand-darker-bg;
-            }
-        }
 
         h1, h2 {
             font-size: 25px;
@@ -336,9 +329,21 @@ button.btn.btn-gradient-red-to-blue:hover, a.btn.btn-gradient-red-to-blue:hover 
     background: $home-page-header-blue !important;
 }
 
+div.std-card-body, div.enrolled-item, div.cart-helptext {
+    a:not(.btn) {
+        color: $home-page-header-blue;
+
+        &:hover {
+            color: $brand-darker-bg;
+        }
+    }
+}
+
+
 @media only screen and (min-width: 767px) {
     div.std-page-header {
         position: sticky;
         top: 0;
+        z-index: 2000;
     }
 }
