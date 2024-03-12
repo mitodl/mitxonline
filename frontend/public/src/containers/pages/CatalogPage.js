@@ -101,6 +101,7 @@ export class CatalogPage extends React.Component<Props> {
    */
   bottomOfLoadedCatalogCallback = async entries => {
     const [entry] = entries
+    console.log("bottomOfLoadedCatalogCallback")
     if (entry.isIntersecting) {
       if (this.state.tabSelected === COURSES_TAB) {
         const { getNextCoursePage, coursesNextPage } = this.props
@@ -115,16 +116,14 @@ export class CatalogPage extends React.Component<Props> {
           )
           this.setState({ isLoadingMoreItems: false })
           if (response.body.results) {
+            const allCourses = this.mergeNewObjects(this.state.allCoursesRetrieved, response.body.results)
             const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
               this.state.selectedDepartment,
-              [...this.state.allCoursesRetrieved, ...response.body.results]
+              allCourses
             )
             this.setState({ filteredCourses: filteredCourses })
             this.setState({
-              allCoursesRetrieved: [
-                ...this.state.allCoursesRetrieved,
-                ...response.body.results
-              ]
+              allCoursesRetrieved: allCourses
             })
           }
         }
@@ -138,17 +137,13 @@ export class CatalogPage extends React.Component<Props> {
           this.setState({ isLoadingMoreItems: false })
           this.setState({ programQueryPage: this.state.programQueryPage + 1 })
           if (response.body.results) {
+            const allPrograms = this.mergeNewObjects(this.state.allProgramsRetrieved, response.body.results)
             const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
               this.state.selectedDepartment,
-              [...this.state.allProgramsRetrieved, ...response.body.results]
+              allPrograms
             )
             this.setState({ filteredPrograms: filteredPrograms })
-            this.setState({
-              allProgramsRetrieved: [
-                ...this.state.allProgramsRetrieved,
-                ...response.body.results
-              ]
-            })
+            this.setState({ allProgramsRetrieved: allPrograms })
           }
         }
       }
@@ -173,6 +168,7 @@ export class CatalogPage extends React.Component<Props> {
       departments,
       departmentsIsLoading
     } = this.props
+    console.log("componentDidUpdate")
     if (!departmentsIsLoading && !this.state.filterDepartmentsCalled) {
       this.setState({ filterDepartmentsCalled: true })
       this.setState({
@@ -349,6 +345,7 @@ export class CatalogPage extends React.Component<Props> {
    * @param {string} selectedDepartment The department name to set selectedDepartment to and filter courses by.
    */
   changeSelectedDepartment = (selectedDepartment: string) => {
+    console.log("changeSelectedDepartment")
     const { departments } = this.props
     if (selectedDepartment === ALL_DEPARTMENTS) {
       this.setState({ courseQueryPage: 1 })
@@ -385,10 +382,7 @@ export class CatalogPage extends React.Component<Props> {
             .getNextCoursePage(1, remainingIDs.toString())
             .then(response => {
               this.setState({isLoadingMoreItems: false})
-              const allCourses = [
-                ...response.body.results,
-                ...this.state.allCoursesRetrieved
-              ]
+              const allCourses = this.mergeNewObjects(this.state.allCoursesRetrieved, response.body.results)
               this.setState({allCoursesRetrieved: allCourses})
               this.setState({filterProgramsCalled: true})
               const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
@@ -403,10 +397,7 @@ export class CatalogPage extends React.Component<Props> {
             .getNextProgramPage(this.state.programQueryPage)
             .then(response => {
               this.setState({isLoadingMoreItems: false})
-              const allPrograms = [
-                ...response.body.results,
-                ...this.state.allProgramsRetrieved
-              ]
+              const allPrograms = this.mergeNewObjects(this.state.allProgramsRetrieved, response.body.results)
               this.setState({allProgramsRetrieved: allPrograms})
               this.setState({filterProgramsCalled: true})
               const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
@@ -418,6 +409,12 @@ export class CatalogPage extends React.Component<Props> {
         }
       }
     }
+  }
+
+  mergeNewObjects(oldArray, newArray) {
+    const oldIds = oldArray.map(a => a.id)
+    const newObjects = newArray.filter(a => !oldIds.includes(a.id))
+    return oldArray.concat(newObjects)
   }
 
   /**
