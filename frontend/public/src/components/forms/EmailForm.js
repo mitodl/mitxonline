@@ -5,6 +5,7 @@ import { Formik, Field, Form, ErrorMessage } from "formik"
 
 import { EmailInput } from "./elements/inputs"
 import FormError from "./elements/FormError"
+import * as yup from "yup"
 
 type EmailFormProps = {
   onSubmit: Function,
@@ -15,10 +16,18 @@ export type EmailFormValues = {
   email: string
 }
 
+const EmailFormValidation = yup.object().shape({
+  email: yup
+    .string()
+    .email("Please enter an email address")
+    .required("Email is required")
+})
+
 const EmailForm = ({ onSubmit, children }: EmailFormProps) => (
   <Formik
     onSubmit={onSubmit}
     initialValues={{ email: "" }}
+    validationSchema={EmailFormValidation}
     validateOnChange={false}
     validateOnBlur={false}
     render={({ isSubmitting }) => (
@@ -31,7 +40,7 @@ const EmailForm = ({ onSubmit, children }: EmailFormProps) => (
             className="form-control"
             component={EmailInput}
             autoComplete="email"
-            aria-describedby="emailError"
+            aria-errormessage="emailError"
             required
           />
           <ErrorMessage name="email" id="emailError" component={FormError} />
