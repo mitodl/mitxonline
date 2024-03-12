@@ -69,7 +69,6 @@ type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
   showAddlProfileFieldsModal: boolean,
   currentCourseRun: ?EnrollmentFlaggedCourseRun,
-  isUserSelectedCourseRun: boolean,
   destinationUrl: string
 }
 
@@ -80,46 +79,8 @@ export class CourseProductDetailEnroll extends React.Component<
   state = {
     upgradeEnrollmentDialogVisibility: false,
     currentCourseRun:                  null,
-    isUserSelectedCourseRun:           false,
     showAddlProfileFieldsModal:        false,
     destinationUrl:                    ""
-  }
-
-  resolveFirstEnrollableRun() {
-    const { courseRuns } = this.props
-
-    const enrollableRun =
-      courseRuns &&
-      courseRuns
-        .sort(
-          (a: EnrollmentFlaggedCourseRun, b: EnrollmentFlaggedCourseRun) => {
-            if (moment(a.start_date).isBefore(moment(b.start_date))) {
-              return -1
-            } else if (moment(a.start_date).isAfter(moment(b.start_date))) {
-              return 1
-            } else {
-              return 0
-            }
-          }
-        )
-        .find((run: EnrollmentFlaggedCourseRun) => {
-          return (
-            (run.enrollment_start === null ||
-              moment(run.enrollment_start).isBefore(moment.now())) &&
-            (run.enrollment_end === null ||
-              moment(run.enrollment_end).isAfter(moment.now()))
-          )
-        })
-
-    return enrollableRun || (courseRuns && courseRuns[0])
-  }
-
-  resolveCurrentRun() {
-    const { courseRuns } = this.props
-
-    return !this.getCurrentCourseRun() && courseRuns
-      ? this.resolveFirstEnrollableRun()
-      : this.getCurrentCourseRun()
   }
 
   toggleAddlProfileFieldsModal() {
@@ -201,7 +162,7 @@ export class CourseProductDetailEnroll extends React.Component<
 
   toggleUpgradeDialogVisibility = () => {
     const { upgradeEnrollmentDialogVisibility } = this.state
-    const run = this.resolveCurrentRun()
+    const run = this.getCurrentCourseRun()
 
     if (!upgradeEnrollmentDialogVisibility) {
       this.checkForExistingEnrollment(run)
@@ -223,6 +184,10 @@ export class CourseProductDetailEnroll extends React.Component<
   hndSetCourseRun = (event: any) => {
     const { courseRuns } = this.props
 
+    if (event.target.value === "") {
+      this.setCurrentCourseRun(null)
+      return
+    }
     const matchingCourseRun =
       courseRuns &&
       courseRuns.find(
@@ -232,9 +197,6 @@ export class CourseProductDetailEnroll extends React.Component<
 
     if (matchingCourseRun) {
       this.setCurrentCourseRun(matchingCourseRun)
-      this.setState({
-        isUserSelectedCourseRun: true
-      })
     }
   }
 
@@ -262,7 +224,7 @@ export class CourseProductDetailEnroll extends React.Component<
     })
   }
 
-  renderRunSelectorButtons(run: EnrollmentFlaggedCourseRun) {
+  renderRunSelectorButtons() {
     const { courseRuns } = this.props
 
     return (
@@ -278,10 +240,10 @@ export class CourseProductDetailEnroll extends React.Component<
           onChange={this.hndSetCourseRun.bind(this)}
           className="form-control"
         >
+          <option value="" key="default-select">-- nothing selected --</option>
           {courseRuns &&
             courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
               <option
-                selected={run.id === elem.id}
                 value={elem.id}
                 key={`courserun-selection-${elem.id}`}
               >
@@ -322,13 +284,9 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   renderUpgradeEnrollmentDialog() {
-    const { courseRuns, courses } = this.props
-    const run = this.resolveCurrentRun()
-    const course =
-      courses &&
-      courses.find(
-        (elem: any) => run && run.course && elem.id === run.course.id
-      )
+    const { courseRuns } = this.props
+    const run = this.getCurrentCourseRun()
+    const course = courseRuns[0].course
     const needFinancialAssistanceLink =
       run &&
       isFinancialAssistanceAvailable(run) &&
@@ -351,7 +309,7 @@ export class CourseProductDetailEnroll extends React.Component<
       )
       : []
 
-    return run && isWithinEnrollmentPeriod(run) ? (
+    return (
       <Modal
         id={`upgrade-enrollment-dialog`}
         className="upgrade-enrollment-modal"
@@ -360,7 +318,7 @@ export class CourseProductDetailEnroll extends React.Component<
         centered
       >
         <ModalHeader toggle={() => this.cancelEnrollment()}>
-          {run.title}
+          {course.title}
         </ModalHeader>
         <ModalBody>
           {courseRuns && courseRuns.length > 1 ? (
@@ -457,7 +415,7 @@ export class CourseProductDetailEnroll extends React.Component<
           </div>
         </ModalBody>
       </Modal>
-    ) : null
+    )
   }
 
   renderAddlProfileFieldsModal() {
@@ -582,7 +540,7 @@ export class CourseProductDetailEnroll extends React.Component<
               {this.renderEnrollNowButton(run, product)}
 
               {currentUser ? this.renderAddlProfileFieldsModal() : null}
-              {run ? this.renderUpgradeEnrollmentDialog() : null}
+              {run ? this.renderUpgradeEnrollmentDialog(run) : null}
             </>
           </Loader>
         }
