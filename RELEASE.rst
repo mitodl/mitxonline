@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.87.3
+Version 0.87.3 (Released March 13, 2024)
 --------------
 
 - 2846 Course About: Replace Free with Free to Learn (#2125)
