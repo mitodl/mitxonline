@@ -240,13 +240,12 @@ export class CourseProductDetailEnroll extends React.Component<
           onChange={this.hndSetCourseRun.bind(this)}
           className="form-control"
         >
-          <option value="" key="default-select">-- nothing selected --</option>
+          <option value="" key="default-select">
+            Nothing Selected
+          </option>
           {courseRuns &&
             courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
-              <option
-                value={elem.id}
-                key={`courserun-selection-${elem.id}`}
-              >
+              <option value={elem.id} key={`courserun-selection-${elem.id}`}>
                 {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
                 {formatPrettyDate(moment(new Date(elem.end_date)))}{" "}
                 {elem.is_upgradable ? "(can upgrade)" : ""}
@@ -257,14 +256,19 @@ export class CourseProductDetailEnroll extends React.Component<
     )
   }
 
-  getEnrollmentForm(run: EnrollmentFlaggedCourseRun) {
+  getEnrollmentForm() {
+    const run = this.getCurrentCourseRun()
     const csrfToken = getCookie("csrftoken")
 
     return (
       <form action="/enrollments/" method="post">
         <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
         <input type="hidden" name="run" value={run ? run.id : ""} />
-        <button type="submit" className="btn enroll-now enroll-now-free">
+        <button
+          type="submit"
+          className="btn enroll-now enroll-now-free"
+          disabled={!run}
+        >
           <strong>Enroll for Free</strong> without a certificate
         </button>
       </form>
@@ -286,7 +290,7 @@ export class CourseProductDetailEnroll extends React.Component<
   renderUpgradeEnrollmentDialog() {
     const { courseRuns } = this.props
     const run = this.getCurrentCourseRun()
-    const course = courseRuns[0].course
+    const course = courseRuns && courseRuns[0].course
     const needFinancialAssistanceLink =
       run &&
       isFinancialAssistanceAvailable(run) &&
@@ -318,13 +322,13 @@ export class CourseProductDetailEnroll extends React.Component<
         centered
       >
         <ModalHeader toggle={() => this.cancelEnrollment()}>
-          {course.title}
+          {course && course.title}
         </ModalHeader>
         <ModalBody>
           {courseRuns && courseRuns.length > 1 ? (
             <div className="row date-selector-button-bar">
               <div className="col-12">
-                <div>{this.renderRunSelectorButtons(run)}</div>
+                <div>{this.renderRunSelectorButtons()}</div>
               </div>
             </div>
           ) : null}
@@ -359,7 +363,11 @@ export class CourseProductDetailEnroll extends React.Component<
                 </div>
               </div>
               <div className="row certificate-pricing-row d-sm-flex flex-md-row flex-sm-column">
-                <div className="col-md-6 col-sm-12 certificate-pricing d-flex align-items-center">
+                <div
+                  className={`col-md-6 col-sm-12 certificate-pricing d-flex align-items-center ${
+                    run ? "" : "opacity-50"
+                  }`}
+                >
                   <div className="certificate-pricing-logo">
                     <img src="/static/images/certificates/certificate-logo.svg" />
                   </div>
@@ -393,7 +401,7 @@ export class CourseProductDetailEnroll extends React.Component<
                     <input
                       type="hidden"
                       name="product_id"
-                      value={product && product.id}
+                      value={(product && product.id) || ""}
                     />
                     <button
                       type="submit"
@@ -411,7 +419,7 @@ export class CourseProductDetailEnroll extends React.Component<
           ) : null}
           <div className="row upgrade-options-row">
             <div>{needFinancialAssistanceLink}</div>
-            <div>{this.getEnrollmentForm(run)}</div>
+            <div>{this.getEnrollmentForm()}</div>
           </div>
         </ModalBody>
       </Modal>
@@ -540,7 +548,7 @@ export class CourseProductDetailEnroll extends React.Component<
               {this.renderEnrollNowButton(run, product)}
 
               {currentUser ? this.renderAddlProfileFieldsModal() : null}
-              {run ? this.renderUpgradeEnrollmentDialog(run) : null}
+              {run ? this.renderUpgradeEnrollmentDialog() : null}
             </>
           </Loader>
         }
