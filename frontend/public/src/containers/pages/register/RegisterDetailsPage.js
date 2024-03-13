@@ -146,7 +146,7 @@ export class RegisterDetailsPage extends React.Component<Props> {
         <div className="std-page-body container auth-page registration-page">
           <div className="std-card std-card-auth">
             <div className="std-card-body create-account-page">
-              <g2>Create an Account</g2>
+              <h2>Create an Account</h2>
               <div className="form-group">
                 {`Already have an ${SETTINGS.site_name} account? `}
                 <Link className="link-black" to={routes.login.begin}>

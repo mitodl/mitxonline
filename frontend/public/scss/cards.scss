@@ -98,7 +98,7 @@ div.std-card {
             margin-bottom: 10px;
         }
 
-        input:active, input:focus {
+        input:active, input:focus, input:hover {
             border: 1px solid $home-page-header-blue !important;
             box-shadow: none !important;
         }
@@ -135,6 +135,10 @@ div.std-card {
                 font-size: 14px;
                 line-height: 18px; /* 128.571% */ 
                 margin-bottom: 10px;
+
+                &.label-helptext {
+                    margin-bottom: 10px;
+                }
             }
 
             input, select {
@@ -176,6 +180,7 @@ div.std-card {
 
         button {
             width: 100%;
+            font-size: 20px;
 
             display: inline-flex;
             padding: 20px 40px;
@@ -334,7 +339,7 @@ div.std-card-body, div.enrolled-item, div.cart-helptext {
         color: $home-page-header-blue;
 
         &:hover {
-            color: $brand-darker-bg;
+            color: $brand-darker-bg !important;
         }
     }
 }
