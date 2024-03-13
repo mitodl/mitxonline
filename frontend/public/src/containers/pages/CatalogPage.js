@@ -175,7 +175,8 @@ export class CatalogPage extends React.Component<Props> {
         )
       })
     }
-    // Initialize allCourses and allPrograms variables in state since the value will change when changing departments
+    // Initialize allCourses and allPrograms variables in state once they finish loading to store since the value will
+    // change when changing departments
     if (this.state.allCoursesCount === 0 && !coursesIsLoading) {
       this.setState({ allCoursesCount: coursesCount })
     }
@@ -189,7 +190,7 @@ export class CatalogPage extends React.Component<Props> {
       this.setState({ allProgramsRetrieved: programs })
     }
     if (!departmentsIsLoading && departments.length > 0) {
-      if (!coursesIsLoading && this.state.filteredCoursesCalled) {
+      if (!coursesIsLoading && this.state.filterCoursesCalled) {
         if (this.state.selectedDepartment !== prevState.selectedDepartment) {
           this.resetQueryVariablesToDefault()
         }
