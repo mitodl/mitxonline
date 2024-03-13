@@ -156,7 +156,7 @@ export class CatalogPage extends React.Component<Props> {
    * Updates the filteredDepartments state variable once departmentsIsLoading
    * is false.
    */
-  componentDidUpdate = prevState => {
+  componentDidUpdate = (prevProps, prevState) => {
     const {
       courses,
       coursesCount,
@@ -175,6 +175,7 @@ export class CatalogPage extends React.Component<Props> {
         )
       })
     }
+    // Initialize allCourses and allPrograms variables in state since the value will change when changing departments
     if (this.state.allCoursesCount === 0 && !coursesIsLoading) {
       this.setState({ allCoursesCount: coursesCount })
     }
@@ -190,9 +191,7 @@ export class CatalogPage extends React.Component<Props> {
     if (!departmentsIsLoading && departments.length > 0) {
       if (!coursesIsLoading && this.state.filteredCoursesCalled) {
         if (this.state.selectedDepartment !== prevState.selectedDepartment) {
-          this.setState({ courseQueryPage: 1 })
-          this.setState({ queryIDListString: "" })
-          this.setState({ filteredCoursesCalled: false })
+          this.resetQueryVariablesToDefault()
         }
       }
       if (!coursesIsLoading && !this.state.filterCoursesCalled) {
@@ -232,6 +231,11 @@ export class CatalogPage extends React.Component<Props> {
               this.setState({ filteredCourses: filteredCourses })
             })
           }
+        }
+      }
+      if (!programsIsLoading && this.state.filterProgramsCalled) {
+        if (this.state.selectedDepartment !== prevState.selectedDepartment) {
+          this.resetQueryVariablesToDefault()
         }
       }
       if (!programsIsLoading && !this.state.filterProgramsCalled) {
@@ -305,6 +309,22 @@ export class CatalogPage extends React.Component<Props> {
     }
   }
 
+
+  /**
+   * Resets the query-related variables to their default values.
+   * This is used when the selected department or tab changes to restart the api calls from the beginning.
+   */
+  resetQueryVariablesToDefault() {
+    if (this.state.tabSelected === COURSES_TAB) {
+      this.setState({ courseQueryPage: 1 })
+      this.setState({ queryIDListString: "" })
+      this.setState({ filterCoursesCalled: false})
+    } else {
+      this.setState({ programQueryPage: 1 })
+      this.setState({ filterProgramsCalled: false})
+    }
+  }
+
   /**
    * Updates this.state.selectedDepartment to {ALL_DEPARTMENTS},
    * updates this.state.tabSelected to the parameter,
@@ -316,6 +336,9 @@ export class CatalogPage extends React.Component<Props> {
    */
   changeSelectedTab = (selectTabName: string) => {
     this.setState({ tabSelected: selectTabName })
+    this.setState({
+      filteredDepartments: this.filterDepartmentsByTabName(selectTabName)
+    })
     if (selectTabName === PROGRAMS_TAB) {
       const { programs, programsIsLoading } = this.props
       if (!programsIsLoading) {
@@ -344,6 +367,9 @@ export class CatalogPage extends React.Component<Props> {
       const { courses, coursesIsLoading } = this.props
       if (!coursesIsLoading) {
         const coursesToFilter = []
+        if (this.renderNumberOfCatalogCourses() === 0) {
+          this.setState({ selectedDepartment: ALL_DEPARTMENTS })
+        }
         // The first time that a user switches to the courses tab, allCoursesRetrieved will be
         // empty and should be populated with the results from the first courses API call.
         if (this.state.allCoursesRetrieved.length === 0) {
@@ -351,9 +377,6 @@ export class CatalogPage extends React.Component<Props> {
           coursesToFilter.push(...courses)
         } else {
           coursesToFilter.push(...this.state.allCoursesRetrieved)
-        }
-        if (this.renderNumberOfCatalogCourses() === 0) {
-          this.setState({ selectedDepartment: ALL_DEPARTMENTS })
         }
         const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
           this.state.selectedDepartment,
@@ -364,9 +387,6 @@ export class CatalogPage extends React.Component<Props> {
         })
       }
     }
-    this.setState({
-      filteredDepartments: this.filterDepartmentsByTabName(selectTabName)
-    })
     this.io = new window.IntersectionObserver(
       this.bottomOfLoadedCatalogCallback,
       { threshold: 1.0 }
@@ -389,10 +409,9 @@ export class CatalogPage extends React.Component<Props> {
    */
   changeSelectedDepartment = (selectedDepartment: string) => {
     const { departments } = this.props
-    if (selectedDepartment === ALL_DEPARTMENTS) {
-      this.setState({ courseQueryPage: 1 })
-      this.setState({ queryIDListString: "" })
-    }
+    this.setState({ courseQueryPage: 1 })
+    this.setState({ queryIDListString: "" })
+    this.setState({ filterCoursesCalled: false})
     this.setState({ selectedDepartment: selectedDepartment })
     const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
       selectedDepartment,
