@@ -223,7 +223,7 @@ export class CatalogPage extends React.Component<Props> {
               this.setState({ isLoadingMoreItems: false })
               const allCourses = this.mergeNewObjects(this.state.allCoursesRetrieved, response.body.results)
               this.setState({ allCoursesRetrieved: allCourses })
-              this.setState({ filterProgramsCalled: true })
+              this.setState({ filterCoursesCalled: true })
               const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
                 this.state.selectedDepartment,
                 allCourses
