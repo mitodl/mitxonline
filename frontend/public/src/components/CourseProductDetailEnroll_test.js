@@ -52,7 +52,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
           currentUser: currentUser
         }
       },
-      {}
+      {
+        state: {
+          currentCourseRun: courseRun
+        }
+      }
     )
 
     SETTINGS.features = {
@@ -136,9 +140,15 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     )
     assert.isNotOk(
       inner
-        .find(".enroll-now")
+        .find("#enrollNowBtn")
         .at(0)
         .exists()
+    )
+    assert.isTrue(
+      inner
+        .find(".enroll-now-free")
+        .at(0)
+        .prop("disabled")
     )
   })
 
@@ -269,6 +279,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       isWithinEnrollmentPeriodStub.returns(true)
       isFinancialAssistanceAvailableStub.returns(true)
       const { inner } = await renderPage()
+      inner.setState({ currentCourseRun: courseRun })
 
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
@@ -413,7 +424,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       ]
       isWithinEnrollmentPeriodStub.returns(true)
       const { inner } = await renderPage()
-
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
       await enrollBtn.prop("onClick")()
@@ -447,7 +457,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       isWithinEnrollmentPeriodStub.returns(true)
       isFinancialAssistanceAvailableStub.returns(false)
       const { inner } = await renderPage()
-
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
       await enrollBtn.prop("onClick")()
@@ -531,7 +540,8 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       if (multiples) {
         assert.isTrue(selectorControl.exists())
         const selectorControlItems = selectorControl.find("option")
-        assert.isTrue(selectorControlItems.length === 2)
+        assert.isTrue(selectorControlItems.length === 3)
+        assert.isTrue(selectorControlItems.at(0).text() === "Nothing Selected")
       } else {
         assert.isFalse(selectorControl.exists())
       }

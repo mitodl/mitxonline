@@ -535,6 +535,7 @@ export class CourseProductDetailEnroll extends React.Component<
       if (run) {
         product = run && run.products ? run.products[0] : null
         this.updateDate(run)
+        this.setCurrentCourseRun(run)
       }
     }
 
