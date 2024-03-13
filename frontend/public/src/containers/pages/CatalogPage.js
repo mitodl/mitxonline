@@ -100,52 +100,72 @@ export class CatalogPage extends React.Component<Props> {
    * updated allCoursesRetrieved or allProgramsRetrieved state variable.
    */
   bottomOfLoadedCatalogCallback = async entries => {
-    const {coursesIsLoading, getNextCoursePage, getNextProgramPage, programsIsLoading, programsNextPage} = this.props
+    const {
+      coursesIsLoading,
+      getNextCoursePage,
+      getNextProgramPage,
+      programsIsLoading,
+      programsNextPage
+    } = this.props
     const [entry] = entries
     if (entry.isIntersecting) {
       if (this.state.tabSelected === COURSES_TAB) {
         // Only request the next page if a next page exists (coursesNextPage)
         // and if we aren't already requesting the next page (isLoadingMoreItems).
-        if (!coursesIsLoading && !this.state.isLoadingMoreItems && this.state.filteredCourses.length < this.renderNumberOfCatalogCourses()) {
-          this.setState({isLoadingMoreItems: true})
+        if (
+          !coursesIsLoading &&
+          !this.state.isLoadingMoreItems &&
+          this.state.filteredCourses.length <
+            this.renderNumberOfCatalogCourses()
+        ) {
+          this.setState({ isLoadingMoreItems: true })
           const response = await getNextCoursePage(
             this.state.courseQueryPage,
             this.state.queryIDListString
           )
-          this.setState({isLoadingMoreItems: false})
-          this.setState({courseQueryPage: this.state.courseQueryPage + 1})
+          this.setState({ isLoadingMoreItems: false })
+          this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
           if (response.body.results) {
-            const allCourses = this.mergeNewObjects(this.state.allCoursesRetrieved, response.body.results)
+            const allCourses = this.mergeNewObjects(
+              this.state.allCoursesRetrieved,
+              response.body.results
+            )
             const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
               this.state.selectedDepartment,
               allCourses
             )
-            this.setState({filteredCourses: filteredCourses})
+            this.setState({ filteredCourses: filteredCourses })
             this.setState({
               allCoursesRetrieved: allCourses
             })
           }
         }
       } else {
-        if (!programsIsLoading && !this.state.isLoadingMoreItems && programsNextPage) {
-          this.setState({isLoadingMoreItems: true})
+        if (
+          !programsIsLoading &&
+          !this.state.isLoadingMoreItems &&
+          programsNextPage
+        ) {
+          this.setState({ isLoadingMoreItems: true })
 
           getNextProgramPage(this.state.programQueryPage).then(response => {
-            this.setState({isLoadingMoreItems: false})
-            this.setState({programQueryPage: this.state.programQueryPage + 1})
-            const updatedAllPrograms = this.mergeNewObjects(this.state.allProgramsRetrieved, response.body.results)
+            this.setState({ isLoadingMoreItems: false })
+            this.setState({ programQueryPage: this.state.programQueryPage + 1 })
+            const updatedAllPrograms = this.mergeNewObjects(
+              this.state.allProgramsRetrieved,
+              response.body.results
+            )
             const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
               this.state.selectedDepartment,
               updatedAllPrograms
             )
-            this.setState({filteredPrograms: filteredPrograms})
-            this.setState({allProgramsRetrieved: updatedAllPrograms})
+            this.setState({ filteredPrograms: filteredPrograms })
+            this.setState({ allProgramsRetrieved: updatedAllPrograms })
           })
         }
       }
     }
   }
-
 
   /**
    * Updates the filteredCourses state variable
@@ -200,7 +220,10 @@ export class CatalogPage extends React.Component<Props> {
           this.state.allCoursesRetrieved
         )
         this.setState({ filteredCourses: filteredCourses })
-        this.countAndRetrieveMoreCourses(filteredCourses, this.state.selectedDepartment)
+        this.countAndRetrieveMoreCourses(
+          filteredCourses,
+          this.state.selectedDepartment
+        )
       }
       if (!programsIsLoading && this.state.filterProgramsCalled) {
         if (this.state.selectedDepartment !== prevState.selectedDepartment) {
@@ -209,7 +232,10 @@ export class CatalogPage extends React.Component<Props> {
       }
       if (!programsIsLoading && !this.state.filterProgramsCalled) {
         this.setState({ filterProgramsCalled: true })
-        this.countAndRetrieveMorePrograms(this.state.allProgramsRetrieved, this.state.selectedDepartment)
+        this.countAndRetrieveMorePrograms(
+          this.state.allProgramsRetrieved,
+          this.state.selectedDepartment
+        )
       }
       this.io = new window.IntersectionObserver(
         this.bottomOfLoadedCatalogCallback,
@@ -249,7 +275,6 @@ export class CatalogPage extends React.Component<Props> {
     }
   }
 
-
   /**
    * Resets the query-related variables to their default values.
    * This is used when the selected department or tab changes to restart the api calls from the beginning.
@@ -258,9 +283,9 @@ export class CatalogPage extends React.Component<Props> {
     if (this.state.tabSelected === COURSES_TAB) {
       this.setState({ courseQueryPage: 1 })
       this.setState({ queryIDListString: "" })
-      this.setState({ filterCoursesCalled: false})
+      this.setState({ filterCoursesCalled: false })
     } else {
-      this.setState({ filterProgramsCalled: false})
+      this.setState({ filterProgramsCalled: false })
     }
   }
 
@@ -293,7 +318,10 @@ export class CatalogPage extends React.Component<Props> {
         if (this.renderNumberOfCatalogPrograms() === 0) {
           this.setState({ selectedDepartment: ALL_DEPARTMENTS })
         }
-        this.countAndRetrieveMorePrograms(programsToFilter, this.state.selectedDepartment)
+        this.countAndRetrieveMorePrograms(
+          programsToFilter,
+          this.state.selectedDepartment
+        )
       }
     }
     if (selectTabName === COURSES_TAB) {
@@ -318,7 +346,10 @@ export class CatalogPage extends React.Component<Props> {
         this.setState({
           filteredCourses: filteredCourses
         })
-        this.countAndRetrieveMoreCourses(filteredCourses, this.state.selectedDepartment)
+        this.countAndRetrieveMoreCourses(
+          filteredCourses,
+          this.state.selectedDepartment
+        )
       }
     }
     this.io = new window.IntersectionObserver(
@@ -355,7 +386,10 @@ export class CatalogPage extends React.Component<Props> {
     if (this.state.tabSelected === COURSES_TAB) {
       this.countAndRetrieveMoreCourses(filteredCourses, selectedDepartment)
     } else if (this.state.tabSelected === PROGRAMS_TAB) {
-      this.countAndRetrieveMorePrograms(this.state.allProgramsRetrieved, selectedDepartment)
+      this.countAndRetrieveMorePrograms(
+        this.state.allProgramsRetrieved,
+        selectedDepartment
+      )
     }
     this.io = new window.IntersectionObserver(
       this.bottomOfLoadedCatalogCallback,
@@ -366,19 +400,30 @@ export class CatalogPage extends React.Component<Props> {
 
   countAndRetrieveMoreCourses(filteredCourses, selectedDepartment) {
     const { departments, getNextCoursePage } = this.props
-    if (selectedDepartment !== ALL_DEPARTMENTS && selectedDepartment !== "" && departments.length > 0) {
+    if (
+      selectedDepartment !== ALL_DEPARTMENTS &&
+      selectedDepartment !== "" &&
+      departments.length > 0
+    ) {
       const newDepartment = this.props.departments.find(
         department => department.name === selectedDepartment
       )
-      if (filteredCourses.length !== newDepartment.course_ids.length && !this.state.isLoadingMoreItems) {
+      if (
+        filteredCourses.length !== newDepartment.course_ids.length &&
+        !this.state.isLoadingMoreItems
+      ) {
         const remainingIDs = newDepartment.course_ids.filter(
-          id => !this.state.allCoursesRetrieved.map(course => course.id).includes(id)
+          id =>
+            !this.state.allCoursesRetrieved
+              .map(course => course.id)
+              .includes(id)
         )
         this.setState({ isLoadingMoreItems: true })
-        getNextCoursePage(1,
-          remainingIDs.toString()
-        ).then(response => {
-          const allCourses = this.mergeNewObjects(this.state.allCoursesRetrieved, response.body.results)
+        getNextCoursePage(1, remainingIDs.toString()).then(response => {
+          const allCourses = this.mergeNewObjects(
+            this.state.allCoursesRetrieved,
+            response.body.results
+          )
           this.setState({ allCoursesRetrieved: allCourses })
           this.setState({ courseQueryPage: 2 })
           this.setState({ queryIDListString: remainingIDs.toString() })
@@ -401,10 +446,17 @@ export class CatalogPage extends React.Component<Props> {
       allPrograms
     )
     this.setState({ filteredPrograms: filteredPrograms })
-    if (programsNextPage && !this.state.isLoadingMoreItems && this.state.allProgramsRetrieved.length < this.state.allProgramsCount) {
+    if (
+      programsNextPage &&
+      !this.state.isLoadingMoreItems &&
+      this.state.allProgramsRetrieved.length < this.state.allProgramsCount
+    ) {
       this.setState({ isLoadingMoreItems: true })
       getNextProgramPage(this.state.programQueryPage).then(response => {
-        const updatedAllPrograms = this.mergeNewObjects(allPrograms, response.body.results)
+        const updatedAllPrograms = this.mergeNewObjects(
+          allPrograms,
+          response.body.results
+        )
         this.setState({ allProgramsRetrieved: updatedAllPrograms })
         this.setState({ programQueryPage: this.state.programQueryPage + 1 })
         filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(

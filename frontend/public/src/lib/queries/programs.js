@@ -23,8 +23,8 @@ export const programsCountSelector = pathOr(null, [
 export const programsQueryKey = "programs"
 
 export const programsQuery = page => ({
-  queryKey:   programsQueryKey,
-  url:        `/api/v2/programs/?page=${page}&live=true&page__live=true`,
+  queryKey:  programsQueryKey,
+  url:       `/api/v2/programs/?page=${page}&live=true&page__live=true`,
   transform: json => ({
     programs: json
   }),

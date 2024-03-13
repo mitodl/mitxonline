@@ -184,6 +184,8 @@ describe("CatalogPage", function() {
     inner.instance().componentDidUpdate({}, {})
     expect(inner.state().selectedDepartment).equals("All Departments")
     expect(inner.state().tabSelected).equals("courses")
+    inner.instance().componentDidUpdate({}, {})
+    console.log(inner.state())
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
     )
