@@ -248,7 +248,7 @@ export class CourseProductDetailEnroll extends React.Component<
               <option value={elem.id} key={`courserun-selection-${elem.id}`}>
                 {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
                 {formatPrettyDate(moment(new Date(elem.end_date)))}{" "}
-                {elem.is_upgradable ? "(can upgrade)" : ""}
+                {elem.is_upgradable ? "" : "(no certificate available"}
               </option>
             ))}
         </select>
@@ -287,9 +287,9 @@ export class CourseProductDetailEnroll extends React.Component<
     }
   }
 
-  renderUpgradeEnrollmentDialog() {
+  renderUpgradeEnrollmentDialog(firstRelevantRun: EnrollmentFlaggedCourseRun) {
     const { courseRuns } = this.props
-    const run = this.getCurrentCourseRun()
+    const run = this.getCurrentCourseRun() || firstRelevantRun
     const course = courseRuns && courseRuns[0].course
     const needFinancialAssistanceLink =
       run &&
@@ -306,6 +306,7 @@ export class CourseProductDetailEnroll extends React.Component<
           </p>
         ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
+    const hasMultipleEnrollableRuns = courseRuns && courseRuns.length > 1
     const product = run && run.products ? run.products[0] : null
     const upgradableCourseRuns = courseRuns
       ? courseRuns.filter(
@@ -325,7 +326,7 @@ export class CourseProductDetailEnroll extends React.Component<
           {course && course.title}
         </ModalHeader>
         <ModalBody>
-          {courseRuns && courseRuns.length > 1 ? (
+          {hasMultipleEnrollableRuns ? (
             <div className="row date-selector-button-bar">
               <div className="col-12">
                 <div>{this.renderRunSelectorButtons()}</div>
@@ -535,7 +536,6 @@ export class CourseProductDetailEnroll extends React.Component<
       if (run) {
         product = run && run.products ? run.products[0] : null
         this.updateDate(run)
-        this.setCurrentCourseRun(run)
       }
     }
 
@@ -549,7 +549,7 @@ export class CourseProductDetailEnroll extends React.Component<
               {this.renderEnrollNowButton(run, product)}
 
               {currentUser ? this.renderAddlProfileFieldsModal() : null}
-              {run ? this.renderUpgradeEnrollmentDialog() : null}
+              {run ? this.renderUpgradeEnrollmentDialog(run) : null}
             </>
           </Loader>
         }
