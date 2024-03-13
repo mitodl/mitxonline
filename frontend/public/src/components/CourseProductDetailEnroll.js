@@ -248,7 +248,7 @@ export class CourseProductDetailEnroll extends React.Component<
               <option value={elem.id} key={`courserun-selection-${elem.id}`}>
                 {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
                 {formatPrettyDate(moment(new Date(elem.end_date)))}{" "}
-                {elem.is_upgradable ? "" : "(no certificate available"}
+                {elem.is_upgradable ? "" : "(no certificate available)"}
               </option>
             ))}
         </select>
@@ -256,8 +256,7 @@ export class CourseProductDetailEnroll extends React.Component<
     )
   }
 
-  getEnrollmentForm() {
-    const run = this.getCurrentCourseRun()
+  getEnrollmentForm(run: EnrollmentFlaggedCourseRun) {
     const csrfToken = getCookie("csrftoken")
 
     return (
@@ -289,8 +288,12 @@ export class CourseProductDetailEnroll extends React.Component<
 
   renderUpgradeEnrollmentDialog(firstRelevantRun: EnrollmentFlaggedCourseRun) {
     const { courseRuns } = this.props
-    const run = this.getCurrentCourseRun() || firstRelevantRun
+    let run = this.getCurrentCourseRun()
     const course = courseRuns && courseRuns[0].course
+    const hasMultipleEnrollableRuns = courseRuns && courseRuns.length > 1
+    if (!run && !hasMultipleEnrollableRuns) {
+      run = firstRelevantRun
+    }
     const needFinancialAssistanceLink =
       run &&
       isFinancialAssistanceAvailable(run) &&
@@ -306,7 +309,6 @@ export class CourseProductDetailEnroll extends React.Component<
           </p>
         ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
-    const hasMultipleEnrollableRuns = courseRuns && courseRuns.length > 1
     const product = run && run.products ? run.products[0] : null
     const upgradableCourseRuns = courseRuns
       ? courseRuns.filter(
@@ -420,7 +422,7 @@ export class CourseProductDetailEnroll extends React.Component<
           ) : null}
           <div className="row upgrade-options-row">
             <div>{needFinancialAssistanceLink}</div>
-            <div>{this.getEnrollmentForm()}</div>
+            <div>{this.getEnrollmentForm(run)}</div>
           </div>
         </ModalBody>
       </Modal>
