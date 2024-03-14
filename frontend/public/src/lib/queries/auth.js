@@ -66,7 +66,7 @@ export default {
     username: string,
     legalAddress: LegalAddress,
     userProfile: ?UserProfile,
-    partialToken: string,
+    partialToken: string
   ) => ({
     ...DEFAULT_OPTIONS,
     url:  "/api/register/details/",

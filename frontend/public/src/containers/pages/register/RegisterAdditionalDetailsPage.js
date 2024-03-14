@@ -50,7 +50,10 @@ const getInitialValues = (user: User) => ({
 
 export class RegisterAdditionalDetailsPage extends React.Component<Props> {
   async onSubmit(detailsData: any, { setSubmitting, setErrors }: any) {
-    const { editProfile, params: { next } } = this.props
+    const {
+      editProfile,
+      params: { next }
+    } = this.props
 
     // On this page, if the user selects stuff for learner type and education
     // level, we also set the field flag so we don't ping the learner later to
@@ -67,9 +70,7 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
     }
 
     try {
-      const {
-        body
-      }: { body: Object } = await editProfile(detailsData)
+      const { body }: { body: Object } = await editProfile(detailsData)
       if (body.errors && body.errors.length > 0) {
         setErrors(body.errors)
       } else {
