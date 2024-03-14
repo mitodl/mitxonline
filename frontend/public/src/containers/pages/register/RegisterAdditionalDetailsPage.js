@@ -35,7 +35,6 @@ type DispatchProps = {|
 |}
 
 type Props = {
-  history: RouterHistory,
   params: { next: string },
   ...StateProps,
   ...DispatchProps
