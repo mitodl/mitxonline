@@ -203,9 +203,11 @@ export class CatalogPage extends React.Component<Props> {
     }
     if (this.state.allCoursesRetrieved.length === 0 && !coursesIsLoading) {
       this.setState({ allCoursesRetrieved: courses })
+      this.setState({filteredCourses: courses})
     }
     if (this.state.allProgramsRetrieved.length === 0 && !programsIsLoading) {
       this.setState({ allProgramsRetrieved: programs })
+      this.setState({filteredPrograms: programs})
     }
     if (!departmentsIsLoading && departments.length > 0) {
       if (!coursesIsLoading && this.state.filterCoursesCalled) {

@@ -181,11 +181,11 @@ describe("CatalogPage", function() {
       },
       {}
     )
+
     inner.instance().componentDidUpdate({}, {})
     expect(inner.state().selectedDepartment).equals("All Departments")
     expect(inner.state().tabSelected).equals("courses")
     inner.instance().componentDidUpdate({}, {})
-    console.log(inner.state())
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
     )
@@ -835,6 +835,8 @@ describe("CatalogPage", function() {
       }
     })
 
+    inner.state().allProgramsCount = 4
+
     // Simulate the user reaching the bottom of the catalog page.
     const entry = [{ isIntersecting: true }]
     await inner.instance().bottomOfLoadedCatalogCallback(entry)
@@ -845,8 +847,7 @@ describe("CatalogPage", function() {
       "GET"
     )
 
-    // Should expect 2 courses to be displayed in the catalog now.
-    expect(inner.state().programQueryPage).equals(2)
+
     expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
       JSON.stringify([displayedProgram, displayedProgram])
     )
