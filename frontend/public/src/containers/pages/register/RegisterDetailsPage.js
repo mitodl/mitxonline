@@ -100,8 +100,11 @@ export class RegisterDetailsPage extends React.Component<Props> {
       }
 
       if (body.state === STATE_SUCCESS) {
-        // COLLIN, can you append the ?next value to this?
-        body.redirect_url = `${routes.register.additionalDetails}?next=${encodeURIComponent(body.redirect_url)}`
+        const nextParam = body.redirect_url
+        body.redirect_url = routes.register.additionalDetails
+        if (nextParam) {
+          body.redirect_url += `?next=${encodeURIComponent(nextParam)}`
+        }
       }
 
       /* eslint-disable camelcase */
