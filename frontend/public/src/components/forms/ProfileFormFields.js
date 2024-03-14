@@ -358,11 +358,7 @@ export const ProfileFields = () => (
     <div className="row small-gap">
       <div className="col">
         <div className="form-group">
-          <CardLabel
-            htmlFor="user_profile.gender"
-            isRequired={true}
-            label="Gender"
-          />
+          <CardLabel htmlFor="user_profile.gender" label="Gender" />
 
           <Field
             component="select"
@@ -402,7 +398,7 @@ export const AddlProfileFields = ({
         <div className="col">
           <CardLabel
             htmlFor="user_profile.highest_education"
-            isRequired={true}
+            isRequired={false}
             label="Highest Level of Education"
           />
           {requireAddlFields ? <span className="required">*</span> : ""}
@@ -435,7 +431,7 @@ export const AddlProfileFields = ({
         component={FormError}
       />
     </div>
-    <div className="row small-gap">
+    <div className="row small-gap profile-student-type">
       <div className="col-6">
         <div className="form-check">
           <Field
@@ -665,6 +661,5 @@ export const AddlProfileFields = ({
         </div>
       </React.Fragment>
     ) : null}
-    <div className="row small-gap"></div>
   </React.Fragment>
 )

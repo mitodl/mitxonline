@@ -10,6 +10,7 @@ import {
   passwordFieldRegex,
   passwordFieldErrorMessage
 } from "../../lib/validation"
+import CardLabel from "../input/CardLabel"
 
 type Props = {
   onSubmit: Function
@@ -31,7 +32,11 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
     render={({ isSubmitting }) => (
       <Form>
         <div className="form-group">
-          <label htmlFor="newPassword">New Password</label>
+          <CardLabel
+            htmlFor="newPassword"
+            isRequired={true}
+            label="New Password"
+          />
           <Field
             name="newPassword"
             id="newPassword"
@@ -48,7 +53,11 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
           />
         </div>
         <div className="form-group">
-          <label htmlFor="confirmPassword">Confirm Password</label>
+          <CardLabel
+            htmlFor="confirmPassword"
+            isRequired={true}
+            label="Confirm Password"
+          />
           <Field
             name="confirmPassword"
             id="confirmPassword"

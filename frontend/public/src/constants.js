@@ -137,7 +137,7 @@ export const LOGIN_PASSWORD_PAGE_TITLE = LOGIN_EMAIL_PAGE_TITLE
 export const FORGOT_PASSWORD_PAGE_TITLE = "Forgot Password"
 export const FORGOT_PASSWORD_CONFIRM_PAGE_TITLE = FORGOT_PASSWORD_PAGE_TITLE
 
-export const EDIT_PROFILE_PAGE_TITLE = "Profile Information"
+export const EDIT_PROFILE_PAGE_TITLE = "Edit Profile"
 export const VIEW_PROFILE_PAGE_TITLE = "Profile Information"
 
 export const REGISTER_EMAIL_PAGE_TITLE = "Register"

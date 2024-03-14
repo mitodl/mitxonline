@@ -119,16 +119,14 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
                         values={values}
                         isNewAccount={false}
                       />
-                      <div className="row submit-row no-gutters">
-                        <div className="col d-flex justify-content-end">
-                          <button
-                            type="submit"
-                            className="btn btn-primary btn-gradient-red-to-blue"
-                            disabled={isSubmitting}
-                          >
-                            Submit
-                          </button>
-                        </div>
+                      <div className="submit-row">
+                        <button
+                          type="submit"
+                          className="btn btn-primary btn-gradient-red-to-blue"
+                          disabled={isSubmitting}
+                        >
+                          Submit
+                        </button>
                       </div>
                     </Form>
                   )}

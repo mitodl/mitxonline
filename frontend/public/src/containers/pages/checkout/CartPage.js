@@ -171,7 +171,9 @@ export class CartPage extends React.Component<Props, CartState> {
           <div className="std-page-body cart container">
             <div className="row d-flex flex-column-reverse flex-md-column flex-lg-row">
               <div className="col-lg-8 enrolled-items">
-                <p>You are about to purchase the following:</p>
+                <p className="d-sm-none">
+                  You are about to purchase the following:
+                </p>
                 {cartItems && cartItems.length > 0
                   ? cartItems.map(this.renderCartItemCard.bind(this))
                   : this.renderEmptyCartCard()}

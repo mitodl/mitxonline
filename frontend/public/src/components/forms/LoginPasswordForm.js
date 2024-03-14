@@ -38,9 +38,7 @@ const LoginPasswordForm = ({ onSubmit }: LoginPasswordFormProps) => (
           />
         </div>
         <div className="form-group">
-          <Link to={routes.login.forgot.begin} className="link-black">
-            Forgot Password?
-          </Link>
+          <Link to={routes.login.forgot.begin}>Forgot Password?</Link>
         </div>
         <div className="row submit-row no-gutters">
           <div className="col d-flex justify-content-end">

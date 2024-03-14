@@ -59,7 +59,7 @@
                   <span id="financial-assist-testify" class="financial-assist-testify">I testify that the income I reported is true and accurate. I am aware that I may be asked to verify the reported income with documentation.</span>
                 </div>
                 <div class="row submit-row no-gutters justify-content-center">
-                  <button type="submit" class="btn btn-primary btn-gradient-red large">Submit request</button>
+                  <button type="submit" class="btn btn-primary btn-gradient-red-to-blue large">Submit request</button>
                 </div>
               </form>
             </div>
@@ -84,17 +84,17 @@
                   <input type="hidden" name="product_id" value={{ product.id }} />
                   <button
                     type="submit"
-                    class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
+                    class="btn btn-primary btn-gradient-red-to-blue flexible-price-certificate-btn">
                     Get Certificate
                   </button>
                 </form>
               {% else %}
-                <a href="{{ product_page }}" class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
+                <a href="{{ product_page }}" class="btn btn-primary btn-gradient-red-to-blue flexible-price-certificate-btn">
                   Course details
                 </a>
               {% endif %}
             {% elif page.selected_program %}
-              <a href="/dashboard" class="btn btn-primary btn-gradient-red flexible-price-certificate-btn">
+              <a href="/dashboard" class="btn btn-primary btn-gradient-red-to-blue flexible-price-certificate-btn">
               Go to Dashboard
               </a>
             {% endif %}

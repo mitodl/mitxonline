@@ -1,7 +1,7 @@
 // @flow
 import React from "react"
 import type { Product } from "../flow/cartTypes"
-import { generateStartDateText } from "../lib/courseApi"
+import { courseRunStatusMessage } from "../lib/courseApi"
 
 type Props = {
   product: Product
@@ -45,7 +45,7 @@ export class CartItemCard extends React.Component<Props> {
         ? purchasableObject.course_number
         : purchasableObject.run_tag
 
-    const startDateDescription = generateStartDateText(purchasableObject)
+    const courseRunStatusMessageText = courseRunStatusMessage(purchasableObject)
     const courseImage =
       course !== undefined && course.page !== null ? (
         <img src={course.page.feature_image_src} alt="" />
@@ -62,22 +62,8 @@ export class CartItemCard extends React.Component<Props> {
           <div className="col-12 col-md enrollment-details-container">
             <h2 className="">{title}</h2>
             <div className="detail">
-              {readableId} |{" "}
-              {startDateDescription !== null && startDateDescription.active ? (
-                <span>
-                  <strong className="text-dark">Starts</strong>{" "}
-                  {startDateDescription.datestr}
-                </span>
-              ) : (
-                <span>
-                  {startDateDescription === null ? null : (
-                    <span>
-                      <strong>Active</strong> from{" "}
-                      {startDateDescription.datestr}
-                    </span>
-                  )}
-                </span>
-              )}
+              {readableId}
+              {courseRunStatusMessageText}
             </div>
             <div className="enrollment-extra-links d-flex">
               {course !== undefined && courseDetail}
