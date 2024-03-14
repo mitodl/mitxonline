@@ -9,9 +9,11 @@ import { connect } from "react-redux"
 import { mutateAsync, requestAsync } from "redux-query"
 import { connectRequest } from "redux-query-react"
 import { createStructuredSelector } from "reselect"
+import type { RouterHistory } from "react-router"
+
+import { qsNextSelector } from "../../../lib/selectors"
 
 import users, { currentUserSelector } from "../../../lib/queries/users"
-import { routes } from "../../../lib/urls"
 import queries from "../../../lib/queries"
 
 import {
@@ -32,10 +34,12 @@ type DispatchProps = {|
   getCurrentUser: () => Promise<HttpResponse<User>>
 |}
 
-type Props = {|
+type Props = {
+  history: RouterHistory,
+  params: { next: string },
   ...StateProps,
   ...DispatchProps
-|}
+}
 
 const getInitialValues = (user: User) => ({
   name:          user.name,
@@ -46,7 +50,7 @@ const getInitialValues = (user: User) => ({
 
 export class RegisterAdditionalDetailsPage extends React.Component<Props> {
   async onSubmit(detailsData: any, { setSubmitting, setErrors }: any) {
-    const { editProfile } = this.props
+    const { editProfile, params: { next }, history } = this.props
 
     // On this page, if the user selects stuff for learner type and education
     // level, we also set the field flag so we don't ping the learner later to
@@ -64,13 +68,16 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
 
     try {
       const {
-        body: { errors }
+        body
       }: { body: Object } = await editProfile(detailsData)
-
-      if (errors && errors.length > 0) {
-        setErrors(errors)
+      if (body.errors && body.errors.length > 0) {
+        setErrors(body.errors)
       } else {
-        window.location = routes.dashboard
+        console.log(next)
+        window.location = next
+        //history.push(next)
+        //return
+        //window.location = next
       }
     } finally {
       setSubmitting(false)
@@ -135,7 +142,10 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
 }
 
 const mapStateToProps = createStructuredSelector({
-  currentUser: currentUserSelector
+  currentUser: currentUserSelector,
+  params:      createStructuredSelector({
+    next: qsNextSelector
+  })
 })
 
 const mapPropsToConfig = () => [queries.users.countriesQuery()]

@@ -55,8 +55,7 @@ type DispatchProps = {|
     username: string,
     legalAddress: LegalAddress,
     userProfile: UserProfile,
-    partialToken: string,
-    next: ?string
+    partialToken: string
   ) => Promise<HttpResponse<AuthResponse>>,
   getCurrentUser: () => Promise<HttpResponse<User>>,
   addUserNotification: Function
@@ -101,7 +100,8 @@ export class RegisterDetailsPage extends React.Component<Props> {
       }
 
       if (body.state === STATE_SUCCESS) {
-        body.redirect_url = routes.register.additionalDetails
+        // COLLIN, can you append the ?next value to this?
+        body.redirect_url = `${routes.register.additionalDetails}?next=${encodeURIComponent(body.redirect_url)}`
       }
 
       /* eslint-disable camelcase */
