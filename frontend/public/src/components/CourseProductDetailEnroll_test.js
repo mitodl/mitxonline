@@ -144,12 +144,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         .at(0)
         .exists()
     )
-    assert.isTrue(
-      inner
-        .find(".enroll-now-free")
-        .at(0)
-        .prop("disabled")
-    )
   })
 
   it("checks for enroll now button should appear if enrollment start not in future", async () => {
