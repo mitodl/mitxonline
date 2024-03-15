@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 
-{% load static wagtail_img_src feature_img_src %}
+{% load static wagtail_img_src feature_img_src wagtailmetadata_tags %}
 {% load wagtailcore_tags wagtailembeds_tags %}
+
+{% block seohead %}
+    {% meta_tags %}
+{% endblock%}
 
 {% block title %}{{ site_name }}{% endblock %}
 

@@ -2,10 +2,17 @@
 {% block bodyclass %}{% if new_design %}new-design{% endif %}{% endblock %}
 
 {% load static wagtail_img_src feature_img_src %}
-{% load wagtailcore_tags wagtailembeds_tags %}
+{% load wagtailcore_tags wagtailembeds_tags wagtailmetadata_tags %}
 {% load expand %}
 {% load videojs %}
 {% load course_list %}
+
+{% block seohead %}
+    {% meta_tags page %}
+    {% if page.thumbnail_image %}
+      <meta property="og:image" content="{% feature_img_src page.thumbnail_image %}" />
+    {% endif %}
+{% endblock %}
 
 {% block title %}{{ page.title }} | {{ site_name }}{% endblock %}
 

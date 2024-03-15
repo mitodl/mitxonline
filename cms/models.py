@@ -1,4 +1,5 @@
 """CMS model definitions"""
+
 import json
 import logging
 import re
@@ -36,6 +37,7 @@ from wagtail.fields import RichTextField, StreamField
 from wagtail.images.models import Image
 from wagtail.models import Page
 from wagtail.search import index
+from wagtailmetadata.models import MetadataPageMixin
 
 from cms.blocks import (
     CourseRunCertificateOverrides,
@@ -413,12 +415,16 @@ class CertificatePage(CourseProgramChildPage):
         if request.is_preview:
             preview_context = {
                 "learner_name": "Anthony M. Stark",
-                "start_date": self.parent.product.first_unexpired_run.start_date
-                if self.parent.product.first_unexpired_run
-                else datetime.now(),
-                "end_date": self.parent.product.first_unexpired_run.end_date
-                if self.parent.product.first_unexpired_run
-                else datetime.now() + timedelta(days=45),
+                "start_date": (
+                    self.parent.product.first_unexpired_run.start_date
+                    if self.parent.product.first_unexpired_run
+                    else datetime.now()
+                ),
+                "end_date": (
+                    self.parent.product.first_unexpired_run.end_date
+                    if self.parent.product.first_unexpired_run
+                    else datetime.now() + timedelta(days=45)
+                ),
                 "CEUs": self.CEUs,
             }
         elif self.certificate:
@@ -452,9 +458,9 @@ class CertificatePage(CourseProgramChildPage):
                 "end_date": end_date,
                 "CEUs": CEUs,
                 "is_program_certificate": is_program_certificate,
-                "program_type": self.parent.program.program_type
-                if is_program_certificate
-                else "",
+                "program_type": (
+                    self.parent.program.program_type if is_program_certificate else ""
+                ),
             }
         else:
             raise Http404()
@@ -731,9 +737,11 @@ class HomePage(VideoPlayerConfigMixin):
                     "url_path": product_page.get_url(),
                     "is_program": product_page.is_program_page,
                     "is_self_paced": run.is_self_paced if run is not None else None,
-                    "program_type": product_page.product.program_type
-                    if product_page.is_program_page
-                    else None,
+                    "program_type": (
+                        product_page.product.program_type
+                        if product_page.is_program_page
+                        else None
+                    ),
                 }
 
                 if run and run.start_date and run.start_date < now_in_utc():
@@ -903,7 +911,7 @@ class ProgramIndexPage(CourseObjectIndexPage):
         return self.get_children().get(programpage__program__readable_id=readable_id)
 
 
-class ProductPage(VideoPlayerConfigMixin):
+class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
     """
     Abstract detail page for course runs and any other "product" that a user can enroll in
     """
@@ -1509,9 +1517,9 @@ class FlexiblePricingRequestForm(AbstractForm):
         else:
             sub_qset = sub_qset.filter(
                 courseware_object_id=parent_courseware.id,
-                courseware_content_type=course_ct
-                if isinstance(parent_courseware, Course)
-                else program_ct,
+                courseware_content_type=(
+                    course_ct if isinstance(parent_courseware, Course) else program_ct
+                ),
             )
 
         return sub_qset.order_by("-created_on").first()
