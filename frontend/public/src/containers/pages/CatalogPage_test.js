@@ -847,4 +847,39 @@ describe("CatalogPage", function() {
     // The count should still be 4 regardless of how many are added or not, since the highest provided count was 4.
     expect(inner.instance().renderNumberOfCatalogPrograms()).equals(4)
   })
+
+  it("mergeNewObjects removes duplicates if present", async () => {
+    const oldArray = [displayedProgram]
+    const newArray = [displayedProgram]
+    const { inner } = await renderPage()
+    const mergedArray = inner.instance().mergeNewObjects(oldArray, newArray)
+    expect(mergedArray.length).equals(1)
+    expect(JSON.stringify(mergedArray)).equals(JSON.stringify(oldArray))
+  })
+
+  it("mergeNewObjects merges objects if they are not duplicates", async () => {
+    const oldArray = [displayedProgram]
+    const newProgram = JSON.parse(JSON.stringify(displayedProgram))
+    newProgram.id = 3
+    const newArray = [newProgram]
+    const { inner } = await renderPage()
+    const mergedArray = inner.instance().mergeNewObjects(oldArray, newArray)
+    expect(mergedArray.length).equals(2)
+    expect(JSON.stringify(mergedArray)).equals(
+      JSON.stringify([displayedProgram, newProgram])
+    )
+  })
+
+  it("mergeNewObjects keeps items with different IDs and removes duplicates", async () => {
+    const oldArray = [displayedProgram]
+    const newProgram = JSON.parse(JSON.stringify(displayedProgram))
+    newProgram.id = 3
+    const newArray = [newProgram, displayedProgram, displayedProgram]
+    const { inner } = await renderPage()
+    const mergedArray = inner.instance().mergeNewObjects(oldArray, newArray)
+    expect(mergedArray.length).equals(2)
+    expect(JSON.stringify(mergedArray)).equals(
+      JSON.stringify([displayedProgram, newProgram])
+    )
+  })
 })
