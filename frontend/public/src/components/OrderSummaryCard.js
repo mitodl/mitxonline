@@ -22,17 +22,7 @@ export class OrderSummaryCard extends React.Component<Props> {
     const { discounts } = this.props
 
     if (discounts === null || discounts.length === 0) {
-      return (
-        <div className="d-flex justify-content-between coupon-info">
-          <div className="flex-grow-1">
-            Coupon applied (
-            <em className="fw-bold text-primary">code-12345-abcd</em> )
-          </div>
-          <div className="ml-auto text-primary text-end">
-            Fixed Price: $20.00
-          </div>
-        </div>
-      )
+      return null
     }
 
     let discountAmountText = null
