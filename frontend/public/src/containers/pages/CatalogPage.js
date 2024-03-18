@@ -146,10 +146,8 @@ export class CatalogPage extends React.Component<Props> {
           !this.state.isLoadingMoreItems &&
           programsNextPage
         ) {
-          console.log("we iffed")
           this.setState({ isLoadingMoreItems: true })
           getNextProgramPage(this.state.programQueryPage).then(response => {
-            console.log(response)
             this.setState({ isLoadingMoreItems: false })
             this.setState({ programQueryPage: this.state.programQueryPage + 1 })
             const updatedAllPrograms = this.mergeNewObjects(
@@ -475,6 +473,7 @@ export class CatalogPage extends React.Component<Props> {
   mergeNewObjects(oldArray, newArray) {
     const oldIds = oldArray.map(a => a.id)
     const newObjects = newArray.filter(a => !oldIds.includes(a.id))
+    console.log(oldArray, newArray, newObjects)
     return oldArray.concat(newObjects)
   }
 

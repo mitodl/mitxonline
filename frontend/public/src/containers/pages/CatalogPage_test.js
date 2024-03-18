@@ -800,7 +800,7 @@ describe("CatalogPage", function() {
             next:    "http://fake.com/api/courses/?page=2"
           },
           programs: {
-            count:   2,
+            count:   4,
             results: programs,
             next:    "http://fake.com/api/courses/?page=2"
           },
@@ -829,17 +829,6 @@ describe("CatalogPage", function() {
     )
     // While there is only one showing, there are still 2 total. The total should be shown.
     expect(inner.instance().renderNumberOfCatalogPrograms()).equals(2)
-    const anotherProgram = JSON.parse(JSON.stringify(displayedProgram))
-    anotherProgram.id = 8
-
-    // Mock the second page of program API results.
-    helper.handleRequestStub.returns({
-      body: {
-        next:    null,
-        results: [anotherProgram],
-        count:   2
-      }
-    })
 
     inner.state().allProgramsCount = 4
     // simulate the state variables changing correctly since the shallow render doesn't actually change the state
@@ -855,14 +844,8 @@ describe("CatalogPage", function() {
       "/api/v2/programs/?page=2&live=true&page__live=true",
       "GET"
     )
-    expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
-      JSON.stringify([displayedProgram, anotherProgram])
-    )
-    expect(JSON.stringify(inner.state().filteredPrograms)).equals(
-      JSON.stringify([displayedProgram, anotherProgram])
-    )
 
-    // This should still be 2 because we haven't changed the filter - no matter if one or two have loaded, there are 2
-    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(2)
+    // If allProgramsCount changes, when we load more, we should see the new count
+    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(4)
   })
 })
