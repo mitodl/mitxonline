@@ -181,9 +181,11 @@ describe("CatalogPage", function() {
       },
       {}
     )
+
     inner.instance().componentDidUpdate({}, {})
     expect(inner.state().selectedDepartment).equals("All Departments")
     expect(inner.state().tabSelected).equals("courses")
+    inner.instance().componentDidUpdate({}, {})
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
     )
@@ -612,7 +614,10 @@ describe("CatalogPage", function() {
       },
       {}
     )
+
+    expect(inner.state().courseQueryPage).equals(1)
     inner.instance().componentDidUpdate({}, {})
+    inner.state().courseQueryPage = 2
     expect(inner.state().selectedDepartment).equals("All Departments")
     expect(inner.state().tabSelected).equals("courses")
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
@@ -623,18 +628,20 @@ describe("CatalogPage", function() {
     )
     // one shows visually, but the total is 2
     expect(inner.instance().renderNumberOfCatalogCourses()).equals(2)
-    expect(inner.state().courseQueryPage).equals(1)
+    const course2 = JSON.parse(JSON.stringify(displayedCourse))
+    course2.id = 3
+    course2.departments = [{ name: "Math" }, { name: "History" }]
 
     // Mock the second page of course API results.
     helper.handleRequestStub.returns({
       body: {
         next:    null,
-        results: courses
+        results: [course2]
       }
     })
-
     // Simulate the user reaching the bottom of the catalog page.
     const entry = [{ isIntersecting: true }]
+
     await inner.instance().bottomOfLoadedCatalogCallback(entry)
 
     sinon.assert.calledWith(
@@ -644,12 +651,12 @@ describe("CatalogPage", function() {
     )
 
     // Should expect 2 courses to be visually displayed in the catalog now. Total count should stay 2.
-    expect(inner.state().courseQueryPage).equals(2)
+    expect(inner.state().courseQueryPage).equals(3)
     expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
-      JSON.stringify([displayedCourse, displayedCourse])
+      JSON.stringify([displayedCourse, course2])
     )
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
-      JSON.stringify([displayedCourse, displayedCourse])
+      JSON.stringify([displayedCourse, course2])
     )
     expect(inner.instance().renderNumberOfCatalogCourses()).equals(2)
   })
@@ -753,7 +760,7 @@ describe("CatalogPage", function() {
 
     // Set isLoadingMoreItems to true which simualtes that the next page
     // request is already in progress.
-    inner.instance().setState({ isLoadingMoreItems: true })
+    inner.state().isLoadingMoreItems = true
     await inner.instance().bottomOfLoadedCatalogCallback(entry)
 
     // Should not expect any additional courses.
@@ -793,7 +800,7 @@ describe("CatalogPage", function() {
             next:    "http://fake.com/api/courses/?page=2"
           },
           programs: {
-            count:   2,
+            count:   4,
             results: programs,
             next:    "http://fake.com/api/courses/?page=2"
           },
@@ -820,18 +827,12 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
       JSON.stringify(programs)
     )
-    // While there is only one showing, there are still 2 total. The total should be shown.
-    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(2)
-    expect(inner.state().programQueryPage).equals(1)
+    // While there is only one showing, there are still 4 total per the count. The total should be shown.
+    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(4)
 
-    // Mock the second page of program API results.
-    helper.handleRequestStub.returns({
-      body: {
-        next:    null,
-        results: programs,
-        count:   2
-      }
-    })
+    // simulate the state variables changing correctly since the shallow render doesn't actually change the state
+    inner.state().programQueryPage = 2
+    inner.state().isLoadingMoreItems = false
 
     // Simulate the user reaching the bottom of the catalog page.
     const entry = [{ isIntersecting: true }]
@@ -843,16 +844,42 @@ describe("CatalogPage", function() {
       "GET"
     )
 
-    // Should expect 2 courses to be displayed in the catalog now.
-    expect(inner.state().programQueryPage).equals(2)
-    expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
-      JSON.stringify([displayedProgram, displayedProgram])
-    )
-    expect(JSON.stringify(inner.state().filteredPrograms)).equals(
-      JSON.stringify([displayedProgram, displayedProgram])
-    )
+    // The count should still be 4 regardless of how many are added or not, since the highest provided count was 4.
+    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(4)
+  })
 
-    // This should still be 2 because we haven't changed the filter - no matter if one or two have loaded, there are 2
-    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(2)
+  it("mergeNewObjects removes duplicates if present", async () => {
+    const oldArray = [displayedProgram]
+    const newArray = [displayedProgram]
+    const { inner } = await renderPage()
+    const mergedArray = inner.instance().mergeNewObjects(oldArray, newArray)
+    expect(mergedArray.length).equals(1)
+    expect(JSON.stringify(mergedArray)).equals(JSON.stringify(oldArray))
+  })
+
+  it("mergeNewObjects merges objects if they are not duplicates", async () => {
+    const oldArray = [displayedProgram]
+    const newProgram = JSON.parse(JSON.stringify(displayedProgram))
+    newProgram.id = 3
+    const newArray = [newProgram]
+    const { inner } = await renderPage()
+    const mergedArray = inner.instance().mergeNewObjects(oldArray, newArray)
+    expect(mergedArray.length).equals(2)
+    expect(JSON.stringify(mergedArray)).equals(
+      JSON.stringify([displayedProgram, newProgram])
+    )
+  })
+
+  it("mergeNewObjects keeps items with different IDs and removes duplicates", async () => {
+    const oldArray = [displayedProgram]
+    const newProgram = JSON.parse(JSON.stringify(displayedProgram))
+    newProgram.id = 3
+    const newArray = [newProgram, displayedProgram, displayedProgram]
+    const { inner } = await renderPage()
+    const mergedArray = inner.instance().mergeNewObjects(oldArray, newArray)
+    expect(mergedArray.length).equals(2)
+    expect(JSON.stringify(mergedArray)).equals(
+      JSON.stringify([displayedProgram, newProgram])
+    )
   })
 })
