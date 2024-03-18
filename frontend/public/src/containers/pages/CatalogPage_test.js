@@ -827,10 +827,9 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
       JSON.stringify(programs)
     )
-    // While there is only one showing, there are still 2 total. The total should be shown.
-    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(2)
+    // While there is only one showing, there are still 4 total per the count. The total should be shown.
+    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(4)
 
-    inner.state().allProgramsCount = 4
     // simulate the state variables changing correctly since the shallow render doesn't actually change the state
     inner.state().programQueryPage = 2
     inner.state().isLoadingMoreItems = false
@@ -845,7 +844,7 @@ describe("CatalogPage", function() {
       "GET"
     )
 
-    // If allProgramsCount changes, when we load more, we should see the new count
+    // The count should still be 4 regardless of how many are added or not, since the highest provided count was 4.
     expect(inner.instance().renderNumberOfCatalogPrograms()).equals(4)
   })
 })
