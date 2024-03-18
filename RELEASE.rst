@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.87.4
+Version 0.87.4 (Released March 18, 2024)
 --------------
 
 - 3360: on account registration redirect new users to the page they started on (#2127)
