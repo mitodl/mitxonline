@@ -241,7 +241,7 @@ export class CourseProductDetailEnroll extends React.Component<
           className="form-control"
         >
           <option value="" key="default-select">
-            Nothing Selected
+            Please Select
           </option>
           {courseRuns &&
             courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
