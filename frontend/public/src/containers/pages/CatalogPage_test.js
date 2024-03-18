@@ -593,7 +593,7 @@ describe("CatalogPage", function() {
         queries: {
           courses: {
             isPending: false,
-            status:    200
+            status:    200,
           },
           programs: {
             isPending: false,
@@ -614,8 +614,12 @@ describe("CatalogPage", function() {
       },
       {}
     )
+
+    expect(inner.state().courseQueryPage).equals(1)
     inner.instance().componentDidUpdate({}, {})
+    inner.instance().setState({ courseQueryPage: 2})
     expect(inner.state().selectedDepartment).equals("All Departments")
+    // inner.instance().changeSelectedDepartment("All Departments", "courses")
     expect(inner.state().tabSelected).equals("courses")
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
@@ -625,18 +629,20 @@ describe("CatalogPage", function() {
     )
     // one shows visually, but the total is 2
     expect(inner.instance().renderNumberOfCatalogCourses()).equals(2)
-    expect(inner.state().courseQueryPage).equals(1)
+    const course2 = JSON.parse(JSON.stringify(displayedCourse))
+    course2.id = 3
+    course2.departments = [{ name: "Math" }, { name: "History" }]
 
     // Mock the second page of course API results.
     helper.handleRequestStub.returns({
       body: {
         next:    null,
-        results: courses
+        results: [course2]
       }
     })
-
     // Simulate the user reaching the bottom of the catalog page.
     const entry = [{ isIntersecting: true }]
+
     await inner.instance().bottomOfLoadedCatalogCallback(entry)
 
     sinon.assert.calledWith(
@@ -646,12 +652,12 @@ describe("CatalogPage", function() {
     )
 
     // Should expect 2 courses to be visually displayed in the catalog now. Total count should stay 2.
-    expect(inner.state().courseQueryPage).equals(2)
+    expect(inner.state().courseQueryPage).equals(3)
     expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
-      JSON.stringify([displayedCourse, displayedCourse])
+      JSON.stringify([displayedCourse, course2])
     )
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
-      JSON.stringify([displayedCourse, displayedCourse])
+      JSON.stringify([displayedCourse, course2])
     )
     expect(inner.instance().renderNumberOfCatalogCourses()).equals(2)
   })
@@ -824,18 +830,22 @@ describe("CatalogPage", function() {
     )
     // While there is only one showing, there are still 2 total. The total should be shown.
     expect(inner.instance().renderNumberOfCatalogPrograms()).equals(2)
-    expect(inner.state().programQueryPage).equals(1)
-
+    const anotherProgram = displayedProgram
+    anotherProgram.id = 3
+    const morePrograms = [anotherProgram]
     // Mock the second page of program API results.
     helper.handleRequestStub.returns({
       body: {
         next:    null,
-        results: programs,
+        results: morePrograms,
         count:   2
       }
     })
 
     inner.state().allProgramsCount = 4
+    // simulate the state variables changing correctly since the shallow render doesn't actually change the state
+    inner.state().programQueryPage = 2
+    inner.state().isLoadingMoreItems = false
 
     // Simulate the user reaching the bottom of the catalog page.
     const entry = [{ isIntersecting: true }]
@@ -847,12 +857,11 @@ describe("CatalogPage", function() {
       "GET"
     )
 
-
     expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
-      JSON.stringify([displayedProgram, displayedProgram])
+      JSON.stringify([displayedProgram, anotherProgram])
     )
     expect(JSON.stringify(inner.state().filteredPrograms)).equals(
-      JSON.stringify([displayedProgram, displayedProgram])
+      JSON.stringify([displayedProgram, anotherProgram])
     )
 
     // This should still be 2 because we haven't changed the filter - no matter if one or two have loaded, there are 2

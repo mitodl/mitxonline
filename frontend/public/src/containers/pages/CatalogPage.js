@@ -109,6 +109,7 @@ export class CatalogPage extends React.Component<Props> {
     } = this.props
     const [entry] = entries
     if (entry.isIntersecting) {
+      console.log(this.state.allProgramsRetrieved)
       if (this.state.tabSelected === COURSES_TAB) {
         // Only request the next page if a next page exists (coursesNextPage)
         // and if we aren't already requesting the next page (isLoadingMoreItems).
@@ -147,7 +148,7 @@ export class CatalogPage extends React.Component<Props> {
           programsNextPage
         ) {
           this.setState({ isLoadingMoreItems: true })
-
+          console.log(this.state.programQueryPage)
           getNextProgramPage(this.state.programQueryPage).then(response => {
             this.setState({ isLoadingMoreItems: false })
             this.setState({ programQueryPage: this.state.programQueryPage + 1 })
@@ -203,11 +204,11 @@ export class CatalogPage extends React.Component<Props> {
     }
     if (this.state.allCoursesRetrieved.length === 0 && !coursesIsLoading) {
       this.setState({ allCoursesRetrieved: courses })
-      this.setState({filteredCourses: courses})
+      this.setState({ filteredCourses: courses })
     }
     if (this.state.allProgramsRetrieved.length === 0 && !programsIsLoading) {
       this.setState({ allProgramsRetrieved: programs })
-      this.setState({filteredPrograms: programs})
+      this.setState({ filteredPrograms: programs })
     }
     if (!departmentsIsLoading && departments.length > 0) {
       if (!coursesIsLoading && this.state.filterCoursesCalled) {
