@@ -55,8 +55,7 @@ type DispatchProps = {|
     username: string,
     legalAddress: LegalAddress,
     userProfile: UserProfile,
-    partialToken: string,
-    next: ?string
+    partialToken: string
   ) => Promise<HttpResponse<AuthResponse>>,
   getCurrentUser: () => Promise<HttpResponse<User>>,
   addUserNotification: Function
@@ -101,7 +100,11 @@ export class RegisterDetailsPage extends React.Component<Props> {
       }
 
       if (body.state === STATE_SUCCESS) {
+        const nextParam = body.redirect_url
         body.redirect_url = routes.register.additionalDetails
+        if (nextParam) {
+          body.redirect_url += `?next=${encodeURIComponent(nextParam)}`
+        }
       }
 
       /* eslint-disable camelcase */

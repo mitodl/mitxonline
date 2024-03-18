@@ -87,7 +87,8 @@ export default {
     username: string,
     legalAddress: LegalAddress,
     userProfile: ?UserProfile,
-    partialToken: string
+    partialToken: string,
+    next: ?string
   ) => ({
     ...DEFAULT_OPTIONS,
     url:  "/api/register/extra/",
@@ -98,7 +99,8 @@ export default {
       legal_address: legalAddress,
       user_profile:  userProfile,
       flow:          FLOW_REGISTER,
-      partial_token: partialToken
+      partial_token: partialToken,
+      next
     }
   }),
 

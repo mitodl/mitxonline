@@ -1,6 +1,38 @@
 Release Notes
 =============
 
+Version 0.87.4 (Released March 18, 2024)
+--------------
+
+- 3360: on account registration redirect new users to the page they started on (#2127)
+
+Version 0.87.3 (Released March 13, 2024)
+--------------
+
+- 2846 Course About: Replace Free with Free to Learn (#2125)
+
+Version 0.87.2 (Released March 07, 2024)
+--------------
+
+- Change program end date to certificate creation date (#2121)
+
+Version 0.87.1 (Released March 07, 2024)
+--------------
+
+- adding enrollment change tracking (#2117)
+- 3689: add department filter to the api endpoints for courses and programs (#2118)
+
+Version 0.87.0 (Released February 29, 2024)
+--------------
+
+- Fix mobile counts on catalog (#2114)
+
+Version 0.86.3 (Released February 22, 2024)
+--------------
+
+- Change the callback to respond on programs page as well (#2111)
+- Certificate Page: End date should be certificate creation date (#2110)
+
 Version 0.86.2 (Released February 21, 2024)
 --------------
 

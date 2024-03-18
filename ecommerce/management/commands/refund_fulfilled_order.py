@@ -1,6 +1,6 @@
 """
 Looks up a fulfilled order in the system, sets it to Refunded, and then adjusts
-the enrollments accordingly. 
+the enrollments accordingly.
 
 - If --unenroll is specified, the learner will be unenrolled from the course run
   associated with the order.
@@ -9,8 +9,8 @@ the enrollments accordingly.
 
 This does not make any sort of call to CyberSource or any other payment gateway
 to perform a refund - you're expected to have refunded the learner's money
-manually already. (At time of writing, PayPal transactions can't be refunded 
-using the normal means, so they get refunded manually via CyberSource and then 
+manually already. (At time of writing, PayPal transactions can't be refunded
+using the normal means, so they get refunded manually via CyberSource and then
 this command comes in to clean up afterwards.)
 
 """
@@ -83,8 +83,7 @@ class Command(BaseCommand):
                     f"Changing enrollment for {order.purchaser.username} in {enrollment.run} to 'audit'"
                 )
 
-                enrollment.enrollment_mode = "audit"
-                enrollment.save()
+                enrollment.update_mode_and_save("audit")
 
                 enroll_in_edx_course_runs(
                     order.purchaser, [enrollment.run], mode="audit"

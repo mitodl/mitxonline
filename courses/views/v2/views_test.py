@@ -1,6 +1,7 @@
 """
 Tests for courses api views v2
 """
+
 import logging
 import random
 
@@ -12,7 +13,9 @@ from rest_framework import status
 from courses.factories import DepartmentFactory
 from courses.models import Course, Program
 from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
-from courses.serializers.v2.departments import DepartmentWithCountSerializer
+from courses.serializers.v2.departments import (
+    DepartmentWithCoursesAndProgramsSerializer,
+)
 from courses.serializers.v2.programs import ProgramSerializer
 from courses.views.test_utils import (
     num_queries_from_course,
@@ -37,7 +40,7 @@ def test_get_departments(
     empty_departments_from_fixture = []
     for department in departments:
         empty_departments_from_fixture.append(
-            DepartmentWithCountSerializer(
+            DepartmentWithCoursesAndProgramsSerializer(
                 instance=department, context=mock_context
             ).data
         )
@@ -65,7 +68,7 @@ def test_get_departments(
     departments_from_fixture = []
     for department in departments:
         departments_from_fixture.append(
-            DepartmentWithCountSerializer(
+            DepartmentWithCoursesAndProgramsSerializer(
                 instance=department, context=mock_context
             ).data
         )

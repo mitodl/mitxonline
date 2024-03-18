@@ -167,7 +167,9 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
             <div className="enrollment-info-icon">
               <img src="/static/images/products/cost.png" alt="Cost" />
             </div>
-            <div className="enrollment-info-text font-weight-bold">Free</div>
+            <div className="enrollment-info-text font-weight-bold">
+              Free to Learn
+            </div>
           </div>
           <div className="row d-flex align-items-top">
             <div className="enrollment-info-icon">
