@@ -593,7 +593,7 @@ describe("CatalogPage", function() {
         queries: {
           courses: {
             isPending: false,
-            status:    200,
+            status:    200
           },
           programs: {
             isPending: false,
@@ -617,9 +617,8 @@ describe("CatalogPage", function() {
 
     expect(inner.state().courseQueryPage).equals(1)
     inner.instance().componentDidUpdate({}, {})
-    inner.instance().setState({ courseQueryPage: 2})
+    inner.state().courseQueryPage = 2
     expect(inner.state().selectedDepartment).equals("All Departments")
-    // inner.instance().changeSelectedDepartment("All Departments", "courses")
     expect(inner.state().tabSelected).equals("courses")
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
@@ -761,7 +760,7 @@ describe("CatalogPage", function() {
 
     // Set isLoadingMoreItems to true which simualtes that the next page
     // request is already in progress.
-    inner.instance().setState({ isLoadingMoreItems: true })
+    inner.state().isLoadingMoreItems = true
     await inner.instance().bottomOfLoadedCatalogCallback(entry)
 
     // Should not expect any additional courses.
@@ -830,14 +829,14 @@ describe("CatalogPage", function() {
     )
     // While there is only one showing, there are still 2 total. The total should be shown.
     expect(inner.instance().renderNumberOfCatalogPrograms()).equals(2)
-    const anotherProgram = displayedProgram
-    anotherProgram.id = 3
-    const morePrograms = [anotherProgram]
+    const anotherProgram = JSON.parse(JSON.stringify(displayedProgram))
+    anotherProgram.id = 8
+
     // Mock the second page of program API results.
     helper.handleRequestStub.returns({
       body: {
         next:    null,
-        results: morePrograms,
+        results: [anotherProgram],
         count:   2
       }
     })
@@ -856,7 +855,6 @@ describe("CatalogPage", function() {
       "/api/v2/programs/?page=2&live=true&page__live=true",
       "GET"
     )
-
     expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
       JSON.stringify([displayedProgram, anotherProgram])
     )

@@ -109,7 +109,6 @@ export class CatalogPage extends React.Component<Props> {
     } = this.props
     const [entry] = entries
     if (entry.isIntersecting) {
-      console.log(this.state.allProgramsRetrieved)
       if (this.state.tabSelected === COURSES_TAB) {
         // Only request the next page if a next page exists (coursesNextPage)
         // and if we aren't already requesting the next page (isLoadingMoreItems).
@@ -147,9 +146,10 @@ export class CatalogPage extends React.Component<Props> {
           !this.state.isLoadingMoreItems &&
           programsNextPage
         ) {
+          console.log("we iffed")
           this.setState({ isLoadingMoreItems: true })
-          console.log(this.state.programQueryPage)
           getNextProgramPage(this.state.programQueryPage).then(response => {
+            console.log(response)
             this.setState({ isLoadingMoreItems: false })
             this.setState({ programQueryPage: this.state.programQueryPage + 1 })
             const updatedAllPrograms = this.mergeNewObjects(
@@ -844,16 +844,16 @@ const getNextCoursePage = (page, ids) =>
     force: true
   })
 
-const getNextProgramPage = (page, ids) =>
+const getNextProgramPage = page =>
   requestAsync({
-    ...programsQuery(page, ids),
+    ...programsQuery(page),
     force: true
   })
 
 const mapPropsToConfig = () => [
   coursesQuery(1, ""),
-  programsQuery(1, ""),
-  departmentsQuery(1, "")
+  programsQuery(1),
+  departmentsQuery(1)
 ]
 
 const mapDispatchToProps = {
