@@ -49,6 +49,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               className="form-control"
               component={PasswordInput}
               autoComplete="current-password"
+              aria-label="Old Password"
               required
             />
           </div>
@@ -65,6 +66,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               component={PasswordInput}
               autoComplete="new-password"
               aria-describedby="newPasswordError"
+              aria-label="New Password"
               required
               pattern={passwordFieldRegex}
               title={passwordFieldErrorMessage}
@@ -88,6 +90,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               component={PasswordInput}
               autoComplete="new-password"
               aria-describedby="confirmPasswordError"
+              aria-label="Confirm Password"
               required
               pattern={passwordFieldRegex}
               title={passwordFieldErrorMessage}

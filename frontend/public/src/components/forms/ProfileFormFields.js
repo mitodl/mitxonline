@@ -422,6 +422,7 @@ export const AddlProfileFields = ({
     <div className="form-group small-gap">
       <CardLabel
         htmlFor="occupation-label"
+        id="occupation-label"
         isRequired={requireAddlFields}
         label="Are you a?"
       />

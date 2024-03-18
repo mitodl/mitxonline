@@ -9,6 +9,7 @@ type CardLabelProps = {
   subLabel?: string,
   isRequired?: boolean,
   className?: string,
+  id?: string,
   children?: React$Element<*>
 }
 
@@ -18,7 +19,8 @@ const CardLabel = ({
   label,
   subLabel,
   isRequired,
-  className
+  className,
+  id
 }: CardLabelProps) => {
   let labelClass = className || "fw-bold"
   let interior = <></>
@@ -40,7 +42,9 @@ const CardLabel = ({
           {label}
           {required}
         </div>
-        <div className="subtitle">{subLabel}</div>
+        <div id={`${htmlFor}-subtitle`} className="subtitle">
+          {subLabel}
+        </div>
         {children}
       </>
     )
@@ -55,7 +59,7 @@ const CardLabel = ({
   }
 
   return (
-    <label className={`${labelClass || "fw-bold"}`} htmlFor={htmlFor}>
+    <label className={`${labelClass || "fw-bold"}`} htmlFor={htmlFor} id={id}>
       {interior}
     </label>
   )

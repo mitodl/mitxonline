@@ -27,7 +27,7 @@
                 {% csrf_token %}
                 <div class="form-group">
                   <label for="your_income" id="your_income_label" class="fw-bold">Yearly Income</label>
-                  {%if form.fields.your_income.required %}<span class="required">*</span>{% endif %}
+                  {%if form.fields.your_income.required %}<span aria-hidden="true" class="required">*</span>{% endif %}
                   <input type="number" name="your_income" step="any" class="form-control {%if form.your_income.errors %}errored{% endif %}" id="your_income" aria-describedby="your_incomeError" required>
                   {% for error in form.your_income.errors %}
                     <div class="form-error" id="your_incomeError" role="alert">{{error}}</div>
@@ -37,7 +37,7 @@
                   <label for="income_currency" class="label-helptext">
                     <div class="fw-bold">
                       Income Currency
-                      {%if form.fields.income_currency.required %}<span class="required">*</span>{% endif %}
+                      {%if form.fields.income_currency.required %}<span aria-hidden="true" class="required">*</span>{% endif %}
                     </div>
                     <div class="subtitle">
                       The currency you’re paid in.
