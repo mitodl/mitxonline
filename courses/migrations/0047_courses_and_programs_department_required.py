@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('courses', '0046_audit_rename_call_stack'),
+        ("courses", "0046_audit_rename_call_stack"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='course',
-            name='departments',
-            field=models.ManyToManyField(to='courses.Department'),
+            model_name="course",
+            name="departments",
+            field=models.ManyToManyField(to="courses.Department"),
         ),
         migrations.AlterField(
-            model_name='program',
-            name='departments',
-            field=models.ManyToManyField(to='courses.Department'),
+            model_name="program",
+            name="departments",
+            field=models.ManyToManyField(to="courses.Department"),
         ),
     ]
