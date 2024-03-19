@@ -614,6 +614,20 @@ export class CatalogPage extends React.Component<Props> {
     )
   }
 
+  renderLoaders() {
+    let numOfLoaders = 0
+    const loaders = []
+    if (this.state.tabSelected === COURSES_TAB) {
+      numOfLoaders = this.state.filteredCourses.length - this.renderNumberOfCatalogCourses()
+    } else {
+      numOfLoaders = this.state.filteredPrograms.length - this.renderNumberOfCatalogPrograms()
+    }
+    for (let i = 0; i < numOfLoaders; i++) {
+      loaders.push(<CourseLoader />)
+    }
+    return loaders
+  }
+
   /**
    * Dynamically renders rows of cards in the catalog.  Each row can contain up to {ITEMS_PER_ROW} course or program cards.
    * @param {Array<CourseDetailWithRuns | Program>} itemsInCatalog The items associated with the currently selected catalog page.
@@ -818,6 +832,7 @@ export class CatalogPage extends React.Component<Props> {
                     </CSSTransition>
                   </TransitionGroup>
                 </div>
+
                 {this.state.isLoadingMoreItems ? courseLoaderGrid : null}
                 {/* span is used to detect when the learner has scrolled to the bottom of the catalog page. */}
                 <span ref={this.container}></span>
