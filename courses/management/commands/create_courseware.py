@@ -2,6 +2,7 @@
 Creates a courseware object. This can be a program or a course (and optionally
 a course run).
 """
+
 from django.core.management import BaseCommand
 
 from courses.models import Course, CourseRun, Department, Program
@@ -36,19 +37,23 @@ class Command(BaseCommand):
             courseware_url_path=kwargs["run_url"],
             live=kwargs["live"],
             is_self_paced=kwargs["self_paced"],
-            start_date=parse_supplied_date(kwargs["start"])
-            if kwargs["start"]
-            else None,
+            start_date=(
+                parse_supplied_date(kwargs["start"]) if kwargs["start"] else None
+            ),
             end_date=parse_supplied_date(kwargs["end"]) if kwargs["end"] else None,
-            enrollment_start=parse_supplied_date(kwargs["enrollment_start"])
-            if kwargs["enrollment_start"]
-            else None,
-            enrollment_end=parse_supplied_date(kwargs["enrollment_end"])
-            if kwargs["enrollment_end"]
-            else None,
-            upgrade_deadline=parse_supplied_date(kwargs["upgrade"])
-            if kwargs["upgrade"]
-            else None,
+            enrollment_start=(
+                parse_supplied_date(kwargs["enrollment_start"])
+                if kwargs["enrollment_start"]
+                else None
+            ),
+            enrollment_end=(
+                parse_supplied_date(kwargs["enrollment_end"])
+                if kwargs["enrollment_end"]
+                else None
+            ),
+            upgrade_deadline=(
+                parse_supplied_date(kwargs["upgrade"]) if kwargs["upgrade"] else None
+            ),
         )
 
         self.stdout.write(
@@ -211,6 +216,13 @@ class Command(BaseCommand):
                         new_dept.save()
 
                 add_depts = Department.objects.filter(name__in=kwargs["depts"]).all()
+        else:
+            self.stderr.write(
+                self.style.ERROR(
+                    "Departments must be defined when creating a course or program."
+                )
+            )
+            exit(-1)
 
         if kwargs["type"] == "program":
             if Program.objects.filter(readable_id=kwargs["courseware_id"]).exists():
