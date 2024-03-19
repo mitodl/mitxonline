@@ -12,14 +12,15 @@ This will not run ``sync_course_run`` for you, so for best results, ensure the c
 Syntax
 ------
 
-``create_courseware <object> <readable id> <title> [--live] [--self-paced] [--create-run [create_run]] [--run-url [RUN_URL]] [--program [PROGRAM]] [--run-tag [run-tag]] [--required] [--elective] [--force] [--start <date>] [--end <date>] [--enrollment-start <date>] [--enrollment-end <date>] [--upgrade <date>]``
+``create_courseware <object> <readable id> <title> [--live] [--self-paced] [--create-run [create_run]] [--run-url [RUN_URL]] [--program [PROGRAM]] [--run-tag [run-tag]] [--required] [--elective] [--force] [--start <date>] [--end <date>] [--enrollment-start <date>] [--enrollment-end <date>] [--upgrade <date>] [--dept <department_name>] [--create-depts]``
 
 Checks
 ------
 
-The command performs two checks:
+The command performs the following checks:
 * It checks to see if ``readable_id`` contains ``course`` or ``program`` at the front - if it doesn't, it will assume you've swapped the title and readable ID mistakenly and stop.
 * It checks to see if the course will be live before adding it to the requirements tree. If ``--live`` isn't specified, it will ignore your request. This only applies to course creation.
+* If creating a course or program, ``--depts`` must be specified and the department names must exist.
 
 Both of these checks can be overridden with the ``--force`` flag. 
 
@@ -31,8 +32,10 @@ Options
 * ``title`` - The title of the object.
 * ``--live`` - Makes the object live (default is not).
 * ``--force|-f`` - Force the creation of the object. (See "Checks" section for details.)
+* ``--create-depts`` - If specified, any departments specified that do not currently exist will be created.
 
-Programs have no additional options (any specified will be ignored).
+Programs can take the following options:
+* ``--depts`` - The departments to associate the program with.
 
 Courses can take the following options:
 
@@ -42,6 +45,7 @@ Courses can take the following options:
 * ``--self-paced`` - The course run is self-paced. (Only if ``--create-run`` is specified.)
 * ``--required`` - The course is a requirement for the program.
 * ``--elective`` - The course is an elective for the program.
+* ``--depts`` - The departments to associate the course with.
 
 Course runs can take the following options:
 
