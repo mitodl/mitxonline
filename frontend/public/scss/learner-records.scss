@@ -1,10 +1,53 @@
-#learner-record-school-name img {
-  width: 200px;
+.learner-record-page .std-card-body {
+  .badge {
+    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 10px 6px;
+    border-radius: 3px;
+    line-height: 12px;
+  }
+
+  .learner-record-header {
+    margin-bottom: 30px;
+  }
+
+  #learner-record-school-name {
+    font-size: 16px;
+
+    div, h1 {
+      margin-bottom: 15px;
+    }
+
+    div.learner-record-inst-logo {
+      padding: 20px 40px;
+      border: 1px solid $home-page-border-grey;
+      border-radius: 5px;
+      align-self: start;
+      align-items: center;
+      margin: 0;
+    }
+
+    img {
+      width: 200px;
+      height: auto;
+    }
+  }
+
+  div.learner-record-user-profile {
+    line-height: 30px !important;
+  
+    h2.learner-record-user-name {
+      font-size: 22px !important;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+  }  
 }
 
 .badge.badge-partially-completed {
-  color: white;
-  background-color: #f0ad4e;
+  color: #4D3507;
+  background: #FBECD0;
 }
 
 .badge.badge-completed {
@@ -12,29 +55,8 @@
   background-color: #556b2f;
 }
 
-span.badge-learner-completion {
-  color: white;
-  background-color: #f0ad4e;
-  font-size: 14px;
-  font-weight: normal;
-}
-
-div.learner-record-user-profile {
-  margin-top: 1em;
-
-  span.learner-record-user-name {
-    font-size: 150%;
-  }
-}
 
 div.learner-record {
-  @media (min-width:960px) { 
-    border: 1px solid #c2c2c2;
-    border-radius: 8px;
-    padding: 30px;
-    margin-top: 1em;
-  }
-  
   h1 {
     font-size: 32px;
     font-weight: 500;
@@ -43,32 +65,76 @@ div.learner-record {
 }
 
 table.learner-record-table {
-  margin-top: .5em;
   width: 100%;
 
-  tr:first-child {
-    width: 45%;
+  thead {
+    border-bottom: 2px solid $helptext-grey;
   }
 
-  td, th {
-    padding: 10px;
+  tbody {
+    tr {
+      border-bottom: 1px solid $home-page-border-grey;
+
+      td {
+        align-content: center;
+      }
+    }
+  }
+
+  th {
     vertical-align: bottom;
   }
 
-  thead {
-    border-bottom: 1px solid grey;
+  td, th {
+    div {
+      margin: 20px 10px 20px 0 !important;
+
+      span.badge.bg-danger {
+        color: #5F071C;
+        background: #FBD0DA !important;
+      }
+
+      span.badge.bg-success {
+        background: #D2FBD0 !important;
+        color: #0D5F07; 
+      }
+    }
+
+    &.learner-record-table-course-name {
+      width: 47%;
+
+      div {
+        margin-left: 10px !important;
+      }
+    }
+
+    &.learner-record-table-course-id {
+      width: 17%;
+    }
+
+    &.learner-record-table-highest-grade  {
+      width: 11%;
+    }
+
+    &.learner-record-table-grade {
+      width: 15%;
+    }
+
+    &.learner-record-table-status {
+      width: 10%;
+    }
   }
 }
 
 div.learner-record-sharing-controls {
   button.btn {
     padding: 8px 10px !important;
-    font-weight: 400;
+    font-weight: 700;
     box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 1px 2px rgb(0 0 0 / 24%);
     border: none;
     text-align: center;
     border-radius: 0.25rem;
-    font-size: 15px;
+    font-size: 14px !important;
     @media (min-width:960px) { 
       line-height: 35px;
     }
@@ -82,4 +148,38 @@ div.learner-record-sharing-controls {
 #sharing-link-modal button.btn, #partner-school-modal button.btn {
   padding: 0.375rem 0.75rem !important;
   font-size: 1rem;
+}
+
+@include media-breakpoint-down(sm) {
+  div.learner-record {
+    .m-0.d-flex.flex-column div {
+      margin-bottom: 0 !important;
+    }
+
+    div.learner-record-user-profile {
+      margin-top: 16px !important;
+      margin-bottom: 0 !important;
+    }
+
+    hr {
+      margin: 15px 0 !important;
+    }
+
+    h4 {
+      margin-bottom: 10px !important;
+    }
+
+    div.list-group {
+      div.list-group-item {
+        border: 0 !important;
+        padding-bottom: 15px !important;
+        margin-bottom: 15px !important;
+        border-bottom: 1px solid $home-page-border-grey !important;
+
+        div.d-flex.w-100.justify-content-between {
+          margin-bottom: 10px;
+        }
+      }
+    }
+  }
 }

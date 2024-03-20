@@ -13,6 +13,7 @@ import {
   HIGHEST_EDUCATION_CHOICES
 } from "../../constants"
 import FormError from "./elements/FormError"
+import CardLabel from "../input/CardLabel"
 
 import {
   passwordField,
@@ -162,10 +163,11 @@ const findStates = (country: string, countries: Array<Country>) => {
 const renderYearOfBirthField = () => {
   return (
     <div>
-      <label htmlFor="user_profile.year_of_birth" className="fw-bold">
-        Year of Birth
-      </label>
-      <span className="required">*</span>
+      <CardLabel
+        htmlFor="user_profile.year_of_birth"
+        isRequired={true}
+        label="Year of Birth"
+      />
       <Field
         component="select"
         name="user_profile.year_of_birth"
@@ -193,14 +195,12 @@ export const LegalAddressFields = ({
 }: LegalAddressProps) => (
   <React.Fragment>
     <div className="form-group">
-      <label htmlFor="legal_address.first_name" className="row">
-        <div className="col-auto fw-bold">
-          First Name<span className="required">*</span>
-        </div>
-        <div id="first-name-subtitle" className="col-auto subtitle">
-          Name that will appear on emails
-        </div>
-      </label>
+      <CardLabel
+        htmlFor="legal_address.first_name"
+        isRequired={true}
+        label="First Name"
+        subLabel="Name that will appear on emails"
+      />
       <Field
         type="text"
         name="legal_address.first_name"
@@ -215,10 +215,11 @@ export const LegalAddressFields = ({
       />
     </div>
     <div className="form-group">
-      <label htmlFor="legal_address.last_name" className="fw-bold">
-        Last Name
-      </label>
-      <span className="required">*</span>
+      <CardLabel
+        htmlFor="legal_address.last_name"
+        isRequired={true}
+        label="Last Name"
+      />
       <Field
         type="text"
         name="legal_address.last_name"
@@ -231,14 +232,12 @@ export const LegalAddressFields = ({
       />
     </div>
     <div className="form-group">
-      <label htmlFor="name" className="row">
-        <div className="col-auto fw-bold">
-          Full Name<span className="required">*</span>
-        </div>
-        <div id="full-name-subtitle" className="col-auto subtitle">
-          Name that will appear on your certificate
-        </div>
-      </label>
+      <CardLabel
+        htmlFor="name"
+        isRequired={true}
+        label="Full Name"
+        subLabel="Name that will appear on your certificate"
+      />
       <Field
         type="text"
         name="name"
@@ -255,14 +254,12 @@ export const LegalAddressFields = ({
     {isNewAccount ? (
       <React.Fragment>
         <div className="form-group">
-          <label htmlFor="username" className="row">
-            <div className="col-auto fw-bold">
-              Public Username<span className="required">*</span>
-            </div>
-            <div id="username-subtitle" className="col-auto subtitle">
-              Name that will identify you in courses
-            </div>
-          </label>
+          <CardLabel
+            htmlFor="username"
+            isRequired={true}
+            label="Public Username"
+            subLabel="Name that will identify you in courses"
+          />
           <Field
             type="text"
             name="username"
@@ -278,10 +275,7 @@ export const LegalAddressFields = ({
           <ErrorMessage name="username" component={FormError} />
         </div>
         <div className="form-group">
-          <label htmlFor="password" className="fw-bold">
-            Password
-          </label>
-          <span className="required">*</span>
+          <CardLabel htmlFor="password" isRequired={true} label="Password" />
           <Field
             type="password"
             name="password"
@@ -301,10 +295,11 @@ export const LegalAddressFields = ({
       </React.Fragment>
     ) : null}
     <div className="form-group">
-      <label htmlFor="legal_address.country" className="fw-bold">
-        Country
-      </label>
-      <span className="required">*</span>
+      <CardLabel
+        htmlFor="legal_address.country"
+        isRequired={true}
+        label="Country"
+      />
       <Field
         component="select"
         name="legal_address.country"
@@ -326,10 +321,11 @@ export const LegalAddressFields = ({
     </div>
     {findStates(values.legal_address.country, countries) ? (
       <div className="form-group">
-        <label htmlFor="legal_address.state" className="fw-bold">
-          State
-        </label>
-        <span className="required">*</span>
+        <CardLabel
+          htmlFor="legal_address.state"
+          isRequired={true}
+          label="State"
+        />
         <Field
           component="select"
           name="legal_address.state"
@@ -359,12 +355,10 @@ export const LegalAddressFields = ({
 
 export const ProfileFields = () => (
   <React.Fragment>
-    <div className="form-group">
-      <div className="row">
-        <div className="col">
-          <label htmlFor="user_profile.gender" className="fw-bold">
-            Gender
-          </label>
+    <div className="row small-gap">
+      <div className="col">
+        <div className="form-group">
+          <CardLabel htmlFor="user_profile.gender" label="Gender" />
 
           <Field
             component="select"
@@ -386,7 +380,9 @@ export const ProfileFields = () => (
             component={FormError}
           />
         </div>
-        <div className="col">{renderYearOfBirthField()}</div>
+      </div>
+      <div className="col">
+        <div className="form-group">{renderYearOfBirthField()}</div>
       </div>
     </div>
   </React.Fragment>
@@ -400,9 +396,11 @@ export const AddlProfileFields = ({
     <div className="form-group">
       <div className="row">
         <div className="col">
-          <label htmlFor="user_profile.highest_education" className="fw-bold">
-            Highest Level of Education
-          </label>
+          <CardLabel
+            htmlFor="user_profile.highest_education"
+            isRequired={false}
+            label="Highest Level of Education"
+          />
           {requireAddlFields ? <span className="required">*</span> : ""}
           <Field
             component="select"
@@ -421,97 +419,95 @@ export const AddlProfileFields = ({
         </div>
       </div>
     </div>
-    <div className="form-group">
-      <label id="occupation-label" className="fw-bold">
-        Are you a
-      </label>
-      {requireAddlFields ? <span className="required">*</span> : ""}
-      <div className="row">
-        <div className="col-6">
-          <div className="form-check">
-            <Field
-              type="checkbox"
-              name="user_profile.type_is_student"
-              id="user_profile.type_is_student"
-              className="form-check-input"
-              aria-labelledby="occupation-label student-label"
-              defaultChecked={values.user_profile.type_is_student}
-              required={false}
-            />
-            <label
-              className="form-check-label"
-              htmlFor="user_profile.type_is_student"
-              id="student-label"
-            >
-              {" "}
-              Student
-            </label>
-          </div>
-          <div className="form-check">
-            <Field
-              type="checkbox"
-              name="user_profile.type_is_professional"
-              id="user_profile.type_is_professional"
-              className="form-check-input"
-              aria-labelledby="occupation-label professional-label"
-              defaultChecked={values.user_profile.type_is_professional}
-            />
-            <label
-              className="form-check-label"
-              htmlFor="user_profile.type_is_professional"
-              id="professional-label"
-            >
-              {" "}
-              Professional
-            </label>
-          </div>
+    <div className="form-group small-gap">
+      <CardLabel
+        htmlFor="occupation-label"
+        id="occupation-label"
+        isRequired={requireAddlFields}
+        label="Are you a?"
+      />
+      <ErrorMessage
+        name="user_profile.type_is_student"
+        id="user_profile.type_is_student_Error"
+        component={FormError}
+      />
+    </div>
+    <div className="row small-gap profile-student-type">
+      <div className="col-6">
+        <div className="form-check">
+          <Field
+            type="checkbox"
+            name="user_profile.type_is_student"
+            id="user_profile.type_is_student"
+            className="form-check-input"
+            aria-labelledby="occupation-label student-label"
+            defaultChecked={values.user_profile.type_is_student}
+            required={false}
+          />
+          <label
+            className="form-check-label"
+            htmlFor="user_profile.type_is_student"
+            id="student-label"
+          >
+            {" "}
+            Student
+          </label>
         </div>
-        <div className="col-6">
-          <div className="form-check">
-            <Field
-              type="checkbox"
-              name="user_profile.type_is_educator"
-              id="user_profile.type_is_educator"
-              className="form-check-input"
-              aria-labelledby="occupation-label educator-label"
-              defaultChecked={values.user_profile.type_is_educator}
-            />
-            <label
-              className="form-check-label"
-              htmlFor="user_profile.type_is_educator"
-              id="educator-label"
-            >
-              {" "}
-              Educator
-            </label>
-          </div>
-          <div className="form-check">
-            <Field
-              type="checkbox"
-              name="user_profile.type_is_other"
-              id="user_profile.type_is_other"
-              className="form-check-input"
-              aria-labelledby="occupation-label other-label"
-              defaultChecked={values.user_profile.type_is_other}
-            />
-            <label
-              className="form-check-label"
-              htmlFor="user_profile.type_is_other"
-              id="other-label"
-            >
-              {" "}
-              Other
-            </label>
-          </div>
+        <div className="form-check">
+          <Field
+            type="checkbox"
+            name="user_profile.type_is_professional"
+            id="user_profile.type_is_professional"
+            className="form-check-input"
+            aria-labelledby="occupation-label professional-label"
+            defaultChecked={values.user_profile.type_is_professional}
+          />
+          <label
+            className="form-check-label"
+            htmlFor="user_profile.type_is_professional"
+            id="professional-label"
+          >
+            {" "}
+            Professional
+          </label>
         </div>
       </div>
-      <div className="row">
-        <div className="col-12">
-          <ErrorMessage
-            name="user_profile.type_is_student"
-            id="user_profile.type_is_student_Error"
-            component={FormError}
+      <div className="col-5">
+        <div className="form-check">
+          <Field
+            type="checkbox"
+            name="user_profile.type_is_educator"
+            id="user_profile.type_is_educator"
+            className="form-check-input"
+            aria-labelledby="occupation-label educator-label"
+            defaultChecked={values.user_profile.type_is_educator}
           />
+          <label
+            className="form-check-label"
+            htmlFor="user_profile.type_is_educator"
+            id="educator-label"
+          >
+            {" "}
+            Educator
+          </label>
+        </div>
+        <div className="form-check">
+          <Field
+            type="checkbox"
+            name="user_profile.type_is_other"
+            id="user_profile.type_is_other"
+            className="form-check-input"
+            aria-labelledby="occupation-label other-label"
+            defaultChecked={values.user_profile.type_is_other}
+          />
+          <label
+            className="form-check-label"
+            htmlFor="user_profile.type_is_other"
+            id="other-label"
+          >
+            {" "}
+            Other
+          </label>
         </div>
       </div>
     </div>
@@ -523,9 +519,7 @@ export const AddlProfileFields = ({
           value={true}
         />
         <div className="form-group">
-          <label htmlFor="user_profile.company" className="fw-bold">
-            Company
-          </label>
+          <CardLabel htmlFor="user_profile.company" label="Company" />
           <Field
             type="text"
             name="user_profile.company"
@@ -540,12 +534,10 @@ export const AddlProfileFields = ({
             component={FormError}
           />
         </div>
-        <div className="row">
+        <div className="row small-gap">
           <div className="col">
             <div className="form-group">
-              <label htmlFor="user_profile.job_title" className="fw-bold">
-                Job Title
-              </label>
+              <CardLabel htmlFor="user_profile.job_title" label="Job Title" />
               <Field
                 type="text"
                 name="user_profile.job_title"
@@ -563,9 +555,10 @@ export const AddlProfileFields = ({
           </div>
           <div className="col">
             <div className="form-group">
-              <label htmlFor="user_profile.company_size" className="fw-bold">
-                Company Size
-              </label>
+              <CardLabel
+                htmlFor="user_profile.company_size"
+                label="Company Size"
+              />
               <Field
                 component="select"
                 name="user_profile.company_size"
@@ -582,12 +575,10 @@ export const AddlProfileFields = ({
             </div>
           </div>
         </div>
-        <div className="row">
+        <div className="row small-gap">
           <div className="col">
             <div className="form-group">
-              <label htmlFor="user_profile.industry" className="fw-bold">
-                Industry
-              </label>
+              <CardLabel htmlFor="user_profile.industry" label="Industry" />
               <Field
                 component="select"
                 name="user_profile.industry"
@@ -605,9 +596,10 @@ export const AddlProfileFields = ({
           </div>
           <div className="col">
             <div className="form-group">
-              <label htmlFor="user_profile.job_function" className="fw-bold">
-                Job Function
-              </label>
+              <CardLabel
+                htmlFor="user_profile.job_function"
+                label="Job Function"
+              />
               <Field
                 component="select"
                 name="user_profile.job_function"
@@ -624,15 +616,13 @@ export const AddlProfileFields = ({
             </div>
           </div>
         </div>
-        <div className="row">
+        <div className="row small-gap">
           <div className="col">
             <div className="form-group">
-              <label
+              <CardLabel
                 htmlFor="user_profile.years_experience"
-                className="fw-bold"
-              >
-                Years of Work Experience
-              </label>
+                label="Years of Work Experience"
+              />
               <Field
                 component="select"
                 name="user_profile.years_experience"
@@ -650,12 +640,10 @@ export const AddlProfileFields = ({
           </div>
           <div className="col">
             <div className="form-group">
-              <label
+              <CardLabel
                 htmlFor="user_profile.leadership_level"
-                className="fw-bold"
-              >
-                Leadership Level
-              </label>
+                label="Leadership Level"
+              />
               <Field
                 component="select"
                 name="user_profile.leadership_level"

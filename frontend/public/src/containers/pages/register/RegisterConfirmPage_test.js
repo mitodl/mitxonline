@@ -51,7 +51,7 @@ describe("RegisterConfirmPage", () => {
     inner.instance().componentDidUpdate({}, {})
     assert.deepEqual(store.getState().ui.userNotifications, {
       "email-verified": {
-        type:  "text",
+        type:  "success",
         props: {
           text:
             "Success! We've verified your email. Please finish your account creation below."

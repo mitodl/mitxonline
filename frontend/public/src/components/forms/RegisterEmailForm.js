@@ -46,8 +46,10 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
             aria-describedby="emailError"
             required
           />
-          <p className="py-2">
-            By creating an account I agree to the{" "}
+
+          <p>
+            By creating an account I agree to the
+            <br />
             <a
               href={routes.informationLinks.honorCode}
               target="_blank"
@@ -83,17 +85,13 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
             <ErrorMessage name="recaptcha" component={FormError} />
           </div>
         ) : null}
-        <div className="row submit-row no-gutters">
-          <div className="col d-flex justify-content-end">
-            <button
-              type="submit"
-              className="btn btn-primary btn-gradient-red large"
-              disabled={isSubmitting}
-            >
-              Continue
-            </button>
-          </div>
-        </div>
+        <button
+          type="submit"
+          className="btn btn-primary btn-gradient-red-to-blue large"
+          disabled={isSubmitting}
+        >
+          Continue
+        </button>
       </Form>
     )}
   />

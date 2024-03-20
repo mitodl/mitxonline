@@ -10,6 +10,7 @@ import {
   passwordFieldErrorMessage,
   changePasswordFormValidation
 } from "../../lib/validation"
+import CardLabel from "../input/CardLabel"
 
 type Props = {
   onSubmit: Function
@@ -35,22 +36,29 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
     render={({ isSubmitting }) => (
       <Form>
         <section className="email-section">
-          <h4>Change Password</h4>
+          <h2>Change Password</h2>
           <div className="form-group">
-            <label htmlFor="oldPassword">Old Password</label>
-            <span className="required">*</span>
+            <CardLabel
+              htmlFor="oldPassword"
+              isRequired={true}
+              label="Old Password"
+            />
             <Field
               name="oldPassword"
               id="oldPassword"
               className="form-control"
               component={PasswordInput}
               autoComplete="current-password"
+              aria-label="Old Password"
               required
             />
           </div>
           <div className="form-group">
-            <label htmlFor="newPassword">New Password</label>
-            <span className="required">*</span>
+            <CardLabel
+              htmlFor="newPassword"
+              isRequired={true}
+              label="New Password"
+            />
             <Field
               name="newPassword"
               id="newPassword"
@@ -58,6 +66,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               component={PasswordInput}
               autoComplete="new-password"
               aria-describedby="newPasswordError"
+              aria-label="New Password"
               required
               pattern={passwordFieldRegex}
               title={passwordFieldErrorMessage}
@@ -69,8 +78,11 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
             />
           </div>
           <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <span className="required">*</span>
+            <CardLabel
+              htmlFor="confirmPassword"
+              isRequired={true}
+              label="Confirm Password"
+            />
             <Field
               name="confirmPassword"
               id="confirmPassword"
@@ -78,6 +90,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               component={PasswordInput}
               autoComplete="new-password"
               aria-describedby="confirmPasswordError"
+              aria-label="Confirm Password"
               required
               pattern={passwordFieldRegex}
               title={passwordFieldErrorMessage}
@@ -93,7 +106,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
           <div className="col d-flex justify-content-end">
             <button
               type="submit"
-              className="btn btn-primary"
+              className="btn btn-primary btn-gradient-red-to-blue"
               disabled={isSubmitting}
             >
               Submit
