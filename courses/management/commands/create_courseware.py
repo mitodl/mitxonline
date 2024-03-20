@@ -20,7 +20,7 @@ class Command(BaseCommand):
 
     help = "Creates a courseware object (a program or course, with or without a courserun)."
 
-    def check_if_courseware_object_readable_id_exists(
+    def _check_if_courseware_object_readable_id_exists(
         self, courseware_object: Union[Course, Program], courseware_id: str
     ):
         """
@@ -41,7 +41,7 @@ class Command(BaseCommand):
             )
             exit(-1)
 
-    def add_departments_to_courseware_object(
+    def _add_departments_to_courseware_object(
         self, courseware_object: Union[Course, Program], departments: models.QuerySet
     ):
         """
@@ -62,7 +62,7 @@ class Command(BaseCommand):
             )
             exit(-1)
 
-    def create_departments(self, departments: List[str]) -> models.QuerySet:
+    def _create_departments(self, departments: List[str]) -> models.QuerySet:
         """
         Creates Department objects from a list of department names (strings).
 
@@ -83,7 +83,7 @@ class Command(BaseCommand):
 
         return Department.objects.filter(name__in=departments).all()
 
-    def department_must_be_defined_error(self):
+    def _department_must_be_defined_error(self):
         """
         Outputs an error message indicating that departments must be
         specified when creating a course or program object
@@ -96,7 +96,7 @@ class Command(BaseCommand):
         )
         exit(-1)
 
-    def departments_do_not_exist_error(self):
+    def _departments_do_not_exist_error(self):
         """
         Outputs an error message indicating the specified departments
         do no currently exist and exits the command with a -1 status.
@@ -106,7 +106,7 @@ class Command(BaseCommand):
         )
         exit(-1)
 
-    def successfully_created_courseware_object_message(
+    def _successfully_created_courseware_object_message(
         self, courseware_object: Union[Course, Program]
     ):
         """
@@ -122,7 +122,7 @@ class Command(BaseCommand):
             )
         )
 
-    def create_course_run(self, course, **kwargs):
+    def _create_course_run(self, course, **kwargs):
         run_id = f"{course.readable_id}+{kwargs['create_run']}"
 
         if CourseRun.objects.filter(
@@ -311,14 +311,14 @@ class Command(BaseCommand):
             if kwargs["depts"] and len(kwargs["depts"]) > 0:
                 add_depts = Department.objects.filter(name__in=kwargs["depts"]).all()
             else:
-                self.department_must_be_defined_error()
+                self._department_must_be_defined_error()
 
             if kwargs["create_depts"]:
-                add_depts = self.create_departments(kwargs["depts"])
+                add_depts = self._create_departments(kwargs["depts"])
             elif not add_depts:
-                self.departments_do_not_exist_error()
+                self._departments_do_not_exist_error()
 
-            self.check_if_courseware_object_readable_id_exists(
+            self._check_if_courseware_object_readable_id_exists(
                 Program, kwargs["courseware_id"]
             )
 
@@ -328,9 +328,9 @@ class Command(BaseCommand):
                 live=kwargs["live"],
             )
 
-            self.add_departments_to_courseware_object(new_program, add_depts)
+            self._add_departments_to_courseware_object(new_program, add_depts)
 
-            self.successfully_created_courseware_object_message(new_program)
+            self._successfully_created_courseware_object_message(new_program)
 
             if kwargs["related"] is not None and len(kwargs["related"]) > 0:
                 for readable_id in kwargs["related"]:
@@ -356,7 +356,7 @@ class Command(BaseCommand):
                 )
             )
         elif kwargs["type"] == "course":
-            self.check_if_courseware_object_readable_id_exists(
+            self._check_if_courseware_object_readable_id_exists(
                 Course, kwargs["courseware_id"]
             )
 
@@ -379,21 +379,19 @@ class Command(BaseCommand):
             if kwargs["depts"] and len(kwargs["depts"]) > 0:
                 add_depts = Department.objects.filter(name__in=kwargs["depts"]).all()
             else:
-                self.department_must_be_defined_error()
+                self._department_must_be_defined_error()
 
             if kwargs["create_depts"]:
-                add_depts = self.create_departments(kwargs["depts"])
+                add_depts = self._create_departments(kwargs["depts"])
             if "add_depts" not in locals() or not add_depts:
-                self.departments_do_not_exist_error()
+                self._departments_do_not_exist_error()
 
-            self.add_departments_to_courseware_object(new_program, add_depts)
+            self._add_departments_to_courseware_object(new_program, add_depts)
 
-            self.successfully_created_courseware_object_message(new_course)
+            self._successfully_created_courseware_object_message(new_course)
 
             if "create_run" in kwargs and kwargs["create_run"] is not None:
-                run_id = f"{new_course.readable_id}+{kwargs['create_run']}"
-
-                self.create_course_run(new_course, **kwargs)
+                self._create_course_run(new_course, **kwargs)
 
             if kwargs["live"] or kwargs["force"]:
                 if kwargs["force"]:
@@ -439,6 +437,6 @@ class Command(BaseCommand):
 
             course = Course.objects.filter(readable_id=kwargs["courseware_id"]).get()
 
-            self.create_course_run(course, **kwargs)
+            self._create_course_run(course, **kwargs)
         else:
             self.stderr.write(self.style.ERROR(f"Not sure what {kwargs['type']} is."))

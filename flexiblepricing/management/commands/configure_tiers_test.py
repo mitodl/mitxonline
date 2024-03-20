@@ -73,7 +73,6 @@ def test_program_tier_setup(with_existing_records, as_dedp):
             "configure_tiers",
             program=readable_id,
             program_abbrev=discount_code_abbrev,
-            program_name=program_title,
             stdout=output,
         )
 

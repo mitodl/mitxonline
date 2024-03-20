@@ -203,8 +203,15 @@ class Command(BaseCommand):
         # Step 2: create the program
         self.stdout.write(self.style.SUCCESS("Creating the DEDP program..."))
 
-        # by default, this will create the DEDP program and tiers
-        call_command("configure_tiers")
+        call_command(
+            "create_courseware",
+            "program",
+            "program-v1:MITx+DEDP",
+            "Data, Economics and Development Policy",
+            live=True,
+            depts="Economics",
+            create_depts=True,
+        )
 
         # Step 3: create the program page
         self.stdout.write(self.style.SUCCESS("Creating the DEDP program about page..."))

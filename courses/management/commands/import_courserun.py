@@ -27,7 +27,7 @@ from django.core.management import BaseCommand
 from django_countries import countries
 
 from cms.api import create_default_courseware_page
-from courses.models import BlockedCountry, Course, CourseRun, Program
+from courses.models import BlockedCountry, Course, CourseRun, Department, Program
 from ecommerce.models import Product
 from openedx.api import get_edx_api_course_detail_client
 
@@ -87,6 +87,15 @@ class Command(BaseCommand):
             nargs="?",
         )
 
+        parser.add_argument(
+            "-d",
+            "--dept",
+            "--department",
+            help="Specify department(s) assigned to the course object.  If program is specified, all courses associated with the program and imported will have the same department.",
+            action="append",
+            dest="depts",
+        )
+
     def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
         edx_course_detail = get_edx_api_course_detail_client()
         edx_courses = []
@@ -95,22 +104,6 @@ class Command(BaseCommand):
             content_type = ContentType.objects.filter(
                 app_label="courses", model="courserun"
             ).get()
-
-        program = None
-
-        if kwargs["program"] is not None:
-            try:
-                if kwargs["program"].isnumeric():
-                    program = Program.objects.filter(pk=kwargs["program"]).get()
-                else:
-                    program = Program.objects.filter(
-                        readable_id=kwargs["program"]
-                    ).get()
-            except:
-                self.stdout.write(
-                    self.style.ERROR(f"Program {kwargs['program']} not found.")
-                )
-                return False
 
         if kwargs["courserun"] is not None:
             try:
@@ -129,6 +122,18 @@ class Command(BaseCommand):
                 )
                 return False
         elif kwargs["program"] is not None and kwargs["run_tag"] is not None:
+            try:
+                if kwargs["program"].isnumeric():
+                    program = Program.objects.filter(pk=kwargs["program"]).get()
+                else:
+                    program = Program.objects.filter(
+                        readable_id=kwargs["program"]
+                    ).get()
+            except:
+                self.stdout.write(
+                    self.style.ERROR(f"Program {kwargs['program']} not found.")
+                )
+                return False
             for course, title in program.courses:
                 if course.courseruns.filter(run_tag=kwargs["run_tag"]).count() == 0:
                     try:
@@ -157,6 +162,21 @@ class Command(BaseCommand):
         for edx_course in edx_courses:
             courserun_tag = edx_course.course_id.split("+")[-1]
             course_readable_id = edx_course.course_id.removesuffix(f"+{courserun_tag}")
+            course = Course.objects.filter(readable_id=course_readable_id)
+
+            if not course:
+                if kwargs["depts"] and len(kwargs["depts"]) > 0:
+                    add_depts = Department.objects.filter(
+                        name__in=kwargs["depts"]
+                    ).all()
+
+                if not add_depts:
+                    self.stdout.write(
+                        self.style.ERROR(
+                            "Departments must exist and be specified with the --dept argument prior to running this command to create courses."
+                        )
+                    )
+                    return False
 
             try:
                 (course, created) = Course.objects.get_or_create(
@@ -165,6 +185,7 @@ class Command(BaseCommand):
                         "title": edx_course.name,
                         "readable_id": course_readable_id,
                         "live": kwargs["live"],
+                        "departments": kwargs["depts"],
                     },
                 )
 
