@@ -359,12 +359,7 @@ div.std-card-body, div.enrolled-item, div.cart-helptext {
         top: 0;
         z-index: 500;
     }
-
-    .d-sm-none {
-        display: block !important;
-    }
 }
-
 
 @media only screen and (max-width: 767px) {
     div.std-card {
@@ -392,10 +387,6 @@ div.std-card-body, div.enrolled-item, div.cart-helptext {
                 }
             }
         }
-    }
-
-    .d-sm-none {
-        display: none;
     }
 }
 

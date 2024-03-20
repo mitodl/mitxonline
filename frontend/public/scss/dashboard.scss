@@ -77,6 +77,16 @@ $enrolled-passed-fg: #ffffff;
       padding: 20px;
     }
 
+    @include media-breakpoint-down(sm)  {
+      div.row.enrolled-item-info {
+        padding: 0 !important;
+
+        div.enrollment-details-container {
+          padding: 16px !important;
+        }
+      }
+    }
+  
     @include media-breakpoint-up(md) {
       .row {
         height: auto;
@@ -91,6 +101,7 @@ $enrolled-passed-fg: #ffffff;
       @include media-breakpoint-down(sm)  {
         width: 100%;
         height: $featureImgMobileHeight;
+        border-radius: 0;
       }
 
       width: $featureImgWidth;
@@ -254,6 +265,7 @@ $enrolled-passed-fg: #ffffff;
     text-align: center;
     color: $brand-darker-bg;
   }
+
 }
 
 .dashboard {

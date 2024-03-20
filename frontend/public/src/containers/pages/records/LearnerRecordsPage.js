@@ -256,8 +256,9 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                         {...field}
                         name="partnerSchool"
                         className="form-control"
+                        aria-label="Select School"
                       >
-                        <option>Choose one...</option>
+                        <option aria-hidden="true">Choose one...</option>
                         {learnerRecord.partner_schools.map(elem => (
                           <option
                             key={`partner-school-${elem.id}`}
@@ -271,7 +272,11 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                   />
                 </section>
                 <div className="mt-2">
-                  <Button type="submit" color="primary">
+                  <Button
+                    type="submit"
+                    color="primary"
+                    className="btn-gradient-red-to-blue"
+                  >
                     Send Record
                   </Button>{" "}
                   <Button
@@ -605,7 +610,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                       {!hasSharingEnabled ? (
                         <button
                           key="togglesharing"
-                          className="btn btn-primary mdl-button"
+                          className="btn btn-primary btn-gradient-red-to-blue mdl-button"
                           type="button"
                           onClick={() => this.onEnableRecordSharing()}
                         >
@@ -620,7 +625,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                         <>
                           <button
                             key="sendlearnerrecord"
-                            className="btn btn-primary"
+                            className="btn btn-primary btn-gradient-red-to-blue"
                             type="button"
                             onClick={() =>
                               this.togglePartnerSchoolSharingDialog()
@@ -630,7 +635,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                           </button>
                           <button
                             key="sharingdialog"
-                            className="btn btn-primary"
+                            className="btn btn-primary btn-gradient-red-to-blue"
                             type="button"
                             onClick={() => this.toggleSharingLinkDialog()}
                           >
@@ -638,7 +643,7 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                           </button>
                           <button
                             key="revokesharing"
-                            className="btn btn-primary"
+                            className="btn btn-primary btn-gradient-red-to-blue"
                             type="button"
                             onClick={() => this.onRevokeSharing()}
                           >

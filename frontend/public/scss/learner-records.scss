@@ -129,12 +129,12 @@ table.learner-record-table {
 div.learner-record-sharing-controls {
   button.btn {
     padding: 8px 10px !important;
-    font-weight: 400;
+    font-weight: 700;
     box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 1px 2px rgb(0 0 0 / 24%);
     border: none;
     text-align: center;
     border-radius: 0.25rem;
-    font-size: 15px;
+    font-size: 14px !important;
     @media (min-width:960px) { 
       line-height: 35px;
     }
@@ -148,4 +148,38 @@ div.learner-record-sharing-controls {
 #sharing-link-modal button.btn, #partner-school-modal button.btn {
   padding: 0.375rem 0.75rem !important;
   font-size: 1rem;
+}
+
+@include media-breakpoint-down(sm) {
+  div.learner-record {
+    .m-0.d-flex.flex-column div {
+      margin-bottom: 0 !important;
+    }
+
+    div.learner-record-user-profile {
+      margin-top: 16px !important;
+      margin-bottom: 0 !important;
+    }
+
+    hr {
+      margin: 15px 0 !important;
+    }
+
+    h4 {
+      margin-bottom: 10px !important;
+    }
+
+    div.list-group {
+      div.list-group-item {
+        border: 0 !important;
+        padding-bottom: 15px !important;
+        margin-bottom: 15px !important;
+        border-bottom: 1px solid $home-page-border-grey !important;
+
+        div.d-flex.w-100.justify-content-between {
+          margin-bottom: 10px;
+        }
+      }
+    }
+  }
 }
