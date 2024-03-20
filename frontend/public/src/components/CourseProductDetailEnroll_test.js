@@ -140,7 +140,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     )
     assert.isNotOk(
       inner
-        .find("#enrollNowBtn")
+        .find(".enroll-now")
         .at(0)
         .exists()
     )
@@ -535,7 +535,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         assert.isTrue(selectorControl.exists())
         const selectorControlItems = selectorControl.find("option")
         assert.isTrue(selectorControlItems.length === 3)
-        assert.isTrue(selectorControlItems.at(0).text() === "Nothing Selected")
+        assert.isTrue(selectorControlItems.at(0).text() === "Please Select")
       } else {
         assert.isFalse(selectorControl.exists())
       }

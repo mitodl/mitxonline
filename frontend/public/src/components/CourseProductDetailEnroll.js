@@ -316,7 +316,7 @@ export class CourseProductDetailEnroll extends React.Component<
       )
       : []
 
-    return (
+    return upgradableCourseRuns.length > 0 || hasMultipleEnrollableRuns ? (
       <Modal
         id={`upgrade-enrollment-dialog`}
         className="upgrade-enrollment-modal"
@@ -426,7 +426,7 @@ export class CourseProductDetailEnroll extends React.Component<
           </div>
         </ModalBody>
       </Modal>
-    )
+    ) : null
   }
 
   renderAddlProfileFieldsModal() {
