@@ -473,7 +473,6 @@ export class CatalogPage extends React.Component<Props> {
   mergeNewObjects(oldArray, newArray) {
     const oldIds = oldArray.map(a => a.id)
     const newObjects = newArray.filter(a => !oldIds.includes(a.id))
-    console.log(oldArray, newArray, newObjects)
     return oldArray.concat(newObjects)
   }
 
