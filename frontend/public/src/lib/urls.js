@@ -11,7 +11,14 @@ export const routes = {
   accountSettings: "/account-settings/",
   logout:          "/logout/",
   orderHistory:    "/orders/history",
-  catalog:         "/catalog",
+  catalog:         include("/catalog", {
+    programs: include("/programs/", {
+      department: ":department/",
+    }),
+    courses: include("/courses/", {
+      department: ":department/",
+    }),
+  }),
 
   // authentication related routes
   login: include("/signin/", {
