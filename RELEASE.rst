@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.88.1
+Version 0.88.1 (Released March 20, 2024)
 --------------
 
 - Updates to ancillary pages (#2119)
