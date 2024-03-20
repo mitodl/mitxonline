@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.88.0 (Released March 20, 2024)
+--------------
+
+- Fetch by department when selected (#2120)
+
 Version 0.87.4 (Released March 18, 2024)
 --------------
 
