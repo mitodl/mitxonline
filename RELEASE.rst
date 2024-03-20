@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.88.1
+--------------
+
+- Updates to ancillary pages (#2119)
+- remove extraneous console.log statement (#2131)
+- 1257: updating meta tags on mitx online site (#2128)
+
 Version 0.88.0 (Released March 20, 2024)
 --------------
 
