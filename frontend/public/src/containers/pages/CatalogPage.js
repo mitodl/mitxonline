@@ -618,9 +618,12 @@ export class CatalogPage extends React.Component<Props> {
     let numOfLoaders = 0
     const loaders = []
     if (this.state.tabSelected === COURSES_TAB) {
-      numOfLoaders = this.state.filteredCourses.length - this.renderNumberOfCatalogCourses()
+      numOfLoaders =
+        this.state.filteredCourses.length - this.renderNumberOfCatalogCourses()
     } else {
-      numOfLoaders = this.state.filteredPrograms.length - this.renderNumberOfCatalogPrograms()
+      numOfLoaders =
+        this.state.filteredPrograms.length -
+        this.renderNumberOfCatalogPrograms()
     }
     for (let i = 0; i < numOfLoaders; i++) {
       loaders.push(<CourseLoader />)
