@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.88.2
+--------------
+
+- Upgrade dialog choose any course run (#2124)
+
 Version 0.88.1 (Released March 20, 2024)
 --------------
 
