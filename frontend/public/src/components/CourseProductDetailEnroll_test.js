@@ -494,7 +494,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
   ].forEach(([showsQualifier, runsQualifier, multiples]) => {
     it(`${showsQualifier} the course run selector for a course with ${runsQualifier} active run${
       multiples ? "s" : ""
-    }`, async () => {
+    } and dis/enables enroll buttons on selection`, async () => {
       courseRun["products"] = [
         {
           id:                     1,
@@ -582,7 +582,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     })
   })
 
-  it(`renders enrollment dialog for a course with multiple non-upgradable active runs`, async () => {
+  it(`renders enrollment dialog for a course with multiple non-upgradable active runs and enables enroll button on selection`, async () => {
     courseRun["products"] = []
     courseRun["is_upgradable"] = false
     const courseRuns = [courseRun]
