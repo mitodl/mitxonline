@@ -11,12 +11,9 @@ export const routes = {
   accountSettings: "/account-settings/",
   logout:          "/logout/",
   orderHistory:    "/orders/history",
-  catalog:         include("/catalog", {
-    programs: include("/programs/", {
-      department: ":department/",
-    }),
-    courses: include("/courses/", {
-      department: ":department/",
+  catalog:         include("/catalog/", {
+    startingTab: include(":tab/", {
+      startingDepartment: ":department/",
     }),
   }),
 

@@ -32,6 +32,7 @@ import { requestAsync } from "redux-query"
 import { connectRequest } from "redux-query-react"
 import { pathOr } from "ramda"
 import CourseLoader from "../../components/CourseLoader"
+import {Match} from "react-router"
 
 type Props = {
   coursesIsLoading: ?boolean,
@@ -43,7 +44,8 @@ type Props = {
   programsNextPage: ?string,
   programsCount: number,
   coursesCount: number,
-  departments: ?Array<Department>
+  departments: ?Array<Department>,
+  match: Match,
 }
 
 // Department filter name for all items.
@@ -54,6 +56,8 @@ const PROGRAMS_TAB = "programs"
 
 // Course tab name.
 const COURSES_TAB = "courses"
+
+const TABS = [PROGRAMS_TAB, COURSES_TAB]
 
 export class CatalogPage extends React.Component<Props> {
   state = {
@@ -81,6 +85,9 @@ export class CatalogPage extends React.Component<Props> {
     super(props)
     this.io = null
     this.container = React.createRef(null)
+    const { tab, department } = this.props.match.params
+    this.setState({ tabSelected: tab in TABS ? tab : COURSES_TAB })
+    this.setState({ selectedDepartment: department || ALL_DEPARTMENTS })
   }
 
   componentWillUnmount() {
