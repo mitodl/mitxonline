@@ -183,7 +183,6 @@ export class CourseProductDetailEnroll extends React.Component<
 
   hndSetCourseRun = (event: any) => {
     const { courseRuns } = this.props
-
     if (event.target.value === "") {
       this.setCurrentCourseRun(null)
       return
@@ -194,7 +193,6 @@ export class CourseProductDetailEnroll extends React.Component<
         (elem: EnrollmentFlaggedCourseRun) =>
           elem.id === parseInt(event.target.value)
       )
-
     if (matchingCourseRun) {
       this.setCurrentCourseRun(matchingCourseRun)
     }
@@ -240,7 +238,7 @@ export class CourseProductDetailEnroll extends React.Component<
           onChange={this.hndSetCourseRun.bind(this)}
           className="form-control"
         >
-          <option value="" key="default-select">
+          <option value="d" key="default-select">
             Please Select
           </option>
           {courseRuns &&

@@ -536,11 +536,93 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         const selectorControlItems = selectorControl.find("option")
         assert.isTrue(selectorControlItems.length === 3)
         assert.isTrue(selectorControlItems.at(0).text() === "Please Select")
+        assert.isTrue(
+          upgradeForm
+            .find("button.btn-upgrade")
+            .at(0)
+            .prop("disabled")
+        )
+        assert.isTrue(
+          inner
+            .find("button.enroll-now-free")
+            .at(0)
+            .prop("disabled")
+        )
+        modal
+          .find("select.form-control")
+          .simulate("change", { target: { value: courseRun["id"] } })
+        inner.update()
+        assert.isFalse(
+          inner
+            .find("button.enroll-now-free")
+            .at(0)
+            .prop("disabled")
+        )
+        assert.isFalse(
+          inner
+            .find("button.btn-upgrade")
+            .at(0)
+            .prop("disabled")
+        )
       } else {
         assert.isFalse(selectorControl.exists())
+        assert.isFalse(
+          inner
+            .find("button.enroll-now-free")
+            .at(0)
+            .prop("disabled")
+        )
+        assert.isFalse(
+          upgradeForm
+            .find("button.btn-upgrade")
+            .at(0)
+            .prop("disabled")
+        )
       }
     })
   })
+
+  it(`renders enrollment dialog for a course with multiple non-upgradable active runs`, async () => {
+    courseRun["products"] = []
+    courseRun["is_upgradable"] = false
+    const courseRuns = [courseRun]
+    courseRuns.push(courseRun)
+
+    isWithinEnrollmentPeriodStub.returns(true)
+    const { inner } = await renderPage({
+      entities: {
+        courseRuns:  courseRuns,
+        courses:     [course],
+        enrollments: [enrollment],
+        currentUser: currentUser
+      }
+    })
+
+    const enrollBtn = inner.find(".enroll-now").at(0)
+    assert.isTrue(enrollBtn.exists())
+    await enrollBtn.prop("onClick")()
+
+    const modal = inner.find(".upgrade-enrollment-modal")
+    assert.isTrue(modal.find("select.form-control").exists())
+    assert.isTrue(
+      modal
+        .find("button.enroll-now-free")
+        .at(0)
+        .prop("disabled")
+    )
+    modal
+      .find("select.form-control")
+      .simulate("change", { target: { value: courseRun["id"] } })
+    inner.update()
+    assert.isFalse(
+      inner
+        .find("button.enroll-now-free")
+        .at(0)
+        .prop("disabled")
+    )
+    assert.isFalse(inner.find("button.btn-upgrade").exists())
+  })
+
   it("renders the upsell dialog with the correct date if the user has an enrollment in the past that is not upgradeable", async () => {
     const pastCourseRun = makeCourseRunDetail()
     pastCourseRun["start_date"] = moment().add(-1, "Y")
