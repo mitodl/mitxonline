@@ -494,7 +494,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
   ].forEach(([showsQualifier, runsQualifier, multiples]) => {
     it(`${showsQualifier} the course run selector for a course with ${runsQualifier} active run${
       multiples ? "s" : ""
-    } and dis/enables enroll buttons on selection`, async () => {
+    } and enables enroll buttons on selection`, async () => {
       courseRun["products"] = [
         {
           id:                     1,
