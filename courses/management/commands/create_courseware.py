@@ -52,7 +52,8 @@ class Command(BaseCommand):
             departments (models.QuerySet): A QuerySet of Department objects.
         """
         if departments:
-            courseware_object.departments.add(*departments)
+            for dept in departments:
+                courseware_object.departments.add(dept.id)
             courseware_object.save()
         else:
             self.stderr.write(
@@ -73,15 +74,13 @@ class Command(BaseCommand):
             models.QuerySet: Query set containing all of the departments specified
                 in the list of department names.
         """
-        add_depts = Department.objects.filter(name__in=departments).all()
-        for dept in departments:
+        add_depts = Department.objects.filter(name__in=departments.split()).all()
+        for dept in departments.split():
             found = len([db_dept for db_dept in add_depts if db_dept.name == dept]) > 0
-
             if not found:
-                new_dept = Department(name=dept)
-                new_dept.save()
+                Department.objects.create(name=dept)
 
-        return Department.objects.filter(name__in=departments).all()
+        return Department.objects.filter(name__in=departments.split()).all()
 
     def _department_must_be_defined_error(self):
         """
@@ -360,16 +359,6 @@ class Command(BaseCommand):
                 Course, kwargs["courseware_id"]
             )
 
-            program = None
-
-            if "program" in kwargs and kwargs["program"] is not None:
-                try:
-                    program = Program.objects.filter(pk=kwargs["program"]).first()
-                except:
-                    program = Program.objects.filter(
-                        readable_id=kwargs["program"]
-                    ).first()
-
             new_course = Course.objects.create(
                 title=kwargs["title"],
                 readable_id=kwargs["courseware_id"],
@@ -386,8 +375,6 @@ class Command(BaseCommand):
             if "add_depts" not in locals() or not add_depts:
                 self._departments_do_not_exist_error()
 
-            self._add_departments_to_courseware_object(new_program, add_depts)
-
             self._successfully_created_courseware_object_message(new_course)
 
             if "create_run" in kwargs and kwargs["create_run"] is not None:
@@ -402,6 +389,16 @@ class Command(BaseCommand):
                     )
 
                 new_req = None
+
+            if "program" in kwargs and kwargs["program"] is not None:
+                try:
+                    program = Program.objects.filter(pk=kwargs["program"]).first()
+                except:
+                    program = Program.objects.filter(
+                        readable_id=kwargs["program"]
+                    ).first()
+
+                self._add_departments_to_courseware_object(program, add_depts)
 
                 if program is not None and kwargs["required"]:
                     new_req = program.add_requirement(new_course)

@@ -30,7 +30,7 @@ Tutor Setup, Part One
 
 ..
 
-   Note that no hosts file changes are needed if you use the default ``local.overhang.io`` domain - that's a real domain with a wildcard subdomain cname that points to 127.0.0.1.
+   Note that no hosts file changes are needed if you use the default ``local.edly.io`` domain - that's a real domain with a wildcard subdomain cname that points to 127.0.0.1.
 
 
 To begin, you need to follow the `One-Click Installer <https://docs.tutor.overhang.io/quickstart.html>`_ instructions provided by Tutor. Do this with your Tutor virtualenv activated.
@@ -69,7 +69,7 @@ For best results, create two new courses within edX. The MITx Online ``configure
 
 If you have a devstack instance handy, you can export these and import them into Tutor. Otherwise, just create them and make sure to set dates for the courses (they default to 2030 otherwise).
 
-Finally, go here to create an access token for the service worker user: http://local.overhang.io/admin/oauth2_provider/accesstoken/add/ The token can be anything, and the expiration date should just be today plus 10 years.
+Finally, go here to create an access token for the service worker user: https://local.edly.io/admin/oauth2_provider/accesstoken/add/ The token can be anything, and the expiration date should just be today plus 10 years.
 
 MITx Online Setup
 -----------------
@@ -79,14 +79,14 @@ To set up MITx Online:
 
 #. Get the gateway IP for the ``tutor_local_default`` network: ``docker network inspect tutor_local_default | grep Gateway``
 
-   * Mac users should instead use the host.docker.internal IP. Specify this by using ``host-internal`` in ``OPENEDX_IP``.
+   * Mac users should instead use the host.docker.internal IP. Specify this by setting ``OPENEDX_IP=host-gateway`` in your MITx Online ``.env`` file.
 
 #. Set up your ``/etc/hosts`` file to point ``mitxonline.odl.local`` to localhost.
 #. Clone the repository somewhere.
 #. Set up your ``.env`` file. These settings need particular attention:
 
    * ``OPENEDX_IP``\ : set to the gateway IP from the first step
-   * ``OPENEDX_API_BASE_URL``\ : set to http://local.overhang.io
+   * ``OPENEDX_API_BASE_URL``\ : set to http://local.edly.io
    * ``OPENEDX_SERVICE_WORKER_USERNAME``\ : set to ``mitx_online_serviceworker`` (unless you changed this)
    * ``OPENEDX_SERVICE_WORKER_API_TOKEN``\ : set to the token you generated
 
@@ -156,14 +156,14 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
    * ``tutor local run lms ./manage.py lms print_setting THIRD_PARTY_AUTH_BACKENDS``
    * If you do have weird errors or settings not showing properly, make sure you edited the right yaml files *and* that they're using the right whitespace (i.e. don't use tabs).
 
-#. In a separate browser session of some kind (incognito/private browsing/other browser entirely), try to navigate to http://local.overhang.io . It should load but it should give you an error message. In the LMS logs, you should see an error message for "Can't fetch settings for disabled provider." This is proper operation - the OAuth2 settings aren't in place yet.
-#. In the superuser session you have open, go to http://local.overhang.io/admin . This should work. If you've been logged out, you should still be able to get in. If you can't (for instance, if you're getting 500 errors), you will need to turn off ``ENABLE_THIRD_PARTY_AUTH`` in ``FEATURES``\ , restart Tutor using ``tutor local stop`` and ``start``\ , not using ``reboot``\ , then try again.
-#. Go to http://local.overhang.io/admin/third_party_auth/oauth2providerconfig/add/ and add a provider configuration:
+#. In a separate browser session of some kind (incognito/private browsing/other browser entirely), try to navigate to http://local.edly.io . It should load but it should give you an error message. In the LMS logs, you should see an error message for "Can't fetch settings for disabled provider." This is proper operation - the OAuth2 settings aren't in place yet.
+#. In the superuser session you have open, go to http://local.edly.io/admin . This should work. If you've been logged out, you should still be able to get in. If you can't (for instance, if you're getting 500 errors), you will need to turn off ``ENABLE_THIRD_PARTY_AUTH`` in ``FEATURES``\ , restart Tutor using ``tutor local stop`` and ``start``\ , not using ``reboot``\ , then try again.
+#. Go to http://local.edly.io/admin/third_party_auth/oauth2providerconfig/add/ and add a provider configuration:
 
    * Enabled is checked.
    * Name: ``mitxonline``
    * Slug: ``mitxpro-oauth2``
-   * Site: ``local.overhang.io``
+   * Site: ``local.edly.io``
    * Skip hinted login dialog is checked.
    * Skip registration form is checked.
    * Skip email verification is checked.
@@ -183,13 +183,13 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
 
 #. Configure Tutor for OAuth2 authentication from MITx Online.
 
-   * Go to http://local.overhang.io/admin/oauth2_provider/application/ and either add or edit the ``edx-oauth-app`` entry.
+   * Go to http://local.edly.io/admin/oauth2_provider/application/ and either add or edit the ``edx-oauth-app`` entry.
    * Ensure these settings are set:
 
       * Name: ``edx-oauth-app``
       * Redirect uris: ``http://mitxonline.odl.local:8013/login/_private/complete``
       * Client type: ``Confidential``
-      * Authorization grant type: ``Confidental``
+      * Authorization grant type: ``Authorization code``
       * Skip authorization is checked.
 
    * Save ``Client id`` and ``Client secret``.

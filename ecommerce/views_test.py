@@ -551,7 +551,6 @@ def test_checkout_result(
     resp = user_client.post(reverse("checkout-result-callback"), payload)
     assert resp.status_code == 302
     assert resp.url == expected_redirect_url
-    print(resp.cookies)
 
     resp = api_client.post(reverse("checkout_result_api"), payload)
 

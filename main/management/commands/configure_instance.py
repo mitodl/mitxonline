@@ -31,7 +31,7 @@ The learner account will have these parameters:
 The product for the courses will both be $999 so they are under the limit
 for test CyberSource transactions.
 
-If the --tutor/-T option is passed, the command will use the local.overhang.io
+If the --tutor/-T option is passed, the command will use the local.edly.io
 address for links to edX rather than edx.odl.local:18000.
 
 This uses other management commands to complete these tasks. So, if you just
@@ -128,9 +128,9 @@ class Command(BaseCommand):
         """Returns a tuple of the edX host and port depending on what the user's passed in"""
 
         if kwargs["tutor"]:
-            return ("local.overhang.io", "")
+            return ("local.edly.io", "")
         elif kwargs["tutordev"]:
-            return ("local.overhang.io", ":8000")
+            return ("local.edly.io", ":8000")
         else:
             return ("edx.odl.local:18000", ":18000")
 
