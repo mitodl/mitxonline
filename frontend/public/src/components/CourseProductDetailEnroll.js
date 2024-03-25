@@ -132,44 +132,9 @@ export class CourseProductDetailEnroll extends React.Component<
       this.toggleAddlProfileFieldsModal()
     }
   }
-
-  async checkForExistingEnrollment(run: EnrollmentFlaggedCourseRun) {
-    // Find an existing enrollment - the default should be the audit enrollment
-    // already have, so you can just upgrade in place. If you don't, you get the
-    // current run (which should be the first available one).
-    // This was changed to also make sure the run you're enrolled in is upgradeable.
-    const { enrollments } = this.props
-
-    if (enrollments) {
-      const firstAuditEnrollment = enrollments.find(
-        (enrollment: RunEnrollment) =>
-          enrollment.run.course.id === run.course.id &&
-          enrollment.enrollment_mode === "audit" &&
-          enrollment.run.enrollment_end !== null &&
-          enrollment.run.enrollment_end > moment.now() &&
-          (enrollment.run.upgrade_deadline === null ||
-            enrollment.run.upgrade_deadline > moment.now())
-      )
-
-      if (firstAuditEnrollment) {
-        this.setCurrentCourseRun(firstAuditEnrollment.run)
-        return
-      }
-    }
-
-    this.setCurrentCourseRun(run)
-  }
-
   toggleUpgradeDialogVisibility = () => {
     const { upgradeEnrollmentDialogVisibility } = this.state
-    const run = this.getCurrentCourseRun()
-
-    if (!upgradeEnrollmentDialogVisibility) {
-      this.checkForExistingEnrollment(run)
-    } else {
-      window.location = "/dashboard/"
-    }
-
+    this.setCurrentCourseRun(null)
     this.setState({
       upgradeEnrollmentDialogVisibility: !upgradeEnrollmentDialogVisibility
     })
@@ -308,6 +273,7 @@ export class CourseProductDetailEnroll extends React.Component<
         ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run && run.products ? run.products[0] : null
+    const canUpgrade = run && run.is_upgradable && product
     const upgradableCourseRuns = courseRuns
       ? courseRuns.filter(
         (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
@@ -375,12 +341,12 @@ export class CourseProductDetailEnroll extends React.Component<
                   <p>
                     Certificate track:{" "}
                     <strong id="certificate-price-info">
-                      {product &&
+                      {product && run.is_upgradable &&
                         formatLocalePrice(getFlexiblePriceForProduct(product))}
                     </strong>
                     <>
                       <br />
-                      {product && run.upgrade_deadline ? (
+                      {canUpgrade ? (
                         <span className="text-danger">
                           Payment date:{" "}
                           {formatPrettyDate(moment(run.upgrade_deadline))}
@@ -407,7 +373,7 @@ export class CourseProductDetailEnroll extends React.Component<
                     <button
                       type="submit"
                       className="btn btn-upgrade"
-                      disabled={!product}
+                      disabled={!canUpgrade}
                     >
                       <strong>Enroll and Pay</strong>
                       <br />
