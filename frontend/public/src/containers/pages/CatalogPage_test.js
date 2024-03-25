@@ -882,4 +882,36 @@ describe("CatalogPage", function() {
       JSON.stringify([displayedProgram, newProgram])
     )
   })
+
+  it("renderCatalogCount is plural for more than one course", async () => {
+    const { inner } = await renderPage()
+    inner.setState({ tabSelected: "courses" })
+    inner.setState({ selectedDepartment: "All Departments" })
+    inner.setState({ allCoursesCount: 2 })
+    expect(inner.find("h2.catalog-count").text()).equals("2 courses")
+  })
+
+  it("renderCatalogCount is plural for more than one program", async () => {
+    const { inner } = await renderPage()
+    inner.setState({ tabSelected: "programs" })
+    inner.setState({ selectedDepartment: "All Departments" })
+    inner.setState({ allProgramsCount: 2 })
+    expect(inner.find("h2.catalog-count").text()).equals("2 programs")
+  })
+
+  it("renderCatalogCount is singular for one course", async () => {
+    const { inner } = await renderPage()
+    inner.setState({ tabSelected: "courses" })
+    inner.setState({ selectedDepartment: "All Departments" })
+    inner.setState({ allCoursesCount: 1 })
+    expect(inner.find("h2.catalog-count").text()).equals("1 course")
+  })
+
+  it("renderCatalogCount is singular for one program", async () => {
+    const { inner } = await renderPage()
+    inner.setState({ tabSelected: "programs" })
+    inner.setState({ selectedDepartment: "All Departments" })
+    inner.setState({ allProgramsCount: 1 })
+    expect(inner.find("h2.catalog-count").text()).equals("1 program")
+  })
 })
