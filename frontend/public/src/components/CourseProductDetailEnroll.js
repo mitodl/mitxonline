@@ -341,7 +341,8 @@ export class CourseProductDetailEnroll extends React.Component<
                   <p>
                     Certificate track:{" "}
                     <strong id="certificate-price-info">
-                      {product && run.is_upgradable &&
+                      {product &&
+                        run.is_upgradable &&
                         formatLocalePrice(getFlexiblePriceForProduct(product))}
                     </strong>
                     <>
