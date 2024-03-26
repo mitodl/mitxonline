@@ -622,6 +622,81 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     )
     assert.isFalse(inner.find("button.btn-upgrade").exists())
   })
+  ;[
+    [false, true],
+    [true, false],
+    [true, true]
+  ].forEach(([isUpgradable, hasProduct]) => {
+    it(`renders enrollment dialog where a run is ${
+      isUpgradable ? "" : "not"
+    } upgradable and has ${hasProduct ? "" : "no"} products`, async () => {
+      const runWithMixedInfo = makeCourseRunDetailWithProduct()
+      runWithMixedInfo["is_upgradable"] = isUpgradable
+      runWithMixedInfo["upgrade_deadline"] = moment().add(11, "M")
+      if (!hasProduct) {
+        runWithMixedInfo["products"] = []
+      }
+      const courseRuns = [courseRun]
+      courseRuns.push(runWithMixedInfo)
+
+      isWithinEnrollmentPeriodStub.returns(true)
+      const { inner } = await renderPage({
+        entities: {
+          courseRuns:  courseRuns,
+          courses:     [course],
+          enrollments: [enrollment],
+          currentUser: currentUser
+        }
+      })
+
+      const enrollBtn = inner.find(".enroll-now").at(0)
+      assert.isTrue(enrollBtn.exists())
+      await enrollBtn.prop("onClick")()
+
+      const modal = inner.find(".upgrade-enrollment-modal")
+      assert.isTrue(modal.find("select.form-control").exists())
+      let upgradeBtnDisabledProp = inner
+        .find("button.btn-upgrade")
+        .at(0)
+        .prop("disabled")
+      assert.isTrue(
+        modal
+          .find("button.enroll-now-free")
+          .at(0)
+          .prop("disabled")
+      )
+      assert.isTrue(upgradeBtnDisabledProp)
+      modal
+        .find("select.form-control")
+        .simulate("change", { target: { value: runWithMixedInfo["id"] } })
+      inner.update()
+      const certPricing = inner.find(".certificate-pricing").at(0)
+      upgradeBtnDisabledProp = inner
+        .find("button.btn-upgrade")
+        .at(0)
+        .prop("disabled")
+      if (isUpgradable && hasProduct) {
+        assert.isFalse(upgradeBtnDisabledProp)
+        assert.isTrue(certPricing.exists())
+        assert.isTrue(
+          certPricing
+            .text()
+            .includes(
+              runWithMixedInfo["upgrade_deadline"].format("MMMM D, YYYY")
+            )
+        )
+      } else {
+        assert.isTrue(upgradeBtnDisabledProp)
+        assert.isTrue(certPricing.text().includes("not available"))
+      }
+      assert.isFalse(
+        inner
+          .find("button.enroll-now-free")
+          .at(0)
+          .prop("disabled")
+      )
+    })
+  })
 
   it("renders the upsell dialog with the correct date if the user has an enrollment in the past that is not upgradeable", async () => {
     const pastCourseRun = makeCourseRunDetail()
