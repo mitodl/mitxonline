@@ -1684,6 +1684,7 @@ class SignatoryPage(Page):
         """
         raise Http404
 
+
 @register_snippet
 class SiteNotification(models.Model):
     """Snippet model for showing site notifications."""
