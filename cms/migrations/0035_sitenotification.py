@@ -7,15 +7,23 @@ import wagtail.fields
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('cms', '0034_add_search_image_to_course_and_program_page'),
+        ("cms", "0034_add_search_image_to_course_and_program_page"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='SiteNotification',
+            name="SiteNotification",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('message', wagtail.fields.RichTextField(max_length=255)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("message", wagtail.fields.RichTextField(max_length=255)),
             ],
         ),
     ]
