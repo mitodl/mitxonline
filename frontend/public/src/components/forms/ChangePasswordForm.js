@@ -36,7 +36,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
     render={({ isSubmitting }) => (
       <Form>
         <section className="email-section">
-          <h2>Change Password</h2>
+          <h2 aria-label="Form Change Password">Change Password</h2>
           <div className="form-group">
             <CardLabel
               htmlFor="oldPassword"
@@ -106,6 +106,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
           <div className="col d-flex justify-content-end">
             <button
               type="submit"
+              aria-label="submit form change password"
               className="btn btn-primary btn-gradient-red-to-blue"
               disabled={isSubmitting}
             >
