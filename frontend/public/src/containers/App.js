@@ -42,7 +42,7 @@ type Props = {
 
 export class App extends React.Component<Props, void> {
   componentDidMount() {
-    const { addUserNotification } = this.props
+    const { addUserNotification } = this.prop
 
     const userMsg = getStoredUserMessage()
     if (userMsg) {

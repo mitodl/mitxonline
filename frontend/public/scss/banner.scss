@@ -1,4 +1,4 @@
-.notifications {
+.banners {
   position: relative;
   z-index: 1;
 
@@ -11,44 +11,21 @@
     }
   }
 
-  .alert {
-    margin-bottom: 0;
-
-    &.alert-info, &.alert-danger {
-      color: white;
-
-      a.alert-link, .close {
-        color: white;
-      }
-
-      a.alert-link {
-        font-weight: inherit;
-        text-decoration: underline;
-
-        &:hover {
-          font-weight: 700;
-        }
-      }
-
-      .close {
-        opacity: 1;
-      }
-    }
-
-    &.alert-info {
-      background-color: #126f9a;
-    }
-
-    &.alert-danger {
-      background-color: $primary;
-    }
-  }
-
   // Django-rendered implementation
-  .notification {
+  .banner {
     background: $primary;
     text-align: center;
     color: white;
+    height: 60px;
+    padding: 15px 20px 15px 20px;
+    gap: 0px;
+    background: linear-gradient(180deg, #A31F34 0%, #700934 100%);
+
+    font-family: Inter;
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 21.78px;
+
 
     p a {
       color: white;
@@ -58,11 +35,10 @@
 
   }
 
-  .close-notification {
+  .close-banner {
     text-decoration: none;
     color: white;
     float: right;
-    margin-right: 10px;
 
     &:after {
       content: "cancel";

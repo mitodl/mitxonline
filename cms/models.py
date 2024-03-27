@@ -1686,8 +1686,8 @@ class SignatoryPage(Page):
 
 
 @register_snippet
-class SiteNotification(models.Model):
-    """Snippet model for showing site notifications."""
+class SiteBanner(models.Model):
+    """Snippet model for showing site banner."""
 
     message = RichTextField(
         max_length=255, features=["bold", "italic", "link", "document-link"]

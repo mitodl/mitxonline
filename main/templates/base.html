@@ -1,5 +1,5 @@
 {% load static hijack_tags js_interop %}
-{% load wagtailcore_tags startswith noindex_meta latest_notification %}
+{% load wagtailcore_tags startswith noindex_meta banner %}
 {% load render_bundle from webpack_loader %}
 <!DOCTYPE html>
 <html lang="en">
@@ -35,7 +35,7 @@
     {% include "partials/gtm_body.html" %}
     {% hijack_notification %}
     {% if not request.path|startswith:'/certificate/' %}
-      {% latest_notification %}
+      {% banner %}
       {% block headercontent %}
         <div id="header"></div>
         {% render_bundle 'header' %}
