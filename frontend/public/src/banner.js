@@ -3,8 +3,6 @@
 
 function renderSiteBanner() {
   const bannerId = $(".banner").data("banner-id");
-  console.log("hi");
-  console.log(bannerId);
   if (bannerId) {
     if (localStorage.getItem("dismissedbanner") !== bannerId.toString()) {
       $(".banners").removeClass("d-none");
