@@ -32,6 +32,7 @@ import { requestAsync } from "redux-query"
 import { connectRequest } from "redux-query-react"
 import { pathOr } from "ramda"
 import CourseLoader from "../../components/CourseLoader"
+import { Match } from "react-router"
 
 type Props = {
   coursesIsLoading: ?boolean,
@@ -43,7 +44,8 @@ type Props = {
   programsNextPage: ?string,
   programsCount: number,
   coursesCount: number,
-  departments: ?Array<Department>
+  departments: ?Array<Department>,
+  match: Match
 }
 
 // Department filter name for all items.
@@ -54,6 +56,8 @@ const PROGRAMS_TAB = "programs"
 
 // Course tab name.
 const COURSES_TAB = "courses"
+
+const TABS = [PROGRAMS_TAB, COURSES_TAB]
 
 export class CatalogPage extends React.Component<Props> {
   state = {
@@ -81,6 +85,20 @@ export class CatalogPage extends React.Component<Props> {
     super(props)
     this.io = null
     this.container = React.createRef(null)
+    const { match } = this.props
+    if (match) {
+      const { tab, department } = match.params
+      if (TABS.includes(tab)) {
+        this.state.tabSelected = tab
+      } else {
+        this.state.tabSelected = COURSES_TAB
+      }
+      if (department) {
+        this.state.selectedDepartment = department
+      } else {
+        this.state.selectedDepartment = ALL_DEPARTMENTS
+      }
+    }
   }
 
   componentWillUnmount() {
@@ -130,7 +148,7 @@ export class CatalogPage extends React.Component<Props> {
               this.state.allCoursesRetrieved,
               response.body.results
             )
-            const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+            const filteredCourses = this.filteredCoursesBasedOnSelectedDepartment(
               this.state.selectedDepartment,
               allCourses
             )
@@ -216,7 +234,7 @@ export class CatalogPage extends React.Component<Props> {
       }
       if (!coursesIsLoading && !this.state.filterCoursesCalled) {
         this.setState({ filterCoursesCalled: true })
-        const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+        const filteredCourses = this.filteredCoursesBasedOnSelectedDepartment(
           this.state.selectedDepartment,
           this.state.allCoursesRetrieved
         )
@@ -247,28 +265,29 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Returns an array of departments names which have one or more course(s) or program(s)
+   * Returns an array of departments objects which have one or more course(s) or program(s)
    * related to them depending on the currently selected tab.
    * @param {string} selectedTabName the name of the currently selected tab.
    */
   filterDepartmentsByTabName(selectedTabName: string) {
     if (!this.props.departmentsIsLoading) {
       const { departments } = this.props
+      const allDepartments = { name: ALL_DEPARTMENTS, slug: ALL_DEPARTMENTS }
       if (selectedTabName === COURSES_TAB) {
         return [
           ...new Set([
-            ALL_DEPARTMENTS,
+            allDepartments,
             ...departments.flatMap(department =>
-              department.course_ids.length > 0 ? department.name : []
+              department.course_ids.length > 0 ? department : []
             )
           ])
         ]
       } else {
         return [
           ...new Set([
-            ALL_DEPARTMENTS,
+            allDepartments,
             ...departments.flatMap(department =>
-              department.program_ids.length > 0 ? department.name : []
+              department.program_ids.length > 0 ? department : []
             )
           ])
         ]
@@ -340,7 +359,7 @@ export class CatalogPage extends React.Component<Props> {
         } else {
           coursesToFilter.push(...this.state.allCoursesRetrieved)
         }
-        const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+        const filteredCourses = this.filteredCoursesBasedOnSelectedDepartment(
           this.state.selectedDepartment,
           coursesToFilter
         )
@@ -376,7 +395,7 @@ export class CatalogPage extends React.Component<Props> {
   changeSelectedDepartment = (selectedDepartment: string) => {
     this.resetQueryVariablesToDefault()
     this.setState({ selectedDepartment: selectedDepartment })
-    const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+    const filteredCourses = this.filteredCoursesBasedOnSelectedDepartment(
       selectedDepartment,
       this.state.allCoursesRetrieved
     )
@@ -407,8 +426,12 @@ export class CatalogPage extends React.Component<Props> {
       departments.length > 0
     ) {
       const newDepartment = this.props.departments.find(
-        department => department.name === selectedDepartment
+        department => department.slug === selectedDepartment
       )
+      if (!newDepartment) {
+        this.setState({ selectedDepartment: ALL_DEPARTMENTS })
+        return
+      }
       if (
         filteredCourses.length !== newDepartment.course_ids.length &&
         !this.state.isLoadingMoreItems
@@ -428,7 +451,7 @@ export class CatalogPage extends React.Component<Props> {
           this.setState({ allCoursesRetrieved: allCourses })
           this.setState({ courseQueryPage: 2 })
           this.setState({ queryIDListString: remainingIDs.toString() })
-          const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+          const filteredCourses = this.filteredCoursesBasedOnSelectedDepartment(
             selectedDepartment,
             allCourses
           )
@@ -497,29 +520,34 @@ export class CatalogPage extends React.Component<Props> {
   /**
    * Returns a filtered array of courses which have: an associated Department name matching the selectedDepartment
    * if the selectedDepartment does not equal "All Departments",
-   * an associated page which is live, and at least 1 associated Course Run.
+   * This function, at one time, checked for an associated page which is live, and at least 1 associated Course Run.
+   * This logic was removed as this is handled by the API & would cause coursecount and programcount to be incorrect.
    * @param {Array<CourseDetailWithRuns>} courses An array of courses which will be filtered by Department.
    * @param {string} selectedDepartment The Department name used to compare against the courses in the array.
    */
-  filteredCoursesBasedOnCourseRunCriteria(
+  filteredCoursesBasedOnSelectedDepartment(
     selectedDepartment: string,
     courses: Array<CourseDetailWithRuns>
   ) {
-    return courses.filter(
-      course =>
-        (selectedDepartment === ALL_DEPARTMENTS ||
-          course.departments
-            .map(department => department.name)
-            .includes(selectedDepartment)) &&
-        course?.page?.live &&
-        course.courseruns.length > 0 &&
-        this.validateCoursesCourseRuns(course.courseruns).length > 0
-    )
+    const { departments } = this.props
+    if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
+      return courses
+    } else {
+      const selectedDepartment = departments.find(
+        department => department.slug === this.state.selectedDepartment
+      )
+      if (!selectedDepartment) {
+        this.setState({ selectedDepartment: ALL_DEPARTMENTS })
+        return courses
+      }
+      return courses.filter(course =>
+        selectedDepartment.course_ids.includes(course.id)
+      )
+    }
   }
 
   /**
-   * Returns an array of Programs which have page.live = true and a department name which
-   * matches the currently selected department.
+   * Returns an array of Programs which relate to the selectedDepartment using the department's list of IDs.
    * @param {Array<Program>} programs An array of Programs which will be filtered by Department and other criteria.
    * @param {string} selectedDepartment The Department name used to compare against the courses in the array.
    */
@@ -527,38 +555,66 @@ export class CatalogPage extends React.Component<Props> {
     selectedDepartment: string,
     programs: Array<Program>
   ) {
-    return programs.filter(
-      program =>
-        selectedDepartment === ALL_DEPARTMENTS ||
+    const { departments } = this.props
+    if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
+      return programs
+    } else {
+      const selectedDepartment = departments.find(
+        department => department.slug === this.state.selectedDepartment
+      )
+      if (!selectedDepartment) {
+        this.setState({ selectedDepartment: ALL_DEPARTMENTS })
+        return programs
+      }
+      return programs.filter(program =>
         program.departments
           .map(department => department)
-          .includes(selectedDepartment)
-    )
+          .includes(selectedDepartment.name)
+      )
+    }
   }
 
   /**
-   * Returns the number of courseRuns or programs based on the selected catalog tab.
+   * Returns the number of courses based on the selectedDepartment.
+   * If the selectedDepartment is "All Departments", the total number of courses is returned.
+   * If the selectedDepartment is not found in the departments array, 0 is returned.
+   * @returns {number}
    */
   renderNumberOfCatalogCourses() {
     const { departments } = this.props
-    if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
+    const selectedDepartment = this.state.selectedDepartment
+    if (selectedDepartment === ALL_DEPARTMENTS) {
       return this.state.allCoursesCount
-    } else if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
+    } else if (!departments) return 0
+    const departmentSlugs = departments.map(department => department.slug)
+    if (!departmentSlugs.includes(selectedDepartment)) {
+      return 0
+    } else {
       return departments.find(
-        department => department.name === this.state.selectedDepartment
+        department => department.slug === this.state.selectedDepartment
       ).course_ids.length
     }
   }
 
+  /** Returns the number of programs based on the selectedDepartment
+   * or all programs if the selectedDepartment is "All Departments".
+   * If the selectedDepartment is not found in the departments array, 0 is returned.
+   * @returns {number}
+   */
   renderNumberOfCatalogPrograms() {
     const { departments } = this.props
+    if (!departments) return 0
+    const departmentSlugs = departments.map(department => department.slug)
+    const selectedDepartment = this.state.selectedDepartment
     if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
       return this.state.allProgramsCount
-    } else if (this.state.selectedDepartment !== ALL_DEPARTMENTS) {
+    } else if (!departmentSlugs.includes(selectedDepartment)) {
+      return 0
+    } else {
       return departments.find(
-        department => department.name === this.state.selectedDepartment
+        department => department.slug === this.state.selectedDepartment
       ).program_ids.length
-    } else return 0
+    }
   }
 
   /**
@@ -682,18 +738,21 @@ export class CatalogPage extends React.Component<Props> {
       departmentSideBarListItems.push(
         <li
           className={`sidebar-link ${
-            this.state.selectedDepartment === department
+            this.state.selectedDepartment === department.slug
               ? "department-selected-link"
               : "department-link"
           }`}
-          key={this.state.tabSelected + department}
+          key={this.state.tabSelected + department.slug}
         >
           <button
             onClick={() =>
-              this.changeSelectedDepartment(department, this.state.tabSelected)
+              this.changeSelectedDepartment(
+                department.slug,
+                this.state.tabSelected
+              )
             }
           >
-            {department}
+            {department.name}
           </button>
         </li>
       )

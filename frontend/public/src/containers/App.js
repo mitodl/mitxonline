@@ -116,6 +116,14 @@ export class App extends React.Component<Props, void> {
               component={LearnerRecordsPage}
             />
             <Route
+              path={urljoin(match.url, String(routes.catalogTabByDepartment))}
+              component={CatalogPage}
+            />
+            <Route
+              path={urljoin(match.url, String(routes.catalogTab))}
+              component={CatalogPage}
+            />
+            <Route
               path={urljoin(match.url, String(routes.catalog))}
               component={CatalogPage}
             />

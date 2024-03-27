@@ -382,6 +382,7 @@ class DepartmentAdmin(admin.ModelAdmin):
     """Admin for Department"""
 
     model = Department
+    list_display = ("name", "slug")
 
 
 class BlockedCountryAdmin(TimestampedModelAdmin):

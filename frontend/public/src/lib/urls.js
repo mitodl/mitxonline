@@ -5,13 +5,15 @@ import qs from "query-string"
 export const getNextParam = (search: string) => qs.parse(search).next || "/"
 
 export const routes = {
-  root:            "/",
-  dashboard:       "/dashboard/",
-  profile:         "/profile/",
-  accountSettings: "/account-settings/",
-  logout:          "/logout/",
-  orderHistory:    "/orders/history",
-  catalog:         "/catalog",
+  root:                   "/",
+  dashboard:              "/dashboard/",
+  profile:                "/profile/",
+  accountSettings:        "/account-settings/",
+  logout:                 "/logout/",
+  orderHistory:           "/orders/history",
+  catalogTabByDepartment: "/catalog/:tab/:department",
+  catalogTab:             "/catalog/:tab",
+  catalog:                "/catalog/",
 
   // authentication related routes
   login: include("/signin/", {
