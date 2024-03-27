@@ -6,10 +6,7 @@ function renderSiteBanner() {
   console.log("hi");
   console.log(bannerId);
   if (bannerId) {
-    if (
-      localStorage.getItem("dismissedbanner") !==
-      bannerId.toString()
-    ) {
+    if (localStorage.getItem("dismissedbanner") !== bannerId.toString()) {
       $(".banners").removeClass("d-none");
     }
   }
@@ -21,10 +18,7 @@ export default function banner() {
   $(".banners").on("click", ".close-banner", function(e) {
     e.preventDefault();
     const $banner = $(this).closest(".banner");
-    localStorage.setItem(
-      "dismissedbanner",
-      $banner.data("banner-id")
-    );
+    localStorage.setItem("dismissedbanner", $banner.data("banner-id"));
     $banner.remove();
   });
 }
