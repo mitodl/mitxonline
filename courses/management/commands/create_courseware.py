@@ -3,6 +3,7 @@ Creates a courseware object. This can be a program or a course (and optionally
 a course run).
 """
 from django.core.management import BaseCommand
+from django.utils.text import slugify
 
 from courses.models import Course, CourseRun, Department, Program
 from main.utils import parse_supplied_date
@@ -207,7 +208,7 @@ class Command(BaseCommand):
                     )
 
                     if not found:
-                        new_dept = Department(name=dept)
+                        new_dept = Department(name=dept, slug=slugify(dept))
                         new_dept.save()
 
                 add_depts = Department.objects.filter(name__in=kwargs["depts"]).all()

@@ -87,6 +87,16 @@ export class CatalogPage extends React.Component<Props> {
     this.container = React.createRef(null)
 
     const { tab, department } = this.props.match.params
+    if (tab in TABS) {
+      this.state.tabSelected = tab
+    } else {
+      this.state.tabSelected = COURSES_TAB
+    }
+    if (department) {
+      this.state.selectedDepartment = department
+    } else {
+      this.state.selectedDepartment = ALL_DEPARTMENTS
+    }
     console.log(tab, department)
   }
 

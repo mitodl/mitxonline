@@ -14,6 +14,7 @@ from django.db import models
 from django.db.models import Q
 from django.db.models.constraints import CheckConstraint, UniqueConstraint
 from django.utils.functional import cached_property
+from django.utils.text import slugify
 from django_countries.fields import CountryField
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.collections import first_matching_item
@@ -113,6 +114,11 @@ class Department(TimestampedModel):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
 
 
 class Program(TimestampedModel, ValidateOnSaveMixin):
