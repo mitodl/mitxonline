@@ -86,8 +86,6 @@ export class CatalogPage extends React.Component<Props> {
     this.io = null
     this.container = React.createRef(null)
     const { tab, department } = this.props.match.params
-    this.setState({ tabSelected: tab in TABS ? tab : COURSES_TAB })
-    this.setState({ selectedDepartment: department || ALL_DEPARTMENTS })
   }
 
   componentWillUnmount() {
