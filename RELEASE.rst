@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.89.0
+--------------
+
+- Upgrade enrollment dialog fixes (#2141)
+- Showing Course rather than Courses (or program/s) when there is only 1 to display (#2139)
+- Distinguish change forms in account settings (#2142)
+- fix(deps): update dependency webpack-dev-middleware to v5.3.4 [security] (#2138)
+- Upgrade dialog choose any course run (#2124)
+
 Version 0.88.1 (Released March 20, 2024)
 --------------
 
