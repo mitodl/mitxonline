@@ -45,7 +45,7 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
                 title="Email must be different than your current one."
               />
             </div>
-            <div className="form-group" >
+            <div className="form-group">
               <CardLabel
                 htmlFor="confirmPassword"
                 isRequired={true}
