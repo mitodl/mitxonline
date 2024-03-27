@@ -1,6 +1,7 @@
 """
 Course models
 """
+
 import logging
 import operator as op
 import uuid
@@ -132,7 +133,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         blank=True,
         null=True,
     )
-    departments = models.ManyToManyField(Department, blank=True)
+    departments = models.ManyToManyField(Department, blank=False)
 
     @cached_property
     def page(self):
@@ -341,9 +342,11 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
                 [
                     (
                         req.course,
-                        "Required Courses"
-                        if not op.elective_flag
-                        else "Elective Courses",
+                        (
+                            "Required Courses"
+                            if not op.elective_flag
+                            else "Elective Courses"
+                        ),
                     )
                     for req in reqs
                 ]
@@ -480,7 +483,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         max_length=255, unique=True, validators=[validate_url_path_field]
     )
     live = models.BooleanField(default=False, db_index=True)
-    departments = models.ManyToManyField(Department, blank=True)
+    departments = models.ManyToManyField(Department, blank=False)
     flexible_prices = GenericRelation(
         "flexiblepricing.FlexiblePrice",
         object_id_field="courseware_object_id",
