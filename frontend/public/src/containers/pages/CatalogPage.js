@@ -86,13 +86,13 @@ export class CatalogPage extends React.Component<Props> {
     this.io = null
     this.container = React.createRef(null)
     const { tab, department } = this.props.match.params
-    if (tab in TABS) {
+    if (TABS.includes(tab)) {
       this.state.tabSelected = tab
     } else {
       this.state.tabSelected = COURSES_TAB
     }
     if (department) {
-      this.state.selectedDepartment = ALL_DEPARTMENTS
+      this.state.selectedDepartment = department
     } else {
       this.state.selectedDepartment = ALL_DEPARTMENTS
     }
@@ -269,7 +269,7 @@ export class CatalogPage extends React.Component<Props> {
   filterDepartmentsByTabName(selectedTabName: string) {
     if (!this.props.departmentsIsLoading) {
       const { departments } = this.props
-      const allDepartments = { name: ALL_DEPARTMENTS, slug: ALL_DEPARTMENTS}
+      const allDepartments = { name: ALL_DEPARTMENTS, slug: ALL_DEPARTMENTS }
       if (selectedTabName === COURSES_TAB) {
         return [
           ...new Set([
@@ -425,6 +425,10 @@ export class CatalogPage extends React.Component<Props> {
       const newDepartment = this.props.departments.find(
         department => department.slug === selectedDepartment
       )
+      if (!newDepartment) {
+        this.setState({ selectedDepartment: ALL_DEPARTMENTS })
+        return
+      }
       if (
         filteredCourses.length !== newDepartment.course_ids.length &&
         !this.state.isLoadingMoreItems
@@ -521,11 +525,17 @@ export class CatalogPage extends React.Component<Props> {
     selectedDepartment: string,
     courses: Array<CourseDetailWithRuns>
   ) {
-    const {departments} = this.props
+    const { departments } = this.props
     if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
       return courses
     } else {
-      const selectedDepartment = departments.find(department => department.slug === this.state.selectedDepartment)
+      const selectedDepartment = departments.find(
+        department => department.slug === this.state.selectedDepartment
+      )
+      if (!selectedDepartment) {
+        this.setState({ selectedDepartment: ALL_DEPARTMENTS })
+        return courses
+      }
       return courses.filter(course =>
         selectedDepartment.course_ids.includes(course.id)
       )
@@ -545,7 +555,13 @@ export class CatalogPage extends React.Component<Props> {
     if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
       return programs
     } else {
-      const selectedDepartment = departments.find(department => department.slug === this.state.selectedDepartment)
+      const selectedDepartment = departments.find(
+        department => department.slug === this.state.selectedDepartment
+      )
+      if (!selectedDepartment) {
+        this.setState({ selectedDepartment: ALL_DEPARTMENTS })
+        return programs
+      }
       return programs.filter(program =>
         program.departments
           .map(department => department)
@@ -707,7 +723,10 @@ export class CatalogPage extends React.Component<Props> {
         >
           <button
             onClick={() =>
-              this.changeSelectedDepartment(department.slug, this.state.tabSelected)
+              this.changeSelectedDepartment(
+                department.slug,
+                this.state.tabSelected
+              )
             }
           >
             {department.name}
