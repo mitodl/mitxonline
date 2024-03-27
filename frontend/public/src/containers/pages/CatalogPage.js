@@ -85,16 +85,19 @@ export class CatalogPage extends React.Component<Props> {
     super(props)
     this.io = null
     this.container = React.createRef(null)
-    const { tab, department } = this.props.match.params
-    if (TABS.includes(tab)) {
-      this.state.tabSelected = tab
-    } else {
-      this.state.tabSelected = COURSES_TAB
-    }
-    if (department) {
-      this.state.selectedDepartment = department
-    } else {
-      this.state.selectedDepartment = ALL_DEPARTMENTS
+    const { match } = this.props
+    if (match) {
+      const { tab, department } = match.params
+      if (TABS.includes(tab)) {
+        this.state.tabSelected = tab
+      } else {
+        this.state.tabSelected = COURSES_TAB
+      }
+      if (department) {
+        this.state.selectedDepartment = department
+      } else {
+        this.state.selectedDepartment = ALL_DEPARTMENTS
+      }
     }
   }
 
@@ -145,7 +148,7 @@ export class CatalogPage extends React.Component<Props> {
               this.state.allCoursesRetrieved,
               response.body.results
             )
-            const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+            const filteredCourses = this.filteredCoursesBasedOnSelectedDepartment(
               this.state.selectedDepartment,
               allCourses
             )
@@ -231,7 +234,7 @@ export class CatalogPage extends React.Component<Props> {
       }
       if (!coursesIsLoading && !this.state.filterCoursesCalled) {
         this.setState({ filterCoursesCalled: true })
-        const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+        const filteredCourses = this.filteredCoursesBasedOnSelectedDepartment(
           this.state.selectedDepartment,
           this.state.allCoursesRetrieved
         )
@@ -356,7 +359,7 @@ export class CatalogPage extends React.Component<Props> {
         } else {
           coursesToFilter.push(...this.state.allCoursesRetrieved)
         }
-        const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+        const filteredCourses = this.filteredCoursesBasedOnSelectedDepartment(
           this.state.selectedDepartment,
           coursesToFilter
         )
@@ -392,7 +395,7 @@ export class CatalogPage extends React.Component<Props> {
   changeSelectedDepartment = (selectedDepartment: string) => {
     this.resetQueryVariablesToDefault()
     this.setState({ selectedDepartment: selectedDepartment })
-    const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+    const filteredCourses = this.filteredCoursesBasedOnSelectedDepartment(
       selectedDepartment,
       this.state.allCoursesRetrieved
     )
@@ -448,7 +451,7 @@ export class CatalogPage extends React.Component<Props> {
           this.setState({ allCoursesRetrieved: allCourses })
           this.setState({ courseQueryPage: 2 })
           this.setState({ queryIDListString: remainingIDs.toString() })
-          const filteredCourses = this.filteredCoursesBasedOnCourseRunCriteria(
+          const filteredCourses = this.filteredCoursesBasedOnSelectedDepartment(
             selectedDepartment,
             allCourses
           )
@@ -517,11 +520,12 @@ export class CatalogPage extends React.Component<Props> {
   /**
    * Returns a filtered array of courses which have: an associated Department name matching the selectedDepartment
    * if the selectedDepartment does not equal "All Departments",
-   * an associated page which is live, and at least 1 associated Course Run.
+   * This function, at one time, checked for an associated page which is live, and at least 1 associated Course Run.
+   * This logic was removed as this is handled by the API & would cause coursecount and programcount to be incorrect.
    * @param {Array<CourseDetailWithRuns>} courses An array of courses which will be filtered by Department.
    * @param {string} selectedDepartment The Department name used to compare against the courses in the array.
    */
-  filteredCoursesBasedOnCourseRunCriteria(
+  filteredCoursesBasedOnSelectedDepartment(
     selectedDepartment: string,
     courses: Array<CourseDetailWithRuns>
   ) {
@@ -578,12 +582,12 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderNumberOfCatalogCourses() {
     const { departments } = this.props
-    if (!departments) return 0
     const selectedDepartment = this.state.selectedDepartment
-    const departmentSlugs = departments.map(department => department.slug)
     if (selectedDepartment === ALL_DEPARTMENTS) {
       return this.state.allCoursesCount
-    } else if (!departmentSlugs.includes(selectedDepartment)) {
+    } else if (!departments) return 0
+    const departmentSlugs = departments.map(department => department.slug)
+    if (!departmentSlugs.includes(selectedDepartment)) {
       return 0
     } else {
       return departments.find(
