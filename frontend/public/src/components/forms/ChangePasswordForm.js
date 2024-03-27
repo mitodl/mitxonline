@@ -36,7 +36,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
     render={({ isSubmitting }) => (
       <Form>
         <section className="email-section">
-          <h2 aria-label="Form Change Password">Change Password</h2>
+          <h2 aria-label="Change Password Form">Change Password</h2>
           <div className="form-group">
             <CardLabel
               htmlFor="oldPassword"

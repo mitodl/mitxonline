@@ -31,7 +31,7 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
       render={({ isSubmitting }) => (
         <Form>
           <section className="email-section">
-            <h2 aria-label="Form Change Email">Change Email</h2>
+            <h2 aria-label="Change Email Form">Change Email</h2>
             <div className="form-group">
               <CardLabel htmlFor="email" isRequired={true} label="Email" />
               <Field
