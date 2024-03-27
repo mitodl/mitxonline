@@ -561,6 +561,11 @@ export class CatalogPage extends React.Component<Props> {
     } else return 0
   }
 
+  /**
+   * Returns the html for the catalog count based on the selected tab, either Courses or Programs.
+   * This return is singular or plural based on the count.
+   * @returns {Element}
+   */
   renderCatalogCount() {
     const count =
       this.state.tabSelected === PROGRAMS_TAB
