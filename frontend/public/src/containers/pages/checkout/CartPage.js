@@ -165,61 +165,34 @@ export class CartPage extends React.Component<Props, CartState> {
         title={`${SETTINGS.site_name} | ${CART_DISPLAY_PAGE_TITLE}`}
       >
         <Loader isLoading={isLoading}>
+          <div role="banner" className="std-page-header">
+            <h1>{CART_DISPLAY_PAGE_TITLE}</h1>
+          </div>
           <div className="std-page-body cart container">
-            <div className="row">
-              <div className="col-12 d-flex justify-content-between">
-                <h1 className="flex-grow-1">Checkout</h1>
-
-                <p className="text-end d-md-none">
-                  <a
-                    href="https://mitxonline.zendesk.com/hc/en-us"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Help &amp; FAQs
-                  </a>
-                </p>
-              </div>
-            </div>
-            <div className="row">
-              <div className="col-12 d-flex justify-content-end d-md-none">
-                <p className="fw-normal">
-                  {this.renderFinancialAssistanceOffer()}
-                </p>
-              </div>
-            </div>
-
-            <div className="row d-none d-md-flex mb-3">
-              <div className="col-md-6">
-                <h4 className="fw-normal">
-                  You are about to purchase the following:
-                </h4>
-              </div>
-              <div className="col-md-4 justify-content-end text-end d-flex">
-                <h4 className="fw-normal">
-                  {this.renderFinancialAssistanceOffer()}
-                </h4>
-              </div>
-              <div className="col-md-2 justify-content-end text-end d-flex">
-                <h4 className="fw-normal">
-                  <a
-                    href="https://mitxonline.zendesk.com/hc/en-us"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Help &amp; FAQs
-                  </a>
-                </h4>
-              </div>
-            </div>
-
             <div className="row d-flex flex-column-reverse flex-md-column flex-lg-row">
               <div className="col-lg-8 enrolled-items">
+                <p className="purchase-block-intro">
+                  You are about to purchase the following:
+                </p>
                 {cartItems && cartItems.length > 0
                   ? cartItems.map(this.renderCartItemCard.bind(this))
                   : this.renderEmptyCartCard()}
               </div>
-              <div className="col-lg-4">{this.renderOrderSummaryCard()}</div>
+              <div className="col-lg-4 summary-cards">
+                <div className="d-md-flex cart-helptext">
+                  <div>{this.renderFinancialAssistanceOffer()}</div>
+                  <div className="text-right ms-auto">
+                    <a
+                      href="https://mitxonline.zendesk.com/hc/en-us"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Help &amp; FAQs
+                    </a>
+                  </div>
+                </div>
+                {this.renderOrderSummaryCard()}
+              </div>
             </div>
           </div>
         </Loader>

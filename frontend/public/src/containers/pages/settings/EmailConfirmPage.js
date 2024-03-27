@@ -12,7 +12,7 @@ import { path, pathOr } from "ramda"
 import { createStructuredSelector } from "reselect"
 
 import { addUserNotification } from "../../../actions"
-import { ALERT_TYPE_TEXT } from "../../../constants"
+import { ALERT_TYPE_TEXT, ALERT_TYPE_SUCCESS } from "../../../constants"
 import queries from "../../../lib/queries"
 import { routes } from "../../../lib/urls"
 
@@ -46,7 +46,7 @@ export class EmailConfirmPage extends React.Component<Props> {
     if (updateEmail && updateEmail !== prevState && updateEmail.confirmed) {
       addUserNotification({
         "email-verified": {
-          type:  ALERT_TYPE_TEXT,
+          type:  ALERT_TYPE_SUCCESS,
           props: {
             text:
               "Success! We've verified your email. Your email has been updated."

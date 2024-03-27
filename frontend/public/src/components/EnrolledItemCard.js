@@ -425,24 +425,27 @@ export class EnrolledItemCard extends React.Component<
     const financialAssistanceLink =
       isFinancialAssistanceAvailable(enrollment.run) &&
       !enrollment.approved_flexible_price_exists ? (
-          <a href={enrollment.run.course.page.financial_assistance_form_url}>
+          <a
+            className="finaid-link"
+            href={enrollment.run.course.page.financial_assistance_form_url}
+          >
           Financial assistance?
           </a>
         ) : null
 
     const certificateLinksStyles = isProgramCard
-      ? "upgrade-item-description detail d-md-flex justify-content-between pb-2 flex-column px-4"
-      : "upgrade-item-description detail d-md-flex justify-content-between pb-2"
+      ? "upgrade-item-description d-md-flex align-items-start justify-content-between flex-column"
+      : "upgrade-item-description d-md-flex align-items-start justify-content-between"
     const certificateLinksIntStyles = isProgramCard
-      ? "enrollment-extra-links d-flex d-md-flex w-100 justify-content-center"
-      : "enrollment-extra-links d-flex d-md-flex col-auto pe-0 justify-content-end"
+      ? "d-flex d-md-flex flex-column align-items-start justify-content-center"
+      : "d-flex d-md-flex flex-column align-items-start justify-content-center"
 
     const certificateLinks =
       enrollment.run.products.length > 0 &&
       enrollment.enrollment_mode === "audit" &&
       enrollment.run.is_upgradable ? (
           <div className={certificateLinksStyles}>
-            <div className="mr-0">
+            <div className="certificate-upgrade-message">
               <p>
                 <strong>Upgrade today</strong> and, upon passing, receive your
               certificate signed by MIT faculty to highlight the knowledge and
@@ -450,9 +453,11 @@ export class EnrolledItemCard extends React.Component<
               </p>
             </div>
             <div className={certificateLinksIntStyles}>
-              <div className="pe-4 my-auto">{financialAssistanceLink}</div>
-              <div className="my-auto">
+              <div className="get-cert-button-container w-100">
                 <GetCertificateButton productId={enrollment.run.products[0].id} />
+              </div>
+              <div className="finaid-link-container">
+                {financialAssistanceLink}
               </div>
             </div>
           </div>
@@ -467,13 +472,10 @@ export class EnrolledItemCard extends React.Component<
     const courseRunStatusMessageText = courseRunStatusMessage(enrollment.run)
 
     return (
-      <div
-        className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3"
-        key={enrollment.run.id}
-      >
-        <div className="row flex-grow-1">
+      <div className="enrolled-item container card" key={enrollment.run.id}>
+        <div className="row flex-grow-1 enrolled-item-info">
           {enrollment.run.course.feature_image_src && (
-            <div className="col-12 col-md-auto px-0 px-md-3">
+            <div className="col-12 col-md-auto p-0">
               <div className="img-container">
                 <img src={enrollment.run.course.feature_image_src} alt="" />
               </div>
@@ -482,7 +484,7 @@ export class EnrolledItemCard extends React.Component<
           {!enrollment.run.course.feature_image_src &&
             enrollment.run.course.page &&
             enrollment.run.course.page.feature_image_src && (
-            <div className="col-12 col-md-auto px-0 px-md-3">
+            <div className="col-12 col-md-auto p-0">
               <div className="img-container">
                 <img
                   src={enrollment.run.course.page.feature_image_src}
@@ -492,7 +494,7 @@ export class EnrolledItemCard extends React.Component<
             </div>
           )}
 
-          <div className="col-12 col-md px-3 py-3 py-md-0 box">
+          <div className="col-12 col-md enrollment-details-container">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100">
               <div className="d-flex flex-column">
                 <div className="align-content-start d-flex enrollment-mode-container flex-wrap pb-1">
@@ -510,7 +512,7 @@ export class EnrolledItemCard extends React.Component<
                     ) : null}
                 </div>
 
-                <h2 className="my-0 mr-3">{title}</h2>
+                <h2>{title}</h2>
               </div>
               <Dropdown
                 isOpen={menuVisibility}
@@ -547,7 +549,7 @@ export class EnrolledItemCard extends React.Component<
               {this.renderRunUnenrollmentModal(enrollment)}
               {this.renderEmailSettingsDialog(enrollment)}
             </div>
-            <div className="detail pt-1">
+            <div className="detail">
               {courseId}
               {startDateDescription === null}
               {courseRunStatusMessageText}
@@ -568,13 +570,20 @@ export class EnrolledItemCard extends React.Component<
                   </a>
                 ) : null}
               </div>
-              <br />
             </div>
           </div>
         </div>
-        <div className="row flex-grow-1 pt-3">
-          <div className="col pe-0 ps-0">{certificateLinks}</div>
-        </div>
+        {certificateLinks ? (
+          <div className="certificate-row row flex-grow-1">
+            <div
+              className={`col certificate-container ${
+                financialAssistanceLink ? "finaid-link-margin" : ""
+              }`}
+            >
+              {certificateLinks}
+            </div>
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -604,17 +613,17 @@ export class EnrolledItemCard extends React.Component<
 
     return (
       <div
-        className="enrolled-item container card mb-4 rounded-0 pb-0 pt-md-3"
+        className="enrolled-item container card"
         key={`enrolled-program-card-id-${enrollment.program.id}`}
       >
-        <div className="row flex-grow-1">
-          <div className="col-12 col-md-auto px-0 px-md-3">
+        <div className="row flex-grow-1 enrolled-item-info">
+          <div className="col-12 col-md-auto p-0">
             <div className="img-container">
               <img src={enrollment.program.page.feature_image_src} alt="" />
             </div>
           </div>
 
-          <div className="col-12 col-md px-3 py-3 py-md-0 box">
+          <div className="col-12 col-md enrollment-details-container">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
               <div className="d-flex flex-column">
                 <div className="align-content-start d-flex enrollment-mode-container flex-wrap pb-1">
@@ -663,7 +672,7 @@ export class EnrolledItemCard extends React.Component<
               </Dropdown>
               {this.renderProgramUnenrollmentModal(enrollment)}
             </div>
-            <div className="detail pt-1">
+            <div className="detail detail-program">
               {startDateDescription === null}
               {courseRunStatusMessageText}
               <div className="enrollment-extra-links d-flex pe-2">
@@ -697,8 +706,8 @@ export class EnrolledItemCard extends React.Component<
             </div>
           </div>
         </div>
-        <div className="row flex-grow-1 pt-3">
-          <div className="col ps-0 pe-0">{certificateLinks}</div>
+        <div className="row flex-grow-1">
+          <div className="col certificate-container">{certificateLinks}</div>
         </div>
       </div>
     )

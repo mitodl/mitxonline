@@ -20,48 +20,44 @@ const ApplyCouponForm = ({ onSubmit, couponCode, discounts }: Props) => (
     initialValues={getInitialValues(couponCode, discounts)}
     render={() => (
       <Form>
-        <div className="row g-0">
-          <div className="col-12 mt-4 px-3 py-3 py-md-0">
-            <label htmlFor="couponCode">
-              <span>Coupon code</span>
-            </label>
-            <div className="d-flex justify-content-between flex-sm-column flex-md-row">
-              <div className="col-sm-6 col-md-8">
-                <Field
-                  type="text"
-                  name="couponCode"
-                  id="couponCode"
-                  className="form-control"
-                  autoComplete="given-name"
-                  aria-describedby="couponCodeError"
-                />
-                <ErrorMessage
-                  name="couponCode"
-                  className="form-control"
-                  id="couponCodeError"
-                  component={FormError}
-                />
-              </div>
-
-              <div className="col-6 col-md-4">
-                <button
-                  className="btn btn-primary btn-red btn-halfsize mx-2 highlight font-weight-normal"
-                  type="submit"
-                  aria-label="Apply coupon"
-                >
-                  Apply
-                </button>
-              </div>
+        <div className="coupon-form">
+          <div className="d-flex align-content-end align-items-end justify-content-between flex-sm-column flex-md-row">
+            <div className="form-group">
+              <label htmlFor="couponCode" className="fw-bold">
+                Coupon code
+              </label>
+              <Field
+                type="text"
+                name="couponCode"
+                id="couponCode"
+                className="form-control"
+                autoComplete="given-name"
+                aria-describedby="couponCodeError"
+              />
+              <ErrorMessage
+                name="couponCode"
+                className="form-control"
+                id="couponCodeError"
+                component={FormError}
+              />
             </div>
-            {discounts !== null && discounts.length > 0 ? (
-              <div
-                id="codeApplicationWarning"
-                className="text-primary mt-2 font-weight-bold cart-text-smaller"
-              >
-                Adding another coupon will replace the currently applied coupon.
-              </div>
-            ) : null}
+
+            <button
+              className="btn btn-primary btn-gradient-red-to-blue btn-apply-coupon"
+              type="submit"
+              aria-label="Apply coupon"
+            >
+              Apply
+            </button>
           </div>
+          {discounts !== null && discounts.length > 0 ? (
+            <div
+              id="codeApplicationWarning"
+              className="text-primary mt-2 font-weight-bold cart-text-smaller"
+            >
+              Adding another coupon will replace the currently applied coupon.
+            </div>
+          ) : null}
         </div>
       </Form>
     )}

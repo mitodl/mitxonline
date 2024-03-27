@@ -40,7 +40,7 @@ describe("EmailConfirmPage", () => {
     inner.instance().componentDidUpdate({}, {})
     assert.deepEqual(store.getState().ui.userNotifications, {
       "email-verified": {
-        type:  "text",
+        type:  "success",
         props: {
           text:
             "Success! We've verified your email. Your email has been updated."

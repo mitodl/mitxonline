@@ -4,6 +4,7 @@ import React from "react"
 import { Formik, Field, Form } from "formik"
 
 import { PasswordInput, EmailInput } from "./elements/inputs"
+import CardLabel from "../input/CardLabel"
 
 import type { User } from "../../flow/authTypes"
 
@@ -30,10 +31,9 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
       render={({ isSubmitting }) => (
         <Form>
           <section className="email-section">
-            <h4>Change Email</h4>
+            <h2>Change Email</h2>
             <div className="form-group">
-              <label htmlFor="email">Email</label>
-              <span className="required">*</span>
+              <CardLabel htmlFor="email" isRequired={true} label="Email" />
               <Field
                 name="email"
                 id="email"
@@ -46,14 +46,12 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
               />
             </div>
             <div className="form-group">
-              <label htmlFor="confirmPassword" className="row">
-                <div className="col-auto fw-bold">
-                  Confirm Password<span className="required">*</span>
-                </div>
-                <div className="col-auto subtitle">
-                  Password required to change email address
-                </div>
-              </label>
+              <CardLabel
+                htmlFor="confirmPassword"
+                isRequired={true}
+                label="Confirm Password"
+                subLabel="Password required to change email address"
+              />
               <Field
                 id="confirmPassword"
                 name="confirmPassword"
@@ -71,7 +69,7 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
             <div className="col d-flex justify-content-end">
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="btn btn-primary btn-gradient-red-to-blue"
                 disabled={isSubmitting}
               >
                 Submit

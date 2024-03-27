@@ -1,0 +1,392 @@
+div.std-page-header {
+    display: flex;
+    width: 100%;
+    padding: 0 60px;
+    align-items: flex-start;
+    background: $home-page-header-blue;
+    box-shadow: 0px 15px 25px 0px rgba(3, 21, 45, 0.25);
+
+    h1 {
+        margin: 0;
+        color: white;
+        font-family: Poppins;
+        font-size: 28px;
+        font-style: normal;
+        font-weight: 700;
+        line-height: normal;
+        padding: 18px 0;
+    }
+}
+
+div.std-page-header + div.std-page-body {
+    padding-top: 40px !important;
+}
+
+div.std-card {
+    display: flex;
+    padding: 0;
+    flex-direction: column;
+    align-items: flex-start;
+
+    border-radius: 5px;
+    background: #FFF;
+    margin-bottom: 30px;
+    
+    /* Dropshadow */
+    box-shadow: $card-drop-shadow;
+
+    &.std-card-auth {
+        width: 535px;
+    }
+
+    &.std-card-finasst {
+        width: 90%;
+        margin: 0 auto 40px;
+    }
+
+    div.std-card-body {
+        margin: 30px;
+        padding: 0;
+        align-self: stretch;
+        width: auto;
+
+        div, h1, h2, h3, h4, h5, h6, p, a:not(.btn), button, ul, li {
+            color: #000;
+            font-size: 14px;
+            font-family: Inter;
+            font-style: normal;
+            line-height: 16px;
+            margin: 0;
+            padding: 0;
+        }
+
+
+        h1, h2 {
+            font-size: 25px;
+            font-weight: 600;
+            margin-bottom: 25px;
+            line-height: 25px;
+        }
+
+        h3 {
+            font-size: 25px;
+            font-weight: 600;
+            margin-bottom: 25px;
+            line-height: 25px;
+        }
+
+        h5 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            line-height: 18px;
+        }
+
+        hr {
+            margin: 26px 0 30px 0;
+            
+            border-bottom: 1px solid $home-page-border-grey;
+        }
+
+        p, li {
+            line-height: 22px;
+        }
+
+        p, input {
+            padding: 0;
+            margin: 0;
+            margin-bottom: 10px;
+        }
+
+        input:active, input:focus, input:hover, select:active, select:focus, select:hover {
+            border: 1px solid $home-page-header-blue !important;
+            box-shadow: none !important;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin-top: -20px;
+            margin-bottom: 20px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid $home-page-border-grey;
+        }
+
+        li {
+            margin-left: 20px;
+            margin-bottom: 20px;
+        }
+
+        div {
+            gap: 10px;       
+            align-self: stretch; 
+            padding-bottom: 0;
+            margin-bottom: 30px;
+        }
+
+        div:last-child {
+            margin-bottom: 0;
+        }
+
+        div.profile-student-type div.form-check {
+            margin-bottom: 10px;
+        }
+
+        div.form-group {            
+            label {
+                color: $footer-blue-bg;
+                font-family: Inter;
+                font-size: 14px;
+                line-height: 18px; /* 128.571% */ 
+                margin-bottom: 10px;
+
+                &.label-helptext {
+                    margin-bottom: 10px;
+                }
+            }
+
+            input, select {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: flex-start;
+                height: 45px;
+                align-self: stretch;
+                border-radius: 5px;
+                border: 1px solid $home-page-border-grey;
+                background: #FFF;        
+            }
+            
+            span.required {
+                color: $brand-darker-bg;
+            }
+
+            &.checkbox-long-label {
+                display: flex;
+
+                input[type=checkbox], span {
+                    display: block;
+                }
+
+                span {
+                    font-size: 14px;
+                }
+            }
+        }
+
+        div.small-gap {
+            margin-bottom: 10px !important;
+
+            div.col, div.col-6, div.col-5, div.col-4, div.col-3, div.col-2, div.col-1 {
+                margin-bottom: 0 !important;
+            }
+        }
+
+        div.submit-row {
+            padding-top: 20px;
+        }
+
+        button {
+            width: 100%;
+            font-size: 20px;
+
+            display: inline-flex;
+            padding: 20px 40px;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        
+            border-radius: 5px;
+            background: $brand-button-bg;
+            color: white;
+        }
+
+        form {
+            width: 100%;
+            gap: 30px;
+        }
+
+        input {
+            padding: 17px 15px 18px;
+        }
+
+        input[type=checkbox] {
+            width: 20px !important;
+            height: 20px !important;
+            flex-shrink: 0;
+            border-radius: 3px;
+            margin-right: 10px;
+            padding: 0;
+        }
+
+        input[type=checkbox]:checked {
+            border: 1px solid $brand-darker-bg;
+            background: $brand-darker-bg;
+            background-image: url('/static/images/checkbox-checked.svg');
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        &.edit-profile-page, &.create-account-page, &.my-account-page, &.financial-assistance-page, &.checkout-page {
+            div.form-group {
+                margin-bottom: 16px; 
+            }
+
+            div.form-check {
+                margin-bottom: 10px;
+            }
+
+            label.label-helptext {
+                display: flex;
+                flex-direction: row;
+                align-items: top;
+                justify-items: stretch;
+                margin-bottom: 0;
+
+                div {
+                    width: auto;
+                    margin-bottom: 0;
+                }
+
+                div.subtitle {
+                    text-align: right;
+                    margin-left: auto;
+                    color: $helptext-grey;
+                    text-align: right;
+                    font-size: 12px;
+                    font-weight: 400;
+                    line-height: 18px; /* 150% */
+                }
+            }
+        }
+
+        &.my-account-page, &.financial-assistance-page {
+            label.label-helptext {
+                margin-bottom: 10px;
+            }
+        }
+
+        &.financial-assistance-page {
+            a.btn {
+                margin: 20px 0 0 0;
+                font-family: "Inter", sans-serif;
+                font-size: 20px;
+            }
+        }
+
+        &.checkout-page {
+            h3, div {
+                margin-bottom: 20px;
+            }
+
+            h5 {
+                margin-bottom: 0;
+            }
+            
+            div.order-pricing-info{
+                padding: 10px 0px 0px 0px; 
+
+                border-bottom: 1px solid $home-page-border-grey; 
+
+                div {
+                    font-size: 16px;
+                    margin-bottom: 15px;
+
+                    div {
+                        margin-bottom: 0;
+                        line-height: 18px;
+                    }
+                }
+            }
+
+            div.coupon-info {
+                line-height: 20px;
+            }
+
+            div.coupon-form {
+                div.form-group, input {
+                    margin-bottom: 0;
+                }
+
+                button.btn-apply-coupon {
+                    padding: 12px 20px !important;
+                    width: auto;
+                    font-weight: 600;
+                }    
+            }
+    
+            button.btn-place-order#place-order-button {
+                width: 100%;
+                font-weight: 700;
+                font-size: 20px !important;
+            }
+        }
+
+        button.flexible-price-certificate-btn {
+            width: auto;
+        }
+
+
+    }
+}
+
+button.btn.btn-gradient-red-to-blue, a.btn.btn-gradient-red-to-blue {
+    color: white;
+    border: 1px solid $brand-darker-bg;
+    background: $brand-darker-bg !important;
+    transition: 0.25s;
+}
+
+button.btn.btn-gradient-red-to-blue:hover, a.btn.btn-gradient-red-to-blue:hover {
+    border-color: $home-page-header-blue;
+    background: $home-page-header-blue !important;
+}
+
+div.std-card-body, div.enrolled-item, div.cart-helptext {
+    a:not(.btn) {
+        color: $home-page-header-blue;
+
+        &:hover {
+            color: $brand-darker-bg !important;
+        }
+    }
+}
+
+
+@media only screen and (min-width: 768px) {
+    div.std-page-header {
+        position: sticky;
+        top: 0;
+        z-index: 500;
+    }
+}
+
+@media only screen and (max-width: 767px) {
+    div.std-card {
+        &.std-card-auth {
+            width: 100%;
+        }
+    
+        div.std-card-body {
+            &.edit-profile-page, &.create-account-page, &.my-account-page, &.financial-assistance-page, &.checkout-page {
+                label.label-helptext {
+                    display: flex;
+                    flex-direction: column !important;
+                    align-items: top;
+                    justify-items: stretch;
+                    margin-bottom: 0;
+
+                    div {
+                        width: 100%;
+                        margin-bottom: 0;
+                    }
+
+                    div.subtitle {
+                        text-align: left;
+                    }
+                }
+            }
+        }
+    }
+}
+
