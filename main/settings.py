@@ -29,7 +29,7 @@ from redbeat import RedBeatScheduler
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 
-VERSION = "0.88.0"
+VERSION = "0.88.1"
 
 log = logging.getLogger()
 
@@ -175,6 +175,7 @@ INSTALLED_APPS = (
     "wagtail.images",
     "wagtail.search",
     "wagtail.admin",
+    "wagtailmetadata",
     "wagtail",
     "modelcluster",
     "taggit",

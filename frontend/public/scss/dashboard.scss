@@ -1,7 +1,7 @@
 // sass-lint:disable mixins-before-declarations
 
-$featureImgWidth: 202px;
-$featureImgHeight: 143px;
+$featureImgWidth: 200px;
+$featureImgHeight: 120px;
 $featureImgMobileWidth: 345px;
 $featureImgMobileHeight: 223px;
 $sidenav-bg: #f5f5f5;
@@ -17,6 +17,9 @@ $enrolled-passed-bg: #3E775D;
 $enrolled-passed-fg: #ffffff;
 
 .enrolled-items {
+  a {
+    color: $footer-blue-bg;
+  }
   .hide-element {
     // hidden elements for screenreaders only
     border: 0;
@@ -29,9 +32,13 @@ $enrolled-passed-fg: #ffffff;
     position: absolute;
     width: 1px;
   }
+
   .card {
     display: flex;
-
+    margin-bottom: 20px;
+    padding: 0;
+    box-shadow: 0px 2px 3px 0px rgba(18, 38, 49, 0.15); 
+    
     &.no-enrollments {
       flex-direction: column;
 
@@ -46,8 +53,8 @@ $enrolled-passed-fg: #ffffff;
     }
 
     h2 {
-      font-size: 26px;
-      line-height: 27px;
+      font-size: 20px;
+      line-height: normal;
     }
 
     h2 a {
@@ -65,6 +72,21 @@ $enrolled-passed-fg: #ffffff;
       }
     }
 
+    div.row {
+      margin: 0 !important;
+      padding: 20px;
+    }
+
+    @include media-breakpoint-down(sm)  {
+      div.row.enrolled-item-info {
+        padding: 0 !important;
+
+        div.enrollment-details-container {
+          padding: 16px !important;
+        }
+      }
+    }
+  
     @include media-breakpoint-up(md) {
       .row {
         height: auto;
@@ -79,11 +101,13 @@ $enrolled-passed-fg: #ffffff;
       @include media-breakpoint-down(sm)  {
         width: 100%;
         height: $featureImgMobileHeight;
+        border-radius: 0;
       }
 
       width: $featureImgWidth;
       height: 100%;
       overflow: hidden;
+      border-radius: 5px;
 
       img {
         width: 100%;
@@ -101,14 +125,28 @@ $enrolled-passed-fg: #ffffff;
       }
     }
 
-    strong.active-enrollment-text {
-      color: #139556;
+    div.row.certificate-row {
+      padding: 0;
     }
+  }
+
+  .no-enrollments h2 {
+    font-size: 25px !important;
+    margin-bottom: 30px !important;
+  }
+
+  .no-enrollments p {
+    margin-bottom: 0 !important;
   }
 
   button.dot-menu {
     // Setting height so the button element doesn't expand to cover the full height of the row
     height: $material-icon-height;
+  }
+
+  .certificate-container {
+    margin: 0;
+    padding: 0;
   }
 
   .unenroll-denied-msg .tooltip {
@@ -153,25 +191,34 @@ $enrolled-passed-fg: #ffffff;
   }
 
   .upgrade-item-description {
-    background-color: #F6F6F6;
-    padding: 15px;
     width: 100%;
     flex-direction: row;
-    box-shadow: inset 0 -1px 0 0 rgba(0,0,0,0.24), inset -1px 0 0 0 rgba(0,0,0,0.07), inset 1px 0 0 0 rgba(0,0,0,0.07);
+    padding: 25px 30px ;
+    border-top: $home-page-border-grey;
+    background: $home-page-grey-lite;
+
+    div.certificate-upgrade-message {
+      width: 80%;
+      height: 30px;
+
+      font-size: 16px;
+      line-height: 30px;
+
+      strong {
+        color: $brand-darker-bg;
+      }
+    }
   }
 
   .enrollment-extra-links {
-    margin-top: .5rem;
-    font-size: smaller;
+    margin-top: 20px;
 
     a {
       text-decoration: underline;
-      color: $light-gray;
       margin: auto 0;
     }
 
     a:hover {
-      color: black;
       text-decoration: none;
     }
 
@@ -205,11 +252,30 @@ $enrolled-passed-fg: #ffffff;
       }
     }
   }
+
+  .get-cert-button-container button, .finaid-link-container {
+    font-size: 14px !important;
+  }
+
+  .finaid-link-container {
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    margin-top: 10px;
+    text-align: center;
+    color: $brand-darker-bg;
+  }
+
+}
+
+.dashboard {
+  font-family: "Inter", sans-serif;
 }
 
 .dashboard .tabs {
-  margin-bottom: 38px;
-  font-size: 38px;
+  margin-bottom: 0;
+  font-size: 20px;
+  line-height: 20px;
 
   @include media-breakpoint-down(md) {
     margin-bottom: 30px;
@@ -218,12 +284,11 @@ $enrolled-passed-fg: #ffffff;
 
 .dashboard button.dash-tab {
   border: 0;
-  font-weight: bold;
-  font-size: 75%;
-  margin-right: 3em;
   background: transparent;
-  padding-left: 0;
-  padding-right: 0;
+  padding: 20px;
+  color: $dashboard-tab-inactive;
+  margin-right: 30px;
+  font-weight: 700;
 
   @include media-breakpoint-down(sm) {
     margin-right: 1em;
@@ -232,6 +297,7 @@ $enrolled-passed-fg: #ffffff;
 
 .dashboard button.dash-tab.active {
   border-bottom: 3px solid $primary !important;
+  color: $footer-blue-bg;
 }
 
 .modal-title {

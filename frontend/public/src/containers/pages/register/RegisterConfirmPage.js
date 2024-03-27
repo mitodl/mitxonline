@@ -12,7 +12,7 @@ import { path } from "ramda"
 import { createStructuredSelector } from "reselect"
 
 import { addUserNotification } from "../../../actions"
-import { ALERT_TYPE_TEXT } from "../../../constants"
+import { ALERT_TYPE_SUCCESS } from "../../../constants"
 import queries from "../../../lib/queries"
 import { routes } from "../../../lib/urls"
 import {
@@ -47,7 +47,7 @@ export class RegisterConfirmPage extends React.Component<Props> {
         [STATE_REGISTER_DETAILS]: () => {
           addUserNotification({
             "email-verified": {
-              type:  ALERT_TYPE_TEXT,
+              type:  ALERT_TYPE_SUCCESS,
               props: {
                 text:
                   "Success! We've verified your email. Please finish your account creation below."

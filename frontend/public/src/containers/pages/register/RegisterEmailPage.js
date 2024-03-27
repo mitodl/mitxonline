@@ -117,11 +117,11 @@ export class RegisterEmailPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${REGISTER_EMAIL_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page">
-          <div className="auth-card card-shadow auth-form">
-            <div className="auth-header">
-              <h1>Create Account</h1>
+          <div className="std-card std-card-auth">
+            <div className="std-card-body">
+              <h2>Create Account</h2>
+              <RegisterEmailForm onSubmit={this.onSubmit.bind(this)} />
             </div>
-            <RegisterEmailForm onSubmit={this.onSubmit.bind(this)} />
           </div>
         </div>
       </DocumentTitle>

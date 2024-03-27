@@ -93,16 +93,16 @@ export class LoginPasswordPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${LOGIN_PASSWORD_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page">
-          <div className="auth-card card-shadow auth-form">
-            <div className="auth-header">
+          <div className="std-card std-card-auth">
+            <div className="std-card-body">
               <h1>Sign in</h1>
               {name && (
                 <p>
                   Signing in as <b>{name}</b>
                 </p>
               )}
+              <LoginPasswordForm onSubmit={this.onSubmit.bind(this)} />
             </div>
-            <LoginPasswordForm onSubmit={this.onSubmit.bind(this)} />
           </div>
         </div>
       </DocumentTitle>

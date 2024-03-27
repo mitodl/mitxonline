@@ -52,7 +52,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
           currentUser: currentUser
         }
       },
-      {}
+      {
+        state: {
+          currentCourseRun: courseRun
+        }
+      }
     )
 
     SETTINGS.features = {
@@ -134,7 +138,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       },
       {}
     )
-
     assert.isNotOk(
       inner
         .find(".enroll-now")
@@ -270,6 +273,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       isWithinEnrollmentPeriodStub.returns(true)
       isFinancialAssistanceAvailableStub.returns(true)
       const { inner } = await renderPage()
+      inner.setState({ currentCourseRun: courseRun })
 
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
@@ -414,7 +418,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       ]
       isWithinEnrollmentPeriodStub.returns(true)
       const { inner } = await renderPage()
-
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
       await enrollBtn.prop("onClick")()
@@ -448,7 +451,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       isWithinEnrollmentPeriodStub.returns(true)
       isFinancialAssistanceAvailableStub.returns(false)
       const { inner } = await renderPage()
-
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
       await enrollBtn.prop("onClick")()
@@ -492,7 +494,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
   ].forEach(([showsQualifier, runsQualifier, multiples]) => {
     it(`${showsQualifier} the course run selector for a course with ${runsQualifier} active run${
       multiples ? "s" : ""
-    }`, async () => {
+    } and enables enroll buttons on selection`, async () => {
       courseRun["products"] = [
         {
           id:                     1,
@@ -532,12 +534,95 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       if (multiples) {
         assert.isTrue(selectorControl.exists())
         const selectorControlItems = selectorControl.find("option")
-        assert.isTrue(selectorControlItems.length === 2)
+        assert.isTrue(selectorControlItems.length === 3)
+        assert.isTrue(selectorControlItems.at(0).text() === "Please Select")
+        assert.isTrue(
+          upgradeForm
+            .find("button.btn-upgrade")
+            .at(0)
+            .prop("disabled")
+        )
+        assert.isTrue(
+          inner
+            .find("button.enroll-now-free")
+            .at(0)
+            .prop("disabled")
+        )
+        modal
+          .find("select.form-control")
+          .simulate("change", { target: { value: courseRun["id"] } })
+        inner.update()
+        assert.isFalse(
+          inner
+            .find("button.enroll-now-free")
+            .at(0)
+            .prop("disabled")
+        )
+        assert.isFalse(
+          inner
+            .find("button.btn-upgrade")
+            .at(0)
+            .prop("disabled")
+        )
       } else {
         assert.isFalse(selectorControl.exists())
+        assert.isFalse(
+          inner
+            .find("button.enroll-now-free")
+            .at(0)
+            .prop("disabled")
+        )
+        assert.isFalse(
+          upgradeForm
+            .find("button.btn-upgrade")
+            .at(0)
+            .prop("disabled")
+        )
       }
     })
   })
+
+  it(`renders enrollment dialog for a course with multiple non-upgradable active runs and enables enroll button on selection`, async () => {
+    courseRun["products"] = []
+    courseRun["is_upgradable"] = false
+    const courseRuns = [courseRun]
+    courseRuns.push(courseRun)
+
+    isWithinEnrollmentPeriodStub.returns(true)
+    const { inner } = await renderPage({
+      entities: {
+        courseRuns:  courseRuns,
+        courses:     [course],
+        enrollments: [enrollment],
+        currentUser: currentUser
+      }
+    })
+
+    const enrollBtn = inner.find(".enroll-now").at(0)
+    assert.isTrue(enrollBtn.exists())
+    await enrollBtn.prop("onClick")()
+
+    const modal = inner.find(".upgrade-enrollment-modal")
+    assert.isTrue(modal.find("select.form-control").exists())
+    assert.isTrue(
+      modal
+        .find("button.enroll-now-free")
+        .at(0)
+        .prop("disabled")
+    )
+    modal
+      .find("select.form-control")
+      .simulate("change", { target: { value: courseRun["id"] } })
+    inner.update()
+    assert.isFalse(
+      inner
+        .find("button.enroll-now-free")
+        .at(0)
+        .prop("disabled")
+    )
+    assert.isFalse(inner.find("button.btn-upgrade").exists())
+  })
+
   it("renders the upsell dialog with the correct date if the user has an enrollment in the past that is not upgradeable", async () => {
     const pastCourseRun = makeCourseRunDetail()
     pastCourseRun["start_date"] = moment().add(-1, "Y")

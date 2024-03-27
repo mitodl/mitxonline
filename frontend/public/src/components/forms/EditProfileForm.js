@@ -62,7 +62,7 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
             <div className="col d-flex justify-content-end">
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="btn btn-primary btn-gradient-red-to-blue"
                 disabled={isSubmitting}
               >
                 Submit

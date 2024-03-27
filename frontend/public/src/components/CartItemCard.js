@@ -1,7 +1,7 @@
 // @flow
 import React from "react"
 import type { Product } from "../flow/cartTypes"
-import { generateStartDateText } from "../lib/courseApi"
+import { courseRunStatusMessage } from "../lib/courseApi"
 
 type Props = {
   product: Product
@@ -45,7 +45,7 @@ export class CartItemCard extends React.Component<Props> {
         ? purchasableObject.course_number
         : purchasableObject.run_tag
 
-    const startDateDescription = generateStartDateText(purchasableObject)
+    const courseRunStatusMessageText = courseRunStatusMessage(purchasableObject)
     const courseImage =
       course !== undefined && course.page !== null ? (
         <img src={course.page.feature_image_src} alt="" />
@@ -53,30 +53,17 @@ export class CartItemCard extends React.Component<Props> {
     const cardKey = `cartsummarycard_${product.id}`
 
     return (
-      <div
-        className="enrolled-item container card mb-4 rounded-0 flex-grow-1"
-        key={cardKey}
-      >
-        <div className="row d-flex flex-md-columm p-md-3">
-          <div className="img-container">{courseImage}</div>
+      <div className="enrolled-item container card" key={cardKey}>
+        <div className="row flex-grow-1 enrolled-item-info">
+          <div className="col-12 col-md-auto p-0">
+            <div className="img-container">{courseImage}</div>
+          </div>
 
-          <div className="flex-grow-1 d-md-flex flex-column w-50 mx-3">
-            <h5 className="">{title}</h5>
+          <div className="col-12 col-md enrollment-details-container">
+            <h2 className="">{title}</h2>
             <div className="detail">
               {readableId}
-              <br />
-              {startDateDescription !== null && startDateDescription.active ? (
-                <span>Starts - {startDateDescription.datestr}</span>
-              ) : (
-                <span>
-                  {startDateDescription === null ? null : (
-                    <span>
-                      <strong>Active</strong> from{" "}
-                      {startDateDescription.datestr}
-                    </span>
-                  )}
-                </span>
-              )}
+              {courseRunStatusMessageText}
             </div>
             <div className="enrollment-extra-links d-flex">
               {course !== undefined && courseDetail}

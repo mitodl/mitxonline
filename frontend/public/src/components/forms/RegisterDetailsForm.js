@@ -49,16 +49,14 @@ const RegisterDetailsForm = ({ onSubmit, countries }: Props) => (
           values={values}
           isNewAccount={true}
         />
-        <div className="row submit-row no-gutters">
-          <div className="col d-flex justify-content-end">
-            <button
-              type="submit"
-              className="btn btn-primary btn-gradient-red large"
-              disabled={isSubmitting}
-            >
-              Continue
-            </button>
-          </div>
+        <div className="submit-row">
+          <button
+            type="submit"
+            className="btn btn-primary btn-gradient-red-to-blue large"
+            disabled={isSubmitting}
+          >
+            Continue
+          </button>
         </div>
       </Form>
     )}

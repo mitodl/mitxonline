@@ -201,7 +201,7 @@ body.new-design {
         }
 
         .vjs-default-skin {
-          width: 325px;
+          width: 340px;
           max-height: 240px;
         }
 
@@ -251,7 +251,7 @@ body.new-design {
         flex-flow: column;
         align-items: top;
         margin: 10px 12px;
-        width: 350px;
+        width: 340px;
 
         @include media-breakpoint-up(xl) {
           margin: 0 -18px;
