@@ -85,7 +85,9 @@ export class CatalogPage extends React.Component<Props> {
     super(props)
     this.io = null
     this.container = React.createRef(null)
+
     const { tab, department } = this.props.match.params
+    console.log(tab, department)
   }
 
   componentWillUnmount() {
