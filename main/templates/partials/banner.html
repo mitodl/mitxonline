@@ -1,0 +1,8 @@
+<div class="banners site-wide d-none">
+  {% if banner %}
+    <div class="banner" data-banner-id="{{ banner.id }}">
+      <a href="#" class="close-banner"></a>
+      {{ banner|safe }}
+    </div>
+  {% endif %}
+</div>
