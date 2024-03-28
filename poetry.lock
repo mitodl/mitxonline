@@ -2418,22 +2418,22 @@ typing-extensions = "*"
 
 [[package]]
 name = "mitol-django-google-sheets"
-version = "2.6.0"
+version = "2023.12.19.1"
 description = "Core library to handle Google Sheets integrations in Django"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "mitol-django-google-sheets-2.6.0.tar.gz", hash = "sha256:87b3defe6a2cdd53cafb77f3dc983d500bfc09dbb33129e1f4c0dcfca1ff34cb"},
-    {file = "mitol_django_google_sheets-2.6.0-py3-none-any.whl", hash = "sha256:c545cd7cf3f57cd727996177db17b878278289f19dc6841d23a3707c240d7855"},
+    {file = "mitol-django-google-sheets-2023.12.19.1.tar.gz", hash = "sha256:0b083cb10d43ebba0d4032b194d3e087a62c5a435fee2b1f919ec3496e1cb878"},
+    {file = "mitol_django_google_sheets-2023.12.19.1-py3-none-any.whl", hash = "sha256:d48acad8e4394fd20104f56858edabe682ac009c9ebe2d17fe955c0ca0507969"},
 ]
 
 [package.dependencies]
-django = ">=2.2.12,<4.0"
+django = ">=3.0"
 factory-boy = ">=3.2,<4.0"
 google-api-python-client = "1.7.11"
 google-auth = "1.6.3"
 google-auth-oauthlib = ">=0.5.2"
-mitol-django-common = ">=2.7.0,<2.8.0"
+mitol-django-common = "*"
 pygsheets = "2.0.2"
 pytz = ">=2020.4"
 setuptools = "*"
@@ -4483,4 +4483,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "e93e92f8fcf304542cf735136d9bf3a5dd7ef6e500b219e9a9ae2dd83dc73fb8"
+content-hash = "9a9ac7535f937a5ea06549a7438c656a9e9fb6827370ae8bbffd89724f3634ca"
