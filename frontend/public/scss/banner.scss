@@ -18,14 +18,11 @@
     color: white;
     height: 60px;
     padding: 15px 20px 15px 20px;
-    gap: 0px;
     background: linear-gradient(180deg, #A31F34 0%, #700934 100%);
 
     font-family: Inter;
     font-size: 18px;
     font-weight: 500;
-    line-height: 21.78px;
-
 
     p a {
       color: white;
@@ -39,11 +36,15 @@
     text-decoration: none;
     color: white;
     float: right;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     &:after {
       content: "cancel";
       font-family: Material Icons;
-      margin-left: 10px;
+      font-size: 30px;
    }
  }
 }
