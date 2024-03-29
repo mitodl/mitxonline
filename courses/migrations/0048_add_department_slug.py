@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("courses", "0046_audit_rename_call_stack"),
+        ("courses", "0047_courses_and_programs_department_required"),
     ]
 
     operations = [

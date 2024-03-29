@@ -14,7 +14,7 @@ def generate_slug(apps, schema):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("courses", "0047_add_department_slug"),
+        ("courses", "0048_add_department_slug"),
     ]
 
     operations = [
