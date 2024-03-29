@@ -38,6 +38,7 @@ from wagtail.images.models import Image
 from wagtail.models import Page
 from wagtail.search import index
 from wagtailmetadata.models import MetadataPageMixin
+from wagtail.snippets.models import register_snippet
 
 from cms.blocks import (
     CourseRunCertificateOverrides,
@@ -1682,3 +1683,17 @@ class SignatoryPage(Page):
         designed to be viewed on their own so we raise a 404 if someone tries to access their slug.
         """
         raise Http404
+
+
+@register_snippet
+class SiteBanner(models.Model):
+    """Snippet model for showing site banner."""
+
+    message = RichTextField(
+        max_length=255, features=["bold", "italic", "link", "document-link"]
+    )
+
+    panels = [FieldPanel("message")]
+
+    def __str__(self):
+        return str(self.message)

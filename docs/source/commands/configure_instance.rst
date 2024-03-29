@@ -3,7 +3,7 @@
 
 Configures a fresh MITx Online instance. For more information, see :doc:`MITx Online Quick Start<../configuration/quickstart>` and :doc:`Local Open edX Tutor and MITx Online Deployment<../configuration/tutor>`.
 
-For Tutor deployments, this will use ``local.overhang.io`` for URLs for the edX platform. If you're running a dev deployment, or are using Tutor Nightly, ``--tutor-dev`` will additionally add the proper ports (as Caddy is disabled in these cases). In either case, the two demo courses will still be created but only the Demonstration Course (``course-v1:edX+DemoX+Demo_Course``) will exist in edX, and then only if you import the demo course using the relevant Tutor command.
+For Tutor deployments, this will use ``local.edly.io`` for URLs for the edX platform. If you're running a dev deployment, or are using Tutor Nightly, ``--tutor-dev`` will additionally add the proper ports (as Caddy is disabled in these cases). In either case, the two demo courses will still be created but only the Demonstration Course (``course-v1:edX+DemoX+Demo_Course``) will exist in edX, and then only if you import the demo course using the relevant Tutor command.
 
 Syntax
 ------

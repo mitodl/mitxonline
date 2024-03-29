@@ -31,7 +31,7 @@ The learner account will have these parameters:
 The product for the courses will both be $999 so they are under the limit
 for test CyberSource transactions.
 
-If the --tutor/-T option is passed, the command will use the local.overhang.io
+If the --tutor/-T option is passed, the command will use the local.edly.io
 address for links to edX rather than edx.odl.local:18000.
 
 This uses other management commands to complete these tasks. So, if you just
@@ -128,9 +128,9 @@ class Command(BaseCommand):
         """Returns a tuple of the edX host and port depending on what the user's passed in"""
 
         if kwargs["tutor"]:
-            return ("local.overhang.io", "")
+            return ("local.edly.io", "")
         elif kwargs["tutordev"]:
-            return ("local.overhang.io", ":8000")
+            return ("local.edly.io", ":8000")
         else:
             return ("edx.odl.local:18000", ":18000")
 
@@ -203,8 +203,15 @@ class Command(BaseCommand):
         # Step 2: create the program
         self.stdout.write(self.style.SUCCESS("Creating the DEDP program..."))
 
-        # by default, this will create the DEDP program and tiers
-        call_command("configure_tiers")
+        call_command(
+            "create_courseware",
+            "program",
+            "program-v1:MITx+DEDP",
+            "Data, Economics and Development Policy",
+            live=True,
+            depts="Economics",
+            create_depts=True,
+        )
 
         # Step 3: create the program page
         self.stdout.write(self.style.SUCCESS("Creating the DEDP program about page..."))
@@ -232,6 +239,8 @@ class Command(BaseCommand):
             create_run="Demo_Course",
             run_url=f"http://{edx_host}/courses/course-v1:edX+DemoX+Demo_Course/",
             program="program-v1:MITx+DEDP",
+            depts="Science",
+            create_depts=True,
         )
 
         call_command(
@@ -242,6 +251,8 @@ class Command(BaseCommand):
             live=True,
             create_run="course",
             run_url=f"http://{edx_host}/courses/course-v1:edX+E2E-101+course/",
+            depts="Math",
+            create_depts=True,
         )
 
         self.stdout.write(self.style.SUCCESS("Syncing course runs (this may fail)..."))

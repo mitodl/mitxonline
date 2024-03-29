@@ -618,6 +618,25 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
+   * Returns the html for the catalog count based on the selected tab, either Courses or Programs.
+   * This return is singular or plural based on the count.
+   * @returns {Element}
+   */
+  renderCatalogCount() {
+    const count =
+      this.state.tabSelected === PROGRAMS_TAB
+        ? this.renderNumberOfCatalogPrograms()
+        : this.renderNumberOfCatalogCourses()
+    const tab = this.state.tabSelected
+    return (
+      <h2 className="catalog-count">
+        {/* Hidden on small screens. */}
+        {count} {count > 1 ? tab : tab.slice(0, -1)}
+      </h2>
+    )
+  }
+
+  /**
    * Renders a single course catalog card.
    * @param {CourseDetailWithRuns} course The course instance used to populate the card.
    */
@@ -852,14 +871,7 @@ export class CatalogPage extends React.Component<Props> {
                           timeout={300}
                           classNames="count"
                         >
-                          <h2>
-                            {/* Hidden on small screens. */}
-                            {/* Could add logic to display only "course" if only 1 course is showing. */}
-                            {this.state.tabSelected === PROGRAMS_TAB
-                              ? this.renderNumberOfCatalogPrograms()
-                              : this.renderNumberOfCatalogCourses()}{" "}
-                            {this.state.tabSelected}
-                          </h2>
+                          {this.renderCatalogCount()}
                         </CSSTransition>
                       </TransitionGroup>
                     </div>

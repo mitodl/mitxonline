@@ -42,13 +42,14 @@ Options
 * ``--live`` - Make the course live. (Default is to set the flag to false.)
 * ``--create-cms-page`` - Attempt to create a basic CMS page for the course, in a similar fashion to ``create_courseware_page``. If this fails (for instance, if the course already has a CMS page), this step will be skipped.
 * ``--price <price>`` - Create (or update) a product for the courserun with the specified price. If the command creates multiple courseruns, this will create a product for each.
+* ``--dept <department_name>`` - Specify department(s) assigned to the course object.  If program is specified, all courses associated with the program and imported will have the same department.
 
 Example
 -------
 
 The use case for this was creating a batch of course runs for an upcoming semester of DEDP courses; these courses existed in edX but not in MITx Online. Since in that case the semester was 1T2023, this command would have created all the applicable courseruns all at once:
 
-``manage.py import_courserun --program program-v1:MITx+DEDP --run-tag 1T2023 --live``
+``manage.py import_courserun --program program-v1:MITx+DEDP --run-tag 1T2023 --live --dept Economics``
 
 Or, the same but with the standard DEDP pricing applied:
 
