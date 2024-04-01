@@ -983,7 +983,47 @@ describe("CatalogPage", function() {
   })
 
   it("renderCatalogCount is plural for more than one course", async () => {
-    const { inner } = await renderPage()
+    const displayedProgram2 = JSON.parse(JSON.stringify(displayedProgram))
+    displayedProgram2.id = 2
+    const displayedCourse2 = JSON.parse(JSON.stringify(displayedCourse))
+    displayedCourse2.id = 2
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   2,
+            results: [displayedCourse, displayedCourse2]
+          },
+          programs: {
+            count:   2,
+            results: [displayedProgram, displayedProgram2]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
     inner.setState({ tabSelected: "courses" })
     inner.setState({ selectedDepartment: "All Departments" })
     inner.setState({ allCoursesCount: 2 })
@@ -991,7 +1031,47 @@ describe("CatalogPage", function() {
   })
 
   it("renderCatalogCount is plural for more than one program", async () => {
-    const { inner } = await renderPage()
+    const displayedProgram2 = JSON.parse(JSON.stringify(displayedProgram))
+    displayedProgram2.id = 2
+    const displayedCourse2 = JSON.parse(JSON.stringify(displayedCourse))
+    displayedCourse2.id = 2
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   2,
+            results: [displayedCourse, displayedCourse2]
+          },
+          programs: {
+            count:   2,
+            results: [displayedProgram, displayedProgram2]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
     inner.setState({ tabSelected: "programs" })
     inner.setState({ selectedDepartment: "All Departments" })
     inner.setState({ allProgramsCount: 2 })
@@ -999,7 +1079,43 @@ describe("CatalogPage", function() {
   })
 
   it("renderCatalogCount is singular for one course", async () => {
-    const { inner } = await renderPage()
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   1,
+            results: [displayedCourse]
+          },
+          programs: {
+            count:   1,
+            results: [displayedProgram]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
     inner.setState({ tabSelected: "courses" })
     inner.setState({ selectedDepartment: "All Departments" })
     inner.setState({ allCoursesCount: 1 })
@@ -1007,10 +1123,47 @@ describe("CatalogPage", function() {
   })
 
   it("renderCatalogCount is singular for one program", async () => {
-    const { inner } = await renderPage()
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   1,
+            results: [displayedCourse]
+          },
+          programs: {
+            count:   1,
+            results: [displayedProgram]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
     inner.setState({ tabSelected: "programs" })
     inner.setState({ selectedDepartment: "All Departments" })
     inner.setState({ allProgramsCount: 1 })
+    inner.instance().componentDidUpdate({}, {})
     expect(inner.find("h2.catalog-count").text()).equals("1 program")
   })
 })
