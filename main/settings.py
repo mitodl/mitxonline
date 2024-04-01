@@ -1148,9 +1148,10 @@ POSTHOG_API_HOST = get_string(
     default="",
     description="API host for PostHog",
 )
-if "IN_TEST_SUITE" not in os.environ:
+if "POSTHOG_ENABLED" not in os.environ:
     posthog.api_key = POSTHOG_API_TOKEN
     posthog.host = POSTHOG_API_HOST
+    posthog.feature_flags_request_timeout_seconds = 500
 
 # HomePage Hubspot Form Settings
 HUBSPOT_HOME_PAGE_FORM_GUID = get_string(
