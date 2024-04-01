@@ -170,13 +170,31 @@ describe("CatalogPage", function() {
           courses: {
             isPending: false,
             status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
           }
         },
         entities: {
           courses: {
             count:   1,
             results: courses
-          }
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            },
+            {
+              name:        "Science",
+              slug:        "science",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
         }
       },
       {}
@@ -226,11 +244,13 @@ describe("CatalogPage", function() {
           departments: [
             {
               name:        "History",
+              slug:        "history",
               course_ids:  [],
               program_ids: [1, 2, 3, 4, 5]
             },
             {
               name:        "Science",
+              slug:        "science",
               course_ids:  [2],
               program_ids: []
             }
@@ -253,6 +273,34 @@ describe("CatalogPage", function() {
   })
 
   it("renders catalog department filter for courses and programs tabs", async () => {
+    const allDepartments = {
+      name: "All Departments",
+      slug: "All Departments"
+    }
+    const department1 = {
+      name:        "department1",
+      slug:        "department1",
+      course_ids:  [1],
+      program_ids: []
+    }
+    const department2 = {
+      name:        "department2",
+      slug:        "department2",
+      course_ids:  [1],
+      program_ids: [1]
+    }
+    const department3 = {
+      name:        "department3",
+      slug:        "department3",
+      course_ids:  [],
+      program_ids: [1]
+    }
+    const department4 = {
+      name:        "department4",
+      slug:        "department4",
+      course_ids:  [],
+      program_ids: []
+    }
     const { inner } = await renderPage(
       {
         queries: {
@@ -262,28 +310,7 @@ describe("CatalogPage", function() {
           }
         },
         entities: {
-          departments: [
-            {
-              name:        "department1",
-              course_ids:  [1],
-              program_ids: []
-            },
-            {
-              name:        "department2",
-              course_ids:  [1],
-              program_ids: [1]
-            },
-            {
-              name:        "department3",
-              course_ids:  [],
-              program_ids: [1]
-            },
-            {
-              name:        "department4",
-              course_ids:  [],
-              program_ids: []
-            }
-          ]
+          departments: [department1, department2, department3, department4]
         }
       },
       {}
@@ -292,67 +319,91 @@ describe("CatalogPage", function() {
       .instance()
       .filterDepartmentsByTabName("courses")
     expect(JSON.stringify(filteredDepartments)).equals(
-      JSON.stringify(["All Departments", "department1", "department2"])
+      JSON.stringify([allDepartments, department1, department2])
     )
     filteredDepartments = inner
       .instance()
       .filterDepartmentsByTabName("programs")
     expect(JSON.stringify(filteredDepartments)).equals(
-      JSON.stringify(["All Departments", "department2", "department3"])
+      JSON.stringify([allDepartments, department2, department3])
     )
   })
 
   it("renders catalog courses when filtered by department", async () => {
     const course1 = JSON.parse(JSON.stringify(displayedCourse))
     course1.departments = [{ name: "Math" }]
+    course1.id = 1
     const course2 = JSON.parse(JSON.stringify(displayedCourse))
     course2.departments = [{ name: "Science" }]
+    course2.id = 2
     const course3 = JSON.parse(JSON.stringify(displayedCourse))
     course3.departments = [{ name: "Science" }]
+    course3.id = 3
     courses = [course1, course2, course3]
-    const { inner } = await renderPage()
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   3,
+            results: courses
+          },
+          programs: {
+            results: [displayedProgram]
+          },
+          departments: [
+            {
+              name:        "Science",
+              slug:        "science",
+              course_ids:  [1, 3],
+              program_ids: [2, 3]
+            },
+            {
+              name:        "Math",
+              slug:        "math",
+              course_ids:  [1],
+              program_ids: [1]
+            },
+            {
+              name:        "department4",
+              slug:        "department4",
+              course_ids:  [],
+              program_ids: []
+            }
+          ]
+        }
+      },
+      {}
+    )
+    inner.state().tabSelected = "courses"
+    inner.state().selectedDepartment = "math"
     let coursesFilteredByCriteriaAndDepartment = inner
       .instance()
-      .filteredCoursesBasedOnCourseRunCriteria("Math", courses)
+      .filteredCoursesBasedOnSelectedDepartment("math", courses)
     expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
+    inner.state().selectedDepartment = "science"
     coursesFilteredByCriteriaAndDepartment = inner
       .instance()
-      .filteredCoursesBasedOnCourseRunCriteria("Science", courses)
+      .filteredCoursesBasedOnSelectedDepartment("science", courses)
     expect(coursesFilteredByCriteriaAndDepartment.length).equals(2)
+    inner.state().selectedDepartment = "All Departments"
     coursesFilteredByCriteriaAndDepartment = inner
       .instance()
-      .filteredCoursesBasedOnCourseRunCriteria("All Departments", courses)
+      .filteredCoursesBasedOnSelectedDepartment("All Departments", courses)
     expect(coursesFilteredByCriteriaAndDepartment.length).equals(3)
-  })
-
-  it("renders no catalog courses if the course's pages are not live", async () => {
-    const course = JSON.parse(JSON.stringify(displayedCourse))
-    course.page.live = false
-    const { inner } = await renderPage()
-    const coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .filteredCoursesBasedOnCourseRunCriteria("All Departments", [course])
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(0)
-  })
-
-  it("renders no catalog courses if the course has no page", async () => {
-    const course = JSON.parse(JSON.stringify(displayedCourse))
-    delete course.page
-    const { inner } = await renderPage()
-    const coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .filteredCoursesBasedOnCourseRunCriteria("All Departments", [course])
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(0)
-  })
-
-  it("renders no catalog courses if the course has no associated course runs", async () => {
-    const course = JSON.parse(JSON.stringify(displayedCourse))
-    course.courseruns = []
-    const { inner } = await renderPage()
-    const coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .filteredCoursesBasedOnCourseRunCriteria("All Departments", [course])
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(0)
   })
 
   it("renders catalog programs when filtered by department", async () => {
@@ -362,16 +413,57 @@ describe("CatalogPage", function() {
     program2.departments = ["History"]
     const program3 = JSON.parse(JSON.stringify(displayedProgram))
     program3.departments = ["History"]
-    const { inner } = await renderPage()
     programs = [program1, program2, program3]
+    const { inner } = await renderPage({
+      queries: {
+        programs: {
+          isPending: false,
+          status:    200
+        },
+        departments: {
+          isPending: false,
+          status:    200
+        }
+      },
+      entities: {
+        programs: {
+          count:   3,
+          results: [program1, program2, program3]
+        },
+        departments: [
+          {
+            name:        "History",
+            slug:        "history",
+            course_ids:  [1, 2],
+            program_ids: [2, 3]
+          },
+          {
+            name:        "Math",
+            slug:        "math",
+            course_ids:  [1, 2, 3],
+            program_ids: [1]
+          },
+          {
+            name:        "department4",
+            slug:        "department4",
+            course_ids:  [],
+            program_ids: []
+          }
+        ]
+      }
+    })
+    inner.state().tabSelected = "programs"
+    inner.state().selectedDepartment = "math"
     let programsFilteredByCriteriaAndDepartment = inner
       .instance()
-      .filteredProgramsByDepartmentAndCriteria("Math", programs)
+      .filteredProgramsByDepartmentAndCriteria("math", programs)
     expect(programsFilteredByCriteriaAndDepartment.length).equals(1)
+    inner.state().selectedDepartment = "history"
     programsFilteredByCriteriaAndDepartment = inner
       .instance()
-      .filteredProgramsByDepartmentAndCriteria("History", programs)
+      .filteredProgramsByDepartmentAndCriteria("history", programs)
     expect(programsFilteredByCriteriaAndDepartment.length).equals(2)
+    inner.state().selectedDepartment = "All Departments"
     programsFilteredByCriteriaAndDepartment = inner
       .instance()
       .filteredProgramsByDepartmentAndCriteria("All Departments", programs)
@@ -493,10 +585,13 @@ describe("CatalogPage", function() {
   it("renders catalog courses based on selected department", async () => {
     const course1 = JSON.parse(JSON.stringify(displayedCourse))
     course1.departments = [{ name: "Math" }]
+    course1.id = 1
     const course2 = JSON.parse(JSON.stringify(displayedCourse))
     course2.departments = [{ name: "Math" }, { name: "History" }]
+    course2.id = 2
     const course3 = JSON.parse(JSON.stringify(displayedCourse))
     course3.departments = [{ name: "Math" }, { name: "History" }]
+    course3.id = 3
     courses = [course1, course2, course3]
     const { inner } = await renderPage(
       {
@@ -525,16 +620,19 @@ describe("CatalogPage", function() {
           departments: [
             {
               name:        "History",
-              course_ids:  [1, 2],
+              slug:        "history",
+              course_ids:  [2, 3],
               program_ids: [1]
             },
             {
               name:        "Math",
+              slug:        "math",
               course_ids:  [1, 2, 3],
               program_ids: []
             },
             {
               name:        "department4",
+              slug:        "department4",
               course_ids:  [],
               program_ids: []
             }
@@ -559,9 +657,10 @@ describe("CatalogPage", function() {
     expect(inner.instance().renderNumberOfCatalogCourses()).equals(3)
 
     // Select a department to filter by.
-    inner.instance().changeSelectedDepartment("History", "courses")
+    inner.instance().changeSelectedDepartment("history")
     // Confirm the state updated to reflect the selected department.
-    expect(inner.state().selectedDepartment).equals("History")
+    expect(inner.state().selectedDepartment).equals("history")
+    expect(inner.state().tabSelected).equals("courses")
     // Confirm the number of catalog items updated to reflect the items filtered by department.
     expect(inner.instance().renderNumberOfCatalogCourses()).equals(2)
     // Confirm the courses filtered are those which have a department name matching the selected department.
@@ -575,7 +674,7 @@ describe("CatalogPage", function() {
     // Change to the programs tab.
     inner.instance().changeSelectedTab("programs")
     // Confirm that the selected department is the same as before.
-    expect(inner.state().selectedDepartment).equals("History")
+    expect(inner.state().selectedDepartment).equals("history")
 
     // Change back to the courses tab.
     inner.instance().changeSelectedTab("courses")
@@ -884,7 +983,47 @@ describe("CatalogPage", function() {
   })
 
   it("renderCatalogCount is plural for more than one course", async () => {
-    const { inner } = await renderPage()
+    const displayedProgram2 = JSON.parse(JSON.stringify(displayedProgram))
+    displayedProgram2.id = 2
+    const displayedCourse2 = JSON.parse(JSON.stringify(displayedCourse))
+    displayedCourse2.id = 2
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   2,
+            results: [displayedCourse, displayedCourse2]
+          },
+          programs: {
+            count:   2,
+            results: [displayedProgram, displayedProgram2]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
     inner.setState({ tabSelected: "courses" })
     inner.setState({ selectedDepartment: "All Departments" })
     inner.setState({ allCoursesCount: 2 })
@@ -892,7 +1031,47 @@ describe("CatalogPage", function() {
   })
 
   it("renderCatalogCount is plural for more than one program", async () => {
-    const { inner } = await renderPage()
+    const displayedProgram2 = JSON.parse(JSON.stringify(displayedProgram))
+    displayedProgram2.id = 2
+    const displayedCourse2 = JSON.parse(JSON.stringify(displayedCourse))
+    displayedCourse2.id = 2
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   2,
+            results: [displayedCourse, displayedCourse2]
+          },
+          programs: {
+            count:   2,
+            results: [displayedProgram, displayedProgram2]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
     inner.setState({ tabSelected: "programs" })
     inner.setState({ selectedDepartment: "All Departments" })
     inner.setState({ allProgramsCount: 2 })
@@ -900,7 +1079,43 @@ describe("CatalogPage", function() {
   })
 
   it("renderCatalogCount is singular for one course", async () => {
-    const { inner } = await renderPage()
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   1,
+            results: [displayedCourse]
+          },
+          programs: {
+            count:   1,
+            results: [displayedProgram]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
     inner.setState({ tabSelected: "courses" })
     inner.setState({ selectedDepartment: "All Departments" })
     inner.setState({ allCoursesCount: 1 })
@@ -908,10 +1123,47 @@ describe("CatalogPage", function() {
   })
 
   it("renderCatalogCount is singular for one program", async () => {
-    const { inner } = await renderPage()
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   1,
+            results: [displayedCourse]
+          },
+          programs: {
+            count:   1,
+            results: [displayedProgram]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
     inner.setState({ tabSelected: "programs" })
     inner.setState({ selectedDepartment: "All Departments" })
     inner.setState({ allProgramsCount: 1 })
+    inner.instance().componentDidUpdate({}, {})
     expect(inner.find("h2.catalog-count").text()).equals("1 program")
   })
 })

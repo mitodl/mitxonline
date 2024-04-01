@@ -3,11 +3,11 @@ Creates a courseware object. This can be a program or a course (and optionally
 a course run).
 """
 
-from typing import Union
-from django.db import models
-from typing import List
+from typing import List, Union
 
 from django.core.management import BaseCommand
+from django.db import models
+from django.utils.text import slugify
 
 from courses.models import Course, CourseRun, Department, Program
 from main.utils import parse_supplied_date
