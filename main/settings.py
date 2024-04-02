@@ -1148,10 +1148,16 @@ POSTHOG_API_HOST = get_string(
     default="",
     description="API host for PostHog",
 )
+POSTHOG_REQUEST_TIMEOUT_MS = get_int(
+    name="POSTHOG_REQUEST_TIMEOUT_MS",
+    default=3000,
+    description="Timeout(MS) for PostHog feature flag requests.",
+)
+
 if "POSTHOG_ENABLED" not in os.environ:
     posthog.api_key = POSTHOG_API_TOKEN
     posthog.host = POSTHOG_API_HOST
-    posthog.feature_flags_request_timeout_seconds = 500
+    posthog.feature_flags_request_timeout_seconds = POSTHOG_REQUEST_TIMEOUT_MS
 
 # HomePage Hubspot Form Settings
 HUBSPOT_HOME_PAGE_FORM_GUID = get_string(
