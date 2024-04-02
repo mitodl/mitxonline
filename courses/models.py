@@ -29,7 +29,6 @@ from courses.constants import (
     ENROLLABLE_ITEM_ID_SEPARATOR,
     SYNCED_COURSE_RUN_FIELD_MSG,
 )
-from ecommerce.models import Order
 from main.models import AuditableModel, AuditModel, ValidateOnSaveMixin
 from main.utils import serialize_model_object
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENTS_PAID_MODES
@@ -1188,13 +1187,21 @@ class CourseRunEnrollment(EnrollmentModel):
         return super().deactivate_and_save(change_status, no_user)
 
     def change_payment_to_run(self, to_run):
+        """
+        During a deferral process, if user has paid for this run
+        we can change the payment to another run
+        """
+        # Due to circular dependancy importing locally
+        from ecommerce.models import Order
+
         paid_run = PaidCourseRun.objects.filter(
             user=self.user,
             course_run=self.run,
             order__state=Order.STATE.FULFILLED,
-        )
-        paid_run.course_run = to_run
-        paid_run.save_and_log()
+        ).first()
+        if paid_run:
+            paid_run.course_run = to_run
+            paid_run.save_and_log()
 
     def to_dict(self):
         return {**super().to_dict(), "text_id": self.run.courseware_id}

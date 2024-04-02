@@ -1,7 +1,7 @@
 """Courses API tests"""
 from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import factory
 import pytest
@@ -886,16 +886,36 @@ def test_defer_enrollment_validation(mocker, user):
         user,
         enrollments[0].run.courseware_id,
         enrollments[1].run.courseware_id,
+        keep_failed_enrollments=True,
         force=True,
     )
-    assert patched_create_enrollments.call_count == 1
+    assert patched_create_enrollments.call_count == 2
+    patched_create_enrollments.assert_has_calls(
+        [
+            call(
+                user=user,
+                runs=[enrollments[1].run],
+                change_status=None,
+                keep_failed_enrollments=True,
+                mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            ),
+            call(
+                user=user,
+                runs=[enrollments[0].run],
+                change_status=ENROLL_CHANGE_STATUS_DEFERRED,
+                keep_failed_enrollments=True,
+                mode=EDX_ENROLLMENT_AUDIT_MODE,
+            )
+        ]
+    )
+
     defer_enrollment(
         user,
         enrollments[1].run.courseware_id,
         enrollments[2].run.courseware_id,
         force=True,
     )
-    assert patched_create_enrollments.call_count == 2
+    assert patched_create_enrollments.call_count == 4
 
 
 @pytest.mark.parametrize(

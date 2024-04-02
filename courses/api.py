@@ -555,6 +555,7 @@ def defer_enrollment(
     to_enrollments, enroll_success = create_run_enrollments(
         user,
         [to_run],
+        change_status=None,
         keep_failed_enrollments=keep_failed_enrollments,
         mode=EDX_ENROLLMENT_VERIFIED_MODE,
     )
@@ -569,7 +570,7 @@ def defer_enrollment(
             user=user,
             runs=[from_enrollment.run],
             change_status=ENROLL_CHANGE_STATUS_DEFERRED,
-            keep_failed_enrollments=True,
+            keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
         )
         if not enroll_success:
