@@ -34,7 +34,8 @@ from courses.models import (
     Program,
     ProgramCertificate,
     ProgramEnrollment,
-    ProgramRequirement, PaidCourseRun,
+    ProgramRequirement,
+    PaidCourseRun,
 )
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
