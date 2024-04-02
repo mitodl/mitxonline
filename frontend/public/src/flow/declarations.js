@@ -22,7 +22,7 @@ declare type Settings = {
   digital_credentials_supported_runs: Array<string>,
   posthog_api_token: ?string,
   posthog_api_host: ?string,
-  posthog_feature_flag_request_timeout_ms: ?string,
+  posthog_feature_flag_request_timeout_ms: ?int,
 }
 declare var SETTINGS: Settings
 
