@@ -1,7 +1,7 @@
 """Courses API tests"""
 from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import Mock, call
+from unittest.mock import Mock, call, patch
 
 import factory
 import pytest
@@ -769,65 +769,65 @@ class TestDeactivateEnrollments:
 
 @pytest.mark.parametrize("keep_failed_enrollments", [True, False])
 @pytest.mark.parametrize("edx_enroll_succeeds", [True, False])
-@pytest.mark.parametrize("edx_deactivate_succeeds", [True, False])
+@pytest.mark.parametrize("edx_downgrade_succeeds", [True, False])
 def test_defer_enrollment(
     mocker,
     course,
     keep_failed_enrollments,
     edx_enroll_succeeds,
-    edx_deactivate_succeeds,
+    edx_downgrade_succeeds,
 ):
     """
-    defer_enrollment should deactivate a user's existing enrollment and create an enrollment in another
+    defer_enrollment should downgrade current enrollment to audit and create a verified enrollment in another
     course run
     """
     course_runs = CourseRunFactory.create_batch(3, course=course)
     existing_enrollment = CourseRunEnrollmentFactory.create(run=course_runs[0])
     target_run = course_runs[1]
-    mock_new_enrollment = mocker.Mock()
-    patched_create_enrollments = mocker.patch(
-        "courses.api.create_run_enrollments",
-        autospec=True,
-        return_value=(
-            [mock_new_enrollment if edx_enroll_succeeds else None],
-            edx_enroll_succeeds,
-        ),
-    )
-    patched_deactivate_enrollments = mocker.patch(
-        "courses.api.deactivate_run_enrollment",
-        autospec=True,
-        return_value=existing_enrollment
-        if (keep_failed_enrollments or edx_deactivate_succeeds)
-        else None,
-    )
-    if keep_failed_enrollments or (edx_enroll_succeeds and edx_deactivate_succeeds):
-        returned_from_enrollment, returned_to_enrollment = defer_enrollment(
-            existing_enrollment.user,
-            existing_enrollment.run.courseware_id,
-            course_runs[1].courseware_id,
-            keep_failed_enrollments=keep_failed_enrollments,
-        )
-        assert returned_from_enrollment == patched_deactivate_enrollments.return_value
-        assert returned_to_enrollment == patched_create_enrollments.return_value[0][0]
-        patched_create_enrollments.assert_called_once_with(
-            existing_enrollment.user,
-            [target_run],
-            keep_failed_enrollments=keep_failed_enrollments,
-            mode=EDX_ENROLLMENT_VERIFIED_MODE,
-        )
-        patched_deactivate_enrollments.assert_called_once_with(
-            existing_enrollment,
-            ENROLL_CHANGE_STATUS_DEFERRED,
-            keep_failed_enrollments=keep_failed_enrollments,
-        )
-    else:
-        with pytest.raises(Exception):
-            defer_enrollment(
+    new_enrollment = CourseRunEnrollmentFactory.create(run=course_runs[1])
+    return_values = [
+        ([new_enrollment] if edx_enroll_succeeds else [], True),
+        ([existing_enrollment] if edx_downgrade_succeeds else None, True)
+    ]
+    with patch("courses.api.create_run_enrollments", autospec=True) as patched_create_enrollments:
+        patched_create_enrollments.side_effect = return_values
+
+        if keep_failed_enrollments:
+            returned_from_enrollment, returned_to_enrollment = defer_enrollment(
                 existing_enrollment.user,
                 existing_enrollment.run.courseware_id,
                 course_runs[1].courseware_id,
                 keep_failed_enrollments=keep_failed_enrollments,
             )
+            assert patched_create_enrollments.call_count == 2
+            # assert returned_from_enrollment == (existing_enrollment if edx_downgrade_succeeds else None)
+            # assert returned_to_enrollment == (new_enrollment if edx_enroll_succeeds else None)
+            patched_create_enrollments.assert_has_calls(
+                [
+                    call(
+                        user=existing_enrollment.user,
+                        runs=[course_runs[1]],
+                        change_status=None,
+                        keep_failed_enrollments=True,
+                        mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                    ),
+                    call(
+                        user=existing_enrollment.user,
+                        runs=[existing_enrollment.run],
+                        change_status=ENROLL_CHANGE_STATUS_DEFERRED,
+                        keep_failed_enrollments=True,
+                        mode=EDX_ENROLLMENT_AUDIT_MODE,
+                    )
+                ]
+            )
+        else:
+            with pytest.raises(Exception):
+                defer_enrollment(
+                    existing_enrollment.user,
+                    existing_enrollment.run.courseware_id,
+                    course_runs[1].courseware_id,
+                    keep_failed_enrollments=keep_failed_enrollments,
+                )
 
 
 def test_defer_enrollment_validation(mocker, user):

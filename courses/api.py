@@ -501,6 +501,7 @@ def defer_enrollment(
     from_enrollment = CourseRunEnrollment.all_objects.get(
         user=user, run__courseware_id=from_courseware_id
     )
+    downgraded_enrollments = []
     already_deferred_from = (
         from_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
     )
@@ -553,8 +554,8 @@ def defer_enrollment(
         return from_enrollment, to_enrollments
 
     to_enrollments, enroll_success = create_run_enrollments(
-        user,
-        [to_run],
+        user=user,
+        runs=[to_run],
         change_status=None,
         keep_failed_enrollments=keep_failed_enrollments,
         mode=EDX_ENROLLMENT_VERIFIED_MODE,
@@ -573,7 +574,7 @@ def defer_enrollment(
             keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
         )
-        if not enroll_success:
+        if not enroll_success and not keep_failed_enrollments:
             raise Exception(
                 "Api call to change enrollment mode to audit on edX "
                 "was not successful for course run '{}'".format(from_courseware_id)
@@ -581,7 +582,7 @@ def defer_enrollment(
     if PaidCourseRun.fulfilled_paid_course_run_exists(user, from_enrollment.run):
         from_enrollment.change_payment_to_run(to_run)
 
-    return from_enrollment, first_or_none(to_enrollments)
+    return downgraded_enrollments, first_or_none(to_enrollments)
 
 
 def ensure_course_run_grade(user, course_run, edx_grade, should_update=False):
