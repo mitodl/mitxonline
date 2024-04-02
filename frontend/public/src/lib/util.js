@@ -43,7 +43,7 @@ if (SETTINGS.posthog_api_host && SETTINGS.posthog_api_token) {
     capture_pageleave:                     false,
     cross_subdomain_cookie:                false,
     persistence:                           "localStorage+cookie",
-    feature_flag_request_timeout_ms:       SETTINGS.posthog_feature_flag_request_timeout_ms || 3000,
+    feature_flag_request_timeout_ms:       SETTINGS.posthog_feature_flag_request_timeout_ms,
     loaded:                                function(posthog) {
       posthog.setPersonPropertiesForFlags({
         environment: environment
