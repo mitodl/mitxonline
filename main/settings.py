@@ -215,7 +215,7 @@ INSTALLED_APPS = (
     "mitol.hubspot_api",
     "mitol.mail.apps.MailApp",
     "mitol.authentication.apps.TransitionalAuthenticationApp",
-    "mitol.payment_gateway.apps.PaymentGatewayApp"
+    "mitol.payment_gateway.apps.PaymentGatewayApp",
     # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
 )
 # Only include the seed data app if this isn't running in prod
@@ -1157,7 +1157,9 @@ POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS = get_int(
 if "POSTHOG_ENABLED" not in os.environ:
     posthog.api_key = POSTHOG_API_TOKEN
     posthog.host = POSTHOG_API_HOST
-    posthog.feature_flags_request_timeout_seconds = POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS / 1000
+    posthog.feature_flags_request_timeout_seconds = (
+        POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS / 1000
+    )
 
 # HomePage Hubspot Form Settings
 HUBSPOT_HOME_PAGE_FORM_GUID = get_string(
