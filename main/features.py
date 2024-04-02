@@ -1,4 +1,5 @@
 """MITxOnline feature flags"""
+
 import os
 from functools import wraps
 
