@@ -1,6 +1,5 @@
 """MITxOnline feature flags"""
 import os
-import uuid
 from functools import wraps
 
 from django.conf import settings
@@ -10,7 +9,6 @@ SYNC_ON_DASHBOARD_LOAD = "SYNC_ON_DASHBOARD_LOAD"
 ENABLE_NEW_DESIGN = "mitxonline-new-product-page"
 ENABLE_NEW_HOME_PAGE_FEATURED = "mitxonline-new-featured-carousel"
 ENABLE_NEW_HOME_PAGE_HERO = "mitxonline-new-featured-hero"
-ENABLE_NEW_HEADER = "mitxonline-new-header"
 ENABLE_NEW_HOME_PAGE_VIDEO = "mitxonline-new-home-page-video-component"
 ENABLE_NEW_HOME_PAGE_CONTACT_FORM = "mitxonline-new-home-page-contact-form"
 ENABLE_NEW_FOOTER = "mitxonline-new-footer"
