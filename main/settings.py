@@ -1149,7 +1149,7 @@ POSTHOG_API_HOST = get_string(
     description="API host for PostHog",
 )
 POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS = get_int(
-    name="POSTHOG_REQUEST_TIMEOUT_MS",
+    name="POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS",
     default=3000,
     description="Timeout(MS) for PostHog feature flag requests.",
 )
