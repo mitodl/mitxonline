@@ -1161,14 +1161,13 @@ POSTHOG_MAX_RETRIES = get_int(
     description="Numbers of time requests to PostHog should be retried after failing.",
 )
 
-if "POSTHOG_ENABLED" not in os.environ:
+if "POSTHOG_ENABLED" in os.environ:
     posthog.api_key = POSTHOG_API_TOKEN
     posthog.host = POSTHOG_API_HOST
     posthog.feature_flags_request_timeout_seconds = (
         POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS / 1000
     )
     posthog.max_retries = POSTHOG_MAX_RETRIES
-    posthog.timeout = 500
 
 # HomePage Hubspot Form Settings
 HUBSPOT_HOME_PAGE_FORM_GUID = get_string(
