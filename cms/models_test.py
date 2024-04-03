@@ -1,4 +1,5 @@
 """Tests for Wagtail models"""
+
 import json
 from datetime import timedelta
 from urllib.parse import quote_plus
@@ -157,19 +158,23 @@ def test_course_page_context(
         "run": run,
         "course_runs": relevant_runs,
         "is_enrolled": exp_is_enrolled,
-        "sign_in_url": f"/signin/?next={quote_plus(course_page.get_url())}"
-        if exp_sign_in_url
-        else None,
+        "sign_in_url": (
+            f"/signin/?next={quote_plus(course_page.get_url())}"
+            if exp_sign_in_url
+            else None
+        ),
         "start_date": getattr(run, "start_date", None),
         "can_access_edx_course": is_authenticated and has_relevant_run,
         "finaid_price": finaid_price,
         "product": product,
-        "instructors": []
-        if not has_instructor
-        else [
-            member.linked_instructor_page
-            for member in course_page.linked_instructors.order_by("order").all()
-        ],
+        "instructors": (
+            []
+            if not has_instructor
+            else [
+                member.linked_instructor_page
+                for member in course_page.linked_instructors.order_by("order").all()
+            ]
+        ),
         "new_design": features.is_enabled(
             "mitxonline-new-product-page",
             False,
