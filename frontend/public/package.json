@@ -72,7 +72,7 @@
     "popper.js": "1.16.1",
     "postcss": "8.4.31",
     "postcss-loader": "6.2.1",
-    "posthog-js": "^1.75.4",
+    "posthog-js": "^1.117.0",
     "prettier-eslint": "9.0.2",
     "prettier-eslint-cli": "5.0.1",
     "prop-types": "15.8.1",

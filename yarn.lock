@@ -15246,7 +15246,7 @@ __metadata:
     popper.js: 1.16.1
     postcss: 8.4.31
     postcss-loader: 6.2.1
-    posthog-js: ^1.75.4
+    posthog-js: ^1.117.0
     prettier-eslint: 9.0.2
     prettier-eslint-cli: 5.0.1
     prop-types: 15.8.1
@@ -17521,13 +17521,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"posthog-js@npm:^1.75.4":
-  version: 1.104.4
-  resolution: "posthog-js@npm:1.104.4"
+"posthog-js@npm:^1.117.0":
+  version: 1.117.0
+  resolution: "posthog-js@npm:1.117.0"
   dependencies:
     fflate: ^0.4.8
     preact: ^10.19.3
-  checksum: d8b9cc7ea69bfef124060c3d11777b761dabcc636a003f1fcd8c52a9da7eb7c2116dff6fbc52bcf80bf09130dad64e9e320b7ee14ecd01f70b268691b3d88ca1
+  checksum: 4d6c6d91561cbe53772f138fbf155cf3ef641f29569124927e10c6db4e1461358723efb2a65b4dc9148877f38bd3d2d220740eeb18cc4fba6bdee7dd6fe4bdee
   languageName: node
   linkType: hard
 

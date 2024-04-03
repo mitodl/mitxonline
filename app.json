@@ -543,6 +543,10 @@
       "description": "Timeout(MS) for PostHog feature flag requests.",
       "required": false
     },
+    "POSTHOG_MAX_RETRIES": {
+      "description": "Numbers of time requests to PostHog should be retried after failing.",
+      "required": false
+    },
     "RECAPTCHA_SECRET_KEY": {
       "description": "The ReCaptcha secret key",
       "required": false

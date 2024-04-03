@@ -2956,13 +2956,13 @@ dev = ["pre-commit", "tox"]
 
 [[package]]
 name = "posthog"
-version = "3.4.0"
+version = "3.5.0"
 description = "Integrate PostHog into any python application."
 optional = false
 python-versions = "*"
 files = [
-    {file = "posthog-3.4.0-py2.py3-none-any.whl", hash = "sha256:922bdc1721a18f7275363130042b4be9bb49c88b3e9d1b30b0b3d33a664b3f10"},
-    {file = "posthog-3.4.0.tar.gz", hash = "sha256:0b9fd6861353e67e289fad26fce72a78a1ec09abd9a3c725b9ab7e1edee3da37"},
+    {file = "posthog-3.5.0-py2.py3-none-any.whl", hash = "sha256:3c672be7ba6f95d555ea207d4486c171d06657eb34b3ce25eb043bfe7b6b5b76"},
+    {file = "posthog-3.5.0.tar.gz", hash = "sha256:8f7e3b2c6e8714d0c0c542a2109b83a7549f63b7113a133ab2763a89245ef2ef"},
 ]
 
 [package.dependencies]
