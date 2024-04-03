@@ -37,9 +37,9 @@ from courses.factories import (
     ProgramFactory,
     program_with_empty_requirements,
 )
-from courses.models import Course, CourseRun, limit_to_certificate_pages
+from courses.models import Course, CourseRun
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
-from ecommerce.factories import DiscountFactory, ProductFactory
+from ecommerce.factories import ProductFactory
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
