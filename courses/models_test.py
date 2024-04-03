@@ -32,8 +32,10 @@ from courses.models import (
     ProgramRequirement,
     ProgramRequirementNodeType,
     limit_to_certificate_pages,
+    PaidCourseRun,
 )
 from ecommerce.factories import ProductFactory
+from ecommerce.models import Order
 from main.test_utils import format_as_iso8601
 from users.factories import UserFactory
 
@@ -349,6 +351,24 @@ def test_deactivate_and_save():
         enrollment.refresh_from_db()
         enrollment.active = False
         enrollment.change_status = ENROLL_CHANGE_STATUS_REFUNDED
+
+
+def test_change_payment_to_run():
+    """Test that the change_payment_to_run updates the obj to new run"""
+    course_run_enrollment = CourseRunEnrollmentFactory.create(
+        active=True, change_status=None
+    )
+    user = UserFactory.create()
+
+    paid_course_run = PaidCourseRun.objects.create(
+        user=user,
+        course_run=course_run_enrollment.run,
+        order__state=Order.STATE.FULFILLED,
+    ).first()
+    new_run = CourseRunFactory.create()
+    course_run_enrollment.change_payment_to_run(new_run)
+    paid_course_run.refresh_from_db()
+    assert paid_course_run.run == new_run
 
 
 @pytest.mark.parametrize(

@@ -1201,7 +1201,7 @@ class CourseRunEnrollment(EnrollmentModel):
         ).first()
         if paid_run:
             paid_run.course_run = to_run
-            paid_run.save_and_log()
+            paid_run.save()
 
     def to_dict(self):
         return {**super().to_dict(), "text_id": self.run.courseware_id}

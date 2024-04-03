@@ -56,6 +56,7 @@ from courses.models import (
     ProgramEnrollment,
     ProgramRequirement,
     ProgramRequirementNodeType,
+    PaidCourseRun,
 )
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order
@@ -779,20 +780,30 @@ def test_defer_enrollment(
 ):
     """
     defer_enrollment should downgrade current enrollment to audit and create a verified enrollment in another
-    course run
+    course run, and update PaidCourseRun to the new run
     """
     course_runs = CourseRunFactory.create_batch(3, course=course)
     existing_enrollment = CourseRunEnrollmentFactory.create(run=course_runs[0])
-    target_run = course_runs[1]
+    fulfilled_order = OrderFactory.create(state=Order.STATE.FULFILLED)
+    paid_course_run = PaidCourseRun.objects.create(
+        user=existing_enrollment.user, course_run=course_runs[0], order=fulfilled_order
+    )
+
     new_enrollment = CourseRunEnrollmentFactory.create(run=course_runs[1])
     return_values = [
-        ([new_enrollment] if edx_enroll_succeeds else [], True),
-        ([existing_enrollment] if edx_downgrade_succeeds else None, True)
+        ([new_enrollment] if edx_enroll_succeeds else [], edx_enroll_succeeds),
+        (
+            [existing_enrollment] if edx_downgrade_succeeds else [],
+            edx_downgrade_succeeds,
+        ),
     ]
-    with patch("courses.api.create_run_enrollments", autospec=True) as patched_create_enrollments:
+
+    with patch(
+        "courses.api.create_run_enrollments", autospec=True
+    ) as patched_create_enrollments:
         patched_create_enrollments.side_effect = return_values
 
-        if keep_failed_enrollments:
+        if keep_failed_enrollments or (edx_enroll_succeeds and edx_downgrade_succeeds):
             returned_from_enrollment, returned_to_enrollment = defer_enrollment(
                 existing_enrollment.user,
                 existing_enrollment.run.courseware_id,
@@ -800,26 +811,32 @@ def test_defer_enrollment(
                 keep_failed_enrollments=keep_failed_enrollments,
             )
             assert patched_create_enrollments.call_count == 2
-            # assert returned_from_enrollment == (existing_enrollment if edx_downgrade_succeeds else None)
-            # assert returned_to_enrollment == (new_enrollment if edx_enroll_succeeds else None)
+            assert returned_from_enrollment == (
+                existing_enrollment if edx_downgrade_succeeds else None
+            )
+            assert returned_to_enrollment == (
+                new_enrollment if edx_enroll_succeeds else None
+            )
             patched_create_enrollments.assert_has_calls(
                 [
                     call(
                         user=existing_enrollment.user,
                         runs=[course_runs[1]],
                         change_status=None,
-                        keep_failed_enrollments=True,
+                        keep_failed_enrollments=keep_failed_enrollments,
                         mode=EDX_ENROLLMENT_VERIFIED_MODE,
                     ),
                     call(
                         user=existing_enrollment.user,
                         runs=[existing_enrollment.run],
                         change_status=ENROLL_CHANGE_STATUS_DEFERRED,
-                        keep_failed_enrollments=True,
+                        keep_failed_enrollments=keep_failed_enrollments,
                         mode=EDX_ENROLLMENT_AUDIT_MODE,
-                    )
+                    ),
                 ]
             )
+            paid_course_run.refresh_from_db()
+            assert paid_course_run.course_run == course_runs[1]
         else:
             with pytest.raises(Exception):
                 defer_enrollment(
@@ -905,7 +922,7 @@ def test_defer_enrollment_validation(mocker, user):
                 change_status=ENROLL_CHANGE_STATUS_DEFERRED,
                 keep_failed_enrollments=True,
                 mode=EDX_ENROLLMENT_AUDIT_MODE,
-            )
+            ),
         ]
     )
 

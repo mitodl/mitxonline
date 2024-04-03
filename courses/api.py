@@ -551,7 +551,8 @@ def defer_enrollment(
         to_enrollments = CourseRunEnrollment.objects.filter(
             user=user, run=to_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
         ).first()
-        return from_enrollment, to_enrollments
+        if to_enrollments:
+            return from_enrollment, to_enrollments
 
     to_enrollments, enroll_success = create_run_enrollments(
         user=user,
@@ -582,7 +583,7 @@ def defer_enrollment(
     if PaidCourseRun.fulfilled_paid_course_run_exists(user, from_enrollment.run):
         from_enrollment.change_payment_to_run(to_run)
 
-    return downgraded_enrollments, first_or_none(to_enrollments)
+    return first_or_none(downgraded_enrollments), first_or_none(to_enrollments)
 
 
 def ensure_course_run_grade(user, course_run, edx_grade, should_update=False):
