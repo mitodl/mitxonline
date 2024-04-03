@@ -1186,6 +1186,23 @@ class CourseRunEnrollment(EnrollmentModel):
 
         return super().deactivate_and_save(change_status, no_user)
 
+    def change_payment_to_run(self, to_run):
+        """
+        During a deferral process, if user has paid for this run
+        we can change the payment to another run
+        """
+        # Due to circular dependancy importing locally
+        from ecommerce.models import Order
+
+        paid_run = PaidCourseRun.objects.filter(
+            user=self.user,
+            course_run=self.run,
+            order__state=Order.STATE.FULFILLED,
+        ).first()
+        if paid_run:
+            paid_run.course_run = to_run
+            paid_run.save()
+
     def to_dict(self):
         return {**super().to_dict(), "text_id": self.run.courseware_id}
 

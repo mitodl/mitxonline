@@ -35,6 +35,7 @@ from courses.models import (
     ProgramCertificate,
     ProgramEnrollment,
     ProgramRequirement,
+    PaidCourseRun,
 )
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
@@ -242,6 +243,7 @@ def create_run_enrollments(
     user,
     runs,
     *,
+    change_status=None,
     keep_failed_enrollments=False,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
 ):
@@ -252,6 +254,7 @@ def create_run_enrollments(
     Args:
         user (User): The user to enroll
         runs (iterable of CourseRun): The course runs to enroll in
+        change_status (str): The status of the enrollment
         keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
             in the database even if the enrollment fails in edX.
         mode (str): The course mode
@@ -315,7 +318,7 @@ def create_run_enrollments(
                 user=user,
                 run=run,
                 defaults=dict(
-                    change_status=None,
+                    change_status=change_status,
                     edx_enrolled=edx_request_success,
                     enrollment_mode=mode,
                 ),
@@ -499,6 +502,10 @@ def defer_enrollment(
     from_enrollment = CourseRunEnrollment.all_objects.get(
         user=user, run__courseware_id=from_courseware_id
     )
+    downgraded_enrollments = []
+    already_deferred_from = (
+        from_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
+    )
     to_run = (
         CourseRun.objects.get(courseware_id=to_courseware_id)
         if to_courseware_id
@@ -509,7 +516,8 @@ def defer_enrollment(
         downgraded_enrollments, _ = create_run_enrollments(
             user=user,
             runs=[from_enrollment.run],
-            keep_failed_enrollments=True,
+            change_status=ENROLL_CHANGE_STATUS_DEFERRED,
+            keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
         )
         return downgraded_enrollments, None
@@ -538,19 +546,19 @@ def defer_enrollment(
                 from_enrollment.run.course.title, to_run.course.title
             )
         )
-    already_unenrolled_from = (
-        from_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
-    )
-    if already_unenrolled_from:
+
+    if already_deferred_from:
         # check if user was already enrolled in verified track
         to_enrollments = CourseRunEnrollment.objects.filter(
             user=user, run=to_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
         ).first()
-        return from_enrollment, to_enrollments
+        if to_enrollments:
+            return from_enrollment, to_enrollments
 
     to_enrollments, enroll_success = create_run_enrollments(
-        user,
-        [to_run],
+        user=user,
+        runs=[to_run],
+        change_status=None,
         keep_failed_enrollments=keep_failed_enrollments,
         mode=EDX_ENROLLMENT_VERIFIED_MODE,
     )
@@ -560,18 +568,23 @@ def defer_enrollment(
                 to_run
             )
         )
-    if not already_unenrolled_from:
-        from_enrollment = deactivate_run_enrollment(
-            from_enrollment,
-            ENROLL_CHANGE_STATUS_DEFERRED,
+    if not already_deferred_from:
+        downgraded_enrollments, enroll_success = create_run_enrollments(
+            user=user,
+            runs=[from_enrollment.run],
+            change_status=ENROLL_CHANGE_STATUS_DEFERRED,
             keep_failed_enrollments=keep_failed_enrollments,
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
         )
-        if from_enrollment is None:
+        if not enroll_success and not keep_failed_enrollments:
             raise Exception(
-                "Api call to deactivate enrollment on edX "
+                "Api call to change enrollment mode to audit on edX "
                 "was not successful for course run '{}'".format(from_courseware_id)
             )
-    return from_enrollment, first_or_none(to_enrollments)
+    if PaidCourseRun.fulfilled_paid_course_run_exists(user, from_enrollment.run):
+        from_enrollment.change_payment_to_run(to_run)
+
+    return first_or_none(downgraded_enrollments), first_or_none(to_enrollments)
 
 
 def ensure_course_run_grade(user, course_run, edx_grade, should_update=False):

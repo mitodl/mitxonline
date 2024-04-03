@@ -19,6 +19,7 @@ class DeferralPlugin:
             user,
             from_courseware_id,
             to_courseware_id,
+            keep_failed_enrollments=True,
             force=True,
         )
         if to_courseware_id and not to_enrollment:
