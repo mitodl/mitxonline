@@ -31,7 +31,7 @@ def is_enabled(name, default=None, unique_id=settings.HOSTNAME):
         bool: True if the feature flag is enabled
     """
 
-    if "POSTHOG_ENABLED" in os.environ:
+    if os.getenv("POSTHOG_ENABLED", "False").lower() in ("true", "1", "t"):
         import posthog
     else:
         posthog = None

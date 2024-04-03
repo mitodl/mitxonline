@@ -1161,7 +1161,7 @@ POSTHOG_MAX_RETRIES = get_int(
     description="Numbers of time requests to PostHog should be retried after failing.",
 )
 
-if "POSTHOG_ENABLED" in os.environ:
+if os.getenv("POSTHOG_ENABLED", "False").lower() in ("true", "1", "t"):
     posthog.api_key = POSTHOG_API_TOKEN
     posthog.host = POSTHOG_API_HOST
     posthog.feature_flags_request_timeout_seconds = (
