@@ -254,6 +254,7 @@ def create_run_enrollments(
     Args:
         user (User): The user to enroll
         runs (iterable of CourseRun): The course runs to enroll in
+        change_status (str): The status of the enrollment
         keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
             in the database even if the enrollment fails in edX.
         mode (str): The course mode
