@@ -50,6 +50,7 @@ def test_get_js_settings(settings, rf):
         "features": {},
         "posthog_api_token": settings.POSTHOG_API_TOKEN,
         "posthog_api_host": settings.POSTHOG_API_HOST,
+        "posthog_feature_flag_request_timeout_ms": settings.POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS,
     }
 
 
