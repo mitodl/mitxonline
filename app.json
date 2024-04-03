@@ -146,12 +146,12 @@
       "description": "The name of the review app",
       "required": false
     },
-    "HUBSPOT_HOME_PAGE_FORM_GUID": {
-      "description": "Hubspot ID for the home page contact form",
-      "required": false
-    },
     "HOST_IP": {
       "description": "This server's host IP",
+      "required": false
+    },
+    "HUBSPOT_HOME_PAGE_FORM_GUID": {
+      "description": "Hubspot ID for the home page contact form",
       "required": false
     },
     "HUBSPOT_MAX_CONCURRENT_TASKS": {
@@ -540,7 +540,7 @@
       "required": false
     },
     "POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS": {
-      "description": "Timeout(MS) for PostHog feature flag requests",
+      "description": "Timeout(MS) for PostHog feature flag requests.",
       "required": false
     },
     "RECAPTCHA_SECRET_KEY": {
