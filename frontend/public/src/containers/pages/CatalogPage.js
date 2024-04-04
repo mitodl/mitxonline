@@ -71,7 +71,7 @@ export class CatalogPage extends React.Component<Props> {
     filterProgramsCalled:       false,
     filterCoursesCalled:        false,
     filteredDepartments:        [],
-    filterDepartmentsCalled:    false,
+    filterDepartmentsByTabName:    false,
     selectedDepartment:         ALL_DEPARTMENTS,
     mobileFilterWindowExpanded: false,
     items_per_row:              3,
@@ -202,35 +202,31 @@ export class CatalogPage extends React.Component<Props> {
       departments,
       departmentsIsLoading
     } = this.props
-    if (!departmentsIsLoading && !this.state.filterDepartmentsCalled) {
-      this.setState({ filterDepartmentsCalled: true })
-      this.setState({
-        filteredDepartments: this.filterDepartmentsByTabName(
-          this.state.tabSelected
-        )
-      })
-    }
     // Initialize allCourses and allPrograms variables in state once they finish loading to store since the value will
     // change when changing departments
     if (!coursesIsLoading && courses.length > 0) {
-      if (this.state.allCoursesCount === 0) {
-        this.setState({ allCoursesCount: coursesCount })
-      }
       if (this.state.allCoursesRetrieved.length === 0) {
         this.setState({ allCoursesRetrieved: courses })
         this.setState({ filteredCourses: courses })
+        this.setState({ allCoursesCount: coursesCount })
       }
     }
     if (!programsIsLoading && programs.length > 0) {
-      if (this.state.allProgramsCount === 0) {
-        this.setState({ allProgramsCount: programsCount })
-      }
       if (this.state.allProgramsRetrieved.length === 0) {
         this.setState({ allProgramsRetrieved: programs })
         this.setState({ filteredPrograms: programs })
+        this.setState({ allProgramsCount: programsCount })
       }
     }
     if (!departmentsIsLoading && departments.length > 0) {
+      if (!this.state.filterDepartmentsByTabName) {
+        this.setState({
+          filteredDepartments: this.filterDepartmentsByTabName(
+            this.state.tabSelected
+          )
+        })
+        this.setState({ filterDepartmentsByTabName: true })
+      }
       if (!coursesIsLoading) {
         if (this.state.filterCoursesCalled) {
           if (this.state.selectedDepartment !== prevState.selectedDepartment) {
@@ -255,7 +251,6 @@ export class CatalogPage extends React.Component<Props> {
             this.resetQueryVariablesToDefault()
           }
         } else {
-          this.setState({ filterProgramsCalled: true })
           this.countAndRetrieveMorePrograms(
             this.state.allProgramsRetrieved,
             this.state.selectedDepartment
@@ -424,6 +419,9 @@ export class CatalogPage extends React.Component<Props> {
     this.io.observe(this.container.current)
   }
 
+  /**
+   * 
+   */
   countAndRetrieveMoreCourses(filteredCourses, selectedDepartment) {
     const { departments, getNextCoursePage } = this.props
     if (
@@ -439,8 +437,7 @@ export class CatalogPage extends React.Component<Props> {
         return
       }
       if (
-        filteredCourses.length !== newDepartment.course_ids.length &&
-        !this.state.isLoadingMoreItems
+        !this.state.isLoadingMoreItems && filteredCourses.length !== newDepartment.course_ids.length
       ) {
         const remainingIDs = newDepartment.course_ids.filter(
           id =>
@@ -469,13 +466,8 @@ export class CatalogPage extends React.Component<Props> {
     }
   }
   countAndRetrieveMorePrograms(allPrograms, selectedDepartment) {
-    this.setState({ filterProgramsCalled: true })
     const { programsNextPage, getNextProgramPage } = this.props
-    let filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
-      selectedDepartment,
-      allPrograms
-    )
-    this.setState({ filteredPrograms: filteredPrograms })
+    let updatedAllPrograms = allPrograms
     if (
       programsNextPage &&
       !this.state.isLoadingMoreItems &&
@@ -483,20 +475,21 @@ export class CatalogPage extends React.Component<Props> {
     ) {
       this.setState({ isLoadingMoreItems: true })
       getNextProgramPage(this.state.programQueryPage).then(response => {
-        const updatedAllPrograms = this.mergeNewObjects(
+        updatedAllPrograms = this.mergeNewObjects(
           allPrograms,
           response.body.results
         )
         this.setState({ allProgramsRetrieved: updatedAllPrograms })
         this.setState({ programQueryPage: this.state.programQueryPage + 1 })
-        filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
-          selectedDepartment,
-          updatedAllPrograms
-        )
         this.setState({ isLoadingMoreItems: false })
-        this.setState({ filteredPrograms: filteredPrograms })
       })
     }
+    const filteredPrograms = this.filteredProgramsByDepartmentAndCriteria(
+      selectedDepartment,
+      updatedAllPrograms
+    )
+    this.setState({ filteredPrograms: filteredPrograms })
+    this.setState({ filterProgramsCalled: true })
   }
 
   mergeNewObjects(oldArray, newArray) {
