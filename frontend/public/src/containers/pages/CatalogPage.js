@@ -216,7 +216,7 @@ export class CatalogPage extends React.Component<Props> {
       if (this.state.allCoursesCount === 0) {
         this.setState({ allCoursesCount: coursesCount })
       }
-      if (this.state.allCoursesRetrieved.length === 0 && !coursesIsLoading) {
+      if (this.state.allCoursesRetrieved.length === 0) {
         this.setState({ allCoursesRetrieved: courses })
         this.setState({ filteredCourses: courses })
       }
@@ -225,40 +225,42 @@ export class CatalogPage extends React.Component<Props> {
       if (this.state.allProgramsCount === 0) {
         this.setState({ allProgramsCount: programsCount })
       }
-      if (this.state.allProgramsRetrieved.length === 0 && !programsIsLoading) {
+      if (this.state.allProgramsRetrieved.length === 0) {
         this.setState({ allProgramsRetrieved: programs })
         this.setState({ filteredPrograms: programs })
       }
     }
     if (!departmentsIsLoading && departments.length > 0) {
-      if (!coursesIsLoading && this.state.filterCoursesCalled) {
-        if (this.state.selectedDepartment !== prevState.selectedDepartment) {
-          this.resetQueryVariablesToDefault()
+      if (!coursesIsLoading) {
+        if (this.state.filterCoursesCalled) {
+          if (this.state.selectedDepartment !== prevState.selectedDepartment) {
+            this.resetQueryVariablesToDefault()
+          }
+        } else {
+          const filteredCourses = this.filteredCoursesBasedOnSelectedDepartment(
+            this.state.selectedDepartment,
+            this.state.allCoursesRetrieved
+          )
+          this.setState({ filteredCourses: filteredCourses })
+          this.setState({ filterCoursesCalled: true })
+          this.countAndRetrieveMoreCourses(
+            filteredCourses,
+            this.state.selectedDepartment
+          )
         }
       }
-      if (!coursesIsLoading && !this.state.filterCoursesCalled) {
-        this.setState({ filterCoursesCalled: true })
-        const filteredCourses = this.filteredCoursesBasedOnSelectedDepartment(
-          this.state.selectedDepartment,
-          this.state.allCoursesRetrieved
-        )
-        this.setState({ filteredCourses: filteredCourses })
-        this.countAndRetrieveMoreCourses(
-          filteredCourses,
-          this.state.selectedDepartment
-        )
-      }
-      if (!programsIsLoading && this.state.filterProgramsCalled) {
-        if (this.state.selectedDepartment !== prevState.selectedDepartment) {
-          this.resetQueryVariablesToDefault()
+      if (!programsIsLoading) {
+        if (this.state.filterProgramsCalled) {
+          if (this.state.selectedDepartment !== prevState.selectedDepartment) {
+            this.resetQueryVariablesToDefault()
+          }
+        } else {
+          this.setState({ filterProgramsCalled: true })
+          this.countAndRetrieveMorePrograms(
+            this.state.allProgramsRetrieved,
+            this.state.selectedDepartment
+          )
         }
-      }
-      if (!programsIsLoading && !this.state.filterProgramsCalled) {
-        this.setState({ filterProgramsCalled: true })
-        this.countAndRetrieveMorePrograms(
-          this.state.allProgramsRetrieved,
-          this.state.selectedDepartment
-        )
       }
       this.io = new window.IntersectionObserver(
         this.bottomOfLoadedCatalogCallback,
