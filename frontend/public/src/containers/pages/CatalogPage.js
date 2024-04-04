@@ -1,6 +1,5 @@
 import React from "react"
 import { CSSTransition, TransitionGroup } from "react-transition-group"
-import moment from "moment"
 import { getStartDateText } from "../../lib/util"
 
 import {
@@ -148,7 +147,7 @@ export class CatalogPage extends React.Component<Props> {
               this.state.allCoursesRetrieved,
               response.body.results
             )
-            const filteredCourses = this.filteredCoursesOrProgramsByDepartmentAndCriteria(
+            const filteredCourses = this.filteredCoursesOrProgramsByDepartment(
               this.state.selectedDepartment,
               allCourses
             )
@@ -172,7 +171,7 @@ export class CatalogPage extends React.Component<Props> {
               this.state.allProgramsRetrieved,
               response.body.results
             )
-            const filteredPrograms = this.filteredCoursesOrProgramsByDepartmentAndCriteria(
+            const filteredPrograms = this.filteredCoursesOrProgramsByDepartment(
               this.state.selectedDepartment,
               updatedAllPrograms
             )
@@ -221,7 +220,7 @@ export class CatalogPage extends React.Component<Props> {
     if (!departmentsIsLoading && departments.length > 0) {
       if (!this.state.filterDepartmentsByTabNameCalled) {
         this.setState({
-          filteredDepartments: this.filterDepartmentsByTabNameCalled(
+          filteredDepartments: this.filterDepartmentsByTabName(
             this.state.tabSelected
           )
         })
@@ -233,7 +232,7 @@ export class CatalogPage extends React.Component<Props> {
             this.resetQueryVariablesToDefault()
           }
         } else {
-          const filteredCourses = this.filteredCoursesOrProgramsByDepartmentAndCriteria(
+          const filteredCourses = this.filteredCoursesOrProgramsByDepartment(
             this.state.selectedDepartment,
             this.state.allCoursesRetrieved
           )
@@ -251,7 +250,7 @@ export class CatalogPage extends React.Component<Props> {
             this.resetQueryVariablesToDefault()
           }
         } else {
-          this.countAndRetrieveMorePrograms(
+          this.retrieveMorePrograms(
             this.state.allProgramsRetrieved,
             this.state.selectedDepartment
           )
@@ -270,7 +269,7 @@ export class CatalogPage extends React.Component<Props> {
    * related to them depending on the currently selected tab.
    * @param {string} selectedTabName the name of the currently selected tab.
    */
-  filterDepartmentsByTabNameCalled(selectedTabName: string) {
+  filterDepartmentsByTabName(selectedTabName: string) {
     if (!this.props.departmentsIsLoading) {
       const { departments } = this.props
       const allDepartments = { name: ALL_DEPARTMENTS, slug: ALL_DEPARTMENTS }
@@ -322,7 +321,7 @@ export class CatalogPage extends React.Component<Props> {
   changeSelectedTab = (selectTabName: string) => {
     this.setState({ tabSelected: selectTabName })
     this.setState({
-      filteredDepartments: this.filterDepartmentsByTabNameCalled(selectTabName)
+      filteredDepartments: this.filterDepartmentsByTabName(selectTabName)
     })
     if (selectTabName === PROGRAMS_TAB) {
       const { programs, programsIsLoading } = this.props
@@ -339,7 +338,7 @@ export class CatalogPage extends React.Component<Props> {
         if (this.renderNumberOfCatalogItems() === 0) {
           this.setState({ selectedDepartment: ALL_DEPARTMENTS })
         }
-        this.countAndRetrieveMorePrograms(
+        this.retrieveMorePrograms(
           programsToFilter,
           this.state.selectedDepartment
         )
@@ -360,7 +359,7 @@ export class CatalogPage extends React.Component<Props> {
         } else {
           coursesToFilter.push(...this.state.allCoursesRetrieved)
         }
-        const filteredCourses = this.filteredCoursesOrProgramsByDepartmentAndCriteria(
+        const filteredCourses = this.filteredCoursesOrProgramsByDepartment(
           this.state.selectedDepartment,
           coursesToFilter
         )
@@ -396,7 +395,7 @@ export class CatalogPage extends React.Component<Props> {
   changeSelectedDepartment = (selectedDepartment: string) => {
     this.resetQueryVariablesToDefault()
     this.setState({ selectedDepartment: selectedDepartment })
-    const filteredCourses = this.filteredCoursesOrProgramsByDepartmentAndCriteria(
+    const filteredCourses = this.filteredCoursesOrProgramsByDepartment(
       selectedDepartment,
       this.state.allCoursesRetrieved
     )
@@ -407,7 +406,7 @@ export class CatalogPage extends React.Component<Props> {
     if (this.state.tabSelected === COURSES_TAB) {
       this.countAndRetrieveMoreCourses(filteredCourses, selectedDepartment)
     } else if (this.state.tabSelected === PROGRAMS_TAB) {
-      this.countAndRetrieveMorePrograms(
+      this.retrieveMorePrograms(
         this.state.allProgramsRetrieved,
         selectedDepartment
       )
@@ -454,7 +453,7 @@ export class CatalogPage extends React.Component<Props> {
           this.setState({ allCoursesRetrieved: allCourses })
           this.setState({ courseQueryPage: 2 })
           this.setState({ queryIDListString: remainingIDs.toString() })
-          const filteredCourses = this.filteredCoursesOrProgramsByDepartmentAndCriteria(
+          const filteredCourses = this.filteredCoursesOrProgramsByDepartment(
             selectedDepartment,
             allCourses
           )
@@ -465,9 +464,22 @@ export class CatalogPage extends React.Component<Props> {
       }
     }
   }
-  countAndRetrieveMorePrograms(allPrograms, selectedDepartment) {
+
+  /**
+   * Retrieves another page of Programs via API request when:
+   * - There is a next page of prorgams available (programsNextPage).
+   * - isLoadingMoreItems is false.
+   * - All of the programs have not already been retrieved.
+   * This will update the following state variables:
+   * - allProgramsRetrieved, updated by adding newly retrieved programs.
+   * - programQueryPage, increment by 1.
+   * - filteredPrograms, update with newly filtered programs.
+   * - filterProgramsCalled, set to true.
+   *
+   * @param {string} selectedDepartment
+   */
+  retrieveMorePrograms(selectedDepartment) {
     const { programsNextPage, getNextProgramPage } = this.props
-    let updatedAllPrograms = allPrograms
     if (
       programsNextPage &&
       !this.state.isLoadingMoreItems &&
@@ -475,21 +487,21 @@ export class CatalogPage extends React.Component<Props> {
     ) {
       this.setState({ isLoadingMoreItems: true })
       getNextProgramPage(this.state.programQueryPage).then(response => {
-        updatedAllPrograms = this.mergeCourseOrProgramArrays(
-          allPrograms,
+        const updatedAllPrograms = this.mergeCourseOrProgramArrays(
+          this.state.allProgramsRetrieved,
           response.body.results
         )
         this.setState({ allProgramsRetrieved: updatedAllPrograms })
         this.setState({ programQueryPage: this.state.programQueryPage + 1 })
         this.setState({ isLoadingMoreItems: false })
+        const filteredPrograms = this.filteredCoursesOrProgramsByDepartment(
+          selectedDepartment,
+          updatedAllPrograms
+        )
+        this.setState({ filteredPrograms: filteredPrograms })
+        this.setState({ filterProgramsCalled: true })
       })
     }
-    const filteredPrograms = this.filteredCoursesOrProgramsByDepartmentAndCriteria(
-      selectedDepartment,
-      updatedAllPrograms
-    )
-    this.setState({ filteredPrograms: filteredPrograms })
-    this.setState({ filterProgramsCalled: true })
   }
 
   /**
@@ -511,7 +523,7 @@ export class CatalogPage extends React.Component<Props> {
    * @param {Array<CourseDetailWithRuns | Program>} catalogItems An array of catalog items which will be filtered based on their associated Departments.
    * @param {string} selectedDepartment The Department name used to compare against the catalogItems array.
    */
-  filteredCoursesOrProgramsByDepartmentAndCriteria(
+  filteredCoursesOrProgramsByDepartment(
     selectedDepartment: string,
     catalogItems: Array<CourseDetailWithRuns | Programs>
   ) {
@@ -526,7 +538,7 @@ export class CatalogPage extends React.Component<Props> {
         this.setState({ selectedDepartment: ALL_DEPARTMENTS })
         return catalogItems
       }
-      if (this.state.selectedTabName === COURSES_TAB) {
+      if (this.state.tabSelected === COURSES_TAB) {
         return catalogItems.filter(catalogItem =>
           selectedDepartment.course_ids.includes(catalogItem.id)
         )
@@ -556,13 +568,15 @@ export class CatalogPage extends React.Component<Props> {
     const { departments } = this.props
     const selectedDepartment = this.state.selectedDepartment
     if (selectedDepartment === ALL_DEPARTMENTS) {
-      return this.state.selectedTabName === COURSES_TAB ? this.state.allCoursesCount : this.state.allProgramsCount
+      return this.state.tabSelected === COURSES_TAB ? this.state.allCoursesCount : this.state.allProgramsCount
     } else if (!departments) return 0
     const departmentSlugs = departments.map(department => department.slug)
     if (!departmentSlugs.includes(selectedDepartment)) {
       return 0
     } else {
-      if (this.state.selectedTabName === COURSES_TAB) {
+      if (this.state.tabSelected === COURSES_TAB) {
+        console.log("HI")
+        console.log(departments)
         return departments.find(
           department => department.slug === this.state.selectedDepartment
         ).course_ids.length
