@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 0.89.0 (Released April 04, 2024)
+--------------
+
+- Add URL routing for catalog for courses/programs and department (#2140)
+- 3005: adding a banner snippet in the header that appears on every page of the site (#2144)
+- fix(deps): update dependency express to v4.19.2 [security] (#2145)
+- 3649 all mitxonline courses should have a department (#2132)
+- Upgrade enrollment dialog fixes (#2141)
+- Showing Course rather than Courses (or program/s) when there is only 1 to display (#2139)
+- Distinguish change forms in account settings (#2142)
+- fix(deps): update dependency webpack-dev-middleware to v5.3.4 [security] (#2138)
+- Upgrade dialog choose any course run (#2124)
+
 Version 0.88.1 (Released March 20, 2024)
 --------------
 
