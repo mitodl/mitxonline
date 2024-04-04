@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.89.1
+--------------
+
+- Enrollment request make sure not enrolled (#2149)
+- Deferrals: set to audit instead of unenrolling (#2146)
+
 Version 0.89.0 (Released April 04, 2024)
 --------------
 
