@@ -61,24 +61,24 @@ const TABS = [PROGRAMS_TAB, COURSES_TAB]
 
 export class CatalogPage extends React.Component<Props> {
   state = {
-    tabSelected:                COURSES_TAB,
-    allCoursesRetrieved:        [],
-    allCoursesCount:            0,
-    allProgramsRetrieved:       [],
-    allProgramsCount:           0,
-    filteredCourses:            [],
-    filteredPrograms:           [],
-    filterProgramsCalled:       false,
-    filterCoursesCalled:        false,
-    filteredDepartments:        [],
-    filterDepartmentsByTabName:    false,
-    selectedDepartment:         ALL_DEPARTMENTS,
-    mobileFilterWindowExpanded: false,
-    items_per_row:              3,
-    courseQueryPage:            1,
-    programQueryPage:           1,
-    isLoadingMoreItems:         false,
-    queryIDListString:          ""
+    tabSelected:                      COURSES_TAB,
+    allCoursesRetrieved:              [],
+    allCoursesCount:                  0,
+    allProgramsRetrieved:             [],
+    allProgramsCount:                 0,
+    filteredCourses:                  [],
+    filteredPrograms:                 [],
+    filterProgramsCalled:             false,
+    filterCoursesCalled:              false,
+    filteredDepartments:              [],
+    filterDepartmentsByTabNameCalled:    false,
+    selectedDepartment:               ALL_DEPARTMENTS,
+    mobileFilterWindowExpanded:       false,
+    items_per_row:                    3,
+    courseQueryPage:                  1,
+    programQueryPage:                 1,
+    isLoadingMoreItems:               false,
+    queryIDListString:                ""
   }
 
   constructor(props) {
@@ -219,13 +219,13 @@ export class CatalogPage extends React.Component<Props> {
       }
     }
     if (!departmentsIsLoading && departments.length > 0) {
-      if (!this.state.filterDepartmentsByTabName) {
+      if (!this.state.filterDepartmentsByTabNameCalled) {
         this.setState({
-          filteredDepartments: this.filterDepartmentsByTabName(
+          filteredDepartments: this.filterDepartmentsByTabNameCalled(
             this.state.tabSelected
           )
         })
-        this.setState({ filterDepartmentsByTabName: true })
+        this.setState({ filterDepartmentsByTabNameCalled: true })
       }
       if (!coursesIsLoading) {
         if (this.state.filterCoursesCalled) {
@@ -270,7 +270,7 @@ export class CatalogPage extends React.Component<Props> {
    * related to them depending on the currently selected tab.
    * @param {string} selectedTabName the name of the currently selected tab.
    */
-  filterDepartmentsByTabName(selectedTabName: string) {
+  filterDepartmentsByTabNameCalled(selectedTabName: string) {
     if (!this.props.departmentsIsLoading) {
       const { departments } = this.props
       const allDepartments = { name: ALL_DEPARTMENTS, slug: ALL_DEPARTMENTS }
@@ -322,7 +322,7 @@ export class CatalogPage extends React.Component<Props> {
   changeSelectedTab = (selectTabName: string) => {
     this.setState({ tabSelected: selectTabName })
     this.setState({
-      filteredDepartments: this.filterDepartmentsByTabName(selectTabName)
+      filteredDepartments: this.filterDepartmentsByTabNameCalled(selectTabName)
     })
     if (selectTabName === PROGRAMS_TAB) {
       const { programs, programsIsLoading } = this.props
@@ -420,7 +420,7 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * 
+   *
    */
   countAndRetrieveMoreCourses(filteredCourses, selectedDepartment) {
     const { departments, getNextCoursePage } = this.props
@@ -574,45 +574,38 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Returns the number of courses based on the selectedDepartment.
-   * If the selectedDepartment is "All Departments", the total number of courses is returned.
+   * Returns the number of catalog items based on the selectedDepartment
+   * and the selectedTabName state variables.
+   * If the selectedDepartment is "All Departments" and selectedTabName is equal to COURSES_TAB,
+   * then total number of courses is returned.
+   * If the selectedDepartment is "All Departments" and selectedTabName is equal not equal to
+   * COURSES_TAB, then total number of programs is returned.
+   * If the selectDepartment state variable is equal to "slug" value for one of the entries in the
+   * "departments" prop, then the "course_ids" or "program_ids" value for that department, depending on the value
+   * of selectedTabName, will be displayed.
    * If the selectedDepartment is not found in the departments array, 0 is returned.
-   * @returns {number}
+   * @returns {number} the number of courses or programs associated with the department matching
+   * the selectedDepartment state variable.
    */
-  renderNumberOfCatalogCourses() {
+  renderNumberOfCatalogItems() {
     const { departments } = this.props
     const selectedDepartment = this.state.selectedDepartment
     if (selectedDepartment === ALL_DEPARTMENTS) {
-      return this.state.allCoursesCount
+      return this.state.selectedTabName === COURSES_TAB ? this.state.allCoursesCount : this.state.allProgramsCount
     } else if (!departments) return 0
     const departmentSlugs = departments.map(department => department.slug)
     if (!departmentSlugs.includes(selectedDepartment)) {
       return 0
     } else {
-      return departments.find(
-        department => department.slug === this.state.selectedDepartment
-      ).course_ids.length
-    }
-  }
-
-  /** Returns the number of programs based on the selectedDepartment
-   * or all programs if the selectedDepartment is "All Departments".
-   * If the selectedDepartment is not found in the departments array, 0 is returned.
-   * @returns {number}
-   */
-  renderNumberOfCatalogPrograms() {
-    const { departments } = this.props
-    if (!departments) return 0
-    const departmentSlugs = departments.map(department => department.slug)
-    const selectedDepartment = this.state.selectedDepartment
-    if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
-      return this.state.allProgramsCount
-    } else if (!departmentSlugs.includes(selectedDepartment)) {
-      return 0
-    } else {
-      return departments.find(
-        department => department.slug === this.state.selectedDepartment
-      ).program_ids.length
+      if (this.state.selectedTabName === COURSES_TAB) {
+        return departments.find(
+          department => department.slug === this.state.selectedDepartment
+        ).course_ids.length
+      } else {
+        return departments.find(
+          department => department.slug === this.state.selectedDepartment
+        ).program_ids.length
+      }
     }
   }
 
@@ -622,10 +615,7 @@ export class CatalogPage extends React.Component<Props> {
    * @returns {Element}
    */
   renderCatalogCount() {
-    const count =
-      this.state.tabSelected === PROGRAMS_TAB
-        ? this.renderNumberOfCatalogPrograms()
-        : this.renderNumberOfCatalogCourses()
+    const count = this.renderNumberOfCatalogItems()
     const tab = this.state.tabSelected
     return (
       <h2 className="catalog-count">
