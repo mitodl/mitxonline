@@ -212,19 +212,23 @@ export class CatalogPage extends React.Component<Props> {
     }
     // Initialize allCourses and allPrograms variables in state once they finish loading to store since the value will
     // change when changing departments
-    if (this.state.allCoursesCount === 0 && !coursesIsLoading) {
-      this.setState({ allCoursesCount: coursesCount })
+    if (!coursesIsLoading && courses.length > 0) {
+      if (this.state.allCoursesCount === 0) {
+        this.setState({ allCoursesCount: coursesCount })
+      }
+      if (this.state.allCoursesRetrieved.length === 0 && !coursesIsLoading) {
+        this.setState({ allCoursesRetrieved: courses })
+        this.setState({ filteredCourses: courses })
+      }
     }
-    if (this.state.allProgramsCount === 0 && !programsIsLoading) {
-      this.setState({ allProgramsCount: programsCount })
-    }
-    if (this.state.allCoursesRetrieved.length === 0 && !coursesIsLoading) {
-      this.setState({ allCoursesRetrieved: courses })
-      this.setState({ filteredCourses: courses })
-    }
-    if (this.state.allProgramsRetrieved.length === 0 && !programsIsLoading) {
-      this.setState({ allProgramsRetrieved: programs })
-      this.setState({ filteredPrograms: programs })
+    if (!programsIsLoading && programs.length > 0) {
+      if (this.state.allProgramsCount === 0) {
+        this.setState({ allProgramsCount: programsCount })
+      }
+      if (this.state.allProgramsRetrieved.length === 0 && !programsIsLoading) {
+        this.setState({ allProgramsRetrieved: programs })
+        this.setState({ filteredPrograms: programs })
+      }
     }
     if (!departmentsIsLoading && departments.length > 0) {
       if (!coursesIsLoading && this.state.filterCoursesCalled) {
