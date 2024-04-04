@@ -70,7 +70,7 @@ export class CatalogPage extends React.Component<Props> {
     filterProgramsCalled:             false,
     filterCoursesCalled:              false,
     filteredDepartments:              [],
-    filterDepartmentsByTabNameCalled:    false,
+    filterDepartmentsByTabNameCalled: false,
     selectedDepartment:               ALL_DEPARTMENTS,
     mobileFilterWindowExpanded:       false,
     items_per_row:                    3,
@@ -132,8 +132,7 @@ export class CatalogPage extends React.Component<Props> {
         if (
           !coursesIsLoading &&
           !this.state.isLoadingMoreItems &&
-          this.state.filteredCourses.length <
-            this.renderNumberOfCatalogItems()
+          this.state.filteredCourses.length < this.renderNumberOfCatalogItems()
         ) {
           this.setState({ isLoadingMoreItems: true })
           const response = await getNextCoursePage(
@@ -411,11 +410,6 @@ export class CatalogPage extends React.Component<Props> {
         selectedDepartment
       )
     }
-    this.io = new window.IntersectionObserver(
-      this.bottomOfLoadedCatalogCallback,
-      { threshold: 1.0 }
-    )
-    this.io.observe(this.container.current)
   }
 
   /**
@@ -428,15 +422,16 @@ export class CatalogPage extends React.Component<Props> {
       selectedDepartment !== "" &&
       departments.length > 0
     ) {
-      const newDepartment = this.props.departments.find(
+      const newDepartment = departments.find(
         department => department.slug === selectedDepartment
       )
       if (!newDepartment) {
-        this.setState({ selectedDepartment: ALL_DEPARTMENTS })
+        this.setState({ selectedDepartment: ALL_DEPARTMENTS }) // Why is does this not use changeSelectedDepartment
         return
       }
       if (
-        !this.state.isLoadingMoreItems && filteredCourses.length !== newDepartment.course_ids.length
+        !this.state.isLoadingMoreItems &&
+        filteredCourses.length !== newDepartment.course_ids.length
       ) {
         const remainingIDs = newDepartment.course_ids.filter(
           id =>
@@ -510,7 +505,10 @@ export class CatalogPage extends React.Component<Props> {
    * @param {Array<CourseDetailWithRuns | Program>} catalogItems
    * @returns {Array<CourseDetailWithRuns | Program>} Union of both array parameters.
    */
-  mergeCourseOrProgramArrays(aArray: Array<CourseDetailWithRuns | Program>, bArray: Array<CourseDetailWithRuns | Program>) {
+  mergeCourseOrProgramArrays(
+    aArray: Array<CourseDetailWithRuns | Program>,
+    bArray: Array<CourseDetailWithRuns | Program>
+  ) {
     const aIds = aArray.map(a => a.id)
     const uniqueObjects = bArray.filter(b => !aIds.includes(b.id))
     return aArray.concat(uniqueObjects)
@@ -518,8 +516,14 @@ export class CatalogPage extends React.Component<Props> {
 
   /**
    * Returns a filtered array of catalog items that are associated with a
-   * Department name matching the selectedDepartment.
-   * if the selectedDepartment does not equal "All Departments",
+   * Department whose name variable matches the selectedDepartment argument.
+   * The association between catalogItems and Departments is determined by the
+   * value of the tabSelected state variable:
+   * - If tabSelected equals COURSES_TAB, then the Department's course_ids array is compared
+   * with the catalog items IDs for matching IDs.
+   * - If tabSelected does not equal COURSES_TAB, then the Department's program_ids array is compared
+   * with the catalog items IDs for matching IDs.
+   * If selectedDepartment equals ALL_DEPARTMENTS, then the catalogItems array is returned.
    * @param {Array<CourseDetailWithRuns | Program>} catalogItems An array of catalog items which will be filtered based on their associated Departments.
    * @param {string} selectedDepartment The Department name used to compare against the catalogItems array.
    */
@@ -568,15 +572,15 @@ export class CatalogPage extends React.Component<Props> {
     const { departments } = this.props
     const selectedDepartment = this.state.selectedDepartment
     if (selectedDepartment === ALL_DEPARTMENTS) {
-      return this.state.tabSelected === COURSES_TAB ? this.state.allCoursesCount : this.state.allProgramsCount
+      return this.state.tabSelected === COURSES_TAB
+        ? this.state.allCoursesCount
+        : this.state.allProgramsCount
     } else if (!departments) return 0
     const departmentSlugs = departments.map(department => department.slug)
     if (!departmentSlugs.includes(selectedDepartment)) {
       return 0
     } else {
       if (this.state.tabSelected === COURSES_TAB) {
-        console.log("HI")
-        console.log(departments)
         return departments.find(
           department => department.slug === this.state.selectedDepartment
         ).course_ids.length
