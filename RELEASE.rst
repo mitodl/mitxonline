@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.89.0
+Version 0.89.0 (Released April 04, 2024)
 --------------
 
 - Add URL routing for catalog for courses/programs and department (#2140)
