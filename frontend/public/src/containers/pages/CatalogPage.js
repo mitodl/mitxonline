@@ -144,7 +144,7 @@ export class CatalogPage extends React.Component<Props> {
           this.setState({ isLoadingMoreItems: false })
           this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
           if (response.body.results) {
-            const allCourses = this.mergeNewObjects(
+            const allCourses = this.mergeCourseOrProgramArrays(
               this.state.allCoursesRetrieved,
               response.body.results
             )
@@ -168,7 +168,7 @@ export class CatalogPage extends React.Component<Props> {
           getNextProgramPage(this.state.programQueryPage).then(response => {
             this.setState({ isLoadingMoreItems: false })
             this.setState({ programQueryPage: this.state.programQueryPage + 1 })
-            const updatedAllPrograms = this.mergeNewObjects(
+            const updatedAllPrograms = this.mergeCourseOrProgramArrays(
               this.state.allProgramsRetrieved,
               response.body.results
             )
@@ -447,7 +447,7 @@ export class CatalogPage extends React.Component<Props> {
         )
         this.setState({ isLoadingMoreItems: true })
         getNextCoursePage(1, remainingIDs.toString()).then(response => {
-          const allCourses = this.mergeNewObjects(
+          const allCourses = this.mergeCourseOrProgramArrays(
             this.state.allCoursesRetrieved,
             response.body.results
           )
@@ -475,7 +475,7 @@ export class CatalogPage extends React.Component<Props> {
     ) {
       this.setState({ isLoadingMoreItems: true })
       getNextProgramPage(this.state.programQueryPage).then(response => {
-        updatedAllPrograms = this.mergeNewObjects(
+        updatedAllPrograms = this.mergeCourseOrProgramArrays(
           allPrograms,
           response.body.results
         )
@@ -492,35 +492,24 @@ export class CatalogPage extends React.Component<Props> {
     this.setState({ filterProgramsCalled: true })
   }
 
-  mergeNewObjects(oldArray, newArray) {
-    const oldIds = oldArray.map(a => a.id)
-    const newObjects = newArray.filter(a => !oldIds.includes(a.id))
-    return oldArray.concat(newObjects)
-  }
-
   /**
-   * Returns a filtered array of Course Runs which are live and:
-   * - Have a start_date before the current date and time
-   * - Have an enrollment_start_date that is before the current date and time
-   * - Has an enrollment_end_date that is not defined or is after the current date and time.
-   * @param {Array<BaseCourseRun>} courseRuns The array of Course Runs apply the filter to.
+   * Returns the union of two arrays of type CourseDetailWithRuns or Programs based on the
+   * ID of each object in the array.
+   * @param {Array<CourseDetailWithRuns | Program>} catalogItems
+   * @returns {Array<CourseDetailWithRuns | Program>} Union of both array parameters.
    */
-  validateCoursesCourseRuns(courseRuns: Array<BaseCourseRun>) {
-    return courseRuns.filter(
-      courseRun =>
-        courseRun.live &&
-        courseRun.start_date &&
-        moment(courseRun?.enrollment_start).isBefore(moment()) &&
-        (!courseRun.enrollment_end ||
-          moment(courseRun.enrollment_end).isAfter(moment()))
-    )
+  mergeCourseOrProgramArrays(aArray: Array<CourseDetailWithRuns | Program>, bArray: Array<CourseDetailWithRuns | Program>) {
+    const aIds = aArray.map(a => a.id)
+    const uniqueObjects = bArray.filter(b => !aIds.includes(b.id))
+    return aArray.concat(uniqueObjects)
   }
 
   /**
-   * Returns a filtered array of courses which have: an associated Department name matching the selectedDepartment
+   * Returns a filtered array of catalog items that are associated with a
+   * Department name matching the selectedDepartment.
    * if the selectedDepartment does not equal "All Departments",
-   * @param {Array<CourseDetailWithRuns | Program>} catalogItems An array of courses which will be filtered by Department.
-   * @param {string} selectedDepartment The Department name used to compare against the courses in the array.
+   * @param {Array<CourseDetailWithRuns | Program>} catalogItems An array of catalog items which will be filtered based on their associated Departments.
+   * @param {string} selectedDepartment The Department name used to compare against the catalogItems array.
    */
   filteredCoursesOrProgramsByDepartmentAndCriteria(
     selectedDepartment: string,
