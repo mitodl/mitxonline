@@ -236,7 +236,8 @@ export class CatalogPage extends React.Component<Props> {
           this.setState({ filteredCourses: filteredCourses })
           this.setState({ filterCoursesCalled: true })
           const departmentObject = this.getDepartmentForTab(this.state.selectedDepartment)
-          if (departmentObject) {
+          if (typeof departmentObject !== 'undefined') {
+            console.log(departmentObject)
             this.retrieveMoreCourses(
               departmentObject
             )
@@ -317,9 +318,8 @@ export class CatalogPage extends React.Component<Props> {
    */
   changeSelectedTab = (selectTabName: string) => {
     this.setState({ tabSelected: selectTabName })
-    const filteredDepartmentsByTabName = this.filterDepartmentsByTabName(selectTabName)
     this.setState({
-      filteredDepartments: filteredDepartmentsByTabName
+      filteredDepartments: this.filterDepartmentsByTabName(selectTabName)
     })
     if (selectTabName === PROGRAMS_TAB) {
       const { programs, programsIsLoading } = this.props
@@ -358,16 +358,13 @@ export class CatalogPage extends React.Component<Props> {
         this.setState({
           filteredCourses: filteredCourses
         })
-        console.log(this.renderNumberOfCatalogItems())
-        if (this.renderNumberOfCatalogItems() !== 0) {
-          const departmentObject = this.getDepartmentForTab(this.state.selectedDepartment)
-          if (departmentObject) {
-            this.retrieveMoreCourses(
-              departmentObject
-            )
-          }
-        } else {
+        const departmentObject = this.getDepartmentForTab(this.state.selectedDepartment)
+        if (this.renderNumberOfCatalogItems() === 0 || typeof departmentObjectForTab === 'undefined') {
           this.changeSelectedDepartment(ALL_DEPARTMENTS)
+        } else {
+          this.retrieveMoreCourses(
+            departmentObject
+          )
         }
       }
     }
@@ -388,8 +385,9 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   getDepartmentForTab(selectedDepartmentSlug: string) {
-    if (this.state.filterDepartmentsByTabNameCalled) {
-      return this.state.filteredDepartments.find(
+    const { departments } = this.props
+    if (departments) {
+      return departments.find(
         department => department.slug === selectedDepartmentSlug
       )
     }
@@ -426,7 +424,7 @@ export class CatalogPage extends React.Component<Props> {
         this.setState({ filteredPrograms: this.state.allProgramsRetrieved })
       }
     } else {
-      // A valid department other ALL_DEPARTMENTS has been selected.
+      // A valid department or ALL_DEPARTMENTS has been selected.
       this.setState({ selectedDepartment: selectedDepartmentSlug})
       // We need to attempt to retrieve more courses or programs
       // in order to populate the filtered catalog page.
@@ -455,7 +453,7 @@ export class CatalogPage extends React.Component<Props> {
    */
   retrieveMoreCourses(selectedDepartmentObject) {
     const {getNextCoursePage } = this.props
-
+    console.log(this.state.filteredCourses)
     // Only request more courses if we have not alraedy retrieved all courses associated with the department.
     if (
       !this.state.isLoadingMoreItems &&
@@ -589,20 +587,20 @@ export class CatalogPage extends React.Component<Props> {
   renderNumberOfCatalogItems() {
     const { departments } = this.props
     if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
-      console.log(this.state.tabSelected)
       return this.state.tabSelected === COURSES_TAB
         ? this.state.allCoursesCount
         : this.state.allProgramsCount
     } else if (!departments) return 0
-    if (!this.state.filteredDepartmentsByTabName.includes(this.state.selectedDepartment)) {
+    const departmentSlugs = this.state.filteredDepartments.map(department => department.slug)
+    if (!departmentSlugs.includes(this.state.selectedDepartment)) {
       return 0
     } else {
       if (this.state.tabSelected === COURSES_TAB) {
-        return this.state.filteredDepartmentsByTabName.find(
+        return this.state.filteredDepartments.find(
           department => department.slug === this.state.selectedDepartment
         ).course_ids.length
       } else {
-        return this.state.filteredDepartmentsByTabName.find(
+        return this.state.filteredDepartments.find(
           department => department.slug === this.state.selectedDepartment
         ).program_ids.length
       }
