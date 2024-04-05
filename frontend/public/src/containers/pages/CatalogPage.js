@@ -77,7 +77,7 @@ export class CatalogPage extends React.Component<Props> {
     courseQueryPage:                  1,
     programQueryPage:                 1,
     isLoadingMoreItems:               false,
-    queryIDListString:                ""
+    courseQueryIDListString:                ""
   }
 
   constructor(props) {
@@ -135,7 +135,7 @@ export class CatalogPage extends React.Component<Props> {
           this.setState({ isLoadingMoreItems: true })
           const response = await getNextCoursePage(
             this.state.courseQueryPage,
-            this.state.queryIDListString
+            this.state.courseQueryIDListString
           )
           this.setState({ isLoadingMoreItems: false })
           this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
@@ -144,7 +144,7 @@ export class CatalogPage extends React.Component<Props> {
               this.state.allCoursesRetrieved,
               response.body.results
             )
-            const filteredCourses = this.filteredCoursesOrProgramsByDepartment(
+            const filteredCourses = this.filteredCoursesOrProgramsByDepartmentSlug(
               this.state.selectedDepartment,
               allCourses
             )
@@ -168,7 +168,7 @@ export class CatalogPage extends React.Component<Props> {
               this.state.allProgramsRetrieved,
               response.body.results
             )
-            const filteredPrograms = this.filteredCoursesOrProgramsByDepartment(
+            const filteredPrograms = this.filteredCoursesOrProgramsByDepartmentSlug(
               this.state.selectedDepartment,
               updatedAllPrograms
             )
@@ -215,7 +215,7 @@ export class CatalogPage extends React.Component<Props> {
       }
     }
     if (!departmentsIsLoading && departments.length > 0) {
-      if (!this.state.filterDepartmentsByTabNameCalled) {
+      if (!this.state.filterDepartmentsByTabNameCalled) { // Why is this here if we already handle it in the tab change?
         this.setState({
           filteredDepartments: this.filterDepartmentsByTabName(
             this.state.tabSelected
@@ -229,16 +229,18 @@ export class CatalogPage extends React.Component<Props> {
             this.resetQueryVariablesToDefault()
           }
         } else {
-          const filteredCourses = this.filteredCoursesOrProgramsByDepartment(
+          const filteredCourses = this.filteredCoursesOrProgramsByDepartmentSlug(
             this.state.selectedDepartment,
             this.state.allCoursesRetrieved
           )
           this.setState({ filteredCourses: filteredCourses })
           this.setState({ filterCoursesCalled: true })
-          this.countAndRetrieveMoreCourses(
-            filteredCourses,
-            this.state.selectedDepartment
-          )
+          const departmentObject = this.getDepartmentForTab(this.state.selectedDepartment)
+          if (departmentObject) {
+            this.retrieveMoreCourses(
+              departmentObject
+            )
+          }
         }
       }
       if (!programsIsLoading) {
@@ -290,13 +292,14 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Resets the query-related variables to their default values.
-   * This is used when the selected department or tab changes to restart the api calls from the beginning.
+   * Resets the query-related variables to their default values
+   * in order to ensure paged API requests start at page 1.
+   * This is called when a different department or tab is selected.
    */
   resetQueryVariablesToDefault() {
     if (this.state.tabSelected === COURSES_TAB) {
       this.setState({ courseQueryPage: 1 })
-      this.setState({ queryIDListString: "" })
+      this.setState({ courseQueryIDListString: "" })
       this.setState({ filterCoursesCalled: false })
     } else {
       this.setState({ filterProgramsCalled: false })
@@ -314,8 +317,9 @@ export class CatalogPage extends React.Component<Props> {
    */
   changeSelectedTab = (selectTabName: string) => {
     this.setState({ tabSelected: selectTabName })
+    const filteredDepartmentsByTabName = this.filterDepartmentsByTabName(selectTabName)
     this.setState({
-      filteredDepartments: this.filterDepartmentsByTabName(selectTabName)
+      filteredDepartments: filteredDepartmentsByTabName
     })
     if (selectTabName === PROGRAMS_TAB) {
       const { programs, programsIsLoading } = this.props
@@ -339,9 +343,6 @@ export class CatalogPage extends React.Component<Props> {
       const { courses, coursesIsLoading } = this.props
       if (!coursesIsLoading) {
         const coursesToFilter = []
-        if (this.renderNumberOfCatalogItems() === 0) {
-          this.setState({ selectedDepartment: ALL_DEPARTMENTS })
-        }
         // The first time that a user switches to the courses tab, allCoursesRetrieved will be
         // empty and should be populated with the results from the first courses API call.
         if (this.state.allCoursesRetrieved.length === 0) {
@@ -350,17 +351,24 @@ export class CatalogPage extends React.Component<Props> {
         } else {
           coursesToFilter.push(...this.state.allCoursesRetrieved)
         }
-        const filteredCourses = this.filteredCoursesOrProgramsByDepartment(
+        const filteredCourses = this.filteredCoursesOrProgramsByDepartmentSlug(
           this.state.selectedDepartment,
           coursesToFilter
         )
         this.setState({
           filteredCourses: filteredCourses
         })
-        this.countAndRetrieveMoreCourses(
-          filteredCourses,
-          this.state.selectedDepartment
-        )
+        console.log(this.renderNumberOfCatalogItems())
+        if (this.renderNumberOfCatalogItems() !== 0) {
+          const departmentObject = this.getDepartmentForTab(this.state.selectedDepartment)
+          if (departmentObject) {
+            this.retrieveMoreCourses(
+              departmentObject
+            )
+          }
+        } else {
+          this.changeSelectedDepartment(ALL_DEPARTMENTS)
+        }
       }
     }
     // Can this be removed?
@@ -379,6 +387,15 @@ export class CatalogPage extends React.Component<Props> {
     this.setState({ mobileFilterWindowExpanded: expanded })
   }
 
+  getDepartmentForTab(selectedDepartmentSlug: string) {
+    if (this.state.filterDepartmentsByTabNameCalled) {
+      return this.state.filteredDepartments.find(
+        department => department.slug === selectedDepartmentSlug
+      )
+    }
+    return undefined
+  }
+
   /**
    * Changes the selectedDepartment state variable and, depending on the value of tabSelected, updates either
    * the filteredCourses or filteredPrograms state variable.
@@ -387,76 +404,86 @@ export class CatalogPage extends React.Component<Props> {
    */
   changeSelectedDepartment = (selectedDepartmentSlug: string) => {
     this.resetQueryVariablesToDefault()
-    this.setState({ selectedDepartment: selectedDepartmentSlug })
     this.toggleMobileFilterWindowExpanded(false)
-    if (this.state.tabSelected === COURSES_TAB) {
-      const filteredCatalogItems = this.filteredCoursesOrProgramsByDepartment(
-        selectedDepartmentSlug,
-        this.state.allCoursesRetrieved
-      )
-      this.countAndRetrieveMoreCourses(
-        filteredCatalogItems,
-        selectedDepartmentSlug
-      )
-    } else if (this.state.tabSelected === PROGRAMS_TAB) {
-      this.retrieveMorePrograms(selectedDepartmentSlug)
-      const filteredProgramsByDepartment = this.filteredCoursesOrProgramsByDepartment(
-        selectedDepartmentSlug,
-        this.state.allProgramsRetrieved
-      )
-      this.setState({ filteredPrograms: filteredProgramsByDepartment })
-      this.setState({ filterProgramsCalled: true })
+    let departmentObjectForTab = undefined
+    if (
+      selectedDepartmentSlug !== ALL_DEPARTMENTS &&
+      selectedDepartmentSlug !== ""
+    ) {
+      departmentObjectForTab = this.getDepartmentForTab(selectedDepartmentSlug)
+    }
+
+    if (typeof departmentObjectForTab === 'undefined') {
+      // If departmentObjectForTab is undefined, then the selectedDepartmentSlug
+      // does not exist or ALL_DEPARTMENTS has been selected.
+      this.setState({ selectedDepartment: ALL_DEPARTMENTS })
+
+      // We should then return either all of the courses or all of the programs,
+      // based on the current tabSelected value.
+      if (this.state.tabSelected === COURSES_TAB) {
+        this.setState({ filteredCourses: this.state.allCoursesRetrieved })
+      } else {
+        this.setState({ filteredPrograms: this.state.allProgramsRetrieved })
+      }
+    } else {
+      // A valid department other ALL_DEPARTMENTS has been selected.
+      this.setState({ selectedDepartment: selectedDepartmentSlug})
+      // We need to attempt to retrieve more courses or programs
+      // in order to populate the filtered catalog page.
+      if (this.state.tabSelected === COURSES_TAB) {
+        this.retrieveMoreCourses(departmentObjectForTab)
+        const filteredCoursesByDepartment = this.filteredCoursesOrProgramsByDepartmentSlug(
+          selectedDepartmentSlug,
+          this.state.allCoursesRetrieved
+        )
+        this.setState({ filteredCourses: filteredCoursesByDepartment })
+        this.setState({ filterCoursesCalled: true })
+      } else if (this.state.tabSelected === PROGRAMS_TAB) {
+        this.retrieveMorePrograms()
+        const filteredProgramsByDepartment = this.filteredCoursesOrProgramsByDepartmentSlug(
+          selectedDepartmentSlug,
+          this.state.allProgramsRetrieved
+        )
+        this.setState({ filteredPrograms: filteredProgramsByDepartment })
+        this.setState({ filterProgramsCalled: true })
+      }
     }
   }
 
   /**
    *
    */
-  countAndRetrieveMoreCourses(filteredCourses, selectedDepartment) {
-    const { departments, getNextCoursePage } = this.props
-    if (
-      selectedDepartment !== ALL_DEPARTMENTS &&
-      selectedDepartment !== "" &&
-      departments.length > 0
-    ) {
-      const selectedDepartmentObject = departments.find(
-        department => department.slug === selectedDepartment
-      )
-      if (!selectedDepartmentObject) {
-        this.setState({ selectedDepartment: ALL_DEPARTMENTS }) // Why does this not use changeSelectedDepartment
-        return
-      }
+  retrieveMoreCourses(selectedDepartmentObject) {
+    const {getNextCoursePage } = this.props
 
-      // Only request more courses if we have not alraedy retrieved all courses associated with the department.
-      if (
-        !this.state.isLoadingMoreItems &&
-        filteredCourses.length !== selectedDepartmentObject.course_ids.length
-      ) {
-        // Determine the course IDs for courses associated with the department and not previously retrieved.
-        const remainingIDs = selectedDepartmentObject.course_ids.filter(
-          id =>
-            !this.state.allCoursesRetrieved
-              .map(course => course.id)
-              .includes(id)
+    // Only request more courses if we have not alraedy retrieved all courses associated with the department.
+    if (
+      !this.state.isLoadingMoreItems &&
+      this.state.filteredCourses.length !== selectedDepartmentObject.course_ids.length
+    ) {
+      // Determine the course IDs for courses associated with the department and not previously retrieved.
+      const remainingIDs = selectedDepartmentObject.course_ids.filter(
+        id =>
+          !this.state.allCoursesRetrieved
+            .map(course => course.id)
+            .includes(id)
+      )
+      this.setState({ isLoadingMoreItems: true })
+      getNextCoursePage(1, remainingIDs.toString()).then(response => {
+        const allCourses = this.mergeCourseOrProgramArrays(
+          this.state.allCoursesRetrieved,
+          response.body.results
         )
-        this.setState({ isLoadingMoreItems: true })
-        getNextCoursePage(1, remainingIDs.toString()).then(response => {
-          const allCourses = this.mergeCourseOrProgramArrays(
-            this.state.allCoursesRetrieved,
-            response.body.results
-          )
-          this.setState({ allCoursesRetrieved: allCourses })
-          this.setState({ courseQueryPage: 2 })
-          this.setState({ queryIDListString: remainingIDs.toString() })
-          const filteredCourses = this.filteredCoursesOrProgramsByDepartment(
-            selectedDepartment,
-            allCourses
-          )
-          this.setState({ filteredCourses: filteredCourses })
-          this.setState({ filterCoursesCalled: true })
-          this.setState({ isLoadingMoreItems: false })
-        })
-      }
+        this.setState({ allCoursesRetrieved: allCourses })
+        this.setState({ courseQueryPage: 2 })
+        this.setState({ courseQueryIDListString: remainingIDs.toString() })
+        // this.setState({ filteredCourses: this.mergeCourseOrProgramArrays(
+        //   this.state.allCoursesRetrieved,
+        //   response.body.results
+        // ) })
+        // this.setState({ filterCoursesCalled: true })  // Is this needed?  Is retrieveMoreCourses called only after filterCourses has been called?
+        this.setState({ isLoadingMoreItems: false })
+      })
     }
   }
 
@@ -518,7 +545,7 @@ export class CatalogPage extends React.Component<Props> {
    * @param {Array<CourseDetailWithRuns | Program>} catalogItems An array of catalog items which will be filtered based on their associated Departments.
    * @param {string} selectedDepartmentSlug The Department slug which is used to compare with items in the catalogItems array.
    */
-  filteredCoursesOrProgramsByDepartment(
+  filteredCoursesOrProgramsByDepartmentSlug(
     selectedDepartmentSlug: string,
     catalogItems: Array<CourseDetailWithRuns | Programs>
   ) {
@@ -561,22 +588,21 @@ export class CatalogPage extends React.Component<Props> {
    */
   renderNumberOfCatalogItems() {
     const { departments } = this.props
-    const selectedDepartment = this.state.selectedDepartment
-    if (selectedDepartment === ALL_DEPARTMENTS) {
+    if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
+      console.log(this.state.tabSelected)
       return this.state.tabSelected === COURSES_TAB
         ? this.state.allCoursesCount
         : this.state.allProgramsCount
     } else if (!departments) return 0
-    const departmentSlugs = departments.map(department => department.slug)
-    if (!departmentSlugs.includes(selectedDepartment)) {
+    if (!this.state.filteredDepartmentsByTabName.includes(this.state.selectedDepartment)) {
       return 0
     } else {
       if (this.state.tabSelected === COURSES_TAB) {
-        return departments.find(
+        return this.state.filteredDepartmentsByTabName.find(
           department => department.slug === this.state.selectedDepartment
         ).course_ids.length
       } else {
-        return departments.find(
+        return this.state.filteredDepartmentsByTabName.find(
           department => department.slug === this.state.selectedDepartment
         ).program_ids.length
       }
