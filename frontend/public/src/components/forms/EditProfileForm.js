@@ -37,27 +37,37 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
       initialValues={getInitialValues(user)}
       validateOnChange={false}
       validateOnBlur={false}
-      render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
+    >
+      {({
+        values,
+        errors,
+        touched,
+        handleChange,
+        handleBlur,
+        handleSubmit,
+        isSubmitting,
+        /* and other goodies */
+      }) => (
         <Form>
           <LegalAddressFields
+            touched={touched}
+            errors={errors}
             countries={countries}
-            setFieldValue={setFieldValue}
-            setFieldTouched={setFieldTouched}
             values={values}
             isNewAccount={false}
           />
           <ProfileFields
-            setFieldValue={setFieldValue}
-            setFieldTouched={setFieldTouched}
+            touched={touched}
+            errors={errors}
             values={values}
             isNewAccount={false}
           />
-          <AddlProfileFields
-            setFieldValue={setFieldValue}
-            setFieldTouched={setFieldTouched}
-            values={values}
-            isNewAccount={false}
-          />
+          {/*<AddlProfileFields*/}
+          {/*  setFieldValue={setFieldValue}*/}
+          {/*  setFieldTouched={setFieldTouched}*/}
+          {/*  values={values}*/}
+          {/*  isNewAccount={false}*/}
+          {/*/>*/}
           <div className="row submit-row no-gutters">
             <div className="col d-flex justify-content-end">
               <button
@@ -71,7 +81,7 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
           </div>
         </Form>
       )}
-    />
+    </Formik>
   )
 }
 
