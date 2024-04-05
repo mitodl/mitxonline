@@ -55,7 +55,7 @@
     "flow": "0.2.3",
     "flow-bin": "0.95.1",
     "flow-typed": "3.7.0",
-    "formik": "1.5.8",
+    "formik": "^2.4.5",
     "history": "4.10.1",
     "isomorphic-fetch": "2.2.1",
     "jquery": "3.6.0",
