@@ -247,9 +247,7 @@ export class CatalogPage extends React.Component<Props> {
             this.resetQueryVariablesToDefault()
           }
         } else {
-          this.retrieveMorePrograms(
-            this.state.selectedDepartment
-          )
+          this.retrieveMorePrograms(this.state.selectedDepartment)
         }
       }
       this.io = new window.IntersectionObserver(
@@ -334,9 +332,7 @@ export class CatalogPage extends React.Component<Props> {
         if (this.renderNumberOfCatalogItems() === 0) {
           this.setState({ selectedDepartment: ALL_DEPARTMENTS })
         }
-        this.retrieveMorePrograms(
-          this.state.selectedDepartment
-        )
+        this.retrieveMorePrograms(this.state.selectedDepartment)
       }
     }
     if (selectTabName === COURSES_TAB) {
@@ -398,11 +394,12 @@ export class CatalogPage extends React.Component<Props> {
         selectedDepartmentSlug,
         this.state.allCoursesRetrieved
       )
-      this.countAndRetrieveMoreCourses(filteredCatalogItems, selectedDepartmentSlug)
-    } else if (this.state.tabSelected === PROGRAMS_TAB) {
-      this.retrieveMorePrograms(
+      this.countAndRetrieveMoreCourses(
+        filteredCatalogItems,
         selectedDepartmentSlug
       )
+    } else if (this.state.tabSelected === PROGRAMS_TAB) {
+      this.retrieveMorePrograms(selectedDepartmentSlug)
       const filteredProgramsByDepartment = this.filteredCoursesOrProgramsByDepartment(
         selectedDepartmentSlug,
         this.state.allProgramsRetrieved
@@ -471,12 +468,9 @@ export class CatalogPage extends React.Component<Props> {
    * This will update the following state variables:
    * - allProgramsRetrieved, updated by adding newly retrieved programs.
    * - programQueryPage, increment by 1.
-   * - filteredPrograms, update with newly filtered programs.
-   * - filterProgramsCalled, set to true.
    *
-   * @param {string} selectedDepartmentSlug
    */
-  retrieveMorePrograms(selectedDepartmentSlug) {
+  retrieveMorePrograms() {
     const { programsNextPage, getNextProgramPage } = this.props
     if (
       programsNextPage &&
