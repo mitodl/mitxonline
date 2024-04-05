@@ -77,7 +77,7 @@ export class CatalogPage extends React.Component<Props> {
     courseQueryPage:                  1,
     programQueryPage:                 1,
     isLoadingMoreItems:               false,
-    courseQueryIDListString:                ""
+    courseQueryIDListString:          ""
   }
 
   constructor(props) {
@@ -215,7 +215,8 @@ export class CatalogPage extends React.Component<Props> {
       }
     }
     if (!departmentsIsLoading && departments.length > 0) {
-      if (!this.state.filterDepartmentsByTabNameCalled) { // Why is this here if we already handle it in the tab change?
+      if (!this.state.filterDepartmentsByTabNameCalled) {
+        // Why is this here if we already handle it in the tab change?
         this.setState({
           filteredDepartments: this.filterDepartmentsByTabName(
             this.state.tabSelected
@@ -235,12 +236,12 @@ export class CatalogPage extends React.Component<Props> {
           )
           this.setState({ filteredCourses: filteredCourses })
           this.setState({ filterCoursesCalled: true })
-          const departmentObject = this.getDepartmentForTab(this.state.selectedDepartment)
-          if (typeof departmentObject !== 'undefined') {
+          const departmentObject = this.getDepartmentForTab(
+            this.state.selectedDepartment
+          )
+          if (typeof departmentObject !== "undefined") {
             console.log(departmentObject)
-            this.retrieveMoreCourses(
-              departmentObject
-            )
+            this.retrieveMoreCourses(departmentObject)
           }
         }
       }
@@ -358,13 +359,16 @@ export class CatalogPage extends React.Component<Props> {
         this.setState({
           filteredCourses: filteredCourses
         })
-        const departmentObject = this.getDepartmentForTab(this.state.selectedDepartment)
-        if (this.renderNumberOfCatalogItems() === 0 || typeof departmentObjectForTab === 'undefined') {
+        const departmentObject = this.getDepartmentForTab(
+          this.state.selectedDepartment
+        )
+        if (
+          this.renderNumberOfCatalogItems() === 0 ||
+          typeof departmentObjectForTab === "undefined"
+        ) {
           this.changeSelectedDepartment(ALL_DEPARTMENTS)
         } else {
-          this.retrieveMoreCourses(
-            departmentObject
-          )
+          this.retrieveMoreCourses(departmentObject)
         }
       }
     }
@@ -411,7 +415,7 @@ export class CatalogPage extends React.Component<Props> {
       departmentObjectForTab = this.getDepartmentForTab(selectedDepartmentSlug)
     }
 
-    if (typeof departmentObjectForTab === 'undefined') {
+    if (typeof departmentObjectForTab === "undefined") {
       // If departmentObjectForTab is undefined, then the selectedDepartmentSlug
       // does not exist or ALL_DEPARTMENTS has been selected.
       this.setState({ selectedDepartment: ALL_DEPARTMENTS })
@@ -425,7 +429,7 @@ export class CatalogPage extends React.Component<Props> {
       }
     } else {
       // A valid department or ALL_DEPARTMENTS has been selected.
-      this.setState({ selectedDepartment: selectedDepartmentSlug})
+      this.setState({ selectedDepartment: selectedDepartmentSlug })
       // We need to attempt to retrieve more courses or programs
       // in order to populate the filtered catalog page.
       if (this.state.tabSelected === COURSES_TAB) {
@@ -452,19 +456,18 @@ export class CatalogPage extends React.Component<Props> {
    *
    */
   retrieveMoreCourses(selectedDepartmentObject) {
-    const {getNextCoursePage } = this.props
+    const { getNextCoursePage } = this.props
     console.log(this.state.filteredCourses)
     // Only request more courses if we have not alraedy retrieved all courses associated with the department.
     if (
       !this.state.isLoadingMoreItems &&
-      this.state.filteredCourses.length !== selectedDepartmentObject.course_ids.length
+      this.state.filteredCourses.length !==
+        selectedDepartmentObject.course_ids.length
     ) {
       // Determine the course IDs for courses associated with the department and not previously retrieved.
       const remainingIDs = selectedDepartmentObject.course_ids.filter(
         id =>
-          !this.state.allCoursesRetrieved
-            .map(course => course.id)
-            .includes(id)
+          !this.state.allCoursesRetrieved.map(course => course.id).includes(id)
       )
       this.setState({ isLoadingMoreItems: true })
       getNextCoursePage(1, remainingIDs.toString()).then(response => {
@@ -591,7 +594,9 @@ export class CatalogPage extends React.Component<Props> {
         ? this.state.allCoursesCount
         : this.state.allProgramsCount
     } else if (!departments) return 0
-    const departmentSlugs = this.state.filteredDepartments.map(department => department.slug)
+    const departmentSlugs = this.state.filteredDepartments.map(
+      department => department.slug
+    )
     if (!departmentSlugs.includes(this.state.selectedDepartment)) {
       return 0
     } else {
