@@ -7,7 +7,6 @@ from typing import List, Union
 
 from django.core.management import BaseCommand
 from django.db import models
-from django.utils.text import slugify
 
 from courses.models import Course, CourseRun, Department, Program
 from main.utils import parse_supplied_date
