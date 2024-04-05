@@ -541,8 +541,13 @@ export class CatalogPage extends React.Component<Props> {
     catalogItems: Array<CourseDetailWithRuns | Programs>,
     tabSelected: string
   ) {
-    const selectedDepartmentObject = this.getDepartmentForTab(selectedDepartmentSlug)
-    if (selectedDepartmentSlug === ALL_DEPARTMENTS || typeof selectedDepartmentObject === "undefined") {
+    const selectedDepartmentObject = this.getDepartmentForTab(
+      selectedDepartmentSlug
+    )
+    if (
+      selectedDepartmentSlug === ALL_DEPARTMENTS ||
+      typeof selectedDepartmentObject === "undefined"
+    ) {
       this.setState({ selectedDepartment: ALL_DEPARTMENTS })
       return catalogItems
     } else {
