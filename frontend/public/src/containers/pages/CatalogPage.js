@@ -218,7 +218,7 @@ export class CatalogPage extends React.Component<Props> {
     }
     if (!departmentsIsLoading && departments.length > 0) {
       if (!this.state.filterDepartmentsByTabNameCalled) {
-        // Why is this here if we already handle it in the tab change?
+        // initialize the departments on page load.
         this.setState({
           filteredDepartments: this.filterDepartmentsByTabName(
             this.state.tabSelected
@@ -227,11 +227,7 @@ export class CatalogPage extends React.Component<Props> {
         this.setState({ filterDepartmentsByTabNameCalled: true })
       }
       if (!coursesIsLoading) {
-        if (this.state.filterCoursesCalled) {
-          if (this.state.selectedDepartment !== prevState.selectedDepartment) {
-            this.resetQueryVariablesToDefault()
-          }
-        } else {
+        if (!this.state.filterCoursesCalled) {
           const filteredCourses = this.filteredCoursesOrProgramsByDepartmentSlug(
             this.state.selectedDepartment,
             this.state.allCoursesRetrieved,
@@ -239,19 +235,6 @@ export class CatalogPage extends React.Component<Props> {
           )
           this.setState({ filteredCourses: filteredCourses })
           this.setState({ filterCoursesCalled: true })
-          const departmentObject = this.getDepartmentForTab(
-            this.state.selectedDepartment
-          )
-          if (typeof departmentObject !== "undefined") {
-            this.retrieveMoreCourses(departmentObject)
-          }
-        }
-      }
-      if (!programsIsLoading) {
-        if (this.state.filterProgramsCalled) {
-          if (this.state.selectedDepartment !== prevState.selectedDepartment) {
-            this.resetQueryVariablesToDefault()
-          }
         }
       }
       this.io = new window.IntersectionObserver(
@@ -342,7 +325,6 @@ export class CatalogPage extends React.Component<Props> {
         const departmentObject = this.getDepartmentForTab(
           this.state.selectedDepartment
         )
-        console.log(this.renderNumberOfCatalogItems())
         if (
           this.renderNumberOfCatalogItems() === 0 ||
           typeof departmentObject === "undefined"
@@ -361,12 +343,12 @@ export class CatalogPage extends React.Component<Props> {
         })
       }
     }
-    // Can this be removed?
-    this.io = new window.IntersectionObserver(
-      this.bottomOfLoadedCatalogCallback,
-      { threshold: 1.0 }
-    )
-    this.io.observe(this.container.current)
+    // // Can this be removed?
+    // this.io = new window.IntersectionObserver(
+    //   this.bottomOfLoadedCatalogCallback,
+    //   { threshold: 1.0 }
+    // )
+    // this.io.observe(this.container.current)
   }
 
   /**
@@ -429,7 +411,6 @@ export class CatalogPage extends React.Component<Props> {
           COURSES_TAB
         )
         this.setState({ filteredCourses: filteredCoursesByDepartment })
-        this.setState({ filterCoursesCalled: true })
       } else if (this.state.tabSelected === PROGRAMS_TAB) {
         this.retrieveMorePrograms()
         const filteredProgramsByDepartment = this.filteredCoursesOrProgramsByDepartmentSlug(
@@ -556,8 +537,6 @@ export class CatalogPage extends React.Component<Props> {
           selectedDepartmentObject.course_ids.includes(catalogItem.id)
         )
       } else {
-        console.log(catalogItems)
-        console.log(selectedDepartmentObject)
         return catalogItems.filter(catalogItem =>
           selectedDepartmentObject.program_ids.includes(catalogItem.id)
         )
