@@ -122,7 +122,9 @@ export class CatalogPage extends React.Component<Props> {
           this.retrieveMoreCourses()
         }
       } else {
-        this.retrieveMorePrograms()
+        if (this.state.filteredPrograms.length < this.renderNumberOfCatalogItems()) {
+          this.retrieveMorePrograms()
+        }
       }
     }
   }
@@ -230,7 +232,6 @@ export class CatalogPage extends React.Component<Props> {
     if (this.state.tabSelected === COURSES_TAB) {
       this.setState({ courseQueryPage: 1 })
       this.setState({ courseQueryIDListString: "" })
-      this.setState({ filterCoursesCalled: false })
     } else {
       this.setState({ filterProgramsCalled: false })
     }
@@ -257,11 +258,12 @@ export class CatalogPage extends React.Component<Props> {
         const departmentObject = this.getDepartmentObjectFromSlug(
           this.state.selectedDepartment
         )
+        console.log(this.renderNumberOfCatalogItems())
         if (
           this.renderNumberOfCatalogItems() === 0 ||
           typeof departmentObject === "undefined"
         ) {
-          // If there are no catalog items on this tab
+          // If there are no courses on this tab
           // with an associated Department matching the
           // selected department, update the selected department
           // to ALL_DEPARTMENTS.
@@ -340,7 +342,7 @@ export class CatalogPage extends React.Component<Props> {
       if (this.state.tabSelected === COURSES_TAB) {
         this.retrieveMoreCoursesByDepartment(departmentObjectForTab)
       } else if (this.state.tabSelected === PROGRAMS_TAB) {
-        this.retrieveMorePrograms()
+        this.retrieveMorePrograms(selectedDepartmentSlug)
       }
     }
   }
@@ -444,8 +446,10 @@ export class CatalogPage extends React.Component<Props> {
    * - allProgramsRetrieved, updated by adding newly retrieved programs.
    * - programQueryPage, increment by 1.
    * - filterProgramsCalled set to true.
+   *
+   * @param {string} selectedDepartmentSlug The department slug for the currently selected department.
    */
-  retrieveMorePrograms() {
+  retrieveMorePrograms(selectedDepartmentSlug: string) {
     const {
       programsIsLoading,
       programsNextPage,
@@ -467,7 +471,7 @@ export class CatalogPage extends React.Component<Props> {
         this.setState({ programQueryPage: this.state.programQueryPage + 1 })
         this.setState({ isLoadingMoreItems: false })
         const filteredPrograms = this.filteredCoursesOrProgramsByDepartmentSlug(
-          this.state.selectedDepartment,
+          selectedDepartmentSlug,
           updatedAllPrograms,
           PROGRAMS_TAB
         )
@@ -477,11 +481,12 @@ export class CatalogPage extends React.Component<Props> {
       // All programs have been retrieved from the API.  We just need to update the
       // filteredPrograms state variable.
       const filteredPrograms = this.filteredCoursesOrProgramsByDepartmentSlug(
-        this.state.selectedDepartment,
+        selectedDepartmentSlug,
         this.state.allProgramsRetrieved,
         PROGRAMS_TAB
       )
       this.setState({ filteredPrograms: filteredPrograms })
+      console.log(filteredPrograms)
     }
     this.setState({ filterProgramsCalled: true })
   }
