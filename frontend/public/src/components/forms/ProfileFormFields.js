@@ -41,7 +41,7 @@ const countryRegex = "^\\S{2,}$"
 export const legalAddressValidation = yup.object().shape({
   name:          yup.string().label("Full Name"),
   legal_address: yup.object().shape({
-    first_name: yup.string().label("First Name"),
+    first_name: yup.string().required("First Name is required").label("First Name"),
     last_name:  yup.string().label("Last Name"),
     country:    yup.string().label("Country"),
     state:      yup
@@ -211,10 +211,10 @@ export const LegalAddressFields = ({
           autoComplete="given-name"
           aria-describedby="first-name-subtitle"
           aria-label="First Name"
-          required
           pattern={NAME_REGEX}
           title={NAME_REGEX_FAIL_MESSAGE}
         />
+        <ErrorMessage name="legal_address.first_name"/>
       </div>
       <div className="form-group">
         <CardLabel
@@ -228,7 +228,6 @@ export const LegalAddressFields = ({
           id="legal_address.last_name"
           className="form-control"
           autoComplete="family-name"
-          required
           pattern={NAME_REGEX}
           title={NAME_REGEX_FAIL_MESSAGE}
         />
@@ -248,7 +247,6 @@ export const LegalAddressFields = ({
           autoComplete="name"
           aria-describedby="full-name-subtitle"
           aria-label="Full Name"
-          required
           pattern={fullNameRegex}
           title={fullNameErrorMessage}
         />
@@ -270,7 +268,6 @@ export const LegalAddressFields = ({
               id="username"
               aria-describedby="username-subtitle"
               aria-label="Public Username"
-              required
               pattern={usernameFieldRegex}
               title={usernameFieldErrorMessage}
             />
@@ -285,7 +282,6 @@ export const LegalAddressFields = ({
               aria-describedby="password-subtitle"
               className="form-control"
               autoComplete="new-password"
-              required
               pattern={passwordFieldRegex}
               title={passwordFieldErrorMessage}
             />

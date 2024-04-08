@@ -7573,6 +7573,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"core-js@npm:3.10.2":
+  version: 3.10.2
+  resolution: "core-js@npm:3.10.2"
+  checksum: b432c827d707c694f03d142e74c144e522c1f6a8632539913bd1f3660f522693b83a474409bb0dd6ccab7878c2ed91014082ce9938664e90f62193b90ce72501
+  languageName: node
+  linkType: hard
+
 "core-js@npm:^1.0.0":
   version: 1.2.7
   resolution: "core-js@npm:1.2.7"
@@ -10565,6 +10572,18 @@ __metadata:
   bin:
     flowgen: lib/cli/index.js
   checksum: 6f4e904a3c29e2095ce2122136f9575e51dd2ca930854d3aa8e24d63b404c91d1b69609833cd34796c0bf69e6c6389818322a6dcf792b9e51014511baf614fef
+  languageName: node
+  linkType: hard
+
+"focus-formik-error@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "focus-formik-error@npm:1.1.0"
+  dependencies:
+    core-js: 3.10.2
+  peerDependencies:
+    formik: ">=2.0.0"
+    react: ">=16.8.0"
+  checksum: 36679c18e0365496eaa347536730ecacfb756dd0c78a4c25d8ab59d4cd219d34d2f284ac0e5e8fdb4a5458442603f73d155048eea34849240684bc6c2968bf47
   languageName: node
   linkType: hard
 
@@ -15208,6 +15227,7 @@ __metadata:
     flow: 0.2.3
     flow-bin: 0.95.1
     flow-typed: 3.7.0
+    focus-formik-error: ^1.1.0
     formik: ^2.4.5
     history: 4.10.1
     isomorphic-fetch: 2.2.1

@@ -1,6 +1,6 @@
 // @flow
 import React from "react"
-import { Formik, Form } from "formik"
+import {Formik, Form, Field, ErrorMessage} from "formik"
 import {
   legalAddressValidation,
   profileValidation,
@@ -11,6 +11,7 @@ import {
 } from "./ProfileFormFields"
 
 import type { Country, User } from "../../flow/authTypes"
+import {ConnectedFocusError} from "focus-formik-error"
 
 type Props = {
   onSubmit: Function,
@@ -27,7 +28,6 @@ const getInitialValues = (user: User) => ({
 
 const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
   const validation = legalAddressValidation.concat(profileValidation)
-
   validation.concat(addlProfileFieldsValidation)
 
   return (
@@ -42,45 +42,45 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
         values,
         errors,
         touched,
-        handleChange,
-        handleBlur,
-        handleSubmit,
         isSubmitting,
-        /* and other goodies */
-      }) => (
-        <Form>
-          <LegalAddressFields
-            touched={touched}
-            errors={errors}
-            countries={countries}
-            values={values}
-            isNewAccount={false}
-          />
-          <ProfileFields
-            touched={touched}
-            errors={errors}
-            values={values}
-            isNewAccount={false}
-          />
-          {/*<AddlProfileFields*/}
-          {/*  setFieldValue={setFieldValue}*/}
-          {/*  setFieldTouched={setFieldTouched}*/}
-          {/*  values={values}*/}
-          {/*  isNewAccount={false}*/}
-          {/*/>*/}
-          <div className="row submit-row no-gutters">
-            <div className="col d-flex justify-content-end">
-              <button
-                type="submit"
-                className="btn btn-primary btn-gradient-red-to-blue"
-                disabled={isSubmitting}
-              >
-                Submit
-              </button>
+      }) => {
+        return (
+          <Form>
+            <ConnectedFocusError />
+            <LegalAddressFields
+              touched={touched}
+              errors={errors}
+              countries={countries}
+              values={values}
+              isNewAccount={false}
+            />
+            <ProfileFields
+              touched={touched}
+              errors={errors}
+              values={values}
+              isNewAccount={false}
+            />
+            <AddlProfileFields
+              touched={touched}
+              errors={errors}
+              values={values}
+              isNewAccount={false}
+            />
+            <div className="row submit-row no-gutters">
+              <div className="col d-flex justify-content-end">
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-gradient-red-to-blue"
+                  disabled={isSubmitting}
+                >
+                  Submit
+                </button>
+              </div>
             </div>
-          </div>
-        </Form>
-      )}
+          </Form>
+        )
+      }
+      }
     </Formik>
   )
 }
