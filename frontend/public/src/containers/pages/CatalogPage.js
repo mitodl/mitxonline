@@ -107,21 +107,17 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Makes another API call to the courses or programs endpoint if there is
-   * a next page defined in the prior request.
-   * Appends the courses or programs from the API call to the current allCoursesRetrieved
-   * or allProgramsRetrieved state variable.  Increments the courseQueryPage or programQueryPage
-   * state variable.  Updates the filteredCourses or filteredPrograms state variable using the
-   * updated allCoursesRetrieved or allProgramsRetrieved state variable.
+   * Callback when the bottom of the catalog is visible.
+   * Retrieves more courses or programs based on the value of
+   * the tabSelected state variable.
    */
   bottomOfLoadedCatalogCallback = async entries => {
+    const { coursesNextPage } = this.props
     const [entry] = entries
     if (entry.isIntersecting) {
       if (this.state.tabSelected === COURSES_TAB) {
-        // Only request the next page if a next page exists (coursesNextPage)
-        // and if we aren't already requesting the next page (isLoadingMoreItems).
         if (
-          this.state.filteredCourses.length < this.renderNumberOfCatalogItems()
+          this.state.filteredCourses.length < this.renderNumberOfCatalogItems() && coursesNextPage
         ) {
           this.retrieveMoreCourses()
         }
@@ -272,6 +268,7 @@ export class CatalogPage extends React.Component<Props> {
         ) {
           this.changeSelectedDepartment(ALL_DEPARTMENTS)
         } else {
+          this.changeSelectedDepartment(departmentObject.slug)
           this.retrieveMoreCoursesByDepartment(departmentObject)
         }
       }
@@ -318,8 +315,8 @@ export class CatalogPage extends React.Component<Props> {
       // does not exist or ALL_DEPARTMENTS has been selected.
       this.setState({ selectedDepartment: ALL_DEPARTMENTS })
 
-      // We should then return either all of the courses or all of the programs,
-      // based on the current tabSelected value.
+      // Return either all of the courses or programs
+      // depending on the current tabSelected value.
       if (this.state.tabSelected === COURSES_TAB) {
         this.setState({ filteredCourses: this.state.allCoursesRetrieved })
       } else {
@@ -340,13 +337,15 @@ export class CatalogPage extends React.Component<Props> {
 
   retrieveMoreCourses(courseQueryIDListString: string) {
     const { coursesIsLoading, getNextCoursePage } = this.props
+    let courseQueryPage = 1
     if (typeof courseQueryIDListString === "undefined") {
       courseQueryIDListString = this.state.courseQueryIDListString
+      courseQueryPage = this.state.courseQueryPage
     }
     if (!this.state.isLoadingMoreItems && !coursesIsLoading) {
       this.setState({ isLoadingMoreItems: true })
       getNextCoursePage(
-        this.state.courseQueryPage,
+        courseQueryPage,
         courseQueryIDListString.toString()
       ).then(response => {
         this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
@@ -355,6 +354,9 @@ export class CatalogPage extends React.Component<Props> {
             this.state.allCoursesRetrieved,
             response.body.results
           )
+          this.setState({
+            allCoursesRetrieved: allCourses
+          })
           const filteredCourses = this.filteredCoursesOrProgramsByDepartmentSlug(
             this.state.selectedDepartment,
             allCourses,
@@ -362,9 +364,6 @@ export class CatalogPage extends React.Component<Props> {
           )
           this.setState({ filteredCourses: filteredCourses })
           this.setState({ filterCoursesCalled: true })
-          this.setState({
-            allCoursesRetrieved: allCourses
-          })
         }
         this.setState({ isLoadingMoreItems: false })
       })
@@ -374,19 +373,24 @@ export class CatalogPage extends React.Component<Props> {
   /**
    *
    */
-  retrieveMoreCoursesByDepartment(selectedDepartmentObject) {
+  retrieveMoreCoursesByDepartment(selectedDepartmentObject: Department) {
     // Only request more courses if we have not already retrieved all courses associated with the department.
-    if (
-      this.state.filteredCourses.length !==
-      selectedDepartmentObject.course_ids.length
-    ) {
-      // Determine the course IDs for courses associated with the department and not previously retrieved.
-      const remainingIDs = selectedDepartmentObject.course_ids.filter(
-        id =>
-          !this.state.allCoursesRetrieved.map(course => course.id).includes(id)
-      )
+    const remainingIDs = selectedDepartmentObject.course_ids.filter(
+      id =>
+        !this.state.allCoursesRetrieved.map(course => course.id).includes(id)
+    )
+    if (remainingIDs.length > 0) {
       this.retrieveMoreCourses(remainingIDs)
-      this.setState({ courseQueryIDListString: remainingIDs.toString() })
+    } else {
+      // If we have already retrieved all courses associated with the department,
+      // just update the filteredCourses state variable.
+      const filteredCourses = this.filteredCoursesOrProgramsByDepartmentSlug(
+        selectedDepartmentObject.slug,
+        this.state.allCoursesRetrieved,
+        COURSES_TAB
+      )
+      this.setState({ filteredCourses: filteredCourses })
+      this.setState({ filterCoursesCalled: true })
     }
   }
 
