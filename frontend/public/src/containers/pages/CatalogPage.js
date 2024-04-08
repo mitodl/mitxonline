@@ -130,11 +130,7 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Updates the filteredCourses state variable
-   * once coursesIsLoading is false..  Adds an observer to detect when
-   * the learner has scrolled to the bottom of the visible catalog items.
-   * Updates the filteredDepartments state variable once departmentsIsLoading
-   * is false.
+   * 
    */
   componentDidUpdate = () => {
     const {
@@ -242,37 +238,42 @@ export class CatalogPage extends React.Component<Props> {
    * - tabSelected, set to the parameter name.
    * - filteredDepartments, based on the return from filterDepartmentsByTabName.
    * Calls changeSelectedDepartment.
-   * @param {string} selectTabName The name of the tab that was selected.
+   * @param {string} selectedTabName The name of the tab that was selected.
    */
-  changeSelectedTab = (selectTabName: string) => {
-    this.setState({ tabSelected: selectTabName })
+  changeSelectedTab = (selectedTabName: string) => {
+    this.setState({ tabSelected: selectedTabName })
+    const filteredDepartments = this.filterDepartmentsByTabName(selectedTabName)
     this.setState({
-      filteredDepartments: this.filterDepartmentsByTabName(selectTabName)
+      filteredDepartments: filteredDepartments
     })
-    if (selectTabName === PROGRAMS_TAB) {
+    const departmentObject = this.getDepartmentObjectFromSlug(
+      this.state.selectedDepartment
+    )
+    // Check if the currently selected department exists for the
+    // newly selected tab.
+    const departmentExistsForTab = filteredDepartments.find(
+      department => department.slug === this.state.selectedDepartment
+    )
+    if (
+      !departmentExistsForTab ||
+      typeof departmentObject === "undefined"
+    ) {
+      // If there are no courses on this tab
+      // with an associated Department matching the
+      // selected department, update the selected department
+      // to ALL_DEPARTMENTS.
+      this.changeSelectedDepartment(ALL_DEPARTMENTS)
+    } else {
+      this.changeSelectedDepartment(departmentObject.slug)
+    }
+
+    // Update either the programs or courses based on the currently
+    // selected tab.
+    if (selectedTabName === PROGRAMS_TAB) {
       this.retrieveMorePrograms()
     }
-    if (selectTabName === COURSES_TAB) {
-      const { coursesIsLoading } = this.props
-      if (!coursesIsLoading) {
-        const departmentObject = this.getDepartmentObjectFromSlug(
-          this.state.selectedDepartment
-        )
-        console.log(this.renderNumberOfCatalogItems())
-        if (
-          this.renderNumberOfCatalogItems() === 0 ||
-          typeof departmentObject === "undefined"
-        ) {
-          // If there are no courses on this tab
-          // with an associated Department matching the
-          // selected department, update the selected department
-          // to ALL_DEPARTMENTS.
-          this.changeSelectedDepartment(ALL_DEPARTMENTS)
-        } else {
-          this.changeSelectedDepartment(departmentObject.slug)
-          this.retrieveMoreCoursesByDepartment(departmentObject)
-        }
-      }
+    if (selectedTabName === COURSES_TAB) {
+      this.retrieveMoreCoursesByDepartment(departmentObject)
     }
   }
 
