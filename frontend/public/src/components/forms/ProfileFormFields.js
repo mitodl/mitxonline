@@ -39,12 +39,24 @@ const fullNameErrorMessage = "Full name must be between 2 and 254 characters."
 const countryRegex = "^\\S{2,}$"
 
 export const legalAddressValidation = yup.object().shape({
-  name:          yup.string().label("Full Name"),
+  name: yup
+    .string()
+    .required()
+    .label("Full Name"),
   legal_address: yup.object().shape({
-    first_name: yup.string().required("First Name is required").label("First Name"),
-    last_name:  yup.string().label("Last Name"),
-    country:    yup.string().label("Country"),
-    state:      yup
+    first_name: yup
+      .string()
+      .required()
+      .label("First Name"),
+    last_name: yup
+      .string()
+      .required()
+      .label("Last Name"),
+    country: yup
+      .string()
+      .required()
+      .label("Country"),
+    state: yup
       .string()
       .label("State")
       .when("country", {
@@ -159,7 +171,9 @@ const findStates = (country: string, countries: Array<Country>) => {
     : null
 }
 
-const renderYearOfBirthField = () => {
+const renderYearOfBirthField = props => {
+  const hasError =
+    props.errors.user_profile && props.errors.user_profile.year_of_birth
   return (
     <div>
       <CardLabel
@@ -173,8 +187,8 @@ const renderYearOfBirthField = () => {
         id="user_profile.year_of_birth"
         className="form-control"
         autoComplete="bday-year"
-        aria-describedby="user_profile.year_of_birth_error"
-        required
+        aria-invalid={hasError ? "true" : null}
+        aria-describedby={hasError ? "year-of-birth-error" : null}
       >
         <option value="">-----</option>
         {reverse(range(seedYear - 120, seedYear - 13)).map((year, i) => (
@@ -183,17 +197,18 @@ const renderYearOfBirthField = () => {
           </option>
         ))}
       </Field>
+      <ErrorMessage name="user_profile.year_of_birth" component={FormError} />
     </div>
   )
 }
 
 export const LegalAddressFields = ({
-  touched,
   errors,
   countries,
   isNewAccount,
   values
 }: LegalAddressProps) => {
+  const addressErrors = errors.legal_address
   return (
     <React.Fragment>
       <div className="form-group">
@@ -209,12 +224,20 @@ export const LegalAddressFields = ({
           id="legal_address.first_name"
           className="form-control"
           autoComplete="given-name"
-          aria-describedby="first-name-subtitle"
+          aria-invalid={
+            addressErrors && addressErrors.first_name ? "true" : null
+          }
+          aria-describedby={
+            addressErrors && addressErrors.first_name
+              ? "first-name-error"
+              : null
+          }
+          aria-required="true"
           aria-label="First Name"
           pattern={NAME_REGEX}
           title={NAME_REGEX_FAIL_MESSAGE}
         />
-        <ErrorMessage name="legal_address.first_name"/>
+        <ErrorMessage name="legal_address.first_name" component={FormError} />
       </div>
       <div className="form-group">
         <CardLabel
@@ -228,9 +251,16 @@ export const LegalAddressFields = ({
           id="legal_address.last_name"
           className="form-control"
           autoComplete="family-name"
+          aria-invalid={
+            addressErrors && addressErrors.last_name ? "true" : null
+          }
+          aria-describedby={
+            addressErrors && addressErrors.last_name ? "last-name-error" : null
+          }
           pattern={NAME_REGEX}
           title={NAME_REGEX_FAIL_MESSAGE}
         />
+        <ErrorMessage name="legal_address.last_name" component={FormError} />
       </div>
       <div className="form-group">
         <CardLabel
@@ -245,11 +275,13 @@ export const LegalAddressFields = ({
           id="name"
           className="form-control"
           autoComplete="name"
-          aria-describedby="full-name-subtitle"
+          aria-invalid={errors.name ? "true" : null}
+          aria-describedby={errors.name ? "full-name-error" : null}
           aria-label="Full Name"
           pattern={fullNameRegex}
           title={fullNameErrorMessage}
         />
+        <ErrorMessage name="name" component={FormError} />
       </div>
       {isNewAccount ? (
         <React.Fragment>
@@ -266,7 +298,8 @@ export const LegalAddressFields = ({
               className="form-control"
               autoComplete="username"
               id="username"
-              aria-describedby="username-subtitle"
+              aria-invalid={errors.username ? "true" : null}
+              aria-describedby={errors.username ? "username-error" : null}
               aria-label="Public Username"
               pattern={usernameFieldRegex}
               title={usernameFieldErrorMessage}
@@ -279,12 +312,14 @@ export const LegalAddressFields = ({
               type="password"
               name="password"
               id="password"
-              aria-describedby="password-subtitle"
+              aria-invalid={errors.password ? "true" : null}
+              aria-describedby={errors.password ? "password-error" : null}
               className="form-control"
               autoComplete="new-password"
               pattern={passwordFieldRegex}
               title={passwordFieldErrorMessage}
             />
+            <ErrorMessage name="passwrod" component={FormError} />
             <div id="password-subtitle" className="label-secondary">
               Passwords must contain at least 8 characters and at least 1 number
               and 1 letter.
@@ -302,9 +337,12 @@ export const LegalAddressFields = ({
           component="select"
           name="legal_address.country"
           id="legal_address.country"
+          aria-invalid={addressErrors && addressErrors.country ? "true" : null}
+          aria-describedby={
+            addressErrors && addressErrors.country ? "country-error" : null
+          }
           className="form-control"
           autoComplete="country"
-          required
           pattern={countryRegex}
         >
           <option value="">-----</option>
@@ -316,6 +354,7 @@ export const LegalAddressFields = ({
             ))
             : null}
         </Field>
+        <ErrorMessage name="legal_address.country" component={FormError} />
       </div>
       {findStates(values.legal_address.country, countries) ? (
         <div className="form-group">
@@ -328,9 +367,12 @@ export const LegalAddressFields = ({
             component="select"
             name="legal_address.state"
             id="legal_address.state"
+            aria-invalid={addressErrors && addressErrors.state ? "true" : null}
+            aria-describedby={
+              addressErrors && addressErrors.state ? "state-error" : null
+            }
             className="form-control"
             autoComplete="state"
-            required
           >
             <option value="">-----</option>
             {findStates(values.legal_address.country, countries)
@@ -343,6 +385,7 @@ export const LegalAddressFields = ({
               )
               : null}
           </Field>
+          <ErrorMessage name="legal_address.state" component={FormError} />
         </div>
       ) : null}
       {isNewAccount ? (
@@ -353,7 +396,6 @@ export const LegalAddressFields = ({
 }
 
 export const ProfileFields = props => {
-  const hasError = props.errors && props.errors.user_profile && props.errors.user_profile.genderError
   return (
     <React.Fragment>
       <div className="row small-gap">
@@ -366,8 +408,6 @@ export const ProfileFields = props => {
               name="user_profile.gender"
               id="user_profile.gender"
               className="form-control"
-              aria-invalid={hasError ? 'true' : null}
-              aria-describedby={hasError ? 'gender-error' : null}
             >
               <option value="">-----</option>
               <option value="f">Female</option>
@@ -384,7 +424,7 @@ export const ProfileFields = props => {
           </div>
         </div>
         <div className="col">
-          <div className="form-group">{renderYearOfBirthField()}</div>
+          <div className="form-group">{renderYearOfBirthField(props)}</div>
         </div>
       </div>
     </React.Fragment>

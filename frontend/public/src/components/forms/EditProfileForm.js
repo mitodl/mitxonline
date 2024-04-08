@@ -1,6 +1,6 @@
 // @flow
 import React from "react"
-import {Formik, Form, Field, ErrorMessage} from "formik"
+import { Formik, Form, Field, ErrorMessage } from "formik"
 import {
   legalAddressValidation,
   profileValidation,
@@ -11,7 +11,7 @@ import {
 } from "./ProfileFormFields"
 
 import type { Country, User } from "../../flow/authTypes"
-import {ConnectedFocusError} from "focus-formik-error"
+import { ConnectedFocusError } from "focus-formik-error"
 
 type Props = {
   onSubmit: Function,
@@ -38,12 +38,7 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
       validateOnChange={false}
       validateOnBlur={false}
     >
-      {({
-        values,
-        errors,
-        touched,
-        isSubmitting,
-      }) => {
+      {({ values, errors, touched, isSubmitting }) => {
         return (
           <Form>
             <ConnectedFocusError />
@@ -79,8 +74,7 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
             </div>
           </Form>
         )
-      }
-      }
+      }}
     </Formik>
   )
 }
