@@ -251,6 +251,7 @@ export class CatalogPage extends React.Component<Props> {
       }
       if (!programsIsLoading && !this.state.filterProgramsCalled) {
         this.setState({ filterProgramsCalled: true })
+        this.setState({ filteredPrograms: programs })
         this.countAndRetrieveMorePrograms(
           this.state.allProgramsRetrieved,
           this.state.selectedDepartment
@@ -372,6 +373,8 @@ export class CatalogPage extends React.Component<Props> {
         )
       }
     }
+    console.log("changeSelectedTab")
+    this.props.history.push(this.getUpdatedURL(selectTabName, this.state.selectedDepartment))
     this.io = new window.IntersectionObserver(
       this.bottomOfLoadedCatalogCallback,
       { threshold: 1.0 }
@@ -411,6 +414,8 @@ export class CatalogPage extends React.Component<Props> {
         selectedDepartment
       )
     }
+    this.props.history.push(this.getUpdatedURL(this.state.tabSelected, selectedDepartment))
+    console.log("changeSelectedDepartment")
     this.io = new window.IntersectionObserver(
       this.bottomOfLoadedCatalogCallback,
       { threshold: 1.0 }
@@ -575,6 +580,17 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
+   * Returns the updated URL based on the given state of the catalog page.
+   * @returns {string}
+   */
+  getUpdatedURL(tabSelected, selectedDepartment) {
+    if (selectedDepartment === ALL_DEPARTMENTS) {
+      return `/catalog/${tabSelected}`
+    }
+    return `/catalog/${tabSelected}/${selectedDepartment}`
+  }
+
+  /**
    * Returns the number of courses based on the selectedDepartment.
    * If the selectedDepartment is "All Departments", the total number of courses is returned.
    * If the selectedDepartment is not found in the departments array, 0 is returned.
@@ -721,7 +737,7 @@ export class CatalogPage extends React.Component<Props> {
         filteredCourses,
         this.renderCourseCatalogCard.bind(this)
       )
-    } else if (tabSelected === PROGRAMS_TAB) {
+    } else if (tabSelected === PROGRAMS_TAB && filteredPrograms.length > 0) {
       return this.renderCatalogRows(
         filteredPrograms,
         this.renderProgramCatalogCard.bind(this)
