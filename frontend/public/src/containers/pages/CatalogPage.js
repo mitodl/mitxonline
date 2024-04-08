@@ -237,12 +237,10 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Updates this.state.selectedDepartment to {ALL_DEPARTMENTS},
-   * updates this.state.tabSelected to the parameter,
-   * updates this.state.filteredDepartments
-   * names from the catalog items in the selected tab,
-   * updates this.state.filteredPrograms to equal the programs
-   * which meet the criteria to be displayed in the catalog.
+   * Updates the following state variables:
+   * - tabSelected, set to the parameter name.
+   * - filteredDepartments, based on the return from filterDepartmentsByTabName.
+   * Calls changeSelectedDepartment.
    * @param {string} selectTabName The name of the tab that was selected.
    */
   changeSelectedTab = (selectTabName: string) => {
@@ -251,21 +249,22 @@ export class CatalogPage extends React.Component<Props> {
       filteredDepartments: this.filterDepartmentsByTabName(selectTabName)
     })
     if (selectTabName === PROGRAMS_TAB) {
-      const { programsIsLoading } = this.props
-      if (!programsIsLoading) {
-        this.retrieveMorePrograms()
-      }
+      this.retrieveMorePrograms()
     }
     if (selectTabName === COURSES_TAB) {
       const { coursesIsLoading } = this.props
       if (!coursesIsLoading) {
-        const departmentObject = this.getDepartmentForTab(
+        const departmentObject = this.getDepartmentObjectFromSlug(
           this.state.selectedDepartment
         )
         if (
           this.renderNumberOfCatalogItems() === 0 ||
           typeof departmentObject === "undefined"
         ) {
+          // If there are no catalog items on this tab
+          // with an associated Department matching the
+          // selected department, update the selected department
+          // to ALL_DEPARTMENTS.
           this.changeSelectedDepartment(ALL_DEPARTMENTS)
         } else {
           this.changeSelectedDepartment(departmentObject.slug)
@@ -283,7 +282,17 @@ export class CatalogPage extends React.Component<Props> {
     this.setState({ mobileFilterWindowExpanded: expanded })
   }
 
-  getDepartmentForTab(selectedDepartmentSlug: string) {
+
+  /**
+   * Returns the Department object that has a slug matching the parameter.
+   * If no Department has a slug matching the parameter, undefined is returned.
+   * Undefined will be returned if the parameter is ALL_DEPARTMENTS.
+   *
+   * @param {string} selectedDepartmentSlug The department slug.
+   *
+   * @returns {Department} The department object with a slug value matching the parameter. Otherwise, undefined.
+   */
+  getDepartmentObjectFromSlug(selectedDepartmentSlug: string) {
     const { departments } = this.props
     if (departments) {
       return departments.find(
@@ -296,6 +305,7 @@ export class CatalogPage extends React.Component<Props> {
   /**
    * Changes the selectedDepartment state variable and, depending on the value of tabSelected, updates either
    * the filteredCourses or filteredPrograms state variable.
+   * Resets the query variables via resetQueryVariablesToDefault.
    * Closes the mobile view filter window.
    * @param {string} selectedDepartmentSlug The department slug to set selectedDepartment to and filter courses by.
    */
@@ -307,7 +317,7 @@ export class CatalogPage extends React.Component<Props> {
       selectedDepartmentSlug !== ALL_DEPARTMENTS &&
       selectedDepartmentSlug !== ""
     ) {
-      departmentObjectForTab = this.getDepartmentForTab(selectedDepartmentSlug)
+      departmentObjectForTab = this.getDepartmentObjectFromSlug(selectedDepartmentSlug)
     }
 
     if (typeof departmentObjectForTab === "undefined") {
@@ -335,9 +345,32 @@ export class CatalogPage extends React.Component<Props> {
     }
   }
 
+  /**
+   * Retrieves more courses via API request.
+   * If the courseQueryIDListString parameter is specified
+   * then the API request will only pertain to the those.
+   * If the courseQueryIDListString parameter is NOT specified,
+   * then a paginated API request will be made using the
+   * courseQueryPage state variable as the page number.
+   *
+   * The following state variables are updated:
+   * - courseQueryPage, increment by 1 only when we are NOT making an API request for specific course IDs.
+   * - allCoursesRetrieved, updated with the courses in the API response.
+   * - filteredCourses, updated with the courses in the API response.
+   * - filterCoursesCalled, set to true.
+   *
+   * @param {string} courseQueryIDListString a string containing a list of course IDs.  This is optional.
+   */
   retrieveMoreCourses(courseQueryIDListString: string) {
     const { coursesIsLoading, getNextCoursePage } = this.props
+
+    // If courseQueryIDListString is defined when calling this method,
+    // then we will only request the first page of API results since
+    // the API request will contain the course IDs we're interested in.
     let courseQueryPage = 1
+
+    // If courseQueryIDListString was not defined when calling this method, then we
+    // should request paginated API results using courseQueryPage for the page number.
     if (typeof courseQueryIDListString === "undefined") {
       courseQueryIDListString = this.state.courseQueryIDListString
       courseQueryPage = this.state.courseQueryPage
@@ -348,7 +381,7 @@ export class CatalogPage extends React.Component<Props> {
         courseQueryPage,
         courseQueryIDListString.toString()
       ).then(response => {
-        this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
+        this.setState({ courseQueryPage: courseQueryPage + 1 })
         if (response.body.results) {
           const allCourses = this.mergeCourseOrProgramArrays(
             this.state.allCoursesRetrieved,
@@ -371,7 +404,14 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
+   * Retrieves courses, that are associated with the department parameter.
+   * This will only retrieve courses which have not already
+   * been retrieved.  If all courses associated with the department have
+   * already been retrieved, this will only update the following state variables:
+   * - filteredCourses.
+   * - filterCoursesCalled.
    *
+   * @param {Department} selectedDepartmentObject The department object containing associated course IDs.
    */
   retrieveMoreCoursesByDepartment(selectedDepartmentObject: Department) {
     // Only request more courses if we have not already retrieved all courses associated with the department.
@@ -398,11 +438,12 @@ export class CatalogPage extends React.Component<Props> {
    * Retrieves another page of Programs via API request when:
    * - There is a next page of prorgams available (programsNextPage).
    * - isLoadingMoreItems is false.
+   * - programsIsLoading is false.
    * - All of the programs have not already been retrieved.
    * This will update the following state variables:
    * - allProgramsRetrieved, updated by adding newly retrieved programs.
    * - programQueryPage, increment by 1.
-   *
+   * - filterProgramsCalled set to true.
    */
   retrieveMorePrograms() {
     const {
@@ -431,9 +472,18 @@ export class CatalogPage extends React.Component<Props> {
           PROGRAMS_TAB
         )
         this.setState({ filteredPrograms: filteredPrograms })
-        this.setState({ filterProgramsCalled: true })
       })
+    } else {
+      // All programs have been retrieved from the API.  We just need to update the
+      // filteredPrograms state variable.
+      const filteredPrograms = this.filteredCoursesOrProgramsByDepartmentSlug(
+        this.state.selectedDepartment,
+        this.state.allProgramsRetrieved,
+        PROGRAMS_TAB
+      )
+      this.setState({ filteredPrograms: filteredPrograms })
     }
+    this.setState({ filterProgramsCalled: true })
   }
 
   /**
@@ -469,7 +519,7 @@ export class CatalogPage extends React.Component<Props> {
     catalogItems: Array<CourseDetailWithRuns | Programs>,
     tabSelected: string
   ) {
-    const selectedDepartmentObject = this.getDepartmentForTab(
+    const selectedDepartmentObject = this.getDepartmentObjectFromSlug(
       selectedDepartmentSlug
     )
     if (
