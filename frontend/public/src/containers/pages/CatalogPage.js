@@ -115,69 +115,18 @@ export class CatalogPage extends React.Component<Props> {
    * updated allCoursesRetrieved or allProgramsRetrieved state variable.
    */
   bottomOfLoadedCatalogCallback = async entries => {
-    const {
-      coursesIsLoading,
-      getNextCoursePage,
-      getNextProgramPage,
-      programsIsLoading,
-      programsNextPage
-    } = this.props
     const [entry] = entries
     if (entry.isIntersecting) {
       if (this.state.tabSelected === COURSES_TAB) {
         // Only request the next page if a next page exists (coursesNextPage)
         // and if we aren't already requesting the next page (isLoadingMoreItems).
         if (
-          !coursesIsLoading &&
-          !this.state.isLoadingMoreItems &&
           this.state.filteredCourses.length < this.renderNumberOfCatalogItems()
         ) {
-          this.setState({ isLoadingMoreItems: true })
-          const response = await getNextCoursePage(
-            this.state.courseQueryPage,
-            this.state.courseQueryIDListString
-          )
-          this.setState({ isLoadingMoreItems: false })
-          this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
-          if (response.body.results) {
-            const allCourses = this.mergeCourseOrProgramArrays(
-              this.state.allCoursesRetrieved,
-              response.body.results
-            )
-            const filteredCourses = this.filteredCoursesOrProgramsByDepartmentSlug(
-              this.state.selectedDepartment,
-              allCourses,
-              COURSES_TAB
-            )
-            this.setState({ filteredCourses: filteredCourses })
-            this.setState({
-              allCoursesRetrieved: allCourses
-            })
-          }
+          this.retrieveMoreCourses()
         }
       } else {
-        if (
-          !programsIsLoading &&
-          !this.state.isLoadingMoreItems &&
-          programsNextPage
-        ) {
-          this.setState({ isLoadingMoreItems: true })
-          getNextProgramPage(this.state.programQueryPage).then(response => {
-            this.setState({ isLoadingMoreItems: false })
-            this.setState({ programQueryPage: this.state.programQueryPage + 1 })
-            const updatedAllPrograms = this.mergeCourseOrProgramArrays(
-              this.state.allProgramsRetrieved,
-              response.body.results
-            )
-            const filteredPrograms = this.filteredCoursesOrProgramsByDepartmentSlug(
-              this.state.selectedDepartment,
-              updatedAllPrograms,
-              PROGRAMS_TAB
-            )
-            this.setState({ filteredPrograms: filteredPrograms })
-            this.setState({ allProgramsRetrieved: updatedAllPrograms })
-          })
-        }
+        this.retrieveMorePrograms()
       }
     }
   }
@@ -189,7 +138,7 @@ export class CatalogPage extends React.Component<Props> {
    * Updates the filteredDepartments state variable once departmentsIsLoading
    * is false.
    */
-  componentDidUpdate = (prevProps, prevState) => {
+  componentDidUpdate = () => {
     const {
       courses,
       coursesCount,
@@ -308,15 +257,7 @@ export class CatalogPage extends React.Component<Props> {
     if (selectTabName === PROGRAMS_TAB) {
       const { programsIsLoading } = this.props
       if (!programsIsLoading) {
-        this.retrieveMorePrograms(this.state.selectedDepartment)
-        const filteredPrograms = this.filteredCoursesOrProgramsByDepartmentSlug(
-          this.state.selectedDepartment,
-          this.state.allProgramsRetrieved,
-          PROGRAMS_TAB
-        )
-        this.setState({
-          filteredPrograms: filteredPrograms
-        })
+        this.retrieveMorePrograms()
       }
     }
     if (selectTabName === COURSES_TAB) {
@@ -331,24 +272,10 @@ export class CatalogPage extends React.Component<Props> {
         ) {
           this.changeSelectedDepartment(ALL_DEPARTMENTS)
         } else {
-          this.retrieveMoreCourses(departmentObject)
+          this.retrieveMoreCoursesByDepartment(departmentObject)
         }
-        const filteredCourses = this.filteredCoursesOrProgramsByDepartmentSlug(
-          this.state.selectedDepartment,
-          this.state.allCoursesRetrieved,
-          COURSES_TAB
-        )
-        this.setState({
-          filteredCourses: filteredCourses
-        })
       }
     }
-    // // Can this be removed?
-    // this.io = new window.IntersectionObserver(
-    //   this.bottomOfLoadedCatalogCallback,
-    //   { threshold: 1.0 }
-    // )
-    // this.io.observe(this.container.current)
   }
 
   /**
@@ -404,58 +331,62 @@ export class CatalogPage extends React.Component<Props> {
       // We need to attempt to retrieve more courses or programs
       // in order to populate the filtered catalog page.
       if (this.state.tabSelected === COURSES_TAB) {
-        this.retrieveMoreCourses(departmentObjectForTab)
-        const filteredCoursesByDepartment = this.filteredCoursesOrProgramsByDepartmentSlug(
-          selectedDepartmentSlug,
-          this.state.allCoursesRetrieved,
-          COURSES_TAB
-        )
-        this.setState({ filteredCourses: filteredCoursesByDepartment })
+        this.retrieveMoreCoursesByDepartment(departmentObjectForTab)
       } else if (this.state.tabSelected === PROGRAMS_TAB) {
         this.retrieveMorePrograms()
-        const filteredProgramsByDepartment = this.filteredCoursesOrProgramsByDepartmentSlug(
-          selectedDepartmentSlug,
-          this.state.allProgramsRetrieved,
-          PROGRAMS_TAB
-        )
-        this.setState({ filteredPrograms: filteredProgramsByDepartment })
-        this.setState({ filterProgramsCalled: true })
       }
+    }
+  }
+
+  retrieveMoreCourses(courseQueryIDListString: string) {
+    const { coursesIsLoading, getNextCoursePage } = this.props
+    if (typeof courseQueryIDListString === "undefined") {
+      courseQueryIDListString = this.state.courseQueryIDListString
+    }
+    if (!this.state.isLoadingMoreItems && !coursesIsLoading) {
+      this.setState({ isLoadingMoreItems: true })
+      getNextCoursePage(
+        this.state.courseQueryPage,
+        courseQueryIDListString.toString()
+      ).then(response => {
+        this.setState({ courseQueryPage: this.state.courseQueryPage + 1 })
+        if (response.body.results) {
+          const allCourses = this.mergeCourseOrProgramArrays(
+            this.state.allCoursesRetrieved,
+            response.body.results
+          )
+          const filteredCourses = this.filteredCoursesOrProgramsByDepartmentSlug(
+            this.state.selectedDepartment,
+            allCourses,
+            COURSES_TAB
+          )
+          this.setState({ filteredCourses: filteredCourses })
+          this.setState({ filterCoursesCalled: true })
+          this.setState({
+            allCoursesRetrieved: allCourses
+          })
+        }
+        this.setState({ isLoadingMoreItems: false })
+      })
     }
   }
 
   /**
    *
    */
-  retrieveMoreCourses(selectedDepartmentObject) {
-    const { getNextCoursePage } = this.props
-    // Only request more courses if we have not alraedy retrieved all courses associated with the department.
+  retrieveMoreCoursesByDepartment(selectedDepartmentObject) {
+    // Only request more courses if we have not already retrieved all courses associated with the department.
     if (
-      !this.state.isLoadingMoreItems &&
       this.state.filteredCourses.length !==
-        selectedDepartmentObject.course_ids.length
+      selectedDepartmentObject.course_ids.length
     ) {
       // Determine the course IDs for courses associated with the department and not previously retrieved.
       const remainingIDs = selectedDepartmentObject.course_ids.filter(
         id =>
           !this.state.allCoursesRetrieved.map(course => course.id).includes(id)
       )
-      this.setState({ isLoadingMoreItems: true })
-      getNextCoursePage(1, remainingIDs.toString()).then(response => {
-        const allCourses = this.mergeCourseOrProgramArrays(
-          this.state.allCoursesRetrieved,
-          response.body.results
-        )
-        this.setState({ allCoursesRetrieved: allCourses })
-        this.setState({ courseQueryPage: 2 })
-        this.setState({ courseQueryIDListString: remainingIDs.toString() })
-        // this.setState({ filteredCourses: this.mergeCourseOrProgramArrays(
-        //   this.state.allCoursesRetrieved,
-        //   response.body.results
-        // ) })
-        // this.setState({ filterCoursesCalled: true })  // Is this needed?  Is retrieveMoreCourses called only after filterCourses has been called?
-        this.setState({ isLoadingMoreItems: false })
-      })
+      this.retrieveMoreCourses(remainingIDs)
+      this.setState({ courseQueryIDListString: remainingIDs.toString() })
     }
   }
 
@@ -470,8 +401,13 @@ export class CatalogPage extends React.Component<Props> {
    *
    */
   retrieveMorePrograms() {
-    const { programsNextPage, getNextProgramPage } = this.props
+    const {
+      programsIsLoading,
+      programsNextPage,
+      getNextProgramPage
+    } = this.props
     if (
+      !programsIsLoading &&
       programsNextPage &&
       !this.state.isLoadingMoreItems &&
       this.state.allProgramsRetrieved.length < this.state.allProgramsCount
@@ -485,6 +421,13 @@ export class CatalogPage extends React.Component<Props> {
         this.setState({ allProgramsRetrieved: updatedAllPrograms })
         this.setState({ programQueryPage: this.state.programQueryPage + 1 })
         this.setState({ isLoadingMoreItems: false })
+        const filteredPrograms = this.filteredCoursesOrProgramsByDepartmentSlug(
+          this.state.selectedDepartment,
+          updatedAllPrograms,
+          PROGRAMS_TAB
+        )
+        this.setState({ filteredPrograms: filteredPrograms })
+        this.setState({ filterProgramsCalled: true })
       })
     }
   }
