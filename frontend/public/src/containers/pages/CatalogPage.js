@@ -117,12 +117,16 @@ export class CatalogPage extends React.Component<Props> {
     if (entry.isIntersecting) {
       if (this.state.tabSelected === COURSES_TAB) {
         if (
-          this.state.filteredCourses.length < this.renderNumberOfCatalogItems() && coursesNextPage
+          this.state.filteredCourses.length <
+            this.renderNumberOfCatalogItems() &&
+          coursesNextPage
         ) {
           this.retrieveMoreCourses()
         }
       } else {
-        if (this.state.filteredPrograms.length < this.renderNumberOfCatalogItems()) {
+        if (
+          this.state.filteredPrograms.length < this.renderNumberOfCatalogItems()
+        ) {
           this.retrieveMorePrograms()
         }
       }
@@ -130,7 +134,7 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * 
+   *
    */
   componentDidUpdate = () => {
     const {
@@ -254,26 +258,28 @@ export class CatalogPage extends React.Component<Props> {
     const departmentExistsForTab = filteredDepartments.find(
       department => department.slug === this.state.selectedDepartment
     )
-    if (
-      !departmentExistsForTab ||
-      typeof departmentObject === "undefined"
-    ) {
+    if (!departmentExistsForTab || typeof departmentObject === "undefined") {
       // If there are no courses on this tab
       // with an associated Department matching the
       // selected department, update the selected department
       // to ALL_DEPARTMENTS.
       this.changeSelectedDepartment(ALL_DEPARTMENTS)
+      if (selectedTabName === PROGRAMS_TAB) {
+        this.retrieveMorePrograms()
+      }
+      if (selectedTabName === COURSES_TAB) {
+        this.retrieveMoreCourses()
+      }
     } else {
       this.changeSelectedDepartment(departmentObject.slug)
-    }
-
-    // Update either the programs or courses based on the currently
-    // selected tab.
-    if (selectedTabName === PROGRAMS_TAB) {
-      this.retrieveMorePrograms()
-    }
-    if (selectedTabName === COURSES_TAB) {
-      this.retrieveMoreCoursesByDepartment(departmentObject)
+      // Update either the programs or courses based on the currently
+      // selected tab.
+      if (selectedTabName === PROGRAMS_TAB) {
+        this.retrieveMorePrograms()
+      }
+      if (selectedTabName === COURSES_TAB) {
+        this.retrieveMoreCoursesByDepartment(departmentObject)
+      }
     }
   }
 
@@ -284,7 +290,6 @@ export class CatalogPage extends React.Component<Props> {
   toggleMobileFilterWindowExpanded = (expanded: boolean) => {
     this.setState({ mobileFilterWindowExpanded: expanded })
   }
-
 
   /**
    * Returns the Department object that has a slug matching the parameter.
@@ -320,7 +325,9 @@ export class CatalogPage extends React.Component<Props> {
       selectedDepartmentSlug !== ALL_DEPARTMENTS &&
       selectedDepartmentSlug !== ""
     ) {
-      departmentObjectForTab = this.getDepartmentObjectFromSlug(selectedDepartmentSlug)
+      departmentObjectForTab = this.getDepartmentObjectFromSlug(
+        selectedDepartmentSlug
+      )
     }
 
     if (typeof departmentObjectForTab === "undefined") {
