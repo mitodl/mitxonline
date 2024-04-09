@@ -125,8 +125,12 @@ export class CatalogPage extends React.Component<Props> {
         }
       } else {
         if (
-          this.state.filteredPrograms.length < this.renderNumberOfCatalogItems()
+          this.state.filteredPrograms.length <
+            this.renderNumberOfCatalogItems() &&
+          this.state.allProgramsRetrieved.length > 0
         ) {
+          // Only retrieve more programs after we have already populated allProgramsRetrieved with the initial response
+          // from the API, and when not all programs, for the currently selected department, are currently displayed.
           this.retrieveMorePrograms()
         }
       }
@@ -458,7 +462,7 @@ export class CatalogPage extends React.Component<Props> {
    * - programQueryPage, increment by 1.
    * - filterProgramsCalled set to true.
    *
-   * @param {string} selectedDepartmentSlug The department slug for the currently selected department.
+   * @param {string} selectedDepartmentSlug The department slug for the currently selected department.  This parameter is optional.
    */
   retrieveMorePrograms(selectedDepartmentSlug: string) {
     const {
@@ -466,6 +470,10 @@ export class CatalogPage extends React.Component<Props> {
       programsNextPage,
       getNextProgramPage
     } = this.props
+    let currentDepartmentSlug = this.state.selectedDepartment
+    if (typeof selectedDepartmentSlug !== "undefined") {
+      currentDepartmentSlug = selectedDepartmentSlug
+    }
     if (
       !programsIsLoading &&
       programsNextPage &&
@@ -482,7 +490,7 @@ export class CatalogPage extends React.Component<Props> {
         this.setState({ programQueryPage: this.state.programQueryPage + 1 })
         this.setState({ isLoadingMoreItems: false })
         const filteredPrograms = this.filteredCoursesOrProgramsByDepartmentSlug(
-          selectedDepartmentSlug,
+          currentDepartmentSlug,
           updatedAllPrograms,
           PROGRAMS_TAB
         )
@@ -492,7 +500,7 @@ export class CatalogPage extends React.Component<Props> {
       // All programs have been retrieved from the API.  We just need to update the
       // filteredPrograms state variable.
       const filteredPrograms = this.filteredCoursesOrProgramsByDepartmentSlug(
-        selectedDepartmentSlug,
+        currentDepartmentSlug,
         this.state.allProgramsRetrieved,
         PROGRAMS_TAB
       )

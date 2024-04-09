@@ -584,7 +584,6 @@ describe("CatalogPage", function() {
     // Change to the programs tab.
     inner.instance().changeSelectedTab("programs")
     expect(inner.state().tabSelected).equals("programs")
-    inner.instance().changeSelectedDepartment("history")
     // Confirm that the selected department is the same as before.
     expect(inner.state().selectedDepartment).equals("history")
 
