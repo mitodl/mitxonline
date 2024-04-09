@@ -129,8 +129,8 @@ export class CatalogPage extends React.Component<Props> {
             this.renderNumberOfCatalogItems() &&
           this.state.allProgramsRetrieved.length > 0
         ) {
-          // Only retrieve more programs after we have already populated allProgramsRetrieved with the initial response
-          // from the API, and when not all programs, for the currently selected department, are currently displayed.
+          // Only retrieve more programs after we have already populated allProgramsRetrieved with the initial API response,
+          // and when not all programs, for the currently selected department, are currently displayed.
           this.retrieveMorePrograms()
         }
       }
@@ -138,7 +138,8 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   *
+   * Initializes many of the state variables with the responses from the programs, courses, and departments API.
+   * Adds an intersection observer in order to load more catalog items when the user scrolls to the bottom of the page.
    */
   componentDidUpdate = () => {
     const {
