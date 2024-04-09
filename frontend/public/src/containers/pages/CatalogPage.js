@@ -373,7 +373,6 @@ export class CatalogPage extends React.Component<Props> {
         )
       }
     }
-    console.log("changeSelectedTab")
     this.props.history.push(
       this.getUpdatedURL(selectTabName, this.state.selectedDepartment)
     )
@@ -419,7 +418,6 @@ export class CatalogPage extends React.Component<Props> {
     this.props.history.push(
       this.getUpdatedURL(this.state.tabSelected, selectedDepartment)
     )
-    console.log("changeSelectedDepartment")
     this.io = new window.IntersectionObserver(
       this.bottomOfLoadedCatalogCallback,
       { threshold: 1.0 }
