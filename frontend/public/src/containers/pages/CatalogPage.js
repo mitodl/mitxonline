@@ -149,47 +149,50 @@ export class CatalogPage extends React.Component<Props> {
     } = this.props
     // Initialize allCourses and allPrograms variables in state once they finish loading to store since the value will
     // change when changing departments
-    if (!coursesIsLoading && courses.length > 0) {
-      if (this.state.allCoursesRetrieved.length === 0) {
-        this.setState({ allCoursesRetrieved: courses })
-        this.setState({ filteredCourses: courses })
-        this.setState({ allCoursesCount: coursesCount })
-      }
+    if (
+      !coursesIsLoading &&
+      courses.length > 0 &&
+      this.state.allCoursesRetrieved.length === 0
+    ) {
+      this.setState({ allCoursesRetrieved: courses })
+      this.setState({ filteredCourses: courses })
+      this.setState({ allCoursesCount: coursesCount })
     }
-    if (!programsIsLoading && programs.length > 0) {
-      if (this.state.allProgramsRetrieved.length === 0) {
-        this.setState({ allProgramsRetrieved: programs })
-        this.setState({ filteredPrograms: programs })
-        this.setState({ allProgramsCount: programsCount })
-      }
+    if (
+      !programsIsLoading &&
+      programs.length > 0 &&
+      this.state.allProgramsRetrieved.length === 0
+    ) {
+      this.setState({ allProgramsRetrieved: programs })
+      this.setState({ filteredPrograms: programs })
+      this.setState({ allProgramsCount: programsCount })
     }
     if (!departmentsIsLoading && departments.length > 0) {
       if (!this.state.filterDepartmentsByTabNameCalled) {
         // initialize the departments on page load.
+        this.setState({ filterDepartmentsByTabNameCalled: true })
         this.setState({
           filteredDepartments: this.filterDepartmentsByTabName(
             this.state.tabSelected
           )
         })
-        this.setState({ filterDepartmentsByTabNameCalled: true })
       }
-      if (!coursesIsLoading) {
-        if (!this.state.filterCoursesCalled) {
-          const filteredCourses = this.filteredCoursesOrProgramsByDepartmentSlug(
-            this.state.selectedDepartment,
-            this.state.allCoursesRetrieved,
-            COURSES_TAB
-          )
-          this.setState({ filteredCourses: filteredCourses })
-          this.setState({ filterCoursesCalled: true })
-        }
+      if (!coursesIsLoading && !this.state.filterCoursesCalled) {
+        this.setState({ filterCoursesCalled: true }) // This line must be before calling filteredCoursesOrProgramsByDepartmentSlug
+        // or else componentDidUpdate will end up in an infinite loop.
+        const filteredCourses = this.filteredCoursesOrProgramsByDepartmentSlug(
+          this.state.selectedDepartment,
+          this.state.allCoursesRetrieved,
+          COURSES_TAB
+        )
+        this.setState({ filteredCourses: filteredCourses })
       }
-      this.io = new window.IntersectionObserver(
-        this.bottomOfLoadedCatalogCallback,
-        { threshold: 1.0 }
-      )
-      this.io.observe(this.container.current)
     }
+    this.io = new window.IntersectionObserver(
+      this.bottomOfLoadedCatalogCallback,
+      { threshold: 1.0 }
+    )
+    this.io.observe(this.container.current)
   }
 
   /**
@@ -233,6 +236,7 @@ export class CatalogPage extends React.Component<Props> {
       this.setState({ courseQueryPage: 1 })
       this.setState({ courseQueryIDListString: "" })
     } else {
+      // Required in order to support filtering programs by department via url.
       this.setState({ filterProgramsCalled: false })
     }
   }
@@ -259,7 +263,7 @@ export class CatalogPage extends React.Component<Props> {
       department => department.slug === this.state.selectedDepartment
     )
     if (!departmentExistsForTab || typeof departmentObject === "undefined") {
-      // If there are no courses on this tab
+      // If there are no catalog items on this tab
       // with an associated Department matching the
       // selected department, update the selected department
       // to ALL_DEPARTMENTS.
@@ -329,7 +333,6 @@ export class CatalogPage extends React.Component<Props> {
         selectedDepartmentSlug
       )
     }
-
     if (typeof departmentObjectForTab === "undefined") {
       // If departmentObjectForTab is undefined, then the selectedDepartmentSlug
       // does not exist or ALL_DEPARTMENTS has been selected.
@@ -494,7 +497,6 @@ export class CatalogPage extends React.Component<Props> {
         PROGRAMS_TAB
       )
       this.setState({ filteredPrograms: filteredPrograms })
-      console.log(filteredPrograms)
     }
     this.setState({ filterProgramsCalled: true })
   }
@@ -526,6 +528,7 @@ export class CatalogPage extends React.Component<Props> {
    * If selectedDepartment equals ALL_DEPARTMENTS, then the catalogItems array is returned.
    * @param {Array<CourseDetailWithRuns | Program>} catalogItems An array of catalog items which will be filtered based on their associated Departments.
    * @param {string} selectedDepartmentSlug The Department slug which is used to compare with items in the catalogItems array.
+   * @param {string} tabSelected The tab currently selected.  This is used to indicate whether the catalogItems parameter contains programs or courses.
    */
   filteredCoursesOrProgramsByDepartmentSlug(
     selectedDepartmentSlug: string,
