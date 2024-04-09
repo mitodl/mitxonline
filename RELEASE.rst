@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.89.1
+Version 0.89.1 (Released April 09, 2024)
 --------------
 
 - Enrollment request make sure not enrolled (#2149)
