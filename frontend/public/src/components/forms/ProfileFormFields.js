@@ -171,9 +171,8 @@ const findStates = (country: string, countries: Array<Country>) => {
     : null
 }
 
-const renderYearOfBirthField = props => {
-  const hasError =
-    props.errors.user_profile && props.errors.user_profile.year_of_birth
+const renderYearOfBirthField = errors => {
+  const hasError = errors.user_profile && errors.user_profile.year_of_birth
   return (
     <div>
       <CardLabel
@@ -208,7 +207,7 @@ export const LegalAddressFields = ({
   isNewAccount,
   values
 }: LegalAddressProps) => {
-  const addressErrors = errors.legal_address
+  const addressErrors = errors && errors.legal_address
   return (
     <React.Fragment>
       <div className="form-group">
@@ -389,7 +388,7 @@ export const LegalAddressFields = ({
         </div>
       ) : null}
       {isNewAccount ? (
-        <div className="form-group">{renderYearOfBirthField()}</div>
+        <div className="form-group">{renderYearOfBirthField(errors)}</div>
       ) : null}
     </React.Fragment>
   )
@@ -424,7 +423,9 @@ export const ProfileFields = props => {
           </div>
         </div>
         <div className="col">
-          <div className="form-group">{renderYearOfBirthField(props)}</div>
+          <div className="form-group">
+            {renderYearOfBirthField(props.errors)}
+          </div>
         </div>
       </div>
     </React.Fragment>
