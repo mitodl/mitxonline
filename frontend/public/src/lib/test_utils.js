@@ -30,6 +30,12 @@ export const findFormikErrorByName = (wrapper: any, name: string) =>
     .find("FormikConnect(ErrorMessageImpl)")
     .filterWhere(node => node.prop("name") === name)
 
+export const getDisabledProp = (inner: any, name: string) =>
+  inner
+    .find(`${name}`)
+    .at(0)
+    .prop("disabled")
+
 /**
  * This is here to support testing components that are wrapped with a
  * context consumer, e.g.:

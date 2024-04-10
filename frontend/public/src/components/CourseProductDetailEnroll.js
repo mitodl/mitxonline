@@ -148,7 +148,7 @@ export class CourseProductDetailEnroll extends React.Component<
 
   hndSetCourseRun = (event: any) => {
     const { courseRuns } = this.props
-    if (event.target.value === "") {
+    if (event.target.value === "default") {
       this.setCurrentCourseRun(null)
       return
     }
@@ -203,7 +203,7 @@ export class CourseProductDetailEnroll extends React.Component<
           onChange={this.hndSetCourseRun.bind(this)}
           className="form-control"
         >
-          <option value="d" key="default-select">
+          <option value="default" key="default-select">
             Please Select
           </option>
           {courseRuns &&
