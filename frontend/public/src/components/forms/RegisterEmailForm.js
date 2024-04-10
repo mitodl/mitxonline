@@ -41,7 +41,7 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
       recaptcha: SETTINGS.recaptchaKey ? "" : undefined
     }}
   >
-    {({ errors, isSubmitting }) => {
+    {({ errors, setFieldValue, isSubmitting }) => {
       return (
         <Form>
           <ConnectedFocusError />
