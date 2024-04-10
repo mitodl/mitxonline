@@ -251,7 +251,6 @@ export class CatalogPage extends React.Component<Props> {
       }
       if (!programsIsLoading && !this.state.filterProgramsCalled) {
         this.setState({ filterProgramsCalled: true })
-        this.setState({ filteredPrograms: programs })
         this.countAndRetrieveMorePrograms(
           this.state.allProgramsRetrieved,
           this.state.selectedDepartment
@@ -739,7 +738,7 @@ export class CatalogPage extends React.Component<Props> {
         filteredCourses,
         this.renderCourseCatalogCard.bind(this)
       )
-    } else if (tabSelected === PROGRAMS_TAB && filteredPrograms.length > 0) {
+    } else if (tabSelected === PROGRAMS_TAB) {
       return this.renderCatalogRows(
         filteredPrograms,
         this.renderProgramCatalogCard.bind(this)
