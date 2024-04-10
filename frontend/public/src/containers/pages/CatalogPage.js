@@ -572,16 +572,16 @@ export class CatalogPage extends React.Component<Props> {
     }
   }
 
-    /**
+  /**
    * Returns the updated URL based on the given state of the catalog page.
    * @returns {string}
    */
-    getUpdatedURL(tabSelected, selectedDepartment) {
-      if (selectedDepartment === ALL_DEPARTMENTS) {
-        return `/catalog/${tabSelected}`
-      }
-      return `/catalog/${tabSelected}/${selectedDepartment}`
+  getUpdatedURL(tabSelected, selectedDepartment) {
+    if (selectedDepartment === ALL_DEPARTMENTS) {
+      return `/catalog/${tabSelected}`
     }
+    return `/catalog/${tabSelected}/${selectedDepartment}`
+  }
 
   /**
    * Returns the number of catalog items based on the selectedDepartment
