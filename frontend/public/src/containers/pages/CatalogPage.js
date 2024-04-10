@@ -320,7 +320,7 @@ export class CatalogPage extends React.Component<Props> {
       )
     }
     this.props.history.push(
-      this.getUpdatedURL(this.state.tabSelected, selectedDepartment)
+      this.getUpdatedURL(this.state.tabSelected, selectedDepartmentSlug)
     )
     return undefined
   }
