@@ -319,9 +319,6 @@ export class CatalogPage extends React.Component<Props> {
         department => department.slug === selectedDepartmentSlug
       )
     }
-    this.props.history.push(
-      this.getUpdatedURL(this.state.tabSelected, selectedDepartmentSlug)
-    )
     return undefined
   }
 
@@ -348,7 +345,9 @@ export class CatalogPage extends React.Component<Props> {
       // If departmentObjectForTab is undefined, then the selectedDepartmentSlug
       // does not exist or ALL_DEPARTMENTS has been selected.
       this.setState({ selectedDepartment: ALL_DEPARTMENTS })
-
+      this.props.history.push(
+        this.getUpdatedURL(this.state.tabSelected, selectedDepartmentSlug)
+      )
       // Return either all of the courses or programs
       // depending on the current tabSelected value.
       if (this.state.tabSelected === COURSES_TAB) {
@@ -359,6 +358,9 @@ export class CatalogPage extends React.Component<Props> {
     } else {
       // A valid department or ALL_DEPARTMENTS has been selected.
       this.setState({ selectedDepartment: selectedDepartmentSlug })
+      this.props.history.push(
+        this.getUpdatedURL(this.state.tabSelected, selectedDepartmentSlug)
+      )
       // We need to attempt to retrieve more courses or programs
       // in order to populate the filtered catalog page.
       if (this.state.tabSelected === COURSES_TAB) {
