@@ -372,6 +372,9 @@ export class CatalogPage extends React.Component<Props> {
         )
       }
     }
+    this.props.history.push(
+      this.getUpdatedURL(selectTabName, this.state.selectedDepartment)
+    )
     this.io = new window.IntersectionObserver(
       this.bottomOfLoadedCatalogCallback,
       { threshold: 1.0 }
@@ -411,6 +414,9 @@ export class CatalogPage extends React.Component<Props> {
         selectedDepartment
       )
     }
+    this.props.history.push(
+      this.getUpdatedURL(this.state.tabSelected, selectedDepartment)
+    )
     this.io = new window.IntersectionObserver(
       this.bottomOfLoadedCatalogCallback,
       { threshold: 1.0 }
@@ -572,6 +578,17 @@ export class CatalogPage extends React.Component<Props> {
           .includes(selectedDepartment.name)
       )
     }
+  }
+
+  /**
+   * Returns the updated URL based on the given state of the catalog page.
+   * @returns {string}
+   */
+  getUpdatedURL(tabSelected, selectedDepartment) {
+    if (selectedDepartment === ALL_DEPARTMENTS) {
+      return `/catalog/${tabSelected}`
+    }
+    return `/catalog/${tabSelected}/${selectedDepartment}`
   }
 
   /**
