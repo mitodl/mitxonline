@@ -271,7 +271,12 @@ def _validate_enrollment_post_request(
             max_age=USER_MSG_COOKIE_MAX_AGE,
         )
         return resp, None, None
-    if PaidCourseRun.fulfilled_paid_course_run_exists(user, run):
+    if (
+        PaidCourseRun.fulfilled_paid_course_run_exists(user, run)
+        or CourseRunEnrollment.objects.filter(
+            user=user, run=run, change_status=None
+        ).exists()
+    ):
         resp = redirect_with_user_message(
             reverse("user-dashboard"),
             {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},

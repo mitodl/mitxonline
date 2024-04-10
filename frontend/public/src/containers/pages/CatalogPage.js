@@ -290,6 +290,9 @@ export class CatalogPage extends React.Component<Props> {
         this.retrieveMoreCoursesByDepartment(departmentObject)
       }
     }
+    this.props.history.push(
+      this.getUpdatedURL(selectedTabName, this.state.selectedDepartment)
+    )
   }
 
   /**
@@ -316,6 +319,9 @@ export class CatalogPage extends React.Component<Props> {
         department => department.slug === selectedDepartmentSlug
       )
     }
+    this.props.history.push(
+      this.getUpdatedURL(this.state.tabSelected, selectedDepartment)
+    )
     return undefined
   }
 
@@ -565,6 +571,17 @@ export class CatalogPage extends React.Component<Props> {
       }
     }
   }
+
+    /**
+   * Returns the updated URL based on the given state of the catalog page.
+   * @returns {string}
+   */
+    getUpdatedURL(tabSelected, selectedDepartment) {
+      if (selectedDepartment === ALL_DEPARTMENTS) {
+        return `/catalog/${tabSelected}`
+      }
+      return `/catalog/${tabSelected}/${selectedDepartment}`
+    }
 
   /**
    * Returns the number of catalog items based on the selectedDepartment
