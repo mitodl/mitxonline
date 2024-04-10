@@ -106,31 +106,27 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
                   onSubmit={this.onSubmit.bind(this)}
                   validationSchema={addlProfileFieldsValidation}
                   initialValues={getInitialValues(currentUser)}
-                  render={({
-                    isSubmitting,
-                    setFieldValue,
-                    setFieldTouched,
-                    values
-                  }) => (
-                    <Form>
-                      <AddlProfileFields
-                        setFieldValue={setFieldValue}
-                        setFieldTouched={setFieldTouched}
-                        values={values}
-                        isNewAccount={false}
-                      />
-                      <div className="submit-row">
-                        <button
-                          type="submit"
-                          className="btn btn-primary btn-gradient-red-to-blue"
-                          disabled={isSubmitting}
-                        >
-                          Submit
-                        </button>
-                      </div>
-                    </Form>
-                  )}
-                />
+                >
+                  {({ isSubmitting, values }) => {
+                    return (
+                      <Form>
+                        <AddlProfileFields
+                          values={values}
+                          isNewAccount={false}
+                        />
+                        <div className="submit-row">
+                          <button
+                            type="submit"
+                            className="btn btn-primary btn-gradient-red-to-blue"
+                            disabled={isSubmitting}
+                          >
+                            Submit
+                          </button>
+                        </div>
+                      </Form>
+                    )
+                  }}
+                </Formik>
               </div>
             </div>
           </div>

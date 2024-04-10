@@ -59,6 +59,11 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
                   errors.oldPassword ? "odlPasswordError" : null
                 }
               />
+              <ErrorMessage
+                name="oldPassword"
+                id="oldPasswordError"
+                component={FormError}
+              />
             </div>
             <div className="form-group">
               <CardLabel

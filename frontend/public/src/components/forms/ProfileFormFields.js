@@ -485,7 +485,6 @@ export const AddlProfileFields = ({
             className="form-check-input"
             aria-labelledby="occupation-label student-label"
             defaultChecked={values.user_profile.type_is_student}
-            required={false}
           />
           <label
             className="form-check-label"
