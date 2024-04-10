@@ -451,7 +451,6 @@ export const AddlProfileFields = ({
             name="user_profile.highest_education"
             id="user_profile.highest_education"
             className="form-control"
-            required={requireAddlFields}
           >
             <option value="">-----</option>
             {HIGHEST_EDUCATION_CHOICES.map((level, i) => (

@@ -54,35 +54,31 @@ const AddlProfileFieldsForm = ({
       initialValues={getInitialValues(user)}
       validateOnChange={false}
       validateOnBlur={false}
-      render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
-        <Form>
-          <ProfileFields
-            setFieldValue={setFieldValue}
-            setFieldTouched={setFieldTouched}
-            values={values}
-            isNewAccount={false}
-          />
-          <AddlProfileFields
-            setFieldValue={setFieldValue}
-            setFieldTouched={setFieldTouched}
-            values={values}
-            isNewAccount={false}
-            requireAddlFields={requireTypeFields}
-          />
-          <div className="row submit-row no-gutters">
-            <div className="col d-flex justify-content-end">
-              <button
-                type="submit"
-                className="btn btn-primary btn-gradient-red-to-blue"
-                disabled={isSubmitting}
-              >
-                Submit
-              </button>
+    >
+      {({ isSubmitting, values }) => {
+        return (
+          <Form>
+            <ProfileFields values={values} isNewAccount={false} />
+            <AddlProfileFields
+              values={values}
+              isNewAccount={false}
+              requireAddlFields={requireTypeFields}
+            />
+            <div className="row submit-row no-gutters">
+              <div className="col d-flex justify-content-end">
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-gradient-red-to-blue"
+                  disabled={isSubmitting}
+                >
+                  Submit
+                </button>
+              </div>
             </div>
-          </div>
-        </Form>
-      )}
-    />
+          </Form>
+        )
+      }}
+    </Formik>
   )
 }
 
