@@ -175,6 +175,8 @@ export class CatalogPage extends React.Component<Props> {
     if (!departmentsIsLoading && departments.length > 0) {
       if (!this.state.filterDepartmentsByTabNameCalled) {
         // initialize the departments on page load.
+        this.setState({ filterDepartmentsByTabNameCalled: true }) // This line must be before calling changeSelectedTab for the first time
+        // or else componentDidUpdate will end up in an infinite loop.
         this.changeSelectedTab(this.state.tabSelected)
       }
       if (!coursesIsLoading && !this.state.filterCoursesCalled) {
@@ -254,7 +256,6 @@ export class CatalogPage extends React.Component<Props> {
     this.setState({
       filteredDepartments: filteredDepartments
     })
-    this.setState({ filterDepartmentsByTabNameCalled: true })
     const departmentObject = this.getDepartmentObjectFromSlug(
       this.state.selectedDepartment
     )
