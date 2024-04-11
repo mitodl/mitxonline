@@ -175,12 +175,7 @@ export class CatalogPage extends React.Component<Props> {
     if (!departmentsIsLoading && departments.length > 0) {
       if (!this.state.filterDepartmentsByTabNameCalled) {
         // initialize the departments on page load.
-        this.setState({ filterDepartmentsByTabNameCalled: true })
-        this.setState({
-          filteredDepartments: this.filterDepartmentsByTabName(
-            this.state.tabSelected
-          )
-        })
+        this.changeSelectedTab(this.state.tabSelected)
       }
       if (!coursesIsLoading && !this.state.filterCoursesCalled) {
         this.setState({ filterCoursesCalled: true }) // This line must be before calling filteredCoursesOrProgramsByDepartmentSlug
@@ -259,6 +254,7 @@ export class CatalogPage extends React.Component<Props> {
     this.setState({
       filteredDepartments: filteredDepartments
     })
+    this.setState({ filterDepartmentsByTabNameCalled: true })
     const departmentObject = this.getDepartmentObjectFromSlug(
       this.state.selectedDepartment
     )
@@ -272,23 +268,23 @@ export class CatalogPage extends React.Component<Props> {
       // with an associated Department matching the
       // selected department, update the selected department
       // to ALL_DEPARTMENTS.
+      this.changeSelectedDepartment(ALL_DEPARTMENTS, selectedTabName)
       if (selectedTabName === PROGRAMS_TAB) {
         this.retrieveMorePrograms()
       }
       if (selectedTabName === COURSES_TAB) {
         this.retrieveMoreCourses()
       }
-      this.changeSelectedDepartment(ALL_DEPARTMENTS, selectedTabName)
     } else {
       // Update either the programs or courses based on the currently
       // selected tab.
+      this.changeSelectedDepartment(departmentObject.slug, selectedTabName)
       if (selectedTabName === PROGRAMS_TAB) {
         this.retrieveMorePrograms()
       }
       if (selectedTabName === COURSES_TAB) {
         this.retrieveMoreCoursesByDepartment(departmentObject)
       }
-      this.changeSelectedDepartment(departmentObject.slug, selectedTabName)
     }
   }
 
@@ -352,7 +348,6 @@ export class CatalogPage extends React.Component<Props> {
       // If departmentObjectForTab is undefined, then the selectedDepartmentSlug
       // does not exist or ALL_DEPARTMENTS has been selected.
       this.setState({ selectedDepartment: ALL_DEPARTMENTS })
-      console.log(tabSelectedValue)
       this.props.history.push(
         this.getUpdatedURL(tabSelectedValue, ALL_DEPARTMENTS)
       )
@@ -361,7 +356,6 @@ export class CatalogPage extends React.Component<Props> {
       if (tabSelectedValue === COURSES_TAB) {
         this.setState({ filteredCourses: this.state.allCoursesRetrieved })
       } else {
-        console.log("hi")
         this.setState({ filteredPrograms: this.state.allProgramsRetrieved })
       }
     } else {
