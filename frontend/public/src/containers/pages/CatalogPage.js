@@ -325,7 +325,8 @@ export class CatalogPage extends React.Component<Props> {
    * Resets the query variables via resetQueryVariablesToDefault.
    * Closes the mobile view filter window.
    * @param {string} selectedDepartmentSlug The department slug to set selectedDepartment to and filter courses by.
-   * @param {string} tabSelected The currently selected tab.  Optional.
+   * @param {string} tabSelected The currently selected tab.  Optional.  If not defined, this.state.tabSelected is used
+   * when updating this.props.history.
    */
   changeSelectedDepartment = (
     selectedDepartmentSlug: string,
@@ -393,7 +394,8 @@ export class CatalogPage extends React.Component<Props> {
    * - filteredCourses, updated with the courses in the API response.
    * - filterCoursesCalled, set to true.
    *
-   * @param {string} courseQueryIDListString a string containing a list of course IDs.  This is optional.
+   * @param {string} courseQueryIDListString a string containing a list of course IDs.  This is optional.  When not defined,
+   * this method will make paginated API requests without specifying course IDs.
    */
   retrieveMoreCourses(courseQueryIDListString: string) {
     const { coursesIsLoading, getNextCoursePage } = this.props
@@ -480,6 +482,7 @@ export class CatalogPage extends React.Component<Props> {
    * - filterProgramsCalled set to true.
    *
    * @param {string} selectedDepartmentSlug The department slug for the currently selected department.  This parameter is optional.
+   * If this is not defined when calling the method, the value of this.state.selectedDepartment will be used.
    */
   retrieveMorePrograms(selectedDepartmentSlug: string) {
     const {
