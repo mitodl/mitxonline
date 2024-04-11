@@ -567,7 +567,7 @@ describe("CatalogPage", function() {
     expect(inner.instance().renderNumberOfCatalogItems()).equals(3)
 
     // Select a department to filter by.
-    inner.instance().changeSelectedDepartment("history")
+    inner.instance().changeSelectedDepartment("history", "courses")
     // Confirm the state updated to reflect the selected department.
     expect(inner.state().selectedDepartment).equals("history")
     expect(inner.state().tabSelected).equals("courses")

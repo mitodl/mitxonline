@@ -272,15 +272,14 @@ export class CatalogPage extends React.Component<Props> {
       // with an associated Department matching the
       // selected department, update the selected department
       // to ALL_DEPARTMENTS.
-      this.changeSelectedDepartment(ALL_DEPARTMENTS)
       if (selectedTabName === PROGRAMS_TAB) {
         this.retrieveMorePrograms()
       }
       if (selectedTabName === COURSES_TAB) {
         this.retrieveMoreCourses()
       }
+      this.changeSelectedDepartment(ALL_DEPARTMENTS, selectedTabName)
     } else {
-      this.changeSelectedDepartment(departmentObject.slug)
       // Update either the programs or courses based on the currently
       // selected tab.
       if (selectedTabName === PROGRAMS_TAB) {
@@ -289,10 +288,8 @@ export class CatalogPage extends React.Component<Props> {
       if (selectedTabName === COURSES_TAB) {
         this.retrieveMoreCoursesByDepartment(departmentObject)
       }
+      this.changeSelectedDepartment(departmentObject.slug, selectedTabName)
     }
-    this.props.history.push(
-      this.getUpdatedURL(selectedTabName, this.state.selectedDepartment)
-    )
   }
 
   /**
@@ -328,10 +325,19 @@ export class CatalogPage extends React.Component<Props> {
    * Resets the query variables via resetQueryVariablesToDefault.
    * Closes the mobile view filter window.
    * @param {string} selectedDepartmentSlug The department slug to set selectedDepartment to and filter courses by.
+   * @param {string} tabSelected The currently selected tab.  Optional.
    */
-  changeSelectedDepartment = (selectedDepartmentSlug: string) => {
+  changeSelectedDepartment = (
+    selectedDepartmentSlug: string,
+    tabSelected: string
+  ) => {
     this.resetQueryVariablesToDefault()
     this.toggleMobileFilterWindowExpanded(false)
+    let tabSelectedValue = tabSelected
+    if (typeof tabSelectedValue === "undefined") {
+      tabSelectedValue = this.state.tabSelected
+    }
+
     let departmentObjectForTab = undefined
     if (
       selectedDepartmentSlug !== ALL_DEPARTMENTS &&
@@ -345,27 +351,29 @@ export class CatalogPage extends React.Component<Props> {
       // If departmentObjectForTab is undefined, then the selectedDepartmentSlug
       // does not exist or ALL_DEPARTMENTS has been selected.
       this.setState({ selectedDepartment: ALL_DEPARTMENTS })
+      console.log(tabSelectedValue)
       this.props.history.push(
-        this.getUpdatedURL(this.state.tabSelected, selectedDepartmentSlug)
+        this.getUpdatedURL(tabSelectedValue, ALL_DEPARTMENTS)
       )
       // Return either all of the courses or programs
       // depending on the current tabSelected value.
-      if (this.state.tabSelected === COURSES_TAB) {
+      if (tabSelectedValue === COURSES_TAB) {
         this.setState({ filteredCourses: this.state.allCoursesRetrieved })
       } else {
+        console.log("hi")
         this.setState({ filteredPrograms: this.state.allProgramsRetrieved })
       }
     } else {
       // A valid department or ALL_DEPARTMENTS has been selected.
       this.setState({ selectedDepartment: selectedDepartmentSlug })
       this.props.history.push(
-        this.getUpdatedURL(this.state.tabSelected, selectedDepartmentSlug)
+        this.getUpdatedURL(tabSelectedValue, selectedDepartmentSlug)
       )
       // We need to attempt to retrieve more courses or programs
       // in order to populate the filtered catalog page.
-      if (this.state.tabSelected === COURSES_TAB) {
+      if (tabSelectedValue === COURSES_TAB) {
         this.retrieveMoreCoursesByDepartment(departmentObjectForTab)
-      } else if (this.state.tabSelected === PROGRAMS_TAB) {
+      } else if (tabSelectedValue === PROGRAMS_TAB) {
         this.retrieveMorePrograms(selectedDepartmentSlug)
       }
     }
