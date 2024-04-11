@@ -243,51 +243,54 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
             initialValues={{
               partnerSchool: ""
             }}
-            render={() => (
-              <Form className="text-center">
-                <section>
-                  <label htmlFor="partnerSchool" className="text-start">
-                    Select School
-                  </label>
-                  <Field
-                    name="partnerSchool"
-                    render={({ field }) => (
-                      <select
-                        {...field}
-                        name="partnerSchool"
-                        className="form-control"
-                        aria-label="Select School"
-                      >
-                        <option aria-hidden="true">Choose one...</option>
-                        {learnerRecord.partner_schools.map(elem => (
-                          <option
-                            key={`partner-school-${elem.id}`}
-                            value={elem.id}
-                          >
-                            {elem.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  />
-                </section>
-                <div className="mt-2">
-                  <Button
-                    type="submit"
-                    color="primary"
-                    className="btn-gradient-red-to-blue"
-                  >
-                    Send Record
-                  </Button>{" "}
-                  <Button
-                    onClick={() => this.togglePartnerSchoolSharingDialog()}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </Form>
-            )}
-          />
+          >
+            {() => {
+              return (
+                <Form className="text-center">
+                  <section>
+                    <label htmlFor="partnerSchool" className="text-start">
+                      Select School
+                    </label>
+                    <Field
+                      name="partnerSchool"
+                      render={({ field }) => (
+                        <select
+                          {...field}
+                          name="partnerSchool"
+                          className="form-control"
+                          aria-label="Select School"
+                        >
+                          <option aria-hidden="true">Choose one...</option>
+                          {learnerRecord.partner_schools.map(elem => (
+                            <option
+                              key={`partner-school-${elem.id}`}
+                              value={elem.id}
+                            >
+                              {elem.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    />
+                  </section>
+                  <div className="mt-2">
+                    <Button
+                      type="submit"
+                      color="primary"
+                      className="btn-gradient-red-to-blue"
+                    >
+                      Send Record
+                    </Button>{" "}
+                    <Button
+                      onClick={() => this.togglePartnerSchoolSharingDialog()}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </Form>
+              )
+            }}
+          </Formik>
 
           <div className="form-group"></div>
         </ModalBody>

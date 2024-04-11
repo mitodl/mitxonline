@@ -9,11 +9,16 @@ import ScaledRecaptcha from "../ScaledRecaptcha"
 import { EmailInput } from "./elements/inputs"
 import FormError from "./elements/FormError"
 import { routes } from "../../lib/urls"
+import { ConnectedFocusError } from "focus-formik-error"
 
 const emailValidation = yup.object().shape({
   recaptcha: SETTINGS.recaptchaKey
     ? yup.string().required("Please verify you're not a robot")
-    : yup.mixed().notRequired()
+    : yup.mixed().notRequired(),
+  email: yup
+    .string()
+    .email("Please enter an email address")
+    .required("Email is required")
 })
 
 type Props = {
@@ -29,72 +34,78 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
   <Formik
     onSubmit={onSubmit}
     validationSchema={emailValidation}
+    validateOnChange={false}
+    validateOnBlur={false}
     initialValues={{
       email:     "",
       recaptcha: SETTINGS.recaptchaKey ? "" : undefined
     }}
-    render={({ isSubmitting, setFieldValue }) => (
-      <Form>
-        <div className="form-group">
-          <label htmlFor="email">Email</label>
-          <Field
-            name="email"
-            id="email"
-            className="form-control"
-            autoComplete="email"
-            component={EmailInput}
-            aria-describedby="emailError"
-            required
-          />
-
-          <p>
-            By creating an account I agree to the
-            <br />
-            <a
-              href={routes.informationLinks.honorCode}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Honor Code
-            </a>
-            {", "}
-            <a
-              href={routes.informationLinks.termsOfService}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Terms of Service
-            </a>
-            {" and "}
-            <a
-              href={routes.informationLinks.privacyPolicy}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Privacy Policy
-            </a>
-            {"."}
-          </p>
-        </div>
-        {SETTINGS.recaptchaKey ? (
+  >
+    {({ errors, setFieldValue, isSubmitting }) => {
+      return (
+        <Form>
+          <ConnectedFocusError />
           <div className="form-group">
-            <ScaledRecaptcha
-              onRecaptcha={value => setFieldValue("recaptcha", value)}
-              recaptchaKey={SETTINGS.recaptchaKey}
+            <label htmlFor="email">Email</label>
+            <Field
+              name="email"
+              id="email"
+              className="form-control"
+              autoComplete="email"
+              component={EmailInput}
+              aria-invalid={errors.email ? "true" : null}
+              aria-describedby={errors.email ? "emailError" : null}
             />
-            <ErrorMessage name="recaptcha" component={FormError} />
+            <ErrorMessage name="email" component={FormError} />
+            <p>
+              By creating an account I agree to the
+              <br />
+              <a
+                href={routes.informationLinks.honorCode}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Honor Code
+              </a>
+              {", "}
+              <a
+                href={routes.informationLinks.termsOfService}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Terms of Service
+              </a>
+              {" and "}
+              <a
+                href={routes.informationLinks.privacyPolicy}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Privacy Policy
+              </a>
+              {"."}
+            </p>
           </div>
-        ) : null}
-        <button
-          type="submit"
-          className="btn btn-primary btn-gradient-red-to-blue large"
-          disabled={isSubmitting}
-        >
-          Continue
-        </button>
-      </Form>
-    )}
-  />
+          {SETTINGS.recaptchaKey ? (
+            <div className="form-group">
+              <ScaledRecaptcha
+                onRecaptcha={value => setFieldValue("recaptcha", value)}
+                recaptchaKey={SETTINGS.recaptchaKey}
+              />
+              <ErrorMessage name="recaptcha" component={FormError} />
+            </div>
+          ) : null}
+          <button
+            type="submit"
+            className="btn btn-primary btn-gradient-red-to-blue large"
+            disabled={isSubmitting}
+          >
+            Continue
+          </button>
+        </Form>
+      )
+    }}
+  </Formik>
 )
 
 export default RegisterEmailForm

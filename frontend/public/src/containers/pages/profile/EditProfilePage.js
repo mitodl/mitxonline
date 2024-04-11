@@ -50,7 +50,6 @@ export class EditProfilePage extends React.Component<Props> {
       const {
         body: { errors }
       }: { body: Object } = await editProfile(profileData)
-
       if (errors && errors.length > 0) {
         setErrors({
           email: errors[0]

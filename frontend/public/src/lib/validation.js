@@ -21,9 +21,26 @@ export const changeEmailValidationRegex = (email: string) => {
   return `^((?!${escapedUserEmail}).)*$`
 }
 
-export const passwordField = yup.string().label("Password")
+export const changeEmailFormValidation = yup.object().shape({
+  email: yup
+    .string()
+    .label("New Email")
+    .required(),
+  confirmPassword: yup
+    .string()
+    .label("Confirm Password")
+    .required()
+})
 
-export const usernameField = yup.string().label("Username")
+export const passwordField = yup
+  .string()
+  .required()
+  .label("Password")
+
+export const usernameField = yup
+  .string()
+  .required()
+  .label("Username")
 
 export const resetPasswordFormValidation = yup.object().shape({
   newPassword:     passwordField.label("New Password"),
@@ -40,7 +57,7 @@ export const changePasswordFormValidation = yup.object().shape({
     .label("Old Password")
     .required(),
 
-  newPassword: passwordField.label("New Password"),
+  newPassword: passwordField.label("New Password").required(),
 
   confirmPassword: yup
     .string()

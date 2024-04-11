@@ -132,7 +132,11 @@ div.std-card {
             margin-bottom: 10px;
         }
 
-        div.form-group {            
+        div.form-group {
+
+            .form-error {
+                color: $primary;
+            }
             label {
                 color: $footer-blue-bg;
                 font-family: Inter;

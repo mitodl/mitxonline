@@ -255,42 +255,45 @@ export class EnrolledItemCard extends React.Component<
               enrollmentId:    enrollment.id,
               courseNumber:    enrollment.run.course_number
             }}
-            render={({ values }) => (
-              <Form className="text-center">
-                <section>
-                  <Field
-                    type="hidden"
-                    name="enrollmentId"
-                    value={values.enrollmentId}
-                  />
-                  <Field
-                    type="hidden"
-                    name="courseNumber"
-                    value={values.courseNumber}
-                  />
-                  <Field
-                    type="checkbox"
-                    name="subscribeEmails"
-                    checked={values.subscribeEmails}
-                    aria-labelledby={`verified-unenrollment-${values.enrollmentId}-email-checkbox`}
-                  />{" "}
-                  <label
-                    id={`verified-unenrollment-${values.enrollmentId}-email-checkbox`}
+          >
+            {({ values }) => {
+              return (
+                <Form className="text-center">
+                  <section>
+                    <Field
+                      type="hidden"
+                      name="enrollmentId"
+                      value={values.enrollmentId}
+                    />
+                    <Field
+                      type="hidden"
+                      name="courseNumber"
+                      value={values.courseNumber}
+                    />
+                    <Field
+                      type="checkbox"
+                      name="subscribeEmails"
+                      checked={values.subscribeEmails}
+                      aria-labelledby={`verified-unenrollment-${values.enrollmentId}-email-checkbox`}
+                    />{" "}
+                    <label
+                      id={`verified-unenrollment-${values.enrollmentId}-email-checkbox`}
+                    >
+                      Receive course emails
+                    </label>
+                  </section>
+                  <Button type="submit" color="success">
+                    Save Settings
+                  </Button>{" "}
+                  <Button
+                    onClick={() => this.toggleEmailSettingsModalVisibility()}
                   >
-                    Receive course emails
-                  </label>
-                </section>
-                <Button type="submit" color="success">
-                  Save Settings
-                </Button>{" "}
-                <Button
-                  onClick={() => this.toggleEmailSettingsModalVisibility()}
-                >
-                  Cancel
-                </Button>
-              </Form>
-            )}
-          />
+                    Cancel
+                  </Button>
+                </Form>
+              )
+            }}
+          </Formik>
         </ModalBody>
       </Modal>
     )
