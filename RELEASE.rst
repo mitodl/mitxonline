@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.89.2
+--------------
+
+- Fix catalog page for empty app (#2152)
+- Fix enrollment dialog default option (#2154)
+- Form error messages should appear consistently and be accessible  (#2151)
+- change route to catalog from root now that we have a catalog (#2155)
+- Ensure filteredPrograms is set earlier and change the route when navigation changes. (#2153)
+
 Version 0.89.1 (Released April 09, 2024)
 --------------
 
