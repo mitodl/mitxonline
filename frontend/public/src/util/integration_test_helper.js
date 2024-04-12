@@ -96,10 +96,7 @@ export default class IntegrationTestHelper {
           {...extraProps}
         />,
         {
-          context: {
-            // TODO: should be removed in the near future after upgrading enzyme
-            store
-          }
+          context: {}
         }
       )
 
