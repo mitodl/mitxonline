@@ -23,6 +23,7 @@ import {
 
 import * as courseApi from "../lib/courseApi"
 import { makeUser, makeAnonymousUser } from "../factories/user"
+import { getDisabledProp } from "../lib/test_utils"
 
 describe("CourseProductDetailEnrollShallowRender", () => {
   let helper,
@@ -542,36 +543,23 @@ describe("CourseProductDetailEnrollShallowRender", () => {
             .at(0)
             .prop("disabled")
         )
-        assert.isTrue(
-          inner
-            .find("button.enroll-now-free")
-            .at(0)
-            .prop("disabled")
-        )
+        assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
         modal
           .find("select.form-control")
           .simulate("change", { target: { value: courseRun["id"] } })
         inner.update()
-        assert.isFalse(
-          inner
-            .find("button.enroll-now-free")
-            .at(0)
-            .prop("disabled")
-        )
-        assert.isFalse(
-          inner
-            .find("button.btn-upgrade")
-            .at(0)
-            .prop("disabled")
-        )
+        assert.isFalse(getDisabledProp(inner, "button.enroll-now-free"))
+        assert.isFalse(getDisabledProp(inner, "button.btn-upgrade"))
+        // check if default selected it resets back
+        modal
+          .find("select.form-control")
+          .simulate("change", { target: { value: "default" } })
+        inner.update()
+        assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
+        assert.isTrue(getDisabledProp(inner, "button.btn-upgrade"))
       } else {
         assert.isFalse(selectorControl.exists())
-        assert.isFalse(
-          inner
-            .find("button.enroll-now-free")
-            .at(0)
-            .prop("disabled")
-        )
+        assert.isFalse(getDisabledProp(inner, "button.enroll-now-free"))
         assert.isFalse(
           upgradeForm
             .find("button.btn-upgrade")
@@ -604,22 +592,12 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
     const modal = inner.find(".upgrade-enrollment-modal")
     assert.isTrue(modal.find("select.form-control").exists())
-    assert.isTrue(
-      modal
-        .find("button.enroll-now-free")
-        .at(0)
-        .prop("disabled")
-    )
+    assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
     modal
       .find("select.form-control")
       .simulate("change", { target: { value: courseRun["id"] } })
     inner.update()
-    assert.isFalse(
-      inner
-        .find("button.enroll-now-free")
-        .at(0)
-        .prop("disabled")
-    )
+    assert.isFalse(getDisabledProp(inner, "button.enroll-now-free"))
     assert.isFalse(inner.find("button.btn-upgrade").exists())
   })
   ;[
@@ -655,28 +633,15 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
       const modal = inner.find(".upgrade-enrollment-modal")
       assert.isTrue(modal.find("select.form-control").exists())
-      let upgradeBtnDisabledProp = inner
-        .find("button.btn-upgrade")
-        .at(0)
-        .prop("disabled")
-      assert.isTrue(
-        modal
-          .find("button.enroll-now-free")
-          .at(0)
-          .prop("disabled")
-      )
-      assert.isTrue(upgradeBtnDisabledProp)
+      assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
+      assert.isTrue(getDisabledProp(inner, "button.btn-upgrade"))
       modal
         .find("select.form-control")
         .simulate("change", { target: { value: runWithMixedInfo["id"] } })
       inner.update()
       const certPricing = inner.find(".certificate-pricing").at(0)
-      upgradeBtnDisabledProp = inner
-        .find("button.btn-upgrade")
-        .at(0)
-        .prop("disabled")
       if (isUpgradable && hasProduct) {
-        assert.isFalse(upgradeBtnDisabledProp)
+        assert.isFalse(getDisabledProp(inner, "button.btn-upgrade"))
         assert.isTrue(certPricing.exists())
         assert.isTrue(
           certPricing
@@ -686,15 +651,10 @@ describe("CourseProductDetailEnrollShallowRender", () => {
             )
         )
       } else {
-        assert.isTrue(upgradeBtnDisabledProp)
+        assert.isTrue(getDisabledProp(inner, "button.btn-upgrade"))
         assert.isTrue(certPricing.text().includes("not available"))
       }
-      assert.isFalse(
-        inner
-          .find("button.enroll-now-free")
-          .at(0)
-          .prop("disabled")
-      )
+      assert.isFalse(getDisabledProp(inner, "button.enroll-now-free"))
     })
   })
 
