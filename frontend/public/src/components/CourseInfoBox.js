@@ -44,6 +44,18 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     )
   }
 
+  warningMessage(isArchived) {
+    const message = isArchived
+      ? "This course is no longer active, but you can still access selected content."
+      : "No sessions of this course are currently open for enrollment. More sessions may be added in the future."
+    return (
+      <div className="row d-flex align-self-stretch callout callout-warning course-archived-message">
+        <i className="material-symbols-outlined warning">error</i>
+        <p>{message}</p>
+      </div>
+    )
+  }
+
   render() {
     const { courses, courseRuns, enrollments } = this.props
 
@@ -55,9 +67,11 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     const run = getFirstRelevantRun(course, courseRuns)
     const product = run && run.products.length > 0 && run.products[0]
 
-    const isArchived =
-      moment().isAfter(run.end_date) &&
-      (moment().isBefore(run.enrollment_end) || emptyOrNil(run.enrollment_end))
+    const isArchived = run
+      ? moment().isAfter(run.end_date) &&
+        (moment().isBefore(run.enrollment_end) ||
+          emptyOrNil(run.enrollment_end))
+      : false
 
     const startDates = []
     const moreEnrollableCourseRuns = courseRuns && courseRuns.length > 1
@@ -82,41 +96,42 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     return (
       <>
         <div className="enrollment-info-box componentized">
-          {isArchived ? (
-            <div className="row d-flex align-self-stretch callout callout-warning course-archived-message">
-              <i className="material-symbols-outlined warning">error</i>
-              <p>
-                This course is no longer active, but you can still access
-                selected content.
-              </p>
+          {!run || isArchived ? this.warningMessage(isArchived) : null}
+          {run ? (
+            <div className="row d-flex align-items-center course-timing-message">
+              <div
+                className="enrollment-info-icon"
+                aria-level="3"
+                role="heading"
+              >
+                <img
+                  src="/static/images/products/start-date.png"
+                  alt="Course Timing"
+                />
+              </div>
+              <div className="enrollment-info-text">
+                {isArchived
+                  ? "Course content available anytime"
+                  : getStartDateText(run)}
+              </div>
+
+              {!isArchived && moreEnrollableCourseRuns ? (
+                <>
+                  <button
+                    className="more-enrollment-info"
+                    onClick={() => this.toggleShowMoreEnrollDates()}
+                  >
+                    {this.state.showMoreEnrollDates
+                      ? "Show Less"
+                      : "More Dates"}
+                  </button>
+                  {this.state.showMoreEnrollDates ? (
+                    <ul className="more-dates-enrollment-list">{startDates}</ul>
+                  ) : null}
+                </>
+              ) : null}
             </div>
           ) : null}
-          <div className="row d-flex align-items-center course-timing-message">
-            <div className="enrollment-info-icon" aria-level="3" role="heading">
-              <img
-                src="/static/images/products/start-date.png"
-                alt="Course Timing"
-              />
-            </div>
-            <div className="enrollment-info-text">
-              {isArchived
-                ? "Course content available anytime"
-                : getStartDateText(run)}
-            </div>
-            {!isArchived && moreEnrollableCourseRuns ? (
-              <>
-                <button
-                  className="more-enrollment-info"
-                  onClick={() => this.toggleShowMoreEnrollDates()}
-                >
-                  {this.state.showMoreEnrollDates ? "Show Less" : "More Dates"}
-                </button>
-                {this.state.showMoreEnrollDates ? (
-                  <ul className="more-dates-enrollment-list">{startDates}</ul>
-                ) : null}
-              </>
-            ) : null}
-          </div>
           {course && course.page ? (
             <div className="row d-flex align-items-top course-effort-message">
               <div
@@ -131,37 +146,41 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               </div>
               <div className="enrollment-info-text">
                 {course.page.length}
-                {isArchived ? (
-                  <>
-                    <span className="badge badge-pacing">ARCHIVED</span>
-                    <a
-                      className="pacing-faq-link float-right"
-                      href="https://mitxonline.zendesk.com/hc/en-us/articles/21995114519067-What-are-Archived-courses-on-MITx-Online-"
-                    >
-                      What's this?
-                    </a>
-                  </>
-                ) : run && run.is_self_paced ? (
-                  <>
-                    <span className="badge badge-pacing">SELF-PACED</span>
-                    <a
-                      className="pacing-faq-link float-right"
-                      href="https://mitxonline.zendesk.com/hc/en-us/articles/21994872904475-What-are-Self-Paced-courses-on-MITx-Online-"
-                    >
-                      What's this?
-                    </a>
-                  </>
-                ) : (
-                  <>
-                    <span className="badge badge-pacing">INSTRUCTOR-PACED</span>
-                    <a
-                      className="pacing-faq-link float-right"
-                      href="https://mitxonline.zendesk.com/hc/en-us/articles/21994938130075-What-are-Instructor-Paced-courses-on-MITx-Online-"
-                    >
-                      What's this?
-                    </a>
-                  </>
-                )}
+                {run ? (
+                  isArchived ? (
+                    <>
+                      <span className="badge badge-pacing">ARCHIVED</span>
+                      <a
+                        className="pacing-faq-link float-right"
+                        href="https://mitxonline.zendesk.com/hc/en-us/articles/21995114519067-What-are-Archived-courses-on-MITx-Online-"
+                      >
+                        What's this?
+                      </a>
+                    </>
+                  ) : run.is_self_paced ? (
+                    <>
+                      <span className="badge badge-pacing">SELF-PACED</span>
+                      <a
+                        className="pacing-faq-link float-right"
+                        href="https://mitxonline.zendesk.com/hc/en-us/articles/21994872904475-What-are-Self-Paced-courses-on-MITx-Online-"
+                      >
+                        What's this?
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <span className="badge badge-pacing">
+                        INSTRUCTOR-PACED
+                      </span>
+                      <a
+                        className="pacing-faq-link float-right"
+                        href="https://mitxonline.zendesk.com/hc/en-us/articles/21994938130075-What-are-Instructor-Paced-courses-on-MITx-Online-"
+                      >
+                        What's this?
+                      </a>
+                    </>
+                  )
+                ) : null}
 
                 {course.page.effort ? (
                   <>
@@ -189,7 +208,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               />
             </div>
             <div className="enrollment-info-text">
-              {product && !isArchived ? (
+              {run && product && !isArchived ? (
                 <>
                   Certificate track:{" "}
                   {formatLocalePrice(getFlexiblePriceForProduct(product))}

@@ -433,8 +433,7 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   renderEnrollLoginButton() {
-    const { currentUser } = this.props
-    return !currentUser || !currentUser.id ? (
+    return (
       <h2>
         <a
           href={`${routes.login}?next=${encodeURIComponent(
@@ -445,43 +444,55 @@ export class CourseProductDetailEnroll extends React.Component<
           Enroll now
         </a>
       </h2>
-    ) : null
+    )
+  }
+
+  renderAccessCourseButton() {
+    return (
+      <h2>
+        <a
+          href={`${routes.login}?next=${encodeURIComponent(
+            window.location.pathname
+          )}`}
+          className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
+        >
+          Access Course Materials
+        </a>
+      </h2>
+    )
   }
 
   renderEnrollNowButton(
     run: EnrollmentFlaggedCourseRun,
     product: Product | null
   ) {
-    const { currentUser, courseRuns } = this.props
+    const { courseRuns } = this.props
     const csrfToken = getCookie("csrftoken")
-    return currentUser &&
-      currentUser.id &&
-      run &&
-      isWithinEnrollmentPeriod(run) ? (
-        <h2>
-          {(product && run.is_upgradable) ||
+    return run && isWithinEnrollmentPeriod(run) ? (
+      <h2>
+        {(product && run.is_upgradable) ||
         (courseRuns && courseRuns.length > 1) ? (
-              <button
-                id="upgradeEnrollBtn"
-                className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
-                onClick={() => this.toggleUpgradeDialogVisibility()}
-              >
+            <button
+              id="upgradeEnrollBtn"
+              className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
+              onClick={() => this.toggleUpgradeDialogVisibility()}
+            >
             Enroll now
-              </button>
-            ) : (
-              <form action="/enrollments/" method="post">
-                <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
-                <input type="hidden" name="run" value={run ? run.id : ""} />
-                <button
-                  type="submit"
-                  className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
-                >
+            </button>
+          ) : (
+            <form action="/enrollments/" method="post">
+              <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+              <input type="hidden" name="run" value={run ? run.id : ""} />
+              <button
+                type="submit"
+                className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+              >
               Enroll now
-                </button>
-              </form>
-            )}
-        </h2>
-      ) : null
+              </button>
+            </form>
+          )}
+      </h2>
+    ) : null
   }
 
   render() {
@@ -506,16 +517,19 @@ export class CourseProductDetailEnroll extends React.Component<
       }
     }
 
-    return run ? (
+    return (
       <>
         {
           // $FlowFixMe: isLoading null or undefined
           <Loader key="product_detail_enroll_loader" isLoading={isLoading}>
             <>
-              {this.renderEnrollLoginButton()}
-              {this.renderEnrollNowButton(run, product)}
+              {run
+                ? currentUser && currentUser.id
+                  ? this.renderEnrollNowButton(run, product)
+                  : this.renderEnrollLoginButton()
+                : this.renderAccessCourseButton()}
 
-              {currentUser ? this.renderAddlProfileFieldsModal() : null}
+              {run && currentUser ? this.renderAddlProfileFieldsModal() : null}
               {run ? this.renderUpgradeEnrollmentDialog(run) : null}
             </>
           </Loader>
@@ -541,7 +555,7 @@ export class CourseProductDetailEnroll extends React.Component<
           }
         </>
       </>
-    ) : null
+    )
   }
 }
 
