@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.89.2
+Version 0.89.2 (Released April 16, 2024)
 --------------
 
 - Fix catalog page for empty app (#2152)
