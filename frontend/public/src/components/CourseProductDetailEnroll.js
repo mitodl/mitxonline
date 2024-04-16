@@ -454,7 +454,7 @@ export class CourseProductDetailEnroll extends React.Component<
           href={`${routes.login}?next=${encodeURIComponent(
             window.location.pathname
           )}`}
-          className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
+          className="btn btn-primary btn-enrollment-button btn-lg highlight disabled"
         >
           Access Course Materials
         </a>
