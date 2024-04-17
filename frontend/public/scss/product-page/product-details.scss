@@ -340,6 +340,8 @@ body.new-design {
           .enrollment-info-text {
             width: auto;
             flex-grow: 1;
+            color: #58585A;
+
 
             .pacing-faq-link {
               color: $home-page-dark-blue;
@@ -364,12 +366,14 @@ body.new-design {
           }
           .more-enrollment-info {
             width: auto;
-            color: $brand-darker-bg;
+            color: $home-page-header-blue;
             font-size: 12px;
             text-decoration-line: underline;
             border-color: transparent;
             background-color: transparent;
             padding-right: 0;
+            height: fit-content;
+            line-height: normal;
           }
           .more-dates-enrollment-list{
             list-style: none;
