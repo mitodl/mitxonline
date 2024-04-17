@@ -4,7 +4,7 @@ import {
   emptyOrNil,
   getFlexiblePriceForProduct,
   formatLocalePrice,
-  getStartDateText
+  getStartDateText, compareCourseRunStartDates, parseDateString
 } from "../lib/util"
 import { getFirstRelevantRun } from "../lib/courseApi"
 import moment from "moment-timezone"
@@ -12,6 +12,7 @@ import moment from "moment-timezone"
 import type { BaseCourseRun } from "../flow/courseTypes"
 import { EnrollmentFlaggedCourseRun, RunEnrollment } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
+import {CourseDetailWithRuns} from "../flow/courseTypes";
 
 type CourseInfoBoxProps = {
   courses: Array<BaseCourseRun>,
@@ -20,6 +21,16 @@ type CourseInfoBoxProps = {
   currentUser: CurrentUser,
   toggleUpgradeDialogVisibility: () => Promise<any>,
   setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>
+}
+const getCourseDates = run => {
+  let startDate = formatPrettyDate(parseDateString(run.start_date))
+  if (run.is_self_paced && moment(run.start_date).isBefore(moment())) {
+    startDate = "Start Anytime"
+  }
+  return <>
+    <b>Start:</b>{" "}{startDate}<br/>
+    <b>End:</b>{" "}{formatPrettyDate(parseDateString(run.end_date))}
+  </>
 }
 
 export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProps> {
@@ -34,14 +45,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
   setRunEnrollDialog(run: EnrollmentFlaggedCourseRun) {
     this.props.setCurrentCourseRun(run)
     this.props.toggleUpgradeDialogVisibility()
-  }
-
-  renderEnrolledDateLink(run: EnrollmentFlaggedCourseRun) {
-    return (
-      <button className="more-dates-link enrolled">
-        {getStartDateText(run)} - Enrolled
-      </button>
-    )
   }
 
   warningMessage(isArchived) {
@@ -80,14 +83,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         if (courseRun.id !== run.id) {
           startDates.push(
             <li key={index}>
-              {courseRun.is_enrolled ||
-              (enrollments &&
-                enrollments.find(
-                  (enrollment: RunEnrollment) =>
-                    enrollment.run.id === courseRun.id
-                ))
-                ? this.renderEnrolledDateLink(courseRun)
-                : getStartDateText(courseRun)}
+              {getStartDateText(courseRun)}
             </li>
           )
         }
@@ -98,7 +94,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         <div className="enrollment-info-box componentized">
           {!run || isArchived ? this.warningMessage(isArchived) : null}
           {run ? (
-            <div className="row d-flex align-items-center course-timing-message">
+            <div className="row d-flex course-timing-message">
               <div
                 className="enrollment-info-icon"
                 aria-level="3"
@@ -112,7 +108,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               <div className="enrollment-info-text">
                 {isArchived
                   ? "Course content available anytime"
-                  : getStartDateText(run)}
+                  : getCourseDates(run)}
               </div>
 
               {!isArchived && moreEnrollableCourseRuns ? (
