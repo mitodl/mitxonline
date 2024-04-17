@@ -270,6 +270,11 @@ body.new-design {
           text-align: center;
         }
 
+        .btn-enrollment-button.disabled {
+          color: $white;
+          background-color: grey;
+        }
+
         button.btn-enrollment-button {
           color: $white;
         }
