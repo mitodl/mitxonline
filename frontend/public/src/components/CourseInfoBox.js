@@ -4,7 +4,7 @@ import {
   emptyOrNil,
   getFlexiblePriceForProduct,
   formatLocalePrice,
-  getStartDateText, compareCourseRunStartDates, parseDateString
+  parseDateString
 } from "../lib/util"
 import { getFirstRelevantRun } from "../lib/courseApi"
 import moment from "moment-timezone"
@@ -12,7 +12,6 @@ import moment from "moment-timezone"
 import type { BaseCourseRun } from "../flow/courseTypes"
 import { EnrollmentFlaggedCourseRun, RunEnrollment } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
-import {CourseDetailWithRuns} from "../flow/courseTypes";
 
 type CourseInfoBoxProps = {
   courses: Array<BaseCourseRun>,
@@ -27,10 +26,12 @@ const getCourseDates = (run, isMoreDates = false) => {
   if (run.is_self_paced && moment(run.start_date).isBefore(moment())) {
     startDate = "Anytime"
   }
-  return <>
-    <b>Start:</b>{" "}{startDate}{" "}{isMoreDates ? null : (<br/>)}
-    <b>End:</b>{" "}{formatPrettyDate(parseDateString(run.end_date))}
-  </>
+  return (
+    <>
+      <b>Start:</b> {startDate} {isMoreDates ? null : <br />}
+      <b>End:</b> {formatPrettyDate(parseDateString(run.end_date))}
+    </>
+  )
 }
 
 export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProps> {
@@ -60,7 +61,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
   }
 
   render() {
-    const { courses, courseRuns, enrollments } = this.props
+    const { courses, courseRuns } = this.props
 
     if (!courses || courses.length < 1) {
       return null
@@ -82,9 +83,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
       courseRuns.forEach((courseRun, index) => {
         if (courseRun.id !== run.id) {
           startDates.push(
-            <li key={index}>
-              {getCourseDates(courseRun, true)}
-            </li>
+            <li key={index}>{getCourseDates(courseRun, true)}</li>
           )
         }
       })
