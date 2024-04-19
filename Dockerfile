@@ -39,12 +39,11 @@ RUN curl -sSL https://install.python-poetry.org \
   POETRY_VERSION=${POETRY_VERSION} \
   POETRY_HOME=${POETRY_HOME} \
   python3 -q
+# Add project
+COPY . /app
 WORKDIR /app
 RUN python3 -m venv $VIRTUAL_ENV
 RUN poetry install
-
-# Add project
-COPY . /app
 
 USER root
 RUN apt-get clean && apt-get purge

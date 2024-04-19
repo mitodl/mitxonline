@@ -20,6 +20,7 @@ from django.urls import reverse
 from django.utils.functional import cached_property
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
+from mitol.posthog import features
 from modelcluster.fields import ParentalKey
 from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel
 from wagtail.blocks import PageChooserBlock, StreamBlock

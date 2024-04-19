@@ -82,10 +82,10 @@ ulid-py = "^1.1.0"
 uwsgi = "^2.0.19"
 wagtail = "^5.0"
 hypothesis = "4.23.9"
-posthog = "^3.5.0"
 uwsgitop = "^0.11"
 deepdiff = "^6.6.1"
 wagtail-metadata = "^5.0.0"
+mitol-django-posthog = {path = "mitol-django-posthog-2024.04.16.tar.gz"}
 
 
 [tool.poetry.group.dev.dependencies]
