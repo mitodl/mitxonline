@@ -22,13 +22,13 @@ type CourseInfoBoxProps = {
   toggleUpgradeDialogVisibility: () => Promise<any>,
   setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>
 }
-const getCourseDates = run => {
+const getCourseDates = (run, isMoreDates = false) => {
   let startDate = formatPrettyDate(parseDateString(run.start_date))
   if (run.is_self_paced && moment(run.start_date).isBefore(moment())) {
-    startDate = "Start Anytime"
+    startDate = "Anytime"
   }
   return <>
-    <b>Start:</b>{" "}{startDate}<br/>
+    <b>Start:</b>{" "}{startDate}{" "}{isMoreDates ? null : (<br/>)}
     <b>End:</b>{" "}{formatPrettyDate(parseDateString(run.end_date))}
   </>
 }
@@ -83,7 +83,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         if (courseRun.id !== run.id) {
           startDates.push(
             <li key={index}>
-              {getStartDateText(courseRun)}
+              {getCourseDates(courseRun, true)}
             </li>
           )
         }
