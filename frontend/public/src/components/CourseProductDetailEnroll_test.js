@@ -731,7 +731,9 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     ["instructor-paced", true],
     ["instructor-paced", false]
   ].forEach(([courseMode, startInFuture]) => {
-    it(`CourseInfoBox renders the course start and end dates when the course is ${courseMode} and ${startInFuture}`, async () => {
+    it(`CourseInfoBox renders the course start and end dates when the course is ${courseMode} and has ${
+      startInFuture ? "future" : "past"
+    } start date`, async () => {
       if (courseMode === "self-paced") {
         courseRun = {
           ...makeCourseRunDetail(),
