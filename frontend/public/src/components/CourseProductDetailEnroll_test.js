@@ -24,6 +24,7 @@ import {
 import * as courseApi from "../lib/courseApi"
 import { makeUser, makeAnonymousUser } from "../factories/user"
 import { getDisabledProp } from "../lib/test_utils"
+import { formatPrettyDate, parseDateString } from "../lib/util"
 
 describe("CourseProductDetailEnrollShallowRender", () => {
   let helper,
@@ -725,6 +726,75 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     )
   })
   ;[
+    ["self-paced", true],
+    ["self-paced", false],
+    ["instructor-paced", true],
+    ["instructor-paced", false]
+  ].forEach(([courseMode, startInFuture]) => {
+    it(`CourseInfoBox renders the course start and end dates when the course is ${courseMode} and ${startInFuture}`, async () => {
+      if (courseMode === "self-paced") {
+        courseRun = {
+          ...makeCourseRunDetail(),
+          is_self_paced:  true,
+          enrollment_end: moment()
+            .add(7, "months")
+            .toISOString(),
+          enrollment_start: moment()
+            .subtract(1, "years")
+            .toISOString(),
+          end_date: moment()
+            .add(1, "years")
+            .toISOString()
+        }
+      }
+      if (startInFuture) {
+        courseRun["start_date"] = moment()
+          .add(10, "months")
+          .toISOString()
+      } else {
+        courseRun["start_date"] = moment()
+          .subtract(10, "months")
+          .toISOString()
+      }
+      const courseRuns = [courseRun]
+
+      const entities = {
+        currentUser: currentUser,
+        enrollments: [],
+        courseRuns:  courseRuns
+      }
+
+      const { inner } = await renderPage({
+        entities: entities
+      })
+
+      assert.isTrue(inner.exists())
+      const infobox = inner.find("CourseInfoBox").dive()
+      assert.isTrue(infobox.exists())
+      if (courseMode === "self-paced" && !startInFuture) {
+        assert.include(
+          infobox
+            .find(".enrollment-info-text")
+            .at(0)
+            .text(),
+          `Start: Anytime End: ${formatPrettyDate(
+            parseDateString(courseRun.end_date)
+          )}`
+        )
+      } else {
+        assert.include(
+          infobox
+            .find(".enrollment-info-text")
+            .at(0)
+            .text(),
+          `Start: ${formatPrettyDate(
+            parseDateString(courseRun.start_date)
+          )} End: ${formatPrettyDate(parseDateString(courseRun.end_date))}`
+        )
+      }
+    })
+  })
+  ;[
     [true, false],
     [false, false],
     [true, true],
@@ -786,40 +856,5 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         assert.isTrue(selectorBar.exists())
       }
     })
-  })
-
-  it("CourseInfoBox renders a date selector with Enrolled text if the user is enrolled in one", async () => {
-    const secondCourseRun = makeCourseRunDetail()
-    const enrollmentOne = {
-      ...makeCourseRunEnrollment(),
-      run: secondCourseRun
-    }
-    const enrollmentTwo = {
-      ...makeCourseRunEnrollment(),
-      run: courseRun
-    }
-    const entities = {
-      currentUser: currentUser,
-      enrollments: [enrollmentOne, enrollmentTwo],
-      courseRuns:  [courseRun, secondCourseRun]
-    }
-
-    const { inner } = await renderPage({
-      entities: entities
-    })
-
-    assert.isTrue(inner.exists())
-    const infobox = inner.find("CourseInfoBox").dive()
-    assert.isTrue(infobox.exists())
-
-    const moreDatesLink = infobox.find("button.more-enrollment-info").first()
-    await moreDatesLink.prop("onClick")()
-
-    const selectorBar = infobox.find(".more-dates-enrollment-list")
-    assert.isTrue(selectorBar.exists())
-
-    const enrolledItem = infobox.find(".more-dates-link.enrolled")
-
-    assert.isTrue(enrolledItem.exists())
   })
 })
