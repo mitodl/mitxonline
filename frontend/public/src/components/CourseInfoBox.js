@@ -4,7 +4,8 @@ import {
   emptyOrNil,
   getFlexiblePriceForProduct,
   formatLocalePrice,
-  parseDateString
+  parseDateString,
+  formatPrettyShortDate
 } from "../lib/util"
 import { getFirstRelevantRun } from "../lib/courseApi"
 import moment from "moment-timezone"
@@ -21,15 +22,33 @@ type CourseInfoBoxProps = {
   toggleUpgradeDialogVisibility: () => Promise<any>,
   setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>
 }
+
+/**
+ * This constructs the Date section for a given run
+ * If the run is under the toggle "More Dates" the format is inline and month
+ * is shortened to 3 letters.
+ * @param {EnrollmentFlaggedCourseRun} run
+ * @param {boolean} isMoreDates true if this run is going to show up under the More Dates toggle
+ * */
+
 const getCourseDates = (run, isMoreDates = false) => {
-  let startDate = formatPrettyDate(parseDateString(run.start_date))
+  let startDate = isMoreDates
+    ? formatPrettyShortDate(parseDateString(run.start_date))
+    : formatPrettyDate(parseDateString(run.end_date))
   if (run.is_self_paced && moment(run.start_date).isBefore(moment())) {
     startDate = "Anytime"
   }
   return (
     <>
       <b>Start:</b> {startDate} {isMoreDates ? null : <br />}
-      <b>End:</b> {formatPrettyDate(parseDateString(run.end_date))}
+      {run.end_date ? (
+        <>
+          <b>End:</b>{" "}
+          {isMoreDates
+            ? formatPrettyShortDate(parseDateString(run.end_date))
+            : formatPrettyDate(parseDateString(run.end_date))}
+        </>
+      ) : null}
     </>
   )
 }
