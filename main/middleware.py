@@ -1,4 +1,5 @@
 """Common mitx_online middleware"""
+
 from django.utils.deprecation import MiddlewareMixin
 
 

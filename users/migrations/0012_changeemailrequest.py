@@ -8,7 +8,6 @@ import users.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [("users", "0011_change_username_max_len_50")]
 
     operations = [

@@ -1,7 +1,7 @@
 Google Sheets
 ---
 
-This is an explanation of integration with Google Sheets libraries for an 
+This is an explanation of integration with Google Sheets libraries for an
 automated processing of change of enrollment requests.
 
 ## Refunds
@@ -12,14 +12,14 @@ In the MITx Online Google Sheet folder there is a sheet called "MITx Online Prod
 sheet contains a tab "Refund Form Responses", it is getting filled by the "Refund Request" form submissions. This form also resides
 within the same folder.
 
-When you fill out the "Refund Request" form your request gets output into the "Refund Form Responses", then copied 
+When you fill out the "Refund Request" form your request gets output into the "Refund Form Responses", then copied
 and formatted into the "Refunds" tab within the same document.
 
-From there an automated scheduled task makes an api call to retrieve the data from the tab "Refunds". It parses each 
+From there an automated scheduled task makes an api call to retrieve the data from the tab "Refunds". It parses each
 row checks if the row already has errors present and if it happens to be also unmodified, it ignores the row.
 If a request that you submitted has error, you can reprocess this request by clearing the error cell.
 
-If you choose not to process this row again or the request has been resolved another way, set the 
+If you choose not to process this row again or the request has been resolved another way, set the
 Ignore column to TRUE.
 
 When a row is processed:

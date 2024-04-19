@@ -1,9 +1,10 @@
 """mitx_online utilities"""
+
 import json
 from datetime import datetime
 from decimal import Decimal
 from enum import Flag, auto
-from typing import Set, Tuple, TypeVar, Union
+from typing import Set, Tuple, TypeVar, Union  # noqa: UP035
 from urllib.parse import quote_plus
 
 import dateutil
@@ -30,7 +31,7 @@ class FeatureFlag(Flag):
     EXAMPLE_FEATURE = auto()
 
 
-def get_js_settings(request: HttpRequest):
+def get_js_settings(request: HttpRequest):  # noqa: ARG001
     """
     Get the set of JS settings
 
@@ -54,7 +55,7 @@ def get_js_settings(request: HttpRequest):
     }
 
 
-def get_refine_oidc_settings(request: HttpRequest):
+def get_refine_oidc_settings(request: HttpRequest):  # noqa: ARG001
     """
     Get the set of JS settings for refine OIDC
 
@@ -71,7 +72,7 @@ def get_refine_oidc_settings(request: HttpRequest):
     }
 
 
-def get_refine_datasources_settings(request: HttpRequest):
+def get_refine_datasources_settings(request: HttpRequest):  # noqa: ARG001
     """
     Get the set of JS settings for refine datasources
 
@@ -114,7 +115,7 @@ def get_field_names(model):
     """
     return [
         field.name
-        for field in model._meta.get_fields()
+        for field in model._meta.get_fields()  # noqa: SLF001
         if not field.auto_created  # pylint: disable=protected-access
     ]
 
@@ -158,8 +159,9 @@ T = TypeVar("T")
 
 
 def get_partitioned_set_difference(
-    set1: Set[T], set2: Set[T]
-) -> Tuple[Set[T], Set[T], Set[T]]:
+    set1: Set[T],  # noqa: UP006
+    set2: Set[T],  # noqa: UP006
+) -> Tuple[Set[T], Set[T], Set[T]]:  # noqa: UP006
     """
     Returns a tuple containing items that only exist in the first set, items that exist in both sets, and items that
     only exist in the second set.
@@ -183,7 +185,7 @@ def parse_supplied_date(datearg):
         retDate = retDate - retDate.utcoffset()
 
     retDate = retDate.replace(tzinfo=pytz.timezone(TIME_ZONE))
-    return retDate
+    return retDate  # noqa: RET504
 
 
 def format_decimal(amount: Decimal):

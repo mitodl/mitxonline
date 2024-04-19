@@ -4,11 +4,11 @@ import pytest
 from django.utils.timezone import now
 
 from cms.serializers import ProgramPageSerializer
-from courses.factories import CourseRunFactory, program_with_empty_requirements
+from courses.factories import CourseRunFactory
 from courses.models import Department
 from courses.serializers.v2.programs import (
-    ProgramSerializer,
     ProgramRequirementTreeSerializer,
+    ProgramSerializer,
 )
 from main.test_utils import assert_drf_json_equal
 

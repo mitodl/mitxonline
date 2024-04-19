@@ -21,11 +21,12 @@ Check the usages of this command below:
 
 """
 
-from django.core.management.base import BaseCommand, CommandError
-from users.api import fetch_user
-from courses.api import manage_program_certificate_access, generate_program_certificate
-from courses.models import Program
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand, CommandError
+
+from courses.api import generate_program_certificate, manage_program_certificate_access
+from courses.models import Program
+from users.api import fetch_user
 
 User = get_user_model()
 
@@ -74,7 +75,7 @@ class Command(BaseCommand):
 
         super().add_arguments(parser)
 
-    def handle(self, *args, **options):  # pylint: disable=too-many-locals
+    def handle(self, *args, **options):  # pylint: disable=too-many-locals  # noqa: ARG002
         """Handle command execution"""
 
         revoke = options.get("revoke")
@@ -86,37 +87,35 @@ class Command(BaseCommand):
 
         if not (revoke or unrevoke) and not create:
             raise CommandError(
-                "The command needs a valid action e.g. --revoke, --unrevoke, --create."
+                "The command needs a valid action e.g. --revoke, --unrevoke, --create."  # noqa: EM101
             )
 
         try:
             user = fetch_user(user)
         except User.DoesNotExist:
-            raise CommandError(
-                "Could not find a user with <username or email>={}.".format(user)
+            raise CommandError(  # noqa: B904
+                f"Could not find a user with <username or email>={user}."  # noqa: EM102
             )
 
         # Unable to obtain a program object based on the provided program readable id
         try:
             program = Program.objects.get(readable_id=program)
         except Program.DoesNotExist:
-            raise CommandError(
-                "Could not find program with readable_id={}.".format(program)
-            )
+            raise CommandError(f"Could not find program with readable_id={program}.")  # noqa: B904, EM102
 
         # Handle revoke/un-revoke of a certificate
         if revoke or unrevoke:
             revoke_status = manage_program_certificate_access(
                 user=user,
                 program=program,
-                revoke_state=True if revoke else False,
+                revoke_state=True if revoke else False,  # noqa: SIM210
             )
 
             if revoke_status:
                 self.stdout.write(
                     self.style.SUCCESS(
                         "Certificate for {} has been {}".format(
-                            "program: {}".format(program),
+                            f"program: {program}",
                             "revoked." if revoke else "un-revoked.",
                         )
                     )
@@ -126,7 +125,6 @@ class Command(BaseCommand):
 
         # Handle the creation of the program certificate.
         elif create:
-
             # If -f or --force argument is provided, we'll forcefully generate the program certificate
             certificate, created_cert = generate_program_certificate(
                 user=user, program=program, force_create=force_create
@@ -144,14 +142,9 @@ class Command(BaseCommand):
                     "-f or --force argument to forcefully create a program certificate"
                 )
 
-            result_summary = "Certificate: {}".format(cert_status)
+            result_summary = f"Certificate: {cert_status}"
 
-            result = "Processed user {} ({}) in program {}. Result - {}".format(
-                user.username,
-                user.email,
-                program.readable_id,
-                result_summary,
-            )
+            result = f"Processed user {user.username} ({user.email}) in program {program.readable_id}. Result - {result_summary}"
             result_output = self.style.SUCCESS(result)
             if not success_result:
                 result_output = self.style.ERROR(result)

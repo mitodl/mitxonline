@@ -17,7 +17,6 @@ def reverse_func(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("cms", "0029_add_linked_instructors_to_product_pages"),
     ]

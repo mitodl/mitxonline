@@ -1,5 +1,6 @@
 """Factories for creating course data in tests"""
-import string
+
+import string  # noqa: F401
 from types import SimpleNamespace
 
 import factory
@@ -43,15 +44,13 @@ class ProgramFactory(DjangoModelFactory):
     """Factory for Programs"""
 
     title = fuzzy.FuzzyText(prefix="Program ")
-    readable_id = factory.Sequence(
-        lambda number: "{}{}".format(PROGRAM_TEXT_ID_PREFIX, number)
-    )
+    readable_id = factory.Sequence(lambda number: f"{PROGRAM_TEXT_ID_PREFIX}{number}")
     live = True
 
     page = factory.RelatedFactory("cms.factories.ProgramPageFactory", "program")
 
     @factory.post_generation
-    def departments(self, create, extracted, **kwargs):
+    def departments(self, create, extracted, **kwargs):  # noqa: ARG002
         if not create or not extracted:
             return
         self.departments.add(*extracted)
@@ -81,7 +80,7 @@ class CourseFactory(DjangoModelFactory):
     page = factory.RelatedFactory("cms.factories.CoursePageFactory", "course")
 
     @factory.post_generation
-    def departments(self, create, extracted, **kwargs):
+    def departments(self, create, extracted, **kwargs):  # noqa: ARG002
         if not create or not extracted:
             return
         self.departments.add(*extracted)
@@ -94,10 +93,8 @@ class CourseRunFactory(DjangoModelFactory):
     """Factory for CourseRuns"""
 
     course = factory.SubFactory(CourseFactory)
-    title = factory.LazyAttribute(lambda x: "CourseRun " + FAKE.sentence())
-    courseware_id = factory.Sequence(
-        lambda number: "course:/v{}/{}".format(number, FAKE.slug())
-    )
+    title = factory.LazyAttribute(lambda x: "CourseRun " + FAKE.sentence())  # noqa: ARG005
+    courseware_id = factory.Sequence(lambda number: f"course:/v{number}/{FAKE.slug()}")
     run_tag = factory.Sequence("R{0}".format)
     courseware_url_path = factory.Faker("uri")
     start_date = factory.Faker(
@@ -257,7 +254,7 @@ class LearnerProgramRecordShareFactory(DjangoModelFactory):
         model = LearnerProgramRecordShare
 
 
-@pytest.fixture()
+@pytest.fixture
 def program_with_empty_requirements():
     program = ProgramFactory.create()
     ProgramRequirementFactory.add_root(program)

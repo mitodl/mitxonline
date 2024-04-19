@@ -1,13 +1,15 @@
+import logging
+from urllib.parse import urljoin, urlparse
+
+import requests
+
+from cms.models import Page
 from main.celery import app
 from main.settings import (
-    SITE_BASE_URL,
     MITX_ONLINE_FASTLY_AUTH_TOKEN,
     MITX_ONLINE_FASTLY_URL,
+    SITE_BASE_URL,
 )
-from cms.models import Page
-from urllib.parse import urljoin, urlparse
-import logging
-import requests
 
 
 def call_fastly_purge_api(relative_url):
@@ -37,12 +39,12 @@ def call_fastly_purge_api(relative_url):
 
     resp = requests.request("PURGE", api_url, headers=headers)
 
-    if resp.status_code >= 400:
-        logger.error(f"Fastly API Purge call failed: {resp.status_code} {resp.reason}")
-        logger.error(f"Fastly returned: {resp.text}")
+    if resp.status_code >= 400:  # noqa: PLR2004
+        logger.error(f"Fastly API Purge call failed: {resp.status_code} {resp.reason}")  # noqa: G004
+        logger.error(f"Fastly returned: {resp.text}")  # noqa: G004
         return False
     else:
-        logger.info(f"Fastly returned: {resp.text}")
+        logger.info(f"Fastly returned: {resp.text}")  # noqa: G004
         return resp.json()
 
 
@@ -57,14 +59,14 @@ def queue_fastly_purge_url(page_id):
     """
     logger = logging.getLogger("fastly_purge")
 
-    logger.info(f"Processing purge request for {page_id}")
+    logger.info(f"Processing purge request for {page_id}")  # noqa: G004
 
     page = Page.objects.get(pk=page_id)
 
-    logger.debug(f"Page URL is {page.get_url()}")
+    logger.debug(f"Page URL is {page.get_url()}")  # noqa: G004
 
     if page is None:
-        raise Exception(f"Page {page_id} not found.")
+        raise Exception(f"Page {page_id} not found.")  # noqa: EM102, TRY002
 
     resp = call_fastly_purge_api(page.get_url())
 
@@ -72,7 +74,7 @@ def queue_fastly_purge_url(page_id):
         logger.info("Purge request processed OK.")
         return True
 
-    logger.error("Purge request failed.")
+    logger.error("Purge request failed.")  # noqa: RET503
 
 
 @app.task()
@@ -92,4 +94,4 @@ def queue_fastly_full_purge():
         logger.info("Purge request processed OK.")
         return True
 
-    logger.error("Purge request failed.")
+    logger.error("Purge request failed.")  # noqa: RET503

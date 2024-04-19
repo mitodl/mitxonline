@@ -1,6 +1,7 @@
 """
 Tests for cms serializers
 """
+
 import bleach
 import pytest
 from django.test.client import RequestFactory
@@ -15,8 +16,6 @@ from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.factories import (
     CourseFactory,
     ProgramFactory,
-    program_with_empty_requirements,
-    program_with_requirements,
 )
 from main.test_utils import assert_drf_json_equal
 
@@ -120,7 +119,7 @@ def test_serialize_course_page_with_flex_price_with_program_fk_no_parent(
     mocker.patch("cms.serializers.get_wagtail_img_src", return_value=fake_image_src)
 
     program = ProgramFactory(page=None)
-    program_page = ProgramPageFactory(program=program)
+    program_page = ProgramPageFactory(program=program)  # noqa: F841
     financial_assistance_form = FlexiblePricingFormFactory(
         selected_program_id=program.id
     )
@@ -233,13 +232,13 @@ def test_serialize_course_page_with_flex_price_form_as_child_no_program(
 
 
 @pytest.mark.parametrize(
-    "own_program_has_form,related_program,related_program_has_form",
+    "own_program_has_form,related_program,related_program_has_form",  # noqa: PT006
     [
-        [True, False, False],
-        [True, True, False],
-        [False, True, False],
-        [False, True, True],
-        [True, True, True],
+        [True, False, False],  # noqa: PT007
+        [True, True, False],  # noqa: PT007
+        [False, True, False],  # noqa: PT007
+        [False, True, True],  # noqa: PT007
+        [True, True, True],  # noqa: PT007
     ],
 )
 def test_serialized_course_finaid_form_url(
@@ -310,7 +309,7 @@ def test_serialize_program_page(
     mocker, fully_configured_wagtail, staff_user, mock_context
 ):
     fake_image_src = "http://example.com/my.img"
-    patched_get_wagtail_src = mocker.patch(
+    patched_get_wagtail_src = mocker.patch(  # noqa: F841
         "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
     )
 
@@ -345,7 +344,7 @@ def test_serialize_program_page__with_related_financial_form(
     mocker, fully_configured_wagtail, staff_user, mock_context
 ):
     fake_image_src = "http://example.com/my.img"
-    patched_get_wagtail_src = mocker.patch(
+    patched_get_wagtail_src = mocker.patch(  # noqa: F841
         "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
     )
 
@@ -383,7 +382,7 @@ def test_serialize_program_page__no_financial_form(
     mocker, fully_configured_wagtail, staff_user, mock_context
 ):
     fake_image_src = "http://example.com/my.img"
-    patched_get_wagtail_src = mocker.patch(
+    patched_get_wagtail_src = mocker.patch(  # noqa: F841
         "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
     )
 
@@ -415,14 +414,14 @@ def test_serialize_program_page__with_related_program_no_financial_form(
     mocker, fully_configured_wagtail, staff_user, mock_context
 ):
     fake_image_src = "http://example.com/my.img"
-    patched_get_wagtail_src = mocker.patch(
+    patched_get_wagtail_src = mocker.patch(  # noqa: F841
         "cms.serializers.get_wagtail_img_src", return_value=fake_image_src
     )
 
     program = ProgramFactory(page=None)
     program_page = ProgramPageFactory(program=program)
     other_program = ProgramFactory(page=None)
-    other_program_page = ProgramPageFactory(program=other_program)
+    other_program_page = ProgramPageFactory(program=other_program)  # noqa: F841
     program.add_related_program(other_program)
     rf = RequestFactory()
     request = rf.get("/")

@@ -1,7 +1,7 @@
 """User serializers"""
+
 import logging
 import re
-from collections import defaultdict
 
 import pycountry
 from django.db import transaction
@@ -13,7 +13,7 @@ from social_django.models import UserSocialAuth
 
 from hubspot_sync.task_helpers import sync_hubspot_user
 
-# from ecommerce.api import fetch_and_serialize_unused_coupons
+# from ecommerce.api import fetch_and_serialize_unused_coupons  # noqa: ERA001
 from mail import verification_api
 from main.constants import USER_REGISTRATION_FAILED_MSG
 from main.serializers import WriteableSerializerMethodField
@@ -56,8 +56,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
         """Validates the year of birth field"""
         from users.utils import determine_approx_age
 
-        if not (value and determine_approx_age(value) >= 13):
-            raise serializers.ValidationError("Year of Birth provided is under 13")
+        if not (value and determine_approx_age(value) >= 13):  # noqa: PLR2004
+            raise serializers.ValidationError("Year of Birth provided is under 13")  # noqa: EM101
 
         return value
 
@@ -97,13 +97,13 @@ class LegalAddressSerializer(serializers.ModelSerializer):
     def validate_first_name(self, value):
         """Validates the first name of the user"""
         if value and not USER_GIVEN_NAME_RE.match(value):
-            raise serializers.ValidationError("First name is not valid")
+            raise serializers.ValidationError("First name is not valid")  # noqa: EM101
         return value
 
     def validate_last_name(self, value):
         """Validates the last name of the user"""
         if value and not USER_GIVEN_NAME_RE.match(value):
-            raise serializers.ValidationError("Last name is not valid")
+            raise serializers.ValidationError("Last name is not valid")  # noqa: EM101
         return value
 
     def validate(self, data):
@@ -111,18 +111,17 @@ class LegalAddressSerializer(serializers.ModelSerializer):
         # The CountriesStatesSerializer below only provides state options for
         # US and Canada - pycountry has them for everything but we therefore
         # only test for these two.
-        if not data["country"] in ["US", "CA"]:
+        if data["country"] not in ["US", "CA"]:
             return data
-        else:
-            if (
-                "state" in data
-                and data["state"] is not None
-                and (
-                    data["country"] in ["US", "CA"]
-                    and not pycountry.subdivisions.get(code=data["state"])
-                )
-            ):
-                raise serializers.ValidationError({"state": "Invalid state specified"})
+        elif (
+            "state" in data
+            and data["state"] is not None
+            and (
+                data["country"] in ["US", "CA"]
+                and not pycountry.subdivisions.get(code=data["state"])
+            )
+        ):
+            raise serializers.ValidationError({"state": "Invalid state specified"})
 
         return data
 
@@ -147,7 +146,7 @@ class ExtendedLegalAddressSerializer(LegalAddressSerializer):
 
     class Meta:
         model = LegalAddress
-        fields = LegalAddressSerializer.Meta.fields + ("email",)
+        fields = LegalAddressSerializer.Meta.fields + ("email",)  # noqa: RUF005
 
 
 class PublicUserSerializer(serializers.ModelSerializer):
@@ -251,8 +250,8 @@ class UserSerializer(serializers.ModelSerializer):
                 RequestsConnectionError,
                 EdxApiRegistrationValidationException,
             ) as exc:
-                log.exception("Unable to create user account", exc)
-                raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)
+                log.exception("Unable to create user account", exc)  # noqa: PLE1205, TRY401
+                raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)  # noqa: B904
 
             if openedx_validation_msg:
                 raise serializers.ValidationError({"username": openedx_validation_msg})
@@ -324,7 +323,7 @@ class UserSerializer(serializers.ModelSerializer):
                     user_profile_serializer = UserProfileSerializer(
                         instance.user_profile, data=user_profile_data
                     )
-                except:
+                except:  # noqa: E722
                     user_profile_serializer = UserProfileSerializer(
                         UserProfile(user=instance), data=user_profile_data
                     )
@@ -338,7 +337,7 @@ class UserSerializer(serializers.ModelSerializer):
 
             user = super().update(instance, validated_data)
 
-        return user
+        return user  # noqa: RET504
 
     class Meta:
         model = User
@@ -401,7 +400,7 @@ class ChangeEmailRequestCreateSerializer(serializers.ModelSerializer):
 
         # verify the password verifies for the current user
         if not user.check_password(password):
-            raise serializers.ValidationError("Invalid Password")
+            raise serializers.ValidationError("Invalid Password")  # noqa: EM101
 
         return attrs
 
@@ -433,7 +432,7 @@ class ChangeEmailRequestUpdateSerializer(serializers.ModelSerializer):
             log.debug(
                 "User %s tried to change email address to one already in use", instance
             )
-            raise serializers.ValidationError("Unable to change email")
+            raise serializers.ValidationError("Unable to change email")  # noqa: EM101
 
         result = super().update(instance, validated_data)
 
@@ -487,7 +486,7 @@ class CountrySerializer(serializers.Serializer):
         """Get a list of states/provinces if USA or Canada"""
         if instance.alpha_2 in ("US", "CA"):
             return StateProvinceSerializer(
-                instance=sorted(
+                instance=sorted(  # noqa: C414
                     list(pycountry.subdivisions.get(country_code=instance.alpha_2)),
                     key=lambda state: state.name,
                 ),

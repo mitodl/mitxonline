@@ -1,6 +1,7 @@
 """Templatetags for rendering site banner"""
 
 from django import template
+
 from cms.models import SiteBanner
 
 register = template.Library()

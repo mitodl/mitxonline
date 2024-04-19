@@ -7,11 +7,11 @@ import {
     DateField,
     Table,
     useTable,
-    Space, 
+    Space,
     Select,
     FormProps,
     Form,
-    Input, 
+    Input,
     Icons,
     Row,
     Col,
@@ -42,11 +42,11 @@ const FlexiblePricingStatuses = [
         label: 'Pending Manual Approval',
         value: 'pending-manual-approval'
     },
-    { 
+    {
         label: 'Denied',
         value: 'denied'
     },
-    { 
+    {
         label: 'Reset',
         value: 'reset'
     }
@@ -126,9 +126,9 @@ export const FlexiblePricingList: React.FC = () => {
     const invalidate = useInvalidate()
     const {tableQueryResult, tableProps, searchFormProps} = useTable<
         IFlexiblePriceRequest,
-        HttpError, 
+        HttpError,
         IFlexiblePriceRequestFilters
-    >({ 
+    >({
         resource: 'flexible_pricing/applications_admin',
         onSearch: (params) => {
             const filters: CrudFilters = [];
@@ -160,7 +160,7 @@ export const FlexiblePricingList: React.FC = () => {
     const [approveStatus, setApproveStatus] = useState('');
 
     const [isModalVisible, setIsModalVisible] = useState(false);
-    
+
     const showModal = (record: IFlexiblePriceRequest, action: string) => {
         setModalData(record);
         setApproveStatus(action);
@@ -203,8 +203,8 @@ export const FlexiblePricingList: React.FC = () => {
                         pageHeaderProps={{ subTitle: <RefreshTableButton isFetching={tableQueryResult.isFetching} refreshList={refreshList} /> }}
                     >
                         <Table {...tableProps} rowKey="id">
-                            <Table.Column 
-                                dataIndex="user" 
+                            <Table.Column
+                                dataIndex="user"
                                 title="Name/Location"
                                 render={(value) => <div><strong>{value.name}</strong> <br /> {value.email} <br /> {value.legal_address.country}</div>}
                             />

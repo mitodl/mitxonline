@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("flexiblepricing", "0005_add_flexible_pricing_request_form"),
     ]

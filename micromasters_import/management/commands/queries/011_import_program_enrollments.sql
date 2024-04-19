@@ -11,7 +11,7 @@ SELECT
     pk_map.program_id,
     mo_user.id,
     '' AS change_status,
-    'audit', -- audit for now 
+    'audit', -- audit for now
     true,
     NOW(),
     NOW()

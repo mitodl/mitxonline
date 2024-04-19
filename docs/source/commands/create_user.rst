@@ -1,7 +1,7 @@
 ``create_user``
 ===============
 
-Creates a learner account in the system. You will be prompted for the account password. 
+Creates a learner account in the system. You will be prompted for the account password.
 
 Syntax
 ------

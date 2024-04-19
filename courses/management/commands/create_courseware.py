@@ -3,7 +3,7 @@ Creates a courseware object. This can be a program or a course (and optionally
 a course run).
 """
 
-from typing import List, Union
+from typing import List, Union  # noqa: UP035
 
 from django.core.management import BaseCommand
 from django.db import models
@@ -20,7 +20,9 @@ class Command(BaseCommand):
     help = "Creates a courseware object (a program or course, with or without a courserun)."
 
     def _check_if_courseware_object_readable_id_exists(
-        self, courseware_object: Union[Course, Program], courseware_id: str
+        self,
+        courseware_object: Union[Course, Program],  # noqa: FA100
+        courseware_id: str,
     ):
         """
         Queries courseware objects of the same type as the courseware_object
@@ -38,10 +40,12 @@ class Command(BaseCommand):
                     f"{courseware_object.__name__} with ID {courseware_id} already exists."
                 )
             )
-            exit(-1)
+            exit(-1)  # noqa: PLR1722
 
     def _add_departments_to_courseware_object(
-        self, courseware_object: Union[Course, Program], departments: models.QuerySet
+        self,
+        courseware_object: Union[Course, Program],  # noqa: FA100
+        departments: models.QuerySet,
     ):
         """
         Associates Departments with a Course or Program object.
@@ -60,9 +64,9 @@ class Command(BaseCommand):
                     "There was an issue creating or adding departments to the courseware object."
                 )
             )
-            exit(-1)
+            exit(-1)  # noqa: PLR1722
 
-    def _create_departments(self, departments: List[str]) -> models.QuerySet:
+    def _create_departments(self, departments: List[str]) -> models.QuerySet:  # noqa: UP006
         """
         Creates Department objects from a list of department names (strings).
 
@@ -92,7 +96,7 @@ class Command(BaseCommand):
                 "Departments must be defined when creating a course or program."
             )
         )
-        exit(-1)
+        exit(-1)  # noqa: PLR1722
 
     def _departments_do_not_exist_error(self):
         """
@@ -102,10 +106,11 @@ class Command(BaseCommand):
         self.stderr.write(
             self.style.ERROR("The departments specified do not currently exist.")
         )
-        exit(-1)
+        exit(-1)  # noqa: PLR1722
 
     def _successfully_created_courseware_object_message(
-        self, courseware_object: Union[Course, Program]
+        self,
+        courseware_object: Union[Course, Program],  # noqa: FA100
     ):
         """
         Outputs a success message to the console in the format of
@@ -131,7 +136,7 @@ class Command(BaseCommand):
                     f"Course run for {course} with ID {kwargs['create_run']} already exists."
                 )
             )
-            exit(-1)
+            exit(-1)  # noqa: PLR1722
 
         course_run = CourseRun.objects.create(
             course=course,
@@ -292,7 +297,7 @@ class Command(BaseCommand):
             action="store_true",
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915
         if not (
             kwargs["force"]
             or kwargs["courseware_id"].startswith("course")
@@ -303,7 +308,7 @@ class Command(BaseCommand):
                     f"Object ID \"{kwargs['courseware_id']}\" would be named \"{kwargs['title']}\" - you might have your ID and title options swapped. Use --force to force creation anyway."
                 )
             )
-            exit(-1)
+            exit(-1)  # noqa: PLR1722
 
         if kwargs["type"] == "program":
             if kwargs["depts"] and len(kwargs["depts"]) > 0:
@@ -341,7 +346,7 @@ class Command(BaseCommand):
                         self.stdout.write(
                             self.style.SUCCESS(f"Added relationship for {readable_id}.")
                         )
-                    except Exception as e:
+                    except Exception:  # noqa: BLE001, PERF203
                         self.stderr.write(
                             self.style.ERROR(
                                 f"Can't add relationship for {readable_id}: program not found."
@@ -392,7 +397,7 @@ class Command(BaseCommand):
             if "program" in kwargs and kwargs["program"] is not None:
                 try:
                     program = Program.objects.filter(pk=kwargs["program"]).first()
-                except:
+                except:  # noqa: E722
                     program = Program.objects.filter(
                         readable_id=kwargs["program"]
                     ).first()
@@ -421,7 +426,7 @@ class Command(BaseCommand):
                         f"Course with ID {kwargs['courseware_id']} doesn't exist."
                     )
                 )
-                exit(-1)
+                exit(-1)  # noqa: PLR1722
 
             if "create_run" not in kwargs or kwargs["create_run"] is None:
                 self.stderr.write(
@@ -429,7 +434,7 @@ class Command(BaseCommand):
                         "You must specify the run tag with either --run-tag or --create-run when creating a course run."
                     )
                 )
-                exit(-1)
+                exit(-1)  # noqa: PLR1722
 
             course = Course.objects.filter(readable_id=kwargs["courseware_id"]).get()
 

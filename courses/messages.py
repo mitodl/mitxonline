@@ -1,4 +1,5 @@
 """Course email messages"""
+
 from mitol.mail.messages import TemplatedMessage
 
 

@@ -1,18 +1,17 @@
-""" Generate Hubspot message bodies for various model objects"""
+"""Generate Hubspot message bodies for various model objects"""
+
 import logging
 import re
 from decimal import Decimal
-import time
-from typing import List
+from typing import List  # noqa: UP035
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 from hubspot.crm.objects import (
     SimplePublicObject,
     SimplePublicObjectInput,
-    ApiException,
 )
-from main import settings
+from mitol.common.utils.datetime import now_in_utc
 from mitol.hubspot_api.api import (
     HubspotAssociationType,
     HubspotObjectType,
@@ -29,7 +28,6 @@ from mitol.hubspot_api.api import (
     upsert_object_request,
 )
 from mitol.hubspot_api.models import HubspotObject
-from mitol.common.utils.datetime import now_in_utc
 
 from ecommerce.models import Line, Order, Product
 from users.models import User
@@ -38,8 +36,8 @@ log = logging.getLogger(__name__)
 
 
 def make_contact_create_message_list_from_user_ids(
-    user_ids: List[int],
-) -> List[SimplePublicObjectInput]:
+    user_ids: List[int],  # noqa: UP006
+) -> List[SimplePublicObjectInput]:  # noqa: UP006
     """
     Create the body of a HubSpot create message for a list of User IDs.
 
@@ -54,14 +52,14 @@ def make_contact_create_message_list_from_user_ids(
     )  # Sorted to support unit test.
     message_list = []
     for user in users:
-        message_list.append(make_contact_sync_message_from_user(user))
+        message_list.append(make_contact_sync_message_from_user(user))  # noqa: PERF401
 
     return message_list
 
 
 def make_contact_update_message_list_from_user_ids(
-    chunk: List[tuple[int, str]]
-) -> List[dict]:
+    chunk: List[tuple[int, str]],  # noqa: UP006
+) -> List[dict]:  # noqa: UP006
     """
     Create the body of a HubSpot contact update message from a dictionary..
 
@@ -127,7 +125,7 @@ def make_contact_sync_message_from_user(user: User) -> SimplePublicObjectInput:
 
 
 def make_deal_create_message_list_from_order_ids(
-    order_ids: List[int],
+    order_ids: List[int],  # noqa: UP006
 ) -> SimplePublicObjectInput:
     """
     Create the body of a HubSpot Deal create message for a list of Order IDs.
@@ -141,13 +139,13 @@ def make_deal_create_message_list_from_order_ids(
     orders = Order.objects.filter(id__in=order_ids)
     message_list = []
     for order in orders:
-        message_list.append(make_deal_sync_message_from_order(order))
+        message_list.append(make_deal_sync_message_from_order(order))  # noqa: PERF401
     return message_list
 
 
 def make_deal_update_message_list_from_order_ids(
-    chunk: List[tuple[int, str]]
-) -> List[dict]:
+    chunk: List[tuple[int, str]],  # noqa: UP006
+) -> List[dict]:  # noqa: UP006
     """
     Create the body of a HubSpot Deal batch update message from a dictionary.
 
@@ -188,7 +186,7 @@ def make_deal_sync_message_from_order(order: Order) -> SimplePublicObjectInput:
 
 
 def make_line_item_create_messages_list_from_line_ids(
-    line_ids: List[int],
+    line_ids: List[int],  # noqa: UP006
 ) -> SimplePublicObjectInput:
     """
     Create the body of a HubSpot Line create message for a list of Line IDs.
@@ -202,13 +200,13 @@ def make_line_item_create_messages_list_from_line_ids(
     lines = Line.objects.filter(id__in=line_ids)
     message_list = []
     for line in lines:
-        message_list.append(make_line_item_sync_message_from_line(line))
+        message_list.append(make_line_item_sync_message_from_line(line))  # noqa: PERF401
     return message_list
 
 
 def make_line_item_update_message_list_from_line_ids(
-    chunk: List[tuple[int, str]]
-) -> List[dict]:
+    chunk: List[tuple[int, str]],  # noqa: UP006
+) -> List[dict]:  # noqa: UP006
     """
     Create the body of a HubSpot Line batch update message from a dictionary.
 
@@ -249,7 +247,7 @@ def make_line_item_sync_message_from_line(line: Line) -> SimplePublicObjectInput
 
 
 def make_product_create_message_list_from_product_ids(
-    product_ids: List[int],
+    product_ids: List[int],  # noqa: UP006
 ) -> SimplePublicObjectInput:
     """
     Create the body of a HubSpot Product create message for a list of Product IDs.
@@ -263,13 +261,13 @@ def make_product_create_message_list_from_product_ids(
     message_list = []
     products = Product.objects.filter(id__in=product_ids)
     for product in products:
-        message_list.append(make_product_sync_message_from_product(product))
+        message_list.append(make_product_sync_message_from_product(product))  # noqa: PERF401
     return message_list
 
 
 def make_product_update_message_list_from_product_ids(
-    chunk: List[tuple[int, str]]
-) -> List[dict]:
+    chunk: List[tuple[int, str]],  # noqa: UP006
+) -> List[dict]:  # noqa: UP006
     """
     Create the body of a HubSpot Product batch update message from a dictionary.
 
@@ -485,9 +483,9 @@ def sync_deal_line_hubspot_ids_to_db(order, hubspot_order_id) -> bool:
     return matches == expected_matches
 
 
-def get_hubspot_id_for_object(
+def get_hubspot_id_for_object(  # noqa: C901
     obj: Order or Product or Line or User,
-    raise_error: bool = False,
+    raise_error: bool = False,  # noqa: FBT001, FBT002
 ) -> str:
     """
     Get the hubspot id for an object, querying Hubspot if necessary
@@ -511,8 +509,8 @@ def get_hubspot_id_for_object(
     if isinstance(obj, User):
         try:
             hubspot_obj = find_contact(obj.email)
-        except:
-            log.exception(f"No User found w/ {obj.email}, is it active?")
+        except:  # noqa: E722
+            log.exception(f"No User found w/ {obj.email}, is it active?")  # noqa: G004
     elif isinstance(obj, Order):
         serialized_deal = get_hubspot_serializer(obj).data
         hubspot_obj = find_deal(
@@ -536,7 +534,7 @@ def get_hubspot_id_for_object(
             serialized_product["name"],
             raise_count_error=raise_error,
         )
-    if hubspot_obj and hubspot_obj.id:
+    if hubspot_obj and hubspot_obj.id:  # noqa: RET503
         try:
             HubspotObject.objects.update_or_create(
                 object_id=obj.id,
@@ -544,8 +542,8 @@ def get_hubspot_id_for_object(
                 defaults={"hubspot_id": hubspot_obj.id},
             )
         except:
-            log.error(
-                f"OBJ_ID: {obj.id}, ct: {content_type}, hubspot_id: {hubspot_obj.id}"
+            log.error(  # noqa: TRY400
+                f"OBJ_ID: {obj.id}, ct: {content_type}, hubspot_id: {hubspot_obj.id}"  # noqa: G004
             )
             raise
         return hubspot_obj.id

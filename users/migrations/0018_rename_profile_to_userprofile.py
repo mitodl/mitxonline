@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("users", "0017_update_legal_address_and_profile_add_addl_fields"),
     ]

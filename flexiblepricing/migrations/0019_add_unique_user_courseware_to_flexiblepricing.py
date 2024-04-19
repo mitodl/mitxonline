@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("flexiblepricing", "0018_alter_flexibleprice_status"),
     ]

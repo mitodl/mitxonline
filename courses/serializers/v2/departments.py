@@ -66,7 +66,7 @@ class DepartmentWithCoursesAndProgramsSerializer(DepartmentSerializer):
 
     class Meta:
         model = Department
-        fields = DepartmentSerializer.Meta.fields + [
+        fields = DepartmentSerializer.Meta.fields + [  # noqa: RUF005
             "course_ids",
             "program_ids",
         ]

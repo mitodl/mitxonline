@@ -16,7 +16,6 @@ def reset_enrollments(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("courses", "0010_enrollment_update_default_mode"),
     ]

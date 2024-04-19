@@ -6,7 +6,6 @@ from django.db import migrations, models
 # Running this migration across 3 files to support the unique field, per django docs:
 # https://docs.djangoproject.com/en/4.2/howto/writing-migrations/#migrations-that-add-unique-fields
 class Migration(migrations.Migration):
-
     dependencies = [
         ("courses", "0047_courses_and_programs_department_required"),
     ]

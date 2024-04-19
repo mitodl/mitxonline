@@ -36,7 +36,7 @@ export const Sider: React.FC = () => {
             localStorage.removeItem("mitx-online-staff-profile");
             const logoutPath = (new URL(DATASOURCES_CONFIG.mitxOnline)).origin + "/logout/";
             window.location.href = logoutPath;
-      
+
             return;
           }
 

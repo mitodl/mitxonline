@@ -15,10 +15,8 @@ this command comes in to clean up afterwards.)
 
 """
 
-from django.core.exceptions import ObjectDoesNotExist
 from django.core.management import BaseCommand
 from django.core.management.base import CommandError
-from django.db.models import Q
 
 from courses.api import deactivate_run_enrollment
 from courses.models import CourseRunEnrollment
@@ -49,18 +47,18 @@ class Command(BaseCommand):
             help="Set the learner's enrollments to audit.",
         )
 
-    def handle(self, *args, **kwargs):
-        if (not "audit" in kwargs or not kwargs["audit"]) and (
-            not "unenroll" in kwargs or not kwargs["unenroll"]
+    def handle(self, *args, **kwargs):  # noqa: ARG002
+        if ("audit" not in kwargs or not kwargs["audit"]) and (
+            "unenroll" not in kwargs or not kwargs["unenroll"]
         ):
-            raise CommandError("Please specify an action to take on the enrollment.")
+            raise CommandError("Please specify an action to take on the enrollment.")  # noqa: EM101
 
         try:
             order = Order.objects.filter(
                 state=Order.STATE.FULFILLED, reference_number=kwargs["order"]
             ).get()
-        except:
-            raise CommandError("Couldn't find that order, or the order was ambiguous.")
+        except:  # noqa: E722
+            raise CommandError("Couldn't find that order, or the order was ambiguous.")  # noqa: B904, EM101
 
         order.state = Order.STATE.REFUNDED
         order.save()
@@ -73,11 +71,11 @@ class Command(BaseCommand):
         )
 
         for enrollment in run_enrollments:
-            if "unenroll" in kwargs and kwargs["unenroll"]:
+            if kwargs.get("unenroll"):
                 self.stdout.write(
                     f"Unenrolling {order.purchaser.username} in {enrollment.run}"
                 )
-                deactivate_run_enrollment(enrollment, "refunded", True)
+                deactivate_run_enrollment(enrollment, "refunded", True)  # noqa: FBT003
             else:
                 self.stdout.write(
                     f"Changing enrollment for {order.purchaser.username} in {enrollment.run} to 'audit'"

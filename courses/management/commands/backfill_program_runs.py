@@ -1,4 +1,5 @@
 """Management command to create program runs for programs that have a complete sets of course runs"""
+
 import re
 from collections import defaultdict
 
@@ -119,7 +120,7 @@ class Command(BaseCommand):
             for run_tag in run_tags_to_create
         ]
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         """Handle command execution"""
         programs = Program.objects.prefetch_related("programruns")
         if options["program"]:

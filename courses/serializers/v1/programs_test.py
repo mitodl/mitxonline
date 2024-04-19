@@ -1,29 +1,28 @@
-import pytest
 from datetime import timedelta
 from decimal import Decimal
 
+import pytest
 from django.utils.timezone import now
 from mitol.common.utils import now_in_utc
 
 from cms.serializers import ProgramPageSerializer
 from courses.factories import (
-    CourseRunFactory,
-    ProgramFactory,
     CourseFactory,
     CourseRunEnrollmentFactory,
+    CourseRunFactory,
     CourseRunGradeFactory,
-    program_with_empty_requirements,
+    ProgramFactory,
 )
-from courses.models import Department, ProgramRequirementNodeType, ProgramRequirement
+from courses.models import Department, ProgramRequirement, ProgramRequirementNodeType
 from courses.serializers.v1.courses import CourseWithCourseRunsSerializer
 from courses.serializers.v1.programs import (
-    ProgramSerializer,
     LearnerRecordSerializer,
     ProgramRequirementSerializer,
     ProgramRequirementTreeSerializer,
+    ProgramSerializer,
 )
 from main.test_utils import assert_drf_json_equal
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = [pytest.mark.django_db]
 
@@ -44,7 +43,7 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
         start_date=now() + timedelta(hours=2),
     )
     course2 = run2.course
-    runs = (
+    runs = (  # noqa: F841
         [run1, run2]
         + [
             CourseRunFactory.create(
@@ -200,7 +199,7 @@ def test_learner_record_serializer(
     for course in courses:
         program.add_requirement(course)
         course_run = CourseRunFactory.create(course=course)
-        course_run_enrollment = CourseRunEnrollmentFactory.create(
+        course_run_enrollment = CourseRunEnrollmentFactory.create(  # noqa: F841
             run=course_run,
             user=user,
             enrollment_mode=enrollment_mode,

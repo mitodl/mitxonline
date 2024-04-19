@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [("openedx", "0003_add_edx_auth")]
 
     operations = [

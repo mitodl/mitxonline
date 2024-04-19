@@ -1,10 +1,9 @@
 """User models"""
-import math
+
 import uuid
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pycountry
-import pytz
 from django.conf import settings
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
@@ -202,9 +201,9 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_active", True)
 
         if extra_fields.get("is_staff") is not True:
-            raise ValueError("Superuser must have is_staff=True.")
+            raise ValueError("Superuser must have is_staff=True.")  # noqa: EM101
         if extra_fields.get("is_superuser") is not True:
-            raise ValueError("Superuser must have is_superuser=True.")
+            raise ValueError("Superuser must have is_superuser=True.")  # noqa: EM101
 
         return self._create_user(username, email, password, **extra_fields)
 
@@ -277,7 +276,7 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
         return determine_approx_age(self.user_profile.year_of_birth)
 
     def is_coppa_compliant(self):
-        return self.get_age() >= 13
+        return self.get_age() >= 13  # noqa: PLR2004
 
     def __str__(self):
         """Str representation for the user"""
@@ -358,7 +357,7 @@ class LegalAddress(TimestampedModel):
     country = models.CharField(
         max_length=2, blank=True, validators=[validate_iso_3166_1_code]
     )  # ISO-3166-1
-    state = models.CharField(max_length=255, blank=True, null=True)
+    state = models.CharField(max_length=255, blank=True, null=True)  # noqa: DJ001
 
     @property
     def us_state(self):
@@ -395,7 +394,7 @@ class UserProfile(TimestampedModel):
         User, on_delete=models.CASCADE, related_name="user_profile"
     )
 
-    gender = models.CharField(
+    gender = models.CharField(  # noqa: DJ001
         max_length=128, blank=True, null=True, choices=GENDER_CHOICES
     )
     year_of_birth = models.IntegerField(blank=True, null=True)
@@ -406,20 +405,20 @@ class UserProfile(TimestampedModel):
         help_text="Flags if we've asked the user for additional information",
     )
 
-    company = models.CharField(max_length=128, blank=True, null=True, default="")
-    job_title = models.CharField(max_length=128, blank=True, null=True, default="")
-    industry = models.CharField(max_length=60, blank=True, null=True, default="")
-    job_function = models.CharField(max_length=60, blank=True, null=True, default="")
+    company = models.CharField(max_length=128, blank=True, null=True, default="")  # noqa: DJ001
+    job_title = models.CharField(max_length=128, blank=True, null=True, default="")  # noqa: DJ001
+    industry = models.CharField(max_length=60, blank=True, null=True, default="")  # noqa: DJ001
+    job_function = models.CharField(max_length=60, blank=True, null=True, default="")  # noqa: DJ001
     company_size = models.IntegerField(
         null=True, blank=True, choices=COMPANY_SIZE_CHOICES
     )
     years_experience = models.IntegerField(
         null=True, blank=True, choices=YRS_EXPERIENCE_CHOICES
     )
-    leadership_level = models.CharField(
+    leadership_level = models.CharField(  # noqa: DJ001
         max_length=60, null=True, blank=True, default=""
     )
-    highest_education = models.CharField(
+    highest_education = models.CharField(  # noqa: DJ001
         null=True,
         max_length=60,
         blank=True,
@@ -455,7 +454,7 @@ class UserProfile(TimestampedModel):
     def level_of_education(self):
         """Open edX uses codes for this so we need to map our values."""
         return (
-            [
+            [  # noqa: RUF015
                 item[1]
                 for item in OPENEDX_HIGHEST_EDUCATION_MAPPINGS
                 if item[0] == self.highest_education

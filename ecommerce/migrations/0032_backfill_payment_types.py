@@ -49,7 +49,6 @@ def backfill_payment_types(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("ecommerce", "0031_discount_payment_type"),
     ]

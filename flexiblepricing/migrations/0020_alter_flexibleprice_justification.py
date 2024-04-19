@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("flexiblepricing", "0019_add_unique_user_courseware_to_flexiblepricing"),
     ]

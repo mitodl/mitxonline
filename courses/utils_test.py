@@ -2,7 +2,6 @@
 """
 Tests for utils
 """
-import pytest
 
 from courses.factories import (
     CourseFactory,
@@ -10,8 +9,6 @@ from courses.factories import (
     CourseRunFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
-    ProgramFactory,
-    program_with_requirements,
 )
 from courses.utils import get_program_certificate_by_enrollment
 
@@ -54,7 +51,7 @@ def test_get_program_certificate_by_enrollment_program_does_not_exist(user):
 
     course_enrollment = CourseRunEnrollmentFactory.create(user=user, run=course_run)
 
-    assert get_program_certificate_by_enrollment(course_enrollment) == None
+    assert get_program_certificate_by_enrollment(course_enrollment) == None  # noqa: E711
 
 
 def test_get_program_certificate_by_enrollment_program_page_does_not_exist(
@@ -82,8 +79,8 @@ def test_get_program_certificate_by_enrollment_program_page_does_not_exist(
     assert (
         get_program_certificate_by_enrollment(program_enrollment) != program_certificate
     )
-    assert get_program_certificate_by_enrollment(course_enrollment, program) == None
-    assert get_program_certificate_by_enrollment(program_enrollment) == None
+    assert get_program_certificate_by_enrollment(course_enrollment, program) == None  # noqa: E711
+    assert get_program_certificate_by_enrollment(program_enrollment) == None  # noqa: E711
 
 
 def test_get_program_certificate_by_enrollment_program_certificate_page_does_not_exist(
@@ -111,5 +108,5 @@ def test_get_program_certificate_by_enrollment_program_certificate_page_does_not
     assert (
         get_program_certificate_by_enrollment(program_enrollment) != program_certificate
     )
-    assert get_program_certificate_by_enrollment(course_enrollment) == None
-    assert get_program_certificate_by_enrollment(program_enrollment) == None
+    assert get_program_certificate_by_enrollment(course_enrollment) == None  # noqa: E711
+    assert get_program_certificate_by_enrollment(program_enrollment) == None  # noqa: E711

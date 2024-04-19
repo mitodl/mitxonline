@@ -1,4 +1,5 @@
 """micromasters_import app configs"""
+
 from django.apps import AppConfig
 
 

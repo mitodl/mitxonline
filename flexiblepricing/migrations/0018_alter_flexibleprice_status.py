@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("flexiblepricing", "0017_update_flexible_pricing_rename_skipped_to_denied"),
     ]

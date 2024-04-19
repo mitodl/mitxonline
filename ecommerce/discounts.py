@@ -1,14 +1,15 @@
 import abc
 from dataclasses import dataclass
-from reversion.models import Version
 from decimal import Decimal
 
-from ecommerce.models import Discount, Product
+from reversion.models import Version
+
 from ecommerce.constants import (
-    DISCOUNT_TYPE_PERCENT_OFF,
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
+    DISCOUNT_TYPE_PERCENT_OFF,
 )
+from ecommerce.models import Discount, Product
 
 
 def resolve_product_version(product: Product, product_version=None):
@@ -38,7 +39,7 @@ def resolve_product_version(product: Product, product_version=None):
                 is_active=test_version.field_dict["is_active"],
             )
 
-    raise TypeError("Invalid product version specified")
+    raise TypeError("Invalid product version specified")  # noqa: EM101
 
 
 @dataclass
@@ -51,7 +52,7 @@ class DiscountType(abc.ABC):
         super().__init_subclass__()
 
         if discount_type in cls._CLASSES:
-            raise TypeError(f"{discount_type} already defined for DiscountType")
+            raise TypeError(f"{discount_type} already defined for DiscountType")  # noqa: EM102
 
         cls.discount_type = discount_type
         cls._CLASSES[discount_type] = cls
@@ -91,7 +92,6 @@ class DiscountType(abc.ABC):
 
 class PercentDiscount(DiscountType, discount_type=DISCOUNT_TYPE_PERCENT_OFF):
     def get_product_version_price(self, product: Product, version=None):
-
         version = resolve_product_version(product, version)
 
         return round(
@@ -112,5 +112,5 @@ class DollarsOffDiscount(DiscountType, discount_type=DISCOUNT_TYPE_DOLLARS_OFF):
 
 
 class FixedPriceDiscount(DiscountType, discount_type=DISCOUNT_TYPE_FIXED_PRICE):
-    def get_product_version_price(self, product: Product, version=None):
+    def get_product_version_price(self, product: Product, version=None):  # noqa: ARG002
         return Decimal(self.discount.amount)

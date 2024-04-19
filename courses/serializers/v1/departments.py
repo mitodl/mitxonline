@@ -19,7 +19,7 @@ class DepartmentWithCountSerializer(DepartmentSerializer):
 
     class Meta:
         model = models.Department
-        fields = DepartmentSerializer.Meta.fields + [
+        fields = DepartmentSerializer.Meta.fields + [  # noqa: RUF005
             "courses",
             "programs",
         ]

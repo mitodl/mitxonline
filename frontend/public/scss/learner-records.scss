@@ -36,13 +36,13 @@
 
   div.learner-record-user-profile {
     line-height: 30px !important;
-  
+
     h2.learner-record-user-name {
       font-size: 22px !important;
       font-weight: 700;
       margin-bottom: 5px;
     }
-  }  
+  }
 }
 
 .badge.badge-partially-completed {
@@ -96,7 +96,7 @@ table.learner-record-table {
 
       span.badge.bg-success {
         background: #D2FBD0 !important;
-        color: #0D5F07; 
+        color: #0D5F07;
       }
     }
 
@@ -135,7 +135,7 @@ div.learner-record-sharing-controls {
     text-align: center;
     border-radius: 0.25rem;
     font-size: 14px !important;
-    @media (min-width:960px) { 
+    @media (min-width:960px) {
       line-height: 35px;
     }
   }

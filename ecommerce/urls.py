@@ -3,8 +3,8 @@ from rest_framework.routers import SimpleRouter
 from rest_framework_extensions.routers import NestedRouterMixin
 
 """ TODO: clean this up later (make the views look more like the courses one) """
-from ecommerce.admin import AdminRefundOrderView
-from ecommerce.views.v0 import (
+from ecommerce.admin import AdminRefundOrderView  # noqa: E402
+from ecommerce.views.v0 import (  # noqa: E402
     AllProductViewSet,
     BackofficeCallbackView,
     BasketDiscountViewSet,
@@ -37,7 +37,7 @@ router.register(r"checkout", CheckoutApiViewSet, basename="checkout_api")
 router.register(r"orders/history", OrderHistoryViewSet, basename="orderhistory_api")
 router.register(r"discounts/user", UserDiscountViewSet, basename="userdiscounts_api")
 
-discountsRouter = router.register(
+discountsRouter = router.register(  # noqa: N816
     r"discounts", DiscountViewSet, basename="discounts_api"
 )
 discountsRouter.register(
@@ -65,7 +65,7 @@ discountsRouter.register(
     parents_query_lookups=["discount"],
 )
 
-basketRouter = router.register(r"baskets", BasketViewSet, basename="basket")
+basketRouter = router.register(r"baskets", BasketViewSet, basename="basket")  # noqa: N816
 basketRouter.register(
     r"items",
     BasketItemViewSet,

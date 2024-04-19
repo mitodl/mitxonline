@@ -5,6 +5,4 @@ class CmsConfig(AppConfig):
     name = "cms"
 
     def ready(self):
-        from . import signalreceivers
-
         pass

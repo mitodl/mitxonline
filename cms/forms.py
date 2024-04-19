@@ -1,6 +1,7 @@
 """
 Custom forms for the cms
 """
+
 from wagtail.admin.forms import WagtailAdminPageForm
 
 

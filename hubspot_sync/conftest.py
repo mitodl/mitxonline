@@ -1,6 +1,7 @@
 """
 Fixtures for hubspot_sync tests
 """
+
 from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
@@ -44,7 +45,7 @@ def mocked_celery(mocker):
     group_mock = mocker.patch("celery.group", autospec=True)
     chain_mock = mocker.patch("celery.chain", autospec=True)
 
-    yield SimpleNamespace(
+    return SimpleNamespace(
         replace=replace_mock,
         group=group_mock,
         chain=chain_mock,
@@ -55,7 +56,7 @@ def mocked_celery(mocker):
 @pytest.fixture
 def mock_logger(mocker):
     """Mock the logger"""
-    yield mocker.patch("hubspot_sync.tasks.log.error")
+    return mocker.patch("hubspot_sync.tasks.log.error")
 
 
 @pytest.fixture
@@ -102,4 +103,4 @@ def mock_hubspot_api(mocker):
     mock_api.return_value.crm.objects.basic_api.create.return_value = (
         SimplePublicObject(id=FAKE_HUBSPOT_ID)
     )
-    yield mock_api
+    return mock_api

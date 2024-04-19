@@ -13,13 +13,14 @@ Check the usages of this command below:
 2. Keep failed enrollments
 ./manage.py unenroll_enrollment -—user=<username or email> -—run=<course_run_courseware_id> -k or --keep-failed-enrollments
 """
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import CommandError
 
 from courses.api import deactivate_run_enrollment
-from courses.models import CourseRun
-from courses.management.utils import EnrollmentChangeCommand, enrollment_summary
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
+from courses.management.utils import EnrollmentChangeCommand, enrollment_summary
+from courses.models import CourseRun
 from users.api import fetch_user
 
 User = get_user_model()
@@ -53,20 +54,20 @@ class Command(EnrollmentChangeCommand):
 
         super().add_arguments(parser)
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         """Handle command execution"""
         username = options.get("user", "")
         try:
             user = fetch_user(username)
         except User.DoesNotExist:
-            raise CommandError(
-                "Could not find a user with <username or email>={}".format(username)
+            raise CommandError(  # noqa: B904
+                f"Could not find a user with <username or email>={username}"  # noqa: EM102
             )
         courseware_id = options.get("run")
         course_run = CourseRun.objects.filter(courseware_id=courseware_id).first()
         if course_run is None:
             raise CommandError(
-                "Could not find course run with courseware_id={}".format(courseware_id)
+                f"Could not find course run with courseware_id={courseware_id}"  # noqa: EM102
             )
 
         keep_failed_enrollments = options.get("keep_failed_enrollments")
@@ -78,11 +79,7 @@ class Command(EnrollmentChangeCommand):
         )
 
         if run_enrollment:
-            success_msg = "Unenrolled enrollment for user: {} ({})\nEnrollment affected: {}".format(
-                enrollment.user.username,
-                enrollment.user.email,
-                enrollment_summary(run_enrollment),
-            )
+            success_msg = f"Unenrolled enrollment for user: {enrollment.user.username} ({enrollment.user.email})\nEnrollment affected: {enrollment_summary(run_enrollment)}"
 
             self.stdout.write(self.style.SUCCESS(success_msg))
         else:

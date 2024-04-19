@@ -1,6 +1,6 @@
 import random
 from datetime import timedelta
-from decimal import Decimal, getcontext
+from decimal import Decimal
 
 import pytest
 import reversion
@@ -47,27 +47,27 @@ def users():
     return UserFactory.create_batch(2)
 
 
-@pytest.fixture()
+@pytest.fixture
 def onetime_discount():
     return OneTimeDiscountFactory.create()
 
 
-@pytest.fixture()
+@pytest.fixture
 def onetime_per_user_discount():
     return OneTimePerUserDiscountFactory.create()
 
 
-@pytest.fixture()
+@pytest.fixture
 def unlimited_discount():
     return UnlimitedUseDiscountFactory.create()
 
 
-@pytest.fixture()
+@pytest.fixture
 def set_limited_use_discount():
     return SetLimitDiscountFactory.create()
 
 
-@pytest.fixture()
+@pytest.fixture
 def basket():
     return BasketFactory.create()
 
@@ -121,7 +121,7 @@ def test_unlimited_discounts(users, unlimited_discount):
     """
 
     for user in users:
-        for i in range(random.randrange(1, 15, 1)):
+        for i in range(random.randrange(1, 15, 1)):  # noqa: S311, B007
             assert unlimited_discount.check_validity(user) is True
 
             perform_discount_redemption(user, unlimited_discount)
@@ -136,7 +136,7 @@ def test_set_limit_discount_single_user(user, set_limited_use_discount):
     test for multiple users.
     """
 
-    for i in range(set_limited_use_discount.max_redemptions):
+    for i in range(set_limited_use_discount.max_redemptions):  # noqa: B007
         assert set_limited_use_discount.check_validity(user) is True
 
         perform_discount_redemption(user, set_limited_use_discount)
@@ -152,7 +152,7 @@ def test_set_limit_discount_multiple_users(users, set_limited_use_discount):
     """
 
     for user in users:
-        for i in range(int(set_limited_use_discount.max_redemptions / 2)):
+        for i in range(int(set_limited_use_discount.max_redemptions / 2)):  # noqa: B007
             assert set_limited_use_discount.check_validity(user) is True
 
             perform_discount_redemption(user, set_limited_use_discount)
@@ -205,7 +205,7 @@ def test_order_refund(settings):
     Tests state change from fulfilled to refund. There should be a new
     Transaction record after the order has been refunded.
     """
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     with reversion.create_revision():
         basket_item = BasketItemFactory.create()
 
@@ -292,7 +292,8 @@ def test_product_managers():
 
 def test_product_multiple_active_for_single_purchasable_object():
     """Test that creating multiple Products with the same course/program
-    and are active is not allowed"""
+    and are active is not allowed
+    """
     first_product = ProductFactory.create()
     try:
         with transaction.atomic():
@@ -307,14 +308,14 @@ def test_order_update_reference_number(user):
     order = Order(purchaser=user, total_price_paid=10)
     order.save()
 
-    assert order.reference_number == order._generate_reference_number()
+    assert order.reference_number == order._generate_reference_number()  # noqa: SLF001
 
     existing_order = Order.objects.get(pk=order.id)
     existing_order.reference_number = None
     existing_order.save()
 
     assert (
-        existing_order.reference_number == existing_order._generate_reference_number()
+        existing_order.reference_number == existing_order._generate_reference_number()  # noqa: SLF001
     )
 
 
@@ -341,9 +342,9 @@ def test_duplicated_product_lines_validation(basket):
 
 
 def test_create_transaction_with_no_transaction_id():
-    """test that creating payment or refund transaction without transaction id in payment data will raise exception"""
+    """Test that creating payment or refund transaction without transaction id in payment data will raise exception"""
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError):  # noqa: PT012
         pending_order = OrderFactory.create(state=Order.STATE.PENDING)
         pending_order.fulfill({})
         pending_order.save()
@@ -371,13 +372,13 @@ def test_create_transaction_with_no_transaction_id():
 
 
 @pytest.mark.parametrize(
-    "discount_type, less_than_zero_or_discount",
+    "discount_type, less_than_zero_or_discount",  # noqa: PT006
     [
-        [DISCOUNT_TYPE_DOLLARS_OFF, False],
-        [DISCOUNT_TYPE_DOLLARS_OFF, True],
-        [DISCOUNT_TYPE_FIXED_PRICE, False],
-        [DISCOUNT_TYPE_FIXED_PRICE, True],
-        [DISCOUNT_TYPE_PERCENT_OFF, False],
+        [DISCOUNT_TYPE_DOLLARS_OFF, False],  # noqa: PT007
+        [DISCOUNT_TYPE_DOLLARS_OFF, True],  # noqa: PT007
+        [DISCOUNT_TYPE_FIXED_PRICE, False],  # noqa: PT007
+        [DISCOUNT_TYPE_FIXED_PRICE, True],  # noqa: PT007
+        [DISCOUNT_TYPE_PERCENT_OFF, False],  # noqa: PT007
     ],
 )
 def test_discount_product_calculation(
@@ -505,7 +506,7 @@ def test_pending_order_is_reused_but_discounts_cleared(
     if apply_discount == "to_order":
         assert order.discounts.count() == 0
     else:
-        order.discounts.count() == 1
+        order.discounts.count() == 1  # noqa: B015
 
         # A different discount gets attached if there's a second basket so make
         # sure the right one is there
@@ -587,7 +588,7 @@ def test_discount_expires_in_past(unlimited_discount):
 
     test_discount.expiration_date = now_in_utc() - timedelta(days=2)
 
-    with pytest.raises(Exception) as e:
+    with pytest.raises(Exception) as e:  # noqa: PT011, PT012
         test_discount.save()
 
         assert "is in the past" in str(e)
@@ -604,7 +605,7 @@ def test_discount_expires_before_activation(unlimited_discount):
     test_discount.expiration_date = now_in_utc() + timedelta(days=2)
     test_discount.activation_date = now_in_utc() + timedelta(days=3)
 
-    with pytest.raises(Exception) as e:
+    with pytest.raises(Exception) as e:  # noqa: PT011, PT012
         test_discount.save()
 
         assert "is before activation date" in str(e)

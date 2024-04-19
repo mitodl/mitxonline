@@ -1,4 +1,5 @@
 """Shared pytest configuration for courses application"""
+
 import random
 
 import pytest
@@ -10,40 +11,40 @@ from courses.factories import (
     ProgramRequirementFactory,
 )
 from courses.models import (
-    ProgramRequirementNodeType,
     ProgramRequirement,
+    ProgramRequirementNodeType,
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def programs():
     """Fixture for a set of Programs in the database"""
     return ProgramFactory.create_batch(3)
 
 
-@pytest.fixture()
+@pytest.fixture
 def courses():
     """Fixture for a set of Courses in the database"""
     return CourseFactory.create_batch(3)
 
 
-@pytest.fixture()
+@pytest.fixture
 def course_runs():
     """Fixture for a set of CourseRuns in the database"""
     return CourseRunFactory.create_batch(3)
 
 
-@pytest.fixture()
+@pytest.fixture
 def course_catalog_program_count(request):
     return getattr(request, "param", 5)
 
 
-@pytest.fixture()
+@pytest.fixture
 def course_catalog_course_count(request):
     return getattr(request, "param", 10)
 
 
-@pytest.fixture()
+@pytest.fixture
 def course_catalog_data(course_catalog_program_count, course_catalog_course_count):
     """
     Current production data is around 85 courses and 150 course runs. I opted to create 3 of each to allow
@@ -67,7 +68,7 @@ def course_catalog_data(course_catalog_program_count, course_catalog_course_coun
         course, course_runs_for_course = _create_course(n)
         courses.append(course)
         course_runs.append(course_runs_for_course)
-    for n in range(course_catalog_program_count):
+    for n in range(course_catalog_program_count):  # noqa: B007
         program = _create_program(courses)
         programs.append(program)
     return courses, programs, course_runs
@@ -97,7 +98,7 @@ def _create_program(courses):
         title="Elective Courses",
         elective_flag=True,
     )
-    if len(courses) > 3:
+    if len(courses) > 3:  # noqa: PLR2004
         for c in random.sample(courses, 3):
             required_courses_node.add_child(
                 node_type=ProgramRequirementNodeType.COURSE, course=c

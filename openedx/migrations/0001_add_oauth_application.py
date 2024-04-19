@@ -11,10 +11,10 @@ def create_edx_oauth_application(apps, schema_editor):
     Application = get_application_model()
     Application.objects.get_or_create(
         name=settings.OPENEDX_OAUTH_APP_NAME,
-        defaults=dict(
+        defaults=dict(  # noqa: C408
             redirect_uris=urljoin(
                 settings.OPENEDX_BASE_REDIRECT_URL,
-                "/auth/complete/{}/".format(settings.MITX_ONLINE_OAUTH_PROVIDER),
+                f"/auth/complete/{settings.MITX_ONLINE_OAUTH_PROVIDER}/",
             ),
             client_type="confidential",
             authorization_grant_type="authorization-code",

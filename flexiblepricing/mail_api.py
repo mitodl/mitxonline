@@ -1,6 +1,7 @@
 """
 Utils for mail
 """
+
 import logging
 
 from django.core.exceptions import ValidationError
@@ -65,7 +66,7 @@ def generate_flexible_price_email(flexible_price):
         )
     else:
         raise ValidationError(
-            "Invalid status on FlexiblePrice for generate_flexible_price_email()"
+            "Invalid status on FlexiblePrice for generate_flexible_price_email()"  # noqa: EM101
         )
     try:
         with get_message_sender(FlexiblePriceStatusChangeMessage) as sender:
@@ -78,7 +79,7 @@ def generate_flexible_price_email(flexible_price):
                     "program_name": program_name_with_course_number,
                 },
             )
-    except:
+    except:  # noqa: E722
         log.exception("Error sending flexible price request status change email")
 
 
@@ -86,7 +87,7 @@ def send_financial_assistance_request_denied_email(
     financial_assistance_request, email_subject, email_body
 ):
     log.info(
-        f"Sending Financial Assistance request denied email to {financial_assistance_request.user.email}"
+        f"Sending Financial Assistance request denied email to {financial_assistance_request.user.email}"  # noqa: G004
     )
     try:
         with get_message_sender(FlexiblePriceStatusChangeMessage) as sender:
@@ -99,5 +100,5 @@ def send_financial_assistance_request_denied_email(
                     "program_name": financial_assistance_request.courseware_object.title,
                 },
             )
-    except:
+    except:  # noqa: E722
         log.exception("Error sending flexible price request status change email")

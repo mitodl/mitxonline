@@ -37,7 +37,7 @@ class Command(BaseCommand):
             "--live", action="store_true", help="Check only live programs."
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
         if kwargs["program"] is not None and len(kwargs["program"]) > 0:
             numeric_ids = []
             readable_ids = []
@@ -46,7 +46,7 @@ class Command(BaseCommand):
                 readable_ids.append(id[0])
                 if not id[0].isnumeric()
                 else numeric_ids.append(id[0])
-                for id in kwargs["program"]
+                for id in kwargs["program"]  # noqa: A001
             ]
 
             programs_qset = Program.objects.filter(

@@ -8,13 +8,15 @@ command and is passed to it as a CSV file. The format of the file is:
 learner email,courserun readable id
 ```
 """
-from django.core.management import BaseCommand
-from django.conf import settings
+
 import csv
+
+from django.conf import settings
+from django.core.management import BaseCommand
 
 from courses.api import create_run_enrollments
 from courses.models import CourseRun, CourseRunEnrollment
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
 
@@ -32,10 +34,10 @@ class Command(BaseCommand):
             help="Input file. See documentation for file format.",
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
         upgrade_count = 0
         users_no_enrollment = []
-        with open(kwargs["input_file"], newline="") as csvfile:
+        with open(kwargs["input_file"], newline="") as csvfile:  # noqa: PTH123
             reader = csv.reader(csvfile, delimiter=",", quotechar="\\")
 
             for row in reader:
@@ -95,8 +97,8 @@ class Command(BaseCommand):
                     )
         if users_no_enrollment:
             file_name = "users_eligible_for_coupon.csv"
-            path = "{}/{}".format(settings.BASE_DIR, file_name)
-            with open(path, "w") as f:
+            path = f"{settings.BASE_DIR}/{file_name}"
+            with open(path, "w") as f:  # noqa: PTH123
                 for email, course_id in users_no_enrollment:
                     f.write(f"{email},{course_id}\n")
 
