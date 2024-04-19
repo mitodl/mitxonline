@@ -34,7 +34,7 @@ type CourseInfoBoxProps = {
 const getCourseDates = (run, isMoreDates = false) => {
   let startDate = isMoreDates
     ? formatPrettyShortDate(parseDateString(run.start_date))
-    : formatPrettyDate(parseDateString(run.end_date))
+    : formatPrettyDate(parseDateString(run.start_date))
   if (run.is_self_paced && moment(run.start_date).isBefore(moment())) {
     startDate = "Anytime"
   }
