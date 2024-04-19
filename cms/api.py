@@ -307,13 +307,13 @@ def create_featured_items():
     """
     Manually pull a new set of featured items for the CMS home page
     """
-    from cms.models import Course, HomePage
+    from courses.models import Course, CourseRun
 
     now = now_in_utc()
     start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = start_of_day.replace(hour=23, minute=59, second=59)
 
-    courses = Course.objects.filter(
+    courseruns = CourseRun.objects.filter(
         page__live=True,
         live=True,
         enrollment_start__lte=start_of_day,
