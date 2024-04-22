@@ -330,16 +330,19 @@ body.new-design {
 
           .enrollment-info-icon {
             max-width: 20px;
-            margin-right: 12px;
+            margin-right: 8px;
+            padding-left: 0;
 
             img {
-              max-width: 20px;
+              max-width: 18px;
             }
           }
 
           .enrollment-info-text {
             width: auto;
             flex-grow: 1;
+            color: $helptext-grey;
+
 
             .pacing-faq-link {
               color: $home-page-dark-blue;
@@ -364,17 +367,28 @@ body.new-design {
           }
           .more-enrollment-info {
             width: auto;
-            color: $brand-darker-bg;
+            color: $home-page-header-blue;
             font-size: 12px;
             text-decoration-line: underline;
             border-color: transparent;
             background-color: transparent;
             padding-right: 0;
+            height: fit-content;
+            line-height: normal;
+
+            &:hover {
+              text-decoration-line: none;
+              color: $brand-darker-bg;
+            }
           }
           .more-dates-enrollment-list{
             list-style: none;
+            font-size: 14px;
+            color: $helptext-grey;
+            margin-top: 5px;
+            margin-bottom: 0;
             li {
-              padding-left: 36px;
+              padding-left: 29px;
             }
             button.more-dates-link {
               font-size: 14px;

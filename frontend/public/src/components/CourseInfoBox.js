@@ -4,7 +4,8 @@ import {
   emptyOrNil,
   getFlexiblePriceForProduct,
   formatLocalePrice,
-  getStartDateText
+  parseDateString,
+  formatPrettyShortDate
 } from "../lib/util"
 import { getFirstRelevantRun } from "../lib/courseApi"
 import moment from "moment-timezone"
@@ -22,6 +23,36 @@ type CourseInfoBoxProps = {
   setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>
 }
 
+/**
+ * This constructs the Date section for a given run
+ * If the run is under the toggle "More Dates" the format is inline and month
+ * is shortened to 3 letters.
+ * @param {EnrollmentFlaggedCourseRun} run
+ * @param {boolean} isMoreDates true if this run is going to show up under the More Dates toggle
+ * */
+
+const getCourseDates = (run, isMoreDates = false) => {
+  let startDate = isMoreDates
+    ? formatPrettyShortDate(parseDateString(run.start_date))
+    : formatPrettyDate(parseDateString(run.start_date))
+  if (run.is_self_paced && moment(run.start_date).isBefore(moment())) {
+    startDate = "Anytime"
+  }
+  return (
+    <>
+      <b>Start:</b> {startDate} {isMoreDates ? null : <br />}
+      {run.end_date ? (
+        <>
+          <b>End:</b>{" "}
+          {isMoreDates
+            ? formatPrettyShortDate(parseDateString(run.end_date))
+            : formatPrettyDate(parseDateString(run.end_date))}
+        </>
+      ) : null}
+    </>
+  )
+}
+
 export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProps> {
   state = {
     showMoreEnrollDates: false
@@ -34,14 +65,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
   setRunEnrollDialog(run: EnrollmentFlaggedCourseRun) {
     this.props.setCurrentCourseRun(run)
     this.props.toggleUpgradeDialogVisibility()
-  }
-
-  renderEnrolledDateLink(run: EnrollmentFlaggedCourseRun) {
-    return (
-      <button className="more-dates-link enrolled">
-        {getStartDateText(run)} - Enrolled
-      </button>
-    )
   }
 
   warningMessage(isArchived) {
@@ -57,7 +80,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
   }
 
   render() {
-    const { courses, courseRuns, enrollments } = this.props
+    const { courses, courseRuns } = this.props
 
     if (!courses || courses.length < 1) {
       return null
@@ -79,16 +102,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
       courseRuns.forEach((courseRun, index) => {
         if (courseRun.id !== run.id) {
           startDates.push(
-            <li key={index}>
-              {courseRun.is_enrolled ||
-              (enrollments &&
-                enrollments.find(
-                  (enrollment: RunEnrollment) =>
-                    enrollment.run.id === courseRun.id
-                ))
-                ? this.renderEnrolledDateLink(courseRun)
-                : getStartDateText(courseRun)}
-            </li>
+            <li key={index}>{getCourseDates(courseRun, true)}</li>
           )
         }
       })
@@ -98,7 +112,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         <div className="enrollment-info-box componentized">
           {!run || isArchived ? this.warningMessage(isArchived) : null}
           {run ? (
-            <div className="row d-flex align-items-center course-timing-message">
+            <div className="row d-flex course-timing-message">
               <div
                 className="enrollment-info-icon"
                 aria-level="3"
@@ -112,7 +126,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               <div className="enrollment-info-text">
                 {isArchived
                   ? "Course content available anytime"
-                  : getStartDateText(run)}
+                  : getCourseDates(run)}
               </div>
 
               {!isArchived && moreEnrollableCourseRuns ? (
