@@ -28,10 +28,20 @@ type CourseInfoBoxProps = {
  * If the run is under the toggle "More Dates" the format is inline and month
  * is shortened to 3 letters.
  * @param {EnrollmentFlaggedCourseRun} run
+ * @param {boolean} isArchived if the course ended, but still enrollable
  * @param {boolean} isMoreDates true if this run is going to show up under the More Dates toggle
  * */
 
-const getCourseDates = (run, isMoreDates = false) => {
+const getCourseDates = (run, isArchived = false, isMoreDates = false) => {
+  if (isArchived) {
+    return (
+      <>
+        <span>Course content available anytime</span>
+        <br />
+        <b>Start:</b> {formatPrettyDate(parseDateString(run.start_date))}
+      </>
+    )
+  }
   let startDate = isMoreDates
     ? formatPrettyShortDate(parseDateString(run.start_date))
     : formatPrettyDate(parseDateString(run.start_date))
@@ -102,7 +112,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
       courseRuns.forEach((courseRun, index) => {
         if (courseRun.id !== run.id) {
           startDates.push(
-            <li key={index}>{getCourseDates(courseRun, true)}</li>
+            <li key={index}>{getCourseDates(courseRun, isArchived, true)}</li>
           )
         }
       })
@@ -124,9 +134,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                 />
               </div>
               <div className="enrollment-info-text">
-                {isArchived
-                  ? "Course content available anytime"
-                  : getCourseDates(run)}
+                {getCourseDates(run, isArchived)}
               </div>
 
               {!isArchived && moreEnrollableCourseRuns ? (
@@ -146,6 +154,50 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               ) : null}
             </div>
           ) : null}
+          {run ? (
+            <div className="row d-flex align-items-top">
+              <div
+                className="enrollment-info-icon"
+                aria-level="3"
+                role="heading"
+              >
+                <img
+                  className="course-format-icon align-text-bottom"
+                  src="/static/images/products/vector-left.png"
+                  alt="Course Format"
+                />
+                <img
+                  className="course-format-icon align-text-top"
+                  src="/static/images/products/vector-right.png"
+                  alt="Course Format"
+                />
+              </div>
+              <div className="enrollment-info-text">
+                <b>Course Format: </b>
+                {isArchived || run.is_self_paced ? (
+                  <>
+                    Self-paced
+                    <a
+                      className="pacing-faq-link float-right"
+                      href="https://mitxonline.zendesk.com/hc/en-us/articles/21995114519067-What-are-Archived-courses-on-MITx-Online-"
+                    >
+                      What's this?
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    Instructor-paced
+                    <a
+                      className="pacing-faq-link float-right"
+                      href="https://mitxonline.zendesk.com/hc/en-us/articles/21994938130075-What-are-Instructor-Paced-courses-on-MITx-Online-"
+                    >
+                      What's this?
+                    </a>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : null}
           {course && course.page ? (
             <div className="row d-flex align-items-top course-effort-message">
               <div
@@ -159,43 +211,8 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                 />
               </div>
               <div className="enrollment-info-text">
-                {course.page.length}
-                {run ? (
-                  isArchived ? (
-                    <>
-                      <span className="badge badge-pacing">ARCHIVED</span>
-                      <a
-                        className="pacing-faq-link float-right"
-                        href="https://mitxonline.zendesk.com/hc/en-us/articles/21995114519067-What-are-Archived-courses-on-MITx-Online-"
-                      >
-                        What's this?
-                      </a>
-                    </>
-                  ) : run.is_self_paced ? (
-                    <>
-                      <span className="badge badge-pacing">SELF-PACED</span>
-                      <a
-                        className="pacing-faq-link float-right"
-                        href="https://mitxonline.zendesk.com/hc/en-us/articles/21994872904475-What-are-Self-Paced-courses-on-MITx-Online-"
-                      >
-                        What's this?
-                      </a>
-                    </>
-                  ) : (
-                    <>
-                      <span className="badge badge-pacing">
-                        INSTRUCTOR-PACED
-                      </span>
-                      <a
-                        className="pacing-faq-link float-right"
-                        href="https://mitxonline.zendesk.com/hc/en-us/articles/21994938130075-What-are-Instructor-Paced-courses-on-MITx-Online-"
-                      >
-                        What's this?
-                      </a>
-                    </>
-                  )
-                ) : null}
-
+                <b>Estimated: </b>
+                {course.page.length}{" "}
                 {course.page.effort ? (
                   <>
                     <div className="enrollment-effort">

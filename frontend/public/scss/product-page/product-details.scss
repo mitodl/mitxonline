@@ -329,12 +329,16 @@ body.new-design {
           }
 
           .enrollment-info-icon {
-            max-width: 20px;
-            margin-right: 8px;
+            max-width: 28px;
+            margin-right: 5px;
             padding-left: 0;
 
             img {
               max-width: 18px;
+            }
+
+            img.course-format-icon{
+
             }
           }
 
@@ -342,8 +346,12 @@ body.new-design {
             width: auto;
             flex-grow: 1;
             color: $helptext-grey;
+            padding-left: 0;
 
-
+            span {
+              font-weight: 700;
+              color: black;
+            }
             .pacing-faq-link {
               color: $home-page-dark-blue;
               text-decoration-line: underline;
@@ -354,6 +362,7 @@ body.new-design {
 
             .enrollment-effort {
               font-size: smaller;
+              display: inline-block;
             }
 
             .badge-pacing {
