@@ -881,6 +881,10 @@ CACHES = {
         "LOCATION": CELERY_BROKER_URL,
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
     },
+    "durable": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "durable_cache",
+    },
 }
 
 AUTHENTICATION_BACKENDS = (
@@ -964,7 +968,6 @@ MITOL_MAIL_ENABLE_EMAIL_DEBUGGER = get_bool(  # NOTE: this will override the leg
 # mitol-django-authentication
 MITOL_AUTHENTICATION_FROM_EMAIL = MAILGUN_FROM_EMAIL
 MITOL_AUTHENTICATION_REPLY_TO_EMAIL = MITX_ONLINE_REPLY_TO_ADDRESS
-
 
 MITX_ONLINE_OAUTH_PROVIDER = "mitxpro-oauth2"
 OPENEDX_OAUTH_APP_NAME = get_string(
@@ -1150,7 +1153,6 @@ POSTHOG_API_HOST = get_string(
     default="",
     description="API host for PostHog",
 )
-
 POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS = get_int(
     name="POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS",
     default=3000,
