@@ -240,22 +240,22 @@ class UserSerializer(serializers.ModelSerializer):
                 )
 
         username = data.get("username")
-        if username:
-            try:
-                openedx_validation_msg = validate_username_with_edx(username)
-                openedx_validation_msg = OPENEDX_USERNAME_VALIDATION_MSGS_MAP.get(
-                    openedx_validation_msg, openedx_validation_msg
-                )
-            except (
-                HTTPError,
-                RequestsConnectionError,
-                EdxApiRegistrationValidationException,
-            ) as exc:
-                log.exception("Unable to create user account", exc)
-                raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)
+        # if username:
+        #     try:
+        #         openedx_validation_msg = validate_username_with_edx(username)
+        #         openedx_validation_msg = OPENEDX_USERNAME_VALIDATION_MSGS_MAP.get(
+        #             openedx_validation_msg, openedx_validation_msg
+        #         )
+        #     except (
+        #         HTTPError,
+        #         RequestsConnectionError,
+        #         EdxApiRegistrationValidationException,
+        #     ) as exc:
+        #         log.exception("Unable to create user account", exc)
+        #         raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)
 
-            if openedx_validation_msg:
-                raise serializers.ValidationError({"username": openedx_validation_msg})
+        #     if openedx_validation_msg:
+        #         raise serializers.ValidationError({"username": openedx_validation_msg})
 
         return data
 

@@ -2,8 +2,6 @@
 Django app
 """
 from django.apps import AppConfig
-from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
 
 
 class RootConfig(AppConfig):
@@ -13,5 +11,7 @@ class RootConfig(AppConfig):
 
     def ready(self):
         from mitol.common import envs
+        from mitol.posthog.features import configure
 
         envs.validate()
+        configure()

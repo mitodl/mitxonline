@@ -535,7 +535,7 @@
       "description": "API host for PostHog",
       "required": false
     },
-    "POSTHOG_API_TOKEN": {
+    "POSTHOG_PROJECT_API_KEY": {
       "description": "API token to communicate with PostHog",
       "required": false
     },

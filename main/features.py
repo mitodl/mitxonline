@@ -16,59 +16,59 @@ ENABLE_NEW_HOME_PAGE_CONTACT_FORM = "mitxonline-new-home-page-contact-form"
 ENABLE_NEW_FOOTER = "mitxonline-new-footer"
 
 
-def is_enabled(name, default=None, unique_id=settings.HOSTNAME):
-    """
-    Returns True if the feature flag is enabled
+# def is_enabled(name, default=None, unique_id=settings.HOSTNAME):
+#     """
+#     Returns True if the feature flag is enabled
 
-    Args:
-        name (str): feature flag name
-        default (bool): default value if not set in settings
-        unique_id (str): person identifier passed back to posthog which is the display value for person. I recommend
-                         this be user.id for logged-in users to allow for more readable user flags as well as more clear
-                         troubleshooting. For anonymous users, a persistent ID will help with troubleshooting and
-                         tracking efforts.
+#     Args:
+#         name (str): feature flag name
+#         default (bool): default value if not set in settings
+#         unique_id (str): person identifier passed back to posthog which is the display value for person. I recommend
+#                          this be user.id for logged-in users to allow for more readable user flags as well as more clear
+#                          troubleshooting. For anonymous users, a persistent ID will help with troubleshooting and
+#                          tracking efforts.
 
-    Returns:
-        bool: True if the feature flag is enabled
-    """
+#     Returns:
+#         bool: True if the feature flag is enabled
+#     """
 
-    if "IN_TEST_SUITE" not in os.environ:
-        import posthog
-    else:
-        posthog = None
-    return (
-        posthog
-        and posthog.get_feature_flag(
-            name,
-            unique_id,
-            person_properties={
-                "environment": settings.ENVIRONMENT,
-                "user_id": unique_id,
-            },
-        )
-    ) or settings.FEATURES.get(name, default or settings.FEATURES_DEFAULT)
+#     if os.getenv("POSTHOG_ENABLED", "False").lower() in ("true", "1", "t"):
+#         import posthog
+#     else:
+#         posthog = None
+#     return (
+#         posthog
+#         and posthog.get_feature_flag(
+#             name,
+#             unique_id,
+#             person_properties={
+#                 "environment": settings.ENVIRONMENT,
+#                 "user_id": unique_id,
+#             },
+#         )
+#     ) or settings.FEATURES.get(name, default or settings.FEATURES_DEFAULT)
 
 
-def if_feature_enabled(name, default=None):
-    """
-    Wrapper that results in a no-op if the given feature isn't enabled, and otherwise
-    runs the wrapped function as normal.
+# def if_feature_enabled(name, default=None):
+#     """
+#     Wrapper that results in a no-op if the given feature isn't enabled, and otherwise
+#     runs the wrapped function as normal.
 
-    Args:
-        name (str): Feature flag name
-        default (bool): default value if not set in settings
-    """
+#     Args:
+#         name (str): Feature flag name
+#         default (bool): default value if not set in settings
+#     """
 
-    def if_feature_enabled_inner(func):  # pylint: disable=missing-docstring
-        @wraps(func)
-        def wrapped_func(*args, **kwargs):  # pylint: disable=missing-docstring
-            if not is_enabled(name, default):
-                # If the given feature name is not enabled, do nothing (no-op).
-                return
-            else:
-                # If the given feature name is enabled, call the function and return as normal.
-                return func(*args, **kwargs)
+#     def if_feature_enabled_inner(func):  # pylint: disable=missing-docstring
+#         @wraps(func)
+#         def wrapped_func(*args, **kwargs):  # pylint: disable=missing-docstring
+#             if not is_enabled(name, default):
+#                 # If the given feature name is not enabled, do nothing (no-op).
+#                 return
+#             else:
+#                 # If the given feature name is enabled, call the function and return as normal.
+#                 return func(*args, **kwargs)
 
-        return wrapped_func
+#         return wrapped_func
 
-    return if_feature_enabled_inner
+#     return if_feature_enabled_inner

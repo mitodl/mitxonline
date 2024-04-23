@@ -41,6 +41,8 @@ RUN curl -sSL https://install.python-poetry.org \
   python3 -q
 WORKDIR /app
 RUN python3 -m venv $VIRTUAL_ENV
+# Add project
+COPY . /app
 RUN poetry install
 
 # Add project

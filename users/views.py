@@ -52,9 +52,9 @@ class CurrentUserRetrieveUpdateViewSet(
         with transaction.atomic():
             user_name = request.user.name
             update_result = super().update(request, *args, **kwargs)
-            if user_name != request.data.get("name"):
-                tasks.change_edx_user_name_async.delay(request.user.id)
-            tasks.update_edx_user_profile(request.user.id)
+            # if user_name != request.data.get("name"):
+            #     tasks.change_edx_user_name_async.delay(request.user.id)
+            # tasks.update_edx_user_profile(request.user.id)
             sync_hubspot_user(request.user)
             return update_result
 

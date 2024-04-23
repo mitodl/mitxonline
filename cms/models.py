@@ -20,6 +20,7 @@ from django.urls import reverse
 from django.utils.functional import cached_property
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
+from mitol.posthog.features import is_enabled
 from modelcluster.fields import ParentalKey
 from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel
 from wagtail.blocks import PageChooserBlock, StreamBlock
@@ -776,22 +777,22 @@ class HomePage(VideoPlayerConfigMixin):
                 request.session["anonymous_session_id"] = str(uuid.uuid4())
             user = request.session["anonymous_session_id"]
 
-        show_new_featured_carousel = features.is_enabled(
+        show_new_featured_carousel = is_enabled(
             features.ENABLE_NEW_HOME_PAGE_FEATURED,
             False,
             user,
         )
-        show_new_design_hero = features.is_enabled(
+        show_new_design_hero = is_enabled(
             features.ENABLE_NEW_HOME_PAGE_HERO,
             False,
             user,
         )
-        show_home_page_video_component = features.is_enabled(
+        show_home_page_video_component = is_enabled(
             features.ENABLE_NEW_HOME_PAGE_VIDEO,
             False,
             user,
         )
-        show_home_page_contact_form = features.is_enabled(
+        show_home_page_contact_form = is_enabled(
             features.ENABLE_NEW_HOME_PAGE_CONTACT_FORM,
             False,
             user,

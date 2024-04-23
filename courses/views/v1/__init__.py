@@ -20,6 +20,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from reversion.models import Version
+from mitol.posthog.features import is_enabled
 
 from courses.api import (
     create_run_enrollments,
@@ -295,7 +296,7 @@ def create_enrollment_view(request):
     _, edx_request_success = create_run_enrollments(
         user=user,
         runs=[run],
-        keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
+        keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
     )
 
     def respond(data, status=True):
@@ -308,7 +309,7 @@ def create_enrollment_view(request):
 
         return HttpResponseRedirect(data)
 
-    if edx_request_success or features.is_enabled(features.IGNORE_EDX_FAILURES):
+    if edx_request_success or is_enabled(features.IGNORE_EDX_FAILURES):
         resp = respond(reverse("user-dashboard"))
         cookie_value = {
             "type": USER_MSG_TYPE_ENROLLED,
@@ -380,7 +381,7 @@ class UserEnrollmentsApiViewSet(
             return {"user": self.request.user}
 
     def list(self, request, *args, **kwargs):
-        if features.is_enabled(features.SYNC_ON_DASHBOARD_LOAD):
+        if (features.SYNC_ON_DASHBOARD_LOAD):
             try:
                 sync_enrollments_with_edx(self.request.user)
             except Exception:  # pylint: disable=broad-except
@@ -392,7 +393,7 @@ class UserEnrollmentsApiViewSet(
         deactivated_enrollment = deactivate_run_enrollment(
             enrollment,
             change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-            keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
         )
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
