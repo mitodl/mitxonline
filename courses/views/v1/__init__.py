@@ -20,7 +20,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from reversion.models import Version
-from mitol.posthog.features import is_enabled
+from mitol.olposthog.features import is_enabled
 
 from courses.api import (
     create_run_enrollments,

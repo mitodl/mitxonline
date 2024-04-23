@@ -2517,6 +2517,25 @@ premailer = ">=3.7.0"
 toolz = ">=0.10.0"
 
 [[package]]
+name = "mitol-django-olposthog"
+version = "2024.4.16"
+description = "MIT Open Learning django app extensions for Posthog."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "mitol-django-olposthog-2024.4.16.tar.gz", hash = "sha256:1c74f882a0eddf000fae4a6c8b7131c0e6700d9e420f6b74abecbdbad7f4ce8d"},
+]
+
+[package.dependencies]
+django = ">=3.0"
+mitol-django-common = "*"
+posthog = ">=3.5.0"
+
+[package.source]
+type = "file"
+url = "mitol-django-olposthog-2024.4.16.tar.gz"
+
+[[package]]
 name = "mitol-django-openedx"
 version = "1.3.0"
 description = "MIT Open Learning django app extensions for edx related utilities"
@@ -2956,13 +2975,13 @@ dev = ["pre-commit", "tox"]
 
 [[package]]
 name = "posthog"
-version = "3.4.0"
+version = "3.5.0"
 description = "Integrate PostHog into any python application."
 optional = false
 python-versions = "*"
 files = [
-    {file = "posthog-3.4.0-py2.py3-none-any.whl", hash = "sha256:922bdc1721a18f7275363130042b4be9bb49c88b3e9d1b30b0b3d33a664b3f10"},
-    {file = "posthog-3.4.0.tar.gz", hash = "sha256:0b9fd6861353e67e289fad26fce72a78a1ec09abd9a3c725b9ab7e1edee3da37"},
+    {file = "posthog-3.5.0-py2.py3-none-any.whl", hash = "sha256:3c672be7ba6f95d555ea207d4486c171d06657eb34b3ce25eb043bfe7b6b5b76"},
+    {file = "posthog-3.5.0.tar.gz", hash = "sha256:8f7e3b2c6e8714d0c0c542a2109b83a7549f63b7113a133ab2763a89245ef2ef"},
 ]
 
 [package.dependencies]
@@ -4483,4 +4502,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "e93e92f8fcf304542cf735136d9bf3a5dd7ef6e500b219e9a9ae2dd83dc73fb8"
+content-hash = "83c5af59e925a30b6d03d75491a150013d423a5a2f73d2e5963a08edfe98efb6"
