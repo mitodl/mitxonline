@@ -117,7 +117,7 @@
     "shelljs": "0.8.5",
     "sinon": "4.5.0",
     "slick-carousel": "^1.8.1",
-    "style-loader": "3.3.1",
+    "style-loader": "3.3.4",
     "styled-components": "4.4.1",
     "url-join": "4.0.1",
     "validator": "13.7.0",
