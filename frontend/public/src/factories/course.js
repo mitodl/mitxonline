@@ -229,6 +229,13 @@ export const makeCourseDetailWithRuns = (): CourseDetailWithRuns => {
   }
 }
 
+export const makeCourseDetailNoRuns = (): CourseDetail => {
+  return {
+    ...makeCourseDetail(),
+    courseruns: []
+  }
+}
+
 export const makeCourseRunDetail = (): CourseRunDetail => {
   return {
     ...makeCourseRun(),

@@ -450,14 +450,17 @@ export class CourseProductDetailEnroll extends React.Component<
   renderAccessCourseButton() {
     return (
       <h2>
-        <a
-          href={`${routes.login}?next=${encodeURIComponent(
-            window.location.pathname
-          )}`}
-          className="btn btn-primary btn-enrollment-button btn-lg highlight disabled"
+        <button
+          onClick={() =>
+            (window.location = `${routes.login}?next=${encodeURIComponent(
+              window.location.pathname
+            )}`)
+          }
+          className="btn btn-primary btn-enrollment-button btn-lg highlight"
+          disabled={true}
         >
           Access Course Materials
-        </a>
+        </button>
       </h2>
     )
   }

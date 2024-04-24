@@ -10,6 +10,7 @@ import CourseProductDetailEnroll, {
 
 import {
   makeCourseDetailWithRuns,
+  makeCourseDetailNoRuns,
   makeCourseRunDetail,
   makeCourseRunEnrollment,
   makeCourseRunDetailWithProduct
@@ -328,7 +329,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     const infobox = inner.find("CourseInfoBox").dive()
     assert.isTrue(infobox.exists())
 
-    const archivedMessage = infobox.find("div.course-archived-message")
+    const archivedMessage = infobox.find("div.course-status-message")
     assert.isTrue(archivedMessage.exists())
 
     const contentAvailabilityMessage = infobox.find(
@@ -472,6 +473,34 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         "9"
       )
     })
+  })
+
+  it(`shows the disabled enroll button and warning message when no active runs`, async () => {
+    course = makeCourseDetailNoRuns()
+    isWithinEnrollmentPeriodStub.returns(false)
+
+    const { inner } = await renderPage(
+      {
+        entities: {
+          courses: [course]
+        },
+        queries: {
+          courseRuns: {
+            isPending: false,
+            status:    200
+          }
+        }
+      },
+      {}
+    )
+
+    const enrollBtn = inner.find(".btn-enrollment-button").at(0)
+    assert.isTrue(enrollBtn.exists())
+    assert.include(enrollBtn.text(), "Access Course Materials")
+    assert.isTrue(enrollBtn.prop("disabled"))
+    const infobox = inner.find("CourseInfoBox").dive()
+    assert.isTrue(infobox.exists())
+    assert.isTrue(infobox.find("div.course-status-message").exists())
   })
 
   it(`shows the enroll button and upsell message, and checks for enrollments when the enroll button is clicked`, async () => {

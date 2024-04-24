@@ -270,9 +270,10 @@ body.new-design {
           text-align: center;
         }
 
-        .btn-enrollment-button.disabled {
+        .btn-enrollment-button:disabled {
           color: $white;
-          background-color: grey;
+          background-color: $dashboard-tab-inactive;
+          border-color: $dashboard-tab-inactive;
         }
 
         button.btn-enrollment-button {
@@ -320,6 +321,7 @@ body.new-design {
               color: $home-page-header-blue;
               font-family: Inter, sans-serif;
               margin: 0;
+              padding: 0 10px 0 0;
             }
           }
           .callout-warning{
