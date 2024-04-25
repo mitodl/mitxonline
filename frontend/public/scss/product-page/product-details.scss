@@ -176,7 +176,7 @@ body.new-design {
 
     #product-info-box {
       padding-bottom: 25px;
-      font-size: 16px;
+      font-size: 15px;
       line-height: 24px;
       color: $black;
       max-width: 400px;
@@ -193,7 +193,7 @@ body.new-design {
 
       .hero-media {
         margin: 7px 15px;
-        max-width: 350px;
+        max-width: 360px;
 
         img {
           border-radius: 5px;
@@ -251,7 +251,7 @@ body.new-design {
         flex-flow: column;
         align-items: top;
         margin: 10px 12px;
-        width: 340px;
+        width: 360px;
 
         @include media-breakpoint-up(xl) {
           margin: 0 -18px;
@@ -329,9 +329,9 @@ body.new-design {
           }
 
           .enrollment-info-icon {
-            max-width: 28px;
-            margin-right: 5px;
-            padding-left: 0;
+            max-width: 18px;
+            padding: 0;
+            margin-right: 0;
 
             img {
               max-width: 18px;
@@ -346,7 +346,8 @@ body.new-design {
             width: auto;
             flex-grow: 1;
             color: $helptext-grey;
-            padding-left: 0;
+            padding-left: 10px;
+            padding-right: 0;
 
             span {
               font-weight: 700;
