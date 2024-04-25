@@ -182,6 +182,7 @@ body.new-design {
       max-width: 400px;
       height: auto;
       border-radius: 5px;
+      margin-left: 20px;
 
       @include media-breakpoint-down(md) {
           margin-top: 1.5rem;
@@ -375,7 +376,12 @@ body.new-design {
 
             }
           }
-          .more-enrollment-info {
+          .course-certificate-message {
+            background-color: rgba(3, 21, 45, 0.05);
+            padding: 15px 15px 20px 15px;
+            margin-left: 28px;
+          }
+          .more-info {
             width: auto;
             color: $home-page-header-blue;
             font-size: 12px;
@@ -398,7 +404,7 @@ body.new-design {
             margin-top: 5px;
             margin-bottom: 0;
             li {
-              padding-left: 29px;
+              padding-left: 16px;
             }
             button.more-dates-link {
               font-size: 14px;

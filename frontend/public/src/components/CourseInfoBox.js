@@ -140,7 +140,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               {!isArchived && moreEnrollableCourseRuns ? (
                 <>
                   <button
-                    className="more-enrollment-info"
+                    className="more-info"
                     onClick={() => this.toggleShowMoreEnrollDates()}
                   >
                     {this.state.showMoreEnrollDates
@@ -228,21 +228,23 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               <img src="/static/images/products/cost.png" alt="Cost" />
             </div>
             <div className="enrollment-info-text">
-              <b>Free to Learn</b>
+              <b>Price: </b> <span>Free</span> to Learn
             </div>
           </div>
-          <div className="row d-flex align-items-top course-certificate-message">
-            <div className="enrollment-info-icon" aria-level="3" role="heading">
-              <img
-                src="/static/images/products/certificate.png"
-                alt="Certificate Track Information"
-              />
-            </div>
-            <div className="enrollment-info-text">
+          <div className="row d-flex align-items-top">
+            <div className="enrollment-info-text course-certificate-message">
               {run && product && !isArchived ? (
                 <>
-                  Certificate track:{" "}
+                  <span>Earn a Certificate: </span>
                   {formatLocalePrice(getFlexiblePriceForProduct(product))}
+                  <a
+                    className="more-info"
+                    target="_blank"
+                    rel="noreferrer"
+                    href="https://mitxonline.zendesk.com/hc/en-us/articles/16928404973979-Does-MITx-Online-offer-free-certificates-"
+                  >
+                    Learn more
+                  </a>
                   {run.upgrade_deadline ? (
                     <>
                       <div className="text-danger">
@@ -255,15 +257,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               ) : (
                 "No certificate available."
               )}
-              <div>
-                <a
-                  target="_blank"
-                  rel="noreferrer"
-                  href="https://mitxonline.zendesk.com/hc/en-us/articles/16928404973979-Does-MITx-Online-offer-free-certificates-"
-                >
-                  What's the certificate track?
-                </a>
-              </div>
               {course.page.financial_assistance_form_url ? (
                 <div>
                   <a
