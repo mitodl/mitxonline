@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.90.0 (Released April 25, 2024)
+--------------
+
+- Adding end date info to the CourseInfoBox (#2160)
+- Update akhileshns/heroku-deploy digest to 581dd28 (#1196)
+- Course Product Page with no Runs (#2157)
+- Fix: Add nubbins for celery monitoring. (#2159)
+
 Version 0.89.2 (Released April 16, 2024)
 --------------
 
