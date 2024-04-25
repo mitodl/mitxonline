@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.90.0
+Version 0.90.0 (Released April 25, 2024)
 --------------
 
 - Adding end date info to the CourseInfoBox (#2160)
