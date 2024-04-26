@@ -268,11 +268,15 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           </div>
         </div>
         {course && course.programs && course.programs.length > 0 ? (
-          <div className="program-info-box" aria-level="3" role="heading">
-            <h3>
+          <div className="program-info-box">
+            <div className="related-programs-info">
+              <img
+                src="/static/images/products/program-icon.svg"
+                alt="Programs"
+              />
               Part of the following program
               {course.programs.length === 1 ? null : "s"}
-            </h3>
+            </div>
 
             <ul>
               {course.programs.map(elem => (
