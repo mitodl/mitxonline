@@ -13888,7 +13888,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lodash-es@npm:^4.17.11, lodash-es@npm:^4.17.21, lodash-es@npm:^4.2.1":
+"lodash-es@npm:^4.17.11, lodash-es@npm:^4.17.21":
   version: 4.17.21
   resolution: "lodash-es@npm:4.17.21"
   checksum: 05cbffad6e2adbb331a4e16fbd826e7faee403a1a04873b82b42c0f22090f280839f85b95393f487c1303c8a3d2a010048bf06151a6cbe03eee4d388fb0a12d2
@@ -14028,7 +14028,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lodash@npm:4.17.21, lodash@npm:^4.0.0, lodash@npm:^4.17.11, lodash@npm:^4.17.12, lodash@npm:^4.17.14, lodash@npm:^4.17.15, lodash@npm:^4.17.19, lodash@npm:^4.17.20, lodash@npm:^4.17.21, lodash@npm:^4.17.4, lodash@npm:^4.2.1, lodash@npm:^4.3.0, lodash@npm:^4.6.1, lodash@npm:^4.7.0":
+"lodash@npm:4.17.21, lodash@npm:^4.0.0, lodash@npm:^4.17.11, lodash@npm:^4.17.12, lodash@npm:^4.17.14, lodash@npm:^4.17.15, lodash@npm:^4.17.19, lodash@npm:^4.17.20, lodash@npm:^4.17.21, lodash@npm:^4.17.4, lodash@npm:^4.3.0, lodash@npm:^4.7.0":
   version: 4.17.21
   resolution: "lodash@npm:4.17.21"
   checksum: eb835a2e51d381e561e508ce932ea50a8e5a68f4ebdd771ea240d3048244a8d13658acbd502cd4829768c56f2e16bdd4340b9ea141297d472517b83868e677f7
@@ -15274,7 +15274,6 @@ __metadata:
     reactstrap: 9.1.6
     redux: 4.0.0
     redux-actions: 2.6.5
-    redux-asserts: 0.0.10
     redux-logger: 3.0.6
     redux-mock-store: ^1.5.4
     redux-query: 3.3.1
@@ -19378,17 +19377,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"redux-asserts@npm:0.0.10":
-  version: 0.0.10
-  resolution: "redux-asserts@npm:0.0.10"
-  dependencies:
-    lodash: ^4.6.1
-    redux: ^3.3.1
-    redux-thunk: ^2.0.1
-  checksum: 83e44ee7d7abdc77e247b3920ab12599acda011b6748ade62539b2ba7d366a577360c435e7aa8867db8dd3af1726d8fc2c2409b091f8ad61c52dce3030de119d
-  languageName: node
-  linkType: hard
-
 "redux-logger@npm:3.0.6":
   version: 3.0.6
   resolution: "redux-logger@npm:3.0.6"
@@ -19445,15 +19433,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"redux-thunk@npm:^2.0.1":
-  version: 2.4.2
-  resolution: "redux-thunk@npm:2.4.2"
-  peerDependencies:
-    redux: ^4
-  checksum: c7f757f6c383b8ec26152c113e20087818d18ed3edf438aaad43539e9a6b77b427ade755c9595c4a163b6ad3063adf3497e5fe6a36c68884eb1f1cfb6f049a5c
-  languageName: node
-  linkType: hard
-
 "redux@npm:4.0.0":
   version: 4.0.0
   resolution: "redux@npm:4.0.0"
@@ -19461,18 +19440,6 @@ __metadata:
     loose-envify: ^1.1.0
     symbol-observable: ^1.2.0
   checksum: ed50a72b0e9c72a0f8b7ce7b23b669412d705fdcfbfd9283dddb1f5bbe1838be2f09803deebbae4a1b401b6e899ea2838ad2f5401517eccc3fa581e2aedbd28d
-  languageName: node
-  linkType: hard
-
-"redux@npm:^3.3.1":
-  version: 3.7.2
-  resolution: "redux@npm:3.7.2"
-  dependencies:
-    lodash: ^4.2.1
-    lodash-es: ^4.2.1
-    loose-envify: ^1.1.0
-    symbol-observable: ^1.0.3
-  checksum: c349b77e68d009bc530d3cb6252a6a3e43e20a6e52f9483a048b24cd2f266d9bfa6f0bbd4769d40fe36795e2f7a7a884c3ddc92c13e82efd3328890f94821091
   languageName: node
   linkType: hard
 
@@ -21532,7 +21499,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"symbol-observable@npm:^1.0.3, symbol-observable@npm:^1.0.4, symbol-observable@npm:^1.2.0":
+"symbol-observable@npm:^1.0.4, symbol-observable@npm:^1.2.0":
   version: 1.2.0
   resolution: "symbol-observable@npm:1.2.0"
   checksum: 48ffbc22e3d75f9853b3ff2ae94a44d84f386415110aea5effc24d84c502e03a4a6b7a8f75ebaf7b585780bda34eb5d6da3121f826a6f93398429d30032971b6
