@@ -116,6 +116,16 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         }
       })
     }
+    const certificateInfoLink = (
+      <a
+        className="info-link more-info"
+        target="_blank"
+        rel="noreferrer"
+        href="https://mitxonline.zendesk.com/hc/en-us/articles/16928404973979-Does-MITx-Online-offer-free-certificates-"
+      >
+        Learn more
+      </a>
+    )
     return (
       <>
         <div className="enrollment-info-box componentized">
@@ -236,14 +246,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                 <>
                   <span>Earn a Certificate: </span>
                   {formatLocalePrice(getFlexiblePriceForProduct(product))}
-                  <a
-                    className="info-link more-info"
-                    target="_blank"
-                    rel="noreferrer"
-                    href="https://mitxonline.zendesk.com/hc/en-us/articles/16928404973979-Does-MITx-Online-offer-free-certificates-"
-                  >
-                    Learn more
-                  </a>
+                  {certificateInfoLink}
                   {course.page.financial_assistance_form_url ? (
                     <a
                       className="info-link finaid-link"
@@ -262,7 +265,10 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                   ) : null}
                 </>
               ) : (
-                "No certificate available."
+                <>
+                  <span>Certificate deadline passed.</span>
+                  {certificateInfoLink}
+                </>
               )}
             </div>
           </div>
