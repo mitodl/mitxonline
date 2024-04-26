@@ -99,7 +99,12 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     const course = courses[0]
     const run = getFirstRelevantRun(course, courseRuns)
     const product = run && run.products.length > 0 && run.products[0]
-
+    console.log(run)
+    console.log(
+      product && product.product_flexible_price
+        ? product.product_flexible_price
+        : "none"
+    )
     const isArchived = run
       ? moment().isAfter(run.end_date) &&
         (moment().isBefore(run.enrollment_end) ||
@@ -140,7 +145,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               {!isArchived && moreEnrollableCourseRuns ? (
                 <>
                   <button
-                    className="more-info"
+                    className="info-link more-info"
                     onClick={() => this.toggleShowMoreEnrollDates()}
                   >
                     {this.state.showMoreEnrollDates
@@ -178,7 +183,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                   <>
                     Self-paced
                     <a
-                      className="pacing-faq-link float-right"
+                      className="info-link more-info"
                       href="https://mitxonline.zendesk.com/hc/en-us/articles/21995114519067-What-are-Archived-courses-on-MITx-Online-"
                     >
                       What's this?
@@ -188,7 +193,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                   <>
                     Instructor-paced
                     <a
-                      className="pacing-faq-link float-right"
+                      className="info-link more-info"
                       href="https://mitxonline.zendesk.com/hc/en-us/articles/21994938130075-What-are-Instructor-Paced-courses-on-MITx-Online-"
                     >
                       What's this?
@@ -238,36 +243,33 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                   <span>Earn a Certificate: </span>
                   {formatLocalePrice(getFlexiblePriceForProduct(product))}
                   <a
-                    className="more-info"
+                    className="info-link more-info"
                     target="_blank"
                     rel="noreferrer"
                     href="https://mitxonline.zendesk.com/hc/en-us/articles/16928404973979-Does-MITx-Online-offer-free-certificates-"
                   >
                     Learn more
                   </a>
+                  {course.page.financial_assistance_form_url ? (
+                    <a
+                      className="info-link finaid-link"
+                      target="_blank"
+                      rel="noreferrer"
+                      href={course.page.financial_assistance_form_url}
+                    >
+                      Financial assistance available
+                    </a>
+                  ) : null}
                   {run.upgrade_deadline ? (
-                    <>
-                      <div className="text-danger">
-                        Payment deadline:{" "}
-                        {formatPrettyDate(moment(run.upgrade_deadline))}
-                      </div>
-                    </>
+                    <div className="text-danger">
+                      Payment deadline:{" "}
+                      {formatPrettyDate(moment(run.upgrade_deadline))}
+                    </div>
                   ) : null}
                 </>
               ) : (
                 "No certificate available."
               )}
-              {course.page.financial_assistance_form_url ? (
-                <div>
-                  <a
-                    target="_blank"
-                    rel="noreferrer"
-                    href={course.page.financial_assistance_form_url}
-                  >
-                    Financial assistance available
-                  </a>
-                </div>
-              ) : null}
             </div>
           </div>
         </div>
@@ -282,7 +284,12 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               {course.programs.map(elem => (
                 <li key={elem.readable_id}>
                   {" "}
-                  <a href={`/programs/${elem.readable_id}/`}>{elem.title}</a>
+                  <a
+                    className="info-link"
+                    href={`/programs/${elem.readable_id}/`}
+                  >
+                    {elem.title}
+                  </a>
                 </li>
               ))}
             </ul>

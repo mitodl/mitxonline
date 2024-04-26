@@ -191,6 +191,15 @@ body.new-design {
       strong {
         font-weight: 600;
       }
+      .info-link {
+        color: $home-page-header-blue;
+        text-decoration-line: underline;
+
+        &:hover {
+          text-decoration-line: none;
+          color: $brand-darker-bg;
+        }
+      }
 
       .hero-media {
         margin: 7px 15px;
@@ -354,13 +363,6 @@ body.new-design {
               font-weight: 700;
               color: black;
             }
-            .pacing-faq-link {
-              color: $home-page-dark-blue;
-              text-decoration-line: underline;
-              float: right;
-              padding: 0;
-              font-size: smaller;
-            }
 
             .enrollment-effort {
               font-size: smaller;
@@ -378,24 +380,28 @@ body.new-design {
           }
           .course-certificate-message {
             background-color: rgba(3, 21, 45, 0.05);
-            padding: 15px 15px 20px 15px;
+            padding: 15px 0 20px 15px;
             margin-left: 28px;
+
+            div {
+              font-size: 14px;
+            }
+
+            .more-info {
+              padding-right: 12px;
+            }
           }
           .more-info {
             width: auto;
-            color: $home-page-header-blue;
-            font-size: 12px;
-            text-decoration-line: underline;
             border-color: transparent;
             background-color: transparent;
-            padding-right: 0;
-            height: fit-content;
-            line-height: normal;
-
-            &:hover {
-              text-decoration-line: none;
-              color: $brand-darker-bg;
-            }
+            float: right;
+            padding: 0;
+            font-size: smaller;
+          }
+          .finaid-link {
+            display: block;
+            font-size: 14px;
           }
           .more-dates-enrollment-list{
             list-style: none;
