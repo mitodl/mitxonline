@@ -139,7 +139,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               {!isArchived && moreEnrollableCourseRuns ? (
                 <>
                   <button
-                    className="info-link more-info"
+                    className="info-link more-info more-dates"
                     onClick={() => this.toggleShowMoreEnrollDates()}
                   >
                     {this.state.showMoreEnrollDates
