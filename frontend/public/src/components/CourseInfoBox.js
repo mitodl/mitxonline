@@ -122,17 +122,17 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           {!run || isArchived ? this.warningMessage(isArchived) : null}
           {run ? (
             <div className="row d-flex course-timing-message">
-              <div
-                className="enrollment-info-icon"
-                aria-level="3"
-                role="heading"
-              >
+              <div className="enrollment-info-icon">
                 <img
                   src="/static/images/products/start-date.png"
                   alt="Course Timing"
                 />
               </div>
-              <div className="enrollment-info-text">
+              <div
+                className="enrollment-info-text"
+                aria-level="3"
+                role="heading"
+              >
                 {getCourseDates(run, isArchived)}
               </div>
 
@@ -155,11 +155,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           ) : null}
           {run ? (
             <div className="row d-flex align-items-top">
-              <div
-                className="enrollment-info-icon"
-                aria-level="3"
-                role="heading"
-              >
+              <div className="enrollment-info-icon">
                 <img
                   className="course-format-icon align-text-bottom"
                   src="/static/images/products/vector-left.png"
@@ -171,7 +167,11 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                   alt="Course Format"
                 />
               </div>
-              <div className="enrollment-info-text">
+              <div
+                className="enrollment-info-text"
+                aria-level="3"
+                role="heading"
+              >
                 <b>Course Format: </b>
                 {isArchived || run.is_self_paced ? (
                   <>
@@ -199,17 +199,17 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           ) : null}
           {course && course.page ? (
             <div className="row d-flex align-items-top course-effort-message">
-              <div
-                className="enrollment-info-icon"
-                aria-level="3"
-                role="heading"
-              >
+              <div className="enrollment-info-icon">
                 <img
                   src="/static/images/products/effort.png"
                   alt="Expected Length and Effort"
                 />
               </div>
-              <div className="enrollment-info-text">
+              <div
+                className="enrollment-info-text"
+                aria-level="3"
+                role="heading"
+              >
                 <b>Estimated: </b>
                 {course.page.length}{" "}
                 {course.page.effort ? (
@@ -223,10 +223,10 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             </div>
           ) : null}
           <div className="row d-flex align-items-center course-pricing-message">
-            <div className="enrollment-info-icon" aria-level="3" role="heading">
+            <div className="enrollment-info-icon">
               <img src="/static/images/products/cost.png" alt="Cost" />
             </div>
-            <div className="enrollment-info-text">
+            <div className="enrollment-info-text" aria-level="3" role="heading">
               <b>Price: </b> <span>Free</span> to Learn
             </div>
           </div>
@@ -268,7 +268,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           </div>
         </div>
         {course && course.programs && course.programs.length > 0 ? (
-          <div className="program-info-box">
+          <div className="program-info-box" aria-level="3" role="heading">
             <h3>
               Part of the following program
               {course.programs.length === 1 ? null : "s"}
