@@ -71,7 +71,7 @@
     "nyc": "15.1.0",
     "object.entries": "1.1.5",
     "popper.js": "1.16.1",
-    "postcss": "8.4.31",
+    "postcss": "8.4.38",
     "postcss-loader": "6.2.1",
     "posthog-js": "^1.75.4",
     "prettier-eslint": "9.0.2",
