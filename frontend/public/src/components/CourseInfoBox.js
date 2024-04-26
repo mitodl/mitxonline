@@ -99,12 +99,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     const course = courses[0]
     const run = getFirstRelevantRun(course, courseRuns)
     const product = run && run.products.length > 0 && run.products[0]
-    console.log(run)
-    console.log(
-      product && product.product_flexible_price
-        ? product.product_flexible_price
-        : "none"
-    )
     const isArchived = run
       ? moment().isAfter(run.end_date) &&
         (moment().isBefore(run.enrollment_end) ||
