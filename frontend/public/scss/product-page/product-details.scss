@@ -296,7 +296,7 @@ body.new-design {
 
         .enrollment-info-box, .program-info-box {
           margin: 10px 0;
-          padding: 10px 0;
+          padding: 0;
 
           .related-programs-info {
             font-size: 16px;
@@ -313,9 +313,10 @@ body.new-design {
           border-left: none;
           border-right: none;
           font-size: 15px;
+          padding-top: 10px;
 
           .row {
-            margin: 20px 0;
+            margin: 0 0 20px 0;
           }
 
           .callout {
@@ -333,6 +334,7 @@ body.new-design {
               font-size: 0.875rem;
               color: $home-page-header-blue;
               font-family: Inter, sans-serif;
+              line-height: 15px;
               margin: 0;
             }
           }
@@ -346,13 +348,10 @@ body.new-design {
             max-width: 18px;
             padding: 0;
             margin-right: 0;
+            margin-top: -2px;
 
             img {
               max-width: 18px;
-            }
-
-            img.course-format-icon{
-
             }
           }
 
@@ -384,8 +383,9 @@ body.new-design {
           }
           .course-certificate-message {
             background-color: rgba(3, 21, 45, 0.05);
-            padding: 15px 0 20px 15px;
+            padding: 15px;
             margin-left: 28px;
+            margin-top: 10px;
 
             div {
               font-size: 14px;

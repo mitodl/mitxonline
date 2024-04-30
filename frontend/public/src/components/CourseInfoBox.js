@@ -239,8 +239,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             <div className="enrollment-info-text" aria-level="3" role="heading">
               <b>Price: </b> <span>Free</span> to Learn
             </div>
-          </div>
-          <div className="row d-flex align-items-top">
             <div className="enrollment-info-text course-certificate-message">
               {run && product && !isArchived ? (
                 <>
