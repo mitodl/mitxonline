@@ -180,17 +180,27 @@ body.new-design {
       color: $black;
       max-width: 400px;
       margin-left: 20px;
+      margin-right: 20px;
       padding: 0;
 
+      @include media-breakpoint-down(md) {
+        margin: 0 auto 30px auto;
+      }
       .product-info-box-container {
         height: auto;
         border-radius: 5px;
-        padding: 20px;
+        padding: 20px 20px 0 20px;
+        border: 1px solid $home-page-border-grey;
+        margin-top: 20px;
+
+        @include media-breakpoint-down(sm) {
+          border-top: none;
+          border-left: none;
+          border-right: none;
+          padding-top: 0;
+        }
       }
 
-      @include media-breakpoint-down(md) {
-          margin-top: 1.5rem;
-        }
 
       strong {
         font-weight: 600;
@@ -265,12 +275,8 @@ body.new-design {
         display: flex;
         flex-flow: column;
         align-items: top;
-        margin: 10px 12px;
+        margin-top: 10px;
         width: 360px;
-
-        @include media-breakpoint-up(xl) {
-          margin: 0 -18px;
-        }
 
         .font-weight-bold {
           font-weight: 600;
