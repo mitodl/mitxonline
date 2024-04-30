@@ -168,8 +168,9 @@
       
           </div>
         </div>
-        <div class="col order-md-2 order-1" id="product-info-box">
-          <div class="px-4 py-2 border align-items-center justify-items-top d-flex flex-column">
+       <div class="col order-md-2 order-1" id="product-info-box">
+        <div class="align-items-center justify-items-top d-flex flex-column product-info-box-container">
+
             <div class="hero-media">
               {% if page.video_url %}
                 {% videojs page %}
@@ -190,13 +191,6 @@
 
               <div class="w-100" id="productDetailEnrollment"></div>
             </div>
-
-            {% if page.is_course_page %}
-            <div class="stats-row">
-              <div class="w-100" id="upsellCard"></div>
-            </div>
-            {% endif %}
-          </div>
         </div>
 
         {% if instructors %}
@@ -243,6 +237,7 @@
         {% endfor %}
         {% endif %}
 
+      </div>
       </div>
     </section>
   </div>
