@@ -72,3 +72,27 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
         return ProgramCertificate.objects.get(user_id=user_id, program_id=program_id)
     except ProgramCertificate.DoesNotExist:
         return None
+
+
+def get_enrollable_courseruns_qs():
+    """Returns all the course runs that are currently open for enrollment."""
+    now = now_in_utc()
+    return CourseRun.objects.filter(
+        Q(live=True)
+        & Q(start_date__isnull=False)
+        & Q(enrollment_start__lt=now)
+        & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))
+    )
+
+
+def get_enrollable_courses(enrollable_runs):
+    """Returns all the programs that are currently open for enrollment."""
+    now = now_in_utc()
+    return (
+        Course.objects.prefetch_related(
+            Prefetch("courseruns", queryset=enrollable_runs)
+        )
+        .prefetch_related("courseruns__course")
+        .filter(courseruns__id__in=enrollable_runs.values_list("id", flat=True))
+        .distinct()
+    )

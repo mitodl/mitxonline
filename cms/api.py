@@ -309,6 +309,10 @@ def create_featured_items():
     """
     from courses.models import Course, CourseRun
 
+    enrollable_courses = Course.objects.filter(
+        live=True, published=True, enrollable=True
+    ).order_by("?")[:30]
+
     now = now_in_utc()
     start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = start_of_day.replace(hour=23, minute=59, second=59)
