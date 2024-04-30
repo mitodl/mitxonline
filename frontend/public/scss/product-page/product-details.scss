@@ -175,14 +175,18 @@ body.new-design {
     }
 
     #product-info-box {
-      padding-bottom: 25px;
       font-size: 15px;
       line-height: 24px;
       color: $black;
       max-width: 400px;
-      height: auto;
-      border-radius: 5px;
       margin-left: 20px;
+      padding: 0;
+
+      .product-info-box-container {
+        height: auto;
+        border-radius: 5px;
+        padding: 20px;
+      }
 
       @include media-breakpoint-down(md) {
           margin-top: 1.5rem;
