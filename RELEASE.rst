@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.90.1
+Version 0.90.1 (Released May 01, 2024)
 --------------
 
 - Updating the styles and adding test for course with no runs (#2172)
