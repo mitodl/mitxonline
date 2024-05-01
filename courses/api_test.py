@@ -46,6 +46,8 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
     ProgramRequirementFactory,
+    program_with_empty_requirements,  # noqa: F401
+    program_with_requirements,  # noqa: F401
 )
 
 # pylint: disable=redefined-outer-name
@@ -203,7 +205,7 @@ def test_get_user_relevant_course_run_ignore_enrolled(user, dates, course):
     assert returned_run == course_runs[0]
 
 
-def test_get_user_enrollments(user, program_with_empty_requirements):
+def test_get_user_enrollments(user, program_with_empty_requirements):  # noqa: F811
     """Test that get_user_enrollments returns an object with a user's program and course enrollments"""
     past_date = now_in_utc() - timedelta(days=1)
     past_start_dates = [
@@ -369,7 +371,10 @@ def test_create_run_enrollments(
 
 @pytest.mark.parametrize("is_active", [True, False])
 def test_create_run_enrollments_upgrade(
-    mocker, user, is_active, program_with_empty_requirements
+    mocker,
+    user,
+    is_active,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     create_run_enrollments should call the edX API to create/update enrollments, and set the enrollment mode properly
@@ -409,7 +414,9 @@ def test_create_run_enrollments_upgrade(
 
 
 def test_create_run_enrollments_multiple_programs(
-    mocker, user, program_with_empty_requirements
+    mocker,
+    user,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     create_run_enrollments should enroll the user into any Programs which have the CourseRun's Course defined as a requirement or elective.
@@ -503,7 +510,7 @@ def test_create_run_enrollments_enroll_api_fail(  # noqa: PLR0913
     keep_failed_enrollments,
     exception_cls,
     inner_exception,
-    program_with_empty_requirements,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     create_run_enrollments should log a message and still create local enrollment records when an enrollment exception
@@ -700,7 +707,10 @@ class TestDeactivateEnrollments:
         assert enrollment.active is not keep_failed_enrollments
 
     def test_deactivate_program_enrollment(
-        self, user, patches, program_with_empty_requirements
+        self,
+        user,
+        patches,
+        program_with_empty_requirements,  # noqa: F811
     ):
         """
         deactivate_program_enrollment set the local program enrollment record to inactive as well as all
@@ -1373,7 +1383,8 @@ def test_create_run_enrollments_upgrade_edx_request_failure(mocker, user):
 
 
 def test_generate_program_certificate_failure_missing_certificates(
-    user, program_with_requirements
+    user,
+    program_with_requirements,  # noqa: F811
 ):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
@@ -1392,7 +1403,8 @@ def test_generate_program_certificate_failure_missing_certificates(
 
 
 def test_generate_program_certificate_failure_not_all_passed(
-    user, program_with_requirements
+    user,
+    program_with_requirements,  # noqa: F811
 ):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
@@ -1512,7 +1524,7 @@ def test_generate_program_certificate_success_minimum_electives_not_met(user):
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_force_generate_program_certificate_success(user, program_with_requirements):
+def test_force_generate_program_certificate_success(user, program_with_requirements):  # noqa: F811
     """
     Test that force creating a program certificate with generate_program_certificate generates
     a program certificate without matching program certificate requirements.
@@ -1536,7 +1548,8 @@ def test_force_generate_program_certificate_success(user, program_with_requireme
 
 
 def test_generate_program_certificate_already_exist(
-    user, program_with_empty_requirements
+    user,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
@@ -1632,7 +1645,9 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
 
 
 def test_program_enrollment_unenrollment_re_enrollment(
-    mocker, user, program_with_empty_requirements
+    mocker,
+    user,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     create_run_enrollments should always enroll a learner into a program even

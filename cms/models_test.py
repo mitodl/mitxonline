@@ -35,6 +35,7 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
+    program_with_empty_requirements,  # noqa: F401
 )
 from courses.models import Course, CourseRun
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
@@ -375,7 +376,7 @@ def test_flex_pricing_parent_resources(course_or_program):
     )
 
 
-def test_flex_pricing_form_courseware_object(program_with_empty_requirements):
+def test_flex_pricing_form_courseware_object(program_with_empty_requirements):  # noqa: F811
     """
     Tests to make sure the correct courseware objects are returned when hitting
     the get_parent_courseware method.
@@ -427,7 +428,9 @@ def test_flex_pricing_form_courseware_object(program_with_empty_requirements):
 
 @pytest.mark.parametrize("test_scenario", ["course", "two_programs", "one_program"])
 def test_flex_pricing_single_submission(
-    mocker, test_scenario, program_with_empty_requirements
+    mocker,
+    test_scenario,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     Tests multiple submissions for the same course/program.
@@ -499,7 +502,8 @@ def test_flex_pricing_single_submission(
 
 
 def test_flex_pricing_form_state_display_no_discount_tier(
-    mocker, program_with_empty_requirements
+    mocker,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     Tests the status display when the user is assigned to the no-discount tier.

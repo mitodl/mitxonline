@@ -16,6 +16,8 @@ from cms.serializers import CoursePageSerializer, ProgramPageSerializer
 from courses.factories import (
     CourseFactory,
     ProgramFactory,
+    program_with_empty_requirements,  # noqa: F401
+    program_with_requirements,  # noqa: F401
 )
 from main.test_utils import assert_drf_json_equal
 

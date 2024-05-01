@@ -9,11 +9,13 @@ from courses.factories import (
     CourseRunFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
+    ProgramFactory,  # noqa: F401
+    program_with_requirements,  # noqa: F401
 )
 from courses.utils import get_program_certificate_by_enrollment
 
 
-def test_get_program_certificate_by_enrollment(user, program_with_requirements):
+def test_get_program_certificate_by_enrollment(user, program_with_requirements):  # noqa: F811
     """
     Test that get_program_certificate_by_enrollment returns a program certificate
     """
@@ -55,7 +57,8 @@ def test_get_program_certificate_by_enrollment_program_does_not_exist(user):
 
 
 def test_get_program_certificate_by_enrollment_program_page_does_not_exist(
-    user, program_with_requirements
+    user,
+    program_with_requirements,  # noqa: F811
 ):
     """
     Test that get_program_certificate_by_enrollment returns None if program page does not exist
@@ -84,7 +87,8 @@ def test_get_program_certificate_by_enrollment_program_page_does_not_exist(
 
 
 def test_get_program_certificate_by_enrollment_program_certificate_page_does_not_exist(
-    user, program_with_requirements
+    user,
+    program_with_requirements,  # noqa: F811
 ):
     """
     Test that get_program_certificate_by_enrollment returns None if program certificate page does not exist

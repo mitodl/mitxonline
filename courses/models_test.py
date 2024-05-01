@@ -24,6 +24,8 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
     ProgramRequirementFactory,
+    program_with_empty_requirements,  # noqa: F401
+    program_with_requirements,  # noqa: F401
 )
 from courses.models import (
     Course,
@@ -557,7 +559,7 @@ def test_program_certificate_start_end_dates_and_page_revision(user):
     )
 
 
-def test_program_requirements(program_with_requirements):
+def test_program_requirements(program_with_requirements):  # noqa: F811
     """Test for program requirements"""
     node_defaults = {
         "course": None,
@@ -678,7 +680,7 @@ def test_program_requirements_is_min_number_of_operator(operator, expected):
     assert ProgramRequirement(operator=operator).is_min_number_of_operator is expected
 
 
-def test_courses_in_program(program_with_requirements):
+def test_courses_in_program(program_with_requirements):  # noqa: F811
     """Test CourseQuerySet.courses_in_program"""
     CourseFactory.create_batch(4)
 

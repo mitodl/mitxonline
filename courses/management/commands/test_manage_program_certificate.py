@@ -11,6 +11,9 @@ from courses.factories import (
     CourseRunGradeFactory,
     ProgramCertificateFactory,
     ProgramFactory,
+    ProgramRequirementFactory,  # noqa: F401
+    program_with_empty_requirements,  # noqa: F401
+    program_with_requirements,  # noqa: F401
 )
 from courses.management.commands import manage_program_certificates
 from courses.models import ProgramCertificate
@@ -117,7 +120,7 @@ def test_program_certificate_management_revoke_unrevoke_success(user, revoke, un
     assert certificate.is_revoked is (False if unrevoke else True)  # noqa: SIM211
 
 
-def test_program_certificate_management_create(user, program_with_empty_requirements):
+def test_program_certificate_management_create(user, program_with_empty_requirements):  # noqa: F811
     """
     Test that create operation for program certificate management command
     creates the program certificate for a user
@@ -142,7 +145,7 @@ def test_program_certificate_management_create(user, program_with_empty_requirem
     assert generated_certificates.count() == 1
 
 
-def test_program_certificate_management_force_create(user, program_with_requirements):
+def test_program_certificate_management_force_create(user, program_with_requirements):  # noqa: F811
     """
     Test that create operation for program certificate management command
     forcefully creates the certificate for a user

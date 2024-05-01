@@ -12,6 +12,8 @@ from courses.factories import (
     CourseRunFactory,
     CourseRunGradeFactory,
     ProgramFactory,
+    program_with_empty_requirements,  # noqa: F401
+    program_with_requirements,  # noqa: F401
 )
 from courses.models import Department, ProgramRequirement, ProgramRequirementNodeType
 from courses.serializers.v1.courses import CourseWithCourseRunsSerializer
@@ -31,7 +33,7 @@ pytestmark = [pytest.mark.django_db]
     "remove_tree",
     [True, False],
 )
-def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):
+def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):  # noqa: F811
     """Test Program serialization"""
     run1 = CourseRunFactory.create(
         course__page=None,
@@ -184,7 +186,9 @@ def test_program_requirement_deletion():
     "enrollment_mode", [EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE]
 )
 def test_learner_record_serializer(
-    mock_context, program_with_empty_requirements, enrollment_mode
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+    enrollment_mode,
 ):
     """Verify that saving the requirements for one program doesn't affect other programs"""
 

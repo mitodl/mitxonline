@@ -4,7 +4,10 @@ import pytest
 from django.utils.timezone import now
 
 from cms.serializers import ProgramPageSerializer
-from courses.factories import CourseRunFactory
+from courses.factories import (  # noqa: F401
+    CourseRunFactory,
+    program_with_empty_requirements,
+)
 from courses.models import Department
 from courses.serializers.v2.programs import (
     ProgramRequirementTreeSerializer,
@@ -19,7 +22,7 @@ pytestmark = [pytest.mark.django_db]
     "remove_tree",
     [True, False],
 )
-def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):
+def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):  # noqa: F811
     """Test Program serialization"""
     run1 = CourseRunFactory.create(
         course__page=None,
