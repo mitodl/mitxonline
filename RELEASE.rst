@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.90.1 (Released May 01, 2024)
+--------------
+
+- Updating the styles and adding test for course with no runs (#2172)
+- Update dependency style-loader to v3.3.4 (#2170)
+
 Version 0.90.0 (Released April 25, 2024)
 --------------
 
