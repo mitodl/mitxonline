@@ -1,11 +1,12 @@
 """User admin"""
+
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as ContribUserAdmin
 from django.utils.translation import gettext_lazy as _
 from hijack_admin.admin import HijackUserAdminMixin
 from mitol.common.admin import TimestampedModelAdmin
 
-from users.models import BlockList, LegalAddress, UserProfile, User
+from users.models import BlockList, LegalAddress, User, UserProfile
 
 
 class UserLegalAddressInline(admin.StackedInline):
@@ -26,7 +27,7 @@ class UserLegalAddressInline(admin.StackedInline):
         ),
     )
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
         return False
 
 
@@ -36,7 +37,7 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
     classes = ["collapse"]
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
         return True
 
 
@@ -103,7 +104,7 @@ class BlockListAdmin(admin.ModelAdmin):
     model = BlockList
     list_display = ("hashed_email",)
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request):  # noqa: ARG002
         return False
 
 

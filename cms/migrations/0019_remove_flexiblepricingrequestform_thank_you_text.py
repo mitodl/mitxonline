@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("cms", "0018_add_country_field_for_flexible_pricing"),
     ]

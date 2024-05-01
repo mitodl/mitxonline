@@ -1,17 +1,17 @@
 """
-Finds learners who have paid for a currently active course but don't have a 
+Finds learners who have paid for a currently active course but don't have a
 corresponding verified enrollment in the course. Outputs a CSV file in a format
-that is suitable for feeding into `generate_legacy_enrollment_codes`. 
+that is suitable for feeding into `generate_legacy_enrollment_codes`.
 """
-from django.core.management import BaseCommand
-from django.contrib.contenttypes.models import ContentType
-from django.db.models import Q
 
 import csv
 
+from django.contrib.contenttypes.models import ContentType
+from django.core.management import BaseCommand
+from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 
-from courses.models import CourseRunEnrollment, CourseRun
+from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Line, Order
 
 
@@ -27,7 +27,7 @@ class Command(BaseCommand):
             "output_file", type=str, help="File to write the results to."
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
         output_codes = []
 
         active_courseruns = (
@@ -51,14 +51,14 @@ class Command(BaseCommand):
                 .filter(user=line.order.purchaser)
                 .exists()
             ):
-                output_codes.append(
+                output_codes.append(  # noqa: PERF401
                     [
                         line.order.purchaser.email,
                         line.purchased_object.courseware_id,
                     ]
                 )
 
-        with open(kwargs["output_file"], mode="w", newline="") as codefile:
+        with open(kwargs["output_file"], mode="w", newline="") as codefile:  # noqa: PTH123
             writer = csv.writer(codefile, delimiter=",", quotechar="\\")
 
             writer.writerows(output_codes)

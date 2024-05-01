@@ -1,7 +1,7 @@
 """Ecommerce mail API"""
+
 import logging
 
-from django.urls import reverse
 from mitol.mail.api import get_message_sender
 
 from courses.messages import (

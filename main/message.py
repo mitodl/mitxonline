@@ -1,4 +1,5 @@
 """Main message classes"""
+
 from mitol.mail.messages import TemplatedMessage
 
 

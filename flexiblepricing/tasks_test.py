@@ -1,6 +1,7 @@
 """
 Test for flexible pricing celery tasks
 """
+
 from unittest.mock import patch
 
 import pytest
@@ -32,7 +33,7 @@ class TaskConfigurationTest(TestCase):
         """
         Assert that the task raises an exception if it is misconfigured.
         """
-        with self.assertRaises(RuntimeError) as context:
+        with self.assertRaises(RuntimeError) as context:  # noqa: PT027
             sync_currency_exchange_rates()
         assert "Currency exchange API URL cannot be determined" in str(
             context.exception
@@ -52,7 +53,7 @@ class TasksTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        super(TasksTest, cls).setUpTestData()
+        super(TasksTest, cls).setUpTestData()  # noqa: UP008
         CurrencyExchangeRate.objects.create(currency_code="DEF", exchange_rate=1.8)
         CurrencyExchangeRate.objects.create(currency_code="MNO", exchange_rate=2.1)
 
@@ -109,7 +110,7 @@ class TasksTest(TestCase):
         mocked_request.return_value.json.return_value = {
             "description": "Invalid App ID"
         }
-        with self.assertRaises(UnexpectedAPIErrorException) as context:
+        with self.assertRaises(UnexpectedAPIErrorException) as context:  # noqa: PT027
             sync_currency_exchange_rates.apply(args=()).get()
         assert str(context.exception) == "Invalid App ID"
 
@@ -122,7 +123,7 @@ class TasksTest(TestCase):
         mocked_request.return_value.json.return_value = {
             "description": "Too many calls"
         }
-        with self.assertRaises(ExceededAPICallsException) as context:
+        with self.assertRaises(ExceededAPICallsException) as context:  # noqa: PT027
             sync_currency_exchange_rates.apply(args=()).get()
         assert str(context.exception) == "Too many calls"
 
@@ -130,7 +131,7 @@ class TasksTest(TestCase):
 pytestmark = [pytest.mark.django_db]
 
 
-@pytest.fixture()
+@pytest.fixture
 def flexprice():
     """
     This does a little extra processing to make sure there is a product
@@ -163,7 +164,7 @@ def test_flexible_price_status_change_email(status, flexprice, admin_drf_client)
         "flexiblepricing.tasks.notify_flexible_price_status_change_email.delay"
     ) as mocked_mailer:
         response = admin_drf_client.patch(
-            "/api/v0/flexible_pricing/applications_admin/{}/".format(flexprice.id),
+            f"/api/v0/flexible_pricing/applications_admin/{flexprice.id}/",
             {"status": status},
         )
 

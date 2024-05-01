@@ -1,6 +1,7 @@
 """
 Common model classes
 """
+
 import traceback
 
 from django.conf import settings
@@ -8,10 +9,8 @@ from django.db import transaction
 from django.db.models import (
     CASCADE,
     CharField,
-    DateTimeField,
     ForeignKey,
     JSONField,
-    Manager,
     Model,
 )
 from mitol.common.models import TimestampedModel
@@ -21,7 +20,7 @@ class AuditModel(TimestampedModel):
     """An abstract base class for audit models"""
 
     acting_user = ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=CASCADE)
-    call_stack = CharField(default="", max_length=750, null=True, blank=True)
+    call_stack = CharField(default="", max_length=750, null=True, blank=True)  # noqa: DJ001
     data_before = JSONField(blank=True, null=True)
     data_after = JSONField(blank=True, null=True)
 
@@ -90,7 +89,7 @@ class AuditableModel(Model):
 
         call_stack = "".join(traceback.format_stack()[-6:-2])
 
-        audit_kwargs = dict(
+        audit_kwargs = dict(  # noqa: C408
             acting_user=acting_user,
             call_stack=call_stack,
             data_before=before_dict,
@@ -107,9 +106,7 @@ class ValidateOnSaveMixin(Model):
     class Meta:
         abstract = True
 
-    def save(
-        self, force_insert=False, force_update=False, **kwargs
-    ):  # pylint: disable=arguments-differ
+    def save(self, force_insert=False, force_update=False, **kwargs):  # pylint: disable=arguments-differ  # noqa: FBT002
         if not (force_insert or force_update):
             self.full_clean()
         super().save(force_insert=force_insert, force_update=force_update, **kwargs)

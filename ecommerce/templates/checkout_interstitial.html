@@ -3,7 +3,7 @@
 
 {% block title %}{% trans "mitxonline" %}{% endblock %}
 
-{% block content %}    
+{% block content %}
     <section id="main" class="info-block">
         <div class="container">
             <div class="content-row">
@@ -14,7 +14,7 @@
                         <form id="checkout_form" method="post" action="{{ checkout_payload.url }}">
                             {% for key, value in form.items %}
                             <input type="hidden" readonly="readonly" name="{{ key }}" value="{{ value }}" />
-                            {% endfor %}        
+                            {% endfor %}
                         </form>
 
                         <script type="text/javascript">

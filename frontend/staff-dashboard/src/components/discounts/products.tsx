@@ -1,4 +1,4 @@
-import { 
+import {
   Table,
   useTable,
   List,
@@ -48,7 +48,7 @@ const ProductResult = (props: IProductResultProps) => {
       title="Price" />
     <Table.Column
       dataIndex="id"
-      title="" 
+      title=""
       render={(value, record) => (<button onClick={() => onAdd(record)}>Add</button>)}
     />
   </Table>);
@@ -110,7 +110,7 @@ export const Products = (props: IProductsTableProps) => {
             </Table>
         </List>
 
-        <Modal 
+        <Modal
             title="Assign Products"
             visible={showAddModal}
             onCancel={() => setShowAddModal(false)}
@@ -125,7 +125,7 @@ export const Products = (props: IProductsTableProps) => {
                 Search Products:
                 <Input onChange={performFilter} allowClear={true}></Input>
               </label>
-              
+
               {searchTerm !== "" ? (<ProductResult onAdd={hndAddProduct} searchTerm={searchTerm}></ProductResult>) : null}
             </Col>
           </Row>

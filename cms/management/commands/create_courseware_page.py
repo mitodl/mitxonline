@@ -1,8 +1,9 @@
 """
 Creates a basic courseware about page. This can be for programs or courses.
 """
-from django.core.management import BaseCommand
+
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.management import BaseCommand
 
 from cms.api import create_default_courseware_page
 from cms.models import Course, Program
@@ -26,7 +27,7 @@ class Command(BaseCommand):
             "--live", action="store_true", help="Make the page live. (Defaults to not.)"
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
         try:
             courseware = Course.objects.filter(
                 readable_id=kwargs["courseware_id"]

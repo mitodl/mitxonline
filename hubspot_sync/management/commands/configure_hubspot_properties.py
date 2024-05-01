@@ -1,10 +1,10 @@
 """
 Management command to configure custom Hubspot properties for Contacts, Deals, Products, and Line Items
 """
+
 import sys
 
 from django.core.management import BaseCommand
-from courses.constants import ALL_ENROLL_CHANGE_STATUSES
 from mitol.hubspot_api.api import (
     delete_object_property,
     delete_property_group,
@@ -14,6 +14,7 @@ from mitol.hubspot_api.api import (
     sync_property_group,
 )
 
+from courses.constants import ALL_ENROLL_CHANGE_STATUSES
 from ecommerce import models
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -21,12 +22,11 @@ from ecommerce.constants import (
     DISCOUNT_TYPE_PERCENT_OFF,
 )
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
-
 from users.models import (
-    GENDER_CHOICES,
     COMPANY_SIZE_CHOICES,
-    YRS_EXPERIENCE_CHOICES,
+    GENDER_CHOICES,
     HIGHEST_EDUCATION_CHOICES,
+    YRS_EXPERIENCE_CHOICES,
 )
 
 CUSTOM_ECOMMERCE_PROPERTIES = {
@@ -676,13 +676,13 @@ class Command(BaseCommand):
             help="Delete custom hubspot properties/groups",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         if options["delete"]:
-            print("Uninstalling custom groups and properties...")
+            print("Uninstalling custom groups and properties...")  # noqa: T201
             delete_custom_properties()
-            print("Uninstall successful")
+            print("Uninstall successful")  # noqa: T201
             return
         else:
-            print("Configuring custom groups and properties...")
+            print("Configuring custom groups and properties...")  # noqa: T201
             upsert_custom_properties()
-            print("Custom properties configured")
+            print("Custom properties configured")  # noqa: T201

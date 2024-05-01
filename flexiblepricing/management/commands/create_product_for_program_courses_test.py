@@ -12,7 +12,7 @@ pytestmark = [pytest.mark.django_db]
 
 
 @pytest.mark.parametrize(
-    "program,price,active",
+    "program,price,active",  # noqa: PT006
     [
         ("program-v1:MITx+DEDP", "1000", True),
         ("program-v1:MITx+DEDP", "1000", False),

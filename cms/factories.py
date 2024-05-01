@@ -1,9 +1,8 @@
 """Wagtail page factories"""
+
 import factory
 import wagtail_factories
-from django.core.exceptions import ObjectDoesNotExist
 from factory import LazyAttribute, fuzzy
-from wagtail.models import Page
 
 from cms.models import (
     CertificatePage,

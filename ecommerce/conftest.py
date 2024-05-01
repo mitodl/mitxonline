@@ -1,4 +1,5 @@
 """Common fixtures for ecommerce tests"""
+
 import pytest
 
 

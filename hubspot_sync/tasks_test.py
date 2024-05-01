@@ -1,14 +1,11 @@
 """
 Tests for hubspot_sync tasks
 """
+
 # pylint: disable=redefined-outer-name
 from decimal import Decimal
 
 import pytest
-from hubspot_sync.api import (
-    make_contact_create_message_list_from_user_ids,
-    make_contact_update_message_list_from_user_ids,
-)
 import reversion
 from django.contrib.contenttypes.models import ContentType
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
@@ -22,6 +19,10 @@ from reversion.models import Version
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Product
 from hubspot_sync import tasks
+from hubspot_sync.api import (
+    make_contact_create_message_list_from_user_ids,
+    make_contact_update_message_list_from_user_ids,
+)
 from hubspot_sync.tasks import (
     batch_upsert_associations,
     batch_upsert_associations_chunked,
@@ -48,7 +49,7 @@ def test_task_sync_contact_with_hubspot(mocker):
     mock_result = SimplePublicObjectFactory()
 
     mock_api_call = mocker.patch(
-        f"hubspot_sync.tasks.api.sync_contact_with_hubspot", return_value=mock_result
+        "hubspot_sync.tasks.api.sync_contact_with_hubspot", return_value=mock_result
     )
 
     assert sync_contact_with_hubspot(mock_object.id) == mock_result.id
@@ -61,7 +62,7 @@ def test_task_sync_product_with_hubspot(mocker):
     mock_result = SimplePublicObjectFactory()
 
     mock_api_call = mocker.patch(
-        f"hubspot_sync.tasks.api.sync_product_with_hubspot", return_value=mock_result
+        "hubspot_sync.tasks.api.sync_product_with_hubspot", return_value=mock_result
     )
 
     assert sync_product_with_hubspot(mock_object.id) == mock_result.id
@@ -74,7 +75,7 @@ def test_task_sync_deal_with_hubspot(mocker):
     mock_result = SimplePublicObjectFactory()
 
     mock_api_call = mocker.patch(
-        f"hubspot_sync.tasks.api.sync_deal_with_hubspot", return_value=mock_result
+        "hubspot_sync.tasks.api.sync_deal_with_hubspot", return_value=mock_result
     )
 
     assert sync_deal_with_hubspot(mock_object.id) == mock_result.id
@@ -83,7 +84,8 @@ def test_task_sync_deal_with_hubspot(mocker):
 
 @pytest.mark.parametrize("task_func", SYNC_FUNCTIONS)
 @pytest.mark.parametrize(
-    "status, expected_error", [[429, TooManyRequestsException], [500, ApiException]]
+    "status, expected_error",  # noqa: PT006
+    [[429, TooManyRequestsException], [500, ApiException]],  # noqa: PT007
 )
 def test_task_functions_error(mocker, task_func, status, expected_error):
     """These task functions should return the expected exception class"""
@@ -207,7 +209,7 @@ def test_batch_create_hubspot_objects_with_ids(settings, mocker, mocked_celery):
 def test_batch_update_hubspot_objects_chunked(mocker, id_count):
     """batch_update_hubspot_objects_chunked should make expected api calls and args"""
     contacts = UserFactory.create_batch(id_count)
-    mock_ids = sorted(
+    mock_ids = sorted(  # noqa: C414
         list(
             zip(
                 [contact.id for contact in contacts],
@@ -245,7 +247,8 @@ def test_batch_update_hubspot_objects_chunked(mocker, id_count):
 
 
 @pytest.mark.parametrize(
-    "status, expected_error", [[429, TooManyRequestsException], [500, ApiException]]
+    "status, expected_error",  # noqa: PT006
+    [[429, TooManyRequestsException], [500, ApiException]],  # noqa: PT007
 )
 def test_batch_update_hubspot_objects_chunked_error(mocker, status, expected_error):
     """batch_update_hubspot_objects_chunked raise expected exception"""
@@ -305,7 +308,8 @@ def test_batch_create_hubspot_objects_chunked(mocker, id_count):
 
 
 @pytest.mark.parametrize(
-    "status, expected_error", [[429, TooManyRequestsException], [500, ApiException]]
+    "status, expected_error",  # noqa: PT006
+    [[429, TooManyRequestsException], [500, ApiException]],  # noqa: PT007
 )
 def test_batch_create_hubspot_objects_chunked_error(mocker, status, expected_error):
     """batch_create_hubspot_objects_chunked raise expected exception"""

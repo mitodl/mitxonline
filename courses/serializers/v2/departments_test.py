@@ -58,7 +58,7 @@ def test_serialize_department_with_courses_and_programs__no_related(mock_context
 
 
 @pytest.mark.parametrize(
-    "valid_courses,valid_programs,invalid_courses,invalid_programs",
+    "valid_courses,valid_programs,invalid_courses,invalid_programs",  # noqa: PT006
     [(0, 0, 0, 0), (1, 1, 0, 0), (0, 0, 1, 1), (2, 2, 0, 0), (2, 2, 1, 1)],
 )
 def test_serialize_department_with_courses_and_programs__with_multiples(

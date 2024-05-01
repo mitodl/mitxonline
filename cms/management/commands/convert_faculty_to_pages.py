@@ -1,5 +1,5 @@
 """
-Grabs faculty member data out of existing Course and Program pages and converts 
+Grabs faculty member data out of existing Course and Program pages and converts
 them to be InstructorPage, then assigns them to the course/program they were in.
 
 If there's no root-level instructor index page, this will also create it.
@@ -41,12 +41,12 @@ class Command(BaseCommand):
             help="Make the page published. (Defaults to draft.)",
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
         try:
             instructor_page_root = InstructorIndexPage.objects.filter(live=True).get()
 
             self.stdout.write("Using existing instructor index page")
-        except Exception:
+        except Exception:  # noqa: BLE001
             hp = HomePage.objects.first()
             # if it errors here then we're all lost
             instructor_page_root = InstructorIndexPage(title="Instructors")
@@ -70,7 +70,7 @@ class Command(BaseCommand):
                         f"Courseware object {kwargs['courseware']} not found."
                     )
                 )
-                exit(-1)
+                exit(-1)  # noqa: PLR1722
         else:
             pages = CoursePage.objects.all()
 
@@ -94,7 +94,7 @@ class Command(BaseCommand):
 
                 try:
                     featured_image = Image.objects.get(pk=block["image"])
-                except Exception:
+                except Exception:  # noqa: BLE001
                     featured_image = None
 
                 page_framework = {

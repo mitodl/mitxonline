@@ -8,15 +8,14 @@ to generate the enrollments if specified (rather than reinventing the wheel).
 from argparse import RawTextHelpFormatter
 from getpass import getpass
 
-from django.core.management import BaseCommand
-from django.core.management import call_command
+from django.core.management import BaseCommand, call_command
 from django.db.models import Q
 
+from authentication.pipeline.user import CREATE_OPENEDX_USER_RETRY_DELAY
 from mail.api import validate_email_addresses
-from users.models import User, LegalAddress, validate_iso_3166_1_code
 from openedx.api import create_user as openedx_create_user
 from openedx.tasks import create_user_from_id as openedx_create_user_from_id
-from authentication.pipeline.user import CREATE_OPENEDX_USER_RETRY_DELAY
+from users.models import User, validate_iso_3166_1_code
 
 
 class Command(BaseCommand):
@@ -25,17 +24,17 @@ class Command(BaseCommand):
     """
 
     help = """Creates a new user in MITx Online, and creates an associated edX account (if there's working edX integration set up).
-    
+
     To create a new user, specify the following options:
     create_user <email> <first name> <last name> <display name> <country code> [--enroll <courseware id>]
     where:
     - email: the new learner's email address
     - first name, last name, display name: the name to associate with the new account
     - country code: the ISO-3166 Alpha-2 code for the learner's country (defaults to US)
-    
+
     You will be prompted for the password.
 
-    Optionally, specify --enroll and a courseware ID (course-v1:MITx+stuff) to enroll the new learner in the specified object. Specify this as many times as necessary. 
+    Optionally, specify --enroll and a courseware ID (course-v1:MITx+stuff) to enroll the new learner in the specified object. Specify this as many times as necessary.
     """
 
     def create_parser(self, prog_name, subcommand):  # pylint: disable=arguments-differ
@@ -47,7 +46,7 @@ class Command(BaseCommand):
         return parser
 
     def add_arguments(self, parser):
-        """parse arguments"""
+        """Parse arguments"""
 
         # pylint: disable=expression-not-assigned
         parser.add_argument(
@@ -80,14 +79,14 @@ class Command(BaseCommand):
             help="Optionally enroll the new user in the specified courseware.",
         )
 
-    def handle(self, *args, **kwargs):
+    def handle(self, *args, **kwargs):  # noqa: ARG002
         if User.objects.filter(
             Q(username=kwargs["username"]) | Q(email=kwargs["email"])
         ).exists():
             self.stderr.write(
                 f"User with username {kwargs['username']} or email address {kwargs['email']} already exists."
             )
-            exit(-1)
+            exit(-1)  # noqa: PLR1722
 
         validate_iso_3166_1_code(kwargs["countrycode"])
         validate_email_addresses([kwargs["email"]])
@@ -114,7 +113,7 @@ class Command(BaseCommand):
 
         try:
             openedx_create_user(new_account)
-        except:
+        except:  # noqa: E722
             self.stdout.write(
                 self.style.ERROR(
                     f"An error occurred creating the Open edX user for {new_account.username}; will queue it for later."

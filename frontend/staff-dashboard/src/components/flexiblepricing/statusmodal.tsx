@@ -149,8 +149,8 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
                 <span>
                     <strong>Justification:</strong>
                 </span>
-                <Select 
-                    onChange={(e) => handleChangeJustification(e)} 
+                <Select
+                    onChange={(e) => handleChangeJustification(e)}
                     style={{ marginLeft: "20px", 'width': '20rem' }}
                     options={ status === financialAssistanceRequestStatus.approved ? Approved_Justifications: status === financialAssistanceRequestStatus.denied?  Denied_Justifications : All_Justifications}
                     defaultValue={justification}

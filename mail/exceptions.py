@@ -16,5 +16,5 @@ class MultiEmailValidationError(Exception):
         super().__init__(msg)
 
 
-class EmailSendFailureException(Exception):
+class EmailSendFailureException(Exception):  # noqa: N818
     """Exception to mark the failure in sending an email"""

@@ -1,8 +1,6 @@
 """Course mail API tests"""
+
 import pytest
-from django.urls import reverse
-from mitol.common.factories import UserFactory
-from pytz import UTC
 
 from courses.factories import (
     CourseRunEnrollmentFactory,

@@ -20,7 +20,6 @@ def reverse_user_profiles(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("users", "0021_alter_user_name_limit"),
     ]

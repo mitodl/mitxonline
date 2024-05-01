@@ -1,8 +1,9 @@
 """
 MITxOnline ecommerce views
 """
+
 import logging
-from distutils.util import strtobool
+from distutils.util import strtobool  # noqa: F401
 
 import django_filters
 from django.conf import settings
@@ -87,7 +88,8 @@ class ProductsPagination(RefinePagination):
 
 class AllProductViewSet(ModelViewSet):
     """This doesn't filter unenrollable products out, and adds name search for
-    courseware object readable id. It's really for the staff dashboard."""
+    courseware object readable id. It's really for the staff dashboard.
+    """
 
     serializer_class = ProductSerializer
     pagination_class = ProductsPagination
@@ -193,7 +195,7 @@ class BasketViewSet(
     lookup_field = "user__username"
     lookup_url_kwarg = "username"
 
-    def get_object(self, username=None):
+    def get_object(self, username=None):  # noqa: ARG002
         basket, _ = Basket.objects.get_or_create(user=self.request.user)
         return basket
 
@@ -212,7 +214,7 @@ class BasketItemViewSet(
     def get_queryset(self):
         return BasketItem.objects.filter(basket__user=self.request.user)
 
-    def create(self, request, *args, **kwargs):
+    def create(self, request, *args, **kwargs):  # noqa: ARG002
         basket = Basket.objects.get(user=request.user)
         product_id = request.data.get("product")
         serializer = self.get_serializer(
@@ -243,7 +245,7 @@ class DiscountFilterSet(django_filters.FilterSet):
         method="redeemed_filter", choices=(("yes", "yes"), ("no", "no"))
     )
 
-    def redeemed_filter(self, qs, name, value):
+    def redeemed_filter(self, qs, name, value):  # noqa: ARG002
         qs = qs.annotate(num_redemptions=Count("order_redemptions"))
 
         if value == "yes":
@@ -290,7 +292,7 @@ class DiscountViewSet(ModelViewSet):
 
             return Response(discounts.data, status=status.HTTP_201_CREATED)
 
-        raise ParseError(f"Batch creation failed: {otherSerializer.errors}")
+        raise ParseError(f"Batch creation failed: {otherSerializer.errors}")  # noqa: EM102
 
 
 class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
@@ -316,11 +318,11 @@ class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
-    def destroy(self, request, **kwargs):
+    def destroy(self, request, **kwargs):  # noqa: ARG002
         discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
         product = Product.objects.get(pk=kwargs["pk"])
 
-        discount_product = DiscountProduct.objects.filter(
+        discount_product = DiscountProduct.objects.filter(  # noqa: F841
             discount=discount, product=product
         ).delete()
 
@@ -366,11 +368,11 @@ class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
-    def destroy(self, request, **kwargs):
+    def destroy(self, request, **kwargs):  # noqa: ARG002
         discount = Discount.objects.get(pk=kwargs["parent_lookup_discount"])
         user = User.objects.get(pk=kwargs["pk"])
 
-        discount_user = UserDiscount.objects.filter(
+        discount_user = UserDiscount.objects.filter(  # noqa: F841
             discount=discount, user=user
         ).delete()
 
@@ -444,13 +446,13 @@ class CheckoutApiViewSet(ViewSet):
             ).get(discount_code=request.data["discount"].strip())
 
             if not api.check_discount_for_products(discount, basket):
-                raise ObjectDoesNotExist()
+                raise ObjectDoesNotExist()  # noqa: RSE102, TRY301
 
             if not discount.check_validity(request.user):
                 log.error(
-                    f"Discount code {request.data['discount']} has already been redeemed"
+                    f"Discount code {request.data['discount']} has already been redeemed"  # noqa: G004
                 )
-                raise ObjectDoesNotExist()
+                raise ObjectDoesNotExist()  # noqa: RSE102, TRY301
         except ObjectDoesNotExist:
             return Response(
                 f"Discount '{request.data['discount']}' not found.",
@@ -535,7 +537,7 @@ class CheckoutCallbackView(View):
     Handle a checkout cancellation or receipt
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):  # noqa: ARG002
         import logging
 
         self.logger = logging.getLogger(__name__)
@@ -593,7 +595,7 @@ class CheckoutCallbackView(View):
                 {"type": USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN},
             )
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):  # noqa: ARG002
         """
         This is where customers should land when they have completed the
         transaction successfully. This does a handful of things:
@@ -631,7 +633,7 @@ class BackofficeCallbackView(APIView):
     authentication_classes = []  # disables authentication
     permission_classes = []  # disables permission
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):  # noqa: ARG002
         """
         This endpoint is called by Cybersource as a server-to-server call
         in order to respond with the payment details.
@@ -703,7 +705,7 @@ class CheckoutProductView(LoginRequiredMixin, RedirectView):
 class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
     template_name = "checkout_interstitial.html"
 
-    def get(self, request):
+    def get(self, request):  # noqa: PLR0911
         try:
             checkout_payload = api.generate_checkout_payload(request)
         except ObjectDoesNotExist:

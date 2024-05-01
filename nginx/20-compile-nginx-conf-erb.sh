@@ -6,11 +6,11 @@ set -e
 ME=$(basename $0)
 
 auto_erb_build() {
-  local template="/etc/nginx/templates/nginx.conf.erb"
-  local output_path="/etc/nginx/nginx.conf"
+	template="/etc/nginx/templates/nginx.conf.erb"
+	output_path="/etc/nginx/nginx.conf"
 
-  echo >&3 "$ME: Running erb on $template to $output_path"
-  erb "$template" > "$output_path"
+	echo >&3 "$ME: Running erb on $template to $output_path"
+	erb "$template" >"$output_path"
 }
 
 auto_erb_build

@@ -1,15 +1,15 @@
 """Ecommerce mail functions"""
-import pycountry
-import logging
 
+import logging
 from decimal import Decimal
+
+import pycountry
 from dateutil import parser
 from mitol.mail.api import get_message_sender
 
-from ecommerce.messages import OrderReceiptMessage, OrderRefundMessage
-from ecommerce.constants import TRANSACTION_TYPE_REFUND
-
 from courses.models import CourseRun
+from ecommerce.constants import TRANSACTION_TYPE_REFUND
+from ecommerce.messages import OrderReceiptMessage, OrderRefundMessage
 
 log = logging.getLogger()
 
@@ -70,7 +70,7 @@ def send_ecommerce_order_receipt(order_record):
                 },
             )
 
-    except:  # pylint: disable=bare-except
+    except:  # pylint: disable=bare-except  # noqa: E722
         log.exception("Error sending order receipt email.")
 
 
@@ -98,5 +98,5 @@ def send_ecommerce_refund_message(order_record):
                     "transaction_amount": transaction.amount.quantize(Decimal("0.01")),
                 },
             )
-    except:
+    except:  # noqa: E722
         log.exception("Error sending order refund email.")

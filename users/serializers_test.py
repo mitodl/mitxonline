@@ -1,4 +1,5 @@
 """Tests for users.serializers"""
+
 import pytest
 import responses
 from django.contrib.auth.models import AnonymousUser
@@ -10,10 +11,6 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 
 from fixtures.common import (
-    address_no_state_dict,
-    intl_address_dict,
-    invalid_address_dict,
-    user_profile_dict,
     valid_address_dict,
 )
 from openedx.api import OPENEDX_REGISTRATION_VALIDATION_PATH
@@ -31,8 +28,8 @@ from users.serializers import (
 USERNAME = "my-username"
 
 
-@pytest.fixture()
-def application(settings):
+@pytest.fixture
+def application(settings):  # noqa: PT004
     """Test data and settings needed for create_edx_user tests"""
     settings.OPENEDX_API_BASE_URL = "http://example.com"
 
@@ -44,12 +41,12 @@ def test_validate_legal_address(valid_address_dict):
 
 
 @pytest.mark.parametrize(
-    "field,value,error",
+    "field,value,error",  # noqa: PT006
     [
-        ["first_name", "", "This field may not be blank."],
-        ["last_name", "", "This field may not be blank."],
-        ["country", "", "This field may not be blank."],
-        ["country", None, "This field may not be null."],
+        ["first_name", "", "This field may not be blank."],  # noqa: PT007
+        ["last_name", "", "This field may not be blank."],  # noqa: PT007
+        ["country", "", "This field may not be blank."],  # noqa: PT007
+        ["country", None, "This field may not be null."],  # noqa: PT007
     ],
 )
 def test_validate_required_fields(valid_address_dict, field, value, error):
@@ -61,12 +58,12 @@ def test_validate_required_fields(valid_address_dict, field, value, error):
 
 
 @pytest.mark.parametrize(
-    "address_type,error",
+    "address_type,error",  # noqa: PT006
     [
-        [lazy_fixture("valid_address_dict"), None],
-        [lazy_fixture("intl_address_dict"), None],
-        [lazy_fixture("invalid_address_dict"), "Invalid state specified"],
-        [lazy_fixture("address_no_state_dict"), None],
+        [lazy_fixture("valid_address_dict"), None],  # noqa: PT007
+        [lazy_fixture("intl_address_dict"), None],  # noqa: PT007
+        [lazy_fixture("invalid_address_dict"), "Invalid state specified"],  # noqa: PT007
+        [lazy_fixture("address_no_state_dict"), None],  # noqa: PT007
     ],
 )
 def test_legal_address_validate_state_field(address_type, error):
@@ -136,7 +133,7 @@ def test_update_email_change_request_existing_email(user):
     )
     serializer = ChangeEmailRequestUpdateSerializer(change_request, {"confirmed": True})
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError):  # noqa: PT012
         serializer.is_valid()
         serializer.save()
 
@@ -146,15 +143,13 @@ def test_create_email_change_request_same_email(user):
     change_request = ChangeEmailRequest.objects.create(user=user, new_email=user.email)
     serializer = ChangeEmailRequestUpdateSerializer(change_request, {"confirmed": True})
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError):  # noqa: PT012
         serializer.is_valid()
         serializer.save()
 
 
 @pytest.mark.parametrize("raises_error", [False, True])
-def test_update_user_email(
-    mocker, user, raises_error
-):  # pylint: disable=too-many-arguments
+def test_update_user_email(mocker, user, raises_error):  # pylint: disable=too-many-arguments
     """Test that update edx user email takes the correct action"""
 
     mock_update_edx_user_email = mocker.patch("openedx.tasks.api.update_edx_user_email")
@@ -187,13 +182,13 @@ def test_update_user_email(
 @responses.activate
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "new_username, expect_valid, expect_saved_username",
+    "new_username, expect_valid, expect_saved_username",  # noqa: PT006
     [
-        [f"{USERNAME}-1", True, f"{USERNAME}-1"],
-        [" My-Üsérname 1 ", True, "My-Üsérname 1"],
-        ["my@username", False, None],
-        ["my>username>1", False, None],
-        [f"   {USERNAME.upper()}  ", False, None],
+        [f"{USERNAME}-1", True, f"{USERNAME}-1"],  # noqa: PT007
+        [" My-Üsérname 1 ", True, "My-Üsérname 1"],  # noqa: PT007
+        ["my@username", False, None],  # noqa: PT007
+        ["my>username>1", False, None],  # noqa: PT007
+        [f"   {USERNAME.upper()}  ", False, None],  # noqa: PT007
     ],
 )
 def test_username_validation(
@@ -282,7 +277,7 @@ def test_username_validation_connection_exception(
             "legal_address": valid_address_dict,
         }
     )
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017, PT011
         assert serializer.is_valid() is False
 
 
@@ -349,10 +344,12 @@ def test_legal_address_serializer_invalid_name(valid_address_dict):
     # Case 1: Make sure that invalid character(s) doesn't exist within the name
     for invalid_character in "~!@&)(+:'.?/,`-":
         # Replace the invalid character on 3 different places within name for rigorous testing of this case
-        valid_address_dict["first_name"] = "{0}First{0} Name{0}".format(
-            invalid_character
+        valid_address_dict["first_name"] = (
+            f"{invalid_character}First{invalid_character} Name{invalid_character}"
         )
-        valid_address_dict["last_name"] = "{0}Last{0} Name{0}".format(invalid_character)
+        valid_address_dict["last_name"] = (
+            f"{invalid_character}Last{invalid_character} Name{invalid_character}"
+        )
         serializer = LegalAddressSerializer(data=valid_address_dict)
         with pytest.raises(ValidationError):
             serializer.is_valid(raise_exception=True)
@@ -360,8 +357,8 @@ def test_legal_address_serializer_invalid_name(valid_address_dict):
     # Case 2: Make sure that name doesn't start with valid special character(s)
     # These characters are valid for a name but they shouldn't be at the start
     for valid_character in '^/$#*=[]`%_;<>{}"|':
-        valid_address_dict["first_name"] = "{}First".format(valid_character)
-        valid_address_dict["last_name"] = "{}Last".format(valid_character)
+        valid_address_dict["first_name"] = f"{valid_character}First"
+        valid_address_dict["last_name"] = f"{valid_character}Last"
         serializer = LegalAddressSerializer(data=valid_address_dict)
         with pytest.raises(ValidationError):
             serializer.is_valid(raise_exception=True)
@@ -422,6 +419,6 @@ def test_update_user_serializer_sets_addl_field_flag(
     user.refresh_from_db()
 
     if test_incomplete_addl_fields > 1:
-        assert user.user_profile.addl_field_flag == True
+        assert user.user_profile.addl_field_flag == True  # noqa: E712
     else:
-        assert user.user_profile.addl_field_flag == False
+        assert user.user_profile.addl_field_flag == False  # noqa: E712

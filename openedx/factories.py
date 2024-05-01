@@ -1,4 +1,5 @@
 """Courseware factories"""
+
 from datetime import timedelta
 
 import pytz

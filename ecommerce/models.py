@@ -2,7 +2,7 @@ import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import List
+from typing import List  # noqa: UP035
 
 import pytz
 import reversion
@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import FieldError, ValidationError
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils.functional import cached_property
 from django_fsm import FSMField, transition
@@ -28,7 +28,6 @@ from ecommerce.constants import (
     PAYMENT_TYPES,
     REDEMPTION_TYPE_ONE_TIME,
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
-    REDEMPTION_TYPE_UNLIMITED,
     REDEMPTION_TYPES,
     REFERENCE_NUMBER_PREFIX,
     TRANSACTION_TYPE_PAYMENT,
@@ -40,7 +39,7 @@ from main.settings import TIME_ZONE
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
-User = get_user_model()
+User = get_user_model()  # noqa: F811
 
 
 def valid_purchasable_objects_list():
@@ -118,7 +117,7 @@ class Basket(TimestampedModel):
         """Return true if any of the courses in the basket block user's country"""
         basket_items = self.basket_items.prefetch_related("product")
         return any(
-            [
+            [  # noqa: C419
                 item.product.purchasable_object.course.is_country_blocked(user)
                 for item in basket_items
             ]
@@ -131,7 +130,7 @@ class Basket(TimestampedModel):
         basket_items = self.basket_items.prefetch_related("product")
         for item in basket_items:
             purchased_object = item.product.purchasable_object
-            if isinstance(purchased_object, CourseRun):
+            if isinstance(purchased_object, CourseRun):  # noqa: SIM102
                 # PaidCourseRun should only contain fulfilled orders
                 if PaidCourseRun.fulfilled_paid_course_run_exists(
                     user, purchased_object
@@ -155,7 +154,7 @@ class Basket(TimestampedModel):
 
         return False
 
-    def compare_to_order(self, order):
+    def compare_to_order(self, order):  # noqa: C901
         """
         Compares this basket with the specified order. An order is considered
         equal to the basket if it meets these criteria:
@@ -242,7 +241,7 @@ class Discount(TimestampedModel):
     automatic = models.BooleanField(default=False)
     discount_type = models.CharField(choices=DISCOUNT_TYPES, max_length=30)
     redemption_type = models.CharField(choices=REDEMPTION_TYPES, max_length=30)
-    payment_type = models.CharField(null=True, choices=PAYMENT_TYPES, max_length=30)
+    payment_type = models.CharField(null=True, choices=PAYMENT_TYPES, max_length=30)  # noqa: DJ001
     max_redemptions = models.PositiveIntegerField(null=True, default=0)
     discount_code = models.CharField(max_length=100)
     activation_date = models.DateTimeField(
@@ -265,7 +264,7 @@ class Discount(TimestampedModel):
             pytz.timezone(TIME_ZONE)
         ):
             raise ValidationError(
-                f"Expiration date {self.expiration_date} must be in the future."
+                f"Expiration date {self.expiration_date} must be in the future."  # noqa: EM102
             )
 
         if (
@@ -274,7 +273,7 @@ class Discount(TimestampedModel):
             and self.activation_date > self.expiration_date
         ):
             raise ValidationError(
-                f"Expiration date {self.expiration_date} must be after the activation date {self.activation_date}."
+                f"Expiration date {self.expiration_date} must be after the activation date {self.activation_date}."  # noqa: EM102
             )
 
         return True
@@ -365,7 +364,7 @@ class Discount(TimestampedModel):
         return True
 
     def friendly_format(self):
-        amount = "{:.2f}".format(self.amount)
+        amount = f"{self.amount:.2f}"
 
         if self.discount_type == DISCOUNT_TYPE_PERCENT_OFF:
             return f"{amount}% off"
@@ -388,7 +387,7 @@ class Discount(TimestampedModel):
         """
         from ecommerce.discounts import DiscountType
 
-        if (user is None and self.valid_now()) or self.check_validity(user):
+        if (user is None and self.valid_now()) or self.check_validity(user):  # noqa: RET503
             return DiscountType.get_discounted_price([self], product).quantize(
                 Decimal("0.01")
             )
@@ -396,7 +395,7 @@ class Discount(TimestampedModel):
     @property
     def is_full_discount(self):
         return (
-            self.discount_type == DISCOUNT_TYPE_PERCENT_OFF and self.amount == 100
+            self.discount_type == DISCOUNT_TYPE_PERCENT_OFF and self.amount == 100  # noqa: PLR2004
         ) or (self.discount_type == DISCOUNT_TYPE_FIXED_PRICE and self.amount == 0)
 
 
@@ -472,7 +471,7 @@ class Order(TimestampedModel):
         decimal_places=5,
         max_digits=20,
     )
-    reference_number = models.CharField(max_length=255, null=True, blank=True)
+    reference_number = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
 
     # override save method to auto-fill generated_rerefence_number
     def save(self, *args, **kwargs):
@@ -500,27 +499,27 @@ class Order(TimestampedModel):
 
     def fulfill(self, payment_data):
         """Fulfill this order"""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def cancel(self):
         """Cancel this order"""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def decline(self):
         """Decline this order"""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def review(self):
         """Place order in review"""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def errored(self):
         """Error this order"""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def refund(self, *, api_response_data, **kwargs):
         """Issue a refund"""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _generate_reference_number(self):
         return f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{self.id}"
@@ -529,7 +528,7 @@ class Order(TimestampedModel):
     def purchased_runs(self):
         """Return a list of purchased CourseRuns"""
 
-        # TODO: handle programs
+        # TODO: handle programs  # noqa: FIX002, TD002, TD003
         return [
             line.purchased_object
             for line in self.lines.all()
@@ -548,7 +547,7 @@ class FulfillableOrder:
     """class to handle common logics like fulfill, enrollment etc"""
 
     def create_transaction(self, payment_data):
-        log = logging.getLogger(__name__)
+        log = logging.getLogger(__name__)  # noqa: F841
         transaction_id = payment_data.get("transaction_id")
         amount = payment_data.get("amount")
         # There are two use cases:
@@ -558,7 +557,7 @@ class FulfillableOrder:
             transaction_id = uuid.uuid1()
         elif transaction_id is None:
             raise ValidationError(
-                "Failed to record transaction: Missing transaction id from payment API response"
+                "Failed to record transaction: Missing transaction id from payment API response"  # noqa: EM101
             )
 
         self.transactions.get_or_create(
@@ -590,7 +589,7 @@ class FulfillableOrder:
         source=Order.STATE.PENDING,
         target=Order.STATE.FULFILLED,
     )
-    def fulfill(self, payment_data, already_enrolled=False):
+    def fulfill(self, payment_data, already_enrolled=False):  # noqa: FBT002
         # record the transaction
         self.create_transaction(payment_data)
 
@@ -613,7 +612,10 @@ class PendingOrder(FulfillableOrder, Order):
 
     @transaction.atomic
     def _get_or_create(
-        self, products: List[Product], user: User, discounts: List[Discount] = None
+        self,
+        products: List[Product],  # noqa: UP006
+        user: User,
+        discounts: List[Discount] = None,  # noqa: UP006, RUF013
     ):
         """
         Returns an existing PendingOrder if one already exists with the same:
@@ -686,7 +688,7 @@ class PendingOrder(FulfillableOrder, Order):
                 order=order,
                 purchased_object_id=product.object_id,
                 purchased_content_type_id=product.content_type_id,
-                defaults=dict(
+                defaults=dict(  # noqa: C408
                     product_version=product_versions[i],
                     quantity=1,
                 ),
@@ -716,7 +718,7 @@ class PendingOrder(FulfillableOrder, Order):
             for basket_discount in basket.discounts.all()
         ]
         order = cls._get_or_create(cls, products, basket.user, discounts)
-        return order
+        return order  # noqa: RET504
 
     @classmethod
     def create_from_product(
@@ -736,12 +738,11 @@ class PendingOrder(FulfillableOrder, Order):
 
         order = cls._get_or_create(cls, [product], user, [discount])
 
-        return order
+        return order  # noqa: RET504
 
     @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.CANCELED)
     def cancel(self):
         """Cancel this order"""
-        pass
 
     @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.DECLINED)
     def decline(self):
@@ -760,7 +761,6 @@ class PendingOrder(FulfillableOrder, Order):
     @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.ERRORED)
     def error(self):
         """Error this order"""
-        pass
 
     class Meta:
         proxy = True
@@ -772,15 +772,14 @@ class FulfilledOrder(Order):
     @transition(field="state", source=Order.STATE.FULFILLED, target=Order.STATE.ERRORED)
     def error(self):
         """Error this order"""
-        pass
 
     @transition(
         field="state",
         source=Order.STATE.FULFILLED,
         target=Order.STATE.REFUNDED,
-        custom=dict(admin=False),
+        custom=dict(admin=False),  # noqa: C408
     )
-    def refund(self, *, api_response_data: dict = None, **kwargs):
+    def refund(self, *, api_response_data: dict = None, **kwargs):  # noqa: RUF013
         """
         Records the refund, and optionally attempts to unenroll the learner from
         the things they bought.
@@ -802,7 +801,7 @@ class FulfilledOrder(Order):
         transaction_id = api_response_data.get("id")
         if transaction_id is None:
             raise ValidationError(
-                "Failed to record transaction: Missing transaction id from refund API response"
+                "Failed to record transaction: Missing transaction id from refund API response"  # noqa: EM101
             )
 
         refund_transaction, created = self.transactions.get_or_create(
@@ -840,7 +839,6 @@ class CanceledOrder(Order):
     @transition(field="state", source=Order.STATE.CANCELED, target=Order.STATE.ERRORED)
     def error(self):
         """Error this order"""
-        pass
 
     class Meta:
         proxy = True
@@ -867,7 +865,6 @@ class DeclinedOrder(Order):
     @transition(field="state", source=Order.STATE.DECLINED, target=Order.STATE.ERRORED)
     def error(self):
         """Error this order"""
-        pass
 
     class Meta:
         proxy = True

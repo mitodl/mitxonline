@@ -1,4 +1,5 @@
 """Courseware tasks"""
+
 from main.celery import app
 from openedx import api
 from users.api import get_user_by_id
