@@ -96,7 +96,7 @@
     "react-router": "4.3.1",
     "react-router-dom": "4.3.1",
     "react-select": "3.2.0",
-    "react-swipeable": "7.0.0",
+    "react-swipeable": "7.0.1",
     "react-test-renderer": "16.14.0",
     "react-zendesk": "0.1.13",
     "reactstrap": "9.1.6",
