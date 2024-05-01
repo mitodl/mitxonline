@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.91.0
+--------------
+
+- 4012: Improve screen reader accessibility of the site-wide banner. (#2180)
+- Add course format and new wording for course box info (#2175)
+- Update dependency object.entries to v1.1.8 (#2164)
+- Update dependency postcss to v8.4.38 (#2165)
+- Update dependency ubuntu to v22 (#2039)
+- Update dependency reselect to v4.1.8 (#2169)
+
 Version 0.90.1 (Released May 01, 2024)
 --------------
 
