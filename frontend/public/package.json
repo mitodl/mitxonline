@@ -88,7 +88,7 @@
     "react-dom": "16.14.0",
     "react-ga": "2.7.0",
     "react-google-recaptcha": "1.1.0",
-    "react-hot-loader": "4.13.0",
+    "react-hot-loader": "4.13.1",
     "react-markdown": "5.0.3",
     "react-page-click": "4.0.4",
     "react-picky": "4.7.2",
