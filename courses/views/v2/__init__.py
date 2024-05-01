@@ -2,26 +2,20 @@
 Course API Views version 2
 """
 
-from rest_framework import viewsets
-from rest_framework.pagination import PageNumberPagination
 import django_filters
+from django.db.models import Prefetch, Q
 from django_filters.rest_framework import DjangoFilterBackend
 from mitol.common.utils import now_in_utc
-from django.db.models import Prefetch, Q
+from rest_framework import viewsets
+from rest_framework.pagination import PageNumberPagination
 
-from courses.models import (
-    Course,
-    CourseRun,
-    Department,
-    Program,
-)
-from courses.serializers.v2.programs import ProgramSerializer
-from courses.serializers.v2.courses import (
-    CourseWithCourseRunsSerializer,
-)
+from courses.models import Course, CourseRun, Department, Program
+from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
 from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,
 )
+from courses.serializers.v2.programs import ProgramSerializer
+from courses.utils import get_enrollable_courseruns_qs
 
 
 class Pagination(PageNumberPagination):
@@ -67,12 +61,7 @@ class CourseFilterSet(django_filters.FilterSet):
         now = now_in_utc()
 
         if value is True:
-            enrollable_runs = CourseRun.objects.filter(
-                Q(live=True)
-                & Q(start_date__isnull=False)
-                & Q(enrollment_start__lt=now)
-                & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))
-            )
+            enrollable_runs = get_enrollable_courseruns_qs()
             return (
                 queryset.prefetch_related(
                     Prefetch("courseruns", queryset=enrollable_runs),

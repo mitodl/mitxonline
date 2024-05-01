@@ -85,9 +85,10 @@ def get_enrollable_courseruns_qs():
     )
 
 
-def get_enrollable_courses(enrollable_runs):
+def get_enrollable_courses():
     """Returns all the programs that are currently open for enrollment."""
     now = now_in_utc()
+    enrollable_runs = get_enrollable_courseruns_qs()
     return (
         Course.objects.prefetch_related(
             Prefetch("courseruns", queryset=enrollable_runs)
