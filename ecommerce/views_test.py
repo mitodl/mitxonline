@@ -119,7 +119,9 @@ def test_get_products_inactive(user_drf_client, products):
         reverse("products_api-detail", kwargs={"pk": product.id})
     )
 
-    assert_drf_json_equal(resp.json(), {"detail": "Not found."})
+    assert_drf_json_equal(
+        resp.json(), {"detail": "No Product matches the given query."}
+    )
 
 
 def test_get_basket(user_drf_client, user):
