@@ -592,8 +592,8 @@ export class CatalogPage extends React.Component<Props> {
   }
 
   /**
-   * Returns the number of catalog items based on the selectedDepartment
-   * and the selectedTabName state variables.
+   * Returns the number of catalog items that are associated with the value of selectedDepartment
+   * and tabSelected.
    * If the selectedDepartment is "All Departments" and selectedTabName is equal to COURSES_TAB,
    * then total number of courses is returned.
    * If the selectedDepartment is "All Departments" and selectedTabName is equal not equal to
@@ -867,7 +867,8 @@ export class CatalogPage extends React.Component<Props> {
                             >
                               Programs{" "}
                               <div className="product-number d-inline-block d-sm-none">
-                                ({this.renderNumberOfCatalogItems(PROGRAMS_TAB)})
+                                ({this.renderNumberOfCatalogItems(PROGRAMS_TAB)}
+                                )
                               </div>
                             </button>
                           </div>
