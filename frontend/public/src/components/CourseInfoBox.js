@@ -19,7 +19,6 @@ type CourseInfoBoxProps = {
   courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
   enrollments: ?Array<RunEnrollment>,
   currentUser: CurrentUser,
-  toggleUpgradeDialogVisibility: () => Promise<any>,
   setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>
 }
 
@@ -71,10 +70,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     this.setState({
       showMoreEnrollDates: !this.state.showMoreEnrollDates
     })
-  }
-  setRunEnrollDialog(run: EnrollmentFlaggedCourseRun) {
-    this.props.setCurrentCourseRun(run)
-    this.props.toggleUpgradeDialogVisibility()
   }
 
   warningMessage(isArchived) {
