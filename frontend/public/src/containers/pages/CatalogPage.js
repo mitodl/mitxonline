@@ -604,11 +604,17 @@ export class CatalogPage extends React.Component<Props> {
    * If the selectedDepartment is not found in the departments array, 0 is returned.
    * @returns {number} the number of courses or programs associated with the department matching
    * the selectedDepartment state variable.
+   *
+   * @param {string} tabSelected The tab name for which the item count should be based on.  Optional.  If not defined, this.state.tabSelected is used.
    */
-  renderNumberOfCatalogItems() {
+  renderNumberOfCatalogItems(tabSelected: string) {
     const { departments } = this.props
+    let tabSelectedValue = tabSelected
+    if (typeof tabSelectedValue === "undefined") {
+      tabSelectedValue = this.state.tabSelected
+    }
     if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
-      return this.state.tabSelected === COURSES_TAB
+      return tabSelectedValue === COURSES_TAB
         ? this.state.allCoursesCount
         : this.state.allProgramsCount
     } else if (!departments) return 0
@@ -618,7 +624,7 @@ export class CatalogPage extends React.Component<Props> {
     if (!departmentSlugs.includes(this.state.selectedDepartment)) {
       return 0
     } else {
-      if (this.state.tabSelected === COURSES_TAB) {
+      if (tabSelectedValue === COURSES_TAB) {
         return this.state.filteredDepartments.find(
           department => department.slug === this.state.selectedDepartment
         ).course_ids.length
@@ -841,7 +847,7 @@ export class CatalogPage extends React.Component<Props> {
                             >
                               Courses{" "}
                               <div className="product-number d-inline-block d-sm-none">
-                                ({this.renderNumberOfCatalogItems()})
+                                ({this.renderNumberOfCatalogItems(COURSES_TAB)})
                               </div>
                             </button>
                           </div>
@@ -861,7 +867,7 @@ export class CatalogPage extends React.Component<Props> {
                             >
                               Programs{" "}
                               <div className="product-number d-inline-block d-sm-none">
-                                ({this.renderNumberOfCatalogItems()})
+                                ({this.renderNumberOfCatalogItems(PROGRAMS_TAB)})
                               </div>
                             </button>
                           </div>
