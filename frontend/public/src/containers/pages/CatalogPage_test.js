@@ -489,6 +489,56 @@ describe("CatalogPage", function() {
     expect(programsFilteredByDepartment.length).equals(3)
   })
 
+  it("renders catalog course and program count based on selected department", async () => {
+    // The mobile catalog view displays both the course and program count at the same time.
+    // This test ensures that renderNumberOfCatalogItems can determine the course and program
+    // count.
+    courses = [displayedCourse]
+    programs = [displayedProgram]
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   3,
+            results: courses,
+            next:    "http://fake.com/api/courses/?page=2"
+          },
+          programs: {
+            count:   4,
+            results: programs,
+            next:    "http://fake.com/api/courses/?page=2"
+          },
+          departments: [
+            {
+              name:        "History",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
+    inner.instance().componentDidUpdate({}, {})
+    // Number of catalog items should match the number of visible courses.
+    expect(inner.instance().renderNumberOfCatalogItems("courses")).equals(3)
+    expect(inner.instance().renderNumberOfCatalogItems("programs")).equals(4)
+  })
+
   it("renders catalog courses based on selected department", async () => {
     const course1 = JSON.parse(JSON.stringify(displayedCourse))
     course1.departments = [{ name: "Math" }]
