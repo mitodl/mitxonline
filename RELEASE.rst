@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.91.0
+Version 0.91.0 (Released May 02, 2024)
 --------------
 
 - 4012: Improve screen reader accessibility of the site-wide banner. (#2180)
