@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import List  # noqa: UP035
+from typing import List, Optional  # noqa: UP035
 
 import pytz
 import reversion
@@ -722,7 +724,7 @@ class PendingOrder(FulfillableOrder, Order):
 
     @classmethod
     def create_from_product(
-        cls, product: Product, user: User, discount: Discount = None
+        cls, product: Product, user: User, discount: Optional[Discount] = None
     ):
         """
         Creates a new pending order from a product
