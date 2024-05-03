@@ -1,6 +1,21 @@
 Release Notes
 =============
 
+Version 0.91.1
+--------------
+
+- 4137: mitx online course and program count on catalog page is incorrect in mobile view (#2186)
+- warning message (#2188)
+- Update duplicate enrollment meassage (#2184)
+- fix: Resolve Poetry lock file
+- fix: Resolve failing pre-commit check
+- fix: Resolve minor pre-commit fixes
+- chore(deps): lock file maintenance (#2185)
+- Pre commit linting (#2161)
+- Update dependency react-hot-loader to v4.13.1 (#2166)
+- Update dependency enzyme-adapter-react-16 to v1.15.8 (#2163)
+- Update poetry and yarn lock files (#2183)
+
 Version 0.91.0 (Released May 02, 2024)
 --------------
 
