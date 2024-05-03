@@ -1,10 +1,12 @@
 """
 Management command to configure custom Hubspot properties for Contacts, Deals, Products, and Line Items
 """
+
 import sys
 
 from django.core.management import BaseCommand
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
+from courses.models import CourseRun, Program
 from mitol.hubspot_api.api import (
     delete_object_property,
     delete_property_group,
@@ -637,7 +639,51 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
 }
 
 
-def upsert_custom_properties():
+def _get_course_run_certificate_hubspot_property():
+    course_runs = CourseRun.objects.all()
+    options_array = []
+    for course_run in course_runs:
+        options_array.append(
+            {
+                "value": str(course_run),
+                "label": str(course_run),
+                "hidden": False,
+            }
+        )
+    return {
+        "name": "course_run_certificates",
+        "label": "Course Run certificates",
+        "description": "Earned course run certificates.",
+        "groupName": "contactinformation",
+        "type": "enumeration",
+        "fieldType": "checkbox",
+        "options": options_array,
+    }
+
+
+def _get_program_certificate_hubspot_property():
+    programs = Program.objects.all()
+    options_array = []
+    for program in programs:
+        options_array.append(
+            {
+                "value": str(program),
+                "label": str(program),
+                "hidden": False,
+            }
+        )
+    return {
+        "name": "program_certificates",
+        "label": "Program certificates",
+        "description": "Earned program certificates.",
+        "groupName": "contactinformation",
+        "type": "enumeration",
+        "fieldType": "checkbox",
+        "options": options_array,
+    }
+
+
+def _upsert_custom_properties():
     """Create or update all custom properties and groups"""
     for object_type in CUSTOM_ECOMMERCE_PROPERTIES:
         for group in CUSTOM_ECOMMERCE_PROPERTIES[object_type]["groups"]:
@@ -646,9 +692,11 @@ def upsert_custom_properties():
         for obj_property in CUSTOM_ECOMMERCE_PROPERTIES[object_type]["properties"]:
             sys.stdout.write(f"Adding property {obj_property}\n")
             sync_object_property(object_type, obj_property)
+    sync_object_property("contacts", _get_course_run_certificate_hubspot_property())
+    sync_object_property("contacts", _get_program_certificate_hubspot_property())
 
 
-def delete_custom_properties():
+def _delete_custom_properties():
     """Delete all custom properties and groups"""
     for object_type in CUSTOM_ECOMMERCE_PROPERTIES:
         for obj_property in CUSTOM_ECOMMERCE_PROPERTIES[object_type]["properties"]:
@@ -679,10 +727,10 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options["delete"]:
             print("Uninstalling custom groups and properties...")
-            delete_custom_properties()
+            _delete_custom_properties()
             print("Uninstall successful")
             return
         else:
             print("Configuring custom groups and properties...")
-            upsert_custom_properties()
+            _upsert_custom_properties()
             print("Custom properties configured")

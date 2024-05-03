@@ -2,7 +2,6 @@
 import logging
 import re
 from decimal import Decimal
-import time
 from typing import List
 
 from django.contrib.contenttypes.models import ContentType
@@ -10,9 +9,7 @@ from django.db.models import Q
 from hubspot.crm.objects import (
     SimplePublicObject,
     SimplePublicObjectInput,
-    ApiException,
 )
-from main import settings
 from mitol.hubspot_api.api import (
     HubspotAssociationType,
     HubspotObjectType,
