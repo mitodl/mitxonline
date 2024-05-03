@@ -229,7 +229,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                   <>
                     Self-paced
                     <button
-                      className="info-link more-info"
+                      className="info-link more-info explain-format-btn"
                       onClick={() => this.togglePacingInfoDialogVisibility()}
                     >
                       What's this?
@@ -239,7 +239,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                   <>
                     Instructor-paced
                     <button
-                      className="info-link more-info"
+                      className="info-link more-info explain-format-btn"
                       onClick={() => this.togglePacingInfoDialogVisibility()}
                     >
                       What's this?

@@ -292,7 +292,49 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       }
     })
   })
-
+  ;[["Self-Paced"], ["Instructor-Paced"]].forEach(([pacing]) => {
+    it(`shows the Whats This? link to explain format for the course run`, async () => {
+      if (pacing === "Self-Paced") {
+        courseRun = {
+          ...makeCourseRunDetail(),
+          is_self_paced:  true,
+          enrollment_end: moment()
+            .add(7, "months")
+            .toISOString(),
+          enrollment_start: moment()
+            .subtract(1, "years")
+            .toISOString(),
+          end_date: moment()
+            .add(1, "years")
+            .toISOString()
+        }
+      } else {
+        courseRun['is_self_paced'] = false
+      }
+      const courseRuns = [courseRun]
+      const entities = {
+        currentUser: currentUser,
+        enrollments: [],
+        courseRuns:  courseRuns
+      }
+      const { inner } = await renderPage({
+        entities: entities
+      })
+      assert.isTrue(inner.exists())
+      const infobox = inner.find("CourseInfoBox").dive()
+      assert.isTrue(infobox.exists())
+      const pacingBtn = infobox.find(".explain-format-btn").at(0)
+      await pacingBtn.prop("onClick")()
+      assert.isTrue(infobox.find(".pacing-info-dialog").at(0).exists())
+      assert.include(
+        infobox
+          .find(".modal-title")
+          .at(0)
+          .text(),
+        `What are ${pacing} courses?`
+      )
+    })
+  })
   it("CourseInfoBox renders the archived message if the course is archived", async () => {
     const courseRun = {
       ...makeCourseRunDetail(),

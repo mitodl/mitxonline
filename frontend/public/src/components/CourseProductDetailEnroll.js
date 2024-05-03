@@ -548,9 +548,6 @@ export class CourseProductDetailEnroll extends React.Component<
                 courses={courses}
                 courseRuns={courseRuns}
                 currentUser={currentUser}
-                toggleUpgradeDialogVisibility={
-                  this.toggleUpgradeDialogVisibility
-                }
                 setCurrentCourseRun={this.setCurrentCourseRun}
                 enrollments={enrollments}
               ></CourseInfoBox>
