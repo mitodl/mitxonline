@@ -309,7 +309,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
             .toISOString()
         }
       } else {
-        courseRun['is_self_paced'] = false
+        courseRun["is_self_paced"] = false
       }
       const courseRuns = [courseRun]
       const entities = {
@@ -325,7 +325,12 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       assert.isTrue(infobox.exists())
       const pacingBtn = infobox.find(".explain-format-btn").at(0)
       await pacingBtn.prop("onClick")()
-      assert.isTrue(infobox.find(".pacing-info-dialog").at(0).exists())
+      assert.isTrue(
+        infobox
+          .find(".pacing-info-dialog")
+          .at(0)
+          .exists()
+      )
       assert.include(
         infobox
           .find(".modal-title")
