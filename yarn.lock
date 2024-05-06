@@ -15298,7 +15298,6 @@ __metadata:
     react-router: 4.3.1
     react-router-dom: 4.3.1
     react-select: 3.2.0
-    react-swipeable: 7.0.0
     react-test-renderer: 16.14.0
     react-zendesk: 0.1.13
     reactstrap: 9.1.6
@@ -19153,15 +19152,6 @@ __metadata:
   peerDependencies:
     react: ^0.13.0 || ^0.14.0 || ^15.0.0 || ^16.0.0
   checksum: f84c99bc13999f632c7d341b2fe5e1a6cfbf1708ce10e80624535a5296a37359e8cb94c3cde5a3506dbe151fc712896132fae4f856e079fded638b0cb5a4a00e
-  languageName: node
-  linkType: hard
-
-"react-swipeable@npm:7.0.0":
-  version: 7.0.0
-  resolution: "react-swipeable@npm:7.0.0"
-  peerDependencies:
-    react: ^16.8.3 || ^17 || ^18
-  checksum: 54d15933483f7aea8f69e6a9930e220fb3bd98f314cae89a8b797e8a3bb959b68e777fe199cd7729edfe65edfcb5d933c7312ea08626f1613a6fd5d30e646598
   languageName: node
   linkType: hard
 
