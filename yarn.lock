@@ -15303,7 +15303,6 @@ __metadata:
     reactstrap: 9.1.6
     redux: 4.0.0
     redux-actions: 2.6.5
-    redux-asserts: 0.0.12
     redux-logger: 3.0.6
     redux-mock-store: ^1.5.4
     redux-query: 3.3.1
@@ -19380,18 +19379,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"redux-asserts@npm:0.0.12":
-  version: 0.0.12
-  resolution: "redux-asserts@npm:0.0.12"
-  dependencies:
-    lodash: ^4.17.15
-    prop-types: ^15.7.2
-    redux: ^4.0.4
-    redux-thunk: ^2.0.1
-  checksum: d5dc9f8234b5a62099cb2f12a9017fe33aaa72617ab9ee5694dbb0222cceea01eeddda6839d0d868ef048265ae34a5753c541753de2c7b5000084b303f9b822d
-  languageName: node
-  linkType: hard
-
 "redux-logger@npm:3.0.6":
   version: 3.0.6
   resolution: "redux-logger@npm:3.0.6"
@@ -19448,15 +19435,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"redux-thunk@npm:^2.0.1":
-  version: 2.4.2
-  resolution: "redux-thunk@npm:2.4.2"
-  peerDependencies:
-    redux: ^4
-  checksum: c7f757f6c383b8ec26152c113e20087818d18ed3edf438aaad43539e9a6b77b427ade755c9595c4a163b6ad3063adf3497e5fe6a36c68884eb1f1cfb6f049a5c
-  languageName: node
-  linkType: hard
-
 "redux@npm:4.0.0":
   version: 4.0.0
   resolution: "redux@npm:4.0.0"
@@ -19467,7 +19445,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"redux@npm:^4.0.0, redux@npm:^4.0.4":
+"redux@npm:^4.0.0":
   version: 4.2.1
   resolution: "redux@npm:4.2.1"
   dependencies:
