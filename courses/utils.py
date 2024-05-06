@@ -101,7 +101,8 @@ def get_courses_based_on_enrollment(queryset, enrollable=True):
 
     Args:
         queryset: Queryset of Course objects
-        enrollable: Boolean, if True, returns courses that are open for enrollment, otherwise returns courses that are closed for enrollment
+        enrollable: Boolean, if True, returns courses that are open for enrollment,
+                    otherwise returns courses that are closed for enrollment
     """
     if enrollable:
         courseruns_qs = get_enrollable_courseruns_qs()

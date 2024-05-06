@@ -44,12 +44,13 @@ from courses.serializers.v1.courses import (
     CourseRunWithCourseSerializer,
     CourseWithCourseRunsSerializer,
 )
-from courses.serializers.v1.programs import PartnerSchoolSerializer, ProgramSerializer
-from courses.serializers.v1.programs import (
-    UserProgramEnrollmentDetailSerializer,
-    LearnerRecordSerializer,
-)
 from courses.serializers.v1.departments import DepartmentWithCountSerializer
+from courses.serializers.v1.programs import (
+    LearnerRecordSerializer,
+    PartnerSchoolSerializer,
+    ProgramSerializer,
+    UserProgramEnrollmentDetailSerializer,
+)
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
 from ecommerce.models import FulfilledOrder, Order, PendingOrder, Product
@@ -59,9 +60,9 @@ from main.constants import (
     USER_MSG_COOKIE_MAX_AGE,
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_ENROLLED,
-    USER_MSG_TYPE_ENROLL_DUPLICATED,
 )
 from main.utils import encode_json_cookie_value, redirect_with_user_message
 from openedx.api import (
@@ -119,36 +120,7 @@ class CourseFilterSet(django_filters.FilterSet):
         courserun_is_enrollable filter to narrow down runs that are open for
         enrollments
         """
-        now = now_in_utc()
-
-        if value is True:
-            enrollable_runs = CourseRun.objects.filter(
-                Q(live=True)
-                & Q(start_date__isnull=False)
-                & Q(enrollment_start__lt=now)
-                & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))
-            )
-            return (
-                queryset.prefetch_related(
-                    Prefetch("courseruns", queryset=enrollable_runs)
-                )
-                .filter(courseruns__id__in=enrollable_runs.values_list("id", flat=True))
-                .distinct()
-            )
-
-        else:
-            unenrollable_runs = CourseRun.objects.filter(
-                Q(live=False) | Q(start_date__isnull=True) | Q(enrollment_end__lte=now)
-            )
-            return (
-                queryset.prefetch_related(
-                    Prefetch("courseruns", queryset=unenrollable_runs)
-                )
-                .filter(
-                    courseruns__id__in=unenrollable_runs.values_list("id", flat=True)
-                )
-                .distinct()
-            )
+        return get_courses_based_on_enrollment(queryset, value)
 
     class Meta:
         model = Course
