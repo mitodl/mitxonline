@@ -77,7 +77,7 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
 
 
 def get_enrollable_courseruns_qs():
-    """Returns all the course runs that are currently open for enrollment."""
+    """Returns all course runs that are open for enrollment."""
     now = now_in_utc()
     return CourseRun.objects.filter(
         Q(live=True)
@@ -88,7 +88,7 @@ def get_enrollable_courseruns_qs():
 
 
 def get_unenrollable_courseruns_qs():
-    """Returns all the course runs that are currently closed for enrollment."""
+    """Returns all course runs that are closed for enrollment."""
     now = now_in_utc()
     return CourseRun.objects.filter(
         Q(live=False) | Q(start_date__isnull=True) | (Q(enrollment_end__lte=now))
