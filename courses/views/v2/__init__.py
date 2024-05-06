@@ -57,34 +57,12 @@ class CourseFilterSet(django_filters.FilterSet):
         """
         courserun_is_enrollable filter to narrow down runs that are open for
         enrollments
+
+        Uses utility functions that are shared wtih other parts of the application
+        to keep the logic consistent
         """
-        now = now_in_utc()
 
-        if value is True:
-            enrollable_runs = get_enrollable_courseruns_qs()
-            return (
-                queryset.prefetch_related(
-                    Prefetch("courseruns", queryset=enrollable_runs),
-                )
-                .prefetch_related("courseruns__course")
-                .filter(courseruns__id__in=enrollable_runs.values_list("id", flat=True))
-                .distinct()
-            )
-
-        else:
-            unenrollable_runs = CourseRun.objects.filter(
-                Q(live=False) | Q(start_date__isnull=True) | Q(enrollment_end__lte=now)
-            )
-            return (
-                queryset.prefetch_related(
-                    Prefetch("courseruns", queryset=unenrollable_runs)
-                )
-                .prefetch_related("courseruns__course")
-                .filter(
-                    courseruns__id__in=unenrollable_runs.values_list("id", flat=True)
-                )
-                .distinct()
-            )
+        return get_courses_based_on_enrollment(queryset, value)
 
     class Meta:
         model = Course

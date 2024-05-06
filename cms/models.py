@@ -1697,7 +1697,3 @@ class SiteBanner(models.Model):
 
     def __str__(self):
         return str(self.message)
-
-
-class HomePageFeaturedItems(models.Model):
-    """Cached featured items for the homepage"""

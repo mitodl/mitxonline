@@ -87,14 +87,28 @@ def get_enrollable_courseruns_qs():
     )
 
 
-def get_enrollable_courses():
-    """Returns all the programs that are currently open for enrollment."""
+def get_unenrollable_courseruns_qs():
+    """Returns all the course runs that are currently closed for enrollment."""
     now = now_in_utc()
-    enrollable_runs = get_enrollable_courseruns_qs()
+    return CourseRun.objects.filter(
+        Q(live=False) | Q(start_date__isnull=True) | (Q(enrollment_end__lte=now))
+    )
+
+
+def get_courses_based_on_enrollment(queryset, enrollable=True):
+    """
+    Returns courses based on the current enrollment status
+
+    Args:
+        queryset: Queryset of Course objects
+        enrollable: Boolean, if True, returns courses that are open for enrollment, otherwise returns courses that are closed for enrollment
+    """
+    if enrollable:
+        courseruns_qs = get_enrollable_courseruns_qs()
+    else:
+        courseruns_qs = get_unenrollable_courseruns_qs()
     return (
-        Course.objects.prefetch_related(
-            Prefetch("courseruns", queryset=enrollable_runs)
-        )
+        queryset.prefetch_related(Prefetch("courseruns", queryset=courseruns_qs))
         .prefetch_related("courseruns__course")
         .filter(courseruns__id__in=enrollable_runs.values_list("id", flat=True))
         .distinct()
