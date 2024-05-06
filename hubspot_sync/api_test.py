@@ -1,4 +1,5 @@
 """Tests for hubspot_sync.api"""
+
 import pytest
 import json
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
@@ -59,6 +60,8 @@ def test_make_contact_sync_message(user):
         "typeisprofessional": user.user_profile.type_is_professional,
         "typeiseducator": user.user_profile.type_is_educator,
         "typeisother": user.user_profile.type_is_other,
+        "program_certificates": user.program_certificates,
+        "course_run_certificates": user.course_run_certificates,
     }
 
 

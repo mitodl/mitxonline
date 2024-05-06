@@ -685,26 +685,26 @@ def _get_program_certificate_hubspot_property():
 
 def _upsert_custom_properties():
     """Create or update all custom properties and groups"""
-    for object_type in CUSTOM_ECOMMERCE_PROPERTIES:
-        for group in CUSTOM_ECOMMERCE_PROPERTIES[object_type]["groups"]:
+    for ecommerce_object_type, ecommerce_object in CUSTOM_ECOMMERCE_PROPERTIES.items():
+        for group in ecommerce_object["groups"]:
             sys.stdout.write(f"Adding group {group}\n")
-            sync_property_group(object_type, group["name"], group["label"])
-        for obj_property in CUSTOM_ECOMMERCE_PROPERTIES[object_type]["properties"]:
+            sync_property_group(ecommerce_object_type, group["name"], group["label"])
+        for obj_property in ecommerce_object["properties"]:
             sys.stdout.write(f"Adding property {obj_property}\n")
-            sync_object_property(object_type, obj_property)
+            sync_object_property(ecommerce_object_type, obj_property)
     sync_object_property("contacts", _get_course_run_certificate_hubspot_property())
     sync_object_property("contacts", _get_program_certificate_hubspot_property())
 
 
 def _delete_custom_properties():
     """Delete all custom properties and groups"""
-    for object_type in CUSTOM_ECOMMERCE_PROPERTIES:
-        for obj_property in CUSTOM_ECOMMERCE_PROPERTIES[object_type]["properties"]:
-            if object_property_exists(object_type, obj_property):
-                delete_object_property(object_type, obj_property)
-        for group in CUSTOM_ECOMMERCE_PROPERTIES[object_type]["groups"]:
-            if property_group_exists(object_type, group):
-                delete_property_group(object_type, group)
+    for ecommerce_object_type, ecommerce_object in CUSTOM_ECOMMERCE_PROPERTIES.items():
+        for obj_property in ecommerce_object["properties"]:
+            if object_property_exists(ecommerce_object_type, obj_property):
+                delete_object_property(ecommerce_object_type, obj_property)
+        for group in ecommerce_object["groups"]:
+            if property_group_exists(ecommerce_object_type, group):
+                delete_property_group(ecommerce_object_type, group)
 
 
 class Command(BaseCommand):
