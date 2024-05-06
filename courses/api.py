@@ -784,6 +784,8 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
         Tuple[ CourseRunCertificate, bool, bool ]: A Tuple containing None or CourseRunCertificate object,
             A bool representing if the certificate is created, A bool representing if a certificate is deleted
     """
+    from hubspot_sync.task_helpers import sync_hubspot_user
+
     user = course_run_grade.user
     course_run = course_run_grade.course_run
 
@@ -795,6 +797,7 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
         delete_count, _ = CourseRunCertificate.objects.filter(
             user=user, course_run=course_run
         ).delete()
+        sync_hubspot_user(user)
         return None, False, (delete_count > 0)
 
     elif should_create:
@@ -802,12 +805,12 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
             certificate, created = CourseRunCertificate.objects.get_or_create(
                 user=user, course_run=course_run
             )
+            sync_hubspot_user(user)
             return certificate, created, False
         except IntegrityError:
             log.warn(
                 f"IntegrityError caught processing certificate for {course_run.courseware_id} for user {user} - certificate was likely already revoked."
             )
-
     return None, False, False
 
 
@@ -1007,6 +1010,8 @@ def generate_program_certificate(user, program, force_create=False):
         ProgramCertificate (or None if one was not found or created) paired
         with a boolean indicating whether the certificate was newly created.
     """
+    from hubspot_sync.task_helpers import sync_hubspot_user
+
     existing_cert_queryset = ProgramCertificate.objects.filter(
         user=user, program=program
     )
@@ -1026,6 +1031,7 @@ def generate_program_certificate(user, program, force_create=False):
             user.username,
             program.title,
         )
+        sync_hubspot_user(user)
         _, created = ProgramEnrollment.objects.get_or_create(
             program=program, user=user, defaults={"active": True, "change_status": None}
         )

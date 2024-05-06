@@ -8,7 +8,6 @@ from django.test.client import Client
 from nplusone.core import profiler
 from rest_framework.test import APIClient
 
-from courses.factories import CourseFactory, ProgramFactory, ProgramRequirementFactory
 from users.factories import UserFactory
 
 

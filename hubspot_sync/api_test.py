@@ -1,18 +1,22 @@
 """Tests for hubspot_sync.api"""
 
-import pytest
 import json
-from courses.constants import ALL_ENROLL_CHANGE_STATUSES
+
+import pytest
 import reversion
 from django.contrib.contenttypes.models import ContentType
+from hubspot.crm.objects import ApiException
+from mitol.common.utils.datetime import now_in_utc
 from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObjectFactory
 from mitol.hubspot_api.models import HubspotObject
-from hubspot.crm.objects import (
-    ApiException,
-)
-from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
 
+from courses.constants import ALL_ENROLL_CHANGE_STATUSES
+from courses.factories import (
+    CourseRunCertificateFactory,
+    CourseRunEnrollmentFactory,
+    ProgramCertificateFactory,
+)
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Product
 from hubspot_sync import api
@@ -23,14 +27,8 @@ from hubspot_sync.serializers import (
     OrderToDealSerializer,
     ProductSerializer,
 )
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
-from courses.factories import (
-    CourseRunEnrollmentFactory,
-)
-from openedx.constants import (
-    EDX_ENROLLMENT_AUDIT_MODE,
-    EDX_ENROLLMENT_VERIFIED_MODE,
-)
 
 pytestmark = [pytest.mark.django_db]
 
@@ -38,6 +36,10 @@ pytestmark = [pytest.mark.django_db]
 @pytest.mark.django_db
 def test_make_contact_sync_message(user):
     """Test make_contact_sync_message serializes a user and returns a properly formatted sync message"""
+    course_certificate_1 = CourseRunCertificateFactory.create(user=user)
+    course_certificate_2 = CourseRunCertificateFactory.create(user=user)
+    program_certificate_1 = ProgramCertificateFactory.create(user=user)
+    program_certificate_2 = ProgramCertificateFactory.create(user=user)
     contact_sync_message = api.make_contact_sync_message_from_user(user)
     assert contact_sync_message.properties == {
         "country": user.legal_address.country,
@@ -60,8 +62,12 @@ def test_make_contact_sync_message(user):
         "typeisprofessional": user.user_profile.type_is_professional,
         "typeiseducator": user.user_profile.type_is_educator,
         "typeisother": user.user_profile.type_is_other,
-        "program_certificates": user.program_certificates,
-        "course_run_certificates": user.course_run_certificates,
+        "program_certificates": str(program_certificate_1.program)
+        + ";"
+        + str(program_certificate_2.program),
+        "course_run_certificates": str(course_certificate_1.course_run)
+        + ";"
+        + str(course_certificate_2.course_run),
     }
 
 
