@@ -1,6 +1,7 @@
 """Course views version 1"""
+
 import logging
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union  # noqa: UP035
 
 import django_filters
 from django.contrib.auth.models import User
@@ -44,12 +45,13 @@ from courses.serializers.v1.courses import (
     CourseRunWithCourseSerializer,
     CourseWithCourseRunsSerializer,
 )
-from courses.serializers.v1.programs import PartnerSchoolSerializer, ProgramSerializer
-from courses.serializers.v1.programs import (
-    UserProgramEnrollmentDetailSerializer,
-    LearnerRecordSerializer,
-)
 from courses.serializers.v1.departments import DepartmentWithCountSerializer
+from courses.serializers.v1.programs import (
+    LearnerRecordSerializer,
+    PartnerSchoolSerializer,
+    ProgramSerializer,
+    UserProgramEnrollmentDetailSerializer,
+)
 from courses.tasks import send_partner_school_email
 from courses.utils import get_program_certificate_by_enrollment
 from ecommerce.models import FulfilledOrder, Order, PendingOrder, Product
@@ -59,9 +61,9 @@ from main.constants import (
     USER_MSG_COOKIE_MAX_AGE,
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_ENROLLED,
-    USER_MSG_TYPE_ENROLL_DUPLICATED,
 )
 from main.utils import encode_json_cookie_value, redirect_with_user_message
 from openedx.api import (
@@ -239,7 +241,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
 
 def _validate_enrollment_post_request(
     request: Request,
-) -> Union[Tuple[Optional[HttpResponse], None, None], Tuple[None, User, CourseRun]]:
+) -> Union[Tuple[Optional[HttpResponse], None, None], Tuple[None, User, CourseRun]]:  # noqa: FA100, UP006
     """
     Validates a request to create an enrollment. Returns a response if validation fails, or a user and course run
     if validation succeeds.
@@ -298,7 +300,7 @@ def create_enrollment_view(request):
         keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
     )
 
-    def respond(data, status=True):
+    def respond(data, status=True):  # noqa: FBT002
         """
         Either return a redirect or Ok/Fail based on status.
         """
@@ -387,7 +389,7 @@ class UserEnrollmentsApiViewSet(
                 log.exception("Failed to sync user enrollments with edX")
         return super().list(request, *args, **kwargs)
 
-    def destroy(self, request, *args, **kwargs):
+    def destroy(self, request, *args, **kwargs):  # noqa: ARG002
         enrollment = self.get_object()
         deactivated_enrollment = deactivate_run_enrollment(
             enrollment,
@@ -398,7 +400,7 @@ class UserEnrollmentsApiViewSet(
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def partial_update(self, request, *args, **kwargs):
+    def partial_update(self, request, *args, **kwargs):  # noqa: ARG002
         enrollment = self.get_object()
         receive_emails = request.data.get("receive_emails")
 
@@ -410,12 +412,12 @@ class UserEnrollmentsApiViewSet(
                         response = subscribe_to_edx_course_emails(
                             request.user, enrollment.run
                         )
-                        enrollment.edx_emails_subscription = True if response else False
+                        enrollment.edx_emails_subscription = True if response else False  # noqa: SIM210
                     else:
                         response = unsubscribe_from_edx_course_emails(
                             request.user, enrollment.run
                         )
-                        enrollment.edx_emails_subscription = False if response else True
+                        enrollment.edx_emails_subscription = False if response else True  # noqa: SIM211
                     enrollment.save()
                     return Response(data=response, status=status.HTTP_200_OK)
                 except (
@@ -425,11 +427,11 @@ class UserEnrollmentsApiViewSet(
                     HTTPError,
                     RequestsConnectionError,
                 ) as exc:
-                    log.exception(str(exc))
+                    log.exception(str(exc))  # noqa: TRY401
                     return Response(data=str(exc), status=status.HTTP_400_BAD_REQUEST)
         else:
             # only designed to update edx_emails_subscription field
-            # TODO: In the future please add the implementation
+            # TODO: In the future please add the implementation  # noqa: FIX002, TD002, TD003
             # to update the rest of the fields in the PATCH request
             # or separate out the APIs into function-based views.
             raise NotImplementedError
@@ -528,7 +530,7 @@ def get_learner_record_share(request, pk):
         # already one - these technically don't get revoked.
         try:
             school = PartnerSchool.objects.get(pk=request.data["partnerSchool"])
-        except:
+        except:  # noqa: E722
             return Response("Partner school not found.", status.HTTP_404_NOT_FOUND)
 
         (ps_share, created) = LearnerProgramRecordShare.objects.filter(
@@ -574,7 +576,7 @@ def revoke_learner_record_share(request, pk):
 
 @api_view(["GET"])
 @permission_classes([])
-def get_learner_record_from_uuid(request, uuid):
+def get_learner_record_from_uuid(request, uuid):  # noqa: ARG001
     """
     Does mostly the same thing as get_learner_record, but sets context to skip
     the partner school and sharing information.

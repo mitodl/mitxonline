@@ -1,4 +1,5 @@
 """Users api"""
+
 import operator
 import re
 from functools import reduce
@@ -56,12 +57,12 @@ def _determine_filter_field(user_property):
     else:
         try:
             validate_email(user_property)
-            return "email"
+            return "email"  # noqa: TRY300
         except ValidationError:
             return "username"
 
 
-def fetch_user(filter_value, ignore_case=True):
+def fetch_user(filter_value, ignore_case=True):  # noqa: FBT002
     """
     Attempts to fetch a user based on several properties
 
@@ -74,14 +75,14 @@ def fetch_user(filter_value, ignore_case=True):
     filter_field = _determine_filter_field(filter_value)
 
     if _is_case_insensitive_searchable(filter_field) and ignore_case:
-        query = {"{}__iexact".format(filter_field): filter_value}
+        query = {f"{filter_field}__iexact": filter_value}
     else:
         query = {filter_field: filter_value}
     try:
         return User.objects.get(**query)
     except User.DoesNotExist as e:
         raise User.DoesNotExist(
-            "Could not find User with {}={} ({})".format(
+            "Could not find User with {}={} ({})".format(  # noqa: EM103
                 filter_field,
                 filter_value,
                 "case-insensitive" if ignore_case else "case-sensitive",
@@ -89,7 +90,7 @@ def fetch_user(filter_value, ignore_case=True):
         ) from e
 
 
-def fetch_users(filter_values, ignore_case=True):
+def fetch_users(filter_values, ignore_case=True):  # noqa: FBT002
     """
     Attempts to fetch a set of users based on several properties. The property being searched
     (i.e.: id, email, or username) is assumed to be the same for all of the given values, so the
@@ -115,32 +116,28 @@ def fetch_users(filter_values, ignore_case=True):
     )
     if len(filter_values) > len(unique_filter_values):
         raise ValidationError(
-            "Duplicate values provided ({})".format(
-                set(filter_values).intersection(unique_filter_values)
-            )
+            f"Duplicate values provided ({set(filter_values).intersection(unique_filter_values)})"  # noqa: EM102
         )
 
     if is_case_insensitive_searchable and ignore_case:
         query = reduce(
             operator.or_,
             (
-                Q(**{"{}__iexact".format(filter_field): filter_value})
+                Q(**{f"{filter_field}__iexact": filter_value})
                 for filter_value in filter_values
             ),
         )
         user_qset = User.objects.filter(query)
     else:
-        user_qset = User.objects.filter(
-            **{"{}__in".format(filter_field): filter_values}
-        )
-    if not user_qset.count() == len(filter_values):
+        user_qset = User.objects.filter(**{f"{filter_field}__in": filter_values})
+    if user_qset.count() != len(filter_values):
         valid_values = user_qset.values_list(filter_field, flat=True)
         invalid_values = set(filter_values) - set(valid_values)
         raise User.DoesNotExist(
-            "Could not find Users with these '{}' values ({}): {}".format(
+            "Could not find Users with these '{}' values ({}): {}".format(  # noqa: EM103
                 filter_field,
                 "case-insensitive" if ignore_case else "case-sensitive",
-                sorted(list(invalid_values)),
+                sorted(list(invalid_values)),  # noqa: C414
             )
         )
     return user_qset
@@ -177,13 +174,13 @@ def find_available_username(initial_username_base):
     # Any query for suffixed usernames could come up empty. The minimum suffix will be added to
     # the username in that case.
     current_min_suffix = 1
-    while letters_to_truncate < len(initial_username_base):
+    while letters_to_truncate < len(initial_username_base):  # noqa: RET503
         username_base = initial_username_base[
             0 : len(initial_username_base) - letters_to_truncate
         ]
         # Find usernames that match the username base and have a numerical suffix, then find the max suffix
         existing_usernames = User.objects.filter(
-            username__regex=r"{username_base}[0-9]+".format(username_base=username_base)
+            username__regex=rf"{username_base}[0-9]+"
         ).values_list("username", flat=True)
         max_suffix = max_or_none(
             int(re.search(r"\d+$", username).group()) for username in existing_usernames

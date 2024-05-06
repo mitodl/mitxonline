@@ -9,10 +9,9 @@ from courses.factories import (
     CourseRunCertificateFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
-    CourseRunGradeFactory,
 )
 from courses.management.commands import manage_certificates
-from courses.models import CourseRun, CourseRunCertificate, CourseRunGrade
+from courses.models import CourseRunCertificate, CourseRunGrade
 from openedx.constants import EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
@@ -92,7 +91,7 @@ def test_certificate_override_grade_no_letter_grade():
 
 
 @pytest.mark.parametrize(
-    "username, revoke, unrevoke",
+    "username, revoke, unrevoke",  # noqa: PT006
     [
         (None, True, None),
         ("test", True, None),
@@ -117,7 +116,7 @@ def test_certificate_management_revoke_unrevoke_invalid_args(
 
 
 @pytest.mark.parametrize(
-    "revoke, unrevoke",
+    "revoke, unrevoke",  # noqa: PT006
     [
         (True, None),
         (None, True),
@@ -127,7 +126,9 @@ def test_certificate_management_revoke_unrevoke_success(user, revoke, unrevoke):
     """Test that certificate revoke, un-revoke work as expected and manage the certificate access properly"""
     course_run = CourseRunFactory.create()
     certificate = CourseRunCertificateFactory(
-        course_run=course_run, user=user, is_revoked=False if revoke else True
+        course_run=course_run,
+        user=user,
+        is_revoked=False if revoke else True,  # noqa: SIM211
     )
     manage_certificates.Command().handle(
         revoke=revoke,
@@ -136,14 +137,15 @@ def test_certificate_management_revoke_unrevoke_success(user, revoke, unrevoke):
         user=user.username,
     )
     certificate.refresh_from_db()
-    assert certificate.is_revoked is (True if revoke else False)
-    assert certificate.is_revoked is (False if unrevoke else True)
+    assert certificate.is_revoked is (True if revoke else False)  # noqa: SIM210
+    assert certificate.is_revoked is (False if unrevoke else True)  # noqa: SIM211
 
 
 @pytest.mark.parametrize("revoked", [True, False])
 def test_certificate_management_create(mocker, user, edx_grade_json, revoked):
     """Test that create operation for certificate management command creates the certificates for a single user
-    when a user is provided"""
+    when a user is provided
+    """
     edx_grade = CurrentGrade(edx_grade_json)
     course_run = CourseRunFactory.create()
     CourseRunEnrollmentFactory.create(
@@ -152,7 +154,7 @@ def test_certificate_management_create(mocker, user, edx_grade_json, revoked):
 
     if revoked:
         # In this case, create a revoked cert first - it should get skipped.
-        certificate = CourseRunCertificateFactory(
+        certificate = CourseRunCertificateFactory(  # noqa: F841
             course_run=course_run, user=user, is_revoked=True
         )
 
@@ -181,7 +183,8 @@ def test_certificate_management_create(mocker, user, edx_grade_json, revoked):
 
 def test_certificate_management_create_no_user(mocker, edx_grade_json, user):
     """Test that create operation for certificate management command attempts to creates the certificates for all the
-    enrolled users in a run when no user is provided"""
+    enrolled users in a run when no user is provided
+    """
     passed_edx_grade = CurrentGrade(edx_grade_json)
     course_run = CourseRunFactory.create()
     users = UserFactory.create_batch(4)

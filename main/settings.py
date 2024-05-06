@@ -2,15 +2,16 @@
 """
 Django settings for main.
 """
+
 import logging
 import os
 import platform
-import posthog
 from datetime import timedelta
 from urllib.parse import urljoin, urlparse
 
 import cssutils
 import dj_database_url
+import posthog
 from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common.envs import (
@@ -21,15 +22,15 @@ from mitol.common.envs import (
     get_string,
     import_settings_modules,
 )
-from mitol.google_sheets.settings.google_sheets import *
-from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *
-from mitol.google_sheets_refunds.settings.google_sheets_refunds import *
+from mitol.google_sheets.settings.google_sheets import *  # noqa: F403
+from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *  # noqa: F403
+from mitol.google_sheets_refunds.settings.google_sheets_refunds import *  # noqa: F403
 from redbeat import RedBeatScheduler
 
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 
-VERSION = "0.90.0"
+VERSION = "0.91.1"
 
 log = logging.getLogger()
 
@@ -64,7 +65,7 @@ init_sentry(
 )
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # noqa: PTH100, PTH120
 
 SITE_BASE_URL = get_string(
     name="MITX_ONLINE_BASE_URL",
@@ -122,14 +123,14 @@ SECURE_SSL_HOST = get_string(
 WEBPACK_LOADER = {
     "DEFAULT": {
         "CACHE": not DEBUG,
-        "STATS_FILE": os.path.join(BASE_DIR, "webpack-stats/default.json"),
+        "STATS_FILE": os.path.join(BASE_DIR, "webpack-stats/default.json"),  # noqa: PTH118
         "POLL_INTERVAL": 0.1,
         "TIMEOUT": None,
         "IGNORE": [r".+\.hot-update\.+", r".+\.js\.map"],
     },
     "STAFF_DASHBOARD": {
         "CACHE": not DEBUG,
-        "STATS_FILE": os.path.join(BASE_DIR, "webpack-stats/staff-dashboard.json"),
+        "STATS_FILE": os.path.join(BASE_DIR, "webpack-stats/staff-dashboard.json"),  # noqa: PTH118
         "POLL_INTERVAL": 0.1,
         "TIMEOUT": None,
         "IGNORE": [r".+\.hot-update\.+", r".+\.js\.map"],
@@ -215,12 +216,12 @@ INSTALLED_APPS = (
     "mitol.hubspot_api",
     "mitol.mail.apps.MailApp",
     "mitol.authentication.apps.TransitionalAuthenticationApp",
-    "mitol.payment_gateway.apps.PaymentGatewayApp"
+    "mitol.payment_gateway.apps.PaymentGatewayApp",
     # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
 )
 # Only include the seed data app if this isn't running in prod
 # if ENVIRONMENT not in ("production", "prod"):
-#     INSTALLED_APPS += ("localdev.seed",)
+#     INSTALLED_APPS += ("localdev.seed",)  # noqa: ERA001
 
 MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
@@ -259,7 +260,7 @@ ROOT_URLCONF = "main.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [os.path.join(BASE_DIR, "templates")],
+        "DIRS": [os.path.join(BASE_DIR, "templates")],  # noqa: PTH118
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -284,7 +285,7 @@ WSGI_APPLICATION = "main.wsgi.application"
 DEFAULT_DATABASE_CONFIG = dj_database_url.parse(
     get_string(
         name="DATABASE_URL",
-        default="sqlite:///{0}".format(os.path.join(BASE_DIR, "db.sqlite3")),
+        default="sqlite:///{0}".format(os.path.join(BASE_DIR, "db.sqlite3")),  # noqa: PTH118, UP030
         description="The connection url to the Postgres database",
         required=True,
         write_app_json=False,
@@ -416,9 +417,7 @@ CLOUDFRONT_DIST = get_string(
     description="The Cloundfront distribution to use for static assets",
 )
 if CLOUDFRONT_DIST:
-    STATIC_URL = urljoin(
-        "https://{dist}.cloudfront.net".format(dist=CLOUDFRONT_DIST), STATIC_URL
-    )
+    STATIC_URL = urljoin(f"https://{CLOUDFRONT_DIST}.cloudfront.net", STATIC_URL)
 
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
@@ -427,16 +426,16 @@ STATICFILES_FINDERS = [
 
 STATIC_ROOT = "staticfiles"
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),
+    os.path.join(BASE_DIR, "static"),  # noqa: PTH118
 ]
 for name, path in [
-    ("mitx-online", os.path.join(BASE_DIR, "frontend/public/build")),
-    ("staff-dashboard", os.path.join(BASE_DIR, "frontend/staff-dashboard/build")),
+    ("mitx-online", os.path.join(BASE_DIR, "frontend/public/build")),  # noqa: PTH118
+    ("staff-dashboard", os.path.join(BASE_DIR, "frontend/staff-dashboard/build")),  # noqa: PTH118
 ]:
-    if os.path.exists(path):
+    if os.path.exists(path):  # noqa: PTH110
         STATICFILES_DIRS.append((name, path))
     else:
-        log.warn(f"Static file directory was missing: {path}")
+        log.warning(f"Static file directory was missing: {path}")  # noqa: G004
 
 # Important to define this so DEBUG works properly
 INTERNAL_IPS = (
@@ -540,7 +539,7 @@ ADMIN_EMAIL = get_string(
     description="E-mail to send 500 reports to.",
     required=True,
 )
-if ADMIN_EMAIL != "":
+if ADMIN_EMAIL != "":  # noqa: SIM108
     ADMINS = (("Admins", ADMIN_EMAIL),)
 else:
     ADMINS = ()
@@ -580,8 +579,8 @@ LOGGING = {
             "format": (
                 "[%(asctime)s] %(levelname)s %(process)d [%(name)s] "
                 "%(filename)s:%(lineno)d - "
-                "[{hostname}] - %(message)s"
-            ).format(hostname=HOSTNAME),
+                f"[{HOSTNAME}] - %(message)s"
+            ),
             "datefmt": "%Y-%m-%d %H:%M:%S",
         }
     },
@@ -710,13 +709,13 @@ if MITX_ONLINE_USE_S3 and (
     not AWS_ACCESS_KEY_ID or not AWS_SECRET_ACCESS_KEY or not AWS_STORAGE_BUCKET_NAME
 ):
     raise ImproperlyConfigured(
-        "You have enabled S3 support, but are missing one of "
+        "You have enabled S3 support, but are missing one of "  # noqa: EM101
         "AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, or "
         "AWS_STORAGE_BUCKET_NAME"
     )
 if MITX_ONLINE_USE_S3:
     if CLOUDFRONT_DIST:
-        AWS_S3_CUSTOM_DOMAIN = "{dist}.cloudfront.net".format(dist=CLOUDFRONT_DIST)
+        AWS_S3_CUSTOM_DOMAIN = f"{CLOUDFRONT_DIST}.cloudfront.net"
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
 FEATURES_DEFAULT = get_bool(
@@ -892,9 +891,9 @@ AUTHENTICATION_BACKENDS = (
 
 
 # required for migrations
-OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = "oauth2_provider.AccessToken"
+OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = "oauth2_provider.AccessToken"  # noqa: S105
 OAUTH2_PROVIDER_APPLICATION_MODEL = "oauth2_provider.Application"
-OAUTH2_PROVIDER_REFRESH_TOKEN_MODEL = "oauth2_provider.RefreshToken"
+OAUTH2_PROVIDER_REFRESH_TOKEN_MODEL = "oauth2_provider.RefreshToken"  # noqa: S105
 
 OAUTH2_PROVIDER = {
     "OIDC_ENABLED": True,
@@ -909,11 +908,11 @@ OAUTH2_PROVIDER = {
         "write": "Write scope",
         "openid": "OpenID Connect scope",
         "user:read": "Can read user and profile data",
-        # "digitalcredentials": "Can read and write Digital Credentials data",
+        # "digitalcredentials": "Can read and write Digital Credentials data",  # noqa: ERA001
     },
     "DEFAULT_SCOPES": ["user:read"],
     "OAUTH2_VALIDATOR_CLASS": "main.oidc_provider_settings.CustomOAuth2Validator",
-    # "SCOPES_BACKEND_CLASS": "mitol.oauth_toolkit_extensions.backends.ApplicationAccessOrSettingsScopes",
+    # "SCOPES_BACKEND_CLASS": "mitol.oauth_toolkit_extensions.backends.ApplicationAccessOrSettingsScopes",  # noqa: ERA001
     "ERROR_RESPONSE_WITH_SCOPES": DEBUG,
     "ALLOWED_REDIRECT_URI_SCHEMES": get_delimited_list(
         name="OAUTH2_PROVIDER_ALLOWED_REDIRECT_URI_SCHEMES",
@@ -937,7 +936,7 @@ REST_FRAMEWORK = {
 
 # Relative URL to be used by Djoser for the link in the password reset email
 # (see: http://djoser.readthedocs.io/en/stable/settings.html#password-reset-confirm-url)
-PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"
+PASSWORD_RESET_CONFIRM_URL = "password_reset/confirm/{uid}/{token}/"  # noqa: S105
 
 # ol-django configuration
 
@@ -1046,7 +1045,7 @@ EDX_API_CLIENT_TIMEOUT = get_int(
 if DEBUG:
     INSTALLED_APPS += ("debug_toolbar",)
     # it needs to be enabled before other middlewares
-    MIDDLEWARE = ("debug_toolbar.middleware.DebugToolbarMiddleware",) + MIDDLEWARE
+    MIDDLEWARE = ("debug_toolbar.middleware.DebugToolbarMiddleware",) + MIDDLEWARE  # noqa: RUF005
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 

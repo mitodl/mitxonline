@@ -1,4 +1,5 @@
 """Authentication api"""
+
 from importlib import import_module
 
 from django.conf import settings
@@ -25,7 +26,7 @@ def create_user_session(user):
 
     session = SessionStore()
 
-    session[SESSION_KEY] = user._meta.pk.value_to_string(user)
+    session[SESSION_KEY] = user._meta.pk.value_to_string(user)  # noqa: SLF001
     session[BACKEND_SESSION_KEY] = "django.contrib.auth.backends.ModelBackend"
     session[HASH_SESSION_KEY] = user.get_session_auth_hash()
     session.save()
@@ -50,13 +51,13 @@ def create_user_with_generated_username(serializer, initial_username):
     username = initial_username
     attempts = 0
 
-    if len(username) < 2:
+    if len(username) < 2:  # noqa: PLR2004
         username = username + "11"
 
     while created_user is None and attempts < USERNAME_COLLISION_ATTEMPTS:
         try:
             created_user = serializer.save(username=username)
-        except IntegrityError as exc:
+        except IntegrityError as exc:  # noqa: PERF203
             if not is_duplicate_username_error(exc):
                 raise
             username = find_available_username(initial_username)

@@ -1,6 +1,8 @@
-from cms.models import FlexiblePricingRequestForm, FormField
-from django.db.models import Q
 import logging
+
+from django.db.models import Q
+
+from cms.models import FlexiblePricingRequestForm, FormField
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +29,9 @@ def ensure_flexprice_form_fields(form_instance: FlexiblePricingRequestForm):
         | Q(clean_name__in=["your_income", "income_currency"])
     ).all()
 
-    if len(relevant_fields) != 2:
+    if len(relevant_fields) != 2:  # noqa: PLR2004
         logger.warning(
-            f"Improper length {len(relevant_fields)} returned; was expecting 2"
+            f"Improper length {len(relevant_fields)} returned; was expecting 2"  # noqa: G004
         )
 
     for field in relevant_fields:
@@ -39,20 +41,20 @@ def ensure_flexprice_form_fields(form_instance: FlexiblePricingRequestForm):
                 continue
             else:
                 logger.error(
-                    f"Found a currency field for {form_instance} but its clean name is wrong: {field.clean_name} - {field.label}"
+                    f"Found a currency field for {form_instance} but its clean name is wrong: {field.clean_name} - {field.label}"  # noqa: G004
                 )
                 return False
 
         # Country has a specialized purpose; Number does not, so we ignore any other
         # number field.
-        if field.field_type == "number":
+        if field.field_type == "number":  # noqa: SIM102
             if field.clean_name == "your_income":
                 income_field = True
                 continue
 
     if currency_field and income_field:
         logger.info(
-            f"Flexible Pricing Request Form {form_instance} has the right fields in it"
+            f"Flexible Pricing Request Form {form_instance} has the right fields in it"  # noqa: G004
         )
         return True
 
@@ -77,6 +79,6 @@ def ensure_flexprice_form_fields(form_instance: FlexiblePricingRequestForm):
         )
 
     logger.warning(
-        f"Added {'currency' if not currency_field else ''} {'income' if not income_field else ''} field(s) to {form_instance}"
+        f"Added {'currency' if not currency_field else ''} {'income' if not income_field else ''} field(s) to {form_instance}"  # noqa: G004
     )
     return False

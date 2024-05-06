@@ -59,7 +59,7 @@ class ProductAdmin(VersionAdmin):
     def change_view(self, request, object_id, form_url="", extra_context=None):
         product = Product.objects.get(id=object_id)
         extra_context = {"subtitle": self.content_object(product)}
-        return super(ProductAdmin, self).change_view(
+        return super(ProductAdmin, self).change_view(  # noqa: UP008
             request, object_id, form_url, extra_context
         )
 
@@ -67,11 +67,11 @@ class ProductAdmin(VersionAdmin):
         """Return the content object details"""
         return str(obj.purchasable_object)
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
         """Disable the delete permission for Product models"""
         return False
 
-    def get_queryset(self, request):
+    def get_queryset(self, request):  # noqa: ARG002
         """
         Return the all objects for the Product Admin
         """
@@ -192,7 +192,7 @@ class OrderDiscountInline(admin.TabularInline):
 class OrderTransactionInline(admin.TabularInline):
     """Inline editor for transactions for an Order"""
 
-    def has_add_permission(self, request, obj=None):
+    def has_add_permission(self, request, obj=None):  # noqa: ARG002
         return False
 
     model = Transaction
@@ -218,7 +218,7 @@ class BaseOrderAdmin(FSMTransitionMixin, TimestampedModelAdmin):
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     readonly_fields = ["reference_number"]
 
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request, obj=None):  # noqa: ARG002
         return False
 
     @display(description="Purchaser")
@@ -281,7 +281,7 @@ class FulfilledOrderAdmin(TimestampedModelAdmin):
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     model = FulfilledOrder
 
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request, obj=None):  # noqa: ARG002
         return False
 
     @display(description="Purchaser")
@@ -300,7 +300,7 @@ class FulfilledOrderAdmin(TimestampedModelAdmin):
     def response_change(self, request, obj):
         if "refund" in request.POST:
             return HttpResponseRedirect(
-                "%s/?order=%s" % (reverse("refund-order"), obj.id)
+                "%s/?order=%s" % (reverse("refund-order"), obj.id)  # noqa: UP031
             )
 
         return super().response_change(request, obj)
@@ -327,7 +327,6 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
             order = FulfilledOrder.objects.get(pk=request.POST["order"])
 
             if refund_form.is_valid():
-
                 should_unenroll = refund_form.cleaned_data.get(
                     "perform_unenrolls", False
                 )
@@ -397,7 +396,7 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
         try:
             order = FulfilledOrder.objects.get(pk=request.GET["order"])
             if order.state != Order.STATE.FULFILLED:
-                raise ObjectDoesNotExist()
+                raise ObjectDoesNotExist()  # noqa: RSE102, TRY301
         except ObjectDoesNotExist:
             messages.error(
                 request,

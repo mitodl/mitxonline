@@ -2,7 +2,7 @@ name: CI
 on: [push]
 jobs:
   python-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     services:
       db:
@@ -48,7 +48,7 @@ jobs:
       - name: Install poetry
         uses: snok/install-poetry@v1
         with:
-          version: 1.5.1
+          version: 1.8.2
           virtualenvs-create: true
           virtualenvs-in-project: true
 
@@ -59,13 +59,6 @@ jobs:
 
       - name: Install dependencies
         run: poetry install --no-interaction
-
-      # disabled for now because it's broken for some reason
-      # - name: Lint
-      #   run: pylint ./**/*.py
-
-      - name: Code Formatting (Black)
-        run: poetry run black --check .
 
       # Configurations required for elasticsearch.
       - name: Configure sysctl limits
@@ -91,13 +84,13 @@ jobs:
           CELERY_TASK_ALWAYS_EAGER: 'True'
           CELERY_BROKER_URL: redis://localhost:6379/4
           CELERY_RESULT_BACKEND: redis://localhost:6379/4
-          SECRET_KEY: local_unsafe_key
+          SECRET_KEY: local_unsafe_key   # pragma: allowlist secret
           MITX_ONLINE_BASE_URL: http://localhost:8013
           MAILGUN_SENDER_DOMAIN: other.fake.site
           MAILGUN_KEY: fake_mailgun_key
           MITX_ONLINE_ADMIN_EMAIL: example@localhost
           OPENEDX_API_CLIENT_ID: fake_client_id
-          OPENEDX_API_CLIENT_SECRET: fake_client_secret
+          OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
           OPENEDX_API_KEY: test-openedx-api-key  # pragma: allowlist secret
 
       - name: Tests
@@ -124,9 +117,9 @@ jobs:
           MITX_ONLINE_USE_S3: 'False'
           OPENEDX_API_BASE_URL: http://localhost:18000
           OPENEDX_API_CLIENT_ID: fake_client_id
-          OPENEDX_API_CLIENT_SECRET: fake_client_secret
+          OPENEDX_API_CLIENT_SECRET: fake_client_secret  # pragma: allowlist secret
           OPENEDX_API_KEY: test-openedx-api-key  # pragma: allowlist secret
-          SECRET_KEY: local_unsafe_key
+          SECRET_KEY: local_unsafe_key  # pragma: allowlist secret
 
       - name: Upload coverage to CodeCov
         uses: codecov/codecov-action@v3
@@ -134,7 +127,7 @@ jobs:
           file: ./coverage.xml
 
   javascript-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
 
@@ -145,7 +138,7 @@ jobs:
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
 
       - uses: actions/cache@v3
         id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)

@@ -252,7 +252,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       const infobox = inner.find("CourseInfoBox").dive()
       assert.isTrue(infobox.exists())
 
-      const moreDatesLink = infobox.find("button.more-enrollment-info").first()
+      const moreDatesLink = infobox.find("button.more-dates").first()
 
       if (!hasMoreDates) {
         assert.isFalse(moreDatesLink.exists())
@@ -875,7 +875,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       const infobox = inner.find("CourseInfoBox").dive()
       assert.isTrue(infobox.exists())
 
-      const moreDatesLink = infobox.find("button.more-enrollment-info").first()
+      const moreDatesLink = infobox.find("button.more-dates").first()
 
       if (!hasMoreDates) {
         assert.isFalse(moreDatesLink.exists())

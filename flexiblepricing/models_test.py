@@ -1,14 +1,9 @@
 import pytest
-import random
-from decimal import Decimal, getcontext
-from mitol.common.utils import now_in_utc
-import reversion
-
-from users.factories import UserFactory
 
 from courses.factories import CourseFactory
-from flexiblepricing.models import FlexiblePrice
 from flexiblepricing.constants import FlexiblePriceStatus
+from flexiblepricing.models import FlexiblePrice
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -26,7 +21,7 @@ def test_submission_status():
         )
 
         if (
-            status == FlexiblePriceStatus.APPROVED
+            status == FlexiblePriceStatus.APPROVED  # noqa: PLR1714
             or status == FlexiblePriceStatus.AUTO_APPROVED
         ):
             assert submission.is_approved()
@@ -35,4 +30,4 @@ def test_submission_status():
         elif status == FlexiblePriceStatus.RESET:
             assert submission.is_reset()
         else:
-            assert not submission.is_approved() and not submission.is_denied()
+            assert not submission.is_approved() and not submission.is_denied()  # noqa: PT018

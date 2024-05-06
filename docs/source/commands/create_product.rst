@@ -3,7 +3,7 @@
 
 Creates a product for the given courseware ID. (For now, this only works with course runs.)
 
-By default, the product description will be the courseware ID. This is the recommended setting for this to make it easy to determine which products are for what courseware objects. 
+By default, the product description will be the courseware ID. This is the recommended setting for this to make it easy to determine which products are for what courseware objects.
 
 Syntax
 ------

@@ -1,7 +1,8 @@
 """
-Generates a <video-js> tag. Expects the page object, which should use the 
-VideoPlayerConfigMixin. 
+Generates a <video-js> tag. Expects the page object, which should use the
+VideoPlayerConfigMixin.
 """
+
 from django import template
 
 register = template.Library()

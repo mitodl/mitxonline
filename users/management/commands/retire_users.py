@@ -1,7 +1,7 @@
 """
 Retire user(s) from MITx Online and user initiate retirement on edX
 """
-import hashlib
+
 import sys
 from argparse import RawTextHelpFormatter
 from urllib.parse import urlparse
@@ -15,13 +15,12 @@ from authentication.utils import block_user_email
 from main import settings
 from openedx.api import bulk_retire_edx_users
 from users.api import fetch_users
-from users.models import BlockList
 
 User = get_user_model()
 
 RETIRED_USER_SALTS = ["mitx-online-retired-email"]
-RETIRED_EMAIL_FMT = "retired_email_{}@retired." + "{}".format(
-    urlparse(settings.SITE_BASE_URL).netloc
+RETIRED_EMAIL_FMT = (
+    "retired_email_{}@retired." + f"{urlparse(settings.SITE_BASE_URL).netloc}"
 )
 
 
@@ -57,7 +56,7 @@ class Command(BaseCommand):
         return parser
 
     def add_arguments(self, parser):
-        """parse arguments"""
+        """Parse arguments"""
 
         # pylint: disable=expression-not-assigned
         parser.add_argument(
@@ -81,7 +80,7 @@ class Command(BaseCommand):
         """Convert user email to retired email format."""
         return user_util.get_retired_email(email, RETIRED_USER_SALTS, RETIRED_EMAIL_FMT)
 
-    def handle(self, *args, **kwargs):
+    def handle(self, *args, **kwargs):  # noqa: ARG002
         users = kwargs.get("users", [])
         block_users = kwargs.get("block_users")
 
@@ -96,13 +95,11 @@ class Command(BaseCommand):
         users = fetch_users(kwargs["users"])
 
         for user in users:
-            self.stdout.write("Retiring user: {user}".format(user=user))
+            self.stdout.write(f"Retiring user: {user}")
             if not user.is_active:
                 self.stdout.write(
                     self.style.ERROR(
-                        "User: '{user}' is already deactivated in MITx Online".format(
-                            user=user
-                        )
+                        f"User: '{user}' is already deactivated in MITx Online"
                     )
                 )
                 continue
@@ -111,18 +108,14 @@ class Command(BaseCommand):
             if user.username not in resp["successful_user_retirements"]:
                 self.stderr.write(
                     self.style.ERROR(
-                        "Could not initiate retirement request on edX for user {user}".format(
-                            user=user
-                        )
+                        f"Could not initiate retirement request on edX for user {user}"
                     )
                 )
                 continue
             else:
                 self.stdout.write(
                     self.style.SUCCESS(
-                        "Retirement request initiated on edX for User: '{user}'".format(
-                            user=user
-                        )
+                        f"Retirement request initiated on edX for User: '{user}'"
                     )
                 )
 
@@ -141,21 +134,15 @@ class Command(BaseCommand):
             user.save()
 
             self.stdout.write(
-                "Email changed from {email} to {retired_email} and password is not useable now".format(
-                    email=email, retired_email=user.email
-                )
+                f"Email changed from {email} to {user.email} and password is not useable now"
             )
 
             # reset user social auth
             auth_deleted_count = UserSocialAuth.objects.filter(user=user).delete()
 
             if auth_deleted_count:
-                self.stdout.write(
-                    "For  user: '{user}' SocialAuth rows deleted".format(user=user)
-                )
+                self.stdout.write(f"For  user: '{user}' SocialAuth rows deleted")
 
             self.stdout.write(
-                self.style.SUCCESS(
-                    "User: '{user}' is retired from MITx Online".format(user=user)
-                )
+                self.style.SUCCESS(f"User: '{user}' is retired from MITx Online")
             )

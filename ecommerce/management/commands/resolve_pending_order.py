@@ -10,7 +10,6 @@ fulfill or cancel the order as necessary.
 
 """
 
-from django.core.exceptions import ObjectDoesNotExist
 from django.core.management import BaseCommand
 from mitol.payment_gateway.api import PaymentGateway
 
@@ -38,8 +37,8 @@ class Command(BaseCommand):
             "--all", action="store_true", help="Use all pending orders."
         )
 
-    def handle(self, *args, **kwargs):
-        gateway = PaymentGateway.get_gateway_class(ECOMMERCE_DEFAULT_PAYMENT_GATEWAY)
+    def handle(self, *args, **kwargs):  # noqa: ARG002
+        gateway = PaymentGateway.get_gateway_class(ECOMMERCE_DEFAULT_PAYMENT_GATEWAY)  # noqa: F841
 
         if not kwargs["all"] and not kwargs["order"]:
             self.stderr.write(self.style.ERROR("Please specify an order."))

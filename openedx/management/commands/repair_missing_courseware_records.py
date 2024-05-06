@@ -1,6 +1,7 @@
 """
 Management command to repair missing openedx records
 """
+
 from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand
 from mitol.common.utils import get_error_response_summary
@@ -27,7 +28,7 @@ class Command(BaseCommand):
             required=False,
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         """Walk all users who are missing records and repair them"""
         user_attr = options.get("user")
         if user_attr is not None:
@@ -54,10 +55,10 @@ class Command(BaseCommand):
                     )
                 )
                 error_count += 1
-            except Exception as exc:  # pylint: disable=broad-except
+            except Exception as exc:  # pylint: disable=broad-except  # noqa: BLE001
                 self.stderr.write(
                     self.style.ERROR(
-                        f"{user.username} ({user.email}): Failed to repair (Exception: {str(exc)})"
+                        f"{user.username} ({user.email}): Failed to repair (Exception: {exc!s})"
                     )
                 )
                 error_count += 1

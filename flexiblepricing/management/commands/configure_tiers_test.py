@@ -14,7 +14,6 @@ from courses.models import Program
 from ecommerce.constants import PAYMENT_TYPE_FINANCIAL_ASSISTANCE
 from ecommerce.factories import DiscountFactory
 from ecommerce.models import Discount
-from flexiblepricing.management.commands import configure_tiers
 from flexiblepricing.models import FlexiblePriceTier
 
 pytestmark = [pytest.mark.django_db]
@@ -30,7 +29,7 @@ def test_program_tier_setup(with_existing_records):
     """
     Runs the configure command for a program and makes sure everything is created.
     """
-    this_year = date.today().year
+    this_year = date.today().year  # noqa: DTZ011
     content_type = ContentType.objects.filter(
         app_label="courses", model="program"
     ).first()
@@ -85,7 +84,7 @@ def test_program_tier_setup(with_existing_records):
     if with_existing_records:
         existing_discount.refresh_from_db()
         existing_tier.refresh_from_db()
-        assert (
+        assert (  # noqa: PT018
             existing_discount.expiration_date is not None
             and existing_discount.expiration_date
             < datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
@@ -101,7 +100,7 @@ def test_course_tier_setup(with_existing_records):
     """
     Runs the setup command for a course and makes sure the tiers are set up.
     """
-    this_year = date.today().year
+    this_year = date.today().year  # noqa: DTZ011
     content_type = ContentType.objects.filter(
         app_label="courses", model="course"
     ).first()
@@ -149,7 +148,7 @@ def test_course_tier_setup(with_existing_records):
         existing_discount.refresh_from_db()
         existing_tier.refresh_from_db()
 
-        assert (
+        assert (  # noqa: PT018
             existing_discount.expiration_date is not None
             and existing_discount.expiration_date
             < datetime.now(tz=pytz.timezone(settings.TIME_ZONE))

@@ -1,6 +1,7 @@
 import logging
-from mitol.google_sheets_refunds.api import RefundRequestHandler
+
 from mitol.google_sheets_deferrals.api import DeferralRequestHandler
+from mitol.google_sheets_refunds.api import RefundRequestHandler
 
 from main.celery import app
 

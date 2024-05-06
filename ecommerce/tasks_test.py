@@ -9,13 +9,13 @@ from ecommerce.tasks import (
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def products():
     with reversion.create_revision():
         return ProductFactory.create_batch(5)
 
 
-def test_delayed_order_receipt_sends_email(
+def test_delayed_order_receipt_sends_email(  # noqa: PLR0913
     settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):
     """
@@ -24,7 +24,7 @@ def test_delayed_order_receipt_sends_email(
     function should create a basket and process the order through to the point
     where the Order model itself will send the receipt email.
     """
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mock_send_ecommerce_order_receipt = mocker.patch(
         "ecommerce.mail_api.send_ecommerce_order_receipt"
     )
@@ -44,7 +44,7 @@ def test_delayed_order_refund_sends_email(
     function creates a fulfilled order, then we refund it and make sure the
     right task got called.
     """
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mock_send_refund_email = mocker.patch(
         "ecommerce.mail_api.send_ecommerce_refund_message"
     )

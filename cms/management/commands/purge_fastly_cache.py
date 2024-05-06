@@ -1,4 +1,5 @@
 """Purges all pages from the Fastly cache."""
+
 from django.core.management.base import BaseCommand
 
 from cms.tasks import queue_fastly_full_purge
@@ -9,5 +10,5 @@ class Command(BaseCommand):
 
     help = __doc__
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         queue_fastly_full_purge.delay()

@@ -40,14 +40,14 @@ class Command(BaseCommand):
             "--inactive", action="store_false", help="Make the product inactive."
         )
 
-    def handle(self, *args, **kwargs):
+    def handle(self, *args, **kwargs):  # noqa: ARG002
         try:
             courserun = CourseRun.objects.filter(
                 courseware_id=kwargs["courseware"]
             ).get()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.stderr.write(f"Could not retrieve {kwargs['courseware']}: {e}")
-            exit(-1)
+            exit(-1)  # noqa: PLR1722
 
         content_type = ContentType.objects.filter(
             app_label="courses", model="courserun"

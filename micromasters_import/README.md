@@ -16,7 +16,7 @@ There are a few data models that are designed to aid migration of MicroMasters d
 The strategy we'll use here is to create records for each course and program in MicroMasters we want to import. The MicroMasters database will be mounted via [`postgres_fdw`](https://www.postgresql.org/docs/current/postgres-fdw.html) so that we can select/join across both databases. Then when the import queries run we'll join on these tables like this:
 
 ```sql
-SELECT 
+SELECT
     run.title,
     run.edx_course_key,
     run.enrollment_url,
@@ -31,13 +31,13 @@ FROM foreign_data.courses_courserun as run
 ```
 
 ## Importing users data
-The way we match users from MicroMasters to MITxOnline is to use their social auth accounts they have explicitly linked from MicroMasters. 
+The way we match users from MicroMasters to MITxOnline is to use their social auth accounts they have explicitly linked from MicroMasters.
 If users don't have "mitxonline" social auth accounts on MicroMasters, then their data can't be imported
 
 e.g. migrate user's enrollment data from MicroMasters to MITxOnline
 ```sql
 SELECT
-  
+
 FROM micromasters.dashboard_cachedenrollment AS mm_enrollment
 JOIN micromasters.social_auth_usersocialauth AS mm_social
   ON mm_enrollment.user_id = mm_social.user_id
@@ -64,7 +64,7 @@ CREATE USER MAPPING IF NOT EXISTS FOR postgres
    OPTIONS (user 'xxxxx', password 'xxxxx');
 
 CREATE SCHEMA micromasters IF NOT EXISTS;
-IMPORT FOREIGN SCHEMA public 
+IMPORT FOREIGN SCHEMA public
 FROM SERVER micromaster_bridge INTO micromasters;
 
 ```

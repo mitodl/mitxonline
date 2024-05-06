@@ -20,7 +20,6 @@ def update_denied_flexpricings_to_skipped(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("flexiblepricing", "0016_allow_blank_country_of_residence"),
     ]

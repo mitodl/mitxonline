@@ -1,13 +1,15 @@
-from wagtail.signals import page_published, page_unpublished, post_page_move
-from cms.tasks import queue_fastly_purge_url
-from cms.models import FlexiblePricingRequestForm
-from flexiblepricing.utils import ensure_flexprice_form_fields
 import logging
+
+from wagtail.signals import page_published, page_unpublished, post_page_move
+
+from cms.models import FlexiblePricingRequestForm
+from cms.tasks import queue_fastly_purge_url
+from flexiblepricing.utils import ensure_flexprice_form_fields
 
 logger = logging.getLogger("cms.signalreceiver")
 
 
-def fastly_purge_url_receiver(sender, **kwargs):
+def fastly_purge_url_receiver(sender, **kwargs):  # noqa: ARG001
     """
     Generic receiver for the Wagtail page_published, page_unpublished, and
     post_page_move signals. The most important part of the kwargs passed in all
@@ -18,16 +20,16 @@ def fastly_purge_url_receiver(sender, **kwargs):
     """
     instance = kwargs["instance"]
 
-    if "url_path_before" in kwargs:
+    if "url_path_before" in kwargs:  # noqa: SIM102
         if kwargs["url_path_before"] == kwargs["url_path_after"]:
             return
 
-    logger.info(f"Queueing Fastly purge for {instance.id} - {instance.title}")
+    logger.info(f"Queueing Fastly purge for {instance.id} - {instance.title}")  # noqa: G004
 
     queue_fastly_purge_url.delay(instance.id)
 
 
-def flex_pricing_field_check(sender, **kwargs):
+def flex_pricing_field_check(sender, **kwargs):  # noqa: ARG001
     """
     Receives the Wagtail page_published signal and, if it's for a flexible
     pricing request form, ensures the form has the two fields required to make
@@ -44,13 +46,13 @@ def flex_pricing_field_check(sender, **kwargs):
 
     if isinstance(instance, FlexiblePricingRequestForm):
         logger.info(
-            f"Checking fields for Flexible Pricing Request Form {instance.id} - {instance.title}"
+            f"Checking fields for Flexible Pricing Request Form {instance.id} - {instance.title}"  # noqa: G004
         )
 
         if ensure_flexprice_form_fields(instance):
-            logger.info(f"Form was OK!")
+            logger.info("Form was OK!")
         else:
-            logger.info(f"Form changed (or needs changes)")
+            logger.info("Form changed (or needs changes)")
 
 
 page_published.connect(fastly_purge_url_receiver)

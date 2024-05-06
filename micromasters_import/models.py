@@ -1,10 +1,10 @@
 """MicroMasters import models"""
-from django.db import models
 
+from django.db import models
 from wagtail.models import Revision
 
 
-class CourseId(models.Model):
+class CourseId(models.Model):  # noqa: DJ008
     """
     Map primary keys from MicroMasters to MITx Online for courses
     """
@@ -20,7 +20,7 @@ class CourseId(models.Model):
     )
 
 
-class ProgramId(models.Model):
+class ProgramId(models.Model):  # noqa: DJ008
     """
     Map primary keys from MicroMasters to MITx Online for programs
     """

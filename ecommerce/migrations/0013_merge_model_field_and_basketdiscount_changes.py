@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("ecommerce", "0012_basketdiscount_unique_basket_discount"),
         ("ecommerce", "0012_model_related_field_changes"),

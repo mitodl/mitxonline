@@ -1,6 +1,6 @@
 """MITxOnline feature flags"""
+
 import os
-import uuid
 from functools import wraps
 
 from django.conf import settings
@@ -64,7 +64,7 @@ def if_feature_enabled(name, default=None):
         def wrapped_func(*args, **kwargs):  # pylint: disable=missing-docstring
             if not is_enabled(name, default):
                 # If the given feature name is not enabled, do nothing (no-op).
-                return
+                return None
             else:
                 # If the given feature name is enabled, call the function and return as normal.
                 return func(*args, **kwargs)

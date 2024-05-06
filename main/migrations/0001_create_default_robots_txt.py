@@ -14,7 +14,8 @@ def create_default_robots_txt(apps, schema_editor):
     # django.contrib.sites should be creating this, but it's in a delayed post-migration hook:
     #
     current_site, created = Site.objects.get_or_create(
-        pk=getattr(settings, "SITE_ID", 1), defaults=dict(domain=domain, name=domain)
+        pk=getattr(settings, "SITE_ID", 1),
+        defaults=dict(domain=domain, name=domain),  # noqa: C408
     )
 
     url, _ = Url.objects.get_or_create(pattern="/")
@@ -28,7 +29,6 @@ def create_default_robots_txt(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [("sites", "0002_alter_domain_unique"), ("robots", "0001_initial")]
 
     operations = [

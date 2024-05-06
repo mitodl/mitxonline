@@ -2,13 +2,11 @@
 
 from django.db import migrations
 
-
 # NOTE: This migration was set to a no-op in favor of running a management command that performs the
 # Wagtail data migrations that we need.
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("cms", "0007_add_course_index_page"),
     ]

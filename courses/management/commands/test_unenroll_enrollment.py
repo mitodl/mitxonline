@@ -1,26 +1,26 @@
 """Tests for Unenroll Enrollment management command"""
 
-import pytest
-
-from django.core.management.base import CommandError
 from types import SimpleNamespace
+
+import pytest
+import reversion
+from django.core.management.base import CommandError
+from reversion.models import Version
 
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
 from courses.factories import (
-    CourseRunFactory,
     CourseRunEnrollmentFactory,
+    CourseRunFactory,
 )
 from courses.management.commands import unenroll_enrollment
+from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order
 from users.factories import UserFactory
-from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-import reversion
-from reversion.models import Version
 
 pytestmark = [pytest.mark.django_db]
 
 
-@pytest.fixture()
+@pytest.fixture
 def patches(mocker):  # pylint: disable=missing-docstring
     edx_unenroll = mocker.patch("courses.api.unenroll_edx_course_run")
     log_exception = mocker.patch("courses.api.log.exception")
@@ -51,9 +51,10 @@ def test_unenroll_enrollment_invalid_run():
     test_user = UserFactory.create()
     with pytest.raises(CommandError) as command_error:
         unenroll_enrollment.Command().handle(user=test_user.username)
-    assert str(
-        command_error.value
-    ) == "Could not find course run with courseware_id={}".format(None)
+    assert (
+        str(command_error.value)
+        == f"Could not find course run with courseware_id={None}"
+    )
 
     with pytest.raises(CommandError) as command_error:
         unenroll_enrollment.Command().handle(user=test_user.username, run="test")

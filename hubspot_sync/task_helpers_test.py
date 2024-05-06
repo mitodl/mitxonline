@@ -1,4 +1,5 @@
 """Tests for hubspot_sync.task_helpers"""
+
 import pytest
 
 from ecommerce.factories import ProductFactory
@@ -11,10 +12,10 @@ from hubspot_sync.task_helpers import (
 pytestmark = pytest.mark.django_db
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_exception_log(settings, mocker):
     """Return a mocked log.exception object"""
-    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"
+    settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN = "faketoken"  # noqa: S105
     return mocker.patch("hubspot_sync.task_helpers.log.exception")
 
 

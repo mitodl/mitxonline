@@ -1,6 +1,7 @@
 """
 Tests for signals
 """
+
 from unittest.mock import patch
 
 import pytest
@@ -10,7 +11,6 @@ from courses.factories import (
     CourseRunCertificateFactory,
     CourseRunFactory,
     ProgramFactory,
-    ProgramRequirementFactory,
     UserFactory,
 )
 
