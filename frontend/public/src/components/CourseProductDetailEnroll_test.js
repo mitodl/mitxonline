@@ -333,8 +333,8 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       )
       assert.include(
         infobox
-          .find(".modal-title")
-          .at(0)
+          .find("ModalHeader")
+          .dive()
           .text(),
         `What are ${pacing} courses?`
       )
