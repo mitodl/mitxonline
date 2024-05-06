@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.91.1
+Version 0.91.1 (Released May 06, 2024)
 --------------
 
 - 4137: mitx online course and program count on catalog page is incorrect in mobile view (#2186)
