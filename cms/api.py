@@ -34,6 +34,7 @@ RESOURCE_PAGE_TITLES = [
 ]
 RESOURCE_PAGE_SLUGS = [slugify(title) for title in RESOURCE_PAGE_TITLES]
 PROGRAM_INDEX_PAGE_PROPERTIES = dict(title="Programs")
+HOMEPAGE_CACHE_AGE = 86400  # 24 hours
 
 
 def get_home_page(raise_if_missing=True, check_specific=False) -> Page:
@@ -324,5 +325,5 @@ def create_featured_items():
     )[:20]
     featured_courses = featured_self_paced_courses | featured_courses
     # Set the value in cache for 24 hours
-    cache.set("CMS_homepage_featured_courses", featured_courses, 86400)
+    cache.set("CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE)
     return
