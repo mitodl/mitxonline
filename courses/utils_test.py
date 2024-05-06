@@ -113,3 +113,114 @@ def test_get_program_certificate_by_enrollment_program_certificate_page_does_not
     )
     assert get_program_certificate_by_enrollment(course_enrollment) == None
     assert get_program_certificate_by_enrollment(program_enrollment) == None
+
+
+def test_get_enrollable_courseruns_qs():
+    """
+    Test get_enrollable_courseruns_qs
+    """
+    course = CourseFactory.create()
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    past_date = now - timedelta(days=1)
+    course_run = CourseRunFactory.create(
+        course=course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+    CourseRunFactory.create(
+        course=course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+
+    enrollable_qs = get_enrollable_courseruns_qs()
+    assert enrollable_qs.count() == 2
+    assert course_run in enrollable_qs
+
+    unenrollable_course_run = CourseFactory.create(
+        course=course,
+        live=True,
+        start_date=now,
+        enrollment_start=future_date,
+        enrollment_end=None,
+    )
+    enrollable_qs = get_enrollable_courseruns_qs()
+    assert enrollable_qs.count() == 2
+    assert course_run in enrollable_qs
+    assert unenrollable_course_run not in enrollable_qs
+
+
+def test_get_unenrollable_courseruns_qs():
+    """
+    Test get_enrollable_courseruns_qs
+    """
+    course = CourseFactory.create()
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    past_date = now - timedelta(days=1)
+    course_run = CourseRunFactory.create(
+        course=course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+    CourseRunFactory.create(
+        course=course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+
+    enrollable_qs = get_enrollable_courseruns_qs()
+    assert enrollable_qs.count() == 0
+    assert course_run not in enrollable_qs
+
+    unenrollable_course_run = CourseFactory.create(
+        course=course,
+        live=True,
+        start_date=future_date,
+        enrollment_start=future_date,
+        enrollment_end=None,
+    )
+    enrollable_qs = get_enrollable_courseruns_qs()
+    assert enrollable_qs.count() == 1
+    assert course_run not in enrollable_qs
+    assert unenrollable_course_run in enrollable_qs
+
+
+def test_get_courses_based_on_enrollment():
+    """
+    Test get_courses_based_on_enrollment
+    """
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    past_date = now - timedelta(days=1)
+    course = CourseFactory.create()
+    unenrollable_course = CourseFactory.create()
+    CourseRunFactory.createcreate(
+        course=course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+    CourseRunFactory.create(
+        course=unenrollable_course,
+        live=True,
+        start_date=future_date,
+        enrollment_start=future_date,
+        enrollment_end=None,
+    )
+    can_enroll = get_courses_based_on_enrollment(Course.objects.all(), True)
+    assert unenrollable_course not in can_enroll
+    assert course in can_enroll
+    can_not_enroll = get_courses_based_on_enrollment(Course.objects.all(), False)
+    assert unenrollable_course in can_not_enroll
+    assert course not in can_not_enroll
