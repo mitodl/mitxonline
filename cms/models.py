@@ -37,8 +37,8 @@ from wagtail.fields import RichTextField, StreamField
 from wagtail.images.models import Image
 from wagtail.models import Page
 from wagtail.search import index
-from wagtailmetadata.models import MetadataPageMixin
 from wagtail.snippets.models import register_snippet
+from wagtailmetadata.models import MetadataPageMixin
 
 from cms.blocks import (
     CourseRunCertificateOverrides,
@@ -1697,3 +1697,7 @@ class SiteBanner(models.Model):
 
     def __str__(self):
         return str(self.message)
+
+
+class HomePageFeaturedItems(models.Model):
+    """Cached featured items for the homepage"""

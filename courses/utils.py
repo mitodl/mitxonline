@@ -3,9 +3,11 @@
 import logging
 import re
 
+from django.db.models import Prefetch, Q
+from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
-from courses.models import CourseRunEnrollment, ProgramCertificate
+from courses.models import Course, CourseRun, CourseRunEnrollment, ProgramCertificate
 
 log = logging.getLogger(__name__)
 

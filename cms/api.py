@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
+from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page, Site
 from wagtail.rich_text import RichText
 
@@ -323,5 +324,3 @@ def create_featured_items():
         enrollment_start__lte=start_of_day,
         courseruns__enrollment_end__gte=end_of_day,
     ).order_by("?")[:30]
-
-    log.info("Created new featured items for the home page")
