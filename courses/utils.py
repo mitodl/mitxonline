@@ -76,14 +76,14 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
         return None
 
 
-def get_enrollable_courseruns_qs():
+def get_enrollable_courseruns_qs(enrollment_end_date):
     """Returns all course runs that are open for enrollment."""
     now = now_in_utc()
     return CourseRun.objects.filter(
         Q(live=True)
         & Q(start_date__isnull=False)
         & Q(enrollment_start__lt=now)
-        & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))
+        & (Q(enrollment_end=None) | Q(enrollment_end__gt=enrollment_end_date))
     )
 
 
@@ -95,7 +95,9 @@ def get_unenrollable_courseruns_qs():
     )
 
 
-def get_courses_based_on_enrollment(queryset, enrollable=True):
+def get_courses_based_on_enrollment(
+    queryset, enrollable=True, enrollment_end_date=None
+):
     """
     Returns courses based on the current enrollment status
 
@@ -103,9 +105,12 @@ def get_courses_based_on_enrollment(queryset, enrollable=True):
         queryset: Queryset of Course objects
         enrollable: Boolean, if True, returns courses that are open for enrollment,
                     otherwise returns courses that are closed for enrollment
+        enrollment_end_date: datetime, the date to check for enrollment end
     """
+    if enrollment_end_date is None:
+        enrollment_end_date = now_in_utc()
     if enrollable:
-        courseruns_qs = get_enrollable_courseruns_qs()
+        courseruns_qs = get_enrollable_courseruns_qs(enrollment_end_date)
     else:
         courseruns_qs = get_unenrollable_courseruns_qs()
     return (

@@ -314,16 +314,29 @@ def create_featured_items():
     """
     featured_courses = cache.get("CMS_homepage_featured_courses")
     if featured_courses is not None:
-        return
+        cache.delete("CMS_homepage_featured_courses")
+
+    now = now_in_utc()
+    end_of_day = now + timedelta(days=1)
     enrollable_courses = get_courses_based_on_enrollment(
-        Course.objects.select_related("page").filter(page__live=True, live=True), True
+        Course.objects.select_related("page").filter(page__live=True, live=True),
+        True,
+        end_of_day,
     )
     enrollable_courses = enrollable_courses.order_by("?")
-    featured_self_paced_courses = enrollable_courses.filter(self_paced=True)[:2]
-    featured_courses = enrollable_courses.exclude(
-        id__in=featured_self_pace_courses.values_list("id", flat=True)
-    )[:20]
-    featured_courses = featured_self_paced_courses | featured_courses
+    self_paced_featured_courses = enrollable_courses.filter(self_paced=True)[:2]
+    random_featured_courses = enrollable_courses.prefetch_related(
+        first_unexpired_run
+    ).exclude(id__in=self_paced_featured_courses.values_list("id", flat=True))[:20]
+
+    future_featured_courses = random_featured_courses.filter(
+        first_unexpired_run__start_date__gt=now
+    ).order_by("first_unexpired_run__start_date")
+    started_featured_courses = random_featured_courses - future_featured_courses
+
+    featured_courses = (
+        self_paced_featured_courses | future_featured_courses | started_featured_courses
+    )
     # Set the value in cache for 24 hours
     cache.set("CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE)
     return
