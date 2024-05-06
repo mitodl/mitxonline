@@ -455,6 +455,17 @@ body.new-design {
     }
   }
 
+  .pacing-info-dialog {
+    max-width: 500px;
+
+    .modal-header {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .modal-content {
+      padding: 5px 14px;
+    }
+  }
 
   .upgrade-enrollment-modal {
     max-width: 750px;

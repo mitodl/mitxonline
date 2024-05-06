@@ -13,13 +13,13 @@ import moment from "moment-timezone"
 import type { BaseCourseRun } from "../flow/courseTypes"
 import { EnrollmentFlaggedCourseRun, RunEnrollment } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
+import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 type CourseInfoBoxProps = {
   courses: Array<BaseCourseRun>,
   courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
   enrollments: ?Array<RunEnrollment>,
   currentUser: CurrentUser,
-  toggleUpgradeDialogVisibility: () => Promise<any>,
   setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>
 }
 
@@ -65,16 +65,19 @@ const getCourseDates = (run, isArchived = false, isMoreDates = false) => {
 
 export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProps> {
   state = {
-    showMoreEnrollDates: false
+    showMoreEnrollDates:        false,
+    pacingInfoDialogVisibility: false
   }
   toggleShowMoreEnrollDates() {
     this.setState({
       showMoreEnrollDates: !this.state.showMoreEnrollDates
     })
   }
-  setRunEnrollDialog(run: EnrollmentFlaggedCourseRun) {
-    this.props.setCurrentCourseRun(run)
-    this.props.toggleUpgradeDialogVisibility()
+
+  togglePacingInfoDialogVisibility() {
+    this.setState({
+      pacingInfoDialogVisibility: !this.state.pacingInfoDialogVisibility
+    })
   }
 
   warningMessage(isArchived) {
@@ -86,6 +89,45 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         <i className="material-symbols-outlined warning">error</i>
         <p>{message}</p>
       </div>
+    )
+  }
+
+  renderPacingInfoDialog(pacing) {
+    const { pacingInfoDialogVisibility } = this.state
+    return (
+      <Modal
+        id={`pacing-info-dialog`}
+        className="pacing-info-dialog"
+        isOpen={pacingInfoDialogVisibility}
+        toggle={() => this.togglePacingInfoDialogVisibility()}
+        centered
+      >
+        <ModalHeader toggle={() => this.togglePacingInfoDialogVisibility()}>
+          What are {pacing} courses?
+        </ModalHeader>
+        <ModalBody>
+          {pacing === "Self-Paced" ? (
+            <p>
+              Flexible learning. Enroll at any time and progress at your own
+              speed. All course materials available immediately. Adaptable due
+              dates and extended timelines. Earn your certificate as soon as you
+              pass the course.{" "}
+              <a href="https://mitxonline.zendesk.com/hc/en-us/articles/21995114519067-What-are-Archived-courses-on-MITx-Online-">
+                Learn More
+              </a>
+            </p>
+          ) : (
+            <p>
+              Guided learning. Follow a set schedule with specific due dates for
+              assignments and exams. Course materials released on a schedule.
+              Earn your certificate shortly after the course ends.{" "}
+              <a href="https://mitxonline.zendesk.com/hc/en-us/articles/21994938130075-What-are-Instructor-Paced-courses-on-MITx-Online-">
+                Learn More
+              </a>
+            </p>
+          )}
+        </ModalBody>
+      </Modal>
     )
   }
 
@@ -186,22 +228,22 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                 {isArchived || run.is_self_paced ? (
                   <>
                     Self-paced
-                    <a
-                      className="info-link more-info"
-                      href="https://mitxonline.zendesk.com/hc/en-us/articles/21995114519067-What-are-Archived-courses-on-MITx-Online-"
+                    <button
+                      className="info-link more-info explain-format-btn"
+                      onClick={() => this.togglePacingInfoDialogVisibility()}
                     >
                       What's this?
-                    </a>
+                    </button>
                   </>
                 ) : (
                   <>
                     Instructor-paced
-                    <a
-                      className="info-link more-info"
-                      href="https://mitxonline.zendesk.com/hc/en-us/articles/21994938130075-What-are-Instructor-Paced-courses-on-MITx-Online-"
+                    <button
+                      className="info-link more-info explain-format-btn"
+                      onClick={() => this.togglePacingInfoDialogVisibility()}
                     >
                       What's this?
-                    </a>
+                    </button>
                   </>
                 )}
               </div>
@@ -271,6 +313,11 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             </div>
           </div>
         </div>
+        {run
+          ? this.renderPacingInfoDialog(
+            run.is_self_paced ? "Self-Paced" : "Instructor-Paced"
+          )
+          : null}
         {course && course.programs && course.programs.length > 0 ? (
           <div className="program-info-box">
             <div className="related-programs-info">
