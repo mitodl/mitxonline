@@ -11,6 +11,7 @@ from hubspot.crm.objects import (
     SimplePublicObject,
     SimplePublicObjectInput,
 )
+from mitol.common.utils.datetime import now_in_utc
 from mitol.hubspot_api.api import (
     HubspotAssociationType,
     HubspotObjectType,
@@ -201,7 +202,9 @@ def make_line_item_create_messages_list_from_line_ids(
     lines = Line.objects.filter(id__in=line_ids)
     message_list = []
     for line in lines:
-        message_list.append(make_line_item_sync_message_from_line(line))  # noqa: PERF401
+        message_list.append(
+            make_line_item_sync_message_from_line(line)
+        )  # noqa: PERF401
     return message_list
 
 
@@ -262,7 +265,9 @@ def make_product_create_message_list_from_product_ids(
     message_list = []
     products = Product.objects.filter(id__in=product_ids)
     for product in products:
-        message_list.append(make_product_sync_message_from_product(product))  # noqa: PERF401
+        message_list.append(
+            make_product_sync_message_from_product(product)
+        )  # noqa: PERF401
     return message_list
 
 
