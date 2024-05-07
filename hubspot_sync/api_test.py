@@ -2,9 +2,6 @@
 
 import json
 
-
-import json
-
 import pytest
 import reversion
 from django.contrib.contenttypes.models import ContentType
