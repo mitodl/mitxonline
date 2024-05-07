@@ -10,5 +10,9 @@ class Command(BaseCommand):
 
     help = __doc__
 
-    def handle(self):
-        create_featured_items()
+    def handle(self, *args, **options):  # pylint: disable=unused-argument  # noqa: ARG002
+        self.stdout.write("Generating new featured courses for the CMS home page")
+        featured_courses = create_featured_items()
+        self.stdout.write("Featured courses set in cache")
+        for featured_course in featured_courses:
+            self.stdout.write(f"{featured_course}")

@@ -76,15 +76,29 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
         return None
 
 
-def get_enrollable_courseruns_qs(enrollment_end_date):
-    """Returns all course runs that are open for enrollment."""
+def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
+    """
+    Returns all course runs that are open for enrollment.
+
+    args:
+        enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
+        valid_courses: Queryset of Course objects, to filter the course runs by if needed
+    """
     now = now_in_utc()
-    return CourseRun.objects.filter(
+    if enrollment_end_date is None:
+        enrollment_end_date = now
+
+    valid_course_runs = CourseRun.objects.filter(
         Q(live=True)
         & Q(start_date__isnull=False)
         & Q(enrollment_start__lt=now)
         & (Q(enrollment_end=None) | Q(enrollment_end__gt=enrollment_end_date))
     )
+
+    if valid_courses:
+        return valid_course_runs.filter(course__in=valid_courses)
+
+    return valid_course_runs
 
 
 def get_unenrollable_courseruns_qs():
@@ -92,6 +106,28 @@ def get_unenrollable_courseruns_qs():
     now = now_in_utc()
     return CourseRun.objects.filter(
         Q(live=False) | Q(start_date__isnull=True) | (Q(enrollment_end__lte=now))
+    )
+
+
+def get_self_paced_courses(queryset, enrollment_end_date=None):
+    """Returns all course runs that are self-paced."""
+    now = now_in_utc()
+    if enrollment_end_date is None:
+        enrollment_end_date = now
+    course_ids = queryset.values_list("id", flat=True)
+    all_runs = CourseRun.objects.filter(
+        Q(live=True)
+        & Q(course_id__in=course_ids)
+        & Q(start_date__isnull=False)
+        & Q(enrollment_start__lt=now)
+        & (Q(enrollment_end=None) | Q(enrollment_end__gt=enrollment_end_date))
+    )
+    self_paced_runs = all_runs.filter(is_self_paced=True)
+    return (
+        queryset.prefetch_related(Prefetch("courseruns", queryset=self_paced_runs))
+        .prefetch_related("courseruns__course")
+        .filter(courseruns__id__in=self_paced_runs.values_list("id", flat=True))
+        .distinct()
     )
 
 

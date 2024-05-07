@@ -19,7 +19,9 @@ from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
 from cms.exceptions import WagtailSpecificPageError
 from cms.models import Page
 from courses.models import Course, Program
-from courses.utils import get_enrollable_courses
+from courses.utils import (
+    get_enrollable_courseruns_qs,
+)
 
 log = logging.getLogger(__name__)
 DEFAULT_HOMEPAGE_PROPS = dict(  # noqa: C408
@@ -324,23 +326,44 @@ def create_featured_items():
 
     now = now_in_utc()
     end_of_day = now + timedelta(days=1)
-    enrollable_courses = get_enrollable_courses(
-        Course.objects.select_related("page").filter(page__live=True, live=True),
+
+    enrollable_courseruns = get_enrollable_courseruns_qs(
         end_of_day,
+        Course.objects.select_related("page").filter(page__live=True, live=True),
     )
-    enrollable_courses = enrollable_courses.order_by("?")
-    self_paced_featured_courses = enrollable_courses.filter(self_paced=True)[:2]
-    random_featured_courses = enrollable_courses.prefetch_related(
-        "first_unexpired_run"
-    ).exclude(id__in=self_paced_featured_courses.values_list("id", flat=True))[:20]
 
-    future_featured_courses = random_featured_courses.filter(
-        first_unexpired_run__start_date__gt=now
-    ).order_by("first_unexpired_run__start_date")
-    started_featured_courses = random_featured_courses - future_featured_courses
+    # Figure out which courses are self-paced and select 2 at random
+    enrollable_self_paced_courseruns = enrollable_courseruns.filter(is_self_paced=True)
+    self_paced_featured_courseruns = enrollable_self_paced_courseruns.order_by("?")[:2]
+    self_paced_featured_courses = Course.objects.filter(
+        id__in=self_paced_featured_courseruns.values_list("course_id", flat=True)
+    )
 
+    # Select 20 random courses that are not self-paced
+    random_featured_courseruns = enrollable_courseruns.exclude(
+        id__in=self_paced_featured_courseruns.values_list("id", flat=True)
+    ).order_by("?")[:20]
+
+    # Split them into future and started courses, order the future courses by start_date, the rest do not matter, so we leave them as is to save time
+    future_featured_course_ids = [
+        courserun
+        for courserun in random_featured_courseruns
+        if courserun.start_date >= now
+    ]
+    future_featured_course_ids.sort(key=lambda courserun: courserun.start_date)
+    future_featured_courses = Course.objects.filter(id__in=future_featured_course_ids)
+
+    started_featured_course_ids = [
+        courserun.course.id
+        for courserun in random_featured_courseruns
+        if courserun.start_date < now
+    ]
+    started_featured_courses = Course.objects.filter(id__in=started_featured_course_ids)
+
+    # Union all the featured courses together
     featured_courses = (
         self_paced_featured_courses | future_featured_courses | started_featured_courses
     )
     # Set the value in cache for 24 hours
     cache.set("CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE)
+    return featured_courses
