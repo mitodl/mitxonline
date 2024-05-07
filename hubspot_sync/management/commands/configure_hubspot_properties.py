@@ -2,12 +2,9 @@
 Management command to configure custom Hubspot properties for Contacts, Deals, Products, and Line Items
 """
 
-
 import sys
 
 from django.core.management import BaseCommand
-from courses.constants import ALL_ENROLL_CHANGE_STATUSES
-from courses.models import CourseRun, Program
 from mitol.hubspot_api.api import (
     delete_object_property,
     delete_property_group,
@@ -18,6 +15,7 @@ from mitol.hubspot_api.api import (
 )
 
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
+from courses.models import CourseRun, Program
 from ecommerce import models
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,

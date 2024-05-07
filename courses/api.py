@@ -804,7 +804,7 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
                 user=user, course_run=course_run
             )
             sync_hubspot_user(user)
-            return certificate, created, False # noqa: TRY300
+            return certificate, created, False  # noqa: TRY300
         except IntegrityError:
             log.warning(
                 f"IntegrityError caught processing certificate for {course_run.courseware_id} for user {user} - certificate was likely already revoked."  # noqa: G004

@@ -5,16 +5,15 @@ from decimal import Decimal
 from django.conf import settings
 from mitol.hubspot_api.api import format_app_id
 from rest_framework import serializers
-from users.serializers import UserSerializer
-from courses.models import CourseRunCertificate, ProgramCertificate
 
-from courses.models import CourseRunEnrollment
+from courses.models import CourseRunCertificate, CourseRunEnrollment, ProgramCertificate
 from ecommerce import models
 from ecommerce.constants import DISCOUNT_TYPE_DOLLARS_OFF, DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.discounts import resolve_product_version
 from ecommerce.models import Product
 from hubspot_sync.api import format_product_name, get_hubspot_id_for_object
 from main.utils import format_decimal
+from users.serializers import UserSerializer
 
 """
 Map order state to hubspot ids for pipeline stages
