@@ -17,12 +17,12 @@ def exception_logging_generator(generator):
     while True:
         try:
             yield next(generator)
-        except StopIteration:
+        except StopIteration:  # noqa: PERF203
             return
         except HTTPError as exc:
-            log.exception("EdX API error for fetching user grades %s:", exc)
+            log.exception("EdX API error for fetching user grades %s:", exc)  # noqa: TRY401
         except Exception as exp:  # pylint: disable=broad-except
-            log.exception("Error fetching user grades from edX %s:", exp)
+            log.exception("Error fetching user grades from edX %s:", exp)  # noqa: TRY401
 
 
 def is_grade_valid(override_grade: float):

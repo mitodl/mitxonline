@@ -1,6 +1,7 @@
 """
 Django App
 """
+
 from django.apps import AppConfig
 
 
@@ -10,4 +11,4 @@ class CoursesConfig(AppConfig):
     name = "courses"
 
     def ready(self):
-        from courses import signals
+        pass

@@ -1,6 +1,7 @@
 """
 Clears and regenerates the OAuth tokens for the specified learner.
 """
+
 from argparse import RawTextHelpFormatter
 
 from django.core.management import BaseCommand
@@ -33,7 +34,7 @@ class Command(BaseCommand):
             help="The ID, username or email address to reset.",
         )
 
-    def handle(self, *args, **kwargs):
+    def handle(self, *args, **kwargs):  # noqa: ARG002
         self.stdout.write(f"Looking for {kwargs['username']}...")
 
         user = fetch_users([kwargs["username"]])

@@ -168,7 +168,7 @@ In Open edX (derived from instructions `here <https://edx.readthedocs.io/project
 
     * Linux users: The gateway IP of the docker-compose networking setup for mitxonline as found via ``docker network inspect mitx-online_default``
     * OSX users: Use ``host.docker.internal``
-    
+
   * Save the configuration.
 
 

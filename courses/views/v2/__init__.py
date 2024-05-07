@@ -9,13 +9,20 @@ from mitol.common.utils import now_in_utc
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 
-from courses.models import Course, CourseRun, Department, Program
-from courses.serializers.v2.courses import CourseWithCourseRunsSerializer
+from courses.models import (
+    Course,
+    CourseRun,
+    Department,
+    Program,
+)
+from courses.serializers.v2.courses import (
+    CourseWithCourseRunsSerializer,
+)
 from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,
 )
 from courses.serializers.v2.programs import ProgramSerializer
-from courses.utils import get_enrollable_courseruns_qs
+from courses.utils import get_courses_based_on_enrollment
 
 
 class Pagination(PageNumberPagination):

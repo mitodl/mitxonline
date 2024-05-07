@@ -1,11 +1,8 @@
-import json
 from decimal import Decimal
 
 import pytest
 import reversion
 from dateutil.parser import parse
-from django.contrib.auth.models import AnonymousUser
-from django.test import RequestFactory
 from django.urls import reverse
 from mitol.common.utils import now_in_utc
 
@@ -30,7 +27,6 @@ from ecommerce.serializers import (
     BasketSerializer,
     BasketWithProductSerializer,
     CourseRunProductPurchasableObjectSerializer,
-    OrderReceiptSerializer,
     ProductFlexibilePriceSerializer,
     ProductSerializer,
     ProgramRunProductPurchasableObjectSerializer,
@@ -39,17 +35,16 @@ from ecommerce.serializers import (
     TransactionPurchaserSerializer,
     TransactionPurchaseSerializer,
 )
-from ecommerce.views_test import create_basket, payment_gateway_settings
+from ecommerce.views_test import create_basket
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
-from flexiblepricing.models import FlexiblePrice
 from main.test_utils import assert_drf_json_equal
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
 
-@pytest.fixture()
+@pytest.fixture
 def products():
     with reversion.create_revision():
         return ProductFactory.create_batch(5)
@@ -218,7 +213,7 @@ def test_basket_with_product_serializer():
 
 
 @pytest.mark.parametrize(
-    "discount_amount, discount_type",
+    "discount_amount, discount_type",  # noqa: PT006
     [
         (0, DISCOUNT_TYPE_PERCENT_OFF),
         (50, DISCOUNT_TYPE_PERCENT_OFF),
@@ -274,7 +269,7 @@ def create_order_receipt(mocker, user, products, user_client):
         "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
         return_value=True,
     )
-    basket = create_basket(user, products)
+    basket = create_basket(user, products)  # noqa: F841
 
     resp = user_client.post(reverse("checkout_api-start_checkout"))
 
@@ -320,16 +315,16 @@ def get_test_order_data(order, receipt_data):
             "street_address": [],
         },
         "receipt": {
-            "card_number": receipt_data["req_card_number"]
+            "card_number": receipt_data["req_card_number"]  # noqa: SIM401
             if "req_card_number" in receipt_data
             else None,
             "card_type": CYBERSOURCE_CARD_TYPES[receipt_data["req_card_type"]]
             if "req_card_type" in receipt_data
             else None,
-            "payment_method": receipt_data["req_payment_method"]
+            "payment_method": receipt_data["req_payment_method"]  # noqa: SIM401
             if "req_payment_method" in receipt_data
             else None,
-            "bill_to_email": receipt_data["req_bill_to_email"]
+            "bill_to_email": receipt_data["req_bill_to_email"]  # noqa: SIM401
             if "req_bill_to_email" in receipt_data
             else None,
             "name": f"{receipt_data['req_bill_to_forename']} {receipt_data['req_bill_to_surname']}"
@@ -351,7 +346,7 @@ def get_receipt_serializer_test_data(mocker, user, products, user_client):
 def test_order_receipt_purchase_serializer(
     settings, mocker, user, products, user_client
 ):
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     (order, test_data) = get_receipt_serializer_test_data(
         mocker, user, products, user_client
     )
@@ -364,7 +359,7 @@ def test_order_receipt_purchase_serializer(
 def test_order_receipt_purchaser_serializer(
     settings, mocker, user, products, user_client
 ):
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     (order, test_data) = get_receipt_serializer_test_data(
         mocker, user, products, user_client
     )
@@ -375,7 +370,7 @@ def test_order_receipt_purchaser_serializer(
 
 
 def test_order_receipt_order_serializer(settings, mocker, user, products, user_client):
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     (order, test_data) = get_receipt_serializer_test_data(
         mocker, user, products, user_client
     )
@@ -387,7 +382,7 @@ def test_order_receipt_order_serializer(settings, mocker, user, products, user_c
 
 
 def test_order_receipt_lines_serializer(settings, mocker, user, products, user_client):
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     (order, test_data) = get_receipt_serializer_test_data(
         mocker, user, products, user_client
     )
@@ -409,11 +404,9 @@ def test_order_receipt_lines_serializer(settings, mocker, user, products, user_c
             readable_id = content_object.program.readable_id
         elif isinstance(content_object, CourseRun):
             readable_id = content_object.course.readable_id
-            content_title = "{} {}".format(
-                content_object.course_number, content_object.title
-            )
+            content_title = f"{content_object.course_number} {content_object.title}"
 
-        line = dict(
+        line = dict(  # noqa: C408
             quantity=instance.quantity,
             total_paid=str(total_paid),
             discount=str(discount),

@@ -1,7 +1,9 @@
 """API functionality for the CMS app"""
+
 import logging
+
 from datetime import timedelta
-from typing import Tuple, Union
+from typing import Tuple, Union  # noqa: UP035
 from urllib.parse import urlencode, urljoin
 
 from django.conf import settings
@@ -16,18 +18,18 @@ from wagtail.rich_text import RichText
 from cms import models as cms_models
 from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
 from cms.exceptions import WagtailSpecificPageError
-from cms.models import Page
+from cms.models import Page  # noqa: F811
 from courses.models import Course, Program
 from courses.utils import get_courses_based_on_enrollment
 
 log = logging.getLogger(__name__)
-DEFAULT_HOMEPAGE_PROPS = dict(
+DEFAULT_HOMEPAGE_PROPS = dict(  # noqa: C408
     title="Home Page",
     hero_title="Lorem ipsum dolor",
     hero_subtitle="Enim ad minim veniam, quis nostrud exercitation",
 )
-DEFAULT_SITE_PROPS = dict(hostname="localhost", port=80)
-COURSE_INDEX_PAGE_PROPERTIES = dict(title="Courses")
+DEFAULT_SITE_PROPS = dict(hostname="localhost", port=80)  # noqa: C408
+COURSE_INDEX_PAGE_PROPERTIES = dict(title="Courses")  # noqa: C408
 RESOURCE_PAGE_TITLES = [
     "About Us",
     "Terms of Service",
@@ -35,11 +37,11 @@ RESOURCE_PAGE_TITLES = [
     "Honor Code",
 ]
 RESOURCE_PAGE_SLUGS = [slugify(title) for title in RESOURCE_PAGE_TITLES]
-PROGRAM_INDEX_PAGE_PROPERTIES = dict(title="Programs")
+PROGRAM_INDEX_PAGE_PROPERTIES = dict(title="Programs")  # noqa: C408
 HOMEPAGE_CACHE_AGE = 86400  # 24 hours
 
 
-def get_home_page(raise_if_missing=True, check_specific=False) -> Page:
+def get_home_page(raise_if_missing=True, check_specific=False) -> Page:  # noqa: FBT002
     """
     Returns an instance of the home page (all of our Wagtail pages are expected to be descendants of this home page)
 
@@ -97,7 +99,7 @@ def ensure_resource_pages() -> None:
         resource_page.save_revision().publish()
 
 
-def ensure_home_page_and_site() -> Tuple[cms_models.HomePage, Site]:
+def ensure_home_page_and_site() -> Tuple[cms_models.HomePage, Site]:  # noqa: UP006
     """
     Ensures that Wagtail is configured with a home page of the right type, and that
     the home page is configured as the default site.
@@ -252,7 +254,10 @@ def get_wagtail_img_src(image_obj) -> str:
 
 
 def create_default_courseware_page(
-    courseware: Union[Course, Program], live: bool = False, *args, **kwargs
+    courseware: Union[Course, Program],  # noqa: FA100
+    live: bool = False,  # noqa: FBT001, FBT002
+    *args,  # noqa: ARG001
+    **kwargs,  # noqa: ARG001
 ):
     """
     Creates a default about page for the given courseware object. Created pages
@@ -290,8 +295,8 @@ def create_default_courseware_page(
         else:
             parent_page = ProgramIndexPage.objects.filter(live=True).get()
             page = ProgramPage(program=courseware, **page_framework)
-    except:
-        raise ValidationError(f"No valid index page found for {courseware}.")
+    except:  # noqa: E722
+        raise ValidationError(f"No valid index page found for {courseware}.")  # noqa: B904, EM102
 
     parent_page.add_child(instance=page)
 

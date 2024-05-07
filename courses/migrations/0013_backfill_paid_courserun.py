@@ -21,7 +21,6 @@ def backfill_paidcourserun(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("courses", "0012_paidcourserun"),
     ]

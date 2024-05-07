@@ -1,7 +1,7 @@
 ``refund_fulfilled_order``
 ==========================
 
-Looks up a fulfilled order in the system, sets it to Refunded, and then adjusts the enrollments accordingly. 
+Looks up a fulfilled order in the system, sets it to Refunded, and then adjusts the enrollments accordingly.
 
 - If --unenroll is specified, the learner will be unenrolled from the course run associated with the order.
 - If --audit is specified, the learner will keep their unenrollments, but they will be set to "audit" instead of "verified".

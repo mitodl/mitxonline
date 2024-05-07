@@ -1,10 +1,11 @@
 """Factory for Users"""
+
 import random
 from datetime import datetime
 
-from factory import Faker, RelatedFactory, SubFactory, Trait, fuzzy
+from factory import Faker, RelatedFactory, SubFactory
 from factory.django import DjangoModelFactory
-from factory.fuzzy import FuzzyChoice, FuzzyText
+from factory.fuzzy import FuzzyText
 from social_django.models import UserSocialAuth
 
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
@@ -58,8 +59,8 @@ class UserProfileFactory(DjangoModelFactory):
 
     user = SubFactory("users.factories.UserFactory")
 
-    year_of_birth = datetime.now().year - random.randint(1, 100)
-    gender = GENDER_CHOICES[random.randint(0, len(GENDER_CHOICES) - 1)][0]
+    year_of_birth = datetime.now().year - random.randint(1, 100)  # noqa: S311, DTZ005
+    gender = GENDER_CHOICES[random.randint(0, len(GENDER_CHOICES) - 1)][0]  # noqa: S311
 
     class Meta:
         model = UserProfile

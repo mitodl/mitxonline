@@ -1,6 +1,6 @@
 """User app utility functions"""
+
 import logging
-import math
 import re
 from datetime import datetime
 from email.utils import formataddr
@@ -20,8 +20,8 @@ USERNAME_SEPARATOR = "-"
 # Characters that should be replaced by the specified separator character
 USERNAME_SEPARATOR_REPLACE_CHARS = "\\s_"
 # Characters that should be removed entirely from the full name to create the username
-USERNAME_INVALID_CHAR_PATTERN = r"[^\w{}{}]|[\d]".format(
-    USERNAME_SEPARATOR_REPLACE_CHARS, USERNAME_SEPARATOR
+USERNAME_INVALID_CHAR_PATTERN = (
+    rf"[^\w{USERNAME_SEPARATOR_REPLACE_CHARS}{USERNAME_SEPARATOR}]|[\d]"
 )
 
 USERNAME_TURKISH_I_CHARS = r"[ıİ]"
@@ -29,8 +29,8 @@ USERNAME_TURKISH_I_CHARS_REPLACEMENT = "i"
 
 # Pattern for chars to replace with a single separator. The separator character itself
 # is also included in this pattern so repeated separators are squashed down.
-USERNAME_SEPARATOR_REPLACE_PATTERN = r"[{}{}]+".format(
-    USERNAME_SEPARATOR_REPLACE_CHARS, USERNAME_SEPARATOR
+USERNAME_SEPARATOR_REPLACE_PATTERN = (
+    rf"[{USERNAME_SEPARATOR_REPLACE_CHARS}{USERNAME_SEPARATOR}]+"
 )
 
 
@@ -79,9 +79,7 @@ def usernameify(full_name, email=""):
         username = _reformat_for_username(email.split("@")[0])
     if not username:
         raise ValueError(
-            "Username could not be generated (full_name: '{}', email: '{}')".format(
-                full_name, email
-            )
+            f"Username could not be generated (full_name: '{full_name}', email: '{email}')"  # noqa: EM102
         )
     return username[0:USERNAME_MAX_LEN]
 
@@ -125,7 +123,7 @@ def ensure_active_user(user):
             if created_auth_token:
                 log.info("Created edX auth token for %s", user.email)
         except HTTPError as exc:
-            log.error(
+            log.error(  # noqa: TRY400
                 "%s (%s): Failed to repair (%s)",
                 user.username,
                 user.email,

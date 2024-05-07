@@ -1,8 +1,12 @@
 """
 Periodic task that updates currency exchange rates.
 """
-import requests
+
 import logging
+from urllib.parse import quote_plus, urljoin
+
+import requests
+from django.conf import settings
 
 from flexiblepricing.api import update_currency_exchange_rate
 from flexiblepricing.exceptions import (
@@ -15,8 +19,6 @@ from flexiblepricing.mail_api import (
 )
 from flexiblepricing.models import FlexiblePrice
 from main.celery import app
-from django.conf import settings
-from urllib.parse import quote_plus, urljoin
 
 
 def get_open_exchange_rates_url(endpoint):
@@ -54,23 +56,23 @@ def sync_currency_exchange_rates():
     log.info("Loading currency code descriptions")
 
     currency_codes = {}
-    resp = requests.get(get_open_exchange_rates_url("currencies.json"))
+    resp = requests.get(get_open_exchange_rates_url("currencies.json"))  # noqa: S113
     if resp:
         resp_json = resp.json()
-        if resp.status_code == 429:
+        if resp.status_code == 429:  # noqa: PLR2004
             raise ExceededAPICallsException(resp_json["description"])
-        if resp.status_code != 200:
+        if resp.status_code != 200:  # noqa: PLR2004
             raise UnexpectedAPIErrorException(resp_json["description"])
         currency_codes = resp_json
 
     log.info("Updating exchange rate data")
 
-    resp = requests.get(get_open_exchange_rates_url("latest.json"))
+    resp = requests.get(get_open_exchange_rates_url("latest.json"))  # noqa: S113
     resp_json = resp.json()
     # check specifically if maximum number of api calls per month has been exceeded
-    if resp.status_code == 429:
+    if resp.status_code == 429:  # noqa: PLR2004
         raise ExceededAPICallsException(resp_json["description"])
-    if resp.status_code != 200:  # check for other API errors
+    if resp.status_code != 200:  # check for other API errors  # noqa: PLR2004
         raise UnexpectedAPIErrorException(resp_json["description"])
     latest_rates = resp_json["rates"]
 

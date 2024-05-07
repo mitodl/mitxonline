@@ -1,18 +1,18 @@
 import json
-import reversion
 
-from django.db import models
+import reversion
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-
-from ecommerce.models import Discount
-from main.utils import serialize_model_object
-from main.settings import AUTH_USER_MODEL
+from django.db import models
 from mitol.common.models import TimestampedModel
-from flexiblepricing.constants import FlexiblePriceStatus
 from wagtail.contrib.forms.models import (
     AbstractFormSubmission,
 )
+
+from ecommerce.models import Discount
+from flexiblepricing.constants import FlexiblePriceStatus
+from main.settings import AUTH_USER_MODEL
+from main.utils import serialize_model_object
 
 
 def valid_courseware_types_list():
@@ -27,12 +27,12 @@ class CurrencyExchangeRate(TimestampedModel):
     """
 
     currency_code = models.CharField(null=False, unique=True, max_length=3)
-    description = models.CharField(max_length=100, null=True, blank=True)
+    description = models.CharField(max_length=100, null=True, blank=True)  # noqa: DJ001
     exchange_rate = models.FloatField()  # how much foreign currency is per 1 USD
 
     def __str__(self):
-        return "{code}: 1 USD = {rate} {code}".format(
-            rate=self.exchange_rate, code=self.currency_code
+        return (
+            f"{self.currency_code}: 1 USD = {self.exchange_rate} {self.currency_code}"
         )
 
 
@@ -97,11 +97,11 @@ class FlexiblePrice(TimestampedModel):
     )
     income_usd = models.FloatField(null=True)
     original_income = models.FloatField(null=True)
-    original_currency = models.CharField(null=True, max_length=10)
-    country_of_income = models.CharField(null=True, max_length=100)
+    original_currency = models.CharField(null=True, max_length=10)  # noqa: DJ001
+    country_of_income = models.CharField(null=True, max_length=100)  # noqa: DJ001
     date_exchange_rate = models.DateTimeField(null=True)
     date_documents_sent = models.DateField(null=True, blank=True)
-    justification = models.TextField(null=True, blank=True)
+    justification = models.TextField(null=True, blank=True)  # noqa: DJ001
     country_of_residence = models.TextField(blank=True)
     cms_submission = models.ForeignKey(
         FlexiblePricingRequestSubmission,
@@ -140,13 +140,11 @@ class FlexiblePrice(TimestampedModel):
         return serialize_model_object(self)
 
     def __str__(self):
-        return 'FP for user "{user}" in status "{status}"'.format(
-            user=self.user.username, status=self.status
-        )
+        return f'FP for user "{self.user.username}" in status "{self.status}"'
 
     def is_approved(self):
         return (
-            self.status == FlexiblePriceStatus.APPROVED
+            self.status == FlexiblePriceStatus.APPROVED  # noqa: PLR1714
             or self.status == FlexiblePriceStatus.AUTO_APPROVED
         )
 

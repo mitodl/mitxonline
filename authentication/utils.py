@@ -1,4 +1,5 @@
 """Authentication utils"""
+
 import hashlib
 
 from social_core.utils import get_strategy
@@ -15,7 +16,7 @@ class SocialAuthState:  # pylint: disable=too-many-instance-attributes
 
     # login states
     STATE_LOGIN_EMAIL = "login/email"
-    STATE_LOGIN_PASSWORD = "login/password"
+    STATE_LOGIN_PASSWORD = "login/password"  # noqa: S105
     STATE_LOGIN_PROVIDER = "login/provider"
 
     # registration states
@@ -35,7 +36,7 @@ class SocialAuthState:  # pylint: disable=too-many-instance-attributes
     STATE_INVALID_LINK = "invalid-link"
     STATE_EXISTING_ACCOUNT = "existing-account"
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         state,
         *,
@@ -70,7 +71,7 @@ def load_drf_strategy(request=None):
 
 def get_md5_hash(value):
     """Returns the md5 hash object for the given value"""
-    return hashlib.md5(value.lower().encode("utf-8"))
+    return hashlib.md5(value.lower().encode("utf-8"))  # noqa: S324
 
 
 def is_user_email_blocked(email):
@@ -88,11 +89,7 @@ def block_user_email(email):
             hashed_email=hash_object.hexdigest()
         )
         if created:
-            msg = "Email {email} is added to the blocklist of MITx Online.".format(
-                email=email
-            )
+            msg = f"Email {email} is added to the blocklist of MITx Online."
         else:
-            msg = "Email {email} is already marked blocked for MITx Online.".format(
-                email=email
-            )
+            msg = f"Email {email} is already marked blocked for MITx Online."
     return msg

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run Django shell with imported modules"""
+
 if __name__ == "__main__":
     import os
 
@@ -7,16 +8,16 @@ if __name__ == "__main__":
         import sys
         from subprocess import check_call
 
-        base_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.dirname(os.path.abspath(__file__))  # noqa: PTH100, PTH120
 
         sys.exit(
             check_call(
-                [
-                    os.path.join(base_dir, "manage.py"),
+                [  # noqa: S603
+                    os.path.join(base_dir, "manage.py"),  # noqa: PTH118
                     "shell",
                     *sys.argv[1:],
                 ],
-                env={**os.environ, "PYTHONSTARTUP": os.path.join(base_dir, "repl.py")},
+                env={**os.environ, "PYTHONSTARTUP": os.path.join(base_dir, "repl.py")},  # noqa: PTH118
             )
         )
 
@@ -24,9 +25,7 @@ if __name__ == "__main__":
     from django.conf import settings
 
     for app in settings.INSTALLED_APPS:
-        try:
-            exec(
-                "from {app}.models import *".format(app=app)
-            )  # pylint: disable=exec-used
-        except ModuleNotFoundError:
+        try:  # noqa: SIM105
+            exec(f"from {app}.models import *")  # pylint: disable=exec-used  # noqa: S102
+        except ModuleNotFoundError:  # noqa: PERF203
             pass

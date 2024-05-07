@@ -62,7 +62,7 @@ class Command(BaseCommand):
             help="Tiers to create in CSV format: threshold,discount type,discount amount",
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002, C901, PLR0915
         # Ensure that either course or program is defined.
         if not any(x in kwargs for x in ["course", "program"]):
             self.stderr.write(
@@ -70,7 +70,7 @@ class Command(BaseCommand):
                     "--course or --program must be specified as arguments when running the command."
                 )
             )
-            exit(-1)
+            exit(-1)  # noqa: PLR1722
 
         try:
             course = (
@@ -78,9 +78,9 @@ class Command(BaseCommand):
                 if "course" in kwargs and kwargs["course"] is not None
                 else None
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             raise CommandError(
-                f"Couldn't find the course {kwargs['course']}, stopping."
+                f"Couldn't find the course {kwargs['course']}, stopping."  # noqa: EM102
             ) from exc
 
         try:
@@ -89,9 +89,9 @@ class Command(BaseCommand):
                 if "program" in kwargs and kwargs["program"] is not None
                 else None
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             raise CommandError(
-                f"Couldn't find the program {kwargs['program']}, stopping."
+                f"Couldn't find the program {kwargs['program']}, stopping."  # noqa: EM102
             ) from exc
 
         discount_abbrev = (
@@ -100,7 +100,7 @@ class Command(BaseCommand):
             else course.readable_id
         )
 
-        current_year = date.today().year
+        current_year = date.today().year  # noqa: DTZ011
         last_year = datetime(
             current_year - 1, 1, 1, tzinfo=pytz.timezone(settings.TIME_ZONE)
         )

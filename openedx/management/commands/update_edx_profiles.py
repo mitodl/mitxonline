@@ -1,6 +1,7 @@
 """
 Management command to sync local profiles with edX
 """
+
 import sys
 
 from django.contrib.auth import get_user_model
@@ -10,7 +11,7 @@ from openedx.api import update_edx_user_profile
 from users.api import fetch_user
 from users.models import User
 
-User = get_user_model()
+User = get_user_model()  # noqa: F811
 
 
 class Command(BaseCommand):
@@ -33,12 +34,12 @@ class Command(BaseCommand):
             help="Sync all users in the system (this may take a long time).",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         if not options["all"] and "user" in options:
             try:
                 users = [fetch_user(options["user"])]
             except User.DoesNotExist as exc:
-                self.stderr.write(self.style.ERROR(f"{str(exc)}"))
+                self.stderr.write(self.style.ERROR(f"{exc!s}"))
                 sys.exit(1)
         elif options["all"]:
             users = User.objects.all()
@@ -54,9 +55,9 @@ class Command(BaseCommand):
             self.stdout.write(f"Updating profile for '{user.username}' ({user.email})")
 
             try:
-                result = update_edx_user_profile(user)
+                result = update_edx_user_profile(user)  # noqa: F841
                 successes += 1
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.stdout.write(
                     self.style.ERROR(
                         f"Sync did not complete successfully for user {user.username}: {e}"

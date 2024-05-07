@@ -1,4 +1,5 @@
 """Management command to change enrollment status"""
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.management.base import CommandError
@@ -44,7 +45,7 @@ class Command(EnrollmentChangeCommand):
         )
         super().add_arguments(parser)
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         """Handle command execution"""
         user = fetch_user(options["user"])
         from_courseware_id = options["from_run"]
@@ -60,34 +61,26 @@ class Command(EnrollmentChangeCommand):
             )
         except ObjectDoesNotExist as exc:
             if isinstance(exc, CourseRunEnrollment.DoesNotExist):
-                message = "'from' course run enrollment does not exist ({})".format(
-                    from_courseware_id
-                )
+                message = f"'from' course run enrollment does not exist ({from_courseware_id})"
             elif isinstance(exc, CourseRun.DoesNotExist):
-                message = "'to' course does not exist ({})".format(to_courseware_id)
+                message = f"'to' course does not exist ({to_courseware_id})"
             else:
                 message = str(exc)
-            raise CommandError(message)
+            raise CommandError(message)  # noqa: B904
         except ValidationError as exc:
-            raise CommandError("Invalid enrollment deferral - {}".format(exc))
-        except Exception as exc:
-            raise CommandError("{}".format(exc))
+            raise CommandError(f"Invalid enrollment deferral - {exc}")  # noqa: B904, EM102
+        except Exception as exc:  # noqa: BLE001
+            raise CommandError(f"{exc}")  # noqa: B904, EM102
         else:
             if not to_enrollment:
                 raise CommandError(
-                    "Failed to create/update the target enrollment ({})".format(
-                        to_courseware_id
-                    )
+                    f"Failed to create/update the target enrollment ({to_courseware_id})"  # noqa: EM102
                 )
 
         self.stdout.write(
             self.style.SUCCESS(
-                "Deferred enrollment for user: {}\n"
-                "Enrollment deactivated: {}\n"
-                "Enrollment created/updated: {}".format(
-                    user,
-                    enrollment_summary(from_enrollment),
-                    enrollment_summary(to_enrollment),
-                )
+                f"Deferred enrollment for user: {user}\n"
+                f"Enrollment deactivated: {enrollment_summary(from_enrollment)}\n"
+                f"Enrollment created/updated: {enrollment_summary(to_enrollment)}"
             )
         )

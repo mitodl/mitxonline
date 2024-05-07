@@ -7,7 +7,7 @@ This operates in two modes: creating tiers for a program and creating tiers for 
 
 *In the tables below, <year> represents the current year.*
 
-**Configuring tiers for a course** 
+**Configuring tiers for a course**
 
 The command will use the readable ID of the course as part of the financial aid discounts. They will default to this:
 
@@ -35,7 +35,7 @@ DEDP-fa-tier3-<year> dollars-off 500
 DEDP-fa-tier4-<year> percent-off 0
 ==================== =========== ======
 
-Specify changes using ``--program`` and/or ``--program-abbrev``. 
+Specify changes using ``--program`` and/or ``--program-abbrev``.
 
 **Tiers**
 
@@ -75,11 +75,11 @@ Options
 Program options:
 
 * ``--program <readable id>`` - Program ID to use or create.
-* ``--program-abbrev <abbreviation>`` - Abbreviation to use for tiers and discounts. 
+* ``--program-abbrev <abbreviation>`` - Abbreviation to use for tiers and discounts.
 
 Course options:
 
-* ``--course <readable id>`` - Course ID to use. This won't create a course; use ``create_courseware`` for that. 
+* ``--course <readable id>`` - Course ID to use. This won't create a course; use ``create_courseware`` for that.
 
 Common options:
 

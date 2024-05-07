@@ -1,41 +1,30 @@
-import pytest
 import random
-from decimal import Decimal, getcontext
-from mitol.common.utils import now_in_utc
-from django.urls import reverse
+from decimal import Decimal
 
-from users.factories import UserFactory
+import pytest
 
-from reversion.models import Version
-
-from ecommerce.models import Basket, BasketItem, UserDiscount, BasketDiscount
-from ecommerce import api
-from ecommerce.factories import (
-    ProductFactory,
-    DiscountFactory,
-    OneTimeDiscountFactory,
-    OneTimePerUserDiscountFactory,
-    UnlimitedUseDiscountFactory,
-    SetLimitDiscountFactory,
-)
 from ecommerce.discounts import (
     DiscountType,
-    PercentDiscount,
-    FixedPriceDiscount,
     DollarsOffDiscount,
+    FixedPriceDiscount,
+    PercentDiscount,
 )
-from ecommerce.views_test import user
-from ecommerce.models_test import unlimited_discount
+from ecommerce.factories import (
+    DiscountFactory,
+    ProductFactory,
+    UnlimitedUseDiscountFactory,
+)
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
 
-@pytest.fixture()
+@pytest.fixture
 def products():
     return ProductFactory.create_batch(5)
 
 
-@pytest.fixture()
+@pytest.fixture
 def discounts():
     return DiscountFactory.create_batch(10)
 
@@ -91,7 +80,7 @@ def test_discount_factory_adjustment(discounts, products):
             else:
                 discounted_price = None
 
-            assert (
+            assert (  # noqa: PT018
                 discounted_price >= 0
                 and discounted_price == discount_logic.get_product_price(product)
             )
@@ -102,7 +91,7 @@ def test_discounted_price(products):
     Tests the get_discounted_price call with some products to make sure the
     discount is applied successfully.
     """
-    product = products[random.randrange(0, len(products), 1)]
+    product = products[random.randrange(0, len(products), 1)]  # noqa: S311
 
     applied_discounts = [UnlimitedUseDiscountFactory.create()]
 

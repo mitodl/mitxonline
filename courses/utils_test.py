@@ -4,7 +4,6 @@ Tests for utils
 """
 from datetime import timedelta
 
-import pytest
 from mitol.common.utils import now_in_utc
 
 from courses.factories import (
@@ -13,7 +12,8 @@ from courses.factories import (
     CourseRunFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
-    program_with_requirements,
+    ProgramFactory,  # noqa: F401
+    program_with_requirements,  # noqa: F401
 )
 from courses.models import Course
 from courses.utils import (
@@ -23,7 +23,7 @@ from courses.utils import (
 )
 
 
-def test_get_program_certificate_by_enrollment(user, program_with_requirements):
+def test_get_program_certificate_by_enrollment(user, program_with_requirements):  # noqa: F811
     """
     Test that get_program_certificate_by_enrollment returns a program certificate
     """
@@ -61,11 +61,12 @@ def test_get_program_certificate_by_enrollment_program_does_not_exist(user):
 
     course_enrollment = CourseRunEnrollmentFactory.create(user=user, run=course_run)
 
-    assert get_program_certificate_by_enrollment(course_enrollment) == None
+    assert get_program_certificate_by_enrollment(course_enrollment) == None  # noqa: E711
 
 
 def test_get_program_certificate_by_enrollment_program_page_does_not_exist(
-    user, program_with_requirements
+    user,
+    program_with_requirements,  # noqa: F811
 ):
     """
     Test that get_program_certificate_by_enrollment returns None if program page does not exist
@@ -89,12 +90,13 @@ def test_get_program_certificate_by_enrollment_program_page_does_not_exist(
     assert (
         get_program_certificate_by_enrollment(program_enrollment) != program_certificate
     )
-    assert get_program_certificate_by_enrollment(course_enrollment, program) == None
-    assert get_program_certificate_by_enrollment(program_enrollment) == None
+    assert get_program_certificate_by_enrollment(course_enrollment, program) == None  # noqa: E711
+    assert get_program_certificate_by_enrollment(program_enrollment) == None  # noqa: E711
 
 
 def test_get_program_certificate_by_enrollment_program_certificate_page_does_not_exist(
-    user, program_with_requirements
+    user,
+    program_with_requirements,  # noqa: F811
 ):
     """
     Test that get_program_certificate_by_enrollment returns None if program certificate page does not exist
@@ -118,8 +120,8 @@ def test_get_program_certificate_by_enrollment_program_certificate_page_does_not
     assert (
         get_program_certificate_by_enrollment(program_enrollment) != program_certificate
     )
-    assert get_program_certificate_by_enrollment(course_enrollment) == None
-    assert get_program_certificate_by_enrollment(program_enrollment) == None
+    assert get_program_certificate_by_enrollment(course_enrollment) == None  # noqa: E711
+    assert get_program_certificate_by_enrollment(program_enrollment) == None  # noqa: E711
 
 
 def test_get_enrollable_courseruns_qs():

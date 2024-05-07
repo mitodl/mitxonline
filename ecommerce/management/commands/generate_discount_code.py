@@ -33,7 +33,6 @@ import csv
 from django.core.management import BaseCommand
 
 from ecommerce.api import generate_discount_code
-from main.utils import parse_supplied_date
 
 
 class Command(BaseCommand):
@@ -111,13 +110,13 @@ class Command(BaseCommand):
             help="Discount codes to generate (ignored if --count is specified)",
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
         try:
             generated_codes = generate_discount_code(**kwargs)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.stderr.write(self.style.ERROR(e))
 
-        with open("generated-codes.csv", mode="w") as output_file:
+        with open("generated-codes.csv", mode="w") as output_file:  # noqa: PTH123
             writer = csv.DictWriter(
                 output_file, ["code", "type", "amount", "expiration_date"]
             )

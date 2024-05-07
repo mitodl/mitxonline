@@ -1,10 +1,11 @@
 """Tests for CMS template tags"""
+
 import pytest
 from wagtail_factories import ImageFactory
 
 from cms.factories import CoursePageFactory
-from cms.templatetags.wagtail_img_src import wagtail_img_src
 from cms.templatetags.feature_img_src import feature_img_src
+from cms.templatetags.wagtail_img_src import wagtail_img_src
 from courses.constants import DEFAULT_COURSE_IMG_PATH
 
 

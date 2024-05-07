@@ -1,4 +1,5 @@
 """Courses API tests"""
+
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
@@ -45,18 +46,18 @@ from courses.factories import (
     ProgramEnrollmentFactory,
     ProgramFactory,
     ProgramRequirementFactory,
-    program_with_empty_requirements,
-    program_with_requirements,
+    program_with_empty_requirements,  # noqa: F401
+    program_with_requirements,  # noqa: F401
 )
 
 # pylint: disable=redefined-outer-name
 from courses.models import (
     CourseRunEnrollment,
+    PaidCourseRun,
     ProgramCertificate,
     ProgramEnrollment,
     ProgramRequirement,
     ProgramRequirementNodeType,
-    PaidCourseRun,
 )
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order
@@ -90,13 +91,13 @@ def dates():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def course():
     """Course object fixture"""
     return CourseFactory.create()
 
 
-@pytest.fixture()
+@pytest.fixture
 def passed_grade_with_enrollment(user):
     """Fixture to produce a passed CourseRunGrade"""
     paid_enrollment = CourseRunEnrollmentFactory.create(
@@ -111,7 +112,7 @@ def passed_grade_with_enrollment(user):
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def courses_api_logs(mocker):
     """Logger fixture for tasks"""
     return mocker.patch("courses.api.log")
@@ -204,7 +205,7 @@ def test_get_user_relevant_course_run_ignore_enrolled(user, dates, course):
     assert returned_run == course_runs[0]
 
 
-def test_get_user_enrollments(user, program_with_empty_requirements):
+def test_get_user_enrollments(user, program_with_empty_requirements):  # noqa: F811
     """Test that get_user_enrollments returns an object with a user's program and course enrollments"""
     past_date = now_in_utc() - timedelta(days=1)
     past_start_dates = [
@@ -294,14 +295,14 @@ def test_get_user_enrollments(user, program_with_empty_requirements):
     separate_program = ProgramFactory.create()
     ProgramRequirementFactory.add_root(separate_program)
     root_node = separate_program.requirements_root
-    required_courses_node = root_node.add_child(
+    required_courses_node = root_node.add_child(  # noqa: F841
         node_type=ProgramRequirementNodeType.OPERATOR,
         operator=ProgramRequirement.Operator.ALL_OF,
         title="Required Courses",
     )
     separate_courserun = CourseRunFactory.create()
     separate_program.add_requirement(separate_courserun.course)
-    separate_courserun_enrollment = CourseRunEnrollmentFactory.create(
+    separate_courserun_enrollment = CourseRunEnrollmentFactory.create(  # noqa: F841
         run=separate_courserun, user=user
     )
 
@@ -370,7 +371,10 @@ def test_create_run_enrollments(
 
 @pytest.mark.parametrize("is_active", [True, False])
 def test_create_run_enrollments_upgrade(
-    mocker, user, is_active, program_with_empty_requirements
+    mocker,
+    user,
+    is_active,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     create_run_enrollments should call the edX API to create/update enrollments, and set the enrollment mode properly
@@ -410,7 +414,9 @@ def test_create_run_enrollments_upgrade(
 
 
 def test_create_run_enrollments_multiple_programs(
-    mocker, user, program_with_empty_requirements
+    mocker,
+    user,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     create_run_enrollments should enroll the user into any Programs which have the CourseRun's Course defined as a requirement or elective.
@@ -440,8 +446,8 @@ def test_create_run_enrollments_multiple_programs(
         title="Elective Courses",
     )
     program2.add_requirement(test_enrollment.run.course)
-    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
-    patched_send_enrollment_email = mocker.patch(
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")  # noqa: F841
+    patched_send_enrollment_email = mocker.patch(  # noqa: F841
         "courses.api.mail_api.send_course_run_enrollment_email"
     )
     mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
@@ -492,19 +498,19 @@ def test_create_run_enrollments_api_fail(mocker, user, exception_cls):
 
 @pytest.mark.parametrize("keep_failed_enrollments", [True, False])
 @pytest.mark.parametrize(
-    "exception_cls,inner_exception",
+    "exception_cls,inner_exception",  # noqa: PT006
     [
-        [EdxApiEnrollErrorException, MockHttpError()],
-        [UnknownEdxApiEnrollException, Exception()],
+        [EdxApiEnrollErrorException, MockHttpError()],  # noqa: PT007
+        [UnknownEdxApiEnrollException, Exception()],  # noqa: PT007
     ],
 )
-def test_create_run_enrollments_enroll_api_fail(
+def test_create_run_enrollments_enroll_api_fail(  # noqa: PLR0913
     mocker,
     user,
     keep_failed_enrollments,
     exception_cls,
     inner_exception,
-    program_with_empty_requirements,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     create_run_enrollments should log a message and still create local enrollment records when an enrollment exception
@@ -622,7 +628,7 @@ def test_create_program_enrollments_creation_fail(mocker, user):
 class TestDeactivateEnrollments:
     """Test cases for functions that deactivate enrollments"""
 
-    @pytest.fixture()
+    @pytest.fixture
     def patches(self, mocker):  # pylint: disable=missing-docstring
         edx_unenroll = mocker.patch("courses.api.unenroll_edx_course_run")
         send_unenrollment_email = mocker.patch(
@@ -701,7 +707,10 @@ class TestDeactivateEnrollments:
         assert enrollment.active is not keep_failed_enrollments
 
     def test_deactivate_program_enrollment(
-        self, user, patches, program_with_empty_requirements
+        self,
+        user,
+        patches,
+        program_with_empty_requirements,  # noqa: F811
     ):
         """
         deactivate_program_enrollment set the local program enrollment record to inactive as well as all
@@ -838,7 +847,7 @@ def test_defer_enrollment(
             paid_course_run.refresh_from_db()
             assert paid_course_run.course_run == course_runs[1]
         else:
-            with pytest.raises(Exception):
+            with pytest.raises(Exception):  # noqa: B017, PT011
                 defer_enrollment(
                     existing_enrollment.user,
                     existing_enrollment.run.courseware_id,
@@ -936,9 +945,9 @@ def test_defer_enrollment_validation(mocker, user):
 
 
 @pytest.mark.parametrize(
-    "mocked_api_response, expect_success",
+    "mocked_api_response, expect_success",  # noqa: PT006
     [
-        [
+        [  # noqa: PT007
             CourseDetail(
                 {
                     "id": "course-v1:edX+DemoX+2020_T1",
@@ -952,7 +961,7 @@ def test_defer_enrollment_validation(mocker, user):
             ),
             True,
         ],
-        [
+        [  # noqa: PT007
             CourseDetail(
                 {
                     "id": "course-v1:edX+DemoX+2020_T1",
@@ -966,7 +975,7 @@ def test_defer_enrollment_validation(mocker, user):
             ),
             True,
         ],
-        [
+        [  # noqa: PT007
             CourseDetail(
                 {
                     "id": "course-v1:edX+DemoX+2020_T1",
@@ -979,9 +988,9 @@ def test_defer_enrollment_validation(mocker, user):
             ),
             False,
         ],
-        [HTTPError(response=Mock(status_code=404)), False],
-        [HTTPError(response=Mock(status_code=400)), False],
-        [ConnectionError(), False],
+        [HTTPError(response=Mock(status_code=404)), False],  # noqa: PT007
+        [HTTPError(response=Mock(status_code=400)), False],  # noqa: PT007
+        [ConnectionError(), False],  # noqa: PT007
     ],
 )
 def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success):
@@ -989,7 +998,7 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
     Test that sync_course_runs fetches data from edX API. Should fail on API responding with
     an error, as well as trying to set the course run title to None
     """
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mocker.patch.object(CourseDetails, "get_detail", side_effect=[mocked_api_response])
     course_run = CourseRunFactory.create()
 
@@ -1011,9 +1020,9 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
 
 
 @pytest.mark.parametrize(
-    "mocked_api_response, expect_success",
+    "mocked_api_response, expect_success",  # noqa: PT006
     [
-        [
+        [  # noqa: PT007
             [
                 CourseMode(
                     {
@@ -1024,11 +1033,11 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
             ],
             True,
         ],
-        [
+        [  # noqa: PT007
             [CourseMode({"expiration_datetime": "", "mode_slug": "audit"})],
             True,
         ],
-        [
+        [  # noqa: PT007
             [
                 CourseMode({"expiration_datetime": "", "mode_slug": "audit"}),
                 CourseMode(
@@ -1040,9 +1049,9 @@ def test_sync_course_runs(settings, mocker, mocked_api_response, expect_success)
             ],
             True,
         ],
-        [HTTPError(response=Mock(status_code=404)), False],
-        [HTTPError(response=Mock(status_code=400)), False],
-        [ConnectionError(), False],
+        [HTTPError(response=Mock(status_code=404)), False],  # noqa: PT007
+        [HTTPError(response=Mock(status_code=400)), False],  # noqa: PT007
+        [ConnectionError(), False],  # noqa: PT007
     ],
 )
 def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success):
@@ -1050,7 +1059,7 @@ def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success)
     Test that sync_course_mode fetches data from edX API. Should fail on API
     responding with an error.
     """
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mocker.patch.object(CourseModes, "get_mode", side_effect=[mocked_api_response])
     course_run = CourseRunFactory.create()
 
@@ -1076,15 +1085,15 @@ def test_sync_course_mode(settings, mocker, mocked_api_response, expect_success)
 
 
 @pytest.mark.parametrize(
-    "grade, passed, paid, exp_certificate, exp_created, exp_deleted",
+    "grade, passed, paid, exp_certificate, exp_created, exp_deleted",  # noqa: PT006
     [
-        [0.25, True, True, True, True, False],
-        [0.25, True, False, False, False, False],
-        [0.0, True, True, False, False, False],
-        [1.0, False, True, False, False, False],
+        [0.25, True, True, True, True, False],  # noqa: PT007
+        [0.25, True, False, False, False, False],  # noqa: PT007
+        [0.0, True, True, False, False, False],  # noqa: PT007
+        [1.0, False, True, False, False, False],  # noqa: PT007
     ],
 )
-def test_course_run_certificate(
+def test_course_run_certificate(  # noqa: PLR0913
     user,
     passed_grade_with_enrollment,
     grade,
@@ -1205,14 +1214,14 @@ def test_generate_course_certificates_self_paced_course(
 
 
 @pytest.mark.parametrize(
-    "self_paced, end_date",
+    "self_paced, end_date",  # noqa: PT006
     [
         (True, now_in_utc() + timedelta(hours=2)),
         (False, now_in_utc()),
         (False, None),
     ],
 )
-def test_course_certificates_with_course_end_date_self_paced_combination(
+def test_course_certificates_with_course_end_date_self_paced_combination(  # noqa: PLR0913
     mocker,
     settings,
     courses_api_logs,
@@ -1295,7 +1304,7 @@ def test_course_run_certificates_access():
 
 
 @pytest.mark.parametrize(
-    "grade, letter_grade, should_force_pass, is_passed",
+    "grade, letter_grade, should_force_pass, is_passed",  # noqa: PT006
     [
         (0.0, "F", True, False),
         (0.1, "F", True, True),
@@ -1354,7 +1363,7 @@ def test_create_run_enrollments_upgrade_edx_request_failure(mocker, user):
         "courses.api.enroll_in_edx_course_runs",
         side_effect=UnknownEdxApiEnrollException(user, test_course_run, Exception()),
     )
-    patched_log_exception = mocker.patch("courses.api.log.exception")
+    patched_log_exception = mocker.patch("courses.api.log.exception")  # noqa: F841
     successful_enrollments, edx_request_success = create_run_enrollments(
         user,
         runs=[test_course_run],
@@ -1370,11 +1379,12 @@ def test_create_run_enrollments_upgrade_edx_request_failure(mocker, user):
 
     assert edx_request_success is False
     assert successful_enrollments[0].enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
-    assert successful_enrollments[0].edx_enrolled == False
+    assert successful_enrollments[0].edx_enrolled == False  # noqa: E712
 
 
 def test_generate_program_certificate_failure_missing_certificates(
-    user, program_with_requirements
+    user,
+    program_with_requirements,  # noqa: F811
 ):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
@@ -1393,7 +1403,8 @@ def test_generate_program_certificate_failure_missing_certificates(
 
 
 def test_generate_program_certificate_failure_not_all_passed(
-    user, program_with_requirements
+    user,
+    program_with_requirements,  # noqa: F811
 ):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
@@ -1498,7 +1509,7 @@ def test_generate_program_certificate_success_minimum_electives_not_met(user):
 
     required_course1_course_run = CourseRunFactory.create(course=required_course1)
     elective_course1_course_run = CourseRunFactory.create(course=elective_course1)
-    elective_course2_course_run = CourseRunFactory.create(course=elective_course2)
+    elective_course2_course_run = CourseRunFactory.create(course=elective_course2)  # noqa: F841
 
     # User has a certificate for required_course1 and elective_course1 only. No certificate for elective_course2.
     CourseRunCertificateFactory.create(
@@ -1513,7 +1524,7 @@ def test_generate_program_certificate_success_minimum_electives_not_met(user):
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_force_generate_program_certificate_success(user, program_with_requirements):
+def test_force_generate_program_certificate_success(user, program_with_requirements):  # noqa: F811
     """
     Test that force creating a program certificate with generate_program_certificate generates
     a program certificate without matching program certificate requirements.
@@ -1537,7 +1548,8 @@ def test_force_generate_program_certificate_success(user, program_with_requireme
 
 
 def test_generate_program_certificate_already_exist(
-    user, program_with_empty_requirements
+    user,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     Test that generate_program_certificate return (None, False) and not create program certificate
@@ -1633,7 +1645,9 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
 
 
 def test_program_enrollment_unenrollment_re_enrollment(
-    mocker, user, program_with_empty_requirements
+    mocker,
+    user,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     create_run_enrollments should always enroll a learner into a program even

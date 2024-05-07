@@ -148,6 +148,10 @@ export const objectToFormData = (object: Object) => {
 export const formatPrettyDate = (momentDate: Moment) =>
   momentDate.format("MMMM D, YYYY")
 
+// Example return values: "Jan 1, 2019", "Dec 31, 2019"
+export const formatPrettyShortDate = (momentDate: Moment) =>
+  momentDate.format("MMM D, YYYY")
+
 export const formatPrettyDateUtc = (momentDate: Moment) =>
   momentDate.tz("UTC").format("MMMM D, YYYY")
 

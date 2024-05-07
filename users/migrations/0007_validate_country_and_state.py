@@ -6,7 +6,6 @@ import users.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [("users", "0006_user_is_active_false")]
 
     operations = [

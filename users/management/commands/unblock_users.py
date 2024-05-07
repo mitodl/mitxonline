@@ -1,6 +1,7 @@
 """
 Unblock user(s) from MITx Online
 """
+
 import sys
 from argparse import RawTextHelpFormatter
 
@@ -40,7 +41,7 @@ class Command(BaseCommand):
         return parser
 
     def add_arguments(self, parser):
-        """parse arguments"""
+        """Parse arguments"""
 
         # pylint: disable=expression-not-assigned
         parser.add_argument(
@@ -52,7 +53,7 @@ class Command(BaseCommand):
             help="Single or multiple email(s)",
         )
 
-    def handle(self, *args, **kwargs):
+    def handle(self, *args, **kwargs):  # noqa: ARG002
         users = kwargs.get("users", [])
         if not users:
             self.stderr.write(
@@ -81,16 +82,12 @@ class Command(BaseCommand):
                 blocked_user.delete()
                 self.stdout.write(
                     self.style.SUCCESS(
-                        "Email {email} has been removed from the blocklist of MITx Online.".format(
-                            email=user_email
-                        )
+                        f"Email {user_email} has been removed from the blocklist of MITx Online."
                     )
                 )
             else:
                 self.stdout.write(
                     self.style.WARNING(
-                        "Email {email} was not found in the blocklist.".format(
-                            email=user_email
-                        )
+                        f"Email {user_email} was not found in the blocklist."
                     )
                 )

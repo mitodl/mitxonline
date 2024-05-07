@@ -65,7 +65,7 @@ export function parseStoredUserMessage(
     break
   case USER_MSG_TYPE_ENROLL_DUPLICATED:
     alertType = ALERT_TYPE_DANGER
-    msgText = `You have already enrolled and paid for this course. If this is unexpected, please contact customer support at ${SETTINGS.support_email}.`
+    msgText = `You have already enrolled in this course. If this is unexpected, please contact customer support at ${SETTINGS.support_email}.`
     break
   case USER_MSG_TYPE_COMPLETED_AUTH:
     alertType = ALERT_TYPE_SUCCESS

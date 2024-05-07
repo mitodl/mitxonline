@@ -1,4 +1,5 @@
 """API tests"""
+
 import pytest
 from django.db import IntegrityError
 
@@ -83,6 +84,6 @@ def test_create_user_exception(mocker):
     patched_save = mocker.patch.object(
         UserSerializer, "save", side_effect=ValueError("idk")
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         api.create_user_with_generated_username(UserSerializer(data={}), "testuser")
     patched_save.assert_called_once()

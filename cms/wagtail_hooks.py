@@ -1,7 +1,9 @@
 """Custom hooks to configure wagtail behavior"""
-from typing import List
-from wagtail.admin.api.views import PagesAdminAPIViewSet
+
+from typing import List  # noqa: UP035
+
 from wagtail import hooks
+from wagtail.admin.api.views import PagesAdminAPIViewSet
 
 DEFAULT_ORDER = (
     "{prefix}coursepage__course__readable_id".format(prefix=""),
@@ -9,7 +11,7 @@ DEFAULT_ORDER = (
 )
 
 
-def parse_ordering_params(param: List[str]) -> List[str]:
+def parse_ordering_params(param: List[str]) -> List[str]:  # noqa: UP006
     """
     Ignores the request to sort by "ord".
     Returns a sorting order based on the params and includes "readable_id"
@@ -20,16 +22,14 @@ def parse_ordering_params(param: List[str]) -> List[str]:
         order = []
     elif "title" in param:
         prefix = "-" if param[0] == "-" else ""
-        order = ["{prefix}coursepage__course__readable_id".format(prefix=prefix), param]
+        order = [f"{prefix}coursepage__course__readable_id", param]
     else:
         order = [param]
     return order
 
 
 @hooks.register("construct_explorer_page_queryset")
-def sort_pages_alphabetically(
-    parent_page, pages, request
-):  # pylint: disable=unused-argument
+def sort_pages_alphabetically(parent_page, pages, request):  # pylint: disable=unused-argument  # noqa: ARG001
     """Sort all pages by title alphabetically if no ordering is speacified"""
     order = DEFAULT_ORDER
     if request.GET.get("ordering"):

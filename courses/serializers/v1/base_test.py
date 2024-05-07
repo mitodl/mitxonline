@@ -1,7 +1,7 @@
 import pytest
 
-from courses.factories import ProgramFactory, CourseFactory
-from courses.serializers.v1.base import BaseProgramSerializer, BaseCourseSerializer
+from courses.factories import CourseFactory, ProgramFactory
+from courses.serializers.v1.base import BaseCourseSerializer, BaseProgramSerializer
 
 pytestmark = [pytest.mark.django_db]
 

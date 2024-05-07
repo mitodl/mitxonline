@@ -12,12 +12,8 @@ EDX_ENROLLMENTS_PAID_MODES = [
     EDX_ENROLLMENT_VERIFIED_MODE,
 ]
 PRO_ENROLL_MODE_ERROR_TEXTS = (
-    "The [{}] course mode is expired or otherwise unavailable for course run".format(
-        EDX_DEFAULT_ENROLLMENT_MODE
-    ),
-    "Specified course mode '{}' unavailable for course".format(
-        EDX_DEFAULT_ENROLLMENT_MODE
-    ),
+    f"The [{EDX_DEFAULT_ENROLLMENT_MODE}] course mode is expired or otherwise unavailable for course run",
+    f"Specified course mode '{EDX_DEFAULT_ENROLLMENT_MODE}' unavailable for course",
 )
 # The amount of minutes after creation that a openedx model record should be eligible for repair
 OPENEDX_REPAIR_GRACE_PERIOD_MINS = 5

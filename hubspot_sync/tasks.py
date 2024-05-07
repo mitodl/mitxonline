@@ -1,15 +1,16 @@
 """
 Hubspot tasks
 """
+
 import logging
 import time
 from math import ceil
-from typing import List, Tuple
+from typing import List, Tuple  # noqa: UP035
 
 import celery
 from django.conf import settings
-from django.db.models import F
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import F
 from hubspot.crm.associations import BatchInputPublicAssociation, PublicAssociation
 from hubspot.crm.objects import ApiException, BatchInputSimplePublicObjectInput
 from mitol.common.decorators import single_task
@@ -32,7 +33,9 @@ log = logging.getLogger(__name__)
 
 
 def task_obj_lock(
-    func_name: str, args: List[object], kwargs: dict
+    func_name: str,
+    args: List[object],  # noqa: UP006
+    kwargs: dict,  # noqa: ARG001
 ) -> str:  # @pylint:unused-argument
     """
     Determine a task lock name for a specific task function and object id
@@ -62,8 +65,9 @@ def max_concurrent_chunk_size(obj_count: int) -> int:
 
 
 def _batched_chunks(
-    hubspot_type: str, batch_ids: List[int or (int, str)]
-) -> List[List[int or str]]:
+    hubspot_type: str,
+    batch_ids: List[int or (int, str)],  # noqa: UP006
+) -> List[List[int or str]]:  # noqa: UP006
     """
     If list of ids exceed max allowed in a batch API call, chunk them up
 
@@ -80,7 +84,7 @@ def _batched_chunks(
     return chunks(batch_ids, chunk_size=max_chunk_size)
 
 
-def sync_failed_contacts(chunk: List[int]) -> List[int]:
+def sync_failed_contacts(chunk: List[int]) -> List[int]:  # noqa: UP006
     """
     Consecutively try individual contact syncs for a failed batch sync
     Args:
@@ -95,12 +99,12 @@ def sync_failed_contacts(chunk: List[int]) -> List[int]:
         try:
             api.sync_contact_with_hubspot(user)
             time.sleep(settings.HUBSPOT_TASK_DELAY / 1000)
-        except ApiException:
+        except ApiException:  # noqa: PERF203
             failed_ids.append(user.id)
     return failed_ids
 
 
-def handle_failed_batch_chunk(chunk: List[int], hubspot_type: str) -> List[int]:
+def handle_failed_batch_chunk(chunk: List[int], hubspot_type: str) -> List[int]:  # noqa: UP006
     """
     Try reprocessing a chunk of contacts individually, in case conflicting emails are the problem
 
@@ -222,8 +226,10 @@ def sync_line_with_hubspot(line_id: int) -> str:
 )
 @raise_429
 def batch_create_hubspot_objects_chunked(
-    hubspot_type: str, ct_model_name: str, object_ids: List[int]
-) -> List[str]:
+    hubspot_type: str,
+    ct_model_name: str,
+    object_ids: List[int],  # noqa: UP006
+) -> List[str]:  # noqa: UP006
     """
     Batch create or update a list of hubspot objects, no associations
 
@@ -289,8 +295,10 @@ def batch_create_hubspot_objects_chunked(
 )
 @raise_429
 def batch_update_hubspot_objects_chunked(
-    hubspot_type: str, ct_model_name: str, object_ids: List[Tuple[int, str]]
-) -> List[str]:
+    hubspot_type: str,
+    ct_model_name: str,
+    object_ids: List[Tuple[int, str]],  # noqa: UP006
+) -> List[str]:  # noqa: UP006
     """
     Batch create or update hubspot objects, no associations
 
@@ -343,20 +351,20 @@ def batch_update_hubspot_objects_chunked(
 def sync_all_contacts_with_hubspot(self):
     hubspot_type = HubspotObjectType.CONTACTS.value
     model_name = ContentType.objects.get_for_model(User).model
-    app_label = User._meta.app_label
+    app_label = User._meta.app_label  # noqa: SLF001
     raise self.replace(
-        batch_upsert_hubspot_objects(hubspot_type, model_name, app_label, False)
+        batch_upsert_hubspot_objects(hubspot_type, model_name, app_label, False)  # noqa: FBT003
     )
 
 
 @app.task(bind=True)
-def batch_upsert_hubspot_objects(  # pylint:disable=too-many-arguments
+def batch_upsert_hubspot_objects(  # pylint:disable=too-many-arguments  # noqa: PLR0913
     self,
     hubspot_type: str,
     model_name: str,
     app_label: str,
-    create: bool = True,
-    object_ids: List[int] = None,
+    create: bool = True,  # noqa: FBT001, FBT002
+    object_ids: List[int] = None,  # noqa: UP006, RUF013
 ):
     """
     Batch create or update objects in hubspot, no associations (so ideal for contacts and products)
@@ -374,7 +382,7 @@ def batch_upsert_hubspot_objects(  # pylint:disable=too-many-arguments
             content_type=content_type
         ).values_list("object_id", "hubspot_id")
         unsynced_objects = content_type.model_class().objects.exclude(
-            id__in=[id[0] for id in synced_object_ids]
+            id__in=[id[0] for id in synced_object_ids]  # noqa: A001
         )
         if model_name == "user":
             unsynced_objects = (
@@ -410,7 +418,7 @@ def batch_upsert_hubspot_objects(  # pylint:disable=too-many-arguments
     retry_jitter=True,
 )
 @raise_429
-def batch_upsert_associations_chunked(order_ids: List[int]):
+def batch_upsert_associations_chunked(order_ids: List[int]):  # noqa: UP006
     """
     Upsert batches of deal-contact and line-deal associations
 
@@ -444,8 +452,8 @@ def batch_upsert_associations_chunked(order_ids: List[int]):
                     )
                 )
             if (
-                len(contact_associations_batch) == 100
-                or len(line_associations_batch) == 100
+                len(contact_associations_batch) == 100  # noqa: PLR2004
+                or len(line_associations_batch) == 100  # noqa: PLR2004
                 or idx == deal_count - 1
             ):
                 hubspot_client.crm.associations.batch_api.create(
@@ -468,7 +476,7 @@ def batch_upsert_associations_chunked(order_ids: List[int]):
 
 
 @app.task(bind=True)
-def batch_upsert_associations(self, order_ids: List[int] = None):
+def batch_upsert_associations(self, order_ids: List[int] = None):  # noqa: UP006, RUF013
     """
     Upsert chunked batches of deal-contact and line-deal associations
 
