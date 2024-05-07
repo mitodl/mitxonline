@@ -95,24 +95,33 @@ def get_unenrollable_courseruns_qs():
     )
 
 
-def get_courses_based_on_enrollment(
-    queryset, enrollable=True, enrollment_end_date=None
-):
+def get_enrollable_courses(queryset, enrollment_end_date=None):
     """
-    Returns courses based on the current enrollment status
+    Returns courses that are open for enrollment
 
     Args:
         queryset: Queryset of Course objects
-        enrollable: Boolean, if True, returns courses that are open for enrollment,
-                    otherwise returns courses that are closed for enrollment
-        enrollment_end_date: datetime, the date to check for enrollment end
+        enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
     """
     if enrollment_end_date is None:
         enrollment_end_date = now_in_utc()
-    if enrollable:
-        courseruns_qs = get_enrollable_courseruns_qs(enrollment_end_date)
-    else:
-        courseruns_qs = get_unenrollable_courseruns_qs()
+    courseruns_qs = get_enrollable_courseruns_qs(enrollment_end_date)
+    return (
+        queryset.prefetch_related(Prefetch("courseruns", queryset=courseruns_qs))
+        .prefetch_related("courseruns__course")
+        .filter(courseruns__id__in=courseruns_qs.values_list("id", flat=True))
+        .distinct()
+    )
+
+
+def get_unenrollable_courses(queryset):
+    """
+    Returns courses that are closed for enrollment
+
+    Args:
+        queryset: Queryset of Course objects
+    """
+    courseruns_qs = get_unenrollable_courseruns_qs()
     return (
         queryset.prefetch_related(Prefetch("courseruns", queryset=courseruns_qs))
         .prefetch_related("courseruns__course")

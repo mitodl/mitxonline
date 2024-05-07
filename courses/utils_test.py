@@ -18,9 +18,10 @@ from courses.factories import (
 )
 from courses.models import Course
 from courses.utils import (
-    get_courses_based_on_enrollment,
     get_enrollable_courseruns_qs,
+    get_enrollable_courses,
     get_program_certificate_by_enrollment,
+    get_unenrollable_courses,
 )
 
 
@@ -205,17 +206,17 @@ def test_get_unenrollable_courseruns_qs():
     assert unenrollable_course_run in enrollable_qs
 
 
-def test_get_courses_based_on_enrollment():
+def test_get_enrollable_courses():
     """
-    Test get_courses_based_on_enrollment
+    Test get_enrollable_courses
     """
     now = now_in_utc()
     future_date = now + timedelta(days=1)
     past_date = now - timedelta(days=1)
-    course = CourseFactory.create()
+    enrollable_course = CourseFactory.create()
     unenrollable_course = CourseFactory.create()
     CourseRunFactory.create(
-        course=course,
+        course=enrollable_course,
         live=True,
         start_date=now,
         enrollment_start=past_date,
@@ -228,9 +229,34 @@ def test_get_courses_based_on_enrollment():
         enrollment_start=future_date,
         enrollment_end=None,
     )
-    can_enroll = get_courses_based_on_enrollment(Course.objects.all(), True)
-    assert unenrollable_course not in can_enroll
-    assert course in can_enroll
-    can_not_enroll = get_courses_based_on_enrollment(Course.objects.all(), False)
-    assert unenrollable_course in can_not_enroll
-    assert course not in can_not_enroll
+    enrollable_courses = get_enrollable_courses(Course.objects.all())
+    assert unenrollable_course not in enrollable_courses
+    assert enrollable_course in enrollable_courses
+
+
+def test_get_unenrollable_courses():
+    """
+    Test get_unenrollable_courses
+    """
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    past_date = now - timedelta(days=1)
+    enrollable_course = CourseFactory.create()
+    unenrollable_course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=enrollable_course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+    CourseRunFactory.create(
+        course=unenrollable_course,
+        live=True,
+        start_date=future_date,
+        enrollment_start=future_date,
+        enrollment_end=None,
+    )
+    unenrollable_courses = get_unenrollable_courses(Course.objects.all())
+    assert unenrollable_course in unenrollable_courses
+    assert enrollable_course not in unenrollable_courses

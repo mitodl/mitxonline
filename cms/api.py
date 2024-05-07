@@ -19,7 +19,7 @@ from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
 from cms.exceptions import WagtailSpecificPageError
 from cms.models import Page
 from courses.models import Course, Program
-from courses.utils import get_courses_based_on_enrollment
+from courses.utils import get_enrollable_courses
 
 log = logging.getLogger(__name__)
 DEFAULT_HOMEPAGE_PROPS = dict(  # noqa: C408
@@ -324,9 +324,8 @@ def create_featured_items():
 
     now = now_in_utc()
     end_of_day = now + timedelta(days=1)
-    enrollable_courses = get_courses_based_on_enrollment(
+    enrollable_courses = get_enrollable_courses(
         Course.objects.select_related("page").filter(page__live=True, live=True),
-        True,
         end_of_day,
     )
     enrollable_courses = enrollable_courses.order_by("?")

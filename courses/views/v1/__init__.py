@@ -7,11 +7,10 @@ import django_filters
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
-from mitol.common.utils import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, status, viewsets
@@ -53,7 +52,11 @@ from courses.serializers.v1.programs import (
     UserProgramEnrollmentDetailSerializer,
 )
 from courses.tasks import send_partner_school_email
-from courses.utils import get_program_certificate_by_enrollment
+from courses.utils import (
+    get_enrollable_courses,
+    get_program_certificate_by_enrollment,
+    get_unenrollable_courses,
+)
 from ecommerce.models import FulfilledOrder, Order, PendingOrder, Product
 from hubspot_sync.task_helpers import sync_hubspot_deal
 from main import features
@@ -121,7 +124,9 @@ class CourseFilterSet(django_filters.FilterSet):
         courserun_is_enrollable filter to narrow down runs that are open for
         enrollments
         """
-        return get_courses_based_on_enrollment(queryset, value)
+        if value:
+            return get_enrollable_courses(queryset)
+        return get_unenrollable_courses(queryset)
 
     class Meta:
         model = Course

@@ -3,15 +3,12 @@ Course API Views version 2
 """
 
 import django_filters
-from django.db.models import Prefetch, Q
 from django_filters.rest_framework import DjangoFilterBackend
-from mitol.common.utils import now_in_utc
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 
 from courses.models import (
     Course,
-    CourseRun,
     Department,
     Program,
 )
@@ -22,7 +19,7 @@ from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,
 )
 from courses.serializers.v2.programs import ProgramSerializer
-from courses.utils import get_courses_based_on_enrollment
+from courses.utils import get_enrollable_courses, get_unenrollable_courses
 
 
 class Pagination(PageNumberPagination):
@@ -68,8 +65,9 @@ class CourseFilterSet(django_filters.FilterSet):
         Uses utility functions that are shared wtih other parts of the application
         to keep the logic consistent
         """
-
-        return get_courses_based_on_enrollment(queryset, value)
+        if value:
+            return get_enrollable_courses(queryset)
+        return get_unenrollable_courses(queryset)
 
     class Meta:
         model = Course
