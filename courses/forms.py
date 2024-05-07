@@ -233,7 +233,7 @@ class ProgramAdminForm(ModelForm):
 
         return [_serialize(node) for node in data]
 
-    def clean(self):
+    def clean(self):  # noqa: C901
         """
         Verifies that a Program's elective and requirement operators.
         Ensures that every operator has a Title defined.
@@ -276,11 +276,11 @@ class ProgramAdminForm(ModelForm):
                 # Ensure a Value exists and is defined for elective operators.
                 if "operator_value" not in operator["data"]:
                     raise ValidationError(
-                        '"Minimum # of" operator must have Value equal to 1 or more.'
+                        '"Minimum # of" operator must have Value equal to 1 or more.'  # noqa: EM101
                     )
                 if operator["data"]["operator_value"] == "":
                     raise ValidationError(
-                        '"Minimum # of" operator must have Value equal to 1 or more.'
+                        '"Minimum # of" operator must have Value equal to 1 or more.'  # noqa: EM101
                     )
 
         def _validate_operator_title(operator):
@@ -304,7 +304,7 @@ class ProgramAdminForm(ModelForm):
                 ValidationError: Operator Title value is empty.
             """
             if operator["data"]["title"] == "":
-                raise ValidationError("Operator must have a Title.")
+                raise ValidationError("Operator must have a Title.")  # noqa: EM101
 
         def _validate_elective_value_and_child_courses(
             elective_operator_value: int, number_of_applicable_courses_in_operator: int
@@ -324,7 +324,7 @@ class ProgramAdminForm(ModelForm):
             """
             if elective_operator_value > number_of_applicable_courses_in_operator:
                 raise ValidationError(
-                    '"Minimum # of" operator must have Value equal to or less than the number of elective courses which can apply towards the program certificate.'
+                    '"Minimum # of" operator must have Value equal to or less than the number of elective courses which can apply towards the program certificate.'  # noqa: EM101
                 )
 
         if "requirements" in self.cleaned_data:
@@ -371,7 +371,7 @@ class ProgramAdminForm(ModelForm):
                         int(operator["data"]["operator_value"]), total_child_courses
                     )
 
-    def save(self, commit=True):
+    def save(self, commit=True):  # noqa: FBT002
         """Save requirements"""
         program = super().save(commit=commit)
         transaction.on_commit(self._save_requirements)

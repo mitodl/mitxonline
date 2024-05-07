@@ -7,18 +7,18 @@ from rest_framework.exceptions import ValidationError
 from cms.serializers import ProgramPageSerializer
 from courses import models
 from courses.serializers.base import (
-    get_thumbnail_url,
     BaseProgramRequirementTreeSerializer,
-)
-from courses.serializers.v1.departments import DepartmentSerializer
-from courses.serializers.v1.courses import (
-    CourseWithCourseRunsSerializer,
-    CourseRunEnrollmentSerializer,
+    get_thumbnail_url,
 )
 from courses.serializers.v1.base import (
     CourseRunCertificateSerializer,
     CourseRunGradeSerializer,
 )
+from courses.serializers.v1.courses import (
+    CourseRunEnrollmentSerializer,
+    CourseWithCourseRunsSerializer,
+)
+from courses.serializers.v1.departments import DepartmentSerializer
 from main.serializers import StrictFieldsSerializer
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
@@ -127,7 +127,7 @@ class FullProgramSerializer(ProgramSerializer):
         )
 
     class Meta(ProgramSerializer.Meta):
-        fields = ProgramSerializer.Meta.fields + [
+        fields = ProgramSerializer.Meta.fields + [  # noqa: RUF005
             "title",
             "readable_id",
             "id",
@@ -190,7 +190,6 @@ class ProgramRequirementSerializer(StrictFieldsSerializer):
 
 
 class ProgramRequirementTreeSerializer(BaseProgramRequirementTreeSerializer):
-
     child = ProgramRequirementSerializer()
 
 
@@ -222,7 +221,7 @@ class LearnerRecordSerializer(serializers.BaseSerializer):
         """
         user = None
 
-        if "request" in self.context:
+        if "request" in self.context:  # noqa: SIM102
             if not isinstance(self.context["request"].user, AnonymousUser):
                 user = self.context["request"].user
 
@@ -230,7 +229,7 @@ class LearnerRecordSerializer(serializers.BaseSerializer):
             user = self.context["user"]
 
         if user is None:
-            raise ValidationError("Valid user object not found")
+            raise ValidationError("Valid user object not found")  # noqa: EM101
 
         courses = []
         for course, requirement_type in instance.courses:
@@ -316,4 +315,4 @@ class LearnerRecordSerializer(serializers.BaseSerializer):
             else [],
         }
 
-        return output
+        return output  # noqa: RET504

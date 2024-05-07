@@ -13,13 +13,13 @@ import moment from "moment-timezone"
 import type { BaseCourseRun } from "../flow/courseTypes"
 import { EnrollmentFlaggedCourseRun, RunEnrollment } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
+import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 type CourseInfoBoxProps = {
   courses: Array<BaseCourseRun>,
   courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
   enrollments: ?Array<RunEnrollment>,
   currentUser: CurrentUser,
-  toggleUpgradeDialogVisibility: () => Promise<any>,
   setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>
 }
 
@@ -28,10 +28,20 @@ type CourseInfoBoxProps = {
  * If the run is under the toggle "More Dates" the format is inline and month
  * is shortened to 3 letters.
  * @param {EnrollmentFlaggedCourseRun} run
+ * @param {boolean} isArchived if the course ended, but still enrollable
  * @param {boolean} isMoreDates true if this run is going to show up under the More Dates toggle
  * */
 
-const getCourseDates = (run, isMoreDates = false) => {
+const getCourseDates = (run, isArchived = false, isMoreDates = false) => {
+  if (isArchived) {
+    return (
+      <>
+        <span>Course content available anytime</span>
+        <br />
+        <b>Start:</b> {formatPrettyDate(parseDateString(run.start_date))}
+      </>
+    )
+  }
   let startDate = isMoreDates
     ? formatPrettyShortDate(parseDateString(run.start_date))
     : formatPrettyDate(parseDateString(run.start_date))
@@ -55,16 +65,19 @@ const getCourseDates = (run, isMoreDates = false) => {
 
 export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProps> {
   state = {
-    showMoreEnrollDates: false
+    showMoreEnrollDates:        false,
+    pacingInfoDialogVisibility: false
   }
   toggleShowMoreEnrollDates() {
     this.setState({
       showMoreEnrollDates: !this.state.showMoreEnrollDates
     })
   }
-  setRunEnrollDialog(run: EnrollmentFlaggedCourseRun) {
-    this.props.setCurrentCourseRun(run)
-    this.props.toggleUpgradeDialogVisibility()
+
+  togglePacingInfoDialogVisibility() {
+    this.setState({
+      pacingInfoDialogVisibility: !this.state.pacingInfoDialogVisibility
+    })
   }
 
   warningMessage(isArchived) {
@@ -79,6 +92,45 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     )
   }
 
+  renderPacingInfoDialog(pacing) {
+    const { pacingInfoDialogVisibility } = this.state
+    return (
+      <Modal
+        id={`pacing-info-dialog`}
+        className="pacing-info-dialog"
+        isOpen={pacingInfoDialogVisibility}
+        toggle={() => this.togglePacingInfoDialogVisibility()}
+        centered
+      >
+        <ModalHeader toggle={() => this.togglePacingInfoDialogVisibility()}>
+          What are {pacing} courses?
+        </ModalHeader>
+        <ModalBody>
+          {pacing === "Self-Paced" ? (
+            <p>
+              Flexible learning. Enroll at any time and progress at your own
+              speed. All course materials available immediately. Adaptable due
+              dates and extended timelines. Earn your certificate as soon as you
+              pass the course.{" "}
+              <a href="https://mitxonline.zendesk.com/hc/en-us/articles/21995114519067-What-are-Archived-courses-on-MITx-Online-">
+                Learn More
+              </a>
+            </p>
+          ) : (
+            <p>
+              Guided learning. Follow a set schedule with specific due dates for
+              assignments and exams. Course materials released on a schedule.
+              Earn your certificate shortly after the course ends.{" "}
+              <a href="https://mitxonline.zendesk.com/hc/en-us/articles/21994938130075-What-are-Instructor-Paced-courses-on-MITx-Online-">
+                Learn More
+              </a>
+            </p>
+          )}
+        </ModalBody>
+      </Modal>
+    )
+  }
+
   render() {
     const { courses, courseRuns } = this.props
 
@@ -89,7 +141,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     const course = courses[0]
     const run = getFirstRelevantRun(course, courseRuns)
     const product = run && run.products.length > 0 && run.products[0]
-
     const isArchived = run
       ? moment().isAfter(run.end_date) &&
         (moment().isBefore(run.enrollment_end) ||
@@ -102,37 +153,45 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
       courseRuns.forEach((courseRun, index) => {
         if (courseRun.id !== run.id) {
           startDates.push(
-            <li key={index}>{getCourseDates(courseRun, true)}</li>
+            <li key={index}>{getCourseDates(courseRun, isArchived, true)}</li>
           )
         }
       })
     }
+    const certificateInfoLink = (
+      <a
+        className="info-link more-info"
+        target="_blank"
+        rel="noreferrer"
+        href="https://mitxonline.zendesk.com/hc/en-us/articles/16928404973979-Does-MITx-Online-offer-free-certificates-"
+      >
+        Learn more
+      </a>
+    )
     return (
       <>
         <div className="enrollment-info-box componentized">
           {!run || isArchived ? this.warningMessage(isArchived) : null}
           {run ? (
             <div className="row d-flex course-timing-message">
-              <div
-                className="enrollment-info-icon"
-                aria-level="3"
-                role="heading"
-              >
+              <div className="enrollment-info-icon">
                 <img
                   src="/static/images/products/start-date.png"
                   alt="Course Timing"
                 />
               </div>
-              <div className="enrollment-info-text">
-                {isArchived
-                  ? "Course content available anytime"
-                  : getCourseDates(run)}
+              <div
+                className="enrollment-info-text"
+                aria-level="3"
+                role="heading"
+              >
+                {getCourseDates(run, isArchived)}
               </div>
 
               {!isArchived && moreEnrollableCourseRuns ? (
                 <>
                   <button
-                    className="more-enrollment-info"
+                    className="info-link more-info more-dates"
                     onClick={() => this.toggleShowMoreEnrollDates()}
                   >
                     {this.state.showMoreEnrollDates
@@ -146,56 +205,65 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               ) : null}
             </div>
           ) : null}
-          {course && course.page ? (
-            <div className="row d-flex align-items-top course-effort-message">
+          {run ? (
+            <div className="row d-flex align-items-top">
+              <div className="enrollment-info-icon">
+                <img
+                  className="course-format-icon align-text-bottom"
+                  src="/static/images/products/vector-left.png"
+                  alt="Course Format"
+                />
+                <img
+                  className="course-format-icon align-text-top"
+                  src="/static/images/products/vector-right.png"
+                  alt="Course Format"
+                />
+              </div>
               <div
-                className="enrollment-info-icon"
+                className="enrollment-info-text"
                 aria-level="3"
                 role="heading"
               >
+                <b>Course Format: </b>
+                {isArchived || run.is_self_paced ? (
+                  <>
+                    Self-paced
+                    <button
+                      className="info-link more-info explain-format-btn"
+                      onClick={() => this.togglePacingInfoDialogVisibility()}
+                    >
+                      What's this?
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    Instructor-paced
+                    <button
+                      className="info-link more-info explain-format-btn"
+                      onClick={() => this.togglePacingInfoDialogVisibility()}
+                    >
+                      What's this?
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : null}
+          {course && course.page ? (
+            <div className="row d-flex align-items-top course-effort-message">
+              <div className="enrollment-info-icon">
                 <img
                   src="/static/images/products/effort.png"
                   alt="Expected Length and Effort"
                 />
               </div>
-              <div className="enrollment-info-text">
-                {course.page.length}
-                {run ? (
-                  isArchived ? (
-                    <>
-                      <span className="badge badge-pacing">ARCHIVED</span>
-                      <a
-                        className="pacing-faq-link float-right"
-                        href="https://mitxonline.zendesk.com/hc/en-us/articles/21995114519067-What-are-Archived-courses-on-MITx-Online-"
-                      >
-                        What's this?
-                      </a>
-                    </>
-                  ) : run.is_self_paced ? (
-                    <>
-                      <span className="badge badge-pacing">SELF-PACED</span>
-                      <a
-                        className="pacing-faq-link float-right"
-                        href="https://mitxonline.zendesk.com/hc/en-us/articles/21994872904475-What-are-Self-Paced-courses-on-MITx-Online-"
-                      >
-                        What's this?
-                      </a>
-                    </>
-                  ) : (
-                    <>
-                      <span className="badge badge-pacing">
-                        INSTRUCTOR-PACED
-                      </span>
-                      <a
-                        className="pacing-faq-link float-right"
-                        href="https://mitxonline.zendesk.com/hc/en-us/articles/21994938130075-What-are-Instructor-Paced-courses-on-MITx-Online-"
-                      >
-                        What's this?
-                      </a>
-                    </>
-                  )
-                ) : null}
-
+              <div
+                className="enrollment-info-text"
+                aria-level="3"
+                role="heading"
+              >
+                <b>Estimated: </b>
+                {course.page.length}{" "}
                 {course.page.effort ? (
                   <>
                     <div className="enrollment-effort">
@@ -207,72 +275,70 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             </div>
           ) : null}
           <div className="row d-flex align-items-center course-pricing-message">
-            <div className="enrollment-info-icon" aria-level="3" role="heading">
+            <div className="enrollment-info-icon">
               <img src="/static/images/products/cost.png" alt="Cost" />
             </div>
-            <div className="enrollment-info-text">
-              <b>Free to Learn</b>
+            <div className="enrollment-info-text" aria-level="3" role="heading">
+              <b>Price: </b> <span>Free</span> to Learn
             </div>
-          </div>
-          <div className="row d-flex align-items-top course-certificate-message">
-            <div className="enrollment-info-icon" aria-level="3" role="heading">
-              <img
-                src="/static/images/products/certificate.png"
-                alt="Certificate Track Information"
-              />
-            </div>
-            <div className="enrollment-info-text">
+            <div className="enrollment-info-text course-certificate-message">
               {run && product && !isArchived ? (
                 <>
-                  Certificate track:{" "}
+                  <span>Earn a Certificate: </span>
                   {formatLocalePrice(getFlexiblePriceForProduct(product))}
+                  {certificateInfoLink}
+                  {course.page.financial_assistance_form_url ? (
+                    <a
+                      className="info-link finaid-link"
+                      target="_blank"
+                      rel="noreferrer"
+                      href={course.page.financial_assistance_form_url}
+                    >
+                      Financial assistance available
+                    </a>
+                  ) : null}
                   {run.upgrade_deadline ? (
-                    <>
-                      <div className="text-danger">
-                        Payment deadline:{" "}
-                        {formatPrettyDate(moment(run.upgrade_deadline))}
-                      </div>
-                    </>
+                    <div className="text-danger">
+                      Payment deadline:{" "}
+                      {formatPrettyDate(moment(run.upgrade_deadline))}
+                    </div>
                   ) : null}
                 </>
               ) : (
-                "No certificate available."
+                <>
+                  <span>Certificate deadline passed.</span>
+                  {certificateInfoLink}
+                </>
               )}
-              <div>
-                <a
-                  target="_blank"
-                  rel="noreferrer"
-                  href="https://mitxonline.zendesk.com/hc/en-us/articles/16928404973979-Does-MITx-Online-offer-free-certificates-"
-                >
-                  What's the certificate track?
-                </a>
-              </div>
-              {course.page.financial_assistance_form_url ? (
-                <div>
-                  <a
-                    target="_blank"
-                    rel="noreferrer"
-                    href={course.page.financial_assistance_form_url}
-                  >
-                    Financial assistance available
-                  </a>
-                </div>
-              ) : null}
             </div>
           </div>
         </div>
+        {run
+          ? this.renderPacingInfoDialog(
+            run.is_self_paced ? "Self-Paced" : "Instructor-Paced"
+          )
+          : null}
         {course && course.programs && course.programs.length > 0 ? (
           <div className="program-info-box">
-            <h3>
+            <div className="related-programs-info">
+              <img
+                src="/static/images/products/program-icon.svg"
+                alt="Programs"
+              />
               Part of the following program
               {course.programs.length === 1 ? null : "s"}
-            </h3>
+            </div>
 
             <ul>
               {course.programs.map(elem => (
                 <li key={elem.readable_id}>
                   {" "}
-                  <a href={`/programs/${elem.readable_id}/`}>{elem.title}</a>
+                  <a
+                    className="info-link"
+                    href={`/programs/${elem.readable_id}/`}
+                  >
+                    {elem.title}
+                  </a>
                 </li>
               ))}
             </ul>

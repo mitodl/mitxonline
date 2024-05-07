@@ -91,7 +91,7 @@ class Command(BaseCommand):
 
         super().add_arguments(parser)
 
-    def handle(self, *args, **options):  # pylint: disable=too-many-locals
+    def handle(self, *args, **options):  # pylint: disable=too-many-locals  # noqa: ARG002, C901, PLR0915
         """Handle command execution"""
 
         revoke = options.get("revoke")
@@ -103,7 +103,7 @@ class Command(BaseCommand):
 
         if not (revoke or unrevoke) and not create:
             raise CommandError(
-                "The command needs a valid action e.g. --revoke, --unrevoke, --create."
+                "The command needs a valid action e.g. --revoke, --unrevoke, --create."  # noqa: EM101
             )
         try:
             user = fetch_user(options["user"]) if options["user"] else None
@@ -112,30 +112,30 @@ class Command(BaseCommand):
 
         # A run is needed for revoke/un-revoke and certificate creation
         if not run:
-            raise CommandError("The command needs a valid course run.")
+            raise CommandError("The command needs a valid course run.")  # noqa: EM101
 
         # Unable to obtain a run object based on the provided courseware id
         try:
             course_run = CourseRun.objects.get(courseware_id=run)
         except CourseRun.DoesNotExist:
-            raise CommandError("Could not find run with courseware_id={}.".format(run))
+            raise CommandError(f"Could not find run with courseware_id={run}.")  # noqa: B904, EM102
 
         # Handle revoke/un-revoke of a certificate
         if revoke or unrevoke:
             if not user:
-                raise CommandError("Revoke/Un-revoke operation needs a valid user.")
+                raise CommandError("Revoke/Un-revoke operation needs a valid user.")  # noqa: EM101
 
             revoke_status = manage_course_run_certificate_access(
                 user=user,
                 courseware_id=course_run.courseware_id,
-                revoke_state=True if revoke else False,
+                revoke_state=True if revoke else False,  # noqa: SIM210
             )
 
             if revoke_status:
                 self.stdout.write(
                     self.style.SUCCESS(
                         "Certificate for {} has been {}".format(
-                            "run: {}".format(run),
+                            f"run: {run}",
                             "revoked." if revoke else "un-revoked.",
                         )
                     )
@@ -147,18 +147,17 @@ class Command(BaseCommand):
         # Also check if the certificate creation was requested with grade override. (Generally useful when we want to
         # create a certificate for a user while overriding the grade value)
         elif create:
-
             if override_grade and not is_grade_valid(override_grade):
-                raise CommandError("Invalid value for grade. Allowed range: 0.0 - 1.0.")
+                raise CommandError("Invalid value for grade. Allowed range: 0.0 - 1.0.")  # noqa: EM101
 
             if override_grade and not letter_grade:
                 raise CommandError(
-                    "Override grade needs a letter grade, allowed range: A-F"
+                    "Override grade needs a letter grade, allowed range: A-F"  # noqa: EM101
                 )
 
             if override_grade and not user:
                 raise CommandError(
-                    "Override grade needs a user (The grade override operation is not supported for multiple users)."
+                    "Override grade needs a user (The grade override operation is not supported for multiple users)."  # noqa: EM101
                 )
 
             # If user=None, Grades for all users in the run will be fetched
@@ -207,11 +206,9 @@ class Command(BaseCommand):
                 else:
                     grade_status = "already exists"
 
-                grade_summary = ["passed: {}".format(course_run_grade.passed)]
+                grade_summary = [f"passed: {course_run_grade.passed}"]
                 if override_grade is not None:
-                    grade_summary.append(
-                        "value override: {}".format(course_run_grade.grade)
-                    )
+                    grade_summary.append(f"value override: {course_run_grade.grade}")
 
                 if created_cert:
                     cert_status = "created"
@@ -227,12 +224,7 @@ class Command(BaseCommand):
                 )
 
                 results.append(
-                    "Processed user {} ({}) in course run {}. Result - {}".format(
-                        user.username,
-                        user.email,
-                        course_run.courseware_id,
-                        result_summary,
-                    )
+                    f"Processed user {user.username} ({user.email}) in course run {course_run.courseware_id}. Result - {result_summary}"
                 )
 
             for result in results:

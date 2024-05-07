@@ -1,6 +1,7 @@
 """
 Generates CurrencyExchangeRate objects
 """
+
 from django.core.management import BaseCommand
 
 from flexiblepricing.tasks import sync_currency_exchange_rates
@@ -14,5 +15,5 @@ class Command(BaseCommand):
 
     help = "Updates local database with the latest exchange rate information from Open Exchange Rates API"
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
         sync_currency_exchange_rates.delay()

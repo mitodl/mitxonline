@@ -5,9 +5,9 @@ from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
 from courses.serializers.v1.base import (
-    BaseCourseSerializer,
     BaseCourseRunEnrollmentSerializer,
     BaseCourseRunSerializer,
+    BaseCourseSerializer,
     ProductRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
@@ -66,7 +66,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
 
     class Meta:
         model = models.CourseRun
-        fields = BaseCourseRunSerializer.Meta.fields + [
+        fields = BaseCourseRunSerializer.Meta.fields + [  # noqa: RUF005
             "products",
             "approved_flexible_price_exists",
         ]
@@ -76,10 +76,8 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         if self.context and self.context.get("include_enrolled_flag"):
             return {
                 **data,
-                **{
-                    "is_enrolled": getattr(instance, "user_enrollments", 0) > 0,
-                    "is_verified": getattr(instance, "verified_enrollments", 0) > 0,
-                },
+                "is_enrolled": getattr(instance, "user_enrollments", 0) > 0,
+                "is_verified": getattr(instance, "verified_enrollments", 0) > 0,
             }
         return data
 
@@ -97,7 +95,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             if user and user.id
             else False
         )
-        return flexible_price_exists
+        return flexible_price_exists  # noqa: RET504
 
 
 class CourseWithCourseRunsSerializer(CourseSerializer):
@@ -107,7 +105,7 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
 
     class Meta:
         model = models.Course
-        fields = CourseSerializer.Meta.fields + [
+        fields = CourseSerializer.Meta.fields + [  # noqa: RUF005
             "courseruns",
         ]
 
@@ -121,7 +119,7 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
 
     class Meta:
         model = models.CourseRun
-        fields = CourseRunSerializer.Meta.fields + [
+        fields = CourseRunSerializer.Meta.fields + [  # noqa: RUF005
             "course",
         ]
 
@@ -144,7 +142,7 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         try:
             run = models.CourseRun.objects.get(id=run_id)
         except models.CourseRun.DoesNotExist:
-            raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})
+            raise ValidationError({"run_id": f"Invalid course run id: {run_id}"})  # noqa: B904
         successful_enrollments, edx_request_success = create_run_enrollments(
             user,
             [run],
@@ -153,6 +151,6 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         return successful_enrollments
 
     class Meta(BaseCourseRunEnrollmentSerializer.Meta):
-        fields = BaseCourseRunEnrollmentSerializer.Meta.fields + [
+        fields = BaseCourseRunEnrollmentSerializer.Meta.fields + [  # noqa: RUF005
             "run_id",
         ]

@@ -1,4 +1,5 @@
 """MITx Online serializers"""
+
 from django.conf import settings
 from rest_framework import serializers
 
@@ -12,23 +13,23 @@ class AppContextSerializer(serializers.Serializer):
     release_version = serializers.SerializerMethodField()
     features = serializers.SerializerMethodField()
 
-    def get_features(self, request):
+    def get_features(self, request):  # noqa: ARG002
         """Returns a dictionary of features"""
         return {}
 
-    def get_release_version(self, request):
+    def get_release_version(self, request):  # noqa: ARG002
         """Returns a dictionary of features"""
         return settings.VERSION
 
-    def get_gtm_tracking_id(self, request):
+    def get_gtm_tracking_id(self, request):  # noqa: ARG002
         """Returns the GTM container ID"""
         return settings.GTM_TRACKING_ID
 
-    def get_ga_tracking_id(self, request):
+    def get_ga_tracking_id(self, request):  # noqa: ARG002
         """Returns a dictionary of features"""
         return settings.GA_TRACKING_ID
 
-    def get_environment(self, request):
+    def get_environment(self, request):  # noqa: ARG002
         """Returns a dictionary of features"""
         return settings.ENVIRONMENT
 
@@ -60,6 +61,6 @@ class StrictFieldsSerializer(serializers.Serializer):
         if hasattr(self, "initial_data"):
             unknown_keys = set(self.initial_data.keys()) - set(self.fields.keys())
             if unknown_keys:
-                raise ValidationError({key: "Invalid field" for key in unknown_keys})
+                raise ValidationError({key: "Invalid field" for key in unknown_keys})  # noqa: F821
 
         return data

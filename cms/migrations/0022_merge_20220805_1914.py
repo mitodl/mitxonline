@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("cms", "0020_add_productpage_and_base_tables"),
         ("cms", "0021_flexiblepricingrequestform_selected_program"),

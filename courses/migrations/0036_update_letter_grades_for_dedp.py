@@ -8,13 +8,13 @@ from django.db import migrations
 
 def convert_to_letter(grade):
     """Convert a decimal number to letter grade"""
-    if grade >= 0.825:
+    if grade >= 0.825:  # noqa: PLR2004
         return "A"
-    elif grade >= 0.65:
+    elif grade >= 0.65:  # noqa: PLR2004
         return "B"
-    elif grade >= 0.55:
+    elif grade >= 0.55:  # noqa: PLR2004
         return "C"
-    elif grade >= 0.50:
+    elif grade >= 0.50:  # noqa: PLR2004
         return "D"
     else:
         return "F"
@@ -22,7 +22,8 @@ def convert_to_letter(grade):
 
 def populate_letter_grade(apps, schema_editor):
     """Fix the letter grade for the DEDP courses prior to 3T2022
-    that was set by 0033_populate_letter_grades"""
+    that was set by 0033_populate_letter_grades
+    """
     CourseRunGrade = apps.get_model("courses", "CourseRunGrade")
     Course = apps.get_model("courses", "Course")
     Program = apps.get_model("courses", "Program")

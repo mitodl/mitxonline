@@ -85,7 +85,6 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
     const program = programs[0]
 
     const run = this.findFirstCourseRun()
-
     const product = run && run.products.length > 0 && run.products[0]
 
     const reqCount = program.requirements.required.length
@@ -136,7 +135,7 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
                   <>
                     <span className="badge badge-pacing">SELF-PACED</span>
                     <a
-                      className="pacing-faq-link float-right"
+                      className="info-link more-info"
                       href="https://mitxonline.zendesk.com/hc/en-us/articles/21994872904475-What-are-Self-Paced-courses-on-MITx-Online-"
                     >
                       What's this?
@@ -146,7 +145,7 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
                   <>
                     <span className="badge badge-pacing">INSTRUCTOR-PACED</span>
                     <a
-                      className="pacing-faq-link float-right"
+                      className="info-link more-info"
                       href="https://mitxonline.zendesk.com/hc/en-us/articles/21994938130075-What-are-Instructor-Paced-courses-on-MITx-Online-"
                     >
                       What's this?

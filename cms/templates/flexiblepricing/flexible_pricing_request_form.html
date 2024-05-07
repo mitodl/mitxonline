@@ -43,7 +43,7 @@
                       The currency you’re paid in.
                     </div>
                   </label>
-                  
+
                   <select name="income_currency" id="income_currency" class="form-control {%if form.income_currency.errors %}errored{% endif %}" aria-describedby="income-currency-subtitle" required>
                     <option value="">Choose</option>
                     {% for choice in form.fields.income_currency.choices %}

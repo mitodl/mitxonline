@@ -10,11 +10,10 @@ This takes three forms:
   has.
 
 """
+
 from django.core.management import BaseCommand, CommandError
-from django.db.models import Q
 
 from courses.models import Program
-from main.utils import parse_supplied_date
 
 
 class Command(BaseCommand):
@@ -43,21 +42,21 @@ class Command(BaseCommand):
             help="Remove the relationship. This will not undo any already-granted financial assistance discounts.",
         )
 
-    def handle(self, *args, **kwargs):
+    def handle(self, *args, **kwargs):  # noqa: ARG002
         try:
             first_program = Program.objects.filter(
                 readable_id=kwargs["first_program"]
             ).get()
-        except Exception as e:
-            raise CommandError(f"Program {kwargs['first_program']} not found.")
+        except Exception:  # noqa: BLE001
+            raise CommandError(f"Program {kwargs['first_program']} not found.")  # noqa: B904, EM102
 
         if "second_program" in kwargs and kwargs["second_program"] is not None:
             try:
                 second_program = Program.objects.filter(
                     readable_id=kwargs["second_program"]
                 ).get()
-            except Exception as e:
-                raise CommandError(f"Program {kwargs['second_program']} not found.")
+            except Exception:  # noqa: BLE001
+                raise CommandError(f"Program {kwargs['second_program']} not found.")  # noqa: B904, EM102
 
             # this does create a "new" relation and then immediately deletes it if you specify --delete
             # but this'll only happen if there wasn't a relationship to begin with

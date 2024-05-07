@@ -1,4 +1,5 @@
 """Flexible price api tests"""
+
 import json
 from datetime import datetime, timedelta
 
@@ -60,7 +61,7 @@ pytestmark = [pytest.mark.django_db]
 def test_parse_country_income_thresholds_no_header(tmp_path):
     """parse_country_income_thresholds should throw error if no header is found"""
     path = tmp_path / "test.csv"
-    open(path, "w")  # create a file
+    open(path, "w")  # create a file  # noqa: SIM115, PTH123
     with pytest.raises(CountryIncomeThresholdException) as exc:
         parse_country_income_thresholds(path)
 
@@ -70,7 +71,7 @@ def test_parse_country_income_thresholds_no_header(tmp_path):
 def test_parse_country_income_thresholds_missing_header_fields(tmp_path):
     """parse_country_income_thresholds should throw error if any of the header field is missing"""
     path = tmp_path / "test.csv"
-    with open(path, "w") as file:
+    with open(path, "w") as file:  # noqa: PTH123
         file.write("country\n")
         file.write("PK\n")
 
@@ -83,7 +84,7 @@ def test_parse_country_income_thresholds_missing_header_fields(tmp_path):
 def test_parse_country_income_thresholds(tmp_path):
     """parse_country_income_thresholds should convert CSV records into IncomeThreshold objects"""
     path = tmp_path / "test.csv"
-    with open(path, "w") as file:
+    with open(path, "w") as file:  # noqa: PTH123
         file.write("country,income\n")
         file.write("PK,25000\n")
         file.write("US,75000\n")
@@ -97,22 +98,22 @@ def test_parse_country_income_thresholds(tmp_path):
 
 @pytest.mark.django_db
 def test_import_country_income_thresholds(tmp_path, caplog):
-    """test import_country_income_thresholds works fine"""
+    """Test import_country_income_thresholds works fine"""
     path = tmp_path / "test.csv"
-    with open(path, "w") as file:
+    with open(path, "w") as file:  # noqa: PTH123
         file.write("country,income\n")
         file.write("PK,25000\n")
         file.write("US,75000\n")
 
     # first time would create new records
     import_country_income_thresholds(path)
-    assert "Record created successfully for country=PK with income 25000"
-    assert "Record created successfully for country=US with income 75000"
+    assert "Record created successfully for country=PK with income 25000"  # noqa: PLW0129
+    assert "Record created successfully for country=US with income 75000"  # noqa: PLW0129
 
     # second time would rather update records
     import_country_income_thresholds(path)
-    assert "Updated record successfully for country=PK with income 25000"
-    assert "Updated record successfully for country=US with income 75000"
+    assert "Updated record successfully for country=PK with income 25000"  # noqa: PLW0129
+    assert "Updated record successfully for country=US with income 75000"  # noqa: PLW0129
 
 
 class ExchangeRateAPITests(TestCase):
@@ -137,7 +138,7 @@ class ExchangeRateAPITests(TestCase):
             CurrencyExchangeRate.objects.get(currency_code="ABC").exchange_rate
             == latest_rates["ABC"]
         )
-        with self.assertRaises(CurrencyExchangeRate.DoesNotExist):
+        with self.assertRaises(CurrencyExchangeRate.DoesNotExist):  # noqa: PT027
             CurrencyExchangeRate.objects.get(currency_code="DEF")
         assert (
             CurrencyExchangeRate.objects.get(currency_code="GHI").exchange_rate
@@ -153,7 +154,7 @@ class ExchangeRateAPITests(TestCase):
         )
 
 
-def create_courseware(create_tiers=True, past=False):
+def create_courseware(create_tiers=True, past=False):  # noqa: FBT002
     """
     Helper function to create a flexible pricing courseware. Defaults to
     creating a CourseRun.
@@ -257,12 +258,12 @@ class FlexiblePriceBaseTestCase(TestCase):
 
         # Create a FinancialAid with a reset status to verify that it is ignored
         FlexiblePriceFactory.create(
-            # user="US",
+            # user="US",  # noqa: ERA001
             tier=cls.course_tiers["75k"],
             status=FlexiblePriceStatus.RESET,
         )
         FlexiblePriceFactory.create(
-            # user="US",
+            # user="US",  # noqa: ERA001
             tier=cls.program_tiers["75k"],
             status=FlexiblePriceStatus.RESET,
         )
@@ -296,7 +297,7 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
     Tests for financialaid api backend
     """
 
-    def setUp(self, test_program=True):
+    def setUp(self, test_program=True):  # noqa: FBT002
         self.test_program = test_program
 
         super().setUp()
@@ -311,7 +312,7 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
         self.program.refresh_from_db()
         self.course.refresh_from_db()
 
-    def select_course_or_program(self, test_program=False):
+    def select_course_or_program(self, test_program=False):  # noqa: FBT002
         """
         Helper to swap between a course or program for testing.
         """
@@ -353,8 +354,8 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
             == self.course_tiers[expected_tier_key]
         )
 
-    @ddt.data(True, False)
-    def test_determine_tier_courseware_not_current(self, test_program=False):
+    @ddt.data(True, False)  # noqa: FBT003
+    def test_determine_tier_courseware_not_current(self, test_program=False):  # noqa: FBT002
         """
         A current=False tier should be ignored
         """
@@ -376,7 +377,7 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
         course = CourseFactory.create()
         program.add_requirement(course)
 
-        with self.assertRaises(ImproperlyConfigured):
+        with self.assertRaises(ImproperlyConfigured):  # noqa: PT027
             determine_tier_courseware(course, 0)
 
     @ddt.data(
@@ -395,7 +396,11 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
     )
     @ddt.unpack
     def test_determine_auto_approval(
-        self, income_usd, country_code, expected, test_program=False
+        self,
+        income_usd,
+        country_code,
+        expected,
+        test_program=False,  # noqa: FBT002
     ):
         """
         Tests determine_auto_approval() assigning the correct auto-approval status. This should return True
@@ -424,7 +429,7 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
 
         return determine_courseware_flexible_price_discount(product, user)
 
-    def create_fp_and_compare_tiers(
+    def create_fp_and_compare_tiers(  # noqa: PLR0913
         self, courseware_object, income_usd, country_code, user, expected
     ):
         """
@@ -444,7 +449,7 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
             courseware_content_type=content_type,
             courseware_object_id=courseware_object.id,
         ).exists():
-            flexible_price = FlexiblePriceFactory.create(
+            flexible_price = FlexiblePriceFactory.create(  # noqa: F841
                 income_usd=income_usd,
                 country_of_income=country_code,
                 user=user,
@@ -475,7 +480,11 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
     )
     @ddt.unpack
     def test_determine_courseware_flexible_price_discount(
-        self, income_usd, country_code, expected, test_program=False
+        self,
+        income_usd,
+        country_code,
+        expected,
+        test_program=False,  # noqa: FBT002
     ):
         """
         Tests for the correct application of the flexible price discount.
@@ -522,7 +531,7 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
         )
         discount = flexible_price.tier.discount
 
-        assert discount.activation_date is None and discount.expiration_date is None
+        assert discount.activation_date is None and discount.expiration_date is None  # noqa: PT018
         assert determine_courseware_flexible_price_discount(product, user) == discount
 
         expired_delta = timedelta(days=30)
@@ -538,7 +547,7 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
             discount.save()
             discount.refresh_from_db()
 
-        assert (
+        assert (  # noqa: PT018
             discount.activation_date is not None
             and discount.expiration_date is not None
         )
@@ -652,7 +661,7 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
 
 
 @pytest.mark.parametrize(
-    "courseware_type,force_course,gen_slug,gen_title",
+    "courseware_type,force_course,gen_slug,gen_title",  # noqa: PT006
     [
         ("course", False, False, False),
         ("program", False, False, False),
@@ -685,7 +694,7 @@ def test_create_finaid_form(courseware_type, force_course, gen_slug, gen_title):
             second_program = ProgramPageFactory.create()
             second_program.program.add_requirement(courseware)
 
-        if force_course:
+        if force_course:  # noqa: SIM108
             page = courseware.page
         else:
             page = program_page
@@ -716,7 +725,7 @@ def test_create_finaid_form(courseware_type, force_course, gen_slug, gen_title):
     ):
         assert generated_page.selected_course == courseware
     elif (
-        courseware_type == "courseprogram" or courseware_type == "coursemultipleprogram"
+        courseware_type == "courseprogram" or courseware_type == "coursemultipleprogram"  # noqa: PLR1714
     ) and not force_course:
         assert generated_page.selected_program == courseware.programs[0]
     else:

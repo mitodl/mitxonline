@@ -1,35 +1,33 @@
 """Tests for CMS app API functionality"""
+
 import pytest
 from django.contrib.contenttypes.models import ContentType
-from courses.models import ProgramRequirement, ProgramRequirementNodeType
+from django.core.exceptions import ValidationError
 from wagtail.models import Page
 from wagtail_factories import PageFactory
-from django.core.exceptions import ValidationError
-
 
 from cms.api import (
-    ensure_home_page_and_site,
-    get_wagtail_img_src,
-    ensure_resource_pages,
-    ensure_product_index,
-    get_home_page,
     RESOURCE_PAGE_TITLES,
-    ensure_program_product_index,
     create_default_courseware_page,
+    ensure_home_page_and_site,
+    ensure_product_index,
+    ensure_program_product_index,
+    ensure_resource_pages,
+    get_home_page,
+    get_wagtail_img_src,
 )
 from cms.exceptions import WagtailSpecificPageError
-from cms.factories import HomePageFactory, CoursePageFactory, ProgramPageFactory
+from cms.factories import CoursePageFactory, HomePageFactory, ProgramPageFactory
 from cms.models import (
-    HomePage,
-    ResourcePage,
     CourseIndexPage,
+    CoursePage,
+    HomePage,
     HomeProductLink,
     ProgramIndexPage,
-    CoursePage,
     ProgramPage,
+    ResourcePage,
 )
-
-from courses.factories import CourseFactory, ProgramFactory, ProgramRequirementFactory
+from courses.factories import CourseFactory, ProgramFactory
 
 
 @pytest.mark.django_db
@@ -179,9 +177,9 @@ def test_ensure_program_product_index(mocker):
 
 @pytest.mark.django_db
 def test_home_page_featured_products(mocker):
-    """test home page is loading featured product"""
+    """Test home page is loading featured product"""
     home_page = HomePageFactory.create()
-    patched_get_home_page = mocker.patch(
+    patched_get_home_page = mocker.patch(  # noqa: F841
         "cms.api.get_home_page", return_value=home_page
     )
     course_page = CoursePageFactory.create(parent=home_page)
@@ -206,9 +204,9 @@ def test_home_page_featured_products(mocker):
 
 @pytest.mark.django_db
 def test_home_page_featured_products_sorting(mocker):
-    """tests that featured products are sorted in ascending order"""
+    """Tests that featured products are sorted in ascending order"""
     home_page = HomePageFactory.create()
-    patched_get_home_page = mocker.patch(
+    patched_get_home_page = mocker.patch(  # noqa: F841
         "cms.api.get_home_page", return_value=home_page
     )
     course_pages = CoursePageFactory.create_batch(2, parent=home_page)
@@ -247,10 +245,10 @@ def test_home_page_featured_products_published_only():
     unpublished_course_page = CoursePageFactory.create(parent=home_page, live=False)
     unpublished_program_page = ProgramPageFactory.create(parent=home_page, live=False)
 
-    for course_page in course_pages + [unpublished_course_page]:
+    for course_page in course_pages + [unpublished_course_page]:  # noqa: RUF005
         HomeProductLink.objects.create(page=home_page, course_product_page=course_page)
 
-    for program_page in program_pages + [unpublished_program_page]:
+    for program_page in program_pages + [unpublished_program_page]:  # noqa: RUF005
         HomeProductLink.objects.create(page=home_page, course_product_page=program_page)
 
     featured_products = home_page.products

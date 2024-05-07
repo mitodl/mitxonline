@@ -10,7 +10,6 @@ from django.contrib.contenttypes.models import ContentType
 from mitol.common.utils import now_in_utc
 from mitol.hubspot_api.api import format_app_id
 from mitol.hubspot_api.models import HubspotObject
-from courses.models import CourseRunEnrollment
 
 from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
 from ecommerce.constants import (
@@ -36,11 +35,11 @@ pytestmark = [pytest.mark.django_db]
 
 
 @pytest.mark.parametrize(
-    "text_id, expected",
+    "text_id, expected",  # noqa: PT006
     [
-        ["course-v1:MITxOnline+SysEngxNAV+R1", "Run 1"],
-        ["course-v1:MITxOnline+SysEngxNAV+R10", "Run 10"],
-        ["course-v1:MITxOnline+SysEngxNAV", "course-v1:MITxOnline+SysEngxNAV"],
+        ["course-v1:MITxOnline+SysEngxNAV+R1", "Run 1"],  # noqa: PT007
+        ["course-v1:MITxOnline+SysEngxNAV+R10", "Run 10"],  # noqa: PT007
+        ["course-v1:MITxOnline+SysEngxNAV", "course-v1:MITxOnline+SysEngxNAV"],  # noqa: PT007
     ],
 )
 def test_serialize_product(text_id, expected):
@@ -126,14 +125,14 @@ def test_serialize_order(settings, hubspot_order, status):
 
 
 @pytest.mark.parametrize(
-    "discount_type, amount, percent_off, amount_off",
+    "discount_type, amount, percent_off, amount_off",  # noqa: PT006
     [
-        [DISCOUNT_TYPE_PERCENT_OFF, Decimal(75), "75.00", "150.00"],
-        [DISCOUNT_TYPE_DOLLARS_OFF, Decimal(75), "37.50", "75.00"],
-        [DISCOUNT_TYPE_FIXED_PRICE, Decimal(75), "62.50", "125.00"],
+        [DISCOUNT_TYPE_PERCENT_OFF, Decimal(75), "75.00", "150.00"],  # noqa: PT007
+        [DISCOUNT_TYPE_DOLLARS_OFF, Decimal(75), "37.50", "75.00"],  # noqa: PT007
+        [DISCOUNT_TYPE_FIXED_PRICE, Decimal(75), "62.50", "125.00"],  # noqa: PT007
     ],
 )
-def test_serialize_order_with_coupon(
+def test_serialize_order_with_coupon(  # noqa: PLR0913
     settings, hubspot_order, discount_type, amount, percent_off, amount_off
 ):
     """Test that OrderToDealSerializer produces the correct serialized data for an order with coupon"""

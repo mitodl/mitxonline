@@ -1,29 +1,30 @@
-import pytest
 from datetime import timedelta
 from decimal import Decimal
 
+import pytest
 from django.utils.timezone import now
 from mitol.common.utils import now_in_utc
 
 from cms.serializers import ProgramPageSerializer
 from courses.factories import (
-    CourseRunFactory,
-    ProgramFactory,
     CourseFactory,
     CourseRunEnrollmentFactory,
+    CourseRunFactory,
     CourseRunGradeFactory,
-    program_with_empty_requirements,
+    ProgramFactory,
+    program_with_empty_requirements,  # noqa: F401
+    program_with_requirements,  # noqa: F401
 )
-from courses.models import Department, ProgramRequirementNodeType, ProgramRequirement
+from courses.models import Department, ProgramRequirement, ProgramRequirementNodeType
 from courses.serializers.v1.courses import CourseWithCourseRunsSerializer
 from courses.serializers.v1.programs import (
-    ProgramSerializer,
     LearnerRecordSerializer,
     ProgramRequirementSerializer,
     ProgramRequirementTreeSerializer,
+    ProgramSerializer,
 )
 from main.test_utils import assert_drf_json_equal
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = [pytest.mark.django_db]
 
@@ -32,7 +33,7 @@ pytestmark = [pytest.mark.django_db]
     "remove_tree",
     [True, False],
 )
-def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):
+def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):  # noqa: F811
     """Test Program serialization"""
     run1 = CourseRunFactory.create(
         course__page=None,
@@ -44,7 +45,7 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
         start_date=now() + timedelta(hours=2),
     )
     course2 = run2.course
-    runs = (
+    runs = (  # noqa: F841
         [run1, run2]
         + [
             CourseRunFactory.create(
@@ -185,7 +186,9 @@ def test_program_requirement_deletion():
     "enrollment_mode", [EDX_ENROLLMENT_VERIFIED_MODE, EDX_ENROLLMENT_AUDIT_MODE]
 )
 def test_learner_record_serializer(
-    mock_context, program_with_empty_requirements, enrollment_mode
+    mock_context,
+    program_with_empty_requirements,  # noqa: F811
+    enrollment_mode,
 ):
     """Verify that saving the requirements for one program doesn't affect other programs"""
 
@@ -200,7 +203,7 @@ def test_learner_record_serializer(
     for course in courses:
         program.add_requirement(course)
         course_run = CourseRunFactory.create(course=course)
-        course_run_enrollment = CourseRunEnrollmentFactory.create(
+        course_run_enrollment = CourseRunEnrollmentFactory.create(  # noqa: F841
             run=course_run,
             user=user,
             enrollment_mode=enrollment_mode,

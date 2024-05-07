@@ -1,6 +1,7 @@
 """
 Management command to sync dates and title for all or a specific course run from edX
 """
+
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
@@ -30,15 +31,15 @@ class Command(BaseCommand):
         )
         super().add_arguments(parser)
 
-    def handle(self, *args, **options):  # pylint: disable=too-many-locals
+    def handle(self, *args, **options):  # pylint: disable=too-many-locals  # noqa: ARG002
         """Handle command execution"""
         runs = []
         if options["run"]:
             try:
                 runs = [CourseRun.objects.get(courseware_id=options["run"])]
             except CourseRun.DoesNotExist:
-                raise CommandError(
-                    "Could not find run with courseware_id={}".format(options["run"])
+                raise CommandError(  # noqa: B904
+                    "Could not find run with courseware_id={}".format(options["run"])  # noqa: EM103
                 )
         elif options["all"]:
             # We pick up all the course runs that do not have an expiration date (implies not having

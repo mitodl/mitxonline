@@ -1,4 +1,5 @@
 """Serializers tests"""
+
 import pytest
 from rest_framework.exceptions import ValidationError
 from social_core.backends.email import EmailAuth
@@ -15,8 +16,8 @@ pytestmark = [pytest.mark.django_db]
 
 
 @pytest.mark.parametrize(
-    "side_effect,result",
-    (
+    "side_effect,result",  # noqa: PT006
+    (  # noqa: PT007
         (
             AuthException(None, "message"),
             SocialAuthState(SocialAuthState.STATE_ERROR, errors=["message"]),
@@ -42,16 +43,14 @@ def test_social_auth_serializer_error(mocker, side_effect, result):
             "request": mocker.Mock(),
         },
     )
-    assert serializer.is_valid() is True, "Received errors: {}".format(
-        serializer.errors
-    )
+    assert serializer.is_valid() is True, f"Received errors: {serializer.errors}"
     assert isinstance(serializer.save(), SocialAuthState)
     assert serializer.data == RegisterEmailSerializer(result).data
 
 
 @pytest.mark.parametrize(
-    "data,raises,message",
-    (
+    "data,raises,message",  # noqa: PT006
+    (  # noqa: PT007
         (
             {"email": None, "partial": None},
             ValidationError,
@@ -77,17 +76,17 @@ def test_register_email_validation(data, raises, message):
 
 
 @pytest.mark.parametrize(
-    "is_active, force_caps,",
-    (
-        [True, True],
-        [True, False],
-        [False, True],
+    "is_active, force_caps,",  # noqa: PT006
+    (  # noqa: PT007
+        [True, True],  # noqa: PT007
+        [True, False],  # noqa: PT007
+        [False, True],  # noqa: PT007
     ),
 )
 def test_login_email_validation(mocker, is_active, force_caps):
     """Tests class-level validation of LoginEmailSerializer"""
 
-    mocked_authenticate = mocker.patch(
+    mocked_authenticate = mocker.patch(  # noqa: F841
         "authentication.serializers.SocialAuthSerializer._authenticate"
     )
 
@@ -102,7 +101,7 @@ def test_login_email_validation(mocker, is_active, force_caps):
         user.save()
         user.email = user.email.upper()
 
-    user_social_auth = UserSocialAuthFactory.create(
+    user_social_auth = UserSocialAuthFactory.create(  # noqa: F841
         uid=user.email, provider=EmailAuth.name, user=user
     )
 
@@ -125,9 +124,7 @@ def test_login_email_validation(mocker, is_active, force_caps):
             "request": mocker.Mock(),
         },
     )
-    assert serializer.is_valid() is True, "Received errors: {}".format(
-        serializer.errors
-    )
+    assert serializer.is_valid() is True, f"Received errors: {serializer.errors}"
 
     if is_active:
         assert len(LoginEmailSerializer(result).data["field_errors"]) == 0
@@ -141,7 +138,7 @@ def test_login_email_validation_email_changed(mocker):
     """Tests class-level validation of LoginEmailSerializer for a user who changed their email address."""
     # No social auth record exists for the user after they have updated their email address
 
-    mocked_authenticate = mocker.patch(
+    mocked_authenticate = mocker.patch(  # noqa: F841
         "authentication.serializers.SocialAuthSerializer._authenticate"
     )
 
@@ -160,9 +157,7 @@ def test_login_email_validation_email_changed(mocker):
             "request": mocker.Mock(),
         },
     )
-    assert serializer.is_valid() is True, "Received errors: {}".format(
-        serializer.errors
-    )
+    assert serializer.is_valid() is True, f"Received errors: {serializer.errors}"
 
     assert len(LoginEmailSerializer(result).data["field_errors"]) == 0
 
@@ -170,7 +165,7 @@ def test_login_email_validation_email_changed(mocker):
 def test_login_email_validation_email_different_case(mocker):
     """Tests class-level validation of LoginEmailSerializer to handle different case of email entry."""
 
-    mocked_authenticate = mocker.patch(
+    mocked_authenticate = mocker.patch(  # noqa: F841
         "authentication.serializers.SocialAuthSerializer._authenticate"
     )
 
@@ -189,8 +184,6 @@ def test_login_email_validation_email_different_case(mocker):
             "request": mocker.Mock(),
         },
     )
-    assert serializer.is_valid() is True, "Received errors: {}".format(
-        serializer.errors
-    )
+    assert serializer.is_valid() is True, f"Received errors: {serializer.errors}"
 
     assert len(LoginEmailSerializer(result).data["field_errors"]) == 0

@@ -55,6 +55,6 @@
     ]
   },
   "devDependencies": {
-    "yarn-upgrade-all": "0.7.1"
+    "yarn-upgrade-all": "0.7.2"
   }
 }

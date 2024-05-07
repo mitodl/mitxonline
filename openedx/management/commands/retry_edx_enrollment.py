@@ -1,6 +1,7 @@
 """
 Management command to retry edX enrollment for a user's course run enrollments
 """
+
 from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand
 
@@ -41,7 +42,7 @@ class Command(BaseCommand):
             ),
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         """Run the command"""
         enrollment_filter = {}
         if not options["force"]:
@@ -55,9 +56,7 @@ class Command(BaseCommand):
         if course_run_enrollments.count() == 0:
             self.stderr.write(
                 self.style.ERROR(
-                    "No course run enrollments found that match the given filters ({}).\nExiting...".format(
-                        enrollment_filter
-                    )
+                    f"No course run enrollments found that match the given filters ({enrollment_filter}).\nExiting..."
                 )
             )
             return
@@ -69,17 +68,15 @@ class Command(BaseCommand):
                 enroll_in_edx_course_runs(
                     user, [course_run], mode=enrollment.enrollment_mode
                 )
-            except Exception as exc:  # pylint: disable=broad-except
-                self.stderr.write(self.style.ERROR(f"{str(exc)}"))
+            except Exception as exc:  # pylint: disable=broad-except  # noqa: BLE001
+                self.stderr.write(self.style.ERROR(f"{exc!s}"))
             else:
                 enrollment.edx_enrolled = True
                 enrollment.edx_emails_subscription = True
                 enrollment.save_and_log(None)
                 self.stdout.write(
                     self.style.SUCCESS(
-                        "Successfully enrolled user {} ({}) in course run '{}'".format(
-                            user.username, user.email, course_run.courseware_id
-                        )
+                        f"Successfully enrolled user {user.username} ({user.email}) in course run '{course_run.courseware_id}'"
                     )
                 )
 

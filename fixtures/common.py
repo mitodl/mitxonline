@@ -1,4 +1,5 @@
 """Common fixtures"""
+
 # pylint: disable=unused-argument, redefined-outer-name
 import os
 
@@ -12,13 +13,13 @@ from users.factories import UserFactory
 
 
 @pytest.fixture
-def user(db):
+def user(db):  # noqa: ARG001
     """Creates a user"""
     return UserFactory.create()
 
 
 @pytest.fixture
-def staff_user(db):
+def staff_user(db):  # noqa: ARG001
     """Staff user fixture"""
     return UserFactory.create(is_staff=True)
 
@@ -35,7 +36,7 @@ def user_client(user):
 def api_client():
     """Django test client that is authenticated with the user"""
     client = Client()
-    return client
+    return client  # noqa: RET504
 
 
 @pytest.fixture
@@ -78,7 +79,7 @@ def mock_context(mocker, user):
 @pytest.fixture
 def valid_address_dict():
     """Yields a dict that will deserialize into a valid legal address"""
-    return dict(
+    return dict(  # noqa: C408
         first_name="Test",
         last_name="User",
         country="US",
@@ -89,7 +90,7 @@ def valid_address_dict():
 @pytest.fixture
 def invalid_address_dict():
     """Yields a dict that will deserialize into an invalid US legal address"""
-    return dict(
+    return dict(  # noqa: C408
         first_name="Test",
         last_name="User",
         country="US",
@@ -100,7 +101,7 @@ def invalid_address_dict():
 @pytest.fixture
 def address_no_state_dict():
     """Yields a dict that will deserialize into a US legal address with no state"""
-    return dict(
+    return dict(  # noqa: C408
         first_name="Test",
         last_name="User",
         country="US",
@@ -112,7 +113,7 @@ def address_no_state_dict():
 def intl_address_dict():
     """Yields a dict that will deserialize into an valid non-US/CA legal address"""
 
-    return dict(
+    return dict(  # noqa: C408
         first_name="Test",
         last_name="User",
         country="JP",
@@ -123,34 +124,34 @@ def intl_address_dict():
 def user_profile_dict():
     """Yields a dict that generates a basic user profile"""
 
-    return dict(
+    return dict(  # noqa: C408
         gender=None,
         year_of_birth=1980,
     )
 
 
-@pytest.fixture()
-def nplusone_fail(settings):
+@pytest.fixture
+def nplusone_fail(settings):  # noqa: PT004
     """Configures the nplusone app to raise errors"""
     settings.NPLUSONE_RAISE = True
 
 
 @pytest.fixture(autouse=True)
-def webpack_stats(settings):
-    """mocks out webpack stats"""
+def webpack_stats(settings):  # noqa: PT004
+    """Mocks out webpack stats"""
 
     directory = "scripts/test/data/webpack-stats/"
 
     for loader_config in settings.WEBPACK_LOADER.values():
-        filename = os.path.basename(loader_config["STATS_FILE"])
+        filename = os.path.basename(loader_config["STATS_FILE"])  # noqa: PTH119, F841
 
-        loader_config["STATS_FILE"] = os.path.join(
+        loader_config["STATS_FILE"] = os.path.join(  # noqa: PTH118
             settings.BASE_DIR, directory, "default.json"
         )
 
 
-@pytest.fixture()
-def raise_nplusone(request):
+@pytest.fixture
+def raise_nplusone(request):  # noqa: PT004
     if request.node.get_closest_marker("skip_nplusone"):
         yield
     else:

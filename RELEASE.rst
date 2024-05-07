@@ -1,6 +1,37 @@
 Release Notes
 =============
 
+Version 0.91.1 (Released May 06, 2024)
+--------------
+
+- 4137: mitx online course and program count on catalog page is incorrect in mobile view (#2186)
+- warning message (#2188)
+- Update duplicate enrollment meassage (#2184)
+- fix: Resolve Poetry lock file
+- fix: Resolve failing pre-commit check
+- fix: Resolve minor pre-commit fixes
+- chore(deps): lock file maintenance (#2185)
+- Pre commit linting (#2161)
+- Update dependency react-hot-loader to v4.13.1 (#2166)
+- Update dependency enzyme-adapter-react-16 to v1.15.8 (#2163)
+- Update poetry and yarn lock files (#2183)
+
+Version 0.91.0 (Released May 02, 2024)
+--------------
+
+- 4012: Improve screen reader accessibility of the site-wide banner. (#2180)
+- Add course format and new wording for course box info (#2175)
+- Update dependency object.entries to v1.1.8 (#2164)
+- Update dependency postcss to v8.4.38 (#2165)
+- Update dependency ubuntu to v22 (#2039)
+- Update dependency reselect to v4.1.8 (#2169)
+
+Version 0.90.1 (Released May 01, 2024)
+--------------
+
+- Updating the styles and adding test for course with no runs (#2172)
+- Update dependency style-loader to v3.3.4 (#2170)
+
 Version 0.90.0 (Released April 25, 2024)
 --------------
 

@@ -1,4 +1,5 @@
 """Management command to change enrollment status"""
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -37,14 +38,14 @@ class Command(BaseCommand):
         )
         super().add_arguments(parser)
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         """Handle command execution"""
         user = fetch_user(options["user"])
 
         run = CourseRun.objects.filter(courseware_id=options["run"]).first()
         if run is None:
             raise CommandError(
-                "Could not find course run with courseware_id={}".format(options["run"])
+                "Could not find course run with courseware_id={}".format(options["run"])  # noqa: EM103
             )
 
         with transaction.atomic():
@@ -54,7 +55,7 @@ class Command(BaseCommand):
                 keep_failed_enrollments=options["keep_failed_enrollments"],
             )
             if not successful_enrollments:
-                raise CommandError("Failed to create the enrollment record")
+                raise CommandError("Failed to create the enrollment record")  # noqa: EM101
 
         self.stdout.write(
             self.style.SUCCESS(

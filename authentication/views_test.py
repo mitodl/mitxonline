@@ -1,4 +1,5 @@
 """Tests for authentication views"""
+
 # pylint: disable=redefined-outer-name
 from contextlib import ExitStack, contextmanager
 from unittest.mock import patch
@@ -54,14 +55,14 @@ def email_user(user):
 
 
 # pylint: disable=too-many-arguments
-def assert_api_call(
+def assert_api_call(  # noqa: PLR0913
     client,
     url,
     payload,
     expected,
-    expect_authenticated=False,
+    expect_authenticated=False,  # noqa: FBT002
     expect_status=status.HTTP_200_OK,
-    use_defaults=True,
+    use_defaults=True,  # noqa: FBT002
 ):
     """Runs the API call, performs basic assertions, and returns the response"""
     assert bool(get_user(client).is_authenticated) is False
@@ -88,14 +89,14 @@ def assert_api_call(
 
 
 # pylint: disable=too-many-arguments
-def assert_api_call_json(
+def assert_api_call_json(  # noqa: PLR0913
     client,
     url,
     payload,
     expected,
-    expect_authenticated=False,
+    expect_authenticated=False,  # noqa: FBT002
     expect_status=status.HTTP_200_OK,
-    use_defaults=True,
+    use_defaults=True,  # noqa: FBT002
 ):
     """Runs the API call, performs basic assertions, and returns the response JSON"""
     response = assert_api_call(
@@ -110,10 +111,10 @@ def assert_api_call_json(
     return response.json()
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_email_send(mocker):
     """Mock the email send API"""
-    yield mocker.patch("mail.verification_api.send_verification_email")
+    return mocker.patch("mail.verification_api.send_verification_email")
 
 
 @contextmanager
@@ -182,7 +183,7 @@ class AuthStateMachine(RuleBasedStateMachine):
         # shared data
         self.email = fake.email()
         self.user = None
-        self.password = "password123"
+        self.password = "password123"  # noqa: S105
 
         # track whether we've hit an action that starts a flow or not
         self.flow_started = False
@@ -285,14 +286,15 @@ class AuthStateMachine(RuleBasedStateMachine):
     def register_email_not_exists_with_recaptcha_invalid(self):
         """Yield a function for this step"""
         self.flow_started = True
-        with patch(
-            "authentication.views.requests.post",
-            return_value=MockResponse(
-                content='{"success": false, "error-codes": ["bad-request"]}',
-                status_code=status.HTTP_200_OK,
-            ),
-        ) as mock_recaptcha_failure, override_settings(
-            **{"RECAPTCHA_SITE_KEY": "fakse"}
+        with (
+            patch(
+                "authentication.views.requests.post",
+                return_value=MockResponse(
+                    content='{"success": false, "error-codes": ["bad-request"]}',
+                    status_code=status.HTTP_200_OK,
+                ),
+            ) as mock_recaptcha_failure,
+            override_settings(**{"RECAPTCHA_SITE_KEY": "fakse"}),
         ):
             assert_api_call_json(
                 self.client,
@@ -393,7 +395,7 @@ class AuthStateMachine(RuleBasedStateMachine):
         auth_state=consumes(LoginPasswordAuthStates),
         verify_exports=st.sampled_from([True, False]),
     )
-    def login_password_user_inactive(self, auth_state, verify_exports):
+    def login_password_user_inactive(self, auth_state, verify_exports):  # noqa: ARG002
         """Login for an inactive user"""
         self.user.is_active = False
         self.user.save()
@@ -552,7 +554,7 @@ def test_new_register_no_session_partial(client):
             "state": SocialAuthState.STATE_REGISTER_CONFIRM_SENT,
         },
     )
-    assert PARTIAL_PIPELINE_TOKEN_KEY not in client.session.keys()
+    assert PARTIAL_PIPELINE_TOKEN_KEY not in client.session.keys()  # noqa: SIM118
 
 
 def test_login_email_error(client, mocker):
@@ -587,7 +589,7 @@ def test_login_email_error(client, mocker):
 def test_login_email_hijacked(client, user, admin_user):
     """Test that a 403 response is returned for email login view if user is hijacked"""
     client.force_login(admin_user)
-    client.post("/hijack/{}/".format(user.id))
+    client.post(f"/hijack/{user.id}/")
     response = client.post(
         reverse("psa-login-email"),
         {"flow": SocialAuthState.FLOW_LOGIN, "email": "anything@example.com"},
@@ -598,7 +600,7 @@ def test_login_email_hijacked(client, user, admin_user):
 def test_register_email_hijacked(client, user, admin_user):
     """Test that a 403 response is returned for email register view if user is hijacked"""
     client.force_login(admin_user)
-    client.post("/hijack/{}/".format(user.id))
+    client.post(f"/hijack/{user.id}/")
     response = client.post(
         reverse("psa-register-email"),
         {"flow": SocialAuthState.FLOW_LOGIN, "email": "anything@example.com"},

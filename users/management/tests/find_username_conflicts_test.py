@@ -1,8 +1,10 @@
 """Tests the username conflict finder."""
-import pytest
+
 from io import StringIO
 
+import pytest
 from django.core.management import call_command
+
 from users.factories import UserFactory
 
 

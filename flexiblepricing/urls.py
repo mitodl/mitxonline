@@ -1,13 +1,13 @@
 from django.urls import include, re_path
-from rest_framework_extensions.routers import NestedRouterMixin
 from rest_framework.routers import SimpleRouter
+from rest_framework_extensions.routers import NestedRouterMixin
 
 from flexiblepricing.views.v0 import (
-    CurrencyExchangeRateViewSet,
     CountryIncomeThresholdViewSet,
-    FlexiblePriceViewSet,
+    CurrencyExchangeRateViewSet,
     FlexiblePriceAdminViewSet,
     FlexiblePriceCoursewareViewSet,
+    FlexiblePriceViewSet,
 )
 
 

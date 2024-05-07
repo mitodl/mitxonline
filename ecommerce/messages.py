@@ -1,4 +1,5 @@
-""" Ecommerce email messages """
+"""Ecommerce email messages"""
+
 from mitol.mail.messages import TemplatedMessage
 
 

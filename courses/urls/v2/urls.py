@@ -1,4 +1,3 @@
-from django.urls import include, re_path
 from rest_framework import routers
 
 from courses.views import v2

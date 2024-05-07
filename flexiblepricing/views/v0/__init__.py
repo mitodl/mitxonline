@@ -1,9 +1,10 @@
 """
 MITxOnline Flexible Pricing/Financial Aid views
 """
+
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Q
-from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.viewsets import ModelViewSet

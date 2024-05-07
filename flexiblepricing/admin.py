@@ -9,8 +9,8 @@ from flexiblepricing.models import (
     CountryIncomeThreshold,
     CurrencyExchangeRate,
     FlexiblePrice,
-    FlexiblePricingRequestSubmission,
     FlexiblePriceTier,
+    FlexiblePricingRequestSubmission,
 )
 
 
@@ -41,9 +41,7 @@ class FlexiblePriceAdmin(VersionAdmin):
     )
     raw_id_fields = ("user",)
 
-    def has_delete_permission(
-        self, *args, **kwargs
-    ):  # pylint: disable=unused-argument, signature-differs
+    def has_delete_permission(self, *args, **kwargs):  # pylint: disable=unused-argument, signature-differs  # noqa: ARG002
         return False
 
 

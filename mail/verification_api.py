@@ -1,4 +1,5 @@
 """API for email verifications"""
+
 from urllib.parse import quote_plus
 
 from django.urls import reverse
@@ -7,9 +8,7 @@ from mail import api
 from mail.constants import EMAIL_CHANGE_EMAIL, EMAIL_VERIFICATION
 
 
-def send_verification_email(
-    strategy, backend, code, partial_token
-):  # pylint: disable=unused-argument
+def send_verification_email(strategy, backend, code, partial_token):  # pylint: disable=unused-argument  # noqa: ARG001
     """
     Sends a verification email for python-social-auth
 

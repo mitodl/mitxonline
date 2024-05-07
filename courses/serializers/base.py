@@ -38,7 +38,7 @@ class BaseProgramRequirementTreeSerializer(serializers.ListSerializer):
     can consume.
     """
 
-    def update(self, instance, validated_data):
+    def update(self, instance, validated_data):  # noqa: C901
         """
         Update the program requirement tree
 

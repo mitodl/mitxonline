@@ -1,4 +1,5 @@
 """Tests for CMS management commands"""
+
 from django.core.management import call_command
 
 

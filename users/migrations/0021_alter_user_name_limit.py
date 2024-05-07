@@ -13,7 +13,6 @@ def truncate_long_user_names(apps, schema):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("users", "0020_add_addl_profile_fields"),
     ]

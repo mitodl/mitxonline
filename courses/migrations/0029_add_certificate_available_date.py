@@ -11,7 +11,6 @@ def populate_certificate_available_date(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("courses", "0028_alter_certificate_models_make_page_revision_blankable"),
     ]

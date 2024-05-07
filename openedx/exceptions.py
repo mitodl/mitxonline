@@ -1,4 +1,5 @@
 """Courseware exceptions"""
+
 from mitol.common.utils import get_error_response_summary
 
 
@@ -18,7 +19,7 @@ class EdxApiUserUpdateError(Exception):
     """Exception updating the edX user via API"""
 
 
-class EdxApiEnrollErrorException(Exception):
+class EdxApiEnrollErrorException(Exception):  # noqa: N818
     """An edX enrollment API call resulted in an error response"""
 
     def __init__(self, user, course_run, http_error, msg=None):
@@ -36,16 +37,11 @@ class EdxApiEnrollErrorException(Exception):
         self.http_error = http_error
         if msg is None:
             # Set some default useful error message
-            msg = "EdX API error enrolling user {} ({}) in course run '{}'.\n{}".format(
-                self.user.username,
-                self.user.email,
-                self.course_run.courseware_id,
-                get_error_response_summary(self.http_error.response),
-            )
+            msg = f"EdX API error enrolling user {self.user.username} ({self.user.email}) in course run '{self.course_run.courseware_id}'.\n{get_error_response_summary(self.http_error.response)}"
         super().__init__(msg)
 
 
-class UnknownEdxApiEnrollException(Exception):
+class UnknownEdxApiEnrollException(Exception):  # noqa: N818
     """An edX enrollment API call failed for an unknown reason"""
 
     def __init__(self, user, course_run, base_exc, msg=None):
@@ -61,21 +57,15 @@ class UnknownEdxApiEnrollException(Exception):
         self.course_run = course_run
         self.base_exc = base_exc
         if msg is None:
-            msg = "Unexpected error enrolling user {} ({}) in course run '{}' ({}: {})".format(
-                self.user.username,
-                self.user.email,
-                self.course_run.courseware_id,
-                type(base_exc).__name__,
-                str(base_exc),
-            )
+            msg = f"Unexpected error enrolling user {self.user.username} ({self.user.email}) in course run '{self.course_run.courseware_id}' ({type(base_exc).__name__}: {base_exc!s})"
         super().__init__(msg)
 
 
-class UserNameUpdateFailedException(Exception):
+class UserNameUpdateFailedException(Exception):  # noqa: N818
     """Raised if a user's profile name(Full Name) update call is failed"""
 
 
-class EdxApiEmailSettingsErrorException(Exception):
+class EdxApiEmailSettingsErrorException(Exception):  # noqa: N818
     """An edX change email settings API call resulted in an error response"""
 
     def __init__(self, user, course_run, http_error, msg=None):
@@ -93,16 +83,11 @@ class EdxApiEmailSettingsErrorException(Exception):
         self.course_run = course_run
         self.http_error = http_error
         if msg is None:
-            msg = "EdX API error for user {} ({}) course email subscription in course run '{}'.\n{}".format(
-                self.user.username,
-                self.user.email,
-                self.course_run.courseware_id,
-                get_error_response_summary(self.http_error.response),
-            )
+            msg = f"EdX API error for user {self.user.username} ({self.user.email}) course email subscription in course run '{self.course_run.courseware_id}'.\n{get_error_response_summary(self.http_error.response)}"
         super().__init__(msg)
 
 
-class UnknownEdxApiEmailSettingsException(Exception):
+class UnknownEdxApiEmailSettingsException(Exception):  # noqa: N818
     """An edX course email subscription API call failed for an unknown reason"""
 
     def __init__(self, user, course_run, base_exc, msg=None):
@@ -118,17 +103,11 @@ class UnknownEdxApiEmailSettingsException(Exception):
         self.course_run = course_run
         self.base_exc = base_exc
         if msg is None:
-            msg = "Unexpected error for user {} ({}) email subscription in course run '{}' ({}: {})".format(
-                self.user.username,
-                self.user.email,
-                self.course_run.courseware_id,
-                type(base_exc).__name__,
-                str(base_exc),
-            )
+            msg = f"Unexpected error for user {self.user.username} ({self.user.email}) email subscription in course run '{self.course_run.courseware_id}' ({type(base_exc).__name__}: {base_exc!s})"
         super().__init__(msg)
 
 
-class EdxApiRegistrationValidationException(Exception):
+class EdxApiRegistrationValidationException(Exception):  # noqa: N818
     """An edX Registration Validation API call resulted in an error response"""
 
     def __init__(self, username, response, msg=None):
@@ -143,8 +122,5 @@ class EdxApiRegistrationValidationException(Exception):
         self.response = response
         if msg is None:
             # Set some default useful error message
-            msg = "EdX API error validating registration username {}.\n{}".format(
-                self.username,
-                get_error_response_summary(self.response),
-            )
+            msg = f"EdX API error validating registration username {self.username}.\n{get_error_response_summary(self.response)}"
         super().__init__(msg)

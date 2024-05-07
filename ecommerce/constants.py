@@ -1,4 +1,5 @@
 """Constants for ecommerce."""
+
 from mitol.payment_gateway.api import ProcessorResponse
 
 REFERENCE_NUMBER_PREFIX = "mitxonline-"

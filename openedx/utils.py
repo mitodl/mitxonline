@@ -1,6 +1,7 @@
 """Utility functions for the openedx app"""
+
 from dataclasses import dataclass
-from typing import NamedTuple, TypeVar, List, Generic
+from typing import Generic, List, TypeVar  # noqa: UP035
 from urllib.parse import urljoin
 
 from django.conf import settings
@@ -23,15 +24,15 @@ T = TypeVar("T")
 class SyncResult(Generic[T]):
     """Represents the results of a sync with edX"""
 
-    created: List[T]
-    reactivated: List[T]
-    deactivated: List[T]
+    created: List[T]  # noqa: UP006
+    reactivated: List[T]  # noqa: UP006
+    deactivated: List[T]  # noqa: UP006
 
     def __init__(
         self,
-        created: List[T] = None,
-        reactivated: List[T] = None,
-        deactivated: List[T] = None,
+        created: List[T] = None,  # noqa: UP006, RUF013
+        reactivated: List[T] = None,  # noqa: UP006, RUF013
+        deactivated: List[T] = None,  # noqa: UP006, RUF013
     ):
         self.created = created or []
         self.reactivated = reactivated or []

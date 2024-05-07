@@ -20,7 +20,7 @@ class BaseCourseSerializer(serializers.ModelSerializer):
         return {**data, **CoursePageSerializer(instance=instance.page).data}
 
     @staticmethod
-    def get_type(obj):
+    def get_type(obj):  # noqa: ARG004
         return CONTENT_TYPE_MODEL_COURSE
 
     class Meta:
@@ -64,7 +64,7 @@ class BaseProgramSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField(read_only=True)
 
     @staticmethod
-    def get_type(obj):
+    def get_type(obj):  # noqa: ARG004
         return CONTENT_TYPE_MODEL_PROGRAM
 
     class Meta:
@@ -120,7 +120,7 @@ class BaseCourseRunEnrollmentSerializer(serializers.ModelSerializer):
         flexible_price_exists = is_courseware_flexible_price_approved(
             instance_run, instance_user
         )
-        return flexible_price_exists
+        return flexible_price_exists  # noqa: RET504
 
     def get_grades(self, instance):
         instance_run = instance[0].run if isinstance(instance, list) else instance.run

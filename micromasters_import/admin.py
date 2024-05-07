@@ -1,8 +1,10 @@
 """micromasters_import admin"""
+
 from django.contrib import admin
+
 from micromasters_import.models import (
-    CourseId,
     CourseCertificateRevisionId,
+    CourseId,
     ProgramId,
     ProgramTierId,
 )

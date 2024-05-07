@@ -1,9 +1,10 @@
-""" Task helper functions for ecommerce """
+"""Task helper functions for ecommerce"""
+
 import logging
 
 from django.conf import settings
-from ecommerce.models import Order, Product
 
+from ecommerce.models import Order, Product
 from hubspot_sync import tasks
 from users.models import User
 
@@ -22,7 +23,7 @@ def sync_hubspot_user(user: User):
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         try:
             tasks.sync_contact_with_hubspot.delay(user.id)
-        except:
+        except:  # noqa: E722
             log.exception(
                 "Exception calling sync_contact_with_hubspot for user %s", user.username
             )
@@ -39,7 +40,7 @@ def sync_hubspot_deal(order: Order):
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN and order.lines.first() is not None:
         try:
             tasks.sync_deal_with_hubspot.apply_async(args=(order.id,), countdown=10)
-        except:
+        except:  # noqa: E722
             log.exception(
                 "Exception calling sync_deal_with_hubspot for order %d", order.id
             )
@@ -56,7 +57,7 @@ def sync_hubspot_line_by_line_id(line_id: int):
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN and line_id is not None:
         try:
             tasks.sync_line_with_hubspot.apply_async(args=(line_id,), countdown=10)
-        except:
+        except:  # noqa: E722
             log.exception(
                 "Exception calling sync_line_with_hubspot for line ID %d", line_id
             )
@@ -72,7 +73,7 @@ def sync_hubspot_product(product: Product):
     if settings.MITOL_HUBSPOT_API_PRIVATE_TOKEN:
         try:
             tasks.sync_product_with_hubspot.delay(product.id)
-        except:
+        except:  # noqa: E722
             log.exception(
                 "Exception calling sync_product_with_hubspot for product %d", product.id
             )

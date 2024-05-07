@@ -124,7 +124,7 @@ class Command(BaseCommand):
             dest="tutordev",
         )
 
-    def determine_edx_hostport(self, *args, **kwargs):
+    def determine_edx_hostport(self, *args, **kwargs):  # noqa: ARG002
         """Returns a tuple of the edX host and port depending on what the user's passed in"""
 
         if kwargs["tutor"]:
@@ -134,7 +134,7 @@ class Command(BaseCommand):
         else:
             return ("edx.odl.local:18000", ":18000")
 
-    def handle(self, *args, **kwargs):
+    def handle(self, *args, **kwargs):  # noqa: ARG002
         """Coordinates the other commands."""
 
         (edx_host, edx_gateway_port) = self.determine_edx_hostport(**kwargs)
@@ -163,9 +163,9 @@ class Command(BaseCommand):
                             f"Gateway required for platform type {kwargs['platform']}."
                         )
                     )
-                    exit(-1)
+                    exit(-1)  # noqa: PLR1722
 
-                redirects = "\n".join(
+                redirects = "\n".join(  # noqa: F841
                     [
                         f"http://{edx_host}/auth/complete/mitxpro-oauth2/",
                         f"http://{kwargs['gateway']}{edx_gateway_port}/auth/complete/mitxpro-oauth2/",
@@ -281,7 +281,7 @@ class Command(BaseCommand):
         # Step 8: create the learner and enroll them (unless told not to)
         self.stdout.write(self.style.SUCCESS("Creating the learner..."))
 
-        if "dont_enroll" in kwargs and kwargs["dont_enroll"]:
+        if kwargs.get("dont_enroll"):
             call_command(
                 "create_user",
                 "testlearner",
