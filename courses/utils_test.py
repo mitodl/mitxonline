@@ -2,6 +2,7 @@
 """
 Tests for utils
 """
+
 from datetime import timedelta
 
 from mitol.common.utils import now_in_utc

@@ -1,7 +1,6 @@
 """API functionality for the CMS app"""
 
 import logging
-
 from datetime import timedelta
 from typing import Tuple, Union  # noqa: UP035
 from urllib.parse import urlencode, urljoin
@@ -18,7 +17,7 @@ from wagtail.rich_text import RichText
 from cms import models as cms_models
 from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
 from cms.exceptions import WagtailSpecificPageError
-from cms.models import Page  # noqa: F811
+from cms.models import Page
 from courses.models import Course, Program
 from courses.utils import get_courses_based_on_enrollment
 
@@ -346,4 +345,3 @@ def create_featured_items():
     )
     # Set the value in cache for 24 hours
     cache.set("CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE)
-    return
