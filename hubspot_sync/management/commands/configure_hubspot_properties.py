@@ -640,6 +640,14 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
 
 
 def _get_course_run_certificate_hubspot_property():
+    """
+    Creates a dictionary representation of a Hubspot checkbox,
+    populated with options using the string representation of all course runs.
+
+    Returns:
+        dict: dictionary representing the properties for a HubSpot checkbox,
+        populated with the string representation of all course runs.
+    """
     course_runs = CourseRun.objects.all()
     options_array = []
     for course_run in course_runs:
@@ -662,6 +670,14 @@ def _get_course_run_certificate_hubspot_property():
 
 
 def _get_program_certificate_hubspot_property():
+    """
+    Creates a dictionary representation of a Hubspot checkbox,
+    populated with options using string representation of all programs.
+
+    Returns:
+        dict: dictionary representing the properties for a HubSpot checkbox,
+        populated with the string representation of all programs.
+    """
     programs = Program.objects.all()
     options_array = []
     for program in programs:
