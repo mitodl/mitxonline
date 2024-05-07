@@ -6,7 +6,6 @@ import pytest
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from mitol.common.utils import now_in_utc
 from wagtail.models import Page
 from wagtail_factories import PageFactory
 
@@ -296,62 +295,73 @@ def test_create_featured_items():
     if featured_courses is not None:
         cache.delete("CMS_homepage_featured_courses")
 
-    now = now_in_utc()
-    future_date = now + timedelta(days=1)
-    further_future_date = now + timedelta(days=2)
-    past_date = now - timedelta(days=1)
-
-    enrollable_future_course = CourseFactory.create(page=None)
+    enrollable_future_course = CourseFactory.create(
+        page=None, live=True, title="Future"
+    )
     CoursePageFactory.create(course=enrollable_future_course, live=True)
-    CourseRunFactory.create(
+    enrollable_future_courserun = CourseRunFactory.create(
         course=enrollable_future_course,
         live=True,
-        start_date=future_date,
-        end_date=future_date,
-        enrollment_start=future_date,
-        enrollment_end=future_date,
+        in_future=True,
     )
 
-    enrollable_further_future_course = CourseFactory.create(page=None)
-    CoursePageFactory.create(course=enrollable_further_future_course, live=True)
-    CourseRunFactory.create(
-        course=enrollable_further_future_course,
+    enrollable_other_future_course = CourseFactory.create(
+        page=None, live=True, title="Further Future"
+    )
+    CoursePageFactory.create(course=enrollable_other_future_course, live=True)
+    enrollable_other_future_courserun = CourseRunFactory.create(
+        course=enrollable_other_future_course,
         live=True,
-        start_date=further_future_date,
-        end_date=further_future_date,
-        enrollment_start=past_date,
-        enrollment_end=further_future_date,
+        in_future=True,
     )
+    enrollable_other_future_courserun.start_date = (
+        enrollable_future_courserun.start_date + timedelta(days=2)
+    )
+    enrollable_other_future_courserun.enrollment_end = (
+        enrollable_future_courserun.enrollment_end + timedelta(days=2)
+    )
+    enrollable_other_future_courserun.save()
 
-    enrollable_self_paced_course = CourseFactory.create(page=None)
+    enrollable_self_paced_course = CourseFactory.create(
+        page=None, live=True, title="Self Paced"
+    )
     CoursePageFactory.create(course=enrollable_self_paced_course, live=True)
-    CourseRunFactory.create(
+    self_paced_run = CourseRunFactory.create(
         course=enrollable_self_paced_course,
         live=True,
-        start_date=future_date,
-        end_date=future_date,
-        enrollment_start=past_date,
-        enrollment_end=future_date,
-        is_self_paced=True,
+        in_progress=True,
+    )
+    self_paced_run.is_self_paced = True
+    self_paced_run.save()
+
+    in_progress_course = CourseFactory.create(page=None, live=True, title="In Progress")
+    CoursePageFactory.create(course=in_progress_course, live=True)
+    CourseRunFactory.create(
+        course=in_progress_course,
+        live=True,
+        in_progress=True,
     )
 
-    unenrollable_course = CourseFactory.create(page=None)
+    unenrollable_course = CourseFactory.create(
+        page=None, live=False, title="Unenrollable"
+    )
     CoursePageFactory.create(course=unenrollable_course, live=False)
     CourseRunFactory.create(
-        course=unenrollable_course,
-        live=False,
-        start_date=future_date,
-        end_date=future_date,
-        enrollment_start=past_date,
-        enrollment_end=future_date,
+        course=unenrollable_course, live=False, past_enrollment_end=True
     )
 
     create_featured_items()
     cache_value = cache.get("CMS_homepage_featured_courses")
 
-    assert len(cache_value) == 3
-    assert cache_value[0]["title"] == enrollable_self_paced_course.title
-    assert cache_value[1]["title"] == enrollable_future_course.title
-    assert cache_value[2]["title"] == enrollable_further_future_course.title
+    assert len(cache_value) == 4
+    assert enrollable_future_course in cache_value
+    assert enrollable_other_future_course in cache_value
+    assert enrollable_self_paced_course in cache_value
+    assert in_progress_course in cache_value
+
+    assert cache_value[0] == enrollable_self_paced_course
+    assert cache_value[1] == enrollable_future_course
+    assert cache_value[2] == enrollable_other_future_course
+    assert cache_value[3] == in_progress_course
 
     assert unenrollable_course not in cache_value

@@ -345,12 +345,15 @@ def create_featured_items():
     ).order_by("?")[:20]
 
     # Split them into future and started courses, order the future courses by start_date, the rest do not matter, so we leave them as is to save time
-    future_featured_course_ids = [
+    future_featured_courseruns = [
         courserun
         for courserun in random_featured_courseruns
         if courserun.start_date >= now
     ]
-    future_featured_course_ids.sort(key=lambda courserun: courserun.start_date)
+    future_featured_courseruns.sort(key=lambda courserun: courserun.start_date)
+    future_featured_course_ids = [
+        courserun.course.id for courserun in future_featured_courseruns
+    ]
     future_featured_courses = Course.objects.filter(id__in=future_featured_course_ids)
 
     started_featured_course_ids = [
@@ -361,9 +364,11 @@ def create_featured_items():
     started_featured_courses = Course.objects.filter(id__in=started_featured_course_ids)
 
     # Union all the featured courses together
-    featured_courses = (
-        self_paced_featured_courses | future_featured_courses | started_featured_courses
-    )
+    featured_courses = []
+    featured_courses.extend(list(self_paced_featured_courses))
+    featured_courses.extend(list(future_featured_courses))
+    featured_courses.extend(list(started_featured_courses))
+
     # Set the value in cache for 24 hours
     cache.set("CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE)
     return featured_courses
