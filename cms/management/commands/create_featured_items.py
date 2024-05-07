@@ -10,5 +10,5 @@ class Command(BaseCommand):
 
     help = __doc__
 
-    def handle(self, *args, **kwargs):
+    def handle(self):
         create_featured_items()
