@@ -105,7 +105,9 @@ def get_unenrollable_courseruns_qs():
     """Returns all course runs that are closed for enrollment."""
     now = now_in_utc()
     return CourseRun.objects.filter(
-        Q(live=False) | Q(start_date__isnull=True) | (Q(enrollment_end__lte=now))
+        Q(live=False)
+        | Q(start_date__isnull=True)
+        | (Q(enrollment_end__lte=now) | Q(enrollment_start__gt=now))
     )
 
 
