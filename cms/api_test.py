@@ -295,9 +295,7 @@ def test_create_featured_items():
     if featured_courses is not None:
         cache.delete("CMS_homepage_featured_courses")
 
-    enrollable_future_course = CourseFactory.create(
-        page=None, live=True, title="Future"
-    )
+    enrollable_future_course = CourseFactory.create(page=None, live=True)
     CoursePageFactory.create(course=enrollable_future_course, live=True)
     enrollable_future_courserun = CourseRunFactory.create(
         course=enrollable_future_course,
@@ -305,9 +303,7 @@ def test_create_featured_items():
         in_future=True,
     )
 
-    enrollable_other_future_course = CourseFactory.create(
-        page=None, live=True, title="Further Future"
-    )
+    enrollable_other_future_course = CourseFactory.create(page=None, live=True)
     CoursePageFactory.create(course=enrollable_other_future_course, live=True)
     enrollable_other_future_courserun = CourseRunFactory.create(
         course=enrollable_other_future_course,
@@ -322,9 +318,7 @@ def test_create_featured_items():
     )
     enrollable_other_future_courserun.save()
 
-    enrollable_self_paced_course = CourseFactory.create(
-        page=None, live=True, title="Self Paced"
-    )
+    enrollable_self_paced_course = CourseFactory.create(page=None, live=True)
     CoursePageFactory.create(course=enrollable_self_paced_course, live=True)
     self_paced_run = CourseRunFactory.create(
         course=enrollable_self_paced_course,
@@ -334,7 +328,7 @@ def test_create_featured_items():
     self_paced_run.is_self_paced = True
     self_paced_run.save()
 
-    in_progress_course = CourseFactory.create(page=None, live=True, title="In Progress")
+    in_progress_course = CourseFactory.create(page=None, live=True)
     CoursePageFactory.create(course=in_progress_course, live=True)
     CourseRunFactory.create(
         course=in_progress_course,
@@ -342,9 +336,7 @@ def test_create_featured_items():
         in_progress=True,
     )
 
-    unenrollable_course = CourseFactory.create(
-        page=None, live=False, title="Unenrollable"
-    )
+    unenrollable_course = CourseFactory.create(page=None, live=False)
     CoursePageFactory.create(course=unenrollable_course, live=False)
     CourseRunFactory.create(
         course=unenrollable_course, live=False, past_enrollment_end=True
