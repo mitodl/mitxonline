@@ -116,6 +116,6 @@ def get_courses_based_on_enrollment(
     return (
         queryset.prefetch_related(Prefetch("courseruns", queryset=courseruns_qs))
         .prefetch_related("courseruns__course")
-        .filter(courseruns__id__in=enrollable_runs.values_list("id", flat=True))
+        .filter(courseruns__id__in=courseruns_qs.values_list("id", flat=True))
         .distinct()
     )

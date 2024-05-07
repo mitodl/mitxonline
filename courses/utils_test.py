@@ -2,7 +2,10 @@
 """
 Tests for utils
 """
+from datetime import timedelta
+
 import pytest
+from mitol.common.utils import now_in_utc
 
 from courses.factories import (
     CourseFactory,
@@ -10,10 +13,14 @@ from courses.factories import (
     CourseRunFactory,
     ProgramCertificateFactory,
     ProgramEnrollmentFactory,
-    ProgramFactory,
     program_with_requirements,
 )
-from courses.utils import get_program_certificate_by_enrollment
+from courses.models import Course
+from courses.utils import (
+    get_courses_based_on_enrollment,
+    get_enrollable_courseruns_qs,
+    get_program_certificate_by_enrollment,
+)
 
 
 def test_get_program_certificate_by_enrollment(user, program_with_requirements):
@@ -204,7 +211,7 @@ def test_get_courses_based_on_enrollment():
     past_date = now - timedelta(days=1)
     course = CourseFactory.create()
     unenrollable_course = CourseFactory.create()
-    CourseRunFactory.createcreate(
+    CourseRunFactory.create(
         course=course,
         live=True,
         start_date=now,
