@@ -277,5 +277,9 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))
         call_command("configure_hubspot_properties")
-        self.stdout.write(self.style.SUCCESS("Updated Hubspot course and program certificate properties."))
+        self.stdout.write(
+            self.style.SUCCESS(
+                "Updated Hubspot course and program certificate properties."
+            )
+        )
         return None
