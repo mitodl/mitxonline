@@ -1543,7 +1543,7 @@ def test_generate_program_certificate_success_minimum_electives_not_met(user):
 
 def test_force_generate_program_certificate_success(
     user,
-    program_with_requirements,
+    program_with_requirements,  # noqa: F811
     mocker,
 ):
     """
