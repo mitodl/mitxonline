@@ -324,10 +324,6 @@ def create_featured_items():
     if featured_courses is not None:
         cache.delete("CMS_homepage_featured_courses")
 
-    enrollable_courses = Course.objects.filter(
-        live=True, published=True, enrollable=True
-    ).order_by("?")[:30]
-
     now = now_in_utc()
     end_of_day = now + timedelta(days=1)
 
