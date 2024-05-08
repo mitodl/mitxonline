@@ -1,7 +1,10 @@
 """Tests for CMS app API functionality"""
 
+from datetime import timedelta
+
 import pytest
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from wagtail.models import Page
 from wagtail_factories import PageFactory
@@ -9,6 +12,7 @@ from wagtail_factories import PageFactory
 from cms.api import (
     RESOURCE_PAGE_TITLES,
     create_default_courseware_page,
+    create_featured_items,
     ensure_home_page_and_site,
     ensure_product_index,
     ensure_program_product_index,
@@ -27,7 +31,7 @@ from cms.models import (
     ProgramPage,
     ResourcePage,
 )
-from courses.factories import CourseFactory, ProgramFactory
+from courses.factories import CourseFactory, CourseRunFactory, ProgramFactory
 
 
 @pytest.mark.django_db
@@ -282,3 +286,74 @@ def test_create_courseware_page():
 
     with pytest.raises(ValidationError):
         resulting_page = create_default_courseware_page(course.programs[0])
+
+
+@pytest.mark.django_db
+def test_create_featured_items():
+    # pytest does not clear cache thus if we have a cache value set, it will persist between tests and test runs
+    featured_courses = cache.get("CMS_homepage_featured_courses")
+    if featured_courses is not None:
+        cache.delete("CMS_homepage_featured_courses")
+
+    enrollable_future_course = CourseFactory.create(page=None, live=True)
+    CoursePageFactory.create(course=enrollable_future_course, live=True)
+    enrollable_future_courserun = CourseRunFactory.create(
+        course=enrollable_future_course,
+        live=True,
+        in_future=True,
+    )
+
+    enrollable_other_future_course = CourseFactory.create(page=None, live=True)
+    CoursePageFactory.create(course=enrollable_other_future_course, live=True)
+    enrollable_other_future_courserun = CourseRunFactory.create(
+        course=enrollable_other_future_course,
+        live=True,
+        in_future=True,
+    )
+    enrollable_other_future_courserun.start_date = (
+        enrollable_future_courserun.start_date + timedelta(days=2)
+    )
+    enrollable_other_future_courserun.enrollment_end = (
+        enrollable_future_courserun.enrollment_end + timedelta(days=2)
+    )
+    enrollable_other_future_courserun.save()
+
+    enrollable_self_paced_course = CourseFactory.create(page=None, live=True)
+    CoursePageFactory.create(course=enrollable_self_paced_course, live=True)
+    self_paced_run = CourseRunFactory.create(
+        course=enrollable_self_paced_course,
+        live=True,
+        in_progress=True,
+    )
+    self_paced_run.is_self_paced = True
+    self_paced_run.save()
+
+    in_progress_course = CourseFactory.create(page=None, live=True)
+    CoursePageFactory.create(course=in_progress_course, live=True)
+    CourseRunFactory.create(
+        course=in_progress_course,
+        live=True,
+        in_progress=True,
+    )
+
+    unenrollable_course = CourseFactory.create(page=None, live=False)
+    CoursePageFactory.create(course=unenrollable_course, live=False)
+    CourseRunFactory.create(
+        course=unenrollable_course, live=False, past_enrollment_end=True
+    )
+
+    create_featured_items()
+    cache_value = cache.get("CMS_homepage_featured_courses")
+
+    assert len(cache_value) == 4
+    assert enrollable_future_course in cache_value
+    assert enrollable_other_future_course in cache_value
+    assert enrollable_self_paced_course in cache_value
+    assert in_progress_course in cache_value
+
+    assert cache_value[0] == enrollable_self_paced_course
+    assert cache_value[1] == enrollable_future_course
+    assert cache_value[2] == enrollable_other_future_course
+    assert cache_value[3] == in_progress_course
+
+    assert unenrollable_course not in cache_value

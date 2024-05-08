@@ -3,6 +3,11 @@
 Tests for utils
 """
 
+from datetime import timedelta
+
+import pytest
+from mitol.common.utils import now_in_utc
+
 from courses.factories import (
     CourseFactory,
     CourseRunEnrollmentFactory,
@@ -12,7 +17,14 @@ from courses.factories import (
     ProgramFactory,  # noqa: F401
     program_with_requirements,  # noqa: F401
 )
-from courses.utils import get_program_certificate_by_enrollment
+from courses.models import Course
+from courses.utils import (
+    get_enrollable_courseruns_qs,
+    get_enrollable_courses,
+    get_program_certificate_by_enrollment,
+    get_unenrollable_courseruns_qs,
+    get_unenrollable_courses,
+)
 
 
 def test_get_program_certificate_by_enrollment(user, program_with_requirements):  # noqa: F811
@@ -114,3 +126,143 @@ def test_get_program_certificate_by_enrollment_program_certificate_page_does_not
     )
     assert get_program_certificate_by_enrollment(course_enrollment) == None  # noqa: E711
     assert get_program_certificate_by_enrollment(program_enrollment) == None  # noqa: E711
+
+
+@pytest.mark.django_db
+def test_get_enrollable_courseruns_qs():
+    """
+    Test get_enrollable_courseruns_qs
+    """
+    course = CourseFactory.create()
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    past_date = now - timedelta(days=1)
+    course_run = CourseRunFactory.create(
+        course=course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+    CourseRunFactory.create(
+        course=course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+
+    enrollable_qs = get_enrollable_courseruns_qs()
+    assert enrollable_qs.count() == 2
+    assert course_run in enrollable_qs
+
+    unenrollable_course_run = CourseRunFactory.create(
+        course=course,
+        live=True,
+        start_date=now,
+        enrollment_start=future_date,
+        enrollment_end=None,
+    )
+    enrollable_qs = get_enrollable_courseruns_qs()
+    assert enrollable_qs.count() == 2
+    assert course_run in enrollable_qs
+    assert unenrollable_course_run not in enrollable_qs
+
+
+@pytest.mark.django_db
+def test_get_unenrollable_courseruns_qs():
+    """
+    Test get_enrollable_courseruns_qs
+    """
+    course = CourseFactory.create()
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    past_date = now - timedelta(days=1)
+    course_run = CourseRunFactory.create(
+        course=course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+    CourseRunFactory.create(
+        course=course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+
+    unenrollable_qs = get_unenrollable_courseruns_qs()
+    assert unenrollable_qs.count() == 0
+    assert course_run not in unenrollable_qs
+
+    unenrollable_course_run = CourseRunFactory.create(
+        course=course,
+        live=True,
+        start_date=future_date,
+        enrollment_start=future_date,
+        enrollment_end=past_date,
+    )
+    unenrollable_qs = get_unenrollable_courseruns_qs()
+    assert unenrollable_qs.count() == 1
+    assert course_run not in unenrollable_qs
+    assert unenrollable_course_run in unenrollable_qs
+
+
+@pytest.mark.django_db
+def test_get_enrollable_courses():
+    """
+    Test get_enrollable_courses
+    """
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    past_date = now - timedelta(days=1)
+    enrollable_course = CourseFactory.create()
+    unenrollable_course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=enrollable_course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+    CourseRunFactory.create(
+        course=unenrollable_course,
+        live=True,
+        start_date=future_date,
+        enrollment_start=future_date,
+        enrollment_end=None,
+    )
+    enrollable_courses = get_enrollable_courses(Course.objects.all())
+    assert unenrollable_course not in enrollable_courses
+    assert enrollable_course in enrollable_courses
+
+
+@pytest.mark.django_db
+def test_get_unenrollable_courses():
+    """
+    Test get_unenrollable_courses
+    """
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    past_date = now - timedelta(days=1)
+    enrollable_course = CourseFactory.create()
+    unenrollable_course = CourseFactory.create()
+    CourseRunFactory.create(
+        course=enrollable_course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+    CourseRunFactory.create(
+        course=unenrollable_course,
+        live=True,
+        start_date=future_date,
+        enrollment_start=future_date,
+        enrollment_end=None,
+    )
+    unenrollable_courses = get_unenrollable_courses(Course.objects.all())
+    assert unenrollable_course in unenrollable_courses
+    assert enrollable_course not in unenrollable_courses
