@@ -97,7 +97,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           {message}{" "}
           {isArchived ? (
             <button
-              className="info-link more-info float-none explain-format-btn"
+              className="info-link more-info float-none explain-archived-btn"
               onClick={() => this.togglePacingInfoDialogVisibility("Archived")}
             >
               Learn More
@@ -256,7 +256,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                     <button
                       className="info-link more-info explain-format-btn"
                       onClick={() =>
-                        this.togglePacingInfoDialogVisibility("Self-paced")
+                        this.togglePacingInfoDialogVisibility("Self-Paced")
                       }
                     >
                       What's this?
@@ -269,7 +269,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                       className="info-link more-info explain-format-btn"
                       onClick={() =>
                         this.togglePacingInfoDialogVisibility(
-                          "Instructor-paced"
+                          "Instructor-Paced"
                         )
                       }
                     >
