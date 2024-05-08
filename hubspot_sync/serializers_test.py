@@ -1,6 +1,7 @@
 """
 Tests for hubspot_sync serializers
 """
+
 # pylint: disable=unused-argument, redefined-outer-name
 
 from decimal import Decimal
@@ -11,7 +12,12 @@ from mitol.common.utils import now_in_utc
 from mitol.hubspot_api.api import format_app_id
 from mitol.hubspot_api.models import HubspotObject
 
-from courses.factories import CourseRunEnrollmentFactory, CourseRunFactory
+from courses.factories import (
+    CourseRunCertificateFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    ProgramCertificateFactory,
+)
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
@@ -25,6 +31,7 @@ from ecommerce.factories import (
 from ecommerce.models import Order, Product
 from hubspot_sync.serializers import (
     ORDER_STATUS_MAPPING,
+    HubspotContactSerializer,
     LineSerializer,
     OrderToDealSerializer,
     ProductSerializer,
@@ -39,7 +46,10 @@ pytestmark = [pytest.mark.django_db]
     [
         ["course-v1:MITxOnline+SysEngxNAV+R1", "Run 1"],  # noqa: PT007
         ["course-v1:MITxOnline+SysEngxNAV+R10", "Run 10"],  # noqa: PT007
-        ["course-v1:MITxOnline+SysEngxNAV", "course-v1:MITxOnline+SysEngxNAV"],  # noqa: PT007
+        [
+            "course-v1:MITxOnline+SysEngxNAV",
+            "course-v1:MITxOnline+SysEngxNAV",
+        ],  # noqa: PT007
     ],
 )
 def test_serialize_product(text_id, expected):
@@ -164,3 +174,20 @@ def test_serialize_order_with_coupon(  # noqa: PLR0913
         "pipeline": settings.HUBSPOT_PIPELINE_ID,
         "unique_app_id": format_app_id(hubspot_order.id),
     }
+
+
+def test_serialize_contact(settings, user):
+    """Test that HubspotContactSerializer includes program and course run certificates for the user"""
+    program_cert_1 = ProgramCertificateFactory.create(user=user)
+    program_cert_2 = ProgramCertificateFactory.create(user=user)
+    course_run_cert_1 = CourseRunCertificateFactory.create(user=user)
+    course_run_cert_2 = CourseRunCertificateFactory.create(user=user)
+    serialized_data = HubspotContactSerializer(instance=user).data
+    assert (
+        serialized_data["program_certificates"]
+        == f"{program_cert_1.program!s};{program_cert_2.program!s}"
+    )
+    assert (
+        serialized_data["course_run_certificates"]
+        == f"{course_run_cert_1.course_run!s};{course_run_cert_2.course_run!s}"
+    )

@@ -23,7 +23,7 @@ from urllib import parse
 import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.management import BaseCommand
+from django.core.management import BaseCommand, call_command
 from django_countries import countries
 
 from cms.api import create_default_courseware_page
@@ -275,4 +275,7 @@ class Command(BaseCommand):
                         )
                     )
 
-        self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))  # noqa: RET503
+        self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))
+        call_command("configure_hubspot_properties")
+        self.stdout.write(self.style.SUCCESS("Updated Hubspot course and program certificate properties."))
+        return None
