@@ -46,10 +46,10 @@ pytestmark = [pytest.mark.django_db]
     [
         ["course-v1:MITxOnline+SysEngxNAV+R1", "Run 1"],  # noqa: PT007
         ["course-v1:MITxOnline+SysEngxNAV+R10", "Run 10"],  # noqa: PT007
-        [
+        (
             "course-v1:MITxOnline+SysEngxNAV",
             "course-v1:MITxOnline+SysEngxNAV",
-        ],  # noqa: PT007
+        ),
     ],
 )
 def test_serialize_product(text_id, expected):
