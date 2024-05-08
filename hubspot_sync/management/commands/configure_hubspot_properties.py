@@ -648,15 +648,14 @@ def _get_course_run_certificate_hubspot_property():
         populated with the string representation of all course runs.
     """
     course_runs = CourseRun.objects.all()
-    options_array = []
-    for course_run in course_runs:
-        options_array.append(
-            {
-                "value": str(course_run),
-                "label": str(course_run),
-                "hidden": False,
-            }
-        )
+    options_array = [
+        {
+            "value": str(course_run),
+            "label": str(course_run),
+            "hidden": False,
+        }
+        for course_run in course_runs
+    ]
     return {
         "name": "course_run_certificates",
         "label": "Course Run certificates",
@@ -678,15 +677,14 @@ def _get_program_certificate_hubspot_property():
         populated with the string representation of all programs.
     """
     programs = Program.objects.all()
-    options_array = []
-    for program in programs:
-        options_array.append(
-            {
-                "value": str(program),
-                "label": str(program),
-                "hidden": False,
-            }
-        )
+    options_array = [
+        {
+            "value": str(program),
+            "label": str(program),
+            "hidden": False,
+        }
+        for program in programs
+    ]
     return {
         "name": "program_certificates",
         "label": "Program certificates",

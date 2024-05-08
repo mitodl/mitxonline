@@ -286,9 +286,9 @@ class HubspotContactSerializer(UserSerializer):
         programs_user_has_cert = ProgramCertificate.objects.filter(
             user=instance, is_revoked=False
         ).select_related("program")
-        program_name_array = []
-        for program_cert in programs_user_has_cert:
-            program_name_array.append(str(program_cert.program))
+        program_name_array = [
+            str(program_cert.program) for program_cert in programs_user_has_cert
+        ]
         return ";".join(program_name_array)
 
     def get_course_run_certificates(self, instance):
@@ -296,13 +296,15 @@ class HubspotContactSerializer(UserSerializer):
         course_runs_user_has_cert = CourseRunCertificate.objects.filter(
             user=instance, is_revoked=False
         ).select_related("course_run")
-        course_run_name_array = []
-        for course_run_cert in course_runs_user_has_cert:
-            course_run_name_array.append(str(course_run_cert.course_run))
+        course_run_name_array = [
+            str(course_run_cert.course_run)
+            for course_run_cert in course_runs_user_has_cert
+        ]
         return ";".join(course_run_name_array)
 
     class Meta:
-        fields = UserSerializer.Meta.fields + (
+        fields = (
+            *UserSerializer.Meta.fields,
             "program_certificates",
             "course_run_certificates",
         )
