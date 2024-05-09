@@ -1,7 +1,6 @@
 // @flow
 import {
   isLinkableCourseRun,
-  isWithinEnrollmentPeriod,
   generateStartDateText,
   isFinancialAssistanceAvailable,
   learnerProgramIsCompleted,
@@ -86,22 +85,6 @@ describe("Course API", () => {
         })
       }
     )
-  })
-
-  describe("isWithinEnrollmentPeriod", () => {
-    [
-      [past, future, "active enrollment period", true],
-      [past, null, "active enrollment period with no end", true],
-      [null, null, "null enrollment start", false],
-      [farPast, past, "past enrollment period", false],
-      [future, farFuture, "future enrollment period", false]
-    ].forEach(([enrollStart, enrollEnd, desc, expResult]) => {
-      it(`returns ${String(expResult)} with ${desc}`, () => {
-        courseRun.enrollment_start = enrollStart
-        courseRun.enrollment_end = enrollEnd
-        assert.equal(isWithinEnrollmentPeriod(courseRun), expResult)
-      })
-    })
   })
 
   describe("generateStartDateText", () => {

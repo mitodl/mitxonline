@@ -30,8 +30,9 @@ import {
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 import {
-  getFirstRelevantRun, isEnrollmentFuture,
-  isFinancialAssistanceAvailable,
+  getFirstRelevantRun,
+  isEnrollmentFuture,
+  isFinancialAssistanceAvailable
 } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import users, { currentUserSelector } from "../lib/queries/users"
@@ -511,7 +512,10 @@ export class CourseProductDetailEnroll extends React.Component<
       <>
         {
           // $FlowFixMe: isLoading null or undefined
-          <Loader key="product_detail_enroll_loader" isLoading={courseIsLoading}>
+          <Loader
+            key="product_detail_enroll_loader"
+            isLoading={courseIsLoading}
+          >
             <>
               {run
                 ? currentUser && currentUser.id

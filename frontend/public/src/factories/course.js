@@ -56,6 +56,7 @@ export const makeCourseRun = (): CourseRun => ({
   courseware_url:   casual.url,
   courseware_id:    casual.word.concat(genCoursewareId.next().value),
   run_tag:          casual.word.concat(genRunTagNumber.next().value),
+  is_enrollable:    true,
   // $FlowFixMe
   id:               genCourseRunId.next().value,
   course_number:    casual.word,

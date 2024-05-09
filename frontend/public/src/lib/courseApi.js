@@ -37,10 +37,7 @@ export const isLinkableCourseRun = (
 
 export const isEnrollmentFuture = (run: CourseRunDetail): boolean => {
   const enrollStart = run.enrollment_start ? moment(run.enrollment_start) : null
-  return (
-    !!enrollStart &&
-    moment().isBefore(enrollStart)
-  )
+  return !!enrollStart && moment().isBefore(enrollStart)
 }
 
 export const courseRunStatusMessage = (run: CourseRun) => {
