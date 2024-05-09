@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.92.0
+--------------
+
+- Adding a Learn More link to Archived message (#2194)
+- Adding management command and function for pulling featured items (#2190)
+- Course format pacing info popup (#2187)
+- Remove redux-asserts (#2177)
+- Remove react-swipeable (#2178)
+- chore(deps): update all non-major dev-dependencies (#2171)
+- fix(deps): update dependency redux-asserts to v0.0.12 (#2168)
+
 Version 0.91.1 (Released May 06, 2024)
 --------------
 
