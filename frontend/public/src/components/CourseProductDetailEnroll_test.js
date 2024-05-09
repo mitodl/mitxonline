@@ -389,6 +389,21 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         .text()
         .includes("Course content available anytime")
     )
+    const archivedLearnMoreBtn = infobox.find(".explain-archived-btn").at(0)
+    await archivedLearnMoreBtn.prop("onClick")()
+    assert.isTrue(
+      infobox
+        .find(".pacing-info-dialog")
+        .at(0)
+        .exists()
+    )
+    assert.include(
+      infobox
+        .find("ModalHeader")
+        .dive()
+        .text(),
+      `What are Archived courses?`
+    )
   })
 
   it(`shows form based enrollment button when upgrade deadline has passed but course is within enrollment period`, async () => {
