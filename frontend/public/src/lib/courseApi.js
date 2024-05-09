@@ -35,15 +35,11 @@ export const isLinkableCourseRun = (
   return notNil(run.start_date) && moment(run.start_date).isBefore(now)
 }
 
-export const isWithinEnrollmentPeriod = (run: CourseRunDetail): boolean => {
+export const isEnrollmentFuture = (run: CourseRunDetail): boolean => {
   const enrollStart = run.enrollment_start ? moment(run.enrollment_start) : null
-  const enrollEnd = run.enrollment_end ? moment(run.enrollment_end) : null
-  const now = moment()
-
   return (
     !!enrollStart &&
-    now.isAfter(enrollStart) &&
-    (isNil(enrollEnd) || now.isBefore(enrollEnd))
+    moment().isBefore(enrollStart)
   )
 }
 
@@ -255,13 +251,16 @@ export const getFirstRelevantRun = (
       run => run.start_date && moment(run.start_date).isSameOrAfter(now)
     )
   ) {
-    return courseRuns
+    const relevantRun = courseRuns
       .filter(
         run => run.start_date && moment(run.start_date).isSameOrAfter(now)
       )
       .reduce((prev, curr) =>
         moment(curr.start_date).isBefore(moment(prev.start_date)) ? curr : prev
       )
+    if (relevantRun.is_enrollable) {
+      return relevantRun
+    }
   }
 
   return courseRuns

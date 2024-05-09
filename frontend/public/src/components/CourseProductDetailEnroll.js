@@ -30,9 +30,8 @@ import {
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 import {
-  getFirstRelevantRun,
+  getFirstRelevantRun, isEnrollmentFuture,
   isFinancialAssistanceAvailable,
-  isWithinEnrollmentPeriod
 } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import users, { currentUserSelector } from "../lib/queries/users"
@@ -167,18 +166,6 @@ export class CourseProductDetailEnroll extends React.Component<
     return this.state.currentCourseRun
   }
 
-  getFirstUnenrolledCourseRun = (): EnrollmentFlaggedCourseRun => {
-    const { courseRuns } = this.props
-
-    return courseRuns
-      ? courseRuns.find(
-        (run: EnrollmentFlaggedCourseRun) =>
-          run.is_enrolled === false &&
-            moment(run.enrollment_start) <= moment.now()
-      ) || courseRuns[0]
-      : null
-  }
-
   cancelEnrollment() {
     const { upgradeEnrollmentDialogVisibility } = this.state
 
@@ -212,6 +199,7 @@ export class CourseProductDetailEnroll extends React.Component<
                 {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
                 {formatPrettyDate(moment(new Date(elem.end_date)))}{" "}
                 {elem.is_upgradable ? "" : "(no certificate available)"}
+                {isEnrollmentFuture(elem) ? "(enrollment opens soon)" : ""}
               </option>
             ))}
         </select>
@@ -229,7 +217,7 @@ export class CourseProductDetailEnroll extends React.Component<
         <button
           type="submit"
           className="btn enroll-now enroll-now-free"
-          disabled={!run}
+          disabled={!run || isEnrollmentFuture(run)}
         >
           <strong>Enroll for Free</strong> without a certificate
         </button>
@@ -471,7 +459,7 @@ export class CourseProductDetailEnroll extends React.Component<
   ) {
     const { courseRuns } = this.props
     const csrfToken = getCookie("csrftoken")
-    return run && isWithinEnrollmentPeriod(run) ? (
+    return run && run.is_enrollable ? (
       <h2>
         {(product && run.is_upgradable) ||
         (courseRuns && courseRuns.length > 1) ? (
@@ -501,7 +489,6 @@ export class CourseProductDetailEnroll extends React.Component<
   render() {
     const {
       courseRuns,
-      isLoading,
       courses,
       courseIsLoading,
       currentUser,
@@ -524,7 +511,7 @@ export class CourseProductDetailEnroll extends React.Component<
       <>
         {
           // $FlowFixMe: isLoading null or undefined
-          <Loader key="product_detail_enroll_loader" isLoading={isLoading}>
+          <Loader key="product_detail_enroll_loader" isLoading={courseIsLoading}>
             <>
               {run
                 ? currentUser && currentUser.id
