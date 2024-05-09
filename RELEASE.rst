@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.92.0
+Version 0.92.0 (Released May 09, 2024)
 --------------
 
 - Adding a Learn More link to Archived message (#2194)
