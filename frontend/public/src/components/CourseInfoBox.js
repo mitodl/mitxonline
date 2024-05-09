@@ -66,7 +66,8 @@ const getCourseDates = (run, isArchived = false, isMoreDates = false) => {
 export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProps> {
   state = {
     showMoreEnrollDates:        false,
-    pacingInfoDialogVisibility: false
+    pacingInfoDialogVisibility: false,
+    pacingDialogState:          ""
   }
   toggleShowMoreEnrollDates() {
     this.setState({
@@ -74,7 +75,12 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     })
   }
 
-  togglePacingInfoDialogVisibility() {
+  togglePacingInfoDialogVisibility(pacingDialogState = "") {
+    if (pacingDialogState) {
+      this.setState({
+        pacingDialogState: pacingDialogState
+      })
+    }
     this.setState({
       pacingInfoDialogVisibility: !this.state.pacingInfoDialogVisibility
     })
@@ -87,14 +93,24 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     return (
       <div className="row d-flex align-self-stretch callout callout-warning course-status-message">
         <i className="material-symbols-outlined warning">error</i>
-        <p>{message}</p>
+        <p>
+          {message}{" "}
+          {isArchived ? (
+            <button
+              className="info-link more-info float-none explain-archived-btn"
+              onClick={() => this.togglePacingInfoDialogVisibility("Archived")}
+            >
+              Learn More
+            </button>
+          ) : null}
+        </p>
       </div>
     )
   }
 
-  renderPacingInfoDialog(pacing) {
-    const { pacingInfoDialogVisibility } = this.state
-    return (
+  renderPacingInfoDialog() {
+    const { pacingInfoDialogVisibility, pacingDialogState } = this.state
+    return pacingDialogState ? (
       <Modal
         id={`pacing-info-dialog`}
         className="pacing-info-dialog"
@@ -103,16 +119,25 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         centered
       >
         <ModalHeader toggle={() => this.togglePacingInfoDialogVisibility()}>
-          What are {pacing} courses?
+          What are {pacingDialogState} courses?
         </ModalHeader>
         <ModalBody>
-          {pacing === "Self-Paced" ? (
+          {pacingDialogState === "Archived" ? (
+            <p>
+              Access lectures and readings beyond the official end date. Some
+              course assignments and exams may be unavailable. No support in
+              course discussion forums. Cannot earn a Course Certificate.{" "}
+              <a href="https://mitxonline.zendesk.com/hc/en-us/articles/21995114519067-What-are-Archived-courses-on-MITx-Online-">
+                Learn More
+              </a>
+            </p>
+          ) : pacingDialogState === "Self-Paced" ? (
             <p>
               Flexible learning. Enroll at any time and progress at your own
               speed. All course materials available immediately. Adaptable due
               dates and extended timelines. Earn your certificate as soon as you
               pass the course.{" "}
-              <a href="https://mitxonline.zendesk.com/hc/en-us/articles/21995114519067-What-are-Archived-courses-on-MITx-Online-">
+              <a href="https://mitxonline.zendesk.com/hc/en-us/articles/21994872904475-What-are-Self-Paced-courses-on-MITx-Online">
                 Learn More
               </a>
             </p>
@@ -128,7 +153,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           )}
         </ModalBody>
       </Modal>
-    )
+    ) : null
   }
 
   render() {
@@ -230,7 +255,9 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                     Self-paced
                     <button
                       className="info-link more-info explain-format-btn"
-                      onClick={() => this.togglePacingInfoDialogVisibility()}
+                      onClick={() =>
+                        this.togglePacingInfoDialogVisibility("Self-Paced")
+                      }
                     >
                       What's this?
                     </button>
@@ -240,7 +267,11 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                     Instructor-paced
                     <button
                       className="info-link more-info explain-format-btn"
-                      onClick={() => this.togglePacingInfoDialogVisibility()}
+                      onClick={() =>
+                        this.togglePacingInfoDialogVisibility(
+                          "Instructor-Paced"
+                        )
+                      }
                     >
                       What's this?
                     </button>
@@ -313,11 +344,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             </div>
           </div>
         </div>
-        {run
-          ? this.renderPacingInfoDialog(
-            run.is_self_paced ? "Self-Paced" : "Instructor-Paced"
-          )
-          : null}
+        {run ? this.renderPacingInfoDialog() : null}
         {course && course.programs && course.programs.length > 0 ? (
           <div className="program-info-box">
             <div className="related-programs-info">
