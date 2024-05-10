@@ -820,7 +820,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
             .toISOString()
         }
       }
-      console.log(courseMode)
       if (startInFuture) {
         courseRun["start_date"] = moment()
           .add(10, "months")
