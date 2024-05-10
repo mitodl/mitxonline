@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.92.1
+Version 0.92.1 (Released May 10, 2024)
 --------------
 
 - restrict duplicate enrollment only if user is verified (#2199)
