@@ -460,7 +460,7 @@ export class CourseProductDetailEnroll extends React.Component<
   ) {
     const { courseRuns } = this.props
     const csrfToken = getCookie("csrftoken")
-    return run && run.is_enrollable ? (
+    return run ? (
       <h2>
         {(product && run.is_upgradable) ||
         (courseRuns && courseRuns.length > 1) ? (
@@ -468,6 +468,7 @@ export class CourseProductDetailEnroll extends React.Component<
               id="upgradeEnrollBtn"
               className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
               onClick={() => this.toggleUpgradeDialogVisibility()}
+              disabled={!run.is_enrollable}
             >
             Enroll now
             </button>
@@ -478,6 +479,7 @@ export class CourseProductDetailEnroll extends React.Component<
               <button
                 type="submit"
                 className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+                disabled={!run.is_enrollable}
               >
               Enroll now
               </button>
@@ -514,7 +516,7 @@ export class CourseProductDetailEnroll extends React.Component<
           // $FlowFixMe: isLoading null or undefined
           <Loader
             key="product_detail_enroll_loader"
-            isLoading={courseIsLoading}
+            isLoading={courseIsLoading || enrollmentsIsLoading}
           >
             <>
               {run
