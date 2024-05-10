@@ -174,7 +174,7 @@ def test_course_run_not_beyond_enrollment(
             end_date=end_date,
             enrollment_end=enr_end_date,
             enrollment_start=enr_start_date,
-        ).is_not_beyond_enrollment
+        ).is_enrollable
         is expected
     )
 
