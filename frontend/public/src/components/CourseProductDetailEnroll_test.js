@@ -572,17 +572,17 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     it(`${showsQualifier} the course run selector for a course with ${runsQualifier} active run${
       multiples ? "s" : ""
     } and enables enroll buttons on selection`, async () => {
-      courseRun["products"] = [
-        {
-          id:                     1,
-          price:                  10,
-          is_upgradable:          true,
-          product_flexible_price: {
-            amount:        10,
-            discount_type: DISCOUNT_TYPE_PERCENT_OFF
-          }
-        }
-      ]
+      // courseRun["products"] = [
+      //   {
+      //     id:                     1,
+      //     price:                  10,
+      //     is_upgradable:          true,
+      //     product_flexible_price: {
+      //       amount:        10,
+      //       discount_type: DISCOUNT_TYPE_PERCENT_OFF
+      //     }
+      //   }
+      // ]
       const courseRuns = [courseRun]
       if (multiples) {
         courseRuns.push(courseRun)

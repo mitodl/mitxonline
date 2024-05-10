@@ -218,7 +218,7 @@ export class CourseProductDetailEnroll extends React.Component<
         <button
           type="submit"
           className="btn enroll-now enroll-now-free"
-          disabled={!run || isEnrollmentFuture(run)}
+          disabled={!run || !run.is_enrollable}
         >
           <strong>Enroll for Free</strong> without a certificate
         </button>
