@@ -253,7 +253,10 @@ def _validate_enrollment_post_request(
     if (
         PaidCourseRun.fulfilled_paid_course_run_exists(user, run)
         or CourseRunEnrollment.objects.filter(
-            user=user, run=run, change_status=None, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+            user=user,
+            run=run,
+            change_status=None,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
         ).exists()
     ):
         resp = redirect_with_user_message(
