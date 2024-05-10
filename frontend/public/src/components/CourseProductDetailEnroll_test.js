@@ -134,11 +134,17 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       },
       {}
     )
-    assert.isNotOk(
+    assert.isTrue(
       inner
         .find(".enroll-now")
         .at(0)
         .exists()
+    )
+    assert.isTrue(
+      inner
+        .find(".enroll-now")
+        .at(0)
+        .prop("disabled")
     )
   })
 
