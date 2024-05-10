@@ -715,9 +715,8 @@ class CourseRun(TimestampedModel):
             boolean: True if enrollment period has begun but not ended
         """
         now = now_in_utc()
-        return (
-            (self.enrollment_end is None or self.enrollment_end > now)
-            and (self.enrollment_start is None or self.enrollment_start <= now)
+        return (self.enrollment_end is None or self.enrollment_end > now) and (
+            self.enrollment_start is None or self.enrollment_start <= now
         )
 
     @property
