@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.92.1
+--------------
+
+- restrict duplicate enrollment only if user is verified (#2199)
+- add relational dates to ensure all courses end up getting pulled (#2200)
+
 Version 0.92.0 (Released May 09, 2024)
 --------------
 
