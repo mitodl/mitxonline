@@ -256,7 +256,7 @@ def _validate_enrollment_post_request(
             user=user,
             run=run,
             change_status=None,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
         ).exists()
     ):
         resp = redirect_with_user_message(
