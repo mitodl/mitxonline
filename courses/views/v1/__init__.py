@@ -74,6 +74,7 @@ from openedx.api import (
     sync_enrollments_with_edx,
     unsubscribe_from_edx_course_emails,
 )
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.exceptions import (
     EdxApiEmailSettingsErrorException,
     NoEdxApiAuthError,
@@ -252,7 +253,7 @@ def _validate_enrollment_post_request(
     if (
         PaidCourseRun.fulfilled_paid_course_run_exists(user, run)
         or CourseRunEnrollment.objects.filter(
-            user=user, run=run, change_status=None
+            user=user, run=run, change_status=None, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
         ).exists()
     ):
         resp = redirect_with_user_message(
