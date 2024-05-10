@@ -119,6 +119,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
   it("checks for enroll now button should not appear if enrollment start in future", async () => {
     const courseRun = makeCourseRunDetail()
+    courseRun["is_enrollable"] = false
     const { inner } = await renderPage(
       {
         entities: {
@@ -819,6 +820,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
             .toISOString()
         }
       }
+      console.log(courseMode)
       if (startInFuture) {
         courseRun["start_date"] = moment()
           .add(10, "months")
@@ -843,6 +845,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       assert.isTrue(inner.exists())
       const infobox = inner.find("CourseInfoBox").dive()
       assert.isTrue(infobox.exists())
+
       if (courseMode === "self-paced" && !startInFuture) {
         assert.include(
           infobox

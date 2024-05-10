@@ -242,22 +242,22 @@ export const getFirstRelevantRun = (
   }
 
   const now = moment()
-
+  const enrollableRuns = courseRuns.filter(run => run.is_enrollable)
+  if (enrollableRuns.length === 0) {
+    return null
+  }
   if (
-    courseRuns.some(
+    enrollableRuns.some(
       run => run.start_date && moment(run.start_date).isSameOrAfter(now)
     )
   ) {
-    const relevantRun = courseRuns
+    return enrollableRuns
       .filter(
         run => run.start_date && moment(run.start_date).isSameOrAfter(now)
       )
       .reduce((prev, curr) =>
         moment(curr.start_date).isBefore(moment(prev.start_date)) ? curr : prev
       )
-    if (relevantRun.is_enrollable) {
-      return relevantRun
-    }
   }
 
   return courseRuns
