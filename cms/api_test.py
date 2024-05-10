@@ -6,6 +6,7 @@ import pytest
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 from wagtail_factories import PageFactory
 
@@ -291,10 +292,19 @@ def test_create_courseware_page():
 @pytest.mark.django_db
 def test_create_featured_items():
     # pytest does not clear cache thus if we have a cache value set, it will persist between tests and test runs
+    # thus we need to clear the cache before running the test
     featured_courses = cache.get("CMS_homepage_featured_courses")
     if featured_courses is not None:
         cache.delete("CMS_homepage_featured_courses")
 
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    past_date = now - timedelta(days=1)
+    further_future_date = future_date + timedelta(days=1)
+    further_past_date = past_date - timedelta(days=1)
+    furthest_future_date = further_future_date + timedelta(days=1)
+
+    # Course that starts in the future but is open for enrollment
     enrollable_future_course = CourseFactory.create(page=None, live=True)
     CoursePageFactory.create(course=enrollable_future_course, live=True)
     enrollable_future_courserun = CourseRunFactory.create(
@@ -302,7 +312,13 @@ def test_create_featured_items():
         live=True,
         in_future=True,
     )
+    enrollable_future_courserun.enrollment_start = further_past_date
+    enrollable_future_courserun.start_date = future_date
+    enrollable_future_courserun.enrollment_end = further_future_date
+    enrollable_future_courserun.end_date = furthest_future_date
+    enrollable_future_courserun.save()
 
+    # Course that is open for enrollment, but starts after the one above
     enrollable_other_future_course = CourseFactory.create(page=None, live=True)
     CoursePageFactory.create(course=enrollable_other_future_course, live=True)
     enrollable_other_future_courserun = CourseRunFactory.create(
@@ -310,14 +326,21 @@ def test_create_featured_items():
         live=True,
         in_future=True,
     )
+    enrollable_other_future_courserun.enrollment_start = (
+        enrollable_future_courserun.enrollment_start
+    )
     enrollable_other_future_courserun.start_date = (
         enrollable_future_courserun.start_date + timedelta(days=2)
     )
     enrollable_other_future_courserun.enrollment_end = (
         enrollable_future_courserun.enrollment_end + timedelta(days=2)
     )
+    enrollable_other_future_courserun.end_date = (
+        enrollable_future_courserun.end_date + timedelta(days=2)
+    )
     enrollable_other_future_courserun.save()
 
+    # A self-paced course that is open for enrollment
     enrollable_self_paced_course = CourseFactory.create(page=None, live=True)
     CoursePageFactory.create(course=enrollable_self_paced_course, live=True)
     self_paced_run = CourseRunFactory.create(
