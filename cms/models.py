@@ -10,6 +10,7 @@ from urllib.parse import quote_plus
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -740,6 +741,54 @@ class HomePage(VideoPlayerConfigMixin):
         return relevant_courses, relevant_programs
 
     @property
+    def auto_generated_featured_products(self):
+        """
+        Get the featured products for the home page that are auto generated
+        """
+        start_of_day = now_in_utc() - timedelta(days=1)
+        end_of_day = now_in_utc() + timedelta(days=1)
+        cached_featured_products = cache.get("CMS_homepage_featured_courses")
+
+        if cached_featured_products:
+            featured_product_ids = [course.id for course in cached_featured_products]
+            relevant_run_course_ids = (
+                CourseRun.objects.filter(live=True)
+                .filter(enrollment_start__gte=start_of_day)
+                .filter(enrollment_start__lte=end_of_day)
+                .filter(course__id__in=featured_product_ids)
+                .values_list("course__id", flat=True)
+            )
+            featured_products = [
+                course.page
+                for course in cached_featured_products
+                if course.page is not None
+                and course.page.live
+                and course.id in relevant_run_course_ids
+            ]
+            featured_product_pages = []
+            for page in featured_products:
+                if page.course_product_page:
+                    product_page = page.course_product_page.specific
+                    run = product_page.product.first_unexpired_run
+                    run_data = {
+                        "title": product_page.title,
+                        "description": product_page.description,
+                        "feature_image": product_page.feature_image,
+                        "start_date": run.start_date if run is not None else None,
+                        "url_path": product_page.get_url(),
+                        "is_program": product_page.is_program_page,
+                        "is_self_paced": run.is_self_paced if run is not None else None,
+                        "program_type": (
+                            product_page.product.program_type
+                            if product_page.is_program_page
+                            else None
+                        ),
+                    }
+                    featured_product_pages.append(run_data)
+            return featured_product_pages
+        return []
+
+    @property
     def products(self):
         future_data = []
         past_data = []
@@ -813,18 +862,30 @@ class HomePage(VideoPlayerConfigMixin):
             False,  # noqa: FBT003
             user,
         )
+        show_auto_daily_featured_items = features.is_enabled(
+            features.ENABLE_AUTO_DAILY_FEATURED_ITEMS,
+            False,  # noqa: FBT003
+            user,
+        )
+
+        if show_auto_daily_featured_items:
+            products = self.auto_generated_featured_products
+        else:
+            products = self.products
 
         return {
             **super().get_context(request),
             **get_base_context(request),
             "product_cards_section_title": self.product_section_title,
-            "products": self.products,
+            "products": products,
             "show_new_featured_carousel": show_new_featured_carousel,
             "show_new_design_hero": show_new_design_hero,
             "show_home_page_video_component": show_home_page_video_component,
             "show_home_page_contact_form": show_home_page_contact_form,
             "hubspot_portal_id": hubspot_portal_id,
             "hubspot_home_page_form_guid": hubspot_home_page_form_guid,
+            "show_auto_daily_featured_items": show_auto_daily_featured_items,
+            "cached_items": self.auto_generated_featured_products,
         }
 
 

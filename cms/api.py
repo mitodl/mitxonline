@@ -371,4 +371,5 @@ def create_featured_items():
 
     # Set the value in cache for 24 hours
     cache.set("CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE)
+    cache.close()
     return featured_courses

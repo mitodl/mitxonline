@@ -14,6 +14,7 @@ ENABLE_NEW_HEADER = "mitxonline-new-header"
 ENABLE_NEW_HOME_PAGE_VIDEO = "mitxonline-new-home-page-video-component"
 ENABLE_NEW_HOME_PAGE_CONTACT_FORM = "mitxonline-new-home-page-contact-form"
 ENABLE_NEW_FOOTER = "mitxonline-new-footer"
+ENABLE_AUTO_DAILY_FEATURED_ITEMS = "mitxonline-auto-daily-featured-items"
 
 
 def is_enabled(name, default=None, unique_id=settings.HOSTNAME):
