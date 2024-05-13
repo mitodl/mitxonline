@@ -823,6 +823,14 @@ REPAIR_OPENEDX_USERS_FREQUENCY = get_int(
 )
 REPAIR_OPENEDX_USERS_OFFSET = int(REPAIR_OPENEDX_USERS_FREQUENCY / 2)
 
+REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ = get_int(
+    name="REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ",
+    default=60,
+    description="How many seconds between checking for featured items for the homepage in the local in memory cache",
+)
+
+REFRESH_FEATURED_HOMEPAGE_ITEMS_OFFSET = int(REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ / 2)
+
 CELERY_BEAT_SCHEDULE = {
     "retry-failed-edx-enrollments": {
         "task": "openedx.tasks.retry_failed_edx_enrollments",
@@ -861,6 +869,13 @@ CELERY_BEAT_SCHEDULE = {
             day_of_week=CRON_COURSE_CERTIFICATES_DAYS,
             day_of_month="*",
             month_of_year="*",
+        ),
+    },
+    "refresh-featured-homepage-items": {
+        "task": "cms.tasks.refresh_featured_homepage_items",
+        "schedule": OffsettingSchedule(
+            run_every=timedelta(seconds=REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ),
+            offset=timedelta(seconds=REFRESH_FEATURED_HOMEPAGE_ITEMS_OFFSET),
         ),
     },
 }

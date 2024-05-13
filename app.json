@@ -146,12 +146,12 @@
       "description": "The name of the review app",
       "required": false
     },
-    "HUBSPOT_HOME_PAGE_FORM_GUID": {
-      "description": "Hubspot ID for the home page contact form",
-      "required": false
-    },
     "HOST_IP": {
       "description": "This server's host IP",
+      "required": false
+    },
+    "HUBSPOT_HOME_PAGE_FORM_GUID": {
+      "description": "Hubspot ID for the home page contact form",
       "required": false
     },
     "HUBSPOT_MAX_CONCURRENT_TASKS": {
@@ -553,6 +553,10 @@
     },
     "REDIS_URL": {
       "description": "Redis URL for non-production use",
+      "required": false
+    },
+    "REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ": {
+      "description": "How many seconds between checking for featured items for the homepage in the local in memory cache",
       "required": false
     },
     "REPAIR_OPENEDX_USERS_FREQUENCY": {

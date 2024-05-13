@@ -2,7 +2,10 @@ import logging
 from urllib.parse import urljoin, urlparse
 
 import requests
+from django.core.cache import cache
+from mitol.common.decorators import single_task
 
+from cms.api import create_featured_items
 from cms.models import Page
 from main.celery import app
 from main.settings import (
@@ -95,3 +98,20 @@ def queue_fastly_full_purge():
         return True
 
     logger.error("Purge request failed.")  # noqa: RET503
+
+
+@app.task
+@single_task(10)
+def refresh_featured_homepage_items():
+    """
+    Refresh the featured homepage items in the memcached cache.
+    """
+    logger = logging.getLogger("refresh_featured_homepage_items__task")
+    logger.info("Refreshing featured homepage items...")
+    featured_courses = cache.get("CMS_homepage_featured_courses")
+    if featured_courses is not None:
+        logger.info("Featured courses found in cache, moving on")
+        return
+    logger.info("No featured courses found in cache, refreshing")
+    create_featured_items()
+    logger.info("New featured items created")
