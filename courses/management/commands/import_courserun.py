@@ -23,7 +23,7 @@ from urllib import parse
 import reversion
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.management import BaseCommand, call_command
+from django.core.management import BaseCommand
 from django_countries import countries
 
 from cms.api import create_default_courseware_page
