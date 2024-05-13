@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.93.0
+--------------
+
+- Give priority to enrollable runs (#2198)
+- Add task for creating featured items in cache (#2203)
+
 Version 0.92.1 (Released May 10, 2024)
 --------------
 
