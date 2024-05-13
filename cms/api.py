@@ -1,13 +1,17 @@
 """API functionality for the CMS app"""
+
 import logging
-from typing import Tuple, Union
+from datetime import timedelta
+from typing import Tuple, Union  # noqa: UP035
 from urllib.parse import urlencode, urljoin
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
-from wagtail.models import Page, Site
+from mitol.common.utils import now_in_utc
+from wagtail.models import Site
 from wagtail.rich_text import RichText
 
 from cms import models as cms_models
@@ -15,15 +19,18 @@ from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
 from cms.exceptions import WagtailSpecificPageError
 from cms.models import Page
 from courses.models import Course, Program
+from courses.utils import (
+    get_enrollable_courseruns_qs,
+)
 
 log = logging.getLogger(__name__)
-DEFAULT_HOMEPAGE_PROPS = dict(
+DEFAULT_HOMEPAGE_PROPS = dict(  # noqa: C408
     title="Home Page",
     hero_title="Lorem ipsum dolor",
     hero_subtitle="Enim ad minim veniam, quis nostrud exercitation",
 )
-DEFAULT_SITE_PROPS = dict(hostname="localhost", port=80)
-COURSE_INDEX_PAGE_PROPERTIES = dict(title="Courses")
+DEFAULT_SITE_PROPS = dict(hostname="localhost", port=80)  # noqa: C408
+COURSE_INDEX_PAGE_PROPERTIES = dict(title="Courses")  # noqa: C408
 RESOURCE_PAGE_TITLES = [
     "About Us",
     "Terms of Service",
@@ -31,10 +38,11 @@ RESOURCE_PAGE_TITLES = [
     "Honor Code",
 ]
 RESOURCE_PAGE_SLUGS = [slugify(title) for title in RESOURCE_PAGE_TITLES]
-PROGRAM_INDEX_PAGE_PROPERTIES = dict(title="Programs")
+PROGRAM_INDEX_PAGE_PROPERTIES = dict(title="Programs")  # noqa: C408
+HOMEPAGE_CACHE_AGE = 86400  # 24 hours
 
 
-def get_home_page(raise_if_missing=True, check_specific=False) -> Page:
+def get_home_page(raise_if_missing=True, check_specific=False) -> Page:  # noqa: FBT002
     """
     Returns an instance of the home page (all of our Wagtail pages are expected to be descendants of this home page)
 
@@ -92,7 +100,7 @@ def ensure_resource_pages() -> None:
         resource_page.save_revision().publish()
 
 
-def ensure_home_page_and_site() -> Tuple[cms_models.HomePage, Site]:
+def ensure_home_page_and_site() -> Tuple[cms_models.HomePage, Site]:  # noqa: UP006
     """
     Ensures that Wagtail is configured with a home page of the right type, and that
     the home page is configured as the default site.
@@ -247,7 +255,10 @@ def get_wagtail_img_src(image_obj) -> str:
 
 
 def create_default_courseware_page(
-    courseware: Union[Course, Program], live: bool = False, *args, **kwargs
+    courseware: Union[Course, Program],  # noqa: FA100
+    live: bool = False,  # noqa: FBT001, FBT002
+    *args,  # noqa: ARG001
+    **kwargs,  # noqa: ARG001
 ):
     """
     Creates a default about page for the given courseware object. Created pages
@@ -285,8 +296,8 @@ def create_default_courseware_page(
         else:
             parent_page = ProgramIndexPage.objects.filter(live=True).get()
             page = ProgramPage(program=courseware, **page_framework)
-    except:
-        raise ValidationError(f"No valid index page found for {courseware}.")
+    except:  # noqa: E722
+        raise ValidationError(f"No valid index page found for {courseware}.")  # noqa: B904, EM102
 
     parent_page.add_child(instance=page)
 
@@ -301,3 +312,63 @@ def create_default_courseware_page(
         )
 
     return page
+
+
+def create_featured_items():
+    """
+    Pulls a new set of featured items for the CMS home page
+
+    This will only be used by cron task or management command.
+    """
+    featured_courses = cache.get("CMS_homepage_featured_courses")
+    if featured_courses is not None:
+        cache.delete("CMS_homepage_featured_courses")
+
+    now = now_in_utc()
+    end_of_day = now + timedelta(days=1)
+
+    enrollable_courseruns = get_enrollable_courseruns_qs(
+        end_of_day,
+        Course.objects.select_related("page").filter(page__live=True, live=True),
+    )
+
+    # Figure out which courses are self-paced and select 2 at random
+    enrollable_self_paced_courseruns = enrollable_courseruns.filter(is_self_paced=True)
+    self_paced_featured_courseruns = enrollable_self_paced_courseruns.order_by("?")[:2]
+    self_paced_featured_courses = Course.objects.filter(
+        id__in=self_paced_featured_courseruns.values_list("course_id", flat=True)
+    )
+
+    # Select 20 random courses that are not self-paced
+    random_featured_courseruns = enrollable_courseruns.exclude(
+        id__in=self_paced_featured_courseruns.values_list("id", flat=True)
+    ).order_by("?")[:20]
+
+    # Split them into future and started courses, order the future courses by start_date, the rest do not matter, so we leave them as is to save time
+    future_featured_courseruns = [
+        courserun
+        for courserun in random_featured_courseruns
+        if courserun.start_date >= now
+    ]
+    future_featured_courseruns.sort(key=lambda courserun: courserun.start_date)
+    future_featured_course_ids = [
+        courserun.course.id for courserun in future_featured_courseruns
+    ]
+    future_featured_courses = Course.objects.filter(id__in=future_featured_course_ids)
+
+    started_featured_course_ids = [
+        courserun.course.id
+        for courserun in random_featured_courseruns
+        if courserun.start_date < now
+    ]
+    started_featured_courses = Course.objects.filter(id__in=started_featured_course_ids)
+
+    # Union all the featured courses together
+    featured_courses = []
+    featured_courses.extend(list(self_paced_featured_courses))
+    featured_courses.extend(list(future_featured_courses))
+    featured_courses.extend(list(started_featured_courses))
+
+    # Set the value in cache for 24 hours
+    cache.set("CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE)
+    return featured_courses

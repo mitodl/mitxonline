@@ -1,22 +1,18 @@
 """Auth pipline functions for user authentication"""
-import json
+
 import logging
 
-import requests
-from django.conf import settings
 from django.db import IntegrityError
 from mitol.common.utils import dict_without_keys
 from social_core.backends.email import EmailAuth
 from social_core.exceptions import AuthException
 from social_core.pipeline.partial import partial
 
-from authentication.api import create_user_with_generated_username
 from authentication.exceptions import (
     EmailBlockedException,
     InvalidPasswordException,
     RequirePasswordAndPersonalInfoException,
     RequirePasswordException,
-    RequireProfileException,
     RequireRegistrationException,
     UnexpectedExistingUserException,
     UserCreationFailedException,
@@ -25,7 +21,6 @@ from authentication.utils import SocialAuthState, is_user_email_blocked
 from openedx import api as openedx_api
 from openedx import tasks as openedx_tasks
 from users.serializers import UserSerializer
-from users.utils import usernameify
 
 log = logging.getLogger()
 
@@ -35,9 +30,7 @@ NAME_MIN_LENGTH = 2
 # pylint: disable=keyword-arg-before-vararg
 
 
-def validate_email_auth_request(
-    strategy, backend, user=None, *args, **kwargs
-):  # pylint: disable=unused-argument
+def validate_email_auth_request(strategy, backend, user=None, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
     """
     Validates an auth request for email
 
@@ -56,9 +49,7 @@ def validate_email_auth_request(
     return {}
 
 
-def get_username(
-    strategy, backend, user=None, *args, **kwargs
-):  # pylint: disable=unused-argument
+def get_username(strategy, backend, user=None, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
     """
     Gets the username for a user
 
@@ -72,7 +63,13 @@ def get_username(
 
 @partial
 def create_user_via_email(
-    strategy, backend, user=None, flow=None, current_partial=None, *args, **kwargs
+    strategy,
+    backend,
+    user=None,
+    flow=None,
+    current_partial=None,
+    *args,  # noqa: ARG001
+    **kwargs,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """
     Creates a new user if needed and sets the password and name.
@@ -126,14 +123,14 @@ def create_user_via_email(
         # cannot reach this point of the auth flow without a unique email, so we know that the IntegrityError is caused
         # by the username not being unique.
         username = data["username"]
-        raise RequirePasswordAndPersonalInfoException(
+        raise RequirePasswordAndPersonalInfoException(  # noqa: B904
             backend,
             current_partial,
             field_errors={
                 "username": f"The username '{username}' is already taken. Please try a different username."
             },
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         raise UserCreationFailedException(backend, current_partial) from exc
 
     return {"is_new": True, "user": created_user, "username": created_user.username}
@@ -141,7 +138,13 @@ def create_user_via_email(
 
 @partial
 def validate_email(
-    strategy, backend, user=None, flow=None, current_partial=None, *args, **kwargs
+    strategy,
+    backend,
+    user=None,  # noqa: ARG001
+    flow=None,  # noqa: ARG001
+    current_partial=None,
+    *args,  # noqa: ARG001
+    **kwargs,  # noqa: ARG001
 ):  # pylint: disable=unused-argument
     """
     Validates a user's email for register
@@ -158,7 +161,7 @@ def validate_email(
     """
     data = strategy.request_data()
     authentication_flow = data.get("flow")
-    if authentication_flow == SocialAuthState.FLOW_REGISTER and "email" in data:
+    if authentication_flow == SocialAuthState.FLOW_REGISTER and "email" in data:  # noqa: SIM102
         if is_user_email_blocked(data["email"]):
             raise EmailBlockedException(backend, current_partial)
     return {}
@@ -166,7 +169,13 @@ def validate_email(
 
 @partial
 def validate_password(
-    strategy, backend, user=None, flow=None, current_partial=None, *args, **kwargs
+    strategy,
+    backend,
+    user=None,
+    flow=None,
+    current_partial=None,
+    *args,  # noqa: ARG001
+    **kwargs,  # noqa: ARG001
 ):  # pylint: disable=unused-argument
     """
     Validates a user's password for login
@@ -200,7 +209,7 @@ def validate_password(
     return {}
 
 
-def forbid_hijack(strategy, backend, **kwargs):  # pylint: disable=unused-argument
+def forbid_hijack(strategy, backend, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
     """
     Forbid an admin user from trying to login/register while hijacking another user
 
@@ -210,13 +219,11 @@ def forbid_hijack(strategy, backend, **kwargs):  # pylint: disable=unused-argume
     """
     # As first step in pipeline, stop a hijacking admin from going any further
     if strategy.session_get("is_hijacked_user"):
-        raise AuthException("You are hijacking another user, don't try to login again")
+        raise AuthException("You are hijacking another user, don't try to login again")  # noqa: EM101
     return {}
 
 
-def create_openedx_user(
-    strategy, backend, user=None, is_new=False, **kwargs
-):  # pylint: disable=unused-argument
+def create_openedx_user(strategy, backend, user=None, is_new=False, **kwargs):  # pylint: disable=unused-argument  # noqa: FBT002, ARG001
     """
     Create a user in the openedx, deferring a retry via celery if it fails
 

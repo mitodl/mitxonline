@@ -10,7 +10,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Department
-        fields = ["id", "name"]
+        fields = ["id", "name", "slug"]
 
 
 class DepartmentWithCoursesAndProgramsSerializer(DepartmentSerializer):
@@ -66,7 +66,7 @@ class DepartmentWithCoursesAndProgramsSerializer(DepartmentSerializer):
 
     class Meta:
         model = Department
-        fields = DepartmentSerializer.Meta.fields + [
+        fields = DepartmentSerializer.Meta.fields + [  # noqa: RUF005
             "course_ids",
             "program_ids",
         ]

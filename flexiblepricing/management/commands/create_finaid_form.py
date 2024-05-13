@@ -1,11 +1,12 @@
 """
 Creates a basic Financial Assistance form.
 """
-from django.core.management import BaseCommand
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
 
-from flexiblepricing.api import create_default_flexible_pricing_page
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.management import BaseCommand
+
 from cms.models import Course, Program
+from flexiblepricing.api import create_default_flexible_pricing_page
 
 
 class Command(BaseCommand):
@@ -43,7 +44,7 @@ class Command(BaseCommand):
             help="Specify a specific title for the page.",
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
         try:
             courseware = Course.objects.filter(
                 readable_id=kwargs["courseware_id"]
@@ -63,7 +64,9 @@ class Command(BaseCommand):
 
         try:
             if create_default_flexible_pricing_page(
-                courseware, True if kwargs["force"] else False, **kwargs
+                courseware,
+                True if kwargs["force"] else False,  # noqa: SIM210
+                **kwargs,
             ):
                 self.stdout.write(
                     self.style.SUCCESS(

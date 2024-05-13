@@ -10,6 +10,7 @@ import {
 } from "./ProfileFormFields"
 
 import type { Country } from "../../flow/authTypes"
+import { ConnectedFocusError } from "focus-formik-error"
 
 type Props = {
   onSubmit: Function,
@@ -40,29 +41,30 @@ const RegisterDetailsForm = ({ onSubmit, countries }: Props) => (
     initialValues={INITIAL_VALUES}
     validateOnChange={false}
     validateOnBlur={false}
-    render={({ isSubmitting, setFieldValue, setFieldTouched, values }) => (
-      <Form>
-        <LegalAddressFields
-          countries={countries}
-          setFieldValue={setFieldValue}
-          setFieldTouched={setFieldTouched}
-          values={values}
-          isNewAccount={true}
-        />
-        <div className="row submit-row no-gutters">
-          <div className="col d-flex justify-content-end">
+  >
+    {({ values, errors, isSubmitting }) => {
+      return (
+        <Form>
+          <ConnectedFocusError />
+          <LegalAddressFields
+            errors={errors}
+            countries={countries}
+            values={values}
+            isNewAccount={true}
+          />
+          <div className="submit-row">
             <button
               type="submit"
-              className="btn btn-primary btn-gradient-red large"
+              className="btn btn-primary btn-gradient-red-to-blue large"
               disabled={isSubmitting}
             >
               Continue
             </button>
           </div>
-        </div>
-      </Form>
-    )}
-  />
+        </Form>
+      )
+    }}
+  </Formik>
 )
 
 export default RegisterDetailsForm

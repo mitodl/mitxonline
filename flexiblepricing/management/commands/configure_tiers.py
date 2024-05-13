@@ -16,6 +16,7 @@ For more info on how this works, see the docs in
 docs/source/commands/configure_tiers.rst.
 
 """
+
 import csv
 from argparse import FileType
 from datetime import date, datetime
@@ -36,45 +37,40 @@ from flexiblepricing.models import FlexiblePriceTier
 
 class Command(BaseCommand):
     """
-    Sets up tiers and discounts for a specified program or course (or DEDP, by default)
+    Sets up tiers and discounts for a specified program or course.
     """
 
-    help = "Sets up tiers and discounts for a specified program or course (or DEDP, by default)"
-    PROGRAM_READABLE_ID = "program-v1:MITx+DEDP"
-    PROGRAM_TITLE = "Data, Economics and Development Policy"
-    PROGRAM_ABBREV = "DEDP"
+    help = "Sets up tiers and discounts for a specified program or course."
 
     def add_arguments(self, parser) -> None:
         parser.add_argument("--course", type=str, help="Course ID to use", nargs="?")
         parser.add_argument(
             "--program",
             type=str,
-            help=f"Program readable ID to use (default {self.PROGRAM_READABLE_ID})",
+            help="Program readable ID to use.",
             nargs="?",
-            default=self.PROGRAM_READABLE_ID,
-        )
-        parser.add_argument(
-            "--program-name",
-            type=str,
-            help=f"Program name/title to use (default {self.PROGRAM_TITLE})",
-            nargs="?",
-            default=self.PROGRAM_TITLE,
         )
         parser.add_argument(
             "--program-abbrev",
             type=str,
-            help=f"Program abbreviation (to use in discount code names, default {self.PROGRAM_ABBREV})",
+            help="Program abbreviation to use in discount code names.",
             nargs="?",
-            default=self.PROGRAM_ABBREV,
         )
         parser.add_argument(
             "--tier-info",
             type=FileType(mode="r"),
-            help=f"Tiers to create (in CSV format: threshold,discount type,discount amount)",
+            help="Tiers to create in CSV format: threshold,discount type,discount amount",
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
-        # Set defaults
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002, C901, PLR0915
+        # Ensure that either course or program is defined.
+        if not any(x in kwargs for x in ["course", "program"]):
+            self.stderr.write(
+                self.style.ERROR(
+                    "--course or --program must be specified as arguments when running the command."
+                )
+            )
+            exit(-1)  # noqa: PLR1722
 
         try:
             course = (
@@ -82,22 +78,29 @@ class Command(BaseCommand):
                 if "course" in kwargs and kwargs["course"] is not None
                 else None
             )
-        except:
+        except Exception as exc:  # noqa: BLE001
             raise CommandError(
-                f"Couldn't find the course {kwargs['course']}, stopping."
+                f"Couldn't find the course {kwargs['course']}, stopping."  # noqa: EM102
+            ) from exc
+
+        try:
+            program = (
+                Program.objects.get(readable_id=kwargs["program"])
+                if "program" in kwargs and kwargs["program"] is not None
+                else None
             )
+        except Exception as exc:  # noqa: BLE001
+            raise CommandError(
+                f"Couldn't find the program {kwargs['program']}, stopping."  # noqa: EM102
+            ) from exc
 
         discount_abbrev = (
-            (
-                kwargs["program_abbrev"]
-                if "program_abbrev" in kwargs
-                else self.PROGRAM_ABBREV
-            )
+            (program.readable_id if "program_abbrev" in kwargs else program.readable_id)
             if not course
             else course.readable_id
         )
 
-        current_year = date.today().year
+        current_year = date.today().year  # noqa: DTZ011
         last_year = datetime(
             current_year - 1, 1, 1, tzinfo=pytz.timezone(settings.TIME_ZONE)
         )
@@ -180,29 +183,6 @@ class Command(BaseCommand):
                     )
                 )
                 return
-
-        # Step one: get the DEDP program
-        if not course:
-            readable_id = (
-                kwargs["program"] if "program" in kwargs else self.PROGRAM_READABLE_ID
-            )
-            program_title = (
-                kwargs["program_name"]
-                if "program_name" in kwargs
-                else self.PROGRAM_TITLE
-            )
-
-            self.stdout.write(
-                f"Setting up the program {program_title} ({readable_id})..."
-            )
-            (program, created) = Program.objects.update_or_create(
-                readable_id=readable_id,
-                defaults={"title": program_title, "live": True},
-            )
-            if created:
-                self.stdout.write(f"Created new program {program.id}")
-            else:
-                self.stdout.write(f"Using existing program {program.id}")
 
         # Step two: get existing discounts
         discounts = Discount.objects.filter(

@@ -39,7 +39,7 @@ def test_get_departments(
     departments = DepartmentFactory.create_batch(size=10)
     empty_departments_from_fixture = []
     for department in departments:
-        empty_departments_from_fixture.append(
+        empty_departments_from_fixture.append(  # noqa: PERF401
             DepartmentWithCoursesAndProgramsSerializer(
                 instance=department, context=mock_context
             ).data
@@ -56,9 +56,9 @@ def test_get_departments(
 
     courses, programs, _ = course_catalog_data
     for course in courses:
-        course.departments.add(random.choice(departments))
+        course.departments.add(random.choice(departments))  # noqa: S311
     for program in programs:
-        program.departments.add(random.choice(departments))
+        program.departments.add(random.choice(departments))  # noqa: S311
     with django_assert_max_num_queries(
         num_queries_from_department(len(departments))
     ) as context:
@@ -67,7 +67,7 @@ def test_get_departments(
     departments_data = resp.json()["results"]
     departments_from_fixture = []
     for department in departments:
-        departments_from_fixture.append(
+        departments_from_fixture.append(  # noqa: PERF401
             DepartmentWithCoursesAndProgramsSerializer(
                 instance=department, context=mock_context
             ).data
@@ -81,7 +81,7 @@ def test_get_programs(
     user_drf_client, django_assert_max_num_queries, course_catalog_data
 ):
     """Test the view that handles requests for all Programs"""
-    course_catalog_data
+    course_catalog_data  # noqa: B018
 
     # Fetch programs after running the fixture so they're in the right order
     programs = Program.objects.order_by("title").prefetch_related("departments").all()
@@ -178,7 +178,7 @@ def test_get_courses(
     include_finaid,
 ):
     """Test the view that handles requests for all Courses"""
-    course_catalog_data
+    course_catalog_data  # noqa: B018
     courses_from_fixture = []
     num_queries = 0
 
@@ -203,7 +203,7 @@ def test_get_courses(
         )
         query_count_end = len(connection.queries)
         logger.info(
-            f"test_get_course logged {query_count_end - query_count_start} queries"
+            f"test_get_course logged {query_count_end - query_count_start} queries"  # noqa: G004
         )
     #     This will become an assert rather than a warning in the future, for now this function is informational
     duplicate_queries_check(context)
@@ -243,7 +243,7 @@ def test_get_course(
         )
         query_count_end = len(connection.queries)
         logger.info(
-            f"test_get_course logged {query_count_end - query_count_start} queries"
+            f"test_get_course logged {query_count_end - query_count_start} queries"  # noqa: G004
         )
     duplicate_queries_check(context)
     course_data = resp.json()

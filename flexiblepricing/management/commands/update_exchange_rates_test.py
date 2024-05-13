@@ -1,14 +1,15 @@
 """
 Test for management command generating exchange rates
 """
+
 from unittest.mock import patch
 
 from django.test import TestCase
 from django.test.utils import override_settings
 
-from flexiblepricing.tasks import get_open_exchange_rates_url
 from flexiblepricing.management.commands import update_exchange_rates
 from flexiblepricing.models import CurrencyExchangeRate
+from flexiblepricing.tasks import get_open_exchange_rates_url
 
 
 @patch("flexiblepricing.tasks.requests.get")
@@ -22,7 +23,7 @@ class GenerateExchangeRatesTest(TestCase):
         cls.command = update_exchange_rates.Command()
 
     def setUp(self):
-        super(GenerateExchangeRatesTest, self).setUp()
+        super(GenerateExchangeRatesTest, self).setUp()  # noqa: UP008
         self.data = {
             "extraneous information": "blah blah blah",
             "rates": {"CBA": "3.5", "FED": "1.9", "RQP": "0.5"},

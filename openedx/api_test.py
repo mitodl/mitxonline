@@ -1,8 +1,9 @@
 """Courseware API tests"""
+
 # pylint: disable=redefined-outer-name
 import itertools
 from datetime import timedelta
-from urllib.parse import parse_qsl, urljoin
+from urllib.parse import parse_qsl
 
 import factory
 import pytest
@@ -21,7 +22,6 @@ from openedx.api import (
     ACCESS_TOKEN_HEADER_NAME,
     OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS,
     OPENEDX_REGISTRATION_VALIDATION_PATH,
-    OPENEDX_UPDATE_USER_PATH,
     bulk_retire_edx_users,
     create_edx_auth_token,
     create_edx_user,
@@ -39,7 +39,6 @@ from openedx.api import (
     unsubscribe_from_edx_course_emails,
     update_edx_user_email,
     update_edx_user_name,
-    update_edx_user_profile,
     validate_username_with_edx,
 )
 from openedx.constants import (
@@ -67,13 +66,13 @@ User = get_user_model()
 pytestmark = [pytest.mark.django_db]
 
 
-@pytest.fixture()
+@pytest.fixture
 def application(settings):
     """Test data and settings needed for create_edx_user tests"""
     settings.OPENEDX_OAUTH_APP_NAME = "test_app_name"
     settings.OPENEDX_API_BASE_URL = "http://example.com"
     settings.MITX_ONLINE_OAUTH_PROVIDER = "test_provider"
-    settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN = "access_token"
+    settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN = "access_token"  # noqa: S105
     return Application.objects.create(
         name=settings.OPENEDX_OAUTH_APP_NAME,
         user=None,
@@ -125,7 +124,7 @@ def test_create_edx_user(user, settings, application, access_token_count):
     responses.add(
         responses.POST,
         f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
-        json=dict(success=True),
+        json=dict(success=True),  # noqa: C408
         status=status.HTTP_200_OK,
     )
     responses.add(
@@ -179,10 +178,10 @@ def test_create_edx_user_conflict(settings, user):
     responses.add(
         responses.POST,
         f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
-        json=dict(username="exists"),
+        json=dict(username="exists"),  # noqa: C408
         status=status.HTTP_409_CONFLICT,
     )
-    edx_username_validation_response_mock(False, settings)
+    edx_username_validation_response_mock(False, settings)  # noqa: FBT003
 
     with pytest.raises(OpenEdxUserCreateError):
         create_edx_user(user)
@@ -192,7 +191,7 @@ def test_create_edx_user_conflict(settings, user):
 
 @responses.activate
 @pytest.mark.parametrize(
-    "open_edx_user_record_exists,open_edx_user_record_has_been_synced",
+    "open_edx_user_record_exists,open_edx_user_record_has_been_synced",  # noqa: PT006
     itertools.product([True, False], [True, False]),
 )
 def test_create_edx_user_for_user_not_synced_with_edx(
@@ -207,7 +206,7 @@ def test_create_edx_user_for_user_not_synced_with_edx(
     responses.add(
         responses.POST,
         f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
-        json=dict(success=True),
+        json=dict(success=True),  # noqa: C408
         status=status.HTTP_200_OK,
     )
     OpenEdxUserFactory.create(
@@ -230,13 +229,13 @@ def test_create_edx_user_for_user_not_synced_with_edx(
 @responses.activate
 def test_validate_edx_username_conflict(settings, user):
     """Test that validate_username_with_edx handles a username validation conflict"""
-    edx_username_validation_response_mock(True, settings)
+    edx_username_validation_response_mock(True, settings)  # noqa: FBT003
 
     assert validate_username_with_edx(user.username)
 
 
 @responses.activate
-def test_validate_edx_username_conflict(settings, user):
+def test_validate_edx_username_conflict(settings, user):  # noqa: F811
     """Test that validate_username_with_edx raises an exception for non-200 response"""
     responses.add(
         responses.POST,
@@ -256,8 +255,8 @@ def test_validate_edx_username_conflict(settings, user):
 @freeze_time("2019-03-24 11:50:36")
 def test_create_edx_auth_token(settings, user):
     """Tests create_edx_auth_token makes the expected incantations to create a OpenEdxApiAuth"""
-    refresh_token = "abc123"
-    access_token = "def456"
+    refresh_token = "abc123"  # noqa: S105
+    access_token = "def456"  # noqa: S105
     code = "ghi789"
     responses.add(
         responses.GET,
@@ -280,7 +279,7 @@ def test_create_edx_auth_token(settings, user):
     responses.add(
         responses.POST,
         f"{settings.OPENEDX_API_BASE_URL}/oauth2/access_token",
-        json=dict(
+        json=dict(  # noqa: C408
             refresh_token=refresh_token, access_token=access_token, expires_in=3600
         ),
         status=status.HTTP_200_OK,
@@ -289,7 +288,7 @@ def test_create_edx_auth_token(settings, user):
     create_edx_auth_token(user)
 
     assert len(responses.calls) == 4
-    assert dict(parse_qsl(responses.calls[3].request.body)) == dict(
+    assert dict(parse_qsl(responses.calls[3].request.body)) == dict(  # noqa: C408
         code=code,
         grant_type="authorization_code",
         client_id=settings.OPENEDX_API_CLIENT_ID,
@@ -315,7 +314,7 @@ def test_update_edx_user_email(settings, user):
     responses.add(
         responses.POST,
         f"{settings.OPENEDX_API_BASE_URL}/user_api/v1/account/registration/",
-        json=dict(success=True),
+        json=dict(success=True),  # noqa: C408
         status=status.HTTP_200_OK,
     )
     responses.add(
@@ -379,13 +378,13 @@ def test_get_valid_edx_api_auth_unexpired():
 def test_get_valid_edx_api_auth_expired(settings):
     """Tests get_valid_edx_api_auth fetches and updates the auth credentials if expired"""
     auth = OpenEdxApiAuthFactory.create(expired=True)
-    refresh_token = "abc123"
-    access_token = "def456"
+    refresh_token = "abc123"  # noqa: S105
+    access_token = "def456"  # noqa: S105
 
     responses.add(
         responses.POST,
         f"{settings.OPENEDX_API_BASE_URL}/oauth2/access_token",
-        json=dict(
+        json=dict(  # noqa: C408
             refresh_token=refresh_token, access_token=access_token, expires_in=3600
         ),
         status=status.HTTP_200_OK,
@@ -395,7 +394,7 @@ def test_get_valid_edx_api_auth_expired(settings):
 
     assert updated_auth is not None
     assert len(responses.calls) == 1
-    assert dict(parse_qsl(responses.calls[0].request.body)) == dict(
+    assert dict(parse_qsl(responses.calls[0].request.body)) == dict(  # noqa: C408
         refresh_token=auth.refresh_token,
         grant_type="refresh_token",
         client_id=settings.OPENEDX_API_CLIENT_ID,
@@ -431,7 +430,7 @@ def test_get_edx_retirement_service_client(mocker, settings):
         "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_ID"
     )
     settings.OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET = (
-        "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET"
+        "OPENEDX_RETIREMENT_SERVICE_WORKER_CLIENT_SECRET"  # noqa: S105
     )
     mock_resp = mocker.Mock()
     mock_resp.json.return_value = {"access_token": "an_access_token"}
@@ -439,13 +438,13 @@ def test_get_edx_retirement_service_client(mocker, settings):
     mock_resp.raise_for_status.side_effect = None
     mocker.patch("openedx.api.requests.post", return_value=mock_resp)
     client = get_edx_retirement_service_client()
-    assert client.credentials["access_token"] == "an_access_token"
+    assert client.credentials["access_token"] == "an_access_token"  # noqa: S105
     assert client.base_url == settings.OPENEDX_API_BASE_URL
 
 
 def test_enroll_in_edx_course_runs(settings, mocker, user):
     """Tests that enroll_in_edx_course_runs uses the EdxApi client to enroll in course runs"""
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mock_client = mocker.MagicMock()
     enroll_return_values = ["result1", "result2"]
     mock_client.enrollments.create_student_enrollment = mocker.Mock(
@@ -492,7 +491,7 @@ def test_enroll_pro_unknown_fail(settings, mocker, user):
     Tests that enroll_in_edx_course_runs raises an UnknownEdxApiEnrollException if an unexpected exception
     is encountered
     """
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mock_client = mocker.MagicMock()
     mock_client.enrollments.create_student_enrollment = mocker.Mock(
         side_effect=ValueError("Unexpected error")
@@ -562,7 +561,8 @@ def test_retry_failed_enroll_grace_period(mocker):
 
 
 @pytest.mark.parametrize(
-    "no_openedx_user,no_edx_auth", itertools.product([True, False], [True, False])
+    "no_openedx_user,no_edx_auth",  # noqa: PT006
+    itertools.product([True, False], [True, False]),
 )
 def test_repair_faulty_edx_user(mocker, user, no_openedx_user, no_edx_auth):
     """
@@ -573,7 +573,7 @@ def test_repair_faulty_edx_user(mocker, user, no_openedx_user, no_edx_auth):
     OpenEdxUserFactory.create(user=user)
     mocker.patch(
         "openedx.api.create_edx_user",
-        return_value=True if no_openedx_user else False,
+        return_value=True if no_openedx_user else False,  # noqa: SIM210
     )
     openedx_api_auth = None if no_edx_auth else OpenEdxApiAuthFactory.build()
     user.openedx_api_auth = openedx_api_auth
@@ -661,11 +661,11 @@ def test_update_user_edx_name(mocker, user):
 
 
 @pytest.mark.parametrize(
-    "client_exception_raised,expected_exception",
+    "client_exception_raised,expected_exception",  # noqa: PT006
     [
-        [MockHttpError, UserNameUpdateFailedException],
-        [ValueError, UserNameUpdateFailedException],
-        [Exception, UserNameUpdateFailedException],
+        [MockHttpError, UserNameUpdateFailedException],  # noqa: PT007
+        [ValueError, UserNameUpdateFailedException],  # noqa: PT007
+        [Exception, UserNameUpdateFailedException],  # noqa: PT007
     ],
 )
 def test_update_edx_user_name_failure(
@@ -772,7 +772,7 @@ def test_sync_enrollments_with_edx_missing(mocker, user):
 
 
 def test_subscribe_to_edx_course_emails(mocker, user):
-    """tests that subscribe_to_edx_course_emails makes a call to subscribe for course emails in edX via api client"""
+    """Tests that subscribe_to_edx_course_emails makes a call to subscribe for course emails in edX via api client"""
     mock_client = mocker.MagicMock()
     run_enrollment = CourseRunEnrollmentFactory()
     courseware_id = run_enrollment.run.courseware_id
@@ -790,17 +790,17 @@ def test_subscribe_to_edx_course_emails(mocker, user):
 
 
 @pytest.mark.parametrize(
-    "client_exception_raised, expected_exception",
+    "client_exception_raised, expected_exception",  # noqa: PT006
     [
-        [MockHttpError, EdxApiEmailSettingsErrorException],
-        [ValueError, UnknownEdxApiEmailSettingsException],
-        [Exception, UnknownEdxApiEmailSettingsException],
+        [MockHttpError, EdxApiEmailSettingsErrorException],  # noqa: PT007
+        [ValueError, UnknownEdxApiEmailSettingsException],  # noqa: PT007
+        [Exception, UnknownEdxApiEmailSettingsException],  # noqa: PT007
     ],
 )
 def test_subscribe_to_edx_course_emails_failure(
     mocker, user, client_exception_raised, expected_exception
 ):
-    """tests that subscribe_to_edx_course_emails translates exceptions raised by api client"""
+    """Tests that subscribe_to_edx_course_emails translates exceptions raised by api client"""
     mock_client = mocker.MagicMock()
     run_enrollment = CourseRunEnrollmentFactory()
     mock_client.email_settings.subscribe = mocker.Mock(
@@ -813,7 +813,7 @@ def test_subscribe_to_edx_course_emails_failure(
 
 
 def test_unsubscribe_from_edx_course_emails(mocker, user):
-    """tests that unsubscribe_from_edx_course_emails makes a call to unsubscribe for course emails in edX via api client"""
+    """Tests that unsubscribe_from_edx_course_emails makes a call to unsubscribe for course emails in edX via api client"""
     mock_client = mocker.MagicMock()
     run_enrollment = CourseRunEnrollmentFactory()
     courseware_id = run_enrollment.run.courseware_id
@@ -831,7 +831,7 @@ def test_unsubscribe_from_edx_course_emails(mocker, user):
 
 
 @pytest.mark.parametrize(
-    "client_exception_raised, expected_exception",
+    "client_exception_raised, expected_exception",  # noqa: PT006
     [
         (MockHttpError, EdxApiEmailSettingsErrorException),
         (ValueError, UnknownEdxApiEmailSettingsException),
@@ -841,7 +841,7 @@ def test_unsubscribe_from_edx_course_emails(mocker, user):
 def test_unsubscribe_from_edx_course_emails_failure(
     mocker, user, client_exception_raised, expected_exception
 ):
-    """tests that unsubscribe_from_edx_course_emails translates exception raised by api client"""
+    """Tests that unsubscribe_from_edx_course_emails translates exception raised by api client"""
     mock_client = mocker.MagicMock()
     run_enrollment = CourseRunEnrollmentFactory()
     mock_client.email_settings.unsubscribe = mocker.Mock(
@@ -854,7 +854,7 @@ def test_unsubscribe_from_edx_course_emails_failure(
 
 
 @pytest.mark.parametrize(
-    "edx_enrollment_is_active, edx_enrollment_mode, enrollment_mode_to_match, enrollment_is_active_to_match, existing_edx_enrollment_found",
+    "edx_enrollment_is_active, edx_enrollment_mode, enrollment_mode_to_match, enrollment_is_active_to_match, existing_edx_enrollment_found",  # noqa: PT006
     [
         (True, EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_AUDIT_MODE, True, True),
         (False, EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_AUDIT_MODE, True, False),
@@ -872,7 +872,7 @@ def test_unsubscribe_from_edx_course_emails_failure(
         (True, EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE, False, False),
     ],
 )
-def test_existing_edx_enrollment(
+def test_existing_edx_enrollment(  # noqa: PLR0913
     mocker,
     user,
     edx_enrollment_is_active,

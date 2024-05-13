@@ -1,11 +1,11 @@
 """Tests for Wagtail models"""
+
 import json
 from datetime import timedelta
 from urllib.parse import quote_plus
 
 import factory
 import pytest
-from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, Group
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.test.client import RequestFactory
@@ -35,11 +35,11 @@ from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
-    program_with_empty_requirements,
+    program_with_empty_requirements,  # noqa: F401
 )
-from courses.models import Course, CourseRun, limit_to_certificate_pages
+from courses.models import Course, CourseRun
 from ecommerce.constants import DISCOUNT_TYPE_FIXED_PRICE
-from ecommerce.factories import DiscountFactory, ProductFactory
+from ecommerce.factories import ProductFactory
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
@@ -65,25 +65,23 @@ def test_custom_detail_page_urls(fully_configured_wagtail):
     course_pages = CoursePageFactory.create_batch(
         2, course__readable_id=factory.Iterator([FAKE_READABLE_ID, "non-matching-id"])
     )
-    assert course_pages[0].get_url() == "/courses/{}/".format(FAKE_READABLE_ID)
+    assert course_pages[0].get_url() == f"/courses/{FAKE_READABLE_ID}/"
 
 
 def test_custom_detail_page_urls_handled(fully_configured_wagtail):
     """Verify that custom URL paths for our course pages are served by the standard Wagtail view"""
     CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
-    resolver_match = resolve("/courses/{}/".format(FAKE_READABLE_ID))
-    assert (
-        resolver_match.func.__module__ == "wagtail.views"
-    )  # pylint: disable=protected-access
+    resolver_match = resolve(f"/courses/{FAKE_READABLE_ID}/")
+    assert resolver_match.func.__module__ == "wagtail.views"  # pylint: disable=protected-access
     assert resolver_match.func.__name__ == "serve"  # pylint: disable=protected-access
 
 
 @pytest.mark.parametrize(
-    "is_authenticated,has_relevant_run,enrolled,exp_sign_in_url,exp_is_enrolled,has_finaid,has_instructor",
+    "is_authenticated,has_relevant_run,enrolled,exp_sign_in_url,exp_is_enrolled,has_finaid,has_instructor",  # noqa: PT006
     [
-        [True, True, True, False, True, True, True],
-        [True, True, True, False, True, False, False],
-        [
+        [True, True, True, False, True, True, True],  # noqa: PT007
+        [True, True, True, False, True, False, False],  # noqa: PT007
+        [  # noqa: PT007
             False,
             False,
             False,
@@ -92,10 +90,10 @@ def test_custom_detail_page_urls_handled(fully_configured_wagtail):
             False,
             True,
         ],
-        [False, True, True, True, False, False, False],
+        [False, True, True, True, False, False, False],  # noqa: PT007
     ],
 )
-def test_course_page_context(
+def test_course_page_context(  # noqa: PLR0913
     staff_user,
     fully_configured_wagtail,
     is_authenticated,
@@ -114,12 +112,12 @@ def test_course_page_context(
         run = CourseRunFactory.create(
             course__page=None, course__readable_id=FAKE_READABLE_ID, in_future=True
         )
-        course_page_kwargs = dict(course=run.course)
+        course_page_kwargs = dict(course=run.course)  # noqa: C408
     else:
         run = None
-        course_page_kwargs = dict(course__readable_id=FAKE_READABLE_ID)
+        course_page_kwargs = dict(course__readable_id=FAKE_READABLE_ID)  # noqa: C408
     if has_finaid and is_authenticated and has_relevant_run:
-        sub = FlexiblePriceFactory(
+        sub = FlexiblePriceFactory(  # noqa: F841
             courseware_object=run.course,
             user=staff_user,
             status=FlexiblePriceStatus.APPROVED,
@@ -172,12 +170,12 @@ def test_course_page_context(
         ],
         "new_design": features.is_enabled(
             "mitxonline-new-product-page",
-            False,
+            False,  # noqa: FBT003
             request.user.id if request.user.is_authenticated else "anonymousUser",
         ),
         "new_footer": features.is_enabled(
             "mitxonline-new-footer",
-            False,
+            False,  # noqa: FBT003
             request.user.id if request.user.is_authenticated else "anonymousUser",
         ),
     }
@@ -194,16 +192,16 @@ def test_course_page_context(
 
 
 @pytest.mark.parametrize(
-    "is_authed,is_editor,has_relevant_run,is_in_progress,exp_can_access",
+    "is_authed,is_editor,has_relevant_run,is_in_progress,exp_can_access",  # noqa: PT006
     [
-        [True, True, True, True, True],
-        [False, False, True, True, False],
-        [True, True, True, False, True],
-        [True, True, False, True, False],
-        [True, False, True, False, False],
+        [True, True, True, True, True],  # noqa: PT007
+        [False, False, True, True, False],  # noqa: PT007
+        [True, True, True, False, True],  # noqa: PT007
+        [True, True, False, True, False],  # noqa: PT007
+        [True, False, True, False, False],  # noqa: PT007
     ],
 )
-def test_course_page_context_edx_access(
+def test_course_page_context_edx_access(  # noqa: PLR0913
     mocker,
     fully_configured_wagtail,
     is_authed,
@@ -219,13 +217,13 @@ def test_course_page_context_edx_access(
         if not has_relevant_run
         else CourseRunFactory.create(
             course=course_page.course,
-            **(dict(in_progress=True) if is_in_progress else dict(in_future=True)),
+            **(dict(in_progress=True) if is_in_progress else dict(in_future=True)),  # noqa: C408
         )
     )
     patched_get_relevant_run = mocker.patch(
         "cms.models.get_user_relevant_course_run", return_value=run
     )
-    if not is_authed:
+    if not is_authed:  # noqa: SIM108
         request_user = AnonymousUser()
     else:
         request_user = UserFactory.create()
@@ -271,7 +269,8 @@ def generate_flexible_pricing_response(request_user, flexible_pricing_form):
 
 
 @pytest.mark.parametrize(
-    "is_authed,has_submission", [[False, False], [True, False], [True, True]]
+    "is_authed,has_submission",  # noqa: PT006
+    [[False, False], [True, False], [True, True]],  # noqa: PT007
 )
 def test_flex_pricing_form_display(mocker, is_authed, has_submission):
     """
@@ -290,7 +289,7 @@ def test_flex_pricing_form_display(mocker, is_authed, has_submission):
             submission = FlexiblePricingRequestSubmission.objects.create(
                 form_data=json.dumps([]), page=flex_form, user=request_user
             )
-            flexprice = FlexiblePrice.objects.create(
+            flexprice = FlexiblePrice.objects.create(  # noqa: F841
                 user=request_user,
                 cms_submission=submission,
                 courseware_object=flex_form.selected_course,
@@ -303,11 +302,10 @@ def test_flex_pricing_form_display(mocker, is_authed, has_submission):
 
     if not is_authed:
         assert "Not Logged In" in response.rendered_content
+    elif has_submission:
+        assert "Application Processing" in response.rendered_content
     else:
-        if has_submission:
-            assert "Application Processing" in response.rendered_content
-        else:
-            assert "csrfmiddlewaretoken" in response.rendered_content
+        assert "csrfmiddlewaretoken" in response.rendered_content
 
 
 @pytest.mark.parametrize(
@@ -332,7 +330,7 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
     submission = FlexiblePricingRequestSubmission.objects.create(
         form_data=json.dumps([]), page=flex_form, user=request_user
     )
-    flexprice = FlexiblePrice.objects.create(
+    flexprice = FlexiblePrice.objects.create(  # noqa: F841
         user=request_user,
         cms_submission=submission,
         status=submission_status,
@@ -378,14 +376,14 @@ def test_flex_pricing_parent_resources(course_or_program):
     )
 
 
-def test_flex_pricing_form_courseware_object(program_with_empty_requirements):
+def test_flex_pricing_form_courseware_object(program_with_empty_requirements):  # noqa: F811
     """
     Tests to make sure the correct courseware objects are returned when hitting
     the get_parent_courseware method.
     """
 
     first_course = CourseFactory.create(readable_id=FAKE_READABLE_ID, page=None)
-    course_page = CoursePageFactory.create(course=first_course)
+    course_page = CoursePageFactory.create(course=first_course)  # noqa: F841
     flex_form = FlexiblePricingFormFactory()
 
     program = program_with_empty_requirements
@@ -430,7 +428,9 @@ def test_flex_pricing_form_courseware_object(program_with_empty_requirements):
 
 @pytest.mark.parametrize("test_scenario", ["course", "two_programs", "one_program"])
 def test_flex_pricing_single_submission(
-    mocker, test_scenario, program_with_empty_requirements
+    mocker,
+    test_scenario,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     Tests multiple submissions for the same course/program.
@@ -479,7 +479,7 @@ def test_flex_pricing_single_submission(
         form_data=json.dumps([]), page=first_sub_form, user=request_user
     )
 
-    flexprice = FlexiblePrice.objects.create(
+    flexprice = FlexiblePrice.objects.create(  # noqa: F841
         user=request_user,
         cms_submission=submission,
         courseware_object=program,
@@ -502,7 +502,8 @@ def test_flex_pricing_single_submission(
 
 
 def test_flex_pricing_form_state_display_no_discount_tier(
-    mocker, program_with_empty_requirements
+    mocker,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """
     Tests the status display when the user is assigned to the no-discount tier.
@@ -620,11 +621,7 @@ def test_courseware_title_synced_with_product_page_title(test_course):
     product_page.title = updated_title
     product_page.save()
 
-    courseware = (
-        getattr(product_page, "course")
-        if test_course
-        else getattr(product_page, "program")
-    )
+    courseware = product_page.course if test_course else product_page.program
 
     assert courseware.title == updated_title
 

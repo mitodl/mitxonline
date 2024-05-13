@@ -4,10 +4,10 @@ Management command to create Orders for CourseRunEnrollments which were created 
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
+from reversion.models import Version
 
 from courses.models import CourseRun, CourseRunEnrollment
 from ecommerce.models import Order, PendingOrder, Product
-from reversion.models import Version
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 
 
@@ -16,7 +16,7 @@ class Command(BaseCommand):
     Create Orders for each audit CourseRunEnrollment as long as there is a Product associated with the CourseRun.
     """
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         course_run_enrollments = CourseRunEnrollment.objects.filter(
             enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
         )

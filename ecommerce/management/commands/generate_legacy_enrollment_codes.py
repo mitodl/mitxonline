@@ -13,6 +13,7 @@ and this command will generate single-use per-user discounts for each learner
 and course combination (if a product exists for it). The course must be
 available for enrollment and must also have a product associated with it.
 """
+
 import csv
 import uuid
 
@@ -57,7 +58,7 @@ class Command(BaseCommand):
             help="Optional expiration date for the code, in ISO-8601 (YYYY-MM-DD) format.",
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002, C901, PLR0915
         output_codes = []
 
         if "expires" in kwargs and kwargs["expires"] is not None:
@@ -70,7 +71,7 @@ class Command(BaseCommand):
         else:
             expiration_date = None
 
-        with open(kwargs["input_file"], newline="") as csvfile:
+        with open(kwargs["input_file"], newline="") as csvfile:  # noqa: PTH123
             reader = csv.reader(csvfile, delimiter=",", quotechar="\\")
 
             for row in reader:
@@ -112,7 +113,7 @@ class Command(BaseCommand):
                         continue
 
                     courserun = mapped_course.course.first_unexpired_run
-                except:
+                except:  # noqa: E722
                     courserun = CourseRun.objects.filter(courseware_id=row[1]).first()
 
                     if courserun is None:
@@ -181,14 +182,14 @@ class Command(BaseCommand):
                                 code,
                             ]
                         )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     self.stderr.write(
                         self.style.ERROR(
                             f"An error occurred creating the discount for {row[0]} in course {row[1]} - maybe there's no product or valid courserun for the course?; skipping: {e}"
                         )
                     )
 
-        with open(kwargs["output_file"], mode="w", newline="") as codefile:
+        with open(kwargs["output_file"], mode="w", newline="") as codefile:  # noqa: PTH123
             writer = csv.writer(codefile, delimiter=",", quotechar="\\")
 
             writer.writerows(output_codes)

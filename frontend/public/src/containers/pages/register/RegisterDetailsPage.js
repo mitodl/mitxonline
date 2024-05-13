@@ -55,8 +55,7 @@ type DispatchProps = {|
     username: string,
     legalAddress: LegalAddress,
     userProfile: UserProfile,
-    partialToken: string,
-    next: ?string
+    partialToken: string
   ) => Promise<HttpResponse<AuthResponse>>,
   getCurrentUser: () => Promise<HttpResponse<User>>,
   addUserNotification: Function
@@ -101,7 +100,11 @@ export class RegisterDetailsPage extends React.Component<Props> {
       }
 
       if (body.state === STATE_SUCCESS) {
+        const nextParam = body.redirect_url
         body.redirect_url = routes.register.additionalDetails
+        if (nextParam) {
+          body.redirect_url += `?next=${encodeURIComponent(nextParam)}`
+        }
       }
 
       /* eslint-disable camelcase */
@@ -141,18 +144,16 @@ export class RegisterDetailsPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${REGISTER_DETAILS_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page registration-page">
-          <div className="auth-card card-shadow auth-form">
-            <div className="auth-header">
-              <h1>Create an Account</h1>
-            </div>
-            <div className="form-group">
-              {`Already have an ${SETTINGS.site_name} account? `}
-              <Link className="link-black" to={routes.login.begin}>
-                Sign in to your account
-              </Link>
-            </div>
-            <hr className="hr-class-margin" />
-            <div className="auth-form">
+          <div className="std-card std-card-auth">
+            <div className="std-card-body create-account-page">
+              <h2>Create an Account</h2>
+              <div className="form-group">
+                {`Already have an ${SETTINGS.site_name} account? `}
+                <Link className="link-black" to={routes.login.begin}>
+                  Sign in to your account
+                </Link>
+              </div>
+              <hr className="hr-class-margin" />
               <RegisterDetailsForm
                 onSubmit={this.onSubmit.bind(this)}
                 countries={countries}

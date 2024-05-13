@@ -39,7 +39,7 @@ def course_list(courses):
                     "featured_image": featured_image,
                 }
             )
-        except Exception:
+        except Exception:  # noqa: S110, BLE001
             pass
 
     return {"cards": cards}

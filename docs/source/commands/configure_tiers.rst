@@ -7,7 +7,7 @@ This operates in two modes: creating tiers for a program and creating tiers for 
 
 *In the tables below, <year> represents the current year.*
 
-**Configuring tiers for a course** 
+**Configuring tiers for a course**
 
 The command will use the readable ID of the course as part of the financial aid discounts. They will default to this:
 
@@ -24,12 +24,6 @@ Note that configuring course tiers requires the course to exist. Use ``create_co
 
 **Configuring tiers for a program**
 
-The command will create or reuse a program. By default, the program it will try to use is:
-
-* Data, Econonmics and Development Policy
-* program-v1:MITx+DEDP
-* Abbreviated to DEDP
-
 The default discounts will be:
 
 ==================== =========== ======
@@ -41,7 +35,7 @@ DEDP-fa-tier3-<year> dollars-off 500
 DEDP-fa-tier4-<year> percent-off 0
 ==================== =========== ======
 
-Specify changes using ``--program``, ``--program-name``, and/or ``--program-abbrev``. 
+Specify changes using ``--program`` and/or ``--program-abbrev``.
 
 **Tiers**
 
@@ -70,7 +64,7 @@ Syntax
 ------
 
 Configuring tiers for a program:
-``configure_tiers [--program <readable id>] [--program-name <name of the program>] [--program-abbrev <program abbreviation>] [--tier-info <tier info CSV>]``
+``configure_tiers [--program <readable id>] [--program-abbrev <program abbreviation>] [--tier-info <tier info CSV>]``
 
 Configuring tiers for a course:
 ``configure_tiers [--course <readable id>] [--tier-info <tier info CSV>]``
@@ -80,13 +74,12 @@ Options
 
 Program options:
 
-* ``--program <readable id>`` - Program ID to use or create. Defaults to ``program-v1:MITx+DEDP``.
-* ``--program-name <name of the program>`` - Name of the new program. Defaults to ``Data, Economics and Development Policy``.
-* ``--program-abbrev <abbreviation>`` - Abbreviation to use for tiers and discounts. Defaults to ``DEDP``. 
+* ``--program <readable id>`` - Program ID to use or create.
+* ``--program-abbrev <abbreviation>`` - Abbreviation to use for tiers and discounts.
 
 Course options:
 
-* ``--course <readable id>`` - Course ID to use. This won't create a course; use ``create_courseware`` for that. 
+* ``--course <readable id>`` - Course ID to use. This won't create a course; use ``create_courseware`` for that.
 
 Common options:
 

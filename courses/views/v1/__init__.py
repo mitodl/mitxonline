@@ -1,16 +1,16 @@
 """Course views version 1"""
+
 import logging
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union  # noqa: UP035
 
 import django_filters
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
-from mitol.common.utils import now_in_utc
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, status, viewsets
@@ -44,14 +44,19 @@ from courses.serializers.v1.courses import (
     CourseRunWithCourseSerializer,
     CourseWithCourseRunsSerializer,
 )
-from courses.serializers.v1.programs import PartnerSchoolSerializer, ProgramSerializer
-from courses.serializers.v1.programs import (
-    UserProgramEnrollmentDetailSerializer,
-    LearnerRecordSerializer,
-)
 from courses.serializers.v1.departments import DepartmentWithCountSerializer
+from courses.serializers.v1.programs import (
+    LearnerRecordSerializer,
+    PartnerSchoolSerializer,
+    ProgramSerializer,
+    UserProgramEnrollmentDetailSerializer,
+)
 from courses.tasks import send_partner_school_email
-from courses.utils import get_program_certificate_by_enrollment
+from courses.utils import (
+    get_enrollable_courses,
+    get_program_certificate_by_enrollment,
+    get_unenrollable_courses,
+)
 from ecommerce.models import FulfilledOrder, Order, PendingOrder, Product
 from hubspot_sync.task_helpers import sync_hubspot_deal
 from main import features
@@ -59,9 +64,9 @@ from main.constants import (
     USER_MSG_COOKIE_MAX_AGE,
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_ENROLLED,
-    USER_MSG_TYPE_ENROLL_DUPLICATED,
 )
 from main.utils import encode_json_cookie_value, redirect_with_user_message
 from openedx.api import (
@@ -69,6 +74,7 @@ from openedx.api import (
     sync_enrollments_with_edx,
     unsubscribe_from_edx_course_emails,
 )
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.exceptions import (
     EdxApiEmailSettingsErrorException,
     NoEdxApiAuthError,
@@ -119,36 +125,9 @@ class CourseFilterSet(django_filters.FilterSet):
         courserun_is_enrollable filter to narrow down runs that are open for
         enrollments
         """
-        now = now_in_utc()
-
-        if value is True:
-            enrollable_runs = CourseRun.objects.filter(
-                Q(live=True)
-                & Q(start_date__isnull=False)
-                & Q(enrollment_start__lt=now)
-                & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))
-            )
-            return (
-                queryset.prefetch_related(
-                    Prefetch("courseruns", queryset=enrollable_runs)
-                )
-                .filter(courseruns__id__in=enrollable_runs.values_list("id", flat=True))
-                .distinct()
-            )
-
-        else:
-            unenrollable_runs = CourseRun.objects.filter(
-                Q(live=False) | Q(start_date__isnull=True) | Q(enrollment_end__lte=now)
-            )
-            return (
-                queryset.prefetch_related(
-                    Prefetch("courseruns", queryset=unenrollable_runs)
-                )
-                .filter(
-                    courseruns__id__in=unenrollable_runs.values_list("id", flat=True)
-                )
-                .distinct()
-            )
+        if value:
+            return get_enrollable_courses(queryset)
+        return get_unenrollable_courses(queryset)
 
     class Meta:
         model = Course
@@ -239,7 +218,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
 
 def _validate_enrollment_post_request(
     request: Request,
-) -> Union[Tuple[Optional[HttpResponse], None, None], Tuple[None, User, CourseRun]]:
+) -> Union[Tuple[Optional[HttpResponse], None, None], Tuple[None, User, CourseRun]]:  # noqa: FA100, UP006
     """
     Validates a request to create an enrollment. Returns a response if validation fails, or a user and course run
     if validation succeeds.
@@ -271,7 +250,15 @@ def _validate_enrollment_post_request(
             max_age=USER_MSG_COOKIE_MAX_AGE,
         )
         return resp, None, None
-    if PaidCourseRun.fulfilled_paid_course_run_exists(user, run):
+    if (
+        PaidCourseRun.fulfilled_paid_course_run_exists(user, run)
+        or CourseRunEnrollment.objects.filter(
+            user=user,
+            run=run,
+            change_status=None,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        ).exists()
+    ):
         resp = redirect_with_user_message(
             reverse("user-dashboard"),
             {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},
@@ -293,7 +280,7 @@ def create_enrollment_view(request):
         keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
     )
 
-    def respond(data, status=True):
+    def respond(data, status=True):  # noqa: FBT002
         """
         Either return a redirect or Ok/Fail based on status.
         """
@@ -382,7 +369,7 @@ class UserEnrollmentsApiViewSet(
                 log.exception("Failed to sync user enrollments with edX")
         return super().list(request, *args, **kwargs)
 
-    def destroy(self, request, *args, **kwargs):
+    def destroy(self, request, *args, **kwargs):  # noqa: ARG002
         enrollment = self.get_object()
         deactivated_enrollment = deactivate_run_enrollment(
             enrollment,
@@ -393,7 +380,7 @@ class UserEnrollmentsApiViewSet(
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def partial_update(self, request, *args, **kwargs):
+    def partial_update(self, request, *args, **kwargs):  # noqa: ARG002
         enrollment = self.get_object()
         receive_emails = request.data.get("receive_emails")
 
@@ -405,12 +392,12 @@ class UserEnrollmentsApiViewSet(
                         response = subscribe_to_edx_course_emails(
                             request.user, enrollment.run
                         )
-                        enrollment.edx_emails_subscription = True if response else False
+                        enrollment.edx_emails_subscription = True if response else False  # noqa: SIM210
                     else:
                         response = unsubscribe_from_edx_course_emails(
                             request.user, enrollment.run
                         )
-                        enrollment.edx_emails_subscription = False if response else True
+                        enrollment.edx_emails_subscription = False if response else True  # noqa: SIM211
                     enrollment.save()
                     return Response(data=response, status=status.HTTP_200_OK)
                 except (
@@ -420,11 +407,11 @@ class UserEnrollmentsApiViewSet(
                     HTTPError,
                     RequestsConnectionError,
                 ) as exc:
-                    log.exception(str(exc))
+                    log.exception(str(exc))  # noqa: TRY401
                     return Response(data=str(exc), status=status.HTTP_400_BAD_REQUEST)
         else:
             # only designed to update edx_emails_subscription field
-            # TODO: In the future please add the implementation
+            # TODO: In the future please add the implementation  # noqa: FIX002, TD002, TD003
             # to update the rest of the fields in the PATCH request
             # or separate out the APIs into function-based views.
             raise NotImplementedError
@@ -523,7 +510,7 @@ def get_learner_record_share(request, pk):
         # already one - these technically don't get revoked.
         try:
             school = PartnerSchool.objects.get(pk=request.data["partnerSchool"])
-        except:
+        except:  # noqa: E722
             return Response("Partner school not found.", status.HTTP_404_NOT_FOUND)
 
         (ps_share, created) = LearnerProgramRecordShare.objects.filter(
@@ -569,7 +556,7 @@ def revoke_learner_record_share(request, pk):
 
 @api_view(["GET"])
 @permission_classes([])
-def get_learner_record_from_uuid(request, uuid):
+def get_learner_record_from_uuid(request, uuid):  # noqa: ARG001
     """
     Does mostly the same thing as get_learner_record, but sets context to skip
     the partner school and sharing information.

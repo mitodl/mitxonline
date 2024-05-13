@@ -102,7 +102,7 @@ export const UserAssignments = (props: IUserAssignmentsTableProps) => {
             </Table>
         </List>
 
-        <Modal 
+        <Modal
             title="Assign Users"
             visible={showAddModal}
             onCancel={() => setShowAddModal(false)}

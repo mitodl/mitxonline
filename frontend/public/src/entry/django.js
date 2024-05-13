@@ -5,6 +5,11 @@ import "video.js"
 import "videojs-youtube/dist/Youtube"
 import "slick-carousel"
 import $ from "jquery"
+import banner from "../banner.js"
+
+document.addEventListener("DOMContentLoaded", function() {
+  banner()
+})
 $(document).ready(function() {
   $(".dates-tooltip").popover({
     sanitize: false,

@@ -50,7 +50,6 @@ export class EditProfilePage extends React.Component<Props> {
       const {
         body: { errors }
       }: { body: Object } = await editProfile(profileData)
-
       if (errors && errors.length > 0) {
         setErrors({
           email: errors[0]
@@ -69,18 +68,25 @@ export class EditProfilePage extends React.Component<Props> {
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${EDIT_PROFILE_PAGE_TITLE}`}
       >
-        <div className="std-page-body container auth-page">
-          <div className="auth-card card-shadow auth-form">
-            <div className="auth-header">
-              <h1>Edit Profile</h1>
+        <>
+          {currentUser ? (
+            <div role="banner" className="std-page-header">
+              <h1>{EDIT_PROFILE_PAGE_TITLE}</h1>
             </div>
-            <EditProfileForm
-              countries={countries}
-              user={currentUser}
-              onSubmit={this.onSubmit.bind(this)}
-            />
+          ) : null}
+          <div className="std-page-body container auth-page">
+            <div className="std-card std-card-auth">
+              <div className="std-card-body edit-profile-page">
+                <h2>Profile Information</h2>
+                <EditProfileForm
+                  countries={countries}
+                  user={currentUser}
+                  onSubmit={this.onSubmit.bind(this)}
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        </>
       </DocumentTitle>
     ) : null
   }

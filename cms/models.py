@@ -1,4 +1,5 @@
 """CMS model definitions"""
+
 import json
 import logging
 import re
@@ -36,6 +37,8 @@ from wagtail.fields import RichTextField, StreamField
 from wagtail.images.models import Image
 from wagtail.models import Page
 from wagtail.search import index
+from wagtail.snippets.models import register_snippet
+from wagtailmetadata.models import MetadataPageMixin
 
 from cms.blocks import (
     CourseRunCertificateOverrides,
@@ -89,7 +92,7 @@ class VideoPlayerConfigMixin(Page):
     def video_player_config(self):
         """Get configuration for video player"""
 
-        if self.video_url:
+        if self.video_url:  # noqa: RET503
             config = {"techOrder": ["html5"], "sources": [{"src": self.video_url}]}
             try:
                 embed = get_embed(self.video_url)
@@ -113,7 +116,7 @@ class VideoPlayerConfigMixin(Page):
 
             except EmbedException:
                 log.info(
-                    f"The embed for the current url {self.video_url} is unavailable."
+                    f"The embed for the current url {self.video_url} is unavailable."  # noqa: G004
                 )
             return dumps(config)
 
@@ -142,7 +145,7 @@ class SignatoryObjectIndexPage(Page):
             and not parent.get_children().type(cls).exists()
         )
 
-    def serve(self, request, *args, **kwargs):
+    def serve(self, request, *args, **kwargs):  # noqa: ARG002
         """
         For index pages we raise a 404 because these pages do not have a template
         of their own and we do not expect a page to available at their slug.
@@ -182,9 +185,7 @@ class CertificateIndexPage(RoutablePageMixin, Page):
         )
 
     @route(r"^program/([A-Fa-f0-9-]+)/?$")
-    def program_certificate(
-        self, request, uuid, *args, **kwargs
-    ):  # pylint: disable=unused-argument
+    def program_certificate(self, request, uuid, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
         """
         Serve a program certificate by uuid
         """
@@ -192,7 +193,7 @@ class CertificateIndexPage(RoutablePageMixin, Page):
         try:
             certificate = ProgramCertificate.objects.get(uuid=uuid)
         except ProgramCertificate.DoesNotExist:
-            raise Http404()
+            raise Http404()  # noqa: B904, RSE102
 
         # Get a CertificatePage to serve this request
         certificate_page = (
@@ -205,7 +206,7 @@ class CertificateIndexPage(RoutablePageMixin, Page):
             )
         )
         if not certificate_page:
-            raise Http404()
+            raise Http404()  # noqa: RSE102
 
         if not certificate.certificate_page_revision:
             # The certificate.save() is overridden,it associates the certificate
@@ -216,9 +217,7 @@ class CertificateIndexPage(RoutablePageMixin, Page):
         return certificate_page.serve(request)
 
     @route(r"^([A-Fa-f0-9-]+)/?$")
-    def course_certificate(
-        self, request, uuid, *args, **kwargs
-    ):  # pylint: disable=unused-argument
+    def course_certificate(self, request, uuid, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
         """
         Serve a course certificate by uuid
         """
@@ -226,7 +225,7 @@ class CertificateIndexPage(RoutablePageMixin, Page):
         try:
             certificate = CourseRunCertificate.objects.get(uuid=uuid)
         except CourseRunCertificate.DoesNotExist:
-            raise Http404()
+            raise Http404()  # noqa: B904, RSE102
 
         # Get a CertificatePage to serve this request
         certificate_page = (
@@ -240,7 +239,7 @@ class CertificateIndexPage(RoutablePageMixin, Page):
         )
 
         if not certificate_page:
-            raise Http404()
+            raise Http404()  # noqa: RSE102
 
         if not certificate.certificate_page_revision:
             certificate.save()
@@ -248,11 +247,11 @@ class CertificateIndexPage(RoutablePageMixin, Page):
         return certificate_page.serve(request)
 
     @route(r"^$")
-    def index_route(self, request, *args, **kwargs):
+    def index_route(self, request, *args, **kwargs):  # noqa: ARG002
         """
         The index page is not meant to be served/viewed directly
         """
-        raise Http404()
+        raise Http404()  # noqa: RSE102
 
 
 class CourseProgramChildPage(Page):
@@ -275,15 +274,15 @@ class CourseProgramChildPage(Page):
     def can_create_at(cls, parent):
         # You can only create one of these page under course / program.
         return (
-            super(CourseProgramChildPage, cls).can_create_at(parent)
+            super(CourseProgramChildPage, cls).can_create_at(parent)  # noqa: UP008
             and parent.get_children().type(cls).count() == 0
         )
 
-    def save(self, clean=True, user=None, log_action=False, **kwargs):
+    def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
         # autogenerate a unique slug so we don't hit a ValidationError
         if not self.title:
-            self.title = self.__class__._meta.verbose_name.title()
-        self.slug = slugify("{}-{}".format(self.get_parent().id, self.title))
+            self.title = self.__class__._meta.verbose_name.title()  # noqa: SLF001
+        self.slug = slugify(f"{self.get_parent().id}-{self.title}")
         super().save(clean=clean, user=user, log_action=log_action, **kwargs)
 
     def get_url_parts(self, request=None):
@@ -303,12 +302,12 @@ class CourseProgramChildPage(Page):
 
         # Depending on whether we have trailing slashes or not, build the correct path
         if WAGTAIL_APPEND_SLASH:
-            page_path = "{}{}/".format(parent_path, self.slug)
+            page_path = f"{parent_path}{self.slug}/"
         else:
-            page_path = "{}/{}".format(parent_path, self.slug)
+            page_path = f"{parent_path}/{self.slug}"
         return (site_id, site_root, page_path)
 
-    def serve(self, request, *args, **kwargs):
+    def serve(self, request, *args, **kwargs):  # noqa: ARG002
         """
         As the name suggests these pages are going to be children of some other page. They are not
         designed to be viewed on their own so we raise a 404 if someone tries to access their slug.
@@ -331,7 +330,7 @@ class CertificatePage(CourseProgramChildPage):
         help_text="Specify the course/program name.",
     )
 
-    CEUs = models.CharField(
+    CEUs = models.CharField(  # noqa: DJ001
         max_length=250,
         null=True,
         blank=True,
@@ -377,15 +376,15 @@ class CertificatePage(CourseProgramChildPage):
         self.certificate = None
         super().__init__(*args, **kwargs)
 
-    def save(self, clean=True, user=None, log_action=False, **kwargs):
+    def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
         # auto generate a unique slug so we don't hit a ValidationError
         self.title = (
-            self.__class__._meta.verbose_name.title()
+            self.__class__._meta.verbose_name.title()  # noqa: SLF001
             + " For "
             + self.get_parent().title
         )
 
-        self.slug = slugify("certificate-{}".format(self.get_parent().id))
+        self.slug = slugify(f"certificate-{self.get_parent().id}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
 
     def serve(self, request, *args, **kwargs):
@@ -402,7 +401,7 @@ class CertificatePage(CourseProgramChildPage):
         pages = []
         for block in self.signatories:  # pylint: disable=not-an-iterable
             if block.value:
-                pages.append(block.value.specific)
+                pages.append(block.value.specific)  # noqa: PERF401
         return pages
 
     @property
@@ -419,18 +418,22 @@ class CertificatePage(CourseProgramChildPage):
         if request.is_preview:
             preview_context = {
                 "learner_name": "Anthony M. Stark",
-                "start_date": self.parent.product.first_unexpired_run.start_date
-                if self.parent.product.first_unexpired_run
-                else datetime.now(),
-                "end_date": self.parent.product.first_unexpired_run.end_date
-                if self.parent.product.first_unexpired_run
-                else datetime.now() + timedelta(days=45),
+                "start_date": (
+                    self.parent.product.first_unexpired_run.start_date
+                    if self.parent.product.first_unexpired_run
+                    else datetime.now()  # noqa: DTZ005
+                ),
+                "end_date": (
+                    self.parent.product.first_unexpired_run.end_date
+                    if self.parent.product.first_unexpired_run
+                    else datetime.now() + timedelta(days=45)  # noqa: DTZ005
+                ),
                 "CEUs": self.CEUs,
             }
         elif self.certificate:
             # Verify that the certificate in fact is for this same course
             if self.parent.product.id != self.certificate.get_courseware_object_id():
-                raise Http404()
+                raise Http404()  # noqa: RSE102
             start_date, end_date = self.certificate.start_end_dates
             CEUs = self.CEUs
 
@@ -458,21 +461,19 @@ class CertificatePage(CourseProgramChildPage):
                 "end_date": end_date,
                 "CEUs": CEUs,
                 "is_program_certificate": is_program_certificate,
-                "program_type": self.parent.program.program_type
-                if is_program_certificate
-                else "",
+                "program_type": (
+                    self.parent.program.program_type if is_program_certificate else ""
+                ),
             }
         else:
-            raise Http404()
+            raise Http404()  # noqa: RSE102
 
         # The share image url needs to be absolute
         return {
             "site_name": settings.SITE_NAME,
             "share_image_width": "1665",
             "share_image_height": "1291",
-            "share_text": "I just earned a certificate in {} from {}".format(
-                product_name, settings.SITE_NAME
-            ),
+            "share_text": f"I just earned a certificate in {product_name} from {settings.SITE_NAME}",
             **super().get_context(request, *args, **kwargs),
             **preview_context,
             **context,
@@ -484,7 +485,7 @@ class FormField(AbstractFormField):
     Adds support for the Country field (see FlexiblePricingFormBuilder below).
     """
 
-    CHOICES = FORM_FIELD_CHOICES + (("country", "Country"),)
+    CHOICES = FORM_FIELD_CHOICES + (("country", "Country"),)  # noqa: RUF005
 
     page = ParentalKey(
         "FlexiblePricingRequestForm",
@@ -502,21 +503,19 @@ class FlexiblePricingFormBuilder(FormBuilder):
     exchange rates in the system. (So, no exchange rate = no option.)
     """
 
-    def create_number_field(self, field, options):
+    def create_number_field(self, field, options):  # noqa: ARG002
         options["error_messages"] = {
             "required": f"{options['label']} is a required field."
         }
         return DecimalField(**options)
 
-    def create_country_field(self, field, options):
+    def create_country_field(self, field, options):  # noqa: ARG002
         exchange_rates = []
 
         for record in CurrencyExchangeRate.objects.all():
             desc = record.currency_code
             if record.description is not None and len(record.description) > 0:
-                desc = "{code} - {code_description}".format(
-                    code=record.currency_code, code_description=record.description
-                )
+                desc = f"{record.currency_code} - {record.description}"
             exchange_rates.append((record.currency_code, desc))
 
         options["choices"] = exchange_rates
@@ -539,7 +538,7 @@ class InstructorPage(Page):
         help_text="The name of the instructor.",
     )
 
-    instructor_title = models.CharField(
+    instructor_title = models.CharField(  # noqa: DJ001
         max_length=255,
         null=True,
         blank=True,
@@ -565,7 +564,7 @@ class InstructorPage(Page):
         help_text="Image that will be used where the instructor is featured or linked. (The recommended dimensions for the image are 375x244)",
     )
 
-    content_panels = Page.content_panels + [
+    content_panels = Page.content_panels + [  # noqa: RUF005
         FieldPanel("instructor_name"),
         FieldPanel("instructor_title"),
         FieldPanel("instructor_bio_short"),
@@ -573,7 +572,7 @@ class InstructorPage(Page):
         FieldPanel("feature_image"),
     ]
 
-    def serve(self, request, *args, **kwargs):
+    def serve(self, request, *args, **kwargs):  # noqa: ARG002
         """
         For index pages we raise a 404 because these pages do not have a template
         of their own and we do not expect a page to available at their slug.
@@ -605,7 +604,7 @@ class InstructorObjectIndexPage(Page):
             and not parent.get_children().type(cls).exists()
         )
 
-    def serve(self, request, *args, **kwargs):
+    def serve(self, request, *args, **kwargs):  # noqa: ARG002
         """
         For index pages we raise a 404 because these pages do not have a template
         of their own and we do not expect a page to available at their slug.
@@ -622,7 +621,7 @@ class InstructorIndexPage(InstructorObjectIndexPage):
     slug = INSTRUCTOR_INDEX_SLUG
 
 
-class InstructorPageLink(models.Model):
+class InstructorPageLink(models.Model):  # noqa: DJ008
     page = ParentalKey(
         Page, on_delete=models.CASCADE, related_name="linked_instructors"
     )
@@ -657,26 +656,26 @@ class HomePage(VideoPlayerConfigMixin):
         help_text="Main image displayed at the top of the home page. (The recommended dimensions for hero image are "
         "1920x400)",
     )
-    hero_title = models.CharField(
+    hero_title = models.CharField(  # noqa: DJ001
         max_length=255,
         null=True,
         blank=True,
         help_text="The title text to display in the hero section of the home page.",
     )
-    hero_subtitle = models.CharField(
+    hero_subtitle = models.CharField(  # noqa: DJ001
         max_length=255,
         null=True,
         blank=True,
         help_text="The subtitle text to display in the hero section of the home page.",
     )
 
-    product_section_title = models.CharField(
+    product_section_title = models.CharField(  # noqa: DJ001
         max_length=255,
         null=True,
         blank=True,
         help_text="The title text to display in the product cards section of the home page.",
     )
-    video_component_title = models.CharField(
+    video_component_title = models.CharField(  # noqa: DJ001
         max_length=255,
         null=True,
         blank=True,
@@ -687,13 +686,13 @@ class HomePage(VideoPlayerConfigMixin):
         blank=True,
         help_text="The text supporting the video in the video component on the homepage.",
     )
-    video_url = models.URLField(
+    video_url = models.URLField(  # noqa: DJ001
         null=True,
         blank=True,
         help_text="URL to the video to be displayed for the homepage video component. It can be an HLS or Youtube video URL.",
     )
 
-    content_panels = Page.content_panels + [
+    content_panels = Page.content_panels + [  # noqa: RUF005
         FieldPanel("hero"),
         FieldPanel("hero_title"),
         FieldPanel("hero_subtitle"),
@@ -756,9 +755,11 @@ class HomePage(VideoPlayerConfigMixin):
                     "url_path": product_page.get_url(),
                     "is_program": product_page.is_program_page,
                     "is_self_paced": run.is_self_paced if run is not None else None,
-                    "program_type": product_page.product.program_type
-                    if product_page.is_program_page
-                    else None,
+                    "program_type": (
+                        product_page.product.program_type
+                        if product_page.is_program_page
+                        else None
+                    ),
                 }
 
                 if run and run.start_date and run.start_date < now_in_utc():
@@ -781,7 +782,7 @@ class HomePage(VideoPlayerConfigMixin):
         )
         return page_data
 
-    def get_context(self, request, *args, **kwargs):
+    def get_context(self, request, *args, **kwargs):  # noqa: ARG002
         hubspot_portal_id = settings.HUBSPOT_PORTAL_ID
         hubspot_home_page_form_guid = settings.HUBSPOT_HOME_PAGE_FORM_GUID
 
@@ -794,22 +795,22 @@ class HomePage(VideoPlayerConfigMixin):
 
         show_new_featured_carousel = features.is_enabled(
             features.ENABLE_NEW_HOME_PAGE_FEATURED,
-            False,
+            False,  # noqa: FBT003
             user,
         )
         show_new_design_hero = features.is_enabled(
             features.ENABLE_NEW_HOME_PAGE_HERO,
-            False,
+            False,  # noqa: FBT003
             user,
         )
         show_home_page_video_component = features.is_enabled(
             features.ENABLE_NEW_HOME_PAGE_VIDEO,
-            False,
+            False,  # noqa: FBT003
             user,
         )
         show_home_page_contact_form = features.is_enabled(
             features.ENABLE_NEW_HOME_PAGE_CONTACT_FORM,
-            False,
+            False,  # noqa: FBT003
             user,
         )
 
@@ -827,7 +828,7 @@ class HomePage(VideoPlayerConfigMixin):
         }
 
 
-class HomeProductLink(models.Model):
+class HomeProductLink(models.Model):  # noqa: DJ008
     """
     Home and ProductPage Link
     """
@@ -893,12 +894,12 @@ class CourseObjectIndexPage(Page):
                 # instead of the page slug (as Wagtail does by default)
                 subpage = self.get_child_by_readable_id(child_readable_id)
             except Page.DoesNotExist:
-                raise Http404
+                raise Http404  # noqa: B904
 
             return subpage.specific.route(request, remaining_components)
         return super().route(request, path_components)
 
-    def serve(self, request, *args, **kwargs):
+    def serve(self, request, *args, **kwargs):  # noqa: ARG002
         """
         For index pages we raise a 404 because these pages do not have a template
         of their own and we do not expect a page to available at their slug.
@@ -928,7 +929,7 @@ class ProgramIndexPage(CourseObjectIndexPage):
         return self.get_children().get(programpage__program__readable_id=readable_id)
 
 
-class ProductPage(VideoPlayerConfigMixin):
+class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
     """
     Abstract detail page for course runs and any other "product" that a user can enroll in
     """
@@ -946,7 +947,7 @@ class ProductPage(VideoPlayerConfigMixin):
         help_text="A short description indicating how long it takes to complete (e.g. '4 weeks').",
     )
 
-    effort = models.CharField(
+    effort = models.CharField(  # noqa: DJ001
         max_length=100,
         null=True,
         blank=True,
@@ -969,13 +970,13 @@ class ProductPage(VideoPlayerConfigMixin):
         null=True, blank=True, help_text="Details about this course/program."
     )
 
-    faq_url = models.URLField(
+    faq_url = models.URLField(  # noqa: DJ001
         null=True,
         blank=True,
         help_text="URL a relevant FAQ page or entry for the course/program.",
     )
 
-    video_url = models.URLField(
+    video_url = models.URLField(  # noqa: DJ001
         null=True,
         blank=True,
         help_text="URL to the video to be displayed for this course/program. It can be an HLS or Youtube video URL.",
@@ -994,7 +995,7 @@ class ProductPage(VideoPlayerConfigMixin):
         help_text="Image that will be used where the course is featured or linked. (The recommended dimensions for the image are 375x244)",
     )
 
-    faculty_section_title = models.CharField(
+    faculty_section_title = models.CharField(  # noqa: DJ001
         max_length=255,
         null=True,
         blank=True,
@@ -1002,15 +1003,15 @@ class ProductPage(VideoPlayerConfigMixin):
         help_text="The title text to display in the faculty cards section of the product page.",
     )
 
-    def save(self, clean=True, user=None, log_action=False, **kwargs):
+    def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
         """
         Updates related courseware object title.
         """
         courseware_object = None
         if self.is_course_page:
-            courseware_object = getattr(self, "course")
+            courseware_object = self.course
         elif self.is_program_page:
-            courseware_object = getattr(self, "program")
+            courseware_object = self.program
         courseware_object.title = self.title
         courseware_object.save()
 
@@ -1036,7 +1037,7 @@ class ProductPage(VideoPlayerConfigMixin):
         """Gets the product page type, this is used for sorting product pages."""
         return isinstance(self, ProgramPage)
 
-    content_panels = Page.content_panels + [
+    content_panels = Page.content_panels + [  # noqa: RUF005
         FieldPanel("description"),
         FieldPanel("length"),
         FieldPanel("effort"),
@@ -1078,7 +1079,7 @@ class ProductPage(VideoPlayerConfigMixin):
             url_parts[1],
             re.sub(
                 self.slugged_page_path_pattern,
-                r"\1{}\3".format(self.product.readable_id),
+                rf"\1{self.product.readable_id}\3",
                 url_parts[2],
             ),
         )
@@ -1095,7 +1096,7 @@ class ProductPage(VideoPlayerConfigMixin):
         """
         raise NotImplementedError
 
-    def get_context(self, request, *args, **kwargs):
+    def get_context(self, request, *args, **kwargs):  # noqa: ARG002
         instructors = [
             member.linked_instructor_page
             for member in self.linked_instructors.order_by("order").all()
@@ -1119,7 +1120,7 @@ class CoursePage(ProductPage):
         "courses.Course", null=True, on_delete=models.SET_NULL, related_name="page"
     )
 
-    search_fields = Page.search_fields + [
+    search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
             "course",
             [
@@ -1155,7 +1156,7 @@ class CoursePage(ProductPage):
 
             if discount and discount.check_validity(request.user):
                 log.debug(
-                    f"price is {ecommerce_product.price}, discount is {discount.discount_product(ecommerce_product)}"
+                    f"price is {ecommerce_product.price}, discount is {discount.discount_product(ecommerce_product)}"  # noqa: G004
                 )
                 return (
                     ecommerce_product.price,
@@ -1212,7 +1213,7 @@ class CoursePage(ProductPage):
             "product": product,
         }
 
-    content_panels = [
+    content_panels = [  # noqa: RUF005
         FieldPanel("course"),
     ] + ProductPage.content_panels
 
@@ -1228,7 +1229,7 @@ class ProgramPage(ProductPage):
         "courses.Program", null=True, on_delete=models.SET_NULL, related_name="page"
     )
 
-    search_fields = Page.search_fields + [
+    search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
             "program",
             [
@@ -1269,7 +1270,7 @@ class ProgramPage(ProductPage):
             "program_type": self.product.program_type,
         }
 
-    content_panels = [
+    content_panels = [  # noqa: RUF005
         FieldPanel("program"),
     ] + ProductPage.content_panels
 
@@ -1299,7 +1300,7 @@ class ResourcePage(Page):
         use_json_field=True,
     )
 
-    content_panels = Page.content_panels + [
+    content_panels = Page.content_panels + [  # noqa: RUF005
         FieldPanel("header_image"),
         FieldPanel("content"),
     ]
@@ -1384,7 +1385,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         features=RICH_TEXT_FIELD_FEATURES,
     )
 
-    content_panels = AbstractForm.content_panels + [
+    content_panels = AbstractForm.content_panels + [  # noqa: RUF005
         FieldPanel("intro"),
         FieldPanel("selected_course"),
         FieldPanel("selected_program"),
@@ -1534,9 +1535,9 @@ class FlexiblePricingRequestForm(AbstractForm):
         else:
             sub_qset = sub_qset.filter(
                 courseware_object_id=parent_courseware.id,
-                courseware_content_type=course_ct
-                if isinstance(parent_courseware, Course)
-                else program_ct,
+                courseware_content_type=(
+                    course_ct if isinstance(parent_courseware, Course) else program_ct
+                ),
             )
 
         return sub_qset.order_by("-created_on").first()
@@ -1577,7 +1578,7 @@ class FlexiblePricingRequestForm(AbstractForm):
                 form.cleaned_data["income_currency"],
             )
         except NotSupportedException:
-            raise ValidationError("Currency not supported")
+            raise ValidationError("Currency not supported")  # noqa: B904, EM101
 
         courseware = self.get_parent_courseware()
         income_usd = round(converted_income, 2)
@@ -1593,17 +1594,16 @@ class FlexiblePricingRequestForm(AbstractForm):
 
         if flexible_price is None:
             flexible_price = FlexiblePrice(user=form.user, courseware_object=courseware)
-        else:
-            if flexible_price.status != FlexiblePriceStatus.RESET:
-                raise ValidationError(
-                    "A Flexible Price request already exists for this user and course or program."
-                )
+        elif flexible_price.status != FlexiblePriceStatus.RESET:
+            raise ValidationError(
+                "A Flexible Price request already exists for this user and course or program."  # noqa: EM101
+            )
 
         flexible_price.original_income = form.cleaned_data["your_income"]
         flexible_price.original_currency = form.cleaned_data["income_currency"]
         flexible_price.country_of_income = form.user.legal_address.country
         flexible_price.income_usd = income_usd
-        flexible_price.date_exchange_rate = datetime.now()
+        flexible_price.date_exchange_rate = datetime.now()  # noqa: DTZ005
         flexible_price.cms_submission = form_submission
         flexible_price.tier = tier
         flexible_price.justification = ""
@@ -1633,7 +1633,7 @@ class FlexiblePricingRequestForm(AbstractForm):
         if not url_parts:
             return None
 
-        return (url_parts[0], url_parts[1], r"{}{}/".format(url_parts[2], self.slug))
+        return (url_parts[0], url_parts[1], rf"{url_parts[2]}{self.slug}/")
 
 
 class SignatoryPage(Page):
@@ -1646,19 +1646,19 @@ class SignatoryPage(Page):
     name = models.CharField(
         max_length=250, null=False, blank=False, help_text="Name of the signatory."
     )
-    title_1 = models.CharField(
+    title_1 = models.CharField(  # noqa: DJ001
         max_length=250,
         null=True,
         blank=True,
         help_text="Specify signatory first title in organization.",
     )
-    title_2 = models.CharField(
+    title_2 = models.CharField(  # noqa: DJ001
         max_length=250,
         null=True,
         blank=True,
         help_text="Specify signatory second title in organization.",
     )
-    organization = models.CharField(
+    organization = models.CharField(  # noqa: DJ001
         max_length=250,
         null=True,
         blank=True,
@@ -1685,17 +1685,31 @@ class SignatoryPage(Page):
         FieldPanel("signature_image"),
     ]
 
-    def save(self, clean=True, user=None, log_action=False, **kwargs):
+    def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
         # auto generate a unique slug so we don't hit a ValidationError
         if not self.title:
-            self.title = self.__class__._meta.verbose_name.title() + "-" + self.name
+            self.title = self.__class__._meta.verbose_name.title() + "-" + self.name  # noqa: SLF001
 
-        self.slug = slugify("{}-{}".format(self.title, self.id))
+        self.slug = slugify(f"{self.title}-{self.id}")
         super().save(clean=clean, user=user, log_action=log_action, **kwargs)
 
-    def serve(self, request, *args, **kwargs):
+    def serve(self, request, *args, **kwargs):  # noqa: ARG002
         """
         As the name suggests these pages are going to be children of some other page. They are not
         designed to be viewed on their own so we raise a 404 if someone tries to access their slug.
         """
         raise Http404
+
+
+@register_snippet
+class SiteBanner(models.Model):
+    """Snippet model for showing site banner."""
+
+    message = RichTextField(
+        max_length=255, features=["bold", "italic", "link", "document-link"]
+    )
+
+    panels = [FieldPanel("message")]
+
+    def __str__(self):
+        return str(self.message)

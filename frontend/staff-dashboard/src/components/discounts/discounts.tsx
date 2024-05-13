@@ -1,4 +1,4 @@
-import { 
+import {
   Form,
   Input,
   InputNumber,
@@ -12,7 +12,7 @@ import { UserAssignments } from "./user-assignments";
 
 interface IDiscountFormProps {
   formProps: any;
-} 
+}
 
 export const DiscountForm = (props: IDiscountFormProps) => {
   const { formProps } = props;
@@ -31,7 +31,7 @@ export const DiscountForm = (props: IDiscountFormProps) => {
             <Select options={[
                 { label: 'Unlimited', value: 'unlimited' },
                 { label: 'One-Time', value: 'one-time' },
-                { label: 'One Time Per User', value: 'one-time-per-user' }, 
+                { label: 'One Time Per User', value: 'one-time-per-user' },
             ]}></Select>
         </Form.Item>
         <Form.Item noStyle shouldUpdate={(prev, cur) => prev.redemption_type !== cur.redemption_type}>
@@ -45,7 +45,7 @@ export const DiscountForm = (props: IDiscountFormProps) => {
             <Select options={[
                 { label: 'Percent Off', value: 'percent-off' },
                 { label: 'Dollars Off', value: 'dollars-off' },
-                { label: 'Fixed Price', value: 'fixed-price' }, 
+                { label: 'Fixed Price', value: 'fixed-price' },
             ]}></Select>
         </Form.Item>
         <Form.Item label="Amount" name="amount">
@@ -71,7 +71,7 @@ export const DiscountForm = (props: IDiscountFormProps) => {
     </Form>
 
     {formProps.initialValues ? <Products record={formProps.initialValues} isManagement={true}></Products> : null}
-    
+
     {formProps.initialValues ? <UserAssignments record={formProps.initialValues} isManagement={true}></UserAssignments> : null}
   </>);
 };

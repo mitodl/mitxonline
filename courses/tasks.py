@@ -1,9 +1,9 @@
 """
 Tasks for the courses app
 """
+
 import logging
 
-from django.conf import settings
 from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 
@@ -12,7 +12,6 @@ from courses.models import (
     CourseRunEnrollment,
     LearnerProgramRecordShare,
     PaidCourseRun,
-    Program,
 )
 from main.celery import app
 
@@ -91,7 +90,7 @@ def clear_unenrolled_paid_course_run(enrollment_id):
             course_run=enrollment.run,
             order__state=Order.STATE.FULFILLED,
         ).delete()
-    except Exception as e:
-        log.error(
-            f"Unable to clear paid course run records for enrollment ID {enrollment_id}: {str(e)}"
+    except Exception as e:  # noqa: BLE001
+        log.error(  # noqa: TRY400
+            f"Unable to clear paid course run records for enrollment ID {enrollment_id}: {e!s}"  # noqa: G004
         )

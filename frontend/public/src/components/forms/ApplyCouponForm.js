@@ -2,6 +2,7 @@
 import React from "react"
 import { Formik, Form, ErrorMessage, Field } from "formik"
 import FormError from "./elements/FormError"
+import { ConnectedFocusError } from "focus-formik-error"
 
 type Props = {
   onSubmit: Function,
@@ -18,22 +19,27 @@ const ApplyCouponForm = ({ onSubmit, couponCode, discounts }: Props) => (
   <Formik
     onSubmit={onSubmit}
     initialValues={getInitialValues(couponCode, discounts)}
-    render={() => (
-      <Form>
-        <div className="row g-0">
-          <div className="col-12 mt-4 px-3 py-3 py-md-0">
-            <label htmlFor="couponCode">
-              <span>Coupon code</span>
-            </label>
-            <div className="d-flex justify-content-between flex-sm-column flex-md-row">
-              <div className="col-sm-6 col-md-8">
+  >
+    {({ errors }) => {
+      return (
+        <Form>
+          <ConnectedFocusError />
+          <div className="coupon-form">
+            <div className="d-flex align-content-end align-items-end justify-content-between flex-sm-column flex-md-row">
+              <div className="form-group">
+                <label htmlFor="couponCode" className="fw-bold">
+                  Coupon code
+                </label>
                 <Field
                   type="text"
                   name="couponCode"
                   id="couponCode"
                   className="form-control"
                   autoComplete="given-name"
-                  aria-describedby="couponCodeError"
+                  aria-invalid={errors.couponCode ? "true" : null}
+                  aria-describedby={
+                    errors.couponCode ? "couponCodeError" : null
+                  }
                 />
                 <ErrorMessage
                   name="couponCode"
@@ -43,15 +49,13 @@ const ApplyCouponForm = ({ onSubmit, couponCode, discounts }: Props) => (
                 />
               </div>
 
-              <div className="col-6 col-md-4">
-                <button
-                  className="btn btn-primary btn-red btn-halfsize mx-2 highlight font-weight-normal"
-                  type="submit"
-                  aria-label="Apply coupon"
-                >
-                  Apply
-                </button>
-              </div>
+              <button
+                className="btn btn-primary btn-gradient-red-to-blue btn-apply-coupon"
+                type="submit"
+                aria-label="Apply coupon"
+              >
+                Apply
+              </button>
             </div>
             {discounts !== null && discounts.length > 0 ? (
               <div
@@ -62,10 +66,10 @@ const ApplyCouponForm = ({ onSubmit, couponCode, discounts }: Props) => (
               </div>
             ) : null}
           </div>
-        </div>
-      </Form>
-    )}
-  />
+        </Form>
+      )
+    }}
+  </Formik>
 )
 
 export default ApplyCouponForm

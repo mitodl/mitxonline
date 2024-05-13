@@ -1,4 +1,5 @@
 """Ensures that all appropriate changes have been made to Wagtail that will make the site navigable."""
+
 from django.core.management.base import BaseCommand
 
 from cms.api import (
@@ -17,7 +18,7 @@ class Command(BaseCommand):
 
     help = __doc__
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         ensure_home_page_and_site()
         ensure_product_index()
         ensure_resource_pages()

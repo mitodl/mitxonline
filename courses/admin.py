@@ -1,6 +1,7 @@
 """
 Admin site bindings for profiles
 """
+
 from django.contrib import admin
 from django.contrib.admin.decorators import display
 from django.db import models
@@ -68,15 +69,15 @@ class CourseAdmin(admin.ModelAdmin):
         models.CharField: {"widget": TextInput(attrs={"size": "80"})}
     }
 
-    def get_readonly_fields(self, request, obj=None):
+    def get_readonly_fields(self, request, obj=None):  # noqa: ARG002
         """
         Adds `title` as readonly field while editing an existing object.
         """
         if getattr(obj, "page", None):
-            return self.readonly_fields + ("title",)
+            return self.readonly_fields + ("title",)  # noqa: RUF005
         return self.readonly_fields
 
-    def get_form(self, request, obj=None, change=False, **kwargs):
+    def get_form(self, request, obj=None, change=False, **kwargs):  # noqa: FBT002
         """
         Adds help text for `title` field while editing an existing object.
         """
@@ -185,10 +186,10 @@ class ProgramEnrollmentAuditAdmin(TimestampedModelAdmin):
     get_user.short_description = "User"
     get_user.admin_order_field = "enrollment__user__email"
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request):  # noqa: ARG002
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
         return False
 
 
@@ -209,7 +210,7 @@ class CourseRunEnrollmentAuditInline(admin.TabularInline):
     can_delete = False
     can_add = False
 
-    def has_add_permission(self, request, obj=None):
+    def has_add_permission(self, request, obj=None):  # noqa: ARG002
         return False
 
 
@@ -293,10 +294,10 @@ class CourseRunEnrollmentAuditAdmin(TimestampedModelAdmin):
     get_user.short_description = "User"
     get_user.admin_order_field = "enrollment__user__email"
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request):  # noqa: ARG002
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
         return False
 
 
@@ -318,7 +319,7 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
     )
     search_fields = ["user__email", "user__username"]
 
-    def get_queryset(self, request):
+    def get_queryset(self, request):  # noqa: ARG002
         return self.model.objects.get_queryset().select_related("user", "course_run")
 
     def get_user_email(self, obj):
@@ -371,10 +372,10 @@ class CourseRunGradeAuditAdmin(TimestampedModelAdmin):
         "course_run_grade__course_run__courseware_id"
     )
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request):  # noqa: ARG002
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request, obj=None):  # noqa: ARG002
         return False
 
 
@@ -382,6 +383,7 @@ class DepartmentAdmin(admin.ModelAdmin):
     """Admin for Department"""
 
     model = Department
+    list_display = ("name", "slug")
 
 
 class BlockedCountryAdmin(TimestampedModelAdmin):
@@ -445,13 +447,13 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
     raw_id_fields = ("user",)
 
     def get_revoked_state(self, obj):
-        """return the revoked state"""
+        """Return the revoked state"""
         return obj.is_revoked is not True
 
     get_revoked_state.short_description = "Active"
     get_revoked_state.boolean = True
 
-    def get_queryset(self, request):
+    def get_queryset(self, request):  # noqa: ARG002
         return self.model.all_objects.get_queryset().select_related(
             "user", "course_run"
         )
@@ -478,13 +480,13 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
     raw_id_fields = ("user",)
 
     def get_revoked_state(self, obj):
-        """return the revoked state"""
+        """Return the revoked state"""
         return obj.is_revoked is not True
 
     get_revoked_state.short_description = "Active"
     get_revoked_state.boolean = True
 
-    def get_queryset(self, request):
+    def get_queryset(self, request):  # noqa: ARG002
         return self.model.all_objects.get_queryset().select_related("user", "program")
 
 

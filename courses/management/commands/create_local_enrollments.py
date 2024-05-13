@@ -7,7 +7,7 @@ To sync enrollments for specific user and from both direction, use sync_enrollme
 
 """
 
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 
 from courses.models import CourseRun, CourseRunEnrollment, User
 from openedx.api import get_edx_api_service_client
@@ -27,7 +27,7 @@ class Command(BaseCommand):
             required=True,
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         """Handle command execution"""
 
         courseware_ids = options["runs"]
@@ -59,7 +59,7 @@ class Command(BaseCommand):
                         ) = CourseRunEnrollment.all_objects.get_or_create(
                             user=user,
                             run=run,
-                            defaults=dict(
+                            defaults=dict(  # noqa: C408
                                 active=edx_enrollment.is_active,
                                 change_status=None,
                                 edx_emails_subscription=False,
@@ -70,7 +70,7 @@ class Command(BaseCommand):
                         if created:
                             created_count[courseware_id] += 1
 
-                except:
+                except:  # noqa: PERF203, E722
                     self.stderr.write(
                         self.style.ERROR(
                             f"Could not get or create course enrollment for user {edx_enrollment.user} course ID {courseware_id}"

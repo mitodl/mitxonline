@@ -2,10 +2,17 @@
 {% block bodyclass %}{% if new_design %}new-design{% endif %}{% endblock %}
 
 {% load static wagtail_img_src feature_img_src %}
-{% load wagtailcore_tags wagtailembeds_tags %}
+{% load wagtailcore_tags wagtailembeds_tags wagtailmetadata_tags %}
 {% load expand %}
 {% load videojs %}
 {% load course_list %}
+
+{% block seohead %}
+    {% meta_tags page %}
+    {% if page.thumbnail_image %}
+      <meta property="og:image" content="{% feature_img_src page.thumbnail_image %}" />
+    {% endif %}
+{% endblock %}
 
 {% block title %}{{ page.title }} | {{ site_name }}{% endblock %}
 
@@ -121,7 +128,7 @@
               <h2>Prerequisites</h2>
               {{ page.prerequisites |richtext }}
               </section>{% endif %}
-  
+
             {% if instructors or page.faculty_members %}
             <section class="faculty-section" id="instructors">
               <div class="container">
@@ -154,15 +161,16 @@
             <section class="ofac-message border">
               <div class="container">
                 <h2>Who can take this course?</h2>
-      
+
                 <p>Because of U.S. Office of Foreign Assets Control (OFAC) restrictions and other U.S. federal regulations, learners residing in one or more of the following countries or regions will not be able to register for this course: Iran, Cuba, Syria, North Korea and the Crimea, Donetsk People's Republic and Luhansk People's Republic regions of Ukraine.</p>
               </div>
             </section>
-      
+
           </div>
         </div>
-        <div class="col order-md-2 order-1" id="product-info-box">
-          <div class="px-4 py-2 border align-items-center justify-items-top d-flex flex-column">
+       <div class="col order-md-2 order-1" id="product-info-box">
+        <div class="align-items-center justify-items-top d-flex flex-column product-info-box-container">
+
             <div class="hero-media">
               {% if page.video_url %}
                 {% videojs page %}
@@ -183,13 +191,6 @@
 
               <div class="w-100" id="productDetailEnrollment"></div>
             </div>
-
-            {% if page.is_course_page %}
-            <div class="stats-row">
-              <div class="w-100" id="upsellCard"></div>
-            </div>
-            {% endif %}
-          </div>
         </div>
 
         {% if instructors %}
@@ -215,7 +216,7 @@
                   <div class="col col-instructor-title flex-grow-1">
                     <h2>{{member.instructor_name}}</h2>
                     {% if member.instructor_title %}<h3>{{member.instructor_title}}</h3>{% endif %}
-      
+
                     <p>{{member.instructor_bio_short|safe}}</p>
                   </div>
                 </div>
@@ -228,7 +229,7 @@
                       {{ member.instructor_bio_short|safe}}
                     {% endif %}
                   </div>
-                </div>        
+                </div>
               </div>
             </div>
           </div>
@@ -236,6 +237,7 @@
         {% endfor %}
         {% endif %}
 
+      </div>
       </div>
     </section>
   </div>

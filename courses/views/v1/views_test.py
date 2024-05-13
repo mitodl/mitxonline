@@ -1,6 +1,7 @@
 """
 Tests for course views
 """
+
 # pylint: disable=unused-argument, redefined-outer-name, too-many-arguments
 import operator as op
 
@@ -26,11 +27,11 @@ from courses.models import (
 )
 from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,
-    CourseWithCourseRunsSerializer,
+    CourseRunSerializer,
     CourseRunWithCourseSerializer,
+    CourseWithCourseRunsSerializer,
 )
 from courses.serializers.v1.programs import ProgramSerializer
-from courses.serializers.v1.courses import CourseRunSerializer
 from courses.views.test_utils import (
     num_queries_from_course,
     num_queries_from_programs,
@@ -38,7 +39,6 @@ from courses.views.test_utils import (
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Order
-from fixtures.common import raise_nplusone
 from main import features
 from main.constants import (
     USER_MSG_COOKIE_NAME,
@@ -49,7 +49,6 @@ from main.constants import (
 from main.test_utils import assert_drf_json_equal, duplicate_queries_check
 from main.utils import encode_json_cookie_value
 from openedx.exceptions import NoEdxApiAuthError
-
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("raise_nplusone")]
 
@@ -201,7 +200,7 @@ def test_get_course(
 @pytest.mark.parametrize("course_catalog_program_count", [1], indirect=True)
 @pytest.mark.parametrize("program_is_live", [True, False])
 @pytest.mark.parametrize("program_page_is_live", [True, False])
-def test_get_course_by_readable_id(
+def test_get_course_by_readable_id(  # noqa: PLR0913
     user_drf_client,
     course_catalog_data,
     mock_context,
@@ -314,7 +313,7 @@ def test_get_course_runs(user_drf_client, course_runs, django_assert_max_num_que
 
 
 @pytest.mark.parametrize("is_enrolled", [True, False])
-def test_get_course_runs_relevant(
+def test_get_course_runs_relevant(  # noqa: PLR0913
     mocker,
     user_drf_client,
     course_runs,
@@ -505,17 +504,17 @@ def test_user_enrollments_create_invalid(user_drf_client, user):
         reverse("v1:user-enrollments-api-list"), data={"run_id": 1234}
     )
     assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert resp.json() == {"errors": {"run_id": f"Invalid course run id: 1234"}}
+    assert resp.json() == {"errors": {"run_id": "Invalid course run id: 1234"}}
 
 
 @pytest.mark.parametrize(
-    "deactivate_fail, exp_success, exp_status_code",
+    "deactivate_fail, exp_success, exp_status_code",  # noqa: PT006
     [
-        [False, True, status.HTTP_204_NO_CONTENT],
-        [True, False, status.HTTP_400_BAD_REQUEST],
+        [False, True, status.HTTP_204_NO_CONTENT],  # noqa: PT007
+        [True, False, status.HTTP_400_BAD_REQUEST],  # noqa: PT007
     ],
 )
-def test_user_enrollment_delete(
+def test_user_enrollment_delete(  # noqa: PLR0913
     mocker,
     settings,
     user_drf_client,
@@ -552,7 +551,7 @@ def test_user_enrollment_delete(
     )
     assert resp.status_code == exp_status_code
     final_enrollment = patched_deactivate.return_value
-    assert final_enrollment == None if deactivate_fail else inactive_enrollment
+    assert final_enrollment == None if deactivate_fail else inactive_enrollment  # noqa: E711
     if not deactivate_fail:
         assert final_enrollment.edx_emails_subscription is False
 
@@ -585,13 +584,13 @@ def test_create_enrollments(mocker, user_client, api_request, product_exists):
         "courses.views.v1.create_run_enrollments",
         return_value=(None, True),
     )
-    mock_fulfilled_order_filter = mocker.patch(
+    mock_fulfilled_order_filter = mocker.patch(  # noqa: F841
         "ecommerce.models.FulfilledOrder.objects.filter", return_value=None
     )
     run = CourseRunFactory.create()
     if product_exists:
         with reversion.create_revision():
-            product = ProductFactory.create(purchasable_object=run)
+            product = ProductFactory.create(purchasable_object=run)  # noqa: F841
     resp = user_client.post(
         reverse("create-enrollment-via-form"),
         data={"run": str(run.id), "isapi": "true"}
@@ -681,7 +680,7 @@ def test_create_enrollments_blocked_country(user_client, user):
 
 @pytest.mark.parametrize("receive_emails", [True, False])
 def test_update_user_enrollment(mocker, user_drf_client, user, receive_emails):
-    """the enrollment should update the course email subscriptions"""
+    """The enrollment should update the course email subscriptions"""
     run_enrollment = CourseRunEnrollmentFactory.create(user=user)
     fake_enrollment = {"fake": "enrollment"}
     patch_func = (
@@ -707,7 +706,7 @@ def test_update_user_enrollment(mocker, user_drf_client, user, receive_emails):
 def test_update_user_enrollment_failure(
     mocker, user_drf_client, user, receive_emails, exception_raised
 ):
-    """the enrollment update failure to the course email subscriptions"""
+    """The enrollment update failure to the course email subscriptions"""
     run_enrollment = CourseRunEnrollmentFactory.create(user=user)
     patch_func = (
         "subscribe_to_edx_course_emails"

@@ -2,26 +2,24 @@
 Course API Views version 2
 """
 
-from rest_framework import viewsets
-from rest_framework.pagination import PageNumberPagination
 import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
-from mitol.common.utils import now_in_utc
-from django.db.models import Prefetch, Q
+from rest_framework import viewsets
+from rest_framework.pagination import PageNumberPagination
 
 from courses.models import (
     Course,
-    CourseRun,
     Department,
     Program,
 )
-from courses.serializers.v2.programs import ProgramSerializer
 from courses.serializers.v2.courses import (
     CourseWithCourseRunsSerializer,
 )
 from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,
 )
+from courses.serializers.v2.programs import ProgramSerializer
+from courses.utils import get_enrollable_courses, get_unenrollable_courses
 
 
 class Pagination(PageNumberPagination):
@@ -63,39 +61,13 @@ class CourseFilterSet(django_filters.FilterSet):
         """
         courserun_is_enrollable filter to narrow down runs that are open for
         enrollments
+
+        Uses utility functions that are shared wtih other parts of the application
+        to keep the logic consistent
         """
-        now = now_in_utc()
-
-        if value is True:
-            enrollable_runs = CourseRun.objects.filter(
-                Q(live=True)
-                & Q(start_date__isnull=False)
-                & Q(enrollment_start__lt=now)
-                & (Q(enrollment_end=None) | Q(enrollment_end__gt=now))
-            )
-            return (
-                queryset.prefetch_related(
-                    Prefetch("courseruns", queryset=enrollable_runs),
-                )
-                .prefetch_related("courseruns__course")
-                .filter(courseruns__id__in=enrollable_runs.values_list("id", flat=True))
-                .distinct()
-            )
-
-        else:
-            unenrollable_runs = CourseRun.objects.filter(
-                Q(live=False) | Q(start_date__isnull=True) | Q(enrollment_end__lte=now)
-            )
-            return (
-                queryset.prefetch_related(
-                    Prefetch("courseruns", queryset=unenrollable_runs)
-                )
-                .prefetch_related("courseruns__course")
-                .filter(
-                    courseruns__id__in=unenrollable_runs.values_list("id", flat=True)
-                )
-                .distinct()
-            )
+        if value:
+            return get_enrollable_courses(queryset)
+        return get_unenrollable_courses(queryset)
 
     class Meta:
         model = Course

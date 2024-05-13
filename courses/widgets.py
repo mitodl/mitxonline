@@ -1,4 +1,5 @@
 """Widgets for course forms"""
+
 from django.forms.widgets import TextInput
 
 

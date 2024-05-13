@@ -5,7 +5,7 @@ import logging
 from collections import namedtuple
 from datetime import datetime, timedelta
 from traceback import format_exc
-from typing import List, Optional
+from typing import List, Optional  # noqa: UP035
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -31,6 +31,7 @@ from courses.models import (
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
+    PaidCourseRun,
     Program,
     ProgramCertificate,
     ProgramEnrollment,
@@ -62,7 +63,7 @@ from openedx.exceptions import (
 from users.models import User
 
 log = logging.getLogger(__name__)
-UserEnrollments = namedtuple(
+UserEnrollments = namedtuple(  # noqa: PYI024
     "UserEnrollments",
     [
         "programs",
@@ -75,7 +76,9 @@ UserEnrollments = namedtuple(
 
 
 def _relevant_course_qset_filter(
-    run_qset: QuerySet, user: Optional[User], now: Optional[datetime] = None
+    run_qset: QuerySet,
+    user: Optional[User],  # noqa: FA100
+    now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
     Does the actual filtering for user_relevant_course_run_qset and
@@ -119,7 +122,9 @@ def _relevant_course_qset_filter(
 
 
 def get_user_relevant_course_run_qset(
-    course: Course, user: Optional[User], now: Optional[datetime] = None
+    course: Course,
+    user: Optional[User],  # noqa: FA100
+    now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
     Returns a QuerySet of relevant course runs
@@ -130,7 +135,9 @@ def get_user_relevant_course_run_qset(
 
 
 def get_user_relevant_program_course_run_qset(
-    program: Program, user: Optional[User], now: Optional[datetime] = None
+    program: Program,
+    user: Optional[User],  # noqa: FA100
+    now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
     Returns a QuerySet of relevant course runs
@@ -145,7 +152,9 @@ def get_user_relevant_program_course_run_qset(
 
 
 def get_user_relevant_course_run(
-    course: Course, user: Optional[User], now: Optional[datetime] = None
+    course: Course,
+    user: Optional[User],  # noqa: FA100
+    now: Optional[datetime] = None,  # noqa: FA100
 ) -> CourseRun:
     """
     For a given Course, finds the course run that is the most relevant to the user.
@@ -154,7 +163,7 @@ def get_user_relevant_course_run(
     """
     runs = get_user_relevant_course_run_qset(course, user, now)
     run = first_or_none(runs)
-    return run
+    return run  # noqa: RET504
 
 
 def get_user_enrollments(user):
@@ -176,9 +185,7 @@ def get_user_enrollments(user):
     )
 
     all_course_run_programs = []  # all the programs that the course runs belong to
-    filtered_course_run_programs = (
-        []
-    )  # just the programs we don't have distinct ProgramEnrollments for
+    filtered_course_run_programs = []  # just the programs we don't have distinct ProgramEnrollments for
 
     for cre in course_run_enrollments:
         if cre.run.course.programs:
@@ -214,7 +221,7 @@ def get_user_enrollments(user):
             for program_enrollment in program_enrollments
         )
     )
-    program_course_ids = set(course[0].id for course in program_courses)
+    program_course_ids = set(course[0].id for course in program_courses)  # noqa: C401
     non_program_run_enrollments, program_run_enrollments = partition(
         course_run_enrollments,
         lambda course_run_enrollment: (
@@ -238,10 +245,11 @@ def get_user_enrollments(user):
     )
 
 
-def create_run_enrollments(
+def create_run_enrollments(  # noqa: C901
     user,
     runs,
     *,
+    change_status=None,
     keep_failed_enrollments=False,
     mode=EDX_DEFAULT_ENROLLMENT_MODE,
 ):
@@ -252,6 +260,7 @@ def create_run_enrollments(
     Args:
         user (User): The user to enroll
         runs (iterable of CourseRun): The course runs to enroll in
+        change_status (str): The status of the enrollment
         keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
             in the database even if the enrollment fails in edX.
         mode (str): The course mode
@@ -278,7 +287,7 @@ def create_run_enrollments(
             program_enrollment, _ = ProgramEnrollment.objects.get_or_create(
                 user=user,
                 program=program,
-                defaults=dict(
+                defaults=dict(  # noqa: C408
                     change_status=None,
                 ),
             )
@@ -314,8 +323,8 @@ def create_run_enrollments(
             enrollment, created = CourseRunEnrollment.all_objects.get_or_create(
                 user=user,
                 run=run,
-                defaults=dict(
-                    change_status=None,
+                defaults=dict(  # noqa: C408
+                    change_status=change_status,
                     edx_enrolled=edx_request_success,
                     enrollment_mode=mode,
                 ),
@@ -336,14 +345,13 @@ def create_run_enrollments(
                         enrollment.enrollment_mode = mode
                     enrollment.reactivate_and_save()
                     transaction.on_commit(send_enrollment_emails)
-        except:  # pylint: disable=bare-except
+        except:  # pylint: disable=bare-except  # noqa: PERF203, E722
             mail_api.send_enrollment_failure_message(user, run, details=format_exc())
             log.exception(
                 "Failed to create/update enrollment record (user: %s, run: %s)",
                 user,
                 run.courseware_id,
             )
-            pass
         else:
             successful_enrollments.append(enrollment)
             if enrollment.edx_enrolled:
@@ -371,7 +379,7 @@ def create_program_enrollments(user, programs):
             )
             if not created and not enrollment.active:
                 enrollment.reactivate_and_save()
-        except:  # pylint: disable=bare-except
+        except:  # pylint: disable=bare-except  # noqa: PERF203, E722
             mail_api.send_enrollment_failure_message(
                 user, program, details=format_exc()
             )
@@ -380,14 +388,15 @@ def create_program_enrollments(user, programs):
                 user,
                 program.readable_id,
             )
-            pass
         else:
             successful_enrollments.append(enrollment)
     return successful_enrollments
 
 
 def deactivate_run_enrollment(
-    run_enrollment, change_status, keep_failed_enrollments=False
+    run_enrollment,
+    change_status,
+    keep_failed_enrollments=False,  # noqa: FBT002
 ):
     """
     Helper method to deactivate a CourseRunEnrollment
@@ -440,7 +449,7 @@ def deactivate_run_enrollment(
 def deactivate_program_enrollment(
     program_enrollment,
     change_status,
-    keep_failed_enrollments=False,
+    keep_failed_enrollments=False,  # noqa: FBT002
 ):
     """
     Helper method to deactivate a ProgramEnrollment
@@ -463,7 +472,7 @@ def deactivate_program_enrollment(
             change_status=change_status,
             keep_failed_enrollments=keep_failed_enrollments,
         ):
-            deactivated_course_runs.append(run_enrollment)
+            deactivated_course_runs.append(run_enrollment)  # noqa: PERF401
 
     if deactivated_course_runs:
         program_enrollment.deactivate_and_save(change_status, no_user=True)
@@ -473,12 +482,12 @@ def deactivate_program_enrollment(
     return program_enrollment, deactivated_course_runs
 
 
-def defer_enrollment(
+def defer_enrollment(  # noqa: C901
     user,
     from_courseware_id,
     to_courseware_id,
-    keep_failed_enrollments=False,
-    force=False,
+    keep_failed_enrollments=False,  # noqa: FBT002
+    force=False,  # noqa: FBT002
 ):
     """
     Deactivates a user's existing enrollment in one course run and enrolls the user in another.
@@ -499,6 +508,10 @@ def defer_enrollment(
     from_enrollment = CourseRunEnrollment.all_objects.get(
         user=user, run__courseware_id=from_courseware_id
     )
+    downgraded_enrollments = []
+    already_deferred_from = (
+        from_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
+    )
     to_run = (
         CourseRun.objects.get(courseware_id=to_courseware_id)
         if to_courseware_id
@@ -509,72 +522,70 @@ def defer_enrollment(
         downgraded_enrollments, _ = create_run_enrollments(
             user=user,
             runs=[from_enrollment.run],
-            keep_failed_enrollments=True,
+            change_status=ENROLL_CHANGE_STATUS_DEFERRED,
+            keep_failed_enrollments=keep_failed_enrollments,
             mode=EDX_ENROLLMENT_AUDIT_MODE,
         )
         return downgraded_enrollments, None
 
     if not force and not from_enrollment.active:
         raise ValidationError(
-            "Cannot defer from inactive enrollment (id: {}, run: {}, user: {}). "
-            "Set force=True to defer anyway.".format(
-                from_enrollment.id, from_enrollment.run.courseware_id, user.email
-            )
+            f"Cannot defer from inactive enrollment (id: {from_enrollment.id}, run: {from_enrollment.run.courseware_id}, user: {user.email}). "  # noqa: EM102
+            "Set force=True to defer anyway."
         )
     if from_enrollment.run == to_run:
         raise ValidationError(
-            "Cannot defer to the same course run (run: {})".format(to_run.courseware_id)
+            f"Cannot defer to the same course run (run: {to_run.courseware_id})"  # noqa: EM102
         )
     if not force and not to_run.is_not_beyond_enrollment:
         raise ValidationError(
-            "Cannot defer to a course run that is outside of its enrollment period (run: {}).".format(
-                to_run.courseware_id
-            )
+            f"Cannot defer to a course run that is outside of its enrollment period (run: {to_run.courseware_id})."  # noqa: EM102
         )
     if not force and from_enrollment.run.course != to_run.course:
         raise ValidationError(
-            "Cannot defer to a course run of a different course ('{}' -> '{}'). "
-            "Set force=True to defer anyway.".format(
-                from_enrollment.run.course.title, to_run.course.title
-            )
+            f"Cannot defer to a course run of a different course ('{from_enrollment.run.course.title}' -> '{to_run.course.title}'). "  # noqa: EM102
+            "Set force=True to defer anyway."
         )
-    already_unenrolled_from = (
-        from_enrollment.change_status == ENROLL_CHANGE_STATUS_DEFERRED
-    )
-    if already_unenrolled_from:
+
+    if already_deferred_from:
         # check if user was already enrolled in verified track
         to_enrollments = CourseRunEnrollment.objects.filter(
             user=user, run=to_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
         ).first()
-        return from_enrollment, to_enrollments
+        if to_enrollments:
+            return from_enrollment, to_enrollments
 
     to_enrollments, enroll_success = create_run_enrollments(
-        user,
-        [to_run],
+        user=user,
+        runs=[to_run],
+        change_status=None,
         keep_failed_enrollments=keep_failed_enrollments,
         mode=EDX_ENROLLMENT_VERIFIED_MODE,
     )
     if not enroll_success and not keep_failed_enrollments:
-        raise Exception(
-            "Api call to enroll on edX was not successful for course run '{}'".format(
-                to_run
-            )
+        raise Exception(  # noqa: TRY002
+            f"Api call to enroll on edX was not successful for course run '{to_run}'"  # noqa: EM102
         )
-    if not already_unenrolled_from:
-        from_enrollment = deactivate_run_enrollment(
-            from_enrollment,
-            ENROLL_CHANGE_STATUS_DEFERRED,
+    if not already_deferred_from:
+        downgraded_enrollments, enroll_success = create_run_enrollments(
+            user=user,
+            runs=[from_enrollment.run],
+            change_status=ENROLL_CHANGE_STATUS_DEFERRED,
             keep_failed_enrollments=keep_failed_enrollments,
+            mode=EDX_ENROLLMENT_AUDIT_MODE,
         )
-        if from_enrollment is None:
-            raise Exception(
-                "Api call to deactivate enrollment on edX "
-                "was not successful for course run '{}'".format(from_courseware_id)
+        if not enroll_success and not keep_failed_enrollments:
+            raise Exception(  # noqa: TRY002
+                "Api call to change enrollment mode to audit on edX "  # noqa: EM102
+                f"was not successful for course run '{from_courseware_id}'"
             )
-    return from_enrollment, first_or_none(to_enrollments)
+    if PaidCourseRun.fulfilled_paid_course_run_exists(user, from_enrollment.run):
+        from_enrollment.change_payment_to_run(to_run)
+
+    return first_or_none(downgraded_enrollments), first_or_none(to_enrollments)
 
 
-def ensure_course_run_grade(user, course_run, edx_grade, should_update=False):
+def ensure_course_run_grade(user, course_run, edx_grade, should_update=False):  # noqa: FBT002
     """
     Ensure that the local grades repository has the grade for the User/CourseRun combination supplied.
 
@@ -645,17 +656,17 @@ def sync_course_runs(runs):
                 course_id=run.courseware_id,
                 username=settings.OPENEDX_SERVICE_WORKER_USERNAME,
             )
-        except HTTPError as e:
+        except HTTPError as e:  # noqa: PERF203
             failure_count += 1
             if e.response.status_code == HTTP_404_NOT_FOUND:
-                log.error(
+                log.error(  # noqa: TRY400
                     "Course not found on edX for readable id: %s", run.courseware_id
                 )
             else:
-                log.error("%s: %s", str(e), run.courseware_id)
-        except Exception as e:  # pylint: disable=broad-except
+                log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
+        except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
             failure_count += 1
-            log.error("%s: %s", str(e), run.courseware_id)
+            log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
         else:
             # Reset the expiration_date so it is calculated automatically and
             # does not raise a validation error now that the start or end date
@@ -684,15 +695,15 @@ def sync_course_runs(runs):
                 run.save()
                 success_count += 1
                 log.info("Updated course run: %s", run.courseware_id)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
                 # Report any validation or otherwise model errors
-                log.error("%s: %s", str(e), run.courseware_id)
+                log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
                 failure_count += 1
 
     return success_count, failure_count
 
 
-def sync_course_mode(runs: List[CourseRun]) -> List[str]:
+def sync_course_mode(runs: List[CourseRun]) -> List[str]:  # noqa: UP006
     """
     Updates course run upgrade expiration dates from Open edX
 
@@ -713,18 +724,18 @@ def sync_course_mode(runs: List[CourseRun]) -> List[str]:
             course_modes = api_client.get_mode(
                 course_id=run.courseware_id,
             )
-        except HTTPError as e:
+        except HTTPError as e:  # noqa: PERF203
             failure_count += 1
             if e.response.status_code == HTTP_404_NOT_FOUND:
-                log.error(
+                log.error(  # noqa: TRY400
                     "Course mode not found on edX for readable id: %s",
                     run.courseware_id,
                 )
             else:
-                log.error("%s: %s", str(e), run.courseware_id)
-        except Exception as e:  # pylint: disable=broad-except
+                log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
+        except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
             failure_count += 1
-            log.error("%s: %s", str(e), run.courseware_id)
+            log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
         else:
             for course_mode in course_modes:
                 if (
@@ -739,9 +750,9 @@ def sync_course_mode(runs: List[CourseRun]) -> List[str]:
                             "Updated upgrade deadline for course run: %s",
                             run.courseware_id,
                         )
-                    except Exception as e:  # pylint: disable=broad-except
+                    except Exception as e:  # pylint: disable=broad-except  # noqa: BLE001
                         # Report any validation or otherwise model errors
-                        log.error("%s: %s", str(e), run.courseware_id)
+                        log.error("%s: %s", str(e), run.courseware_id)  # noqa: TRY400
                         failure_count += 1
 
     return success_count, failure_count
@@ -760,7 +771,7 @@ def is_program_text_id(item_text_id):
     return item_text_id.startswith(PROGRAM_TEXT_ID_PREFIX)
 
 
-def process_course_run_grade_certificate(course_run_grade, should_force_create=False):
+def process_course_run_grade_certificate(course_run_grade, should_force_create=False):  # noqa: FBT002
     """
     Ensure that the course run certificate is in line with the values in the course run grade
 
@@ -789,10 +800,10 @@ def process_course_run_grade_certificate(course_run_grade, should_force_create=F
             certificate, created = CourseRunCertificate.objects.get_or_create(
                 user=user, course_run=course_run
             )
-            return certificate, created, False
+            return certificate, created, False  # noqa: TRY300
         except IntegrityError:
-            log.warn(
-                f"IntegrityError caught processing certificate for {course_run.courseware_id} for user {user} - certificate was likely already revoked."
+            log.warning(
+                f"IntegrityError caught processing certificate for {course_run.courseware_id} for user {user} - certificate was likely already revoked."  # noqa: G004
             )
 
     return None, False, False
@@ -813,7 +824,7 @@ def get_certificate_grade_eligible_runs(now):
             - timedelta(days=settings.CERTIFICATE_CREATION_WINDOW_IN_DAYS)
         )
     )
-    return course_runs
+    return course_runs  # noqa: RET504
 
 
 def generate_course_run_certificates():
@@ -868,7 +879,7 @@ def generate_course_run_certificates():
                     )
                     generated_certificates_count += 1
         log.info(
-            f"Finished processing course run {run}: created grades for {created_grades_count} users, updated grades for {updated_grades_count} users, generated certificates for {generated_certificates_count} users"
+            f"Finished processing course run {run}: created grades for {created_grades_count} users, updated grades for {updated_grades_count} users, generated certificates for {generated_certificates_count} users"  # noqa: G004
         )
 
 
@@ -905,7 +916,11 @@ def manage_course_run_certificate_access(user, courseware_id, revoke_state):
 
 
 def override_user_grade(
-    user, override_grade, letter_grade, courseware_id, should_force_pass=False
+    user,
+    override_grade,
+    letter_grade,
+    courseware_id,
+    should_force_pass=False,  # noqa: FBT002
 ):
     """Override grade for a user
 
@@ -921,10 +936,10 @@ def override_user_grade(
     """
 
     if not is_grade_valid(override_grade):
-        raise ValidationError("Invalid value for grade. Allowed range: 0.0 - 1.0")
+        raise ValidationError("Invalid value for grade. Allowed range: 0.0 - 1.0")  # noqa: EM101
 
     if not is_letter_grade_valid(letter_grade):
-        raise ValidationError("Invalid letter grade string. Allowed values: A-F")
+        raise ValidationError("Invalid letter grade string. Allowed values: A-F")  # noqa: EM101
 
     with transaction.atomic():
         course_run_grade = CourseRunGrade.objects.select_for_update().get(
@@ -962,7 +977,7 @@ def _has_earned_program_cert(user, program):
     root = ProgramRequirement.get_root_nodes().get(program=program)
 
     def _has_earned(node):
-        if node.is_root or node.is_all_of_operator:
+        if node.is_root or node.is_all_of_operator:  # noqa: RET503
             # has passed all of the child requirements
             return all(_has_earned(child) for child in node.get_children())
         elif node.is_min_number_of_operator:
@@ -977,7 +992,7 @@ def _has_earned_program_cert(user, program):
     return _has_earned(root)
 
 
-def generate_program_certificate(user, program, force_create=False):
+def generate_program_certificate(user, program, force_create=False):  # noqa: FBT002
     """
     Create a program certificate if the user has a course certificate
     for each course in the program. Also, It will create the

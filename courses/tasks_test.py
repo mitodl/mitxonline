@@ -1,14 +1,10 @@
 """Tests for Course related tasks"""
 
-from datetime import timedelta
-
 import pytest
-from mitol.common.utils.datetime import now_in_utc
 
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
-    CourseRunGradeFactory,
     LearnerProgramRecordShareFactory,
 )
 from courses.models import CourseRunEnrollment, PaidCourseRun
@@ -20,7 +16,6 @@ from courses.tasks import (
 )
 from ecommerce.factories import OrderFactory
 from ecommerce.models import Order
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = pytest.mark.django_db
 

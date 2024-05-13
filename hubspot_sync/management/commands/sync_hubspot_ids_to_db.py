@@ -1,8 +1,9 @@
 """
 Management command to sync hubspot ids to database
 """
+
 import sys
-from typing import List
+from typing import List  # noqa: UP035
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
@@ -17,9 +18,9 @@ from hubspot_sync.api import (
 from users.models import User
 
 
-def format_missing(missing: List[int]) -> str:
+def format_missing(missing: List[int]) -> str:  # noqa: UP006
     """Return a string of missing ids"""
-    return f"\n {','.join([str(id) for id in sorted(missing)])}\n\n"
+    return f"\n {','.join([str(id) for id in sorted(missing)])}\n\n"  # noqa: A001
 
 
 class Command(BaseCommand):
@@ -42,7 +43,7 @@ class Command(BaseCommand):
         ).values_list("username", flat=True)
         if not result and missing.count() > 0:
             sys.stderr.write(
-                f"Some users could not be matched with hubspot ids:\n {','.join([username for username in missing])}\n\n"
+                f"Some users could not be matched with hubspot ids:\n {','.join([username for username in missing])}\n\n"  # noqa: C416
             )
         else:
             sys.stdout.write("All users matched with hubspot ids\n\n")
@@ -126,7 +127,7 @@ class Command(BaseCommand):
             help="Sync all orders",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         sys.stdout.write("Syncing hubspot ids...\n")
         if not (
             options["sync_contacts"]

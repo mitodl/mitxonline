@@ -1,6 +1,112 @@
 Release Notes
 =============
 
+Version 0.92.1 (Released May 10, 2024)
+--------------
+
+- restrict duplicate enrollment only if user is verified (#2199)
+- add relational dates to ensure all courses end up getting pulled (#2200)
+
+Version 0.92.0 (Released May 09, 2024)
+--------------
+
+- Adding a Learn More link to Archived message (#2194)
+- Adding management command and function for pulling featured items (#2190)
+- Course format pacing info popup (#2187)
+- Remove redux-asserts (#2177)
+- Remove react-swipeable (#2178)
+- chore(deps): update all non-major dev-dependencies (#2171)
+- fix(deps): update dependency redux-asserts to v0.0.12 (#2168)
+
+Version 0.91.1 (Released May 06, 2024)
+--------------
+
+- 4137: mitx online course and program count on catalog page is incorrect in mobile view (#2186)
+- warning message (#2188)
+- Update duplicate enrollment meassage (#2184)
+- fix: Resolve Poetry lock file
+- fix: Resolve failing pre-commit check
+- fix: Resolve minor pre-commit fixes
+- chore(deps): lock file maintenance (#2185)
+- Pre commit linting (#2161)
+- Update dependency react-hot-loader to v4.13.1 (#2166)
+- Update dependency enzyme-adapter-react-16 to v1.15.8 (#2163)
+- Update poetry and yarn lock files (#2183)
+
+Version 0.91.0 (Released May 02, 2024)
+--------------
+
+- 4012: Improve screen reader accessibility of the site-wide banner. (#2180)
+- Add course format and new wording for course box info (#2175)
+- Update dependency object.entries to v1.1.8 (#2164)
+- Update dependency postcss to v8.4.38 (#2165)
+- Update dependency ubuntu to v22 (#2039)
+- Update dependency reselect to v4.1.8 (#2169)
+
+Version 0.90.1 (Released May 01, 2024)
+--------------
+
+- Updating the styles and adding test for course with no runs (#2172)
+- Update dependency style-loader to v3.3.4 (#2170)
+
+Version 0.90.0 (Released April 25, 2024)
+--------------
+
+- Adding end date info to the CourseInfoBox (#2160)
+- Update akhileshns/heroku-deploy digest to 581dd28 (#1196)
+- Course Product Page with no Runs (#2157)
+- Fix: Add nubbins for celery monitoring. (#2159)
+
+Version 0.89.2 (Released April 16, 2024)
+--------------
+
+- Fix catalog page for empty app (#2152)
+- Fix enrollment dialog default option (#2154)
+- Form error messages should appear consistently and be accessible  (#2151)
+- change route to catalog from root now that we have a catalog (#2155)
+- Ensure filteredPrograms is set earlier and change the route when navigation changes. (#2153)
+
+Version 0.89.1 (Released April 09, 2024)
+--------------
+
+- Enrollment request make sure not enrolled (#2149)
+- Deferrals: set to audit instead of unenrolling (#2146)
+
+Version 0.89.0 (Released April 04, 2024)
+--------------
+
+- Add URL routing for catalog for courses/programs and department (#2140)
+- 3005: adding a banner snippet in the header that appears on every page of the site (#2144)
+- fix(deps): update dependency express to v4.19.2 [security] (#2145)
+- 3649 all mitxonline courses should have a department (#2132)
+- Upgrade enrollment dialog fixes (#2141)
+- Showing Course rather than Courses (or program/s) when there is only 1 to display (#2139)
+- Distinguish change forms in account settings (#2142)
+- fix(deps): update dependency webpack-dev-middleware to v5.3.4 [security] (#2138)
+- Upgrade dialog choose any course run (#2124)
+
+Version 0.88.1 (Released March 20, 2024)
+--------------
+
+- Updates to ancillary pages (#2119)
+- remove extraneous console.log statement (#2131)
+- 1257: updating meta tags on mitx online site (#2128)
+
+Version 0.88.0 (Released March 20, 2024)
+--------------
+
+- Fetch by department when selected (#2120)
+
+Version 0.87.4 (Released March 18, 2024)
+--------------
+
+- 3360: on account registration redirect new users to the page they started on (#2127)
+
+Version 0.87.3 (Released March 13, 2024)
+--------------
+
+- 2846 Course About: Replace Free with Free to Learn (#2125)
+
 Version 0.87.2 (Released March 07, 2024)
 --------------
 

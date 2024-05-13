@@ -1,15 +1,16 @@
 """
 Signals for mitxonline course certificates
 """
+
 from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+from courses.api import generate_multiple_programs_certificate
 from courses.models import (
     CourseRunCertificate,
     Program,
 )
-from courses.api import generate_multiple_programs_certificate
 
 
 @receiver(
@@ -17,9 +18,7 @@ from courses.api import generate_multiple_programs_certificate
     sender=CourseRunCertificate,
     dispatch_uid="courseruncertificate_post_save",
 )
-def handle_create_course_run_certificate(
-    sender, instance, created, **kwargs
-):  # pylint: disable=unused-argument
+def handle_create_course_run_certificate(sender, instance, created, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
     """
     When a CourseRunCertificate model is created.
     """

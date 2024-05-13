@@ -154,68 +154,6 @@
 
 }
 
-.auth-form {
-  .form-control {
-    font-size: inherit;
-    font-weight: inherit;
-  }
-
-  .form-error {
-    font-size: 1rem;
-    font-weight: 400;
-  }
-
-  .errored {
-    border: 2px solid $red;
-  }
-
-  .submit-row {
-    margin-top: 25px;
-  }
-
-  .error-label {
-    color: red;
-  }
-
-  .col {
-    align-self: flex-start;
-  }
-
-  .form-control:focus {
-    border-color: $success;
-    box-shadow: 0 0 0 1px $success;
-  }
-
-  label {
-    font-weight: normal !important;
-    justify-content: space-between;
-
-    div {
-      font-weight: inherit !important;
-    }
-
-    .subtitle {
-      color: $label-subtitle;
-      font-size: 14px;
-    }
-  }
-
-  .required {
-    color: $brand-button-bg;
-  }
-
-  .label-secondary {
-    padding-top: 10px;
-    font-size: 14px;
-  }
-}
-
-.registration-page .auth-form {
-  .row-inner {
-    margin-top: 20px;
-  }
-}
-
 .additional-street {
   cursor: pointer;
   color: $light-blue;

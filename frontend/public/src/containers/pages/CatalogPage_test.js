@@ -131,8 +131,12 @@ const displayedProgram = {
       "http://mitxonline.odl.local:8013/static/images/mit-dome.png"
   },
   program_type: "Series",
-  departments:  ["Science"],
-  live:         true
+  departments:  [
+    {
+      name: "Science"
+    }
+  ],
+  live: true
 }
 
 describe("CatalogPage", function() {
@@ -170,27 +174,47 @@ describe("CatalogPage", function() {
           courses: {
             isPending: false,
             status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
           }
         },
         entities: {
           courses: {
             count:   1,
             results: courses
-          }
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            },
+            {
+              name:        "Science",
+              slug:        "science",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
         }
       },
       {}
     )
+
     inner.instance().componentDidUpdate({}, {})
     expect(inner.state().selectedDepartment).equals("All Departments")
     expect(inner.state().tabSelected).equals("courses")
+    inner.instance().componentDidUpdate({}, {})
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
     )
     expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
       JSON.stringify(courses)
     )
-    expect(inner.instance().renderNumberOfCatalogCourses()).equals(1)
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
   })
 
   it("updates state from changeSelectedTab when selecting program tab", async () => {
@@ -224,11 +248,13 @@ describe("CatalogPage", function() {
           departments: [
             {
               name:        "History",
+              slug:        "history",
               course_ids:  [],
               program_ids: [1, 2, 3, 4, 5]
             },
             {
               name:        "Science",
+              slug:        "science",
               course_ids:  [2],
               program_ids: []
             }
@@ -247,10 +273,38 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
       JSON.stringify(programs)
     )
-    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(5)
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(5)
   })
 
   it("renders catalog department filter for courses and programs tabs", async () => {
+    const allDepartments = {
+      name: "All Departments",
+      slug: "All Departments"
+    }
+    const department1 = {
+      name:        "department1",
+      slug:        "department1",
+      course_ids:  [1],
+      program_ids: []
+    }
+    const department2 = {
+      name:        "department2",
+      slug:        "department2",
+      course_ids:  [1],
+      program_ids: [1]
+    }
+    const department3 = {
+      name:        "department3",
+      slug:        "department3",
+      course_ids:  [],
+      program_ids: [1]
+    }
+    const department4 = {
+      name:        "department4",
+      slug:        "department4",
+      course_ids:  [],
+      program_ids: []
+    }
     const { inner } = await renderPage(
       {
         queries: {
@@ -260,28 +314,7 @@ describe("CatalogPage", function() {
           }
         },
         entities: {
-          departments: [
-            {
-              name:        "department1",
-              course_ids:  [1],
-              program_ids: []
-            },
-            {
-              name:        "department2",
-              course_ids:  [1],
-              program_ids: [1]
-            },
-            {
-              name:        "department3",
-              course_ids:  [],
-              program_ids: [1]
-            },
-            {
-              name:        "department4",
-              course_ids:  [],
-              program_ids: []
-            }
-          ]
+          departments: [department1, department2, department3, department4]
         }
       },
       {}
@@ -290,211 +323,26 @@ describe("CatalogPage", function() {
       .instance()
       .filterDepartmentsByTabName("courses")
     expect(JSON.stringify(filteredDepartments)).equals(
-      JSON.stringify(["All Departments", "department1", "department2"])
+      JSON.stringify([allDepartments, department1, department2])
     )
     filteredDepartments = inner
       .instance()
       .filterDepartmentsByTabName("programs")
     expect(JSON.stringify(filteredDepartments)).equals(
-      JSON.stringify(["All Departments", "department2", "department3"])
+      JSON.stringify([allDepartments, department2, department3])
     )
   })
 
   it("renders catalog courses when filtered by department", async () => {
     const course1 = JSON.parse(JSON.stringify(displayedCourse))
     course1.departments = [{ name: "Math" }]
+    course1.id = 1
     const course2 = JSON.parse(JSON.stringify(displayedCourse))
     course2.departments = [{ name: "Science" }]
+    course2.id = 2
     const course3 = JSON.parse(JSON.stringify(displayedCourse))
     course3.departments = [{ name: "Science" }]
-    courses = [course1, course2, course3]
-    const { inner } = await renderPage()
-    let coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .filteredCoursesBasedOnCourseRunCriteria("Math", courses)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-    coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .filteredCoursesBasedOnCourseRunCriteria("Science", courses)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(2)
-    coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .filteredCoursesBasedOnCourseRunCriteria("All Departments", courses)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(3)
-  })
-
-  it("renders no catalog courses if the course's pages are not live", async () => {
-    const course = JSON.parse(JSON.stringify(displayedCourse))
-    course.page.live = false
-    const { inner } = await renderPage()
-    const coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .filteredCoursesBasedOnCourseRunCriteria("All Departments", [course])
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(0)
-  })
-
-  it("renders no catalog courses if the course has no page", async () => {
-    const course = JSON.parse(JSON.stringify(displayedCourse))
-    delete course.page
-    const { inner } = await renderPage()
-    const coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .filteredCoursesBasedOnCourseRunCriteria("All Departments", [course])
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(0)
-  })
-
-  it("renders no catalog courses if the course has no associated course runs", async () => {
-    const course = JSON.parse(JSON.stringify(displayedCourse))
-    course.courseruns = []
-    const { inner } = await renderPage()
-    const coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .filteredCoursesBasedOnCourseRunCriteria("All Departments", [course])
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(0)
-  })
-
-  it("renders catalog programs when filtered by department", async () => {
-    const program1 = JSON.parse(JSON.stringify(displayedProgram))
-    program1.departments = ["Math"]
-    const program2 = JSON.parse(JSON.stringify(displayedProgram))
-    program2.departments = ["History"]
-    const program3 = JSON.parse(JSON.stringify(displayedProgram))
-    program3.departments = ["History"]
-    const { inner } = await renderPage()
-    programs = [program1, program2, program3]
-    let programsFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .filteredProgramsByDepartmentAndCriteria("Math", programs)
-    expect(programsFilteredByCriteriaAndDepartment.length).equals(1)
-    programsFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .filteredProgramsByDepartmentAndCriteria("History", programs)
-    expect(programsFilteredByCriteriaAndDepartment.length).equals(2)
-    programsFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .filteredProgramsByDepartmentAndCriteria("All Departments", programs)
-    expect(programsFilteredByCriteriaAndDepartment.length).equals(3)
-  })
-
-  it("renders no catalog courses if the course's associated course run is not live", async () => {
-    const courseRuns = JSON.parse(JSON.stringify(displayedCourse.courseruns))
-    const { inner } = await renderPage()
-    let coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-    courseRuns[0].live = false
-    coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(0)
-  })
-
-  it("renders no catalog courses if the course's associated course run has no start date", async () => {
-    const courseRuns = JSON.parse(JSON.stringify(displayedCourse.courseruns))
-    const { inner } = await renderPage()
-    let coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-    delete courseRuns[0].start_date
-    coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(0)
-  })
-
-  it("renders no catalog courses if the course's associated course run has no enrollment start date", async () => {
-    const courseRuns = JSON.parse(JSON.stringify(displayedCourse.courseruns))
-    const { inner } = await renderPage()
-    let coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-    delete courseRuns[0].enrollment_start
-    coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(0)
-  })
-
-  it("renders no catalog courses if the course's associated course run has an enrollment start date in the future", async () => {
-    const courseRuns = JSON.parse(JSON.stringify(displayedCourse.courseruns))
-    const { inner } = await renderPage()
-    let coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-    courseRuns[0].enrollment_start = moment().add(2, "M")
-    coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(0)
-  })
-
-  it("renders no catalog courses if the course's associated course run has an enrollment end date in the past", async () => {
-    const courseRuns = JSON.parse(JSON.stringify(displayedCourse.courseruns))
-    const { inner } = await renderPage()
-    let coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-    courseRuns[0].enrollment_end = moment().subtract(2, "M")
-    coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(0)
-  })
-
-  it("renders catalog courses if the course's associated course run has no enrollment end date", async () => {
-    const courseRuns = JSON.parse(JSON.stringify(displayedCourse.courseruns))
-    const { inner } = await renderPage()
-    let coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-    delete courseRuns[0].enrollment_end
-    coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-  })
-
-  it("renders catalog courses if the course's associated course run has an enrollment end date in the future", async () => {
-    const courseRuns = JSON.parse(JSON.stringify(displayedCourse.courseruns))
-    const { inner } = await renderPage()
-    let coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-    courseRuns[0].enrollment_end = moment().add(2, "M")
-    coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-  })
-
-  it("renders catalog courses if the course's associated course run has an enrollment start date in the past", async () => {
-    const courseRuns = JSON.parse(JSON.stringify(displayedCourse.courseruns))
-    const { inner } = await renderPage()
-    let coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-    courseRuns[0].enrollment_start = moment().subtract(2, "M")
-    coursesFilteredByCriteriaAndDepartment = inner
-      .instance()
-      .validateCoursesCourseRuns(courseRuns)
-    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
-  })
-
-  it("renders catalog courses based on selected department", async () => {
-    const course1 = JSON.parse(JSON.stringify(displayedCourse))
-    course1.departments = [{ name: "Math" }]
-    const course2 = JSON.parse(JSON.stringify(displayedCourse))
-    course2.departments = [{ name: "Math" }, { name: "History" }]
-    const course3 = JSON.parse(JSON.stringify(displayedCourse))
-    course3.departments = [{ name: "Math" }, { name: "History" }]
+    course3.id = 3
     courses = [course1, course2, course3]
     const { inner } = await renderPage(
       {
@@ -522,17 +370,229 @@ describe("CatalogPage", function() {
           },
           departments: [
             {
+              name:        "Science",
+              slug:        "science",
+              course_ids:  [1, 3],
+              program_ids: [2, 3]
+            },
+            {
+              name:        "Math",
+              slug:        "math",
+              course_ids:  [1],
+              program_ids: [1]
+            },
+            {
+              name:        "department4",
+              slug:        "department4",
+              course_ids:  [],
+              program_ids: []
+            }
+          ]
+        }
+      },
+      {}
+    )
+    inner.state().tabSelected = "courses"
+    inner.state().selectedDepartment = "math"
+    let coursesFilteredByCriteriaAndDepartment = inner
+      .instance()
+      .filteredCoursesOrProgramsByDepartmentSlug("math", courses, "courses")
+    expect(coursesFilteredByCriteriaAndDepartment.length).equals(1)
+    inner.state().selectedDepartment = "science"
+    coursesFilteredByCriteriaAndDepartment = inner
+      .instance()
+      .filteredCoursesOrProgramsByDepartmentSlug("science", courses, "courses")
+    expect(coursesFilteredByCriteriaAndDepartment.length).equals(2)
+    inner.state().selectedDepartment = "All Departments"
+    coursesFilteredByCriteriaAndDepartment = inner
+      .instance()
+      .filteredCoursesOrProgramsByDepartmentSlug(
+        "All Departments",
+        courses,
+        "courses"
+      )
+    expect(coursesFilteredByCriteriaAndDepartment.length).equals(3)
+  })
+
+  it("renders catalog programs when filtered by department", async () => {
+    const program1 = JSON.parse(JSON.stringify(displayedProgram))
+    program1.departments = ["Math"]
+    program1.id = 1
+    const program2 = JSON.parse(JSON.stringify(displayedProgram))
+    program2.departments = ["History"]
+    program2.id = 2
+    const program3 = JSON.parse(JSON.stringify(displayedProgram))
+    program3.departments = ["History"]
+    program3.id = 3
+    programs = [program1, program2, program3]
+    const { inner } = await renderPage({
+      queries: {
+        programs: {
+          isPending: false,
+          status:    200
+        },
+        departments: {
+          isPending: false,
+          status:    200
+        }
+      },
+      entities: {
+        programs: {
+          count:   3,
+          results: [program1, program2, program3]
+        },
+        departments: [
+          {
+            name:        "History",
+            slug:        "history",
+            course_ids:  [1, 2],
+            program_ids: [2, 3]
+          },
+          {
+            name:        "Math",
+            slug:        "math",
+            course_ids:  [1, 2, 3],
+            program_ids: [1]
+          },
+          {
+            name:        "department4",
+            slug:        "department4",
+            course_ids:  [],
+            program_ids: []
+          }
+        ]
+      }
+    })
+    inner.state().tabSelected = "programs"
+    inner.state().selectedDepartment = "math"
+    let programsFilteredByDepartment = inner
+      .instance()
+      .filteredCoursesOrProgramsByDepartmentSlug("math", programs, "programs")
+    expect(programsFilteredByDepartment.length).equals(1)
+    inner.state().selectedDepartment = "history"
+    programsFilteredByDepartment = inner
+      .instance()
+      .filteredCoursesOrProgramsByDepartmentSlug(
+        "history",
+        programs,
+        "programs"
+      )
+    expect(programsFilteredByDepartment.length).equals(2)
+    inner.state().selectedDepartment = "All Departments"
+    programsFilteredByDepartment = inner
+      .instance()
+      .filteredCoursesOrProgramsByDepartmentSlug(
+        "All Departments",
+        programs,
+        "programs"
+      )
+    expect(programsFilteredByDepartment.length).equals(3)
+  })
+
+  it("renders catalog course and program count based on selected department", async () => {
+    // The mobile catalog view displays both the course and program count at the same time.
+    // This test ensures that renderNumberOfCatalogItems can determine the course and program
+    // count.
+    courses = [displayedCourse]
+    programs = [displayedProgram]
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   3,
+            results: courses,
+            next:    "http://fake.com/api/courses/?page=2"
+          },
+          programs: {
+            count:   4,
+            results: programs,
+            next:    "http://fake.com/api/courses/?page=2"
+          },
+          departments: [
+            {
               name:        "History",
-              course_ids:  [1, 2],
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
+    inner.instance().componentDidUpdate({}, {})
+    // Number of catalog items should match the number of visible courses.
+    expect(inner.instance().renderNumberOfCatalogItems("courses")).equals(3)
+    expect(inner.instance().renderNumberOfCatalogItems("programs")).equals(4)
+  })
+
+  it("renders catalog courses based on selected department", async () => {
+    const course1 = JSON.parse(JSON.stringify(displayedCourse))
+    course1.departments = [{ name: "Math" }]
+    course1.id = 1
+    const course2 = JSON.parse(JSON.stringify(displayedCourse))
+    course2.departments = [{ name: "Math" }, { name: "History" }]
+    course2.id = 2
+    const course3 = JSON.parse(JSON.stringify(displayedCourse))
+    course3.departments = [{ name: "Math" }, { name: "History" }]
+    course3.id = 3
+    courses = [course1, course2, course3]
+    const program1 = JSON.parse(JSON.stringify(displayedProgram))
+    program1.departments = [{ name: "History" }]
+    program1.id = 1
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   3,
+            results: courses
+          },
+          programs: {
+            results: [program1]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [2, 3],
               program_ids: [1]
             },
             {
               name:        "Math",
+              slug:        "math",
               course_ids:  [1, 2, 3],
               program_ids: []
             },
             {
               name:        "department4",
+              slug:        "department4",
               course_ids:  [],
               program_ids: []
             }
@@ -554,14 +614,15 @@ describe("CatalogPage", function() {
       JSON.stringify(courses)
     )
     // Number of catalog items should match the number of visible courses.
-    expect(inner.instance().renderNumberOfCatalogCourses()).equals(3)
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(3)
 
     // Select a department to filter by.
-    inner.instance().changeSelectedDepartment("History", "courses")
+    inner.instance().changeSelectedDepartment("history", "courses")
     // Confirm the state updated to reflect the selected department.
-    expect(inner.state().selectedDepartment).equals("History")
+    expect(inner.state().selectedDepartment).equals("history")
+    expect(inner.state().tabSelected).equals("courses")
     // Confirm the number of catalog items updated to reflect the items filtered by department.
-    expect(inner.instance().renderNumberOfCatalogCourses()).equals(2)
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
     // Confirm the courses filtered are those which have a department name matching the selected department.
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify([course2, course3])
@@ -572,8 +633,9 @@ describe("CatalogPage", function() {
 
     // Change to the programs tab.
     inner.instance().changeSelectedTab("programs")
+    expect(inner.state().tabSelected).equals("programs")
     // Confirm that the selected department is the same as before.
-    expect(inner.state().selectedDepartment).equals("History")
+    expect(inner.state().selectedDepartment).equals("history")
 
     // Change back to the courses tab.
     inner.instance().changeSelectedTab("courses")
@@ -612,7 +674,10 @@ describe("CatalogPage", function() {
       },
       {}
     )
+
+    expect(inner.state().courseQueryPage).equals(1)
     inner.instance().componentDidUpdate({}, {})
+    inner.state().courseQueryPage = 2
     expect(inner.state().selectedDepartment).equals("All Departments")
     expect(inner.state().tabSelected).equals("courses")
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
@@ -622,19 +687,21 @@ describe("CatalogPage", function() {
       JSON.stringify(courses)
     )
     // one shows visually, but the total is 2
-    expect(inner.instance().renderNumberOfCatalogCourses()).equals(2)
-    expect(inner.state().courseQueryPage).equals(1)
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
+    const course2 = JSON.parse(JSON.stringify(displayedCourse))
+    course2.id = 3
+    course2.departments = [{ name: "Math" }, { name: "History" }]
 
     // Mock the second page of course API results.
     helper.handleRequestStub.returns({
       body: {
         next:    null,
-        results: courses
+        results: [course2]
       }
     })
-
     // Simulate the user reaching the bottom of the catalog page.
     const entry = [{ isIntersecting: true }]
+
     await inner.instance().bottomOfLoadedCatalogCallback(entry)
 
     sinon.assert.calledWith(
@@ -645,13 +712,7 @@ describe("CatalogPage", function() {
 
     // Should expect 2 courses to be visually displayed in the catalog now. Total count should stay 2.
     expect(inner.state().courseQueryPage).equals(2)
-    expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
-      JSON.stringify([displayedCourse, displayedCourse])
-    )
-    expect(JSON.stringify(inner.state().filteredCourses)).equals(
-      JSON.stringify([displayedCourse, displayedCourse])
-    )
-    expect(inner.instance().renderNumberOfCatalogCourses()).equals(2)
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(2)
   })
 
   it("do not load more at the bottom of the courses catalog page if next page is null", async () => {
@@ -692,7 +753,7 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().allCoursesRetrieved)).equals(
       JSON.stringify(courses)
     )
-    expect(inner.instance().renderNumberOfCatalogCourses()).equals(1)
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
     expect(inner.state().courseQueryPage).equals(1)
 
     // Simulate the user reaching the bottom of the catalog page.
@@ -707,7 +768,7 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
     )
-    expect(inner.instance().renderNumberOfCatalogCourses()).equals(1)
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
   })
 
   it("do not load more at the bottom of the courses catalog page if isLoadingMoreItems is true", async () => {
@@ -745,7 +806,7 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
     )
-    expect(inner.instance().renderNumberOfCatalogCourses()).equals(1)
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
     expect(inner.state().courseQueryPage).equals(1)
 
     // Simulate the user reaching the bottom of the catalog page.
@@ -753,7 +814,7 @@ describe("CatalogPage", function() {
 
     // Set isLoadingMoreItems to true which simualtes that the next page
     // request is already in progress.
-    inner.instance().setState({ isLoadingMoreItems: true })
+    inner.state().isLoadingMoreItems = true
     await inner.instance().bottomOfLoadedCatalogCallback(entry)
 
     // Should not expect any additional courses.
@@ -764,7 +825,7 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().filteredCourses)).equals(
       JSON.stringify(courses)
     )
-    expect(inner.instance().renderNumberOfCatalogCourses()).equals(1)
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(1)
   })
 
   it("load more at the bottom of the programs catalog page, all departments filter", async () => {
@@ -793,7 +854,7 @@ describe("CatalogPage", function() {
             next:    "http://fake.com/api/courses/?page=2"
           },
           programs: {
-            count:   2,
+            count:   4,
             results: programs,
             next:    "http://fake.com/api/courses/?page=2"
           },
@@ -820,18 +881,12 @@ describe("CatalogPage", function() {
     expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
       JSON.stringify(programs)
     )
-    // While there is only one showing, there are still 2 total. The total should be shown.
-    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(2)
-    expect(inner.state().programQueryPage).equals(1)
+    // While there is only one showing, there are still 4 total per the count. The total should be shown.
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(4)
 
-    // Mock the second page of program API results.
-    helper.handleRequestStub.returns({
-      body: {
-        next:    null,
-        results: programs,
-        count:   2
-      }
-    })
+    // simulate the state variables changing correctly since the shallow render doesn't actually change the state
+    inner.state().programQueryPage = 2
+    inner.state().isLoadingMoreItems = false
 
     // Simulate the user reaching the bottom of the catalog page.
     const entry = [{ isIntersecting: true }]
@@ -843,16 +898,233 @@ describe("CatalogPage", function() {
       "GET"
     )
 
-    // Should expect 2 courses to be displayed in the catalog now.
-    expect(inner.state().programQueryPage).equals(2)
-    expect(JSON.stringify(inner.state().allProgramsRetrieved)).equals(
-      JSON.stringify([displayedProgram, displayedProgram])
-    )
-    expect(JSON.stringify(inner.state().filteredPrograms)).equals(
-      JSON.stringify([displayedProgram, displayedProgram])
-    )
+    // The count should still be 4 regardless of how many are added or not, since the highest provided count was 4.
+    expect(inner.instance().renderNumberOfCatalogItems()).equals(4)
+  })
 
-    // This should still be 2 because we haven't changed the filter - no matter if one or two have loaded, there are 2
-    expect(inner.instance().renderNumberOfCatalogPrograms()).equals(2)
+  it("mergeCourseOrProgramArrays removes duplicates if present", async () => {
+    const oldArray = [displayedProgram]
+    const newArray = [displayedProgram]
+    const { inner } = await renderPage()
+    const mergedArray = inner
+      .instance()
+      .mergeCourseOrProgramArrays(oldArray, newArray)
+    expect(mergedArray.length).equals(1)
+    expect(JSON.stringify(mergedArray)).equals(JSON.stringify(oldArray))
+  })
+
+  it("mergeCourseOrProgramArrays merges objects if they are not duplicates", async () => {
+    const oldArray = [displayedProgram]
+    const newProgram = JSON.parse(JSON.stringify(displayedProgram))
+    newProgram.id = 3
+    const newArray = [newProgram]
+    const { inner } = await renderPage()
+    const mergedArray = inner
+      .instance()
+      .mergeCourseOrProgramArrays(oldArray, newArray)
+    expect(mergedArray.length).equals(2)
+    expect(JSON.stringify(mergedArray)).equals(
+      JSON.stringify([displayedProgram, newProgram])
+    )
+  })
+
+  it("mergeCourseOrProgramArrays keeps items with different IDs and removes duplicates", async () => {
+    const oldArray = [displayedProgram]
+    const newProgram = JSON.parse(JSON.stringify(displayedProgram))
+    newProgram.id = 3
+    const newArray = [newProgram, displayedProgram, displayedProgram]
+    const { inner } = await renderPage()
+    const mergedArray = inner
+      .instance()
+      .mergeCourseOrProgramArrays(oldArray, newArray)
+    expect(mergedArray.length).equals(2)
+    expect(JSON.stringify(mergedArray)).equals(
+      JSON.stringify([displayedProgram, newProgram])
+    )
+  })
+
+  it("renderCatalogCount is plural for more than one course", async () => {
+    const displayedProgram2 = JSON.parse(JSON.stringify(displayedProgram))
+    displayedProgram2.id = 2
+    const displayedCourse2 = JSON.parse(JSON.stringify(displayedCourse))
+    displayedCourse2.id = 2
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   2,
+            results: [displayedCourse, displayedCourse2]
+          },
+          programs: {
+            count:   2,
+            results: [displayedProgram, displayedProgram2]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
+    inner.setState({ tabSelected: "courses" })
+    inner.setState({ selectedDepartment: "All Departments" })
+    inner.setState({ allCoursesCount: 2 })
+    expect(inner.find("h2.catalog-count").text()).equals("2 courses")
+  })
+
+  it("renderCatalogCount is plural for more than one program", async () => {
+    const displayedProgram2 = JSON.parse(JSON.stringify(displayedProgram))
+    displayedProgram2.id = 2
+    const displayedCourse2 = JSON.parse(JSON.stringify(displayedCourse))
+    displayedCourse2.id = 2
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   2,
+            results: [displayedCourse, displayedCourse2]
+          },
+          programs: {
+            count:   2,
+            results: [displayedProgram, displayedProgram2]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
+    inner.setState({ tabSelected: "programs" })
+    inner.setState({ selectedDepartment: "All Departments" })
+    inner.setState({ allProgramsCount: 2 })
+    expect(inner.find("h2.catalog-count").text()).equals("2 programs")
+  })
+
+  it("renderCatalogCount is singular for one course", async () => {
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   1,
+            results: [displayedCourse]
+          },
+          programs: {
+            count:   1,
+            results: [displayedProgram]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
+    inner.setState({ tabSelected: "courses" })
+    inner.setState({ selectedDepartment: "All Departments" })
+    inner.setState({ allCoursesCount: 1 })
+    expect(inner.find("h2.catalog-count").text()).equals("1 course")
+  })
+
+  it("renderCatalogCount is singular for one program", async () => {
+    const { inner } = await renderPage(
+      {
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          },
+          programs: {
+            isPending: false,
+            status:    200
+          },
+          departments: {
+            isPending: false,
+            status:    200
+          }
+        },
+        entities: {
+          courses: {
+            count:   1,
+            results: [displayedCourse]
+          },
+          programs: {
+            count:   1,
+            results: [displayedProgram]
+          },
+          departments: [
+            {
+              name:        "History",
+              slug:        "history",
+              course_ids:  [1],
+              program_ids: [1]
+            }
+          ]
+        }
+      },
+      {}
+    )
+    inner.setState({ tabSelected: "programs" })
+    inner.setState({ selectedDepartment: "All Departments" })
+    inner.setState({ allProgramsCount: 1 })
+    inner.instance().componentDidUpdate({}, {})
+    expect(inner.find("h2.catalog-count").text()).equals("1 program")
   })
 })

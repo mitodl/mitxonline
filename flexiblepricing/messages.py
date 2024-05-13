@@ -1,4 +1,5 @@
-""" flexible price status change email messages """
+"""flexible price status change email messages"""
+
 from mitol.mail.messages import TemplatedMessage
 
 

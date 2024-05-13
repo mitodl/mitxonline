@@ -1,9 +1,55 @@
 table.order-history-table {
-  margin-top: .5em;
   width: 100%;
 
   td, th {
-    padding: 15px;
+    font-size: 16px;
+    line-height: 26px;
     vertical-align: bottom;
   }
+
+  tbody tr {
+    border-bottom: 1px solid $home-page-border-grey;
+  }
+
+  tfoot tr {
+    border: 0;
+
+    td:first-child {
+      font-weight: 700;
+    }
+
+    td.pagination-controls a {
+      text-decoration: underline;
+    }
+  }
+
+  tr td, tr th {
+    padding: 20px 0;
+  }
+
+  tr td:first-child, tr th:first-child {
+    padding-left: 15px;
+    font-weight: 400;
+  }
+
+  tr td:last-child, tr th:last-child {
+    padding-right: 15px;
+  }
+
+  thead tr th {
+    padding-top: 0;
+  }
+
+  tfoot tr td {
+    padding-bottom: 0;
+  }
+
+  tfoot tr td:first-child {
+    padding-left: 0;
+  }
+
+  tfoot tr td:last-child {
+    padding-right: 0;
+  }
+
 }

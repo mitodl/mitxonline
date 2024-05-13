@@ -1,7 +1,6 @@
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 
 from flexiblepricing.api import import_country_income_thresholds
-from flexiblepricing.models import CountryIncomeThreshold
 
 
 class Command(BaseCommand):
@@ -15,6 +14,6 @@ class Command(BaseCommand):
         """Handle arguments"""
         parser.add_argument("csv_path", type=str, help="path to the csv")
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         """Import a csv of country income thresholds"""
         import_country_income_thresholds(options["csv_path"])

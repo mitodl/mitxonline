@@ -2,8 +2,7 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework import serializers
 
 from courses.models import Course, Program
-from courses.serializers.v1.base import BaseCourseSerializer
-from courses.serializers.v1.base import BaseProgramSerializer
+from courses.serializers.v1.base import BaseCourseSerializer, BaseProgramSerializer
 from ecommerce.models import Discount
 from ecommerce.serializers import DiscountSerializer
 from flexiblepricing import models
@@ -201,7 +200,7 @@ class FlexiblePriceCoursewareAdminSerializer(serializers.ModelSerializer):
         program_content_type = ContentType.objects.get(
             app_label="courses", model="program"
         ).id
-        if instance["courseware_content_type"] == course_content_type:
+        if instance["courseware_content_type"] == course_content_type:  # noqa: RET503
             return BaseCourseSerializer(
                 Course.objects.filter(id=instance["courseware_object_id"]).first()
             ).data

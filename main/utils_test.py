@@ -1,4 +1,5 @@
 """Utils tests"""
+
 from datetime import datetime
 
 import pytest
@@ -75,5 +76,5 @@ def test_parse_supplied_data():
     assert successful_return.day == 1
     assert successful_return.tzinfo == pytz.timezone(TIME_ZONE)
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017, PT011
         parse_supplied_date("this date isn't a date at all")

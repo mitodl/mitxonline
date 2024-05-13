@@ -17,7 +17,6 @@ def remove_legal_addresses(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [("users", "0002_add_legal_address")]
 
     operations = [migrations.RunPython(add_legal_addresses, remove_legal_addresses)]

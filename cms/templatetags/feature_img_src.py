@@ -1,8 +1,9 @@
 """Custom Wagtail templatetags"""
+
 from django import template
+from django.templatetags.static import static
 
 from cms.api import get_wagtail_img_src
-from django.templatetags.static import static
 from courses.constants import DEFAULT_COURSE_IMG_PATH
 
 register = template.Library()

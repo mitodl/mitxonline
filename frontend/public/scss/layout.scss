@@ -38,12 +38,14 @@
 @import "product-page/product-faculty-members";
 @import "home-page/home-page-contact-row";
 @import "product-page/program-courses.scss";
+@import "cards.scss";
+@import "banner";
 
 body {
   font-family: "Montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
   margin: 0;
   color: #000000;
-  background: #f5f5f5;
+  background: $body-bg;
   display: flex;
   min-height: 100vh;
   flex-direction: column;

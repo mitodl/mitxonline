@@ -9,9 +9,11 @@ import { connect } from "react-redux"
 import { mutateAsync, requestAsync } from "redux-query"
 import { connectRequest } from "redux-query-react"
 import { createStructuredSelector } from "reselect"
+import { routes } from "../../../lib/urls"
+
+import { qsNextSelector } from "../../../lib/selectors"
 
 import users, { currentUserSelector } from "../../../lib/queries/users"
-import { routes } from "../../../lib/urls"
 import queries from "../../../lib/queries"
 
 import {
@@ -32,10 +34,11 @@ type DispatchProps = {|
   getCurrentUser: () => Promise<HttpResponse<User>>
 |}
 
-type Props = {|
+type Props = {
+  params: { next: string },
   ...StateProps,
   ...DispatchProps
-|}
+}
 
 const getInitialValues = (user: User) => ({
   name:          user.name,
@@ -46,7 +49,10 @@ const getInitialValues = (user: User) => ({
 
 export class RegisterAdditionalDetailsPage extends React.Component<Props> {
   async onSubmit(detailsData: any, { setSubmitting, setErrors }: any) {
-    const { editProfile } = this.props
+    const {
+      editProfile,
+      params: { next }
+    } = this.props
 
     // On this page, if the user selects stuff for learner type and education
     // level, we also set the field flag so we don't ping the learner later to
@@ -63,14 +69,15 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
     }
 
     try {
-      const {
-        body: { errors }
-      }: { body: Object } = await editProfile(detailsData)
-
-      if (errors && errors.length > 0) {
-        setErrors(errors)
+      const { body }: { body: Object } = await editProfile(detailsData)
+      if (body.errors && body.errors.length > 0) {
+        setErrors(body.errors)
       } else {
-        window.location = routes.dashboard
+        if (next) {
+          window.location = next
+        } else {
+          window.location = routes.dashboard
+        }
       }
     } finally {
       setSubmitting(false)
@@ -85,47 +92,42 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
         title={`${SETTINGS.site_name} | ${REGISTER_EXTRA_DETAILS_PAGE_TITLE}`}
       >
         <div className="std-page-body container auth-page registration-page">
-          <div className="auth-card card-shadow auth-form">
-            <div className="auth-header">
-              <h1>About You</h1>
-            </div>
-            <div className="form-group">
-              Please tell us a bit about yourself. The data you provide here
-              will assist us in our research pursuits. All fields are optional.
-            </div>
-            <hr className="hr-class-margin" />
-            <div className="auth-form">
-              <Formik
-                onSubmit={this.onSubmit.bind(this)}
-                validationSchema={addlProfileFieldsValidation}
-                initialValues={getInitialValues(currentUser)}
-                render={({
-                  isSubmitting,
-                  setFieldValue,
-                  setFieldTouched,
-                  values
-                }) => (
-                  <Form>
-                    <AddlProfileFields
-                      setFieldValue={setFieldValue}
-                      setFieldTouched={setFieldTouched}
-                      values={values}
-                      isNewAccount={false}
-                    />
-                    <div className="row submit-row no-gutters">
-                      <div className="col d-flex justify-content-end">
-                        <button
-                          type="submit"
-                          className="btn btn-primary"
-                          disabled={isSubmitting}
-                        >
-                          Submit
-                        </button>
-                      </div>
-                    </div>
-                  </Form>
-                )}
-              />
+          <div className="std-card std-card-auth">
+            <div className="std-card-body">
+              <h2>About You</h2>
+              <div className="form-group">
+                Please tell us a bit about yourself. The data you provide here
+                will assist us in our research pursuits. All fields are
+                optional.
+              </div>
+              <hr className="hr-class-margin" />
+              <div className="auth-form">
+                <Formik
+                  onSubmit={this.onSubmit.bind(this)}
+                  validationSchema={addlProfileFieldsValidation}
+                  initialValues={getInitialValues(currentUser)}
+                >
+                  {({ isSubmitting, values }) => {
+                    return (
+                      <Form>
+                        <AddlProfileFields
+                          values={values}
+                          isNewAccount={false}
+                        />
+                        <div className="submit-row">
+                          <button
+                            type="submit"
+                            className="btn btn-primary btn-gradient-red-to-blue"
+                            disabled={isSubmitting}
+                          >
+                            Submit
+                          </button>
+                        </div>
+                      </Form>
+                    )
+                  }}
+                </Formik>
+              </div>
             </div>
           </div>
         </div>
@@ -135,7 +137,10 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
 }
 
 const mapStateToProps = createStructuredSelector({
-  currentUser: currentUserSelector
+  currentUser: currentUserSelector,
+  params:      createStructuredSelector({
+    next: qsNextSelector
+  })
 })
 
 const mapPropsToConfig = () => [queries.users.countriesQuery()]

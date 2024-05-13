@@ -33,12 +33,17 @@ export class EnrolledCourseList extends React.Component<EnrolledCourseListProps>
         this.renderEnrolledItemCard(enrollment)
       )
     ) : (
-      <div className="card no-enrollments p-3 p-md-5 rounded-0">
-        <h2>Enroll Now</h2>
-        <p>
-          You are not enrolled in any courses yet. Please{" "}
-          <a href={routes.root}>browse our courses</a>.
-        </p>
+      <div className="no-enrollments std-card">
+        <div className="std-card-body">
+          <h2>Enroll Now</h2>
+          <p>
+            You are not enrolled in any courses yet. Please{" "}
+            <a className="fw-bold" href={routes.catalog}>
+              browse our courses
+            </a>
+            .
+          </p>
+        </div>
       </div>
     )
   }

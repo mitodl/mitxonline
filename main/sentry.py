@@ -1,4 +1,5 @@
 """Sentry setup and configuration"""
+
 import sentry_sdk
 from celery.exceptions import WorkerLostError
 from sentry_sdk.integrations.celery import CeleryIntegration
@@ -29,7 +30,7 @@ def before_send(event, hint):
     return event
 
 
-def init_sentry(
+def init_sentry(  # noqa: PLR0913
     *, dsn, environment, version, send_default_pii, log_level, heroku_app_name
 ):
     """

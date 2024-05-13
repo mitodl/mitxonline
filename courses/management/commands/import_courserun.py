@@ -27,7 +27,7 @@ from django.core.management import BaseCommand
 from django_countries import countries
 
 from cms.api import create_default_courseware_page
-from courses.models import BlockedCountry, Course, CourseRun, Program
+from courses.models import BlockedCountry, Course, CourseRun, Department, Program
 from ecommerce.models import Product
 from openedx.api import get_edx_api_course_detail_client
 
@@ -87,7 +87,16 @@ class Command(BaseCommand):
             nargs="?",
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+        parser.add_argument(
+            "-d",
+            "--dept",
+            "--department",
+            help="Specify department(s) assigned to the course object.  If program is specified, all courses associated with the program and imported will have the same department.",
+            action="append",
+            dest="depts",
+        )
+
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915
         edx_course_detail = get_edx_api_course_detail_client()
         edx_courses = []
 
@@ -95,22 +104,6 @@ class Command(BaseCommand):
             content_type = ContentType.objects.filter(
                 app_label="courses", model="courserun"
             ).get()
-
-        program = None
-
-        if kwargs["program"] is not None:
-            try:
-                if kwargs["program"].isnumeric():
-                    program = Program.objects.filter(pk=kwargs["program"]).get()
-                else:
-                    program = Program.objects.filter(
-                        readable_id=kwargs["program"]
-                    ).get()
-            except:
-                self.stdout.write(
-                    self.style.ERROR(f"Program {kwargs['program']} not found.")
-                )
-                return False
 
         if kwargs["courserun"] is not None:
             try:
@@ -121,7 +114,7 @@ class Command(BaseCommand):
 
                 if course is not None:
                     edx_courses.append(course)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.stdout.write(
                     self.style.ERROR(
                         f"Could not retrieve data for {kwargs['courserun']}: {e}"
@@ -129,7 +122,19 @@ class Command(BaseCommand):
                 )
                 return False
         elif kwargs["program"] is not None and kwargs["run_tag"] is not None:
-            for course, title in program.courses:
+            try:
+                if kwargs["program"].isnumeric():
+                    program = Program.objects.filter(pk=kwargs["program"]).get()
+                else:
+                    program = Program.objects.filter(
+                        readable_id=kwargs["program"]
+                    ).get()
+            except:  # noqa: E722
+                self.stdout.write(
+                    self.style.ERROR(f"Program {kwargs['program']} not found.")
+                )
+                return False
+            for course, title in program.courses:  # noqa: B007
                 if course.courseruns.filter(run_tag=kwargs["run_tag"]).count() == 0:
                     try:
                         edx_course = edx_course_detail.get_detail(
@@ -139,7 +144,7 @@ class Command(BaseCommand):
 
                         if edx_course is not None:
                             edx_courses.append(edx_course)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         self.stdout.write(
                             self.style.ERROR(
                                 f"Could not retrieve data for {course.readable_id}+{kwargs['run_tag']}, skipping it: {e}"
@@ -157,113 +162,117 @@ class Command(BaseCommand):
         for edx_course in edx_courses:
             courserun_tag = edx_course.course_id.split("+")[-1]
             course_readable_id = edx_course.course_id.removesuffix(f"+{courserun_tag}")
+            course = Course.objects.filter(readable_id=course_readable_id)
+            if kwargs["depts"] and len(kwargs["depts"]) > 0:
+                add_depts = Department.objects.filter(name__in=kwargs["depts"]).all()
 
-            try:
-                (course, created) = Course.objects.get_or_create(
-                    readable_id=course_readable_id,
-                    defaults={
-                        "title": edx_course.name,
-                        "readable_id": course_readable_id,
-                        "live": kwargs["live"],
-                    },
-                )
-
-                if created:
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"Created course for {course_readable_id}: {course}"
-                        )
-                    )
-
-                new_run = CourseRun.objects.create(
-                    course=course,
-                    run_tag=courserun_tag,
-                    courseware_id=edx_course.course_id,
-                    start_date=edx_course.start,
-                    end_date=edx_course.end,
-                    enrollment_start=edx_course.enrollment_start,
-                    enrollment_end=edx_course.enrollment_end,
-                    title=edx_course.name,
-                    live=kwargs["live"],
-                    is_self_paced=edx_course.is_self_paced(),
-                    courseware_url_path=parse.urljoin(
-                        settings.OPENEDX_API_BASE_URL,
-                        f"/courses/{edx_course.course_id}/course",
-                    ),
-                )
-
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Created course run for {edx_course.course_id}: id {new_run.id}"
-                    )
-                )
-                success_count += 1
-
-                if kwargs["create_cms_page"]:
-                    try:
-                        create_default_courseware_page(
-                            new_run.course, live=kwargs["live"]
-                        )
-                        self.stdout.write(
-                            self.style.SUCCESS(
-                                f"Created CMS page for {new_run.course.readable_id}"
-                            )
-                        )
-                    except Exception as e:
-                        self.stdout.write(
-                            self.style.ERROR(
-                                f"Could not create CMS page {new_run.course.readable_id}, skipping it: {e}"
-                            )
-                        )
-
-                if kwargs["price"] and kwargs["price"].isnumeric():
-                    with reversion.create_revision():
-                        (course_product, created) = Product.objects.update_or_create(
-                            content_type=content_type,
-                            object_id=new_run.id,
-                            price=Decimal(kwargs["price"]),
-                            description=new_run.courseware_id,
-                            is_active=True,
-                        )
-
-                        course_product.save()
-                        self.stdout.write(
-                            self.style.SUCCESS(
-                                f"Created product {course_product} for {new_run.courseware_id}"
-                            )
-                        )
-
-                if kwargs["block_countries"]:
-                    for code_or_name in kwargs["block_countries"].split(","):
-                        country_code = countries.by_name(code_or_name)
-                        if not country_code:
-                            country_name = countries.countries.get(code_or_name, None)
-                            country_code = code_or_name if country_name else None
-                        else:
-                            country_name = code_or_name
-
-                        if country_code:
-                            BlockedCountry.objects.get_or_create(
-                                course=course, country=country_code
-                            )
-                            self.stdout.write(
-                                self.style.SUCCESS(
-                                    f"Blocked Enrollments for {country_name} ({country_code})."
-                                )
-                            )
-                            continue
-
-                        self.stdout.write(
-                            self.style.ERROR(
-                                f"Could not block country {code_or_name}. "
-                                f"Please verify that it is a valid country name or code."
-                            )
-                        )
-            except Exception as e:
+            if "add_depts" not in locals() or not add_depts:
                 self.stdout.write(
                     self.style.ERROR(
-                        f"Could not retrieve course for {edx_course.course_id}, skipping it: {e}"
+                        "Departments must exist and be specified with the --dept argument prior to running this command to create courses."
+                    )
+                )
+                return False
+
+            (course, created) = Course.objects.get_or_create(
+                readable_id=course_readable_id,
+                defaults={
+                    "title": edx_course.name,
+                    "readable_id": course_readable_id,
+                    "live": kwargs["live"],
+                },
+            )
+            course.departments.set(add_depts)
+            course.save()
+
+            if created:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Created course for {course_readable_id}: {course}"
                     )
                 )
 
-        self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))
+            new_run = CourseRun.objects.create(
+                course=course,
+                run_tag=courserun_tag,
+                courseware_id=edx_course.course_id,
+                start_date=edx_course.start,
+                end_date=edx_course.end,
+                enrollment_start=edx_course.enrollment_start,
+                enrollment_end=edx_course.enrollment_end,
+                title=edx_course.name,
+                live=kwargs["live"],
+                is_self_paced=edx_course.is_self_paced(),
+                courseware_url_path=parse.urljoin(
+                    settings.OPENEDX_API_BASE_URL,
+                    f"/courses/{edx_course.course_id}/course",
+                ),
+            )
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Created course run for {edx_course.course_id}: id {new_run.id}"
+                )
+            )
+            success_count += 1
+
+            if kwargs["create_cms_page"]:
+                try:
+                    create_default_courseware_page(new_run.course, live=kwargs["live"])
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Created CMS page for {new_run.course.readable_id}"
+                        )
+                    )
+                except Exception as e:  # noqa: BLE001
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"Could not create CMS page {new_run.course.readable_id}, skipping it: {e}"
+                        )
+                    )
+
+            if kwargs["price"] and kwargs["price"].isnumeric():
+                with reversion.create_revision():
+                    (course_product, created) = Product.objects.update_or_create(
+                        content_type=content_type,
+                        object_id=new_run.id,
+                        price=Decimal(kwargs["price"]),
+                        description=new_run.courseware_id,
+                        is_active=True,
+                    )
+
+                    course_product.save()
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Created product {course_product} for {new_run.courseware_id}"
+                        )
+                    )
+
+            if kwargs["block_countries"]:
+                for code_or_name in kwargs["block_countries"].split(","):
+                    country_code = countries.by_name(code_or_name)
+                    if not country_code:
+                        country_name = countries.countries.get(code_or_name, None)
+                        country_code = code_or_name if country_name else None
+                    else:
+                        country_name = code_or_name
+
+                    if country_code:
+                        BlockedCountry.objects.get_or_create(
+                            course=course, country=country_code
+                        )
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                f"Blocked Enrollments for {country_name} ({country_code})."
+                            )
+                        )
+                        continue
+
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"Could not block country {code_or_name}. "
+                            f"Please verify that it is a valid country name or code."
+                        )
+                    )
+
+        self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))  # noqa: RET503

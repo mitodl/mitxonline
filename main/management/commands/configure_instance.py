@@ -31,7 +31,7 @@ The learner account will have these parameters:
 The product for the courses will both be $999 so they are under the limit
 for test CyberSource transactions.
 
-If the --tutor/-T option is passed, the command will use the local.overhang.io
+If the --tutor/-T option is passed, the command will use the local.edly.io
 address for links to edX rather than edx.odl.local:18000.
 
 This uses other management commands to complete these tasks. So, if you just
@@ -124,17 +124,17 @@ class Command(BaseCommand):
             dest="tutordev",
         )
 
-    def determine_edx_hostport(self, *args, **kwargs):
+    def determine_edx_hostport(self, *args, **kwargs):  # noqa: ARG002
         """Returns a tuple of the edX host and port depending on what the user's passed in"""
 
         if kwargs["tutor"]:
-            return ("local.overhang.io", "")
+            return ("local.edly.io", "")
         elif kwargs["tutordev"]:
-            return ("local.overhang.io", ":8000")
+            return ("local.edly.io", ":8000")
         else:
             return ("edx.odl.local:18000", ":18000")
 
-    def handle(self, *args, **kwargs):
+    def handle(self, *args, **kwargs):  # noqa: ARG002
         """Coordinates the other commands."""
 
         (edx_host, edx_gateway_port) = self.determine_edx_hostport(**kwargs)
@@ -163,9 +163,9 @@ class Command(BaseCommand):
                             f"Gateway required for platform type {kwargs['platform']}."
                         )
                     )
-                    exit(-1)
+                    exit(-1)  # noqa: PLR1722
 
-                redirects = "\n".join(
+                redirects = "\n".join(  # noqa: F841
                     [
                         f"http://{edx_host}/auth/complete/mitxpro-oauth2/",
                         f"http://{kwargs['gateway']}{edx_gateway_port}/auth/complete/mitxpro-oauth2/",
@@ -203,8 +203,15 @@ class Command(BaseCommand):
         # Step 2: create the program
         self.stdout.write(self.style.SUCCESS("Creating the DEDP program..."))
 
-        # by default, this will create the DEDP program and tiers
-        call_command("configure_tiers")
+        call_command(
+            "create_courseware",
+            "program",
+            "program-v1:MITx+DEDP",
+            "Data, Economics and Development Policy",
+            live=True,
+            depts="Economics",
+            create_depts=True,
+        )
 
         # Step 3: create the program page
         self.stdout.write(self.style.SUCCESS("Creating the DEDP program about page..."))
@@ -232,6 +239,8 @@ class Command(BaseCommand):
             create_run="Demo_Course",
             run_url=f"http://{edx_host}/courses/course-v1:edX+DemoX+Demo_Course/",
             program="program-v1:MITx+DEDP",
+            depts="Science",
+            create_depts=True,
         )
 
         call_command(
@@ -242,6 +251,8 @@ class Command(BaseCommand):
             live=True,
             create_run="course",
             run_url=f"http://{edx_host}/courses/course-v1:edX+E2E-101+course/",
+            depts="Math",
+            create_depts=True,
         )
 
         self.stdout.write(self.style.SUCCESS("Syncing course runs (this may fail)..."))
@@ -270,7 +281,7 @@ class Command(BaseCommand):
         # Step 8: create the learner and enroll them (unless told not to)
         self.stdout.write(self.style.SUCCESS("Creating the learner..."))
 
-        if "dont_enroll" in kwargs and kwargs["dont_enroll"]:
+        if kwargs.get("dont_enroll"):
             call_command(
                 "create_user",
                 "testlearner",

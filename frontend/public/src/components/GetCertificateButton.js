@@ -8,7 +8,10 @@ const GetCertificateButton = ({ productId }: Props) => {
   return (
     <form action="/cart/add/" method="get" className="text-center ml-auto">
       <input type="hidden" name="product_id" value={productId} />
-      <button type="submit" className="btn btn-primary btn-gradient-red">
+      <button
+        type="submit"
+        className="btn btn-primary btn-gradient-red-to-blue"
+      >
         Get Certificate
       </button>
     </form>

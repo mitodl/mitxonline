@@ -3,9 +3,11 @@
 import logging
 import re
 
+from django.db.models import Prefetch, Q
+from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
-from courses.models import CourseRunEnrollment, ProgramCertificate
+from courses.models import CourseRun, CourseRunEnrollment, ProgramCertificate
 
 log = logging.getLogger(__name__)
 
@@ -15,12 +17,12 @@ def exception_logging_generator(generator):
     while True:
         try:
             yield next(generator)
-        except StopIteration:
+        except StopIteration:  # noqa: PERF203
             return
         except HTTPError as exc:
-            log.exception("EdX API error for fetching user grades %s:", exc)
+            log.exception("EdX API error for fetching user grades %s:", exc)  # noqa: TRY401
         except Exception as exp:  # pylint: disable=broad-except
-            log.exception("Error fetching user grades from edX %s:", exp)
+            log.exception("Error fetching user grades from edX %s:", exp)  # noqa: TRY401
 
 
 def is_grade_valid(override_grade: float):
@@ -72,3 +74,95 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
         return ProgramCertificate.objects.get(user_id=user_id, program_id=program_id)
     except ProgramCertificate.DoesNotExist:
         return None
+
+
+def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
+    """
+    Returns all course runs that are open for enrollment.
+
+    args:
+        enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
+        valid_courses: Queryset of Course objects, to filter the course runs by if needed
+    """
+    now = now_in_utc()
+    if enrollment_end_date is None:
+        enrollment_end_date = now
+
+    valid_course_runs = CourseRun.objects.filter(
+        Q(live=True)
+        & Q(start_date__isnull=False)
+        & Q(enrollment_start__lt=now)
+        & (Q(enrollment_end=None) | Q(enrollment_end__gt=enrollment_end_date))
+    )
+
+    if valid_courses:
+        return valid_course_runs.filter(course__in=valid_courses)
+
+    return valid_course_runs
+
+
+def get_unenrollable_courseruns_qs():
+    """Returns all course runs that are closed for enrollment."""
+    now = now_in_utc()
+    return CourseRun.objects.filter(
+        Q(live=False)
+        | Q(start_date__isnull=True)
+        | (Q(enrollment_end__lte=now) | Q(enrollment_start__gt=now))
+    )
+
+
+def get_self_paced_courses(queryset, enrollment_end_date=None):
+    """Returns all course runs that are self-paced."""
+    now = now_in_utc()
+    if enrollment_end_date is None:
+        enrollment_end_date = now
+    course_ids = queryset.values_list("id", flat=True)
+    all_runs = CourseRun.objects.filter(
+        Q(live=True)
+        & Q(course_id__in=course_ids)
+        & Q(start_date__isnull=False)
+        & Q(enrollment_start__lt=now)
+        & (Q(enrollment_end=None) | Q(enrollment_end__gt=enrollment_end_date))
+    )
+    self_paced_runs = all_runs.filter(is_self_paced=True)
+    return (
+        queryset.prefetch_related(Prefetch("courseruns", queryset=self_paced_runs))
+        .prefetch_related("courseruns__course")
+        .filter(courseruns__id__in=self_paced_runs.values_list("id", flat=True))
+        .distinct()
+    )
+
+
+def get_enrollable_courses(queryset, enrollment_end_date=None):
+    """
+    Returns courses that are open for enrollment
+
+    Args:
+        queryset: Queryset of Course objects
+        enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
+    """
+    if enrollment_end_date is None:
+        enrollment_end_date = now_in_utc()
+    courseruns_qs = get_enrollable_courseruns_qs(enrollment_end_date)
+    return (
+        queryset.prefetch_related(Prefetch("courseruns", queryset=courseruns_qs))
+        .prefetch_related("courseruns__course")
+        .filter(courseruns__id__in=courseruns_qs.values_list("id", flat=True))
+        .distinct()
+    )
+
+
+def get_unenrollable_courses(queryset):
+    """
+    Returns courses that are closed for enrollment
+
+    Args:
+        queryset: Queryset of Course objects
+    """
+    courseruns_qs = get_unenrollable_courseruns_qs()
+    return (
+        queryset.prefetch_related(Prefetch("courseruns", queryset=courseruns_qs))
+        .prefetch_related("courseruns__course")
+        .filter(courseruns__id__in=courseruns_qs.values_list("id", flat=True))
+        .distinct()
+    )

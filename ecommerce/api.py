@@ -13,7 +13,6 @@ from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
 from mitol.payment_gateway.api import Order as GatewayOrder
 from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
-from mitol.payment_gateway.exceptions import RefundDuplicateException
 
 from courses.api import create_run_enrollments, deactivate_run_enrollment
 from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
@@ -151,7 +150,7 @@ def generate_checkout_payload(request):
         merchant_fields=[basket.id],
     )
 
-    return payload
+    return payload  # noqa: RET504
 
 
 def check_discount_for_products(discount, basket):
@@ -240,7 +239,7 @@ def apply_user_discounts(request):
     return
 
 
-def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=False):
+def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=False):  # noqa: FBT002
     order.fulfill(payment_data, already_enrolled=already_enrolled)
     order.save()
     sync_hubspot_deal(order)
@@ -279,7 +278,7 @@ def process_cybersource_payment_response(request, order):
         ECOMMERCE_DEFAULT_PAYMENT_GATEWAY, request
     ):
         raise PermissionDenied(
-            "Could not validate response from the payment processor."
+            "Could not validate response from the payment processor."  # noqa: EM101
         )
 
     processor_response = PaymentGateway.get_formatted_response(
@@ -293,9 +292,9 @@ def process_cybersource_payment_response(request, order):
     if reason_code and reason_code.isdigit():
         reason_code = int(reason_code)
         message = "Transaction was not successful. Transaction ID:%s  Reason Code:%d  Message:%s"
-        if 100 < reason_code < 200:
+        if 100 < reason_code < 200:  # noqa: PLR2004
             log.error(message, transaction_id, reason_code, processor_response.message)
-        elif reason_code >= 200:
+        elif reason_code >= 200:  # noqa: PLR2004
             log.debug(message, transaction_id, reason_code, processor_response.message)
 
     return_message = ""
@@ -304,16 +303,14 @@ def process_cybersource_payment_response(request, order):
         # Transaction declined for some reason
         # This probably means the order needed to go through the process
         # again so maybe tell the user to do a thing.
-        log.debug("Transaction declined: {msg}".format(msg=processor_response.message))
+        log.debug(f"Transaction declined: {processor_response.message}")  # noqa: G004
         order.decline()
         order.save()
         return_message = order.state
     elif processor_response.state == ProcessorResponse.STATE_ERROR:
         # Error - something went wrong with the request
         log.debug(
-            "Error happened submitting the transaction: {msg}".format(
-                msg=processor_response.message
-            )
+            f"Error happened submitting the transaction: {processor_response.message}"  # noqa: G004
         )
         order.error()
         order.save()
@@ -327,38 +324,30 @@ def process_cybersource_payment_response(request, order):
         # mean that the entire order is invalid, so we'll do nothing with
         # the order here (other than set it to Cancelled).
         # Transaction could be
-        log.debug(
-            "Transaction cancelled/reviewed: {msg}".format(
-                msg=processor_response.message
-            )
-        )
+        log.debug(f"Transaction cancelled/reviewed: {processor_response.message}")  # noqa: G004
         order.cancel()
         order.save()
         return_message = order.state
 
     elif (
         processor_response.state == ProcessorResponse.STATE_ACCEPTED
-        or reason_code == 100
+        or reason_code == 100  # noqa: PLR2004
     ):
         # It actually worked here
         basket = Basket.objects.filter(user=order.purchaser).first()
         try:
-            log.debug(
-                "Transaction accepted!: {msg}".format(msg=processor_response.message)
-            )
+            log.debug(f"Transaction accepted!: {processor_response.message}")  # noqa: G004
             fulfill_completed_order(order, request.POST, basket)
         except ValidationError:
             log.debug(
-                "Missing transaction id from transaction response: {msg}".format(
-                    msg=processor_response.message
-                )
+                f"Missing transaction id from transaction response: {processor_response.message}"  # noqa: G004
             )
             raise
 
         return_message = order.state
     else:
         log.error(
-            f"Unknown state {processor_response.state} found: transaction ID {transaction_id}, reason code {reason_code}, response message {processor_response.message}"
+            f"Unknown state {processor_response.state} found: transaction ID {transaction_id}, reason code {reason_code}, response message {processor_response.message}"  # noqa: G004
         )
         order.cancel()
         order.save()
@@ -381,7 +370,7 @@ def establish_basket(request):
     return basket
 
 
-def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs):
+def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs):  # noqa: RUF013
     """
     A function that performs refund for a given order id
 
@@ -423,8 +412,8 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
 
     # Check for a PayPal payment - if there's one, we can't process it
     if "paypal_token" in transaction_dict:
-        raise Exception(
-            f"PayPal: Order {order.reference_number} contains a PayPal transaction. Please contact Finance to refund this order."
+        raise Exception(  # noqa: TRY002
+            f"PayPal: Order {order.reference_number} contains a PayPal transaction. Please contact Finance to refund this order."  # noqa: EM102
         )
 
     # The refund amount can be different then the payment amount, so we override
@@ -456,7 +445,7 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
         )
         # PaymentGateway didn't raise an exception and instead gave a Response but the response status was not
         # success so we manually rollback the transaction in this case.
-        raise Exception(f"Payment gateway returned an error: {response.message}")
+        raise Exception(f"Payment gateway returned an error: {response.message}")  # noqa: EM102, TRY002
 
     # If unenroll requested, perform unenrollment after successful refund
     if unenroll:
@@ -501,7 +490,7 @@ def unenroll_learner_from_order(order_id):
                         ENROLL_CHANGE_STATUS_REFUNDED,
                         keep_failed_enrollments=True,
                     )
-            except ObjectDoesNotExist:
+            except ObjectDoesNotExist:  # noqa: PERF203
                 pass
 
 
@@ -531,19 +520,19 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
     if len(pending_orders) == 0:
         return (0, 0, 0)
 
-    log.info(f"Resolving {len(pending_orders)} orders")
+    log.info(f"Resolving {len(pending_orders)} orders")  # noqa: G004
 
     results = gateway.find_and_get_transactions(pending_orders)
 
     if len(results.keys()) == 0:
-        log.info(f"No orders found to resolve.")
+        log.info("No orders found to resolve.")
         return (0, 0, 0)
 
     fulfilled_count = cancel_count = error_count = 0
 
     for result in results:
         payload = results[result]
-        if int(payload["reason_code"]) == 100:
+        if int(payload["reason_code"]) == 100:  # noqa: PLR2004
             try:
                 order = PendingOrder.objects.filter(
                     state=PendingOrder.STATE.PENDING,
@@ -555,10 +544,10 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
                 sync_hubspot_deal(order)
                 fulfilled_count += 1
 
-                log.info(f"Fulfilled order {order.reference_number}.")
-            except Exception as e:
-                log.error(
-                    f"Couldn't process pending order for fulfillment {payload['req_reference_number']}: {str(e)}"
+                log.info(f"Fulfilled order {order.reference_number}.")  # noqa: G004
+            except Exception as e:  # noqa: BLE001
+                log.error(  # noqa: TRY400
+                    f"Couldn't process pending order for fulfillment {payload['req_reference_number']}: {e!s}"  # noqa: G004
                 )
                 error_count += 1
         else:
@@ -579,10 +568,10 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
                 sync_hubspot_deal(order)
                 cancel_count += 1
 
-                log.info(f"Cancelled order {order.reference_number}.")
-            except Exception as e:
-                log.error(
-                    f"Couldn't process pending order for cancellation {payload['req_reference_number']}: {str(e)}"
+                log.info(f"Cancelled order {order.reference_number}.")  # noqa: G004
+            except Exception as e:  # noqa: BLE001
+                log.error(  # noqa: TRY400
+                    f"Couldn't process pending order for cancellation {payload['req_reference_number']}: {e!s}"  # noqa: G004
                 )
                 error_count += 1
 
@@ -663,7 +652,7 @@ def check_for_duplicate_discount_redemptions():
     return seen
 
 
-def generate_discount_code(**kwargs):
+def generate_discount_code(**kwargs):  # noqa: C901
     """
     Generates a discount code (or a batch of discount codes) as specified by the
     arguments passed.
@@ -699,29 +688,29 @@ def generate_discount_code(**kwargs):
     amount = Decimal(kwargs["amount"])
 
     if kwargs["discount_type"] not in ALL_DISCOUNT_TYPES:
-        raise Exception(f"Discount type {kwargs['discount_type']} is not valid.")
+        raise Exception(f"Discount type {kwargs['discount_type']} is not valid.")  # noqa: EM102, TRY002
 
     if payment_type not in ALL_PAYMENT_TYPES:
-        raise Exception(f"Payment type {payment_type} is not valid.")
+        raise Exception(f"Payment type {payment_type} is not valid.")  # noqa: EM102, TRY002
 
-    if kwargs["discount_type"] == DISCOUNT_TYPE_PERCENT_OFF and amount > 100:
-        raise Exception(
-            f"Discount amount {amount} not valid for discount type {DISCOUNT_TYPE_PERCENT_OFF}."
+    if kwargs["discount_type"] == DISCOUNT_TYPE_PERCENT_OFF and amount > 100:  # noqa: PLR2004
+        raise Exception(  # noqa: TRY002
+            f"Discount amount {amount} not valid for discount type {DISCOUNT_TYPE_PERCENT_OFF}."  # noqa: EM102
         )
 
     if kwargs["count"] > 1 and "prefix" not in kwargs:
-        raise Exception("You must specify a prefix to create a batch of codes.")
+        raise Exception("You must specify a prefix to create a batch of codes.")  # noqa: EM101, TRY002
 
     if kwargs["count"] > 1:
         prefix = kwargs["prefix"]
 
         # upped the discount code limit to 100 characters - this used to be 13 (50 - 37 for the UUID)
-        if len(prefix) > 63:
-            raise Exception(
-                f"Prefix {prefix} is {len(prefix)} - prefixes must be 63 characters or less."
+        if len(prefix) > 63:  # noqa: PLR2004
+            raise Exception(  # noqa: TRY002
+                f"Prefix {prefix} is {len(prefix)} - prefixes must be 63 characters or less."  # noqa: EM102
             )
 
-        for i in range(0, kwargs["count"]):
+        for i in range(kwargs["count"]):  # noqa: B007
             generated_uuid = uuid.uuid4()
             code = f"{prefix}{generated_uuid}"
 
@@ -729,10 +718,10 @@ def generate_discount_code(**kwargs):
     else:
         codes_to_generate = kwargs["codes"]
 
-    if "one_time" in kwargs and kwargs["one_time"]:
+    if kwargs.get("one_time"):
         redemption_type = REDEMPTION_TYPE_ONE_TIME
 
-    if "once_per_user" in kwargs and kwargs["once_per_user"]:
+    if kwargs.get("once_per_user"):
         redemption_type = REDEMPTION_TYPE_ONE_TIME_PER_USER
 
     if (

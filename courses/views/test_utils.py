@@ -1,17 +1,3 @@
-import random
-
-from courses.factories import (
-    CourseFactory,
-    CourseRunFactory,
-    ProgramFactory,
-    ProgramRequirementFactory,
-)
-from courses.models import (
-    ProgramRequirementNodeType,
-    ProgramRequirement,
-)
-
-
 def num_queries_from_course(course, version="v1"):
     """
     Generates approximately the number of queries we should expect to see, in a worst case scenario. This is

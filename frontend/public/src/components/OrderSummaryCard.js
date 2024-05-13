@@ -43,20 +43,14 @@ export class OrderSummaryCard extends React.Component<Props> {
     }
 
     return (
-      <div className="row order-summary-total">
-        <div className="col-12 px-3 py-3 py-md-0">
-          <div className="d-flex justify-content-between">
-            <div className="flex-grow-1">
-              Coupon applied (
-              <em className="fw-bold text-primary">
-                {discounts[0].discount_code}
-              </em>{" "}
-              )
-            </div>
-            <div className="ml-auto text-primary text-end">
-              {discountAmountText}
-            </div>
-          </div>
+      <div className="d-flex justify-content-between">
+        <div className="flex-grow-1">
+          Coupon applied (
+          <em className="fw-bold text-primary">{discounts[0].discount_code}</em>{" "}
+          )
+        </div>
+        <div className="ml-auto text-primary text-end">
+          {discountAmountText}
         </div>
       </div>
     )
@@ -70,15 +64,11 @@ export class OrderSummaryCard extends React.Component<Props> {
     const refundAmount = formatLocalePrice(Number(refund.amount))
 
     return (
-      <div className="row order-summary-total">
-        <div className="col-12 px-3 py-3 py-md-0">
-          <div className="d-flex justify-content-between">
-            <div className="flex-grow-1">
-              <Badge className="bg-danger">Refund applied</Badge>
-            </div>
-            <div className="ml-auto text-primary text-end">{refundAmount}</div>
-          </div>
+      <div className="d-flex justify-content-between">
+        <div className="flex-grow-1">
+          <Badge className="bg-danger">Refund applied</Badge>
         </div>
+        <div className="ml-auto text-primary text-end">{refundAmount}</div>
       </div>
     )
   }
@@ -134,73 +124,55 @@ export class OrderSummaryCard extends React.Component<Props> {
     const fmtDiscountPrice = formatLocalePrice(discountedPrice)
     const title = cardTitle ? cardTitle : "Order Summary"
     return (
-      <div
-        className="order-summary container card p-md-3 mb-4 rounded-0"
-        key="ordersummarycard"
-      >
-        <div className="row order-summary-total mt-3 mt-md-0 mb-3">
-          <div className="col-12 col-md-auto px-3 px-md-3">
-            <h5 id="summary-card-title">{title}</h5>
-          </div>
-        </div>
+      <div className="order-summary container std-card" key="ordersummarycard">
+        <div className="std-card-body checkout-page">
+          <h3 id="summary-card-title">{title}</h3>
 
-        <div className="row">
-          <div className="col-12 px-3 py-3 py-md-0">
+          <div className="order-pricing-info">
             <div className="d-flex justify-content-between">
               <div className="flex-grow-1">Price</div>
               <div className="ml-auto">{fmtPrice}</div>
             </div>
+
+            {this.renderAppliedCoupons()}
+
+            {refunds === null || refunds.length === 0
+              ? this.renderFulfilledTag()
+              : this.renderRefunds()}
           </div>
-        </div>
 
-        {this.renderAppliedCoupons()}
-
-        {refunds === null || refunds.length === 0
-          ? this.renderFulfilledTag()
-          : this.renderRefunds()}
-
-        <div className="row my-3 mx-1">
-          <div className="col-12 px-3 border-top border-dark" />
-        </div>
-
-        <div className="row order-summary-total">
-          <div className="col-12 px-3 py-3 py-md-0">
-            <div className="d-flex justify-content-between">
-              <div className="flex-grow-1">
-                <h5>Total</h5>
-              </div>
-              <div className="ml-auto">
-                <h5>{fmtDiscountPrice || fmtPrice}</h5>
-              </div>
+          <div className="d-flex justify-content-between">
+            <div className="flex-grow-1">
+              <h5>Total</h5>
+            </div>
+            <div className="ml-auto">
+              <h5>{fmtDiscountPrice || fmtPrice}</h5>
             </div>
           </div>
-        </div>
 
-        {!orderFulfilled ? (
-          <ApplyCouponForm
-            onSubmit={addDiscount}
-            couponCode={discountCode}
-            discounts={discounts}
-          />
-        ) : null}
+          {!orderFulfilled ? (
+            <ApplyCouponForm
+              onSubmit={addDiscount}
+              couponCode={discountCode}
+              discounts={discounts}
+            />
+          ) : null}
 
-        {totalPrice > 0 && !orderFulfilled ? (
-          <div className="row">
-            <div className="col-12 text-center mt-4 mb-4">
+          {totalPrice > 0 && !orderFulfilled ? (
+            <div>
               <Button
                 type="link"
-                className="btn btn-primary btn-gradient-red highlight fw-bold"
+                id="place-order-button"
+                className="btn btn-primary btn-gradient-red-to-blue btn-place-order"
                 onClick={() => (window.location = "/checkout/to_payment")}
               >
                 Place your order
               </Button>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {totalPrice > 0 && !orderFulfilled ? (
-          <div className="row">
-            <div className="col-12 px-3 py-3 py-md-0 cart-text-smaller">
+          {totalPrice > 0 && !orderFulfilled ? (
+            <div className="cart-text-smaller">
               By placing my order I agree to the{" "}
               <a href="/terms-of-service/" target="_blank" rel="noreferrer">
                 Terms of Service
@@ -210,8 +182,8 @@ export class OrderSummaryCard extends React.Component<Props> {
                 Privacy Policy.
               </a>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     )
   }

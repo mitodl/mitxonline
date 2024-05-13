@@ -1,7 +1,7 @@
 """User views"""
+
 import pycountry
 from django.db import transaction
-from django.db.models import Q
 from mitol.common.utils import now_in_utc
 from oauth2_provider.contrib.rest_framework import IsAuthenticatedOrTokenHasScope
 from rest_framework import mixins, viewsets
@@ -80,7 +80,7 @@ class ChangeEmailRequestViewSet(
         )
 
     def get_serializer_class(self):
-        if self.action == "create":
+        if self.action == "create":  # noqa: RET503
             return ChangeEmailRequestCreateSerializer
         elif self.action == "partial_update":
             return ChangeEmailRequestUpdateSerializer
@@ -91,16 +91,17 @@ class CountriesStatesViewSet(viewsets.ViewSet):
 
     permission_classes = []
 
-    def list(self, request):  # pylint:disable=unused-argument
+    def list(self, request):  # pylint:disable=unused-argument  # noqa: ARG002
         """Get generator for countries/states list"""
-        queryset = sorted(list(pycountry.countries), key=lambda country: country.name)
+        queryset = sorted(list(pycountry.countries), key=lambda country: country.name)  # noqa: C414
         serializer = CountrySerializer(queryset, many=True)
         return Response(serializer.data)
 
 
 class UsersViewSet(viewsets.ReadOnlyModelViewSet):
     """Provides an API for listing system users. This is for the staff
-    dashboard."""
+    dashboard.
+    """
 
     serializer_class = StaffDashboardUserSerializer
     authentication_classes = [SessionAuthentication]

@@ -1,8 +1,8 @@
 """API tests"""
+
 from email.utils import formataddr
 
 import pytest
-from mail.exceptions import EmailSendFailureException
 from mitol.common.pytest_utils import any_instance_of
 
 from mail.api import (
@@ -17,6 +17,7 @@ from mail.api import (
     safe_format_recipients,
     send_messages,
 )
+from mail.exceptions import EmailSendFailureException
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("email_settings")]
@@ -24,7 +25,7 @@ lazy = pytest.lazy_fixture
 
 
 @pytest.fixture
-def email_settings(settings):
+def email_settings(settings):  # noqa: PT004
     """Default settings for email tests"""
     settings.MAILGUN_RECIPIENT_OVERRIDE = None
 
@@ -101,7 +102,7 @@ def test_messages_for_recipients():
 
     for user, msg in zip(users, messages):
         assert user.email in str(msg.to[0])
-        assert msg.subject == "Welcome {}".format(user.name)
+        assert msg.subject == f"Welcome {user.name}"
 
 
 def test_build_messages(mocker):

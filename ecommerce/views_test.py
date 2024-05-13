@@ -60,13 +60,13 @@ from users.factories import UserFactory
 pytestmark = [pytest.mark.django_db]
 
 
-@pytest.fixture()
+@pytest.fixture
 def products():
     with reversion.create_revision():
         return ProductFactory.create_batch(5)
 
 
-@pytest.fixture()
+@pytest.fixture
 def discounts():
     return DiscountFactory.create_batch(5)
 
@@ -78,7 +78,7 @@ def user(db):
 
 
 @pytest.fixture(autouse=True)
-def payment_gateway_settings():
+def payment_gateway_settings():  # noqa: PT004
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY = "Test Security Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY = "Test Access Key"
     settings.MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID = uuid.uuid4()
@@ -100,7 +100,7 @@ def test_list_products(user_drf_client, products):
 
 
 def test_get_products(user_drf_client, products):
-    product = products[random.randrange(0, len(products))]
+    product = products[random.randrange(0, len(products))]  # noqa: S311
 
     resp = user_drf_client.get(
         reverse("products_api-detail", kwargs={"pk": product.id})
@@ -111,7 +111,7 @@ def test_get_products(user_drf_client, products):
 
 def test_get_products_inactive(user_drf_client, products):
     """Test that Product detail API doesn't return data for inactive product"""
-    product = products[random.randrange(0, len(products))]
+    product = products[random.randrange(0, len(products))]  # noqa: S311
     product.is_active = False
     product.save()
 
@@ -119,7 +119,9 @@ def test_get_products_inactive(user_drf_client, products):
         reverse("products_api-detail", kwargs={"pk": product.id})
     )
 
-    assert_drf_json_equal(resp.json(), {"detail": "Not found."})
+    assert_drf_json_equal(
+        resp.json(), {"detail": "No Product matches the given query."}
+    )
 
 
 def test_get_basket(user_drf_client, user):
@@ -140,7 +142,7 @@ def test_get_basket_items(user_drf_client, user):
 
     # this item belongs to another basket, and should not be in the response
     BasketItemFactory.create()
-    resp = user_drf_client.get("/api/baskets/{}/items".format(basket.id), follow=True)
+    resp = user_drf_client.get(f"/api/baskets/{basket.id}/items", follow=True)
     basket_info = resp.json()
     assert len(basket_info) == 2
     assert_drf_json_equal(
@@ -158,7 +160,7 @@ def test_delete_basket_item(user_drf_client, user):
     basket = basket_item.basket
     assert basket.basket_items.count() == 1
     user_drf_client.delete(
-        "/api/baskets/{}/items/{}/".format(user.username, basket_item.id),
+        f"/api/baskets/{user.username}/items/{basket_item.id}/",
         content_type="application/json",
     )
     assert BasketItem.objects.filter(basket=basket).count() == 0
@@ -172,7 +174,7 @@ def test_add_basket_item(user_drf_client, user):
     assert BasketItem.objects.filter(basket__user=user).count() == 1
 
     user_drf_client.post(
-        "/api/baskets/{}/items/".format(basket.id),
+        f"/api/baskets/{basket.id}/items/",
         data={"product": new_product.id},
         follow=True,
     )
@@ -189,7 +191,9 @@ def create_basket(user, products):
     basket.save()
 
     basket_item = BasketItem(
-        product=products[random.randrange(0, len(products))], basket=basket, quantity=1
+        product=products[random.randrange(0, len(products))],  # noqa: S311
+        basket=basket,
+        quantity=1,
     )
     basket_item.save()
 
@@ -210,14 +214,14 @@ def create_basket_with_product(user, product):
 
 
 @pytest.mark.parametrize(
-    ["try_flex_pricing_discount", "try_whitespace"],
+    ["try_flex_pricing_discount", "try_whitespace"],  # noqa: PT006
     [
-        [True, False],
-        [False, True],
-        [True, True],
+        [True, False],  # noqa: PT007
+        [False, True],  # noqa: PT007
+        [True, True],  # noqa: PT007
     ],
 )
-def test_redeem_discount(
+def test_redeem_discount(  # noqa: PLR0913
     user,
     user_drf_client,
     products,
@@ -243,7 +247,7 @@ def test_redeem_discount(
     assert basket is not None
     assert len(basket.basket_items.all()) > 0
 
-    discount = discounts[random.randrange(0, len(discounts))]
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
 
     if try_flex_pricing_discount:
         discount.payment_type = PAYMENT_TYPE_FINANCIAL_ASSISTANCE
@@ -286,7 +290,7 @@ def test_redeem_product_discount(
     assert basket is not None
     assert len(basket.basket_items.all()) > 0
 
-    discount = discounts[random.randrange(0, len(discounts))]
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
 
     if try_product_discount:
         discount_product = DiscountProduct(
@@ -295,7 +299,7 @@ def test_redeem_product_discount(
         discount.refresh_from_db()
     else:
         new_product = ProductFactory.create()
-        discount_product = DiscountProduct(
+        discount_product = DiscountProduct(  # noqa: F841
             discount=discount, product=new_product
         ).save()
         discount.refresh_from_db()
@@ -321,7 +325,7 @@ def test_redeem_discount_with_higher_discount(
     discount on it. Should get back a success message. (The API call returns an
     ID so this doesn't just do json_equal.)
     """
-    product = products[random.randrange(0, len(products), 1)]
+    product = products[random.randrange(0, len(products), 1)]  # noqa: S311
     course = product.purchasable_object.course
     tier = FlexiblePriceTierFactory.create(
         courseware_object=course,
@@ -329,7 +333,7 @@ def test_redeem_discount_with_higher_discount(
         current=True,
         discount__amount=50,
     )
-    flexible_price = FlexiblePriceFactory.create(
+    flexible_price = FlexiblePriceFactory.create(  # noqa: F841
         income_usd=50000,
         country_of_income="US",
         user=user,
@@ -342,7 +346,7 @@ def test_redeem_discount_with_higher_discount(
     assert basket is not None
     assert len(basket.basket_items.all()) > 0
 
-    discount = discounts[random.randrange(0, len(discounts))]
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
 
     # check flexible price discount is applied
     resp = user_drf_client.get(reverse("checkout_api-cart"))
@@ -380,9 +384,10 @@ def test_redeem_discount_with_higher_discount(
 
 
 @pytest.mark.parametrize(
-    "time, expects", [["valid", True], ["past", False], ["future", False]]
+    "time, expects",  # noqa: PT006
+    [["valid", True], ["past", False], ["future", False]],  # noqa: PT007
 )
-def test_redeem_time_limited_discount(
+def test_redeem_time_limited_discount(  # noqa: PLR0913
     user, user_drf_client, products, discounts, time, expects
 ):
     """
@@ -395,7 +400,7 @@ def test_redeem_time_limited_discount(
     assert basket is not None
     assert len(basket.basket_items.all()) > 0
 
-    discount = discounts[random.randrange(0, len(discounts))]
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
 
     check_delta = timedelta(days=30)
 
@@ -438,7 +443,7 @@ def test_start_checkout(user, user_drf_client, products):
     Hits the start checkout view, which should create an Order record
     and its associated line items.
     """
-    basket = create_basket(user, products)
+    basket = create_basket(user, products)  # noqa: F841
 
     resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
 
@@ -455,7 +460,7 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
     Applies a discount, then hits the start checkout view, which should create
     an Order record and its associated line items.
     """
-    test_redeem_discount(user, user_drf_client, products, discounts, False, False)
+    test_redeem_discount(user, user_drf_client, products, discounts, False, False)  # noqa: FBT003
 
     resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
 
@@ -475,7 +480,7 @@ def test_start_checkout_with_invalid_discounts(user, user_client, products, disc
     check_delta = timedelta(days=30)
     more_check_delta = timedelta(days=120)
 
-    test_redeem_discount(user, user_client, products, discounts, False, False)
+    test_redeem_discount(user, user_client, products, discounts, False, False)  # noqa: FBT003
 
     for discount in discounts:
         discount.activation_date = (
@@ -495,7 +500,7 @@ def test_start_checkout_with_invalid_discounts(user, user_client, products, disc
 
 
 @pytest.mark.parametrize(
-    "decision, expected_redirect_url, expected_state, basket_exists",
+    "decision, expected_redirect_url, expected_state, basket_exists",  # noqa: PT006
     [
         ("CANCEL", reverse("cart"), Order.STATE.CANCELED, True),
         ("DECLINE", reverse("cart"), Order.STATE.DECLINED, True),
@@ -504,7 +509,7 @@ def test_start_checkout_with_invalid_discounts(user, user_client, products, disc
         ("ACCEPT", reverse("user-dashboard"), Order.STATE.FULFILLED, False),
     ],
 )
-def test_checkout_result(
+def test_checkout_result(  # noqa: PLR0913
     settings,
     user,
     user_client,
@@ -520,7 +525,7 @@ def test_checkout_result(
     Generates an order (using the API endpoint) and then cancels it using the endpoint.
     There shouldn't be any PendingOrders after that happens.
     """
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mocker.patch(
         "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
         return_value=True,
@@ -551,7 +556,6 @@ def test_checkout_result(
     resp = user_client.post(reverse("checkout-result-callback"), payload)
     assert resp.status_code == 302
     assert resp.url == expected_redirect_url
-    print(resp.cookies)
 
     resp = api_client.post(reverse("checkout_result_api"), payload)
 
@@ -582,7 +586,8 @@ def test_checkout_result(
 
 
 @pytest.mark.parametrize(
-    "cart_exists, cart_empty", [(True, False), (True, True), (False, True)]
+    "cart_exists, cart_empty",  # noqa: PT006
+    [(True, False), (True, True), (False, True)],
 )
 @pytest.mark.parametrize("is_external_checkout", [True, False])
 def test_checkout_product(
@@ -618,14 +623,14 @@ def test_checkout_product(
 
 
 @pytest.mark.parametrize(
-    "cart_exists, cart_empty, expected_status, expected_message",
+    "cart_exists, cart_empty, expected_status, expected_message",  # noqa: PT006
     [
         (False, True, status.HTTP_406_NOT_ACCEPTABLE, "No basket"),
         (True, True, status.HTTP_406_NOT_ACCEPTABLE, "No product in basket"),
         (True, False, status.HTTP_200_OK, ""),
     ],
 )
-def test_checkout_product_cart(
+def test_checkout_product_cart(  # noqa: PLR0913
     user, user_drf_client, cart_exists, cart_empty, expected_status, expected_message
 ):
     """
@@ -755,7 +760,7 @@ def test_discount_redemptions_api(
     one in it.
     """
 
-    discount = discounts[random.randrange(0, len(discounts))]
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
 
     # permissions testing
     resp = user_drf_client.get(
@@ -768,7 +773,7 @@ def test_discount_redemptions_api(
 
     # create basket with discount, then check for redemptions
 
-    basket = create_basket(user, products)
+    basket = create_basket(user, products)  # noqa: F841
 
     resp = user_drf_client.post(
         reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
@@ -779,7 +784,7 @@ def test_discount_redemptions_api(
     resp = user_drf_client.post(reverse("checkout_api-start_checkout"))
 
     # 100% discount will redirect to user dashboard
-    assert resp.status_code == 200 or resp.status_code == 302
+    assert resp.status_code == 200 or resp.status_code == 302  # noqa: PLR1714
 
     resp = admin_drf_client.get(f"/api/v0/discounts/{discount.id}/redemptions/")
     assert resp.status_code == 200
@@ -793,7 +798,7 @@ def test_user_discounts_api(user_drf_client, admin_drf_client, discounts, user):
     Tests retrieving and creating user discounts via the API.
     """
 
-    discount = discounts[random.randrange(0, len(discounts))]
+    discount = discounts[random.randrange(0, len(discounts))]  # noqa: S311
 
     # permissions testing
 
@@ -822,7 +827,7 @@ def test_user_discounts_api(user_drf_client, admin_drf_client, discounts, user):
     resp = admin_drf_client.post(
         reverse("userdiscounts_api-list"), {"discount": discount.id, "user": user.id}
     )
-    assert resp.status_code >= 200 and resp.status_code < 300
+    assert resp.status_code >= 200 and resp.status_code < 300  # noqa: PT018
 
     resp = admin_drf_client.get(f"/api/v0/discounts/{discount.id}/assignees/")
     assert resp.status_code == 200
@@ -839,7 +844,7 @@ def test_paid_and_unpaid_courserun_checkout(
      - If a course run is already paid, it should redirect to cart with 302 status code including a user message in the response cookies
      - Otherwise, it should be successful with 200 status code
     """
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     product = products[0]
     basket = create_basket_with_product(user, product)
     order = PendingOrder.create_from_basket(basket)
@@ -868,7 +873,7 @@ def test_paid_and_unpaid_courserun_checkout(
 
 
 @pytest.mark.parametrize(
-    "decision, expected_state, basket_exists",
+    "decision, expected_state, basket_exists",  # noqa: PT006
     [
         ("CANCEL", Order.STATE.CANCELED, True),
         ("DECLINE", Order.STATE.DECLINED, True),
@@ -877,7 +882,7 @@ def test_paid_and_unpaid_courserun_checkout(
         ("ACCEPT", Order.STATE.FULFILLED, False),
     ],
 )
-def test_checkout_api_result(
+def test_checkout_api_result(  # noqa: PLR0913
     settings,
     user,
     user_client,
@@ -891,7 +896,7 @@ def test_checkout_api_result(
     """
     Tests the proper handling of an order after receiving a valid Cybersource payment response.
     """
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mocker.patch(
         "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
         return_value=True,
@@ -980,14 +985,14 @@ def test_checkout_api_result_verification_failure(
 
 
 @pytest.mark.parametrize(
-    "upgrade_deadline, status_code",
+    "upgrade_deadline, status_code",  # noqa: PT006
     [
         (now_in_utc() - timedelta(days=1), 302),
         (now_in_utc() + timedelta(days=1), 200),
         (None, 200),
     ],
 )
-def test_non_upgradable_courserun_checkout(
+def test_non_upgradable_courserun_checkout(  # noqa: PLR0913
     user, user_client, user_drf_client, products, upgrade_deadline, status_code
 ):
     """
@@ -1017,11 +1022,11 @@ def test_start_checkout_with_zero_value(settings, user, user_client, products):
     """
     Check that the checkout redirects the user to dashboard when basket price is zero
     """
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     discount = DiscountFactory.create(
         discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=100
     )
-    test_redeem_discount(user, user_client, products, [discount], False, False)
+    test_redeem_discount(user, user_client, products, [discount], False, False)  # noqa: FBT003
 
     resp = user_client.get(reverse("checkout_interstitial_page"))
 

@@ -1,4 +1,5 @@
 """Test for user views"""
+
 from datetime import timedelta
 
 import pytest
@@ -52,10 +53,6 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
     if not is_anonymous:
         client.force_login(user)
 
-    # patched_unused_coupon_api = mocker.patch(
-    #     "users.serializers.fetch_and_serialize_unused_coupons",
-    #     return_value=[{"serialized": "data"}],
-    # )
     resp = client.get(reverse("users_api-me"))
 
     assert resp.status_code == status.HTTP_200_OK
@@ -74,7 +71,6 @@ def test_get_user_by_me(mocker, client, user, is_anonymous, show_enrollment_code
             "user_profile": None,
             "is_active": False,
         }
-        # patched_unused_coupon_api.assert_not_called()
     elif not is_anonymous and show_enrollment_codes:
         assert resp.json() == {
             "id": user.id,
@@ -188,7 +184,7 @@ def test_create_email_change_request_valid_email(user_drf_client, user, mocker):
 
     old_email = user.email
     resp = user_drf_client.patch(
-        "/api/change-emails/{}/".format(code), data={"confirmed": True}
+        f"/api/change-emails/{code}/", data={"confirmed": True}
     )
     assert not UserSocialAuth.objects.filter(uid=old_email, user=user).exists()
     assert resp.status_code == status.HTTP_200_OK
@@ -205,7 +201,7 @@ def test_create_email_change_request_expired_code(user_drf_client, user):
     )
 
     resp = user_drf_client.patch(
-        "/api/change-emails/{}/".format(change_request.code), data={"confirmed": True}
+        f"/api/change-emails/{change_request.code}/", data={"confirmed": True}
     )
     assert resp.status_code == status.HTTP_404_NOT_FOUND
 

@@ -2,22 +2,19 @@
 Validate that our settings functions work
 """
 
-import importlib
 import sys
-from unittest import mock
 from types import SimpleNamespace
 
 import pytest
 import semantic_version
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
-from django.test import TestCase
-from mitol.common import envs, pytest_utils
-
+from mitol.common import envs
 
 # this is a test, but pylint thinks it ends up being unused
 # hence we import the entire module and assign it here
-# test_app_json_modified = pytest_utils.test_app_json_modified
+# test_app_json_modified = pytest_utils.test_app_json_modified  # noqa: ERA001
+
 
 # NOTE: this is temporarily inlined here until I can stabilize the test upstream in the library
 def test_app_json_modified():
@@ -28,14 +25,15 @@ def test_app_json_modified():
 
     from mitol.common.pytest_utils import test_app_json_modified
     """
-    from mitol.common import envs
     import json
     import logging
 
-    # this line was causing errors due to a loading error bug
-    # envs.reload()
+    from mitol.common import envs
 
-    with open("app.json") as app_json_file:
+    # this line was causing errors due to a loading error bug
+    # envs.reload()  # noqa: ERA001
+
+    with open("app.json") as app_json_file:  # noqa: PTH123
         app_json = json.load(app_json_file)
 
     generated_app_json = envs.generate_app_json()
@@ -66,7 +64,6 @@ def settings_sandbox(monkeypatch):
         return vars(sys.modules["main.settings"])
 
     def _patch(overrides):
-
         for key, value in overrides.items():
             monkeypatch.setenv(key, value)
 

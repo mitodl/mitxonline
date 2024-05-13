@@ -64,7 +64,7 @@ export const courseRunStatusMessage = (run: CourseRun) => {
         return (
           <span>
             {" "}
-            | <strong>Ended</strong> - {formatPrettyDateTimeAmPmTz(dateString)}
+            | <strong>Ended</strong> {formatPrettyDateTimeAmPmTz(dateString)}
           </span>
         )
       } else {
@@ -236,7 +236,11 @@ export const getFirstRelevantRun = (
    Returns: CourseRunDetail
   */
 
-  if (course.courseruns.length === 0 || courseRuns.length === 0) {
+  if (
+    course.courseruns.length === 0 ||
+    courseRuns === null ||
+    courseRuns.length === 0
+  ) {
     return null
   }
 
