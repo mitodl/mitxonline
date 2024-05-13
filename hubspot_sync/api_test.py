@@ -34,8 +34,11 @@ pytestmark = [pytest.mark.django_db]
 
 
 @pytest.mark.django_db
-def test_make_contact_sync_message(user):
+def test_make_contact_sync_message(user, mocker):
     """Test make_contact_sync_message serializes a user and returns a properly formatted sync message"""
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
     course_certificate_1 = CourseRunCertificateFactory.create(user=user)
     course_certificate_2 = CourseRunCertificateFactory.create(user=user)
     program_certificate_1 = ProgramCertificateFactory.create(user=user)
@@ -248,7 +251,9 @@ def test_sync_line_item_with_hubspot(
 ):
     """Test that the hubspot CRM API is called properly for a line_item sync"""
     line = hubspot_order.lines.first()
-    course_run_enrollment = CourseRunEnrollmentFactory.create(user=line.order.purchaser)  # noqa: F841
+    course_run_enrollment = CourseRunEnrollmentFactory.create(
+        user=line.order.purchaser
+    )  # noqa: F841
     api.sync_line_item_with_hubspot(line)
     assert (
         api.HubspotObject.objects.get(
@@ -410,7 +415,9 @@ def test_sync_deal_hubspot_ids_to_hubspot(
     )
 
 
-@pytest.mark.parametrize("match_lines,quantity", [[True, 2], [False, 3]])  # noqa: PT006, PT007
+@pytest.mark.parametrize(
+    "match_lines,quantity", [[True, 2], [False, 3]]
+)  # noqa: PT006, PT007
 def test_sync_deal_line_hubspot_ids_to_hubspot_two_lines(
     mocker, mock_hubspot_api, match_lines, quantity
 ):

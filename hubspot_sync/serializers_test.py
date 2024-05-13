@@ -176,8 +176,11 @@ def test_serialize_order_with_coupon(  # noqa: PLR0913
     }
 
 
-def test_serialize_contact(settings, user):
+def test_serialize_contact(settings, user, mocker):
     """Test that HubspotContactSerializer includes program and course run certificates for the user"""
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
     program_cert_1 = ProgramCertificateFactory.create(user=user)
     program_cert_2 = ProgramCertificateFactory.create(user=user)
     course_run_cert_1 = CourseRunCertificateFactory.create(user=user)

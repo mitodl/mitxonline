@@ -11,7 +11,6 @@ from courses.factories import (
     CourseRunGradeFactory,
     ProgramCertificateFactory,
     ProgramFactory,
-    ProgramRequirementFactory,  # noqa: F401
     program_with_empty_requirements,  # noqa: F401
     program_with_requirements,  # noqa: F401
 )
@@ -120,11 +119,16 @@ def test_program_certificate_management_revoke_unrevoke_success(user, revoke, un
     assert certificate.is_revoked is (False if unrevoke else True)  # noqa: SIM211
 
 
-def test_program_certificate_management_create(user, program_with_empty_requirements):  # noqa: F811
+def test_program_certificate_management_create(
+    user, program_with_empty_requirements, mocker
+):  # noqa: F811
     """
     Test that create operation for program certificate management command
     creates the program certificate for a user
     """
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
     courses = CourseFactory.create_batch(2)
     program_with_empty_requirements.add_requirement(courses[0])
     program_with_empty_requirements.add_elective(courses[1])
@@ -145,11 +149,16 @@ def test_program_certificate_management_create(user, program_with_empty_requirem
     assert generated_certificates.count() == 1
 
 
-def test_program_certificate_management_force_create(user, program_with_requirements):  # noqa: F811
+def test_program_certificate_management_force_create(
+    user, program_with_requirements, mocker
+):  # noqa: F811
     """
     Test that create operation for program certificate management command
     forcefully creates the certificate for a user
     """
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     CourseRunGradeFactory.create_batch(
