@@ -148,13 +148,13 @@ def test_course_run_invalid_expiration_date(start_delta, end_delta, expiration_d
         [None, None, 1, True],  # noqa: PT007
         [None, None, -1, False],  # noqa: PT007
         [1, None, None, True],  # noqa: PT007
-        [-1, None, None, False],  # noqa: PT007
+        [-1, None, None, True],  # noqa: PT007
         [1, None, -1, False],  # noqa: PT007
         [None, 1, None, False],  # noqa: PT007
         [None, -1, None, True],  # noqa: PT007
     ],
 )
-def test_course_run_not_beyond_enrollment(
+def test_course_run_is_enrollable(
     end_days, enroll_start_days, enroll_end_days, expected
 ):
     """
@@ -174,7 +174,7 @@ def test_course_run_not_beyond_enrollment(
             end_date=end_date,
             enrollment_end=enr_end_date,
             enrollment_start=enr_start_date,
-        ).is_not_beyond_enrollment
+        ).is_enrollable
         is expected
     )
 

@@ -18,6 +18,7 @@ export type BaseCourseRun = {
   upgrade_deadline: ?string,
   certificate_available_date: ?string,
   is_upgradable: boolean,
+  is_enrollable: boolean,
   is_self_paced: boolean,
   courseware_url: ?string,
   courseware_id: string,

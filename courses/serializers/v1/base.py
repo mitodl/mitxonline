@@ -50,6 +50,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "certificate_available_date",
             "upgrade_deadline",
             "is_upgradable",
+            "is_enrollable",
             "is_self_paced",
             "run_tag",
             "id",

@@ -706,7 +706,7 @@ class CourseRun(TimestampedModel):
         return self.end_date < now_in_utc()
 
     @property
-    def is_not_beyond_enrollment(self):
+    def is_enrollable(self):
         """
         Checks if the course is not beyond its enrollment period
 
@@ -715,10 +715,8 @@ class CourseRun(TimestampedModel):
             boolean: True if enrollment period has begun but not ended
         """
         now = now_in_utc()
-        return (
-            (self.end_date is None or self.end_date > now)
-            and (self.enrollment_end is None or self.enrollment_end > now)
-            and (self.enrollment_start is None or self.enrollment_start <= now)
+        return (self.enrollment_end is None or self.enrollment_end > now) and (
+            self.enrollment_start is None or self.enrollment_start <= now
         )
 
     @property
@@ -729,7 +727,7 @@ class CourseRun(TimestampedModel):
         Returns:
             boolean: True if course is not expired
         """
-        return not self.is_past and self.is_not_beyond_enrollment
+        return not self.is_past and self.is_enrollable
 
     @property
     def is_in_progress(self) -> bool:

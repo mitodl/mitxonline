@@ -30,7 +30,6 @@ import { formatPrettyDate, parseDateString } from "../lib/util"
 describe("CourseProductDetailEnrollShallowRender", () => {
   let helper,
     renderPage,
-    isWithinEnrollmentPeriodStub,
     isFinancialAssistanceAvailableStub,
     courseRun,
     course,
@@ -70,11 +69,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       courseApi,
       "isFinancialAssistanceAvailable"
     )
-
-    isWithinEnrollmentPeriodStub = helper.sandbox.stub(
-      courseApi,
-      "isWithinEnrollmentPeriod"
-    )
   })
 
   afterEach(() => {
@@ -99,7 +93,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
   it("checks for enroll now button", async () => {
     const courseRun = makeCourseRunDetail()
-    isWithinEnrollmentPeriodStub.returns(true)
     const { inner } = await renderPage(
       {
         entities: {
@@ -126,7 +119,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
   it("checks for enroll now button should not appear if enrollment start in future", async () => {
     const courseRun = makeCourseRunDetail()
-    isWithinEnrollmentPeriodStub.returns(false)
+    courseRun["is_enrollable"] = false
     const { inner } = await renderPage(
       {
         entities: {
@@ -141,17 +134,22 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       },
       {}
     )
-    assert.isNotOk(
+    assert.isTrue(
       inner
         .find(".enroll-now")
         .at(0)
         .exists()
     )
+    assert.isTrue(
+      inner
+        .find(".enroll-now")
+        .at(0)
+        .prop("disabled")
+    )
   })
 
   it("checks for enroll now button should appear if enrollment start not in future", async () => {
     const courseRun = makeCourseRunDetail()
-    isWithinEnrollmentPeriodStub.returns(true)
     const { inner } = await renderPage(
       {
         entities: {
@@ -178,7 +176,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
   it("checks for form-based enrollment form if there is no product", async () => {
     const courseRun = makeCourseRunDetail()
-    isWithinEnrollmentPeriodStub.returns(true)
     const { inner } = await renderPage(
       {
         entities: {
@@ -273,7 +270,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
           financial_assistance_form_url: "google.com"
         }
       }
-      isWithinEnrollmentPeriodStub.returns(true)
       isFinancialAssistanceAvailableStub.returns(true)
       const { inner } = await renderPage()
       inner.setState({ currentCourseRun: courseRun })
@@ -407,7 +403,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
   })
 
   it(`shows form based enrollment button when upgrade deadline has passed but course is within enrollment period`, async () => {
-    isWithinEnrollmentPeriodStub.returns(true)
     courseRun.is_upgradable = false
     course.next_run_id = courseRun.id
 
@@ -449,7 +444,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
           }
         }
       ]
-      isWithinEnrollmentPeriodStub.returns(true)
       const { inner } = await renderPage()
 
       const enrollBtn = inner.find(".enroll-now").at(0)
@@ -481,7 +475,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
           }
         }
       ]
-      isWithinEnrollmentPeriodStub.returns(true)
       const { inner } = await renderPage()
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
@@ -513,7 +506,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
           }
         }
       ]
-      isWithinEnrollmentPeriodStub.returns(true)
       isFinancialAssistanceAvailableStub.returns(false)
       const { inner } = await renderPage()
       const enrollBtn = inner.find(".enroll-now").at(0)
@@ -539,7 +531,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
   it(`shows the disabled enroll button and warning message when no active runs`, async () => {
     course = makeCourseDetailNoRuns()
-    isWithinEnrollmentPeriodStub.returns(false)
 
     const { inner } = await renderPage(
       {
@@ -573,7 +564,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         product_flexible_price: {}
       }
     ]
-    isWithinEnrollmentPeriodStub.returns(true)
 
     const { inner } = await renderPage()
 
@@ -588,23 +578,22 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     it(`${showsQualifier} the course run selector for a course with ${runsQualifier} active run${
       multiples ? "s" : ""
     } and enables enroll buttons on selection`, async () => {
-      courseRun["products"] = [
-        {
-          id:                     1,
-          price:                  10,
-          is_upgradable:          true,
-          product_flexible_price: {
-            amount:        10,
-            discount_type: DISCOUNT_TYPE_PERCENT_OFF
-          }
-        }
-      ]
+      // courseRun["products"] = [
+      //   {
+      //     id:                     1,
+      //     price:                  10,
+      //     is_upgradable:          true,
+      //     product_flexible_price: {
+      //       amount:        10,
+      //       discount_type: DISCOUNT_TYPE_PERCENT_OFF
+      //     }
+      //   }
+      // ]
       const courseRuns = [courseRun]
       if (multiples) {
         courseRuns.push(courseRun)
       }
 
-      isWithinEnrollmentPeriodStub.returns(true)
       const { inner } = await renderPage({
         entities: {
           courseRuns:  courseRuns,
@@ -668,7 +657,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     const courseRuns = [courseRun]
     courseRuns.push(courseRun)
 
-    isWithinEnrollmentPeriodStub.returns(true)
     const { inner } = await renderPage({
       entities: {
         courseRuns:  courseRuns,
@@ -709,7 +697,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       const courseRuns = [courseRun]
       courseRuns.push(runWithMixedInfo)
 
-      isWithinEnrollmentPeriodStub.returns(true)
       const { inner } = await renderPage({
         entities: {
           courseRuns:  courseRuns,
@@ -795,7 +782,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       currentUser: currentUser
     }
 
-    isWithinEnrollmentPeriodStub.returns(true)
     const { inner } = await renderPage({
       entities: entities
     })
@@ -864,6 +850,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       assert.isTrue(inner.exists())
       const infobox = inner.find("CourseInfoBox").dive()
       assert.isTrue(infobox.exists())
+
       if (courseMode === "self-paced" && !startInFuture) {
         assert.include(
           infobox
