@@ -172,7 +172,8 @@ const findStates = (country: string, countries: Array<Country>) => {
 }
 
 const renderYearOfBirthField = errors => {
-  const hasError = errors && errors.user_profile && errors.user_profile.year_of_birth
+  const hasError =
+    errors && errors.user_profile && errors.user_profile.year_of_birth
   return (
     <div>
       <CardLabel
