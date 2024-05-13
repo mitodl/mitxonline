@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.93.0
+Version 0.93.0 (Released May 13, 2024)
 --------------
 
 - Give priority to enrollable runs (#2198)
