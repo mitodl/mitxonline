@@ -11,6 +11,7 @@ from courses.factories import (
     CourseRunGradeFactory,
     ProgramCertificateFactory,
     ProgramFactory,
+    ProgramRequirementFactory,  # noqa: F401
     program_with_empty_requirements,  # noqa: F811
     program_with_requirements,  # noqa: F811
 )
