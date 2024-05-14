@@ -191,6 +191,9 @@ def test_certificate_management_create_no_user(mocker, edx_grade_json, user):
     """Test that create operation for certificate management command attempts to creates the certificates for all the
     enrolled users in a run when no user is provided
     """
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
     passed_edx_grade = CurrentGrade(edx_grade_json)
     course_run = CourseRunFactory.create()
     users = UserFactory.create_batch(4)
