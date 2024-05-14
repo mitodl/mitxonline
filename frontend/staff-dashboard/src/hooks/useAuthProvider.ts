@@ -40,7 +40,7 @@ export function useAuthProvider(): AuthProvider {
     },
     checkAuth: async () => {
       const profile = await http.get('users/me');
-      
+
       if (
         _.get(profile, "data.is_superuser") === true ||
         _.get(profile, "data.is_staff") === true
@@ -53,11 +53,11 @@ export function useAuthProvider(): AuthProvider {
       });
     },
     getPermissions: async () => {
-      /* 
-      For MITx Online currently, the only permissions we care about are the 
-      'is_staff' and 'is_superuser' flags. 
-      
-      Future enhancement: The current profile API returns a list of all user 
+      /*
+      For MITx Online currently, the only permissions we care about are the
+      'is_staff' and 'is_superuser' flags.
+
+      Future enhancement: The current profile API returns a list of all user
       permissions (as in, from the default Django permissions code), so the app
       could use this to determine permissions outside of those two flags. (This
       data is visible here.)

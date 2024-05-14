@@ -20,7 +20,7 @@ export const DiscountShow = () => {
                     { record?.redemption_type !== "unlimited" && record?.is_redeemed ? (<Tag color="red">Redeemed</Tag>) : null }
                 </Space>
             </h2>
-            
+
             <Row>
                 <Col span={12}>
                     <Title level={5}>Code</Title>

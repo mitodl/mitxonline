@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("flexiblepricing", "0013_add_flex_price_fk_to_course"),
     ]

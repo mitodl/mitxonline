@@ -1,4 +1,5 @@
 """CMS app serializers"""
+
 import bleach
 from django.templatetags.static import static
 from rest_framework import serializers
@@ -71,12 +72,12 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         """
         financial_assistance_page = None
         if instance.product.programs:
-            valid_program_objs = [program for program in instance.product.programs]
+            valid_program_objs = [program for program in instance.product.programs]  # noqa: C416
             valid_related_programs = []
 
             for valid_program in valid_program_objs:
                 for valid_related_program in valid_program.related_programs:
-                    valid_related_programs.append(valid_related_program)
+                    valid_related_programs.append(valid_related_program)  # noqa: PERF402
 
             valid_program_objs.extend(valid_related_programs)
 
@@ -131,7 +132,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         returnable_members = []
 
         for member in members:
-            returnable_members.append(
+            returnable_members.append(  # noqa: PERF401
                 {
                     "name": member.instructor_name,
                     "description": bleach.clean(
@@ -144,7 +145,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
 
     class Meta:
         model = models.CoursePage
-        fields = BaseCoursePageSerializer.Meta.fields + [
+        fields = BaseCoursePageSerializer.Meta.fields + [  # noqa: RUF005
             "financial_assistance_form_url",
             "current_price",
             "instructors",

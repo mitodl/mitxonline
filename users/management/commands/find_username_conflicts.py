@@ -1,4 +1,3 @@
-import sys
 import unicodedata
 from argparse import RawTextHelpFormatter
 
@@ -11,7 +10,7 @@ class Command(BaseCommand):
     """Finds usernames that would cause conflicts after normalization"""
 
     help = """
-  Finds usernames that would cause conflicts after normalization. 
+  Finds usernames that would cause conflicts after normalization.
   """
 
     def make_normalized_username(self, username):
@@ -30,7 +29,7 @@ class Command(BaseCommand):
         parser.formatter_class = RawTextHelpFormatter
         return parser
 
-    def handle(self, *args, **kwargs):
+    def handle(self, *args, **kwargs):  # noqa: ARG002
         all_users = User.objects.only("id", "username").all()
         username_lookup = {}
 

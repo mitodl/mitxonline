@@ -1,6 +1,7 @@
 """
 Management command to sync all Users, Products, Orders, Lines with Hubspot
 """
+
 import sys
 
 from django.contrib.contenttypes.models import ContentType
@@ -33,7 +34,7 @@ class Command(BaseCommand):
         task = batch_upsert_hubspot_objects.delay(
             HubspotObjectType.CONTACTS.value,
             ContentType.objects.get_for_model(User).model,
-            User._meta.app_label,
+            User._meta.app_label,  # noqa: SLF001
             self.create,
             object_ids=self.object_ids,
         )
@@ -41,9 +42,7 @@ class Command(BaseCommand):
         task.get()
         total_seconds = (now_in_utc() - start).total_seconds()
         self.stdout.write(
-            "Syncing of users to hubspot contacts finished, took {} seconds\n".format(
-                total_seconds
-            )
+            f"Syncing of users to hubspot contacts finished, took {total_seconds} seconds\n"
         )
 
     def sync_products(self):
@@ -54,7 +53,7 @@ class Command(BaseCommand):
         task = batch_upsert_hubspot_objects.delay(
             HubspotObjectType.PRODUCTS.value,
             ContentType.objects.get_for_model(Product).model,
-            Product._meta.app_label,
+            Product._meta.app_label,  # noqa: SLF001
             self.create,
             object_ids=self.object_ids,
         )
@@ -62,9 +61,7 @@ class Command(BaseCommand):
         task.get()
         total_seconds = (now_in_utc() - start).total_seconds()
         self.stdout.write(
-            "Syncing of products to hubspot finished, took {} seconds\n".format(
-                total_seconds
-            )
+            f"Syncing of products to hubspot finished, took {total_seconds} seconds\n"
         )
 
     def sync_deals(self):
@@ -75,7 +72,7 @@ class Command(BaseCommand):
         task = batch_upsert_hubspot_objects.delay(
             HubspotObjectType.DEALS.value,
             ContentType.objects.get_for_model(Order).model,
-            Order._meta.app_label,
+            Order._meta.app_label,  # noqa: SLF001
             self.create,
             object_ids=self.object_ids,
         )
@@ -83,9 +80,7 @@ class Command(BaseCommand):
         task.get()
         total_seconds = (now_in_utc() - start).total_seconds()
         self.stdout.write(
-            "Syncing of orders/lines to hubspot finished, took {} seconds\n".format(
-                total_seconds
-            )
+            f"Syncing of orders/lines to hubspot finished, took {total_seconds} seconds\n"
         )
 
     def sync_lines(self):
@@ -96,7 +91,7 @@ class Command(BaseCommand):
         task = batch_upsert_hubspot_objects.delay(
             HubspotObjectType.LINES.value,
             ContentType.objects.get_for_model(Line).model,
-            Line._meta.app_label,
+            Line._meta.app_label,  # noqa: SLF001
             self.create,
             object_ids=self.object_ids,
         )
@@ -104,9 +99,7 @@ class Command(BaseCommand):
         task.get()
         total_seconds = (now_in_utc() - start).total_seconds()
         self.stdout.write(
-            "Syncing of order lines to hubspot finished, took {} seconds\n".format(
-                total_seconds
-            )
+            f"Syncing of order lines to hubspot finished, took {total_seconds} seconds\n"
         )
 
     def sync_associations(self):
@@ -119,9 +112,7 @@ class Command(BaseCommand):
         task.get()
         total_seconds = (now_in_utc() - start).total_seconds()
         self.stdout.write(
-            "Syncing of deal associations to hubspot finished, took {} seconds\n".format(
-                total_seconds
-            )
+            f"Syncing of deal associations to hubspot finished, took {total_seconds} seconds\n"
         )
 
     def sync_all(self):
@@ -187,7 +178,7 @@ class Command(BaseCommand):
             help="create or update",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         if not options["mode"]:
             sys.stderr.write("You must specify mode ('create' or 'update')\n")
             sys.exit(1)

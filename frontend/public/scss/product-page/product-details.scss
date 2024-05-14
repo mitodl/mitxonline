@@ -175,25 +175,50 @@ body.new-design {
     }
 
     #product-info-box {
-      padding-bottom: 25px;
-      font-size: 16px;
+      font-size: 15px;
       line-height: 24px;
       color: $black;
       max-width: 400px;
-      height: auto;
-      border-radius: 5px;
+      margin-left: 20px;
+      margin-right: 20px;
+      padding: 0;
 
       @include media-breakpoint-down(md) {
-          margin-top: 1.5rem;
+        margin: 0 auto 30px auto;
+      }
+      .product-info-box-container {
+        height: auto;
+        border-radius: 5px;
+        padding: 20px 20px 0 20px;
+        border: 1px solid $home-page-border-grey;
+        margin-top: 20px;
+
+        @include media-breakpoint-down(sm) {
+          border-top: none;
+          border-left: none;
+          border-right: none;
+          padding-top: 0;
         }
+      }
+
 
       strong {
         font-weight: 600;
       }
 
+      .info-link {
+        color: $home-page-header-blue;
+        text-decoration-line: underline;
+
+        &:hover {
+          text-decoration-line: none;
+          color: $brand-darker-bg;
+        }
+      }
+
       .hero-media {
         margin: 7px 15px;
-        max-width: 350px;
+        max-width: 360px;
 
         img {
           border-radius: 5px;
@@ -250,12 +275,8 @@ body.new-design {
         display: flex;
         flex-flow: column;
         align-items: top;
-        margin: 10px 12px;
-        width: 340px;
-
-        @include media-breakpoint-up(xl) {
-          margin: 0 -18px;
-        }
+        margin-top: 10px;
+        width: 360px;
 
         .font-weight-bold {
           font-weight: 600;
@@ -270,9 +291,10 @@ body.new-design {
           text-align: center;
         }
 
-        .btn-enrollment-button.disabled {
+        .btn-enrollment-button:disabled, .btn-gradient-red:disabled {
           color: $white;
-          background-color: grey;
+          background: $dashboard-tab-inactive !important;
+          border-color: $dashboard-tab-inactive;
         }
 
         button.btn-enrollment-button {
@@ -285,11 +307,15 @@ body.new-design {
 
         .enrollment-info-box, .program-info-box {
           margin: 10px 0;
-          padding: 10px 0;
+          padding: 0;
 
-          h3 {
+          .related-programs-info {
             font-size: 16px;
             font-weight: 600;
+
+            img {
+              margin-right: 10px;
+            }
           }
         }
 
@@ -298,20 +324,19 @@ body.new-design {
           border-left: none;
           border-right: none;
           font-size: 15px;
+          padding-top: 10px;
 
           .row {
-            margin: 20px 0;
+            margin: 0 0 20px 0;
           }
 
           .callout {
             padding: 0.9375rem;
-            gap: 0.625rem;
             flex-wrap: nowrap;
             i.warning {
               font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
               color: $warning;
               padding: 0;
-              margin-top: .25rem;
               width: fit-content;
             }
             p{
@@ -319,7 +344,9 @@ body.new-design {
               font-size: 0.875rem;
               color: $home-page-header-blue;
               font-family: Inter, sans-serif;
+              line-height: 15px;
               margin: 0;
+              padding: 0 10px 0 10px;
             }
           }
           .callout-warning{
@@ -329,28 +356,31 @@ body.new-design {
           }
 
           .enrollment-info-icon {
-            max-width: 20px;
-            margin-right: 12px;
+            max-width: 18px;
+            padding: 0;
+            margin-right: 0;
+            margin-top: -2px;
 
             img {
-              max-width: 20px;
+              max-width: 18px;
             }
           }
 
           .enrollment-info-text {
             width: auto;
             flex-grow: 1;
+            color: $helptext-grey;
+            padding-left: 10px;
+            padding-right: 0;
 
-            .pacing-faq-link {
-              color: $home-page-dark-blue;
-              text-decoration-line: underline;
-              float: right;
-              padding: 0;
-              font-size: smaller;
+            span {
+              font-weight: 700;
+              color: black;
             }
 
             .enrollment-effort {
               font-size: smaller;
+              display: inline-block;
             }
 
             .badge-pacing {
@@ -359,22 +389,48 @@ body.new-design {
               margin-left: .5rem;
               padding: 3px;
               font-weight: normal;
+              color: white;
 
             }
           }
-          .more-enrollment-info {
+          .course-certificate-message {
+            background-color: rgba(3, 21, 45, 0.05);
+            padding: 15px;
+            margin-left: 28px;
+            margin-top: 10px;
+
+            div {
+              font-size: 14px;
+            }
+
+            .more-info {
+              padding-right: 12px;
+            }
+          }
+          .more-info {
             width: auto;
-            color: $brand-darker-bg;
-            font-size: 12px;
-            text-decoration-line: underline;
             border-color: transparent;
             background-color: transparent;
-            padding-right: 0;
+            float: right;
+            padding: 0;
+            font-size: smaller;
+          }
+          .more-info.more-dates {
+            height: fit-content;
+            line-height: normal;
+          }
+          .finaid-link {
+            display: block;
+            font-size: 14px;
           }
           .more-dates-enrollment-list{
             list-style: none;
+            font-size: 14px;
+            color: $helptext-grey;
+            margin-top: 5px;
+            margin-bottom: 0;
             li {
-              padding-left: 36px;
+              padding-left: 16px;
             }
             button.more-dates-link {
               font-size: 14px;
@@ -399,6 +455,17 @@ body.new-design {
     }
   }
 
+  .pacing-info-dialog {
+    max-width: 500px;
+
+    .modal-header {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .modal-content {
+      padding: 5px 14px;
+    }
+  }
 
   .upgrade-enrollment-modal {
     max-width: 750px;

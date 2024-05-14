@@ -1,17 +1,22 @@
 """Tests for hubspot_sync.api"""
-import pytest
+
 import json
-from courses.constants import ALL_ENROLL_CHANGE_STATUSES
+
+import pytest
 import reversion
 from django.contrib.contenttypes.models import ContentType
-from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObjectFactory
-from mitol.hubspot_api.models import HubspotObject
 from hubspot.crm.objects import (
     ApiException,
 )
 from mitol.common.utils.datetime import now_in_utc
+from mitol.hubspot_api.factories import HubspotObjectFactory, SimplePublicObjectFactory
+from mitol.hubspot_api.models import HubspotObject
 from reversion.models import Version
 
+from courses.constants import ALL_ENROLL_CHANGE_STATUSES
+from courses.factories import (
+    CourseRunEnrollmentFactory,
+)
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
 from ecommerce.models import Product
 from hubspot_sync import api
@@ -22,14 +27,11 @@ from hubspot_sync.serializers import (
     OrderToDealSerializer,
     ProductSerializer,
 )
-from users.factories import UserFactory
-from courses.factories import (
-    CourseRunEnrollmentFactory,
-)
 from openedx.constants import (
     EDX_ENROLLMENT_AUDIT_MODE,
     EDX_ENROLLMENT_VERIFIED_MODE,
 )
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -165,7 +167,7 @@ def test_sync_contact_with_hubspot_error(mocker, mock_hubspot_api):
             status=400,
         )
     )
-    with pytest.raises(ApiException) as exc:
+    with pytest.raises(ApiException) as exc:  # noqa: F841
         api.sync_contact_with_hubspot(user)
     user.refresh_from_db()
     assert user.hubspot_sync_datetime is None
@@ -190,7 +192,7 @@ def test_existing_user_sync_contact_with_hubspot_error(mocker, mock_hubspot_api)
             status=400,
         )
     )
-    with pytest.raises(ApiException) as exc:
+    with pytest.raises(ApiException) as exc:  # noqa: F841
         api.sync_contact_with_hubspot(user)
     user.refresh_from_db()
     assert user.hubspot_sync_datetime == current_datetime
@@ -239,7 +241,7 @@ def test_sync_line_item_with_hubspot(
 ):
     """Test that the hubspot CRM API is called properly for a line_item sync"""
     line = hubspot_order.lines.first()
-    course_run_enrollment = CourseRunEnrollmentFactory.create(user=line.order.purchaser)
+    course_run_enrollment = CourseRunEnrollmentFactory.create(user=line.order.purchaser)  # noqa: F841
     api.sync_line_item_with_hubspot(line)
     assert (
         api.HubspotObject.objects.get(
@@ -401,7 +403,7 @@ def test_sync_deal_hubspot_ids_to_hubspot(
     )
 
 
-@pytest.mark.parametrize("match_lines,quantity", [[True, 2], [False, 3]])
+@pytest.mark.parametrize("match_lines,quantity", [[True, 2], [False, 3]])  # noqa: PT006, PT007
 def test_sync_deal_line_hubspot_ids_to_hubspot_two_lines(
     mocker, mock_hubspot_api, match_lines, quantity
 ):
@@ -420,7 +422,7 @@ def test_sync_deal_line_hubspot_ids_to_hubspot_two_lines(
         content_type=ContentType.objects.get_for_model(Product),
         object_id=product.id,
     )
-    lines = (
+    lines = (  # noqa: F841
         LineFactory.create(order=order, product_version=version, quantity=1),
         LineFactory.create(order=order, product_version=version, quantity=quantity),
     )
@@ -457,7 +459,7 @@ def test_get_hubspot_id_raises(mocker, user):
     """get_hubspot_id should handle errors appropriately"""
     mocker.patch("hubspot_sync.api.find_contact", side_effect=[ValueError])
     mock_log = mocker.patch("hubspot_sync.api.log.exception")
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(ValueError) as exc:  # noqa: PT011
         get_hubspot_id_for_object(user, raise_error=True)
     mock_log.assert_called_once()
     assert f"Hubspot id could not be found for user for id {user.id}" == str(exc.value)

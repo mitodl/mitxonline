@@ -11,9 +11,9 @@ from courses.factories import (
     CourseRunGradeFactory,
     ProgramCertificateFactory,
     ProgramFactory,
-    ProgramRequirementFactory,
-    program_with_empty_requirements,
-    program_with_requirements,
+    ProgramRequirementFactory,  # noqa: F401
+    program_with_empty_requirements,  # noqa: F401
+    program_with_requirements,  # noqa: F401
 )
 from courses.management.commands import manage_program_certificates
 from courses.models import ProgramCertificate
@@ -54,9 +54,9 @@ def test_program_certificate_management_invalid_program():
         manage_program_certificates.Command().handle(
             user=test_user.username, create=True
         )
-    assert str(
-        command_error.value
-    ) == "Could not find program with readable_id={}.".format(None)
+    assert (
+        str(command_error.value) == f"Could not find program with readable_id={None}."
+    )
 
     with pytest.raises(CommandError) as command_error:
         manage_program_certificates.Command().handle(
@@ -66,7 +66,7 @@ def test_program_certificate_management_invalid_program():
 
 
 @pytest.mark.parametrize(
-    "username, revoke, unrevoke",
+    "username, revoke, unrevoke",  # noqa: PT006
     [
         ("test", True, None),
         ("test", None, True),
@@ -85,13 +85,14 @@ def test_program_certificate_management_revoke_unrevoke_invalid_args(
             unrevoke=unrevoke,
             program=program.readable_id,
         )
-    assert str(
-        command_error.value
-    ) == "Could not find a user with <username or email>={}.".format(username)
+    assert (
+        str(command_error.value)
+        == f"Could not find a user with <username or email>={username}."
+    )
 
 
 @pytest.mark.parametrize(
-    "revoke, unrevoke",
+    "revoke, unrevoke",  # noqa: PT006
     [
         (True, None),
         (None, True),
@@ -104,7 +105,9 @@ def test_program_certificate_management_revoke_unrevoke_success(user, revoke, un
     """
     program = ProgramFactory.create()
     certificate = ProgramCertificateFactory(
-        program=program, user=user, is_revoked=False if revoke else True
+        program=program,
+        user=user,
+        is_revoked=False if revoke else True,  # noqa: SIM211
     )
     manage_program_certificates.Command().handle(
         revoke=revoke,
@@ -113,11 +116,11 @@ def test_program_certificate_management_revoke_unrevoke_success(user, revoke, un
         user=user.username,
     )
     certificate.refresh_from_db()
-    assert certificate.is_revoked is (True if revoke else False)
-    assert certificate.is_revoked is (False if unrevoke else True)
+    assert certificate.is_revoked is (True if revoke else False)  # noqa: SIM210
+    assert certificate.is_revoked is (False if unrevoke else True)  # noqa: SIM211
 
 
-def test_program_certificate_management_create(user, program_with_empty_requirements):
+def test_program_certificate_management_create(user, program_with_empty_requirements):  # noqa: F811
     """
     Test that create operation for program certificate management command
     creates the program certificate for a user
@@ -142,7 +145,7 @@ def test_program_certificate_management_create(user, program_with_empty_requirem
     assert generated_certificates.count() == 1
 
 
-def test_program_certificate_management_force_create(user, program_with_requirements):
+def test_program_certificate_management_force_create(user, program_with_requirements):  # noqa: F811
     """
     Test that create operation for program certificate management command
     forcefully creates the certificate for a user

@@ -1,6 +1,73 @@
 Release Notes
 =============
 
+Version 0.93.1 (Released May 14, 2024)
+--------------
+
+- 4111: dashboard crashes when user profile is incomplete (#2206)
+
+Version 0.93.0 (Released May 13, 2024)
+--------------
+
+- Give priority to enrollable runs (#2198)
+- Add task for creating featured items in cache (#2203)
+
+Version 0.92.1 (Released May 10, 2024)
+--------------
+
+- restrict duplicate enrollment only if user is verified (#2199)
+- add relational dates to ensure all courses end up getting pulled (#2200)
+
+Version 0.92.0 (Released May 09, 2024)
+--------------
+
+- Adding a Learn More link to Archived message (#2194)
+- Adding management command and function for pulling featured items (#2190)
+- Course format pacing info popup (#2187)
+- Remove redux-asserts (#2177)
+- Remove react-swipeable (#2178)
+- chore(deps): update all non-major dev-dependencies (#2171)
+- fix(deps): update dependency redux-asserts to v0.0.12 (#2168)
+
+Version 0.91.1 (Released May 06, 2024)
+--------------
+
+- 4137: mitx online course and program count on catalog page is incorrect in mobile view (#2186)
+- warning message (#2188)
+- Update duplicate enrollment meassage (#2184)
+- fix: Resolve Poetry lock file
+- fix: Resolve failing pre-commit check
+- fix: Resolve minor pre-commit fixes
+- chore(deps): lock file maintenance (#2185)
+- Pre commit linting (#2161)
+- Update dependency react-hot-loader to v4.13.1 (#2166)
+- Update dependency enzyme-adapter-react-16 to v1.15.8 (#2163)
+- Update poetry and yarn lock files (#2183)
+
+Version 0.91.0 (Released May 02, 2024)
+--------------
+
+- 4012: Improve screen reader accessibility of the site-wide banner. (#2180)
+- Add course format and new wording for course box info (#2175)
+- Update dependency object.entries to v1.1.8 (#2164)
+- Update dependency postcss to v8.4.38 (#2165)
+- Update dependency ubuntu to v22 (#2039)
+- Update dependency reselect to v4.1.8 (#2169)
+
+Version 0.90.1 (Released May 01, 2024)
+--------------
+
+- Updating the styles and adding test for course with no runs (#2172)
+- Update dependency style-loader to v3.3.4 (#2170)
+
+Version 0.90.0 (Released April 25, 2024)
+--------------
+
+- Adding end date info to the CourseInfoBox (#2160)
+- Update akhileshns/heroku-deploy digest to 581dd28 (#1196)
+- Course Product Page with no Runs (#2157)
+- Fix: Add nubbins for celery monitoring. (#2159)
+
 Version 0.89.2 (Released April 16, 2024)
 --------------
 

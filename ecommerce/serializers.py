@@ -1,7 +1,7 @@
 """
 MITxOnline ecommerce serializers
 """
-from audioop import add
+
 from decimal import Decimal
 
 import pytz
@@ -13,14 +13,9 @@ from ecommerce import models
 from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
     DISCOUNT_TYPE_DOLLARS_OFF,
-    DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
     DISCOUNT_TYPES,
     PAYMENT_TYPES,
-    REDEMPTION_TYPE_ONE_TIME,
-    REDEMPTION_TYPE_ONE_TIME_PER_USER,
-    REDEMPTION_TYPE_UNLIMITED,
-    REDEMPTION_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
 from ecommerce.models import Basket, BasketItem, Order, Product
@@ -80,8 +75,9 @@ class ProductPurchasableObjectField(serializers.RelatedField):
             return ProgramRunProductPurchasableObjectSerializer(instance=value).data
         elif isinstance(value, CourseRun):
             return CourseRunProductPurchasableObjectSerializer(instance=value).data
-        raise Exception(
-            "Unexpected to find type for Product.purchasable_object:", value.__class__
+        raise Exception(  # noqa: TRY002
+            "Unexpected to find type for Product.purchasable_object:",  # noqa: EM101
+            value.__class__,
         )
 
 
@@ -102,7 +98,7 @@ class ProductSerializer(BaseProductSerializer):
     purchasable_object = ProductPurchasableObjectField(read_only=True)
 
     class Meta:
-        fields = BaseProductSerializer.Meta.fields + [
+        fields = BaseProductSerializer.Meta.fields + [  # noqa: RUF005
             "purchasable_object",
         ]
         model = models.Product
@@ -112,7 +108,7 @@ class ProductFlexibilePriceSerializer(BaseProductSerializer):
     product_flexible_price = serializers.SerializerMethodField()
 
     def get_product_flexible_price(self, instance):
-        if not "request" in self.context:
+        if "request" not in self.context:
             return None
 
         discount_record = determine_courseware_flexible_price_discount(
@@ -121,7 +117,7 @@ class ProductFlexibilePriceSerializer(BaseProductSerializer):
         return DiscountSerializer(discount_record, context=self.context).data
 
     class Meta:
-        fields = BaseProductSerializer.Meta.fields + [
+        fields = BaseProductSerializer.Meta.fields + [  # noqa: RUF005
             "product_flexible_price",
         ]
         model = models.Product
@@ -293,7 +289,7 @@ class OrderSerializer(serializers.ModelSerializer):
     def get_discounts(self, instance):
         discounts = []
         for discount in instance.discounts.all():
-            discounts.append(RedeemedDiscountSerializer(discount).data)
+            discounts.append(RedeemedDiscountSerializer(discount).data)  # noqa: PERF401
         return discounts
 
     def get_refunds(self, instance):
@@ -303,7 +299,7 @@ class OrderSerializer(serializers.ModelSerializer):
             .filter(transaction_type=TRANSACTION_TYPE_REFUND)
             .all()
         ):
-            refunds.append(
+            refunds.append(  # noqa: PERF401
                 {"amount": transaction.amount, "date": transaction.created_on}
             )
 
@@ -338,9 +334,9 @@ class OrderSerializer(serializers.ModelSerializer):
                 "req_bill_to_forename" in transaction.data
                 or "req_bill_to_surname" in transaction.data
             ):
-                data[
-                    "name"
-                ] = f"{transaction.data.get('req_bill_to_forename')} {transaction.data.get('req_bill_to_surname')}"
+                data["name"] = (
+                    f"{transaction.data.get('req_bill_to_forename')} {transaction.data.get('req_bill_to_surname')}"
+                )
             return data
         return None
 
@@ -534,11 +530,11 @@ class TransactionDataSerializer(serializers.BaseSerializer):
 
     def to_representation(self, instance):
         if not isinstance(instance, Order):
-            raise AttributeError()
+            raise AttributeError  # noqa: TRY004
 
         transaction = instance.transactions.order_by("-created_on").first()
 
-        return transaction
+        return transaction  # noqa: RET504
 
 
 class TransactionPurchaseSerializer(TransactionDataSerializer):
@@ -572,9 +568,9 @@ class TransactionPurchaseSerializer(TransactionDataSerializer):
             "req_bill_to_forename" in transaction
             or "req_bill_to_surname" in transaction
         ):
-            data[
-                "name"
-            ] = f"{transaction['req_bill_to_forename']} {transaction['req_bill_to_surname']}"
+            data["name"] = (
+                f"{transaction['req_bill_to_forename']} {transaction['req_bill_to_surname']}"
+            )
 
         return data
 
@@ -631,8 +627,8 @@ class TransactionPurchaserSerializer(TransactionDataSerializer):
 
         return fields
 
-    def get_street_address(self, instance):
-        street_address = [
+    def get_street_address(self, instance):  # noqa: ARG002
+        street_address = [  # noqa: F841
             line
             for line in [
                 self.street_address_1,
@@ -670,11 +666,9 @@ class TransactionLineSerializer(serializers.BaseSerializer):
             readable_id = content_object.program.readable_id
         elif isinstance(content_object, CourseRun):
             readable_id = content_object.course.readable_id
-            content_title = "{} {}".format(
-                content_object.course_number, content_object.title
-            )
+            content_title = f"{content_object.course_number} {content_object.title}"
 
-        line = dict(
+        line = dict(  # noqa: C408
             quantity=instance.quantity,
             total_paid=str(total_paid),
             discount=str(discount),
@@ -686,7 +680,7 @@ class TransactionLineSerializer(serializers.BaseSerializer):
             end_date=content_object.end_date,
         )
 
-        return line
+        return line  # noqa: RET504
 
 
 class OrderReceiptSerializer(serializers.ModelSerializer):

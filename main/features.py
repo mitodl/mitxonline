@@ -1,6 +1,6 @@
 """MITxOnline feature flags"""
+
 import os
-import uuid
 from functools import wraps
 
 from django.conf import settings

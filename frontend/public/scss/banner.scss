@@ -8,6 +8,7 @@
   &.site-wide {
     p {
       margin: 0;
+      display: inline;
     }
   }
 
@@ -16,7 +17,6 @@
     background: $primary;
     text-align: center;
     color: white;
-    height: 60px;
     padding: 15px 20px 15px 20px;
     background: linear-gradient(180deg, #A31F34 0%, #700934 100%);
 

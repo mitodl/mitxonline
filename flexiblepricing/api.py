@@ -1,4 +1,5 @@
 """Flexible price apis"""
+
 import csv
 import logging
 from collections import namedtuple
@@ -9,7 +10,7 @@ import pytz
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
-from django.db import transaction, connection
+from django.db import transaction
 from django.db.models import Q
 from django.utils.text import slugify
 
@@ -35,7 +36,7 @@ from flexiblepricing.models import (
 from main.constants import DISALLOWED_CURRENCY_TYPES
 from main.settings import TIME_ZONE
 
-IncomeThreshold = namedtuple("IncomeThreshold", ["country", "income"])
+IncomeThreshold = namedtuple("IncomeThreshold", ["country", "income"])  # noqa: PYI024
 log = logging.getLogger(__name__)
 
 
@@ -49,7 +50,7 @@ def parse_country_income_thresholds(csv_path):
     Returns:
         list of IncomeThreshold, list:
     """
-    with open(csv_path) as csv_file:
+    with open(csv_path) as csv_file:  # noqa: PTH123
         reader = csv.DictReader(csv_file)
 
         header_row = reader.fieldnames
@@ -57,15 +58,15 @@ def parse_country_income_thresholds(csv_path):
             for field in INCOME_THRESHOLD_FIELDS:
                 if field not in header_row:
                     raise CountryIncomeThresholdException(
-                        f"Unable to find column header {field}"
+                        f"Unable to find column header {field}"  # noqa: EM102
                     )
         else:
-            raise CountryIncomeThresholdException("Unable to find the header row")
+            raise CountryIncomeThresholdException("Unable to find the header row")  # noqa: EM101
 
         income_thresholds = [
             IncomeThreshold(country=row[COUNTRY], income=row[INCOME]) for row in reader
         ]
-        return income_thresholds
+        return income_thresholds  # noqa: RET504
 
 
 def import_country_income_thresholds(csv_path):
@@ -118,7 +119,7 @@ def get_ordered_eligible_coursewares(courseware):
         for program in courseware.programs:
             program_relations += program.related_programs
 
-        return courseware.programs + [courseware] + program_relations
+        return courseware.programs + [courseware] + program_relations  # noqa: RUF005
     if isinstance(courseware, ProgramRun) and courseware.program is not None:
         return [courseware.program] + [
             program_tuple[0] for program_tuple in courseware.program.related_programs
@@ -163,7 +164,7 @@ def determine_tier_courseware(courseware, income):
 
     message = (
         "$0-income-threshold Tier has not yet been configured for Courseware "
-        "with id {courseware_id}.".format(courseware_id=courseware.id)
+        f"with id {courseware.id}."
     )
     log.error(message)
     raise ImproperlyConfigured(message)
@@ -185,7 +186,7 @@ def determine_auto_approval(flexible_price, tier):
         )
         income_threshold = country_income_threshold.income_threshold
     except CountryIncomeThreshold.DoesNotExist:
-        log.error(
+        log.error(  # noqa: TRY400
             "Country code %s does not exist in CountryIncomeThreshold for flexible price id %s",
             flexible_price.country_of_income,
             flexible_price.id,
@@ -218,10 +219,10 @@ def determine_income_usd(original_income, original_currency):
             currency_code=original_currency
         )
     except CurrencyExchangeRate.DoesNotExist:
-        raise NotSupportedException("Currency not supported")
+        raise NotSupportedException("Currency not supported")  # noqa: B904, EM101
     exchange_rate = exchange_rate_object.exchange_rate
     income_usd = original_income / exchange_rate
-    return income_usd
+    return income_usd  # noqa: RET504
 
 
 def determine_courseware_flexible_price_discount(product, user):
@@ -341,11 +342,11 @@ def update_currency_exchange_rate(rates, currency_descriptions):
 
     for currency in rates:
         if currency in DISALLOWED_CURRENCY_TYPES:
-            log.info(f"Skipping create on {currency}, in disallow list")
+            log.info(f"Skipping create on {currency}, in disallow list")  # noqa: G004
             continue
 
         description = (
-            currency_descriptions[currency]
+            currency_descriptions[currency]  # noqa: SIM401
             if currency in currency_descriptions
             else None
         )
@@ -360,7 +361,10 @@ def update_currency_exchange_rate(rates, currency_descriptions):
 
 
 def create_default_flexible_pricing_page(
-    object: Union[Course, Program], forceCourse: bool = False, *args, **kwargs
+    object: Union[Course, Program],  # noqa: A002, FA100
+    forceCourse: bool = False,  # noqa: FBT001, FBT002
+    *args,  # noqa: ARG001
+    **kwargs,
 ):
     """
     Creates a default flexible pricing page for the given courseware object.
@@ -391,10 +395,9 @@ def create_default_flexible_pricing_page(
     """
     from cms.models import FlexiblePricingRequestForm
 
-    if isinstance(object, Program):
-        courseware = object
-    elif (isinstance(object, Course) and forceCourse) or (
-        isinstance(object, Course) and len(object.programs) == 0
+    if isinstance(object, Program) or (
+        (isinstance(object, Course) and forceCourse)
+        or (isinstance(object, Course) and len(object.programs) == 0)
     ):
         courseware = object
     else:
@@ -405,7 +408,7 @@ def create_default_flexible_pricing_page(
         )
 
     if courseware.page is None:
-        raise Exception(f"No page for courseware object {courseware}, can't continue.")
+        raise Exception(f"No page for courseware object {courseware}, can't continue.")  # noqa: EM102, TRY002
 
     parent_page = courseware.page
 

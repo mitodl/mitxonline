@@ -23,11 +23,11 @@ def assert_not_raises():
         yield
     except AssertionError:
         raise
-    except Exception:  # pylint: disable=broad-except
+    except Exception:  # pylint: disable=broad-except  # noqa: BLE001
         pytest.fail(f"An exception was not raised: {traceback.format_exc()}")
 
 
-def assert_drf_json_equal(obj1, obj2, ignore_order=False):
+def assert_drf_json_equal(obj1, obj2, ignore_order=False):  # noqa: FBT002
     """
     Asserts that two objects are equal after a round trip through JSON serialization/deserialization.
     Particularly helpful when testing DRF serializers where you may get back OrderedDict and other such objects.
@@ -74,7 +74,7 @@ class MockHttpError(HTTPError):
 
     def __init__(self, *args, **kwargs):
         response = MockResponse(content={"bad": "response"}, status_code=400)
-        super().__init__(*args, **{**kwargs, **{"response": response}})
+        super().__init__(*args, **{**kwargs, "response": response})
 
 
 def drf_datetime(dt):
@@ -102,11 +102,11 @@ def create_tempfile_csv(rows_iter):
         SimpleUploadedFile: A temporary CSV file with the given contents
     """
     f = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
-    with open(f.name, "w", encoding="utf8", newline="") as f:
+    with open(f.name, "w", encoding="utf8", newline="") as f:  # noqa: PTH123
         writer = csv.writer(f, delimiter=",")
         for row in rows_iter:
             writer.writerow(row)
-    with open(f.name, "r") as user_csv:
+    with open(f.name) as user_csv:  # noqa: PTH123
         return SimpleUploadedFile(
             f.name, user_csv.read().encode("utf8"), content_type="application/csv"
         )
@@ -189,5 +189,6 @@ def duplicate_queries_check(context):
         logger = logging.getLogger()
         dupes = [value for query, value in count_of_requests.items() if value > 1]
         logger.info(
-            f"{len(dupes)} out of {total_queries} queries duplicated", stacklevel=2
+            f"{len(dupes)} out of {total_queries} queries duplicated",  # noqa: G004
+            stacklevel=2,
         )

@@ -96,7 +96,7 @@ class Command(BaseCommand):
             dest="depts",
         )
 
-    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def handle(self, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: C901, PLR0915
         edx_course_detail = get_edx_api_course_detail_client()
         edx_courses = []
 
@@ -114,7 +114,7 @@ class Command(BaseCommand):
 
                 if course is not None:
                     edx_courses.append(course)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.stdout.write(
                     self.style.ERROR(
                         f"Could not retrieve data for {kwargs['courserun']}: {e}"
@@ -129,12 +129,12 @@ class Command(BaseCommand):
                     program = Program.objects.filter(
                         readable_id=kwargs["program"]
                     ).get()
-            except:
+            except:  # noqa: E722
                 self.stdout.write(
                     self.style.ERROR(f"Program {kwargs['program']} not found.")
                 )
                 return False
-            for course, title in program.courses:
+            for course, title in program.courses:  # noqa: B007
                 if course.courseruns.filter(run_tag=kwargs["run_tag"]).count() == 0:
                     try:
                         edx_course = edx_course_detail.get_detail(
@@ -144,7 +144,7 @@ class Command(BaseCommand):
 
                         if edx_course is not None:
                             edx_courses.append(edx_course)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         self.stdout.write(
                             self.style.ERROR(
                                 f"Could not retrieve data for {course.readable_id}+{kwargs['run_tag']}, skipping it: {e}"
@@ -224,7 +224,7 @@ class Command(BaseCommand):
                             f"Created CMS page for {new_run.course.readable_id}"
                         )
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     self.stdout.write(
                         self.style.ERROR(
                             f"Could not create CMS page {new_run.course.readable_id}, skipping it: {e}"
@@ -275,4 +275,4 @@ class Command(BaseCommand):
                         )
                     )
 
-        self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))
+        self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))  # noqa: RET503

@@ -13,6 +13,7 @@ Check the usages of this command below:
 4. Keep failed enrollments
 ./manage.py create_verified_enrollment -—user=<username or email> -—run=<course_run_courseware_id> -code=<enrollment_code or discount_code> -k or --keep-failed-enrollments
 """
+
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandError
@@ -67,7 +68,7 @@ class Command(BaseCommand):
         )
         super().add_arguments(parser)
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002, C901
         """Handle command execution"""
         user = fetch_user(options["user"])
         force_enrollment = options["force"]
@@ -75,7 +76,7 @@ class Command(BaseCommand):
         run = CourseRun.objects.filter(courseware_id=options["run"]).first()
         if run is None:
             raise CommandError(
-                "Could not find course run with courseware_id={}".format(options["run"])
+                "Could not find course run with courseware_id={}".format(options["run"])  # noqa: EM103
             )
 
         product = Product.objects.filter(
@@ -83,20 +84,20 @@ class Command(BaseCommand):
         ).first()
         if product is None:
             raise CommandError(
-                "No product found for that course with courseware_id={}".format(
+                "No product found for that course with courseware_id={}".format(  # noqa: EM103
                     options["run"]
                 )
             )
         if PaidCourseRun.fulfilled_paid_course_run_exists(user, run):
             raise CommandError(
-                "User {} already enrolled in this course with courseware_id={}".format(
+                "User {} already enrolled in this course with courseware_id={}".format(  # noqa: EM103
                     options["user"], options["run"]
                 )
             )
 
         if not force_enrollment and not run.is_upgradable:
             raise CommandError(
-                "The course with courseware_id={} is not upgradeable or the upgrade deadline has been passed".format(
+                "The course with courseware_id={} is not upgradeable or the upgrade deadline has been passed".format(  # noqa: EM103
                     options["run"]
                 )
             )
@@ -108,19 +109,19 @@ class Command(BaseCommand):
         )
         if not discount:
             raise CommandError(
-                "That enrollment code {} does not exist".format(options["code"])
+                "That enrollment code {} does not exist".format(options["code"])  # noqa: EM103
             )
 
         if not discount.check_validity_with_products([product]):
             raise CommandError(
-                "That enrollment code {} is invalid for course with courseware_id={}".format(
+                "That enrollment code {} is invalid for course with courseware_id={}".format(  # noqa: EM103
                     options["code"], options["run"]
                 )
             )
 
         if not discount.check_validity(user):
             raise CommandError(
-                "That enrollment code {} for course with courseware_id={} is invalid for user {}".format(
+                "That enrollment code {} for course with courseware_id={} is invalid for user {}".format(  # noqa: EM103
                     options["code"], options["run"], options["user"]
                 )
             )
@@ -128,11 +129,11 @@ class Command(BaseCommand):
         discounted_price = DiscountType.get_discounted_price([discount], product)
 
         if discounted_price > 0:
-            raise CommandError("Enrollment code is not 100% off")
+            raise CommandError("Enrollment code is not 100% off")  # noqa: EM101
 
         if run.course.is_country_blocked(user):
             raise CommandError(
-                "Enrollment is blocked of this course with courseware_id={} for user {}".format(
+                "Enrollment is blocked of this course with courseware_id={} for user {}".format(  # noqa: EM103
                     options["run"], options["user"]
                 )
             )
@@ -145,7 +146,7 @@ class Command(BaseCommand):
                 mode=EDX_ENROLLMENT_VERIFIED_MODE,
             )
             if not successful_enrollments:
-                raise CommandError("Failed to create the enrollment record")
+                raise CommandError("Failed to create the enrollment record")  # noqa: EM101
             order = PendingOrder.create_from_product(product, user, discount)
             fulfill_completed_order(
                 order, payment_data=ZERO_PAYMENT_DATA, already_enrolled=True

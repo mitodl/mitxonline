@@ -65,18 +65,18 @@ class Command(BaseCommand):
             help="Create 'active' product. Default is 'inactive'",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: ARG002
         program_readable_id = options["program"]
         price = options["price"]
-        active = True if options["active"] else False
+        active = True if options["active"] else False  # noqa: SIM210
 
         program = Program.objects.filter(readable_id=program_readable_id).first()
         if program is None:
             raise CommandError(
-                f"Could not find program with readable_id - {self.PROGRAM_READABLE_ID}"
+                f"Could not find program with readable_id - {self.PROGRAM_READABLE_ID}"  # noqa: EM102
             )
 
-        course_ids = [course.id for (course, type) in program.courses]
+        course_ids = [course.id for (course, type) in program.courses]  # noqa: A001
         course_runs = CourseRun.objects.select_related("course").filter(
             course_id__in=course_ids
         )
@@ -108,4 +108,4 @@ class Command(BaseCommand):
                     f"Active product for course run - {course_run.readable_id} already exists - Skipping."
                 )
 
-        self.stdout.write(self.style.SUCCESS(f"Done!"))
+        self.stdout.write(self.style.SUCCESS("Done!"))

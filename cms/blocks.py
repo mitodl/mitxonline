@@ -1,6 +1,7 @@
 """
 Wagtail custom blocks for the CMS
 """
+
 from django import forms
 from django.apps import apps
 from django.core.exceptions import ValidationError
@@ -84,7 +85,7 @@ def validate_unique_readable_ids(value):
     unique readable IDs
     """
     # We want to validate the overall stream not underlying blocks individually
-    if len(value) < 2:
+    if len(value) < 2:  # noqa: PLR2004
         return
     items = [
         stream_block.value.get("readable_id")

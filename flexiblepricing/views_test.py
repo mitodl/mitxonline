@@ -15,17 +15,17 @@ from flexiblepricing.factories import (
 pytestmark = [pytest.mark.django_db]
 
 
-@pytest.fixture()
+@pytest.fixture
 def income_threshold():
     return CountryIncomeThresholdFactory.create()
 
 
-@pytest.fixture()
+@pytest.fixture
 def exchange_rate():
     return CurrencyExchangeRateFactory.create()
 
 
-@pytest.fixture()
+@pytest.fixture
 def flexible_price_application():
     return FlexiblePriceFactory.create()
 
@@ -38,7 +38,7 @@ def test_basic_country_income_thresholds(user_drf_client, income_threshold):
     assert resp.status_code == 200
     assert len(resp.json()) >= 1
 
-    random_threshold = random.randrange(2500, 180000, 2500)
+    random_threshold = random.randrange(2500, 180000, 2500)  # noqa: S311
 
     new_threshold = {"country_code": "XX", "income_threshold": random_threshold}
 
@@ -64,7 +64,7 @@ def test_basic_exchange_rates(user_drf_client, exchange_rate):
     assert resp.status_code == 200
     assert len(resp.json()) >= 1
 
-    random_rate = random.randrange(0, 100, 1) / 100
+    random_rate = random.randrange(0, 100, 1) / 100  # noqa: S311
     new_rate = {"currency_code": "XXX", "exchange_rate": random_rate}
 
     resp = user_drf_client.post(reverse("fp_exchangerates_api-list"), new_rate)

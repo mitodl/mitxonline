@@ -1,4 +1,5 @@
 """Courseware urls"""
+
 from django.urls import path
 
 from openedx import views

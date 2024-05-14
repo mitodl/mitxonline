@@ -35,16 +35,9 @@ export const isLinkableCourseRun = (
   return notNil(run.start_date) && moment(run.start_date).isBefore(now)
 }
 
-export const isWithinEnrollmentPeriod = (run: CourseRunDetail): boolean => {
+export const isEnrollmentFuture = (run: CourseRunDetail): boolean => {
   const enrollStart = run.enrollment_start ? moment(run.enrollment_start) : null
-  const enrollEnd = run.enrollment_end ? moment(run.enrollment_end) : null
-  const now = moment()
-
-  return (
-    !!enrollStart &&
-    now.isAfter(enrollStart) &&
-    (isNil(enrollEnd) || now.isBefore(enrollEnd))
-  )
+  return !!enrollStart && moment().isBefore(enrollStart)
 }
 
 export const courseRunStatusMessage = (run: CourseRun) => {
@@ -236,7 +229,11 @@ export const getFirstRelevantRun = (
    Returns: CourseRunDetail
   */
 
-  if (course.courseruns.length === 0 || courseRuns.length === 0) {
+  if (
+    course.courseruns.length === 0 ||
+    courseRuns === null ||
+    courseRuns.length === 0
+  ) {
     return null
   }
 
@@ -245,24 +242,38 @@ export const getFirstRelevantRun = (
   }
 
   const now = moment()
-
-  if (
-    courseRuns.some(
-      run => run.start_date && moment(run.start_date).isSameOrAfter(now)
-    )
-  ) {
-    return courseRuns
-      .filter(
+  const enrollableRuns = courseRuns.filter(run => run.is_enrollable)
+  if (enrollableRuns.length > 0) {
+    if (
+      enrollableRuns.some(
         run => run.start_date && moment(run.start_date).isSameOrAfter(now)
       )
+    ) {
+      return enrollableRuns
+        .filter(
+          run => run.start_date && moment(run.start_date).isSameOrAfter(now)
+        )
+        .reduce((prev, curr) =>
+          moment(curr.start_date).isBefore(moment(prev.start_date))
+            ? curr
+            : prev
+        )
+    }
+
+    return enrollableRuns
+      .filter(run => run.start_date && moment(run.start_date).isBefore(now))
       .reduce((prev, curr) =>
-        moment(curr.start_date).isBefore(moment(prev.start_date)) ? curr : prev
+        moment(curr.start_date).isBefore(moment(prev.start_date)) ? prev : curr
       )
   }
-
-  return courseRuns
-    .filter(run => run.start_date && moment(run.start_date).isBefore(now))
-    .reduce((prev, curr) =>
-      moment(curr.start_date).isBefore(moment(prev.start_date)) ? prev : curr
+  // no enrollable runs, then check for future runs
+  const futureRuns = courseRuns.filter(
+    run => run.start_date && moment(run.start_date).isSameOrAfter(now)
+  )
+  if (futureRuns.length > 0) {
+    return futureRuns.reduce((prev, curr) =>
+      moment(curr.start_date).isBefore(moment(prev.start_date)) ? curr : prev
     )
+  }
+  return null
 }

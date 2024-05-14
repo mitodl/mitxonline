@@ -1,5 +1,6 @@
 // @flow
 import casual from "casual-browserify"
+import moment from "moment-timezone"
 
 import { incrementer } from "./util"
 
@@ -46,39 +47,35 @@ export const makeCoursePage = (): CoursePage => ({
   effort:                        casual.text
 })
 
-export const makeCourseRun = (): CourseRun => ({
-  title:            casual.text,
-  start_date:       casual.moment.add(2, "M").format(),
-  end_date:         casual.moment.add(4, "M").format(),
-  enrollment_start: casual.moment.add(-1, "M").format(),
-  enrollment_end:   casual.moment.add(3, "M").format(),
-  upgrade_deadline: casual.moment.add(4, "M").format(),
-  courseware_url:   casual.url,
-  courseware_id:    casual.word.concat(genCoursewareId.next().value),
-  run_tag:          casual.word.concat(genRunTagNumber.next().value),
-  // $FlowFixMe
-  id:               genCourseRunId.next().value,
-  course_number:    casual.word,
-  products:         [],
-  departments:      [makeDepartment()],
-  live:             true
-})
+export const makeCourseRun = (): CourseRun => {
+  const now = moment()
+  return {
+    title:            casual.text,
+    start_date:       now.add(2, "M").format(),
+    end_date:         now.add(4, "M").format(),
+    enrollment_start: now.add(-1, "M").format(),
+    enrollment_end:   now.add(3, "M").format(),
+    upgrade_deadline: casual.moment.add(4, "M").format(),
+    courseware_url:   casual.url,
+    courseware_id:    casual.word.concat(genCoursewareId.next().value),
+    run_tag:          casual.word.concat(genRunTagNumber.next().value),
+    is_enrollable:    true,
+    // $FlowFixMe
+    id:               genCourseRunId.next().value,
+    course_number:    casual.word,
+    products:         [],
+    departments:      [makeDepartment()],
+    live:             true
+  }
+}
 
 export const makeCourseRunWithProduct = (): CourseRun => ({
-  title:            casual.text,
-  start_date:       casual.moment.add(2, "M").format(),
-  end_date:         casual.moment.add(4, "M").format(),
-  enrollment_start: casual.moment.add(-1, "M").format(),
-  enrollment_end:   casual.moment.add(3, "M").format(),
-  upgrade_deadline: casual.moment.add(4, "M").format(),
-  courseware_url:   casual.url,
-  courseware_id:    casual.word.concat(genCoursewareId.next().value),
-  run_tag:          casual.word.concat(genRunTagNumber.next().value),
-  // $FlowFixMe
-  id:               genCourseRunId.next().value,
-  course_number:    casual.word,
-  is_upgradable:    true,
-  products:         [
+  ...makeCourseRun(),
+  upgrade_deadline: moment()
+    .add(4, "M")
+    .format(),
+  is_upgradable: true,
+  products:      [
     {
       description:            casual.text,
       id:                     genProductId.next().value,
@@ -226,6 +223,13 @@ export const makeCourseDetailWithRuns = (): CourseDetailWithRuns => {
   return {
     ...makeCourseDetail(),
     courseruns: [makeCourseRun()]
+  }
+}
+
+export const makeCourseDetailNoRuns = (): CourseDetail => {
+  return {
+    ...makeCourseDetail(),
+    courseruns: []
   }
 }
 

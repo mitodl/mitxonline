@@ -1,8 +1,6 @@
 """Custom Wagtail templatetags"""
-from urllib.parse import urlencode, urljoin
 
 from django import template
-from django.conf import settings
 
 from cms.api import get_wagtail_img_src
 

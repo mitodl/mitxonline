@@ -1,6 +1,6 @@
-from mitol.google_sheets_deferrals.hooks import hookimpl, DeferralResult
-from mitol.google_sheets_deferrals.utils import DeferralRequestRow
 from mitol.google_sheets.utils import ResultType
+from mitol.google_sheets_deferrals.hooks import DeferralResult, hookimpl
+from mitol.google_sheets_deferrals.utils import DeferralRequestRow
 
 from courses.api import defer_enrollment
 from users.api import fetch_user
@@ -23,8 +23,8 @@ class DeferralPlugin:
             force=True,
         )
         if to_courseware_id and not to_enrollment:
-            message = "Failed to create/update the target enrollment ({})".format(
-                to_courseware_id
+            message = (
+                f"Failed to create/update the target enrollment ({to_courseware_id})"
             )
             return DeferralResult(ResultType.FAILED, message)
         return DeferralResult(ResultType.PROCESSED)

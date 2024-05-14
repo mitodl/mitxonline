@@ -1,14 +1,13 @@
 import pytest
-
-from mitol.google_sheets_refunds.api import RefundRequestHandler
 from mitol.google_sheets_deferrals.api import DeferralRequestHandler
+from mitol.google_sheets_refunds.api import RefundRequestHandler
 
 from sheets.tasks import process_google_sheets_requests
 
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "refunds_is_configured, deferrals_is_configured",
+    "refunds_is_configured, deferrals_is_configured",  # noqa: PT006
     [(True, True), (False, False)],
 )
 def test_process_google_sheets_requests(

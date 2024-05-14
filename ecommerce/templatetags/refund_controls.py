@@ -1,6 +1,5 @@
-from django.contrib.admin.templatetags.admin_modify import submit_row
 from django import template
-from django.template.context import Context
+from django.contrib.admin.templatetags.admin_modify import submit_row
 
 register = template.Library()
 

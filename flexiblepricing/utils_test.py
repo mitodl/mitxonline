@@ -1,14 +1,14 @@
-import pytest
 import factory
+import pytest
 
-from flexiblepricing.utils import ensure_flexprice_form_fields
 from cms.factories import FlexiblePricingFormFactory
 from cms.models import FormField
+from flexiblepricing.utils import ensure_flexprice_form_fields
 
 pytestmark = [pytest.mark.django_db]
 
 
-@pytest.fixture()
+@pytest.fixture
 def flex_price_form():
     return FlexiblePricingFormFactory.create()
 
@@ -30,7 +30,7 @@ def test_form_with_no_fields(flex_price_form):
 
     for field in flex_price_form.form_fields.all():
         assert (
-            field.clean_name == "income_currency" or field.clean_name == "your_income"
+            field.clean_name == "income_currency" or field.clean_name == "your_income"  # noqa: PLR1714
         )
 
 

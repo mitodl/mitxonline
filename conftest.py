@@ -1,14 +1,15 @@
 """Project conftest"""
-from types import SimpleNamespace
+
+from types import SimpleNamespace  # noqa: F401
 
 import pytest
 
-from fixtures.common import *
+from fixtures.common import *  # noqa: F403
 from main import features
 
 
 @pytest.fixture(autouse=True)
-def default_settings(monkeypatch, settings):
+def default_settings(monkeypatch, settings):  # noqa: PT004
     """Set default settings for all tests"""
     monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "main.settings")
 
@@ -17,7 +18,7 @@ def default_settings(monkeypatch, settings):
 
 
 @pytest.fixture(autouse=True)
-def mocked_product_signal(mocker):
+def mocked_product_signal(mocker):  # noqa: PT004
     """Mock hubspot_sync signals"""
     mocker.patch("ecommerce.signals.sync_hubspot_product")
 
@@ -33,14 +34,14 @@ def pytest_addoption(parser):
 
 def pytest_cmdline_main(config):
     """Pytest hook that runs after command line options are parsed"""
-    if getattr(config.option, "simple") is True:
+    if config.option.simple is True:
         config.option.pylint = False
         config.option.no_pylint = True
 
 
 def pytest_configure(config):
     """Pytest hook to perform some initial configuration"""
-    if getattr(config.option, "simple") is True:
+    if config.option.simple is True:
         # NOTE: These plugins are already configured by the time the pytest_cmdline_main hook is run, so we can't
         #       simply add/alter the command line options in that hook. This hook is being used to
         #       reconfigure/unregister plugins that we can't change via the pytest_cmdline_main hook.

@@ -2,21 +2,21 @@ import bleach
 import pytest
 from django.contrib.auth.models import AnonymousUser
 
-from cms.factories import FlexiblePricingFormFactory, CoursePageFactory
+from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
 from cms.serializers import CoursePageSerializer
 from courses.factories import (
-    CourseRunFactory,
     CourseRunEnrollmentFactory,
+    CourseRunFactory,
     CourseRunGradeFactory,
 )
 from courses.models import Department
 from courses.serializers.v1.base import BaseCourseSerializer, CourseRunGradeSerializer
 from courses.serializers.v1.courses import (
-    CourseRunSerializer,
-    CourseWithCourseRunsSerializer,
-    CourseSerializer,
-    CourseRunWithCourseSerializer,
     CourseRunEnrollmentSerializer,
+    CourseRunSerializer,
+    CourseRunWithCourseSerializer,
+    CourseSerializer,
+    CourseWithCourseRunsSerializer,
 )
 from courses.serializers.v1.programs import ProgramSerializer
 from ecommerce.serializers import BaseProductSerializer
@@ -137,6 +137,7 @@ def test_serialize_course_run():
             "expiration_date": drf_datetime(course_run.expiration_date),
             "upgrade_deadline": drf_datetime(course_run.upgrade_deadline),
             "is_upgradable": course_run.is_upgradable,
+            "is_enrollable": course_run.is_enrollable,
             "id": course_run.id,
             "products": [],
             "approved_flexible_price_exists": False,
@@ -171,6 +172,7 @@ def test_serialize_course_run_with_course():
             course_run.certificate_available_date
         ),
         "is_upgradable": course_run.is_upgradable,
+        "is_enrollable": course_run.is_enrollable,
         "is_self_paced": False,
         "id": course_run.id,
         "products": BaseProductSerializer(course_run.products, many=True).data,

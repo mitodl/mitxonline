@@ -1,23 +1,64 @@
+---
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
-  - repo: git@github.com:Yelp/detect-secrets
-    rev: v0.14.2
-    hooks:
-    -   id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
-        exclude: .*_test.*|yarn\.lock
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.3.0
+    rev: v4.6.0
     hooks:
-    - id: end-of-file-fixer
-      verbose: true
-    - id: trailing-whitespace
-  - repo: https://github.com/psf/black
-    rev: 22.10.0
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+        exclude: ".hbs$"
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: debug-statements
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.8.0-1
     hooks:
-    - id: black
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
+      - id: shfmt
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.35.1
     hooks:
-    - id: isort
+      - id: yamllint
+        args: [--format, parsable, -d, relaxed]
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args:
+          - --baseline
+          - .secrets.baseline
+          - --exclude-files
+          - .yarn/
+          - --exclude-files
+          - ".*_test.py"
+          - --exclude-files
+          - "test_.*.py"
+          - --exclude-files
+          - poetry.lock
+          - --exclude-files
+          - yarn.lock
+          - --exclude-files
+          - compliance/test_data/cybersource/
+          - --exclude-files
+          - ".*_test.js"
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.4.1"
+    hooks:
+      - id: ruff-format
+      - id: ruff
+        args:
+          - --extend-ignore=D1
+          - --fix
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        args: ["--severity=warning"]
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.6.27
+    hooks:
+      - id: actionlint
+        name: actionlint
+        description: Runs actionlint to lint GitHub Actions workflow files

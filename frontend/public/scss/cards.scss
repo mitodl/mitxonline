@@ -31,7 +31,7 @@ div.std-card {
     border-radius: 5px;
     background: #FFF;
     margin-bottom: 30px;
-    
+
     /* Dropshadow */
     box-shadow: $card-drop-shadow;
 
@@ -84,7 +84,7 @@ div.std-card {
 
         hr {
             margin: 26px 0 30px 0;
-            
+
             border-bottom: 1px solid $home-page-border-grey;
         }
 
@@ -118,8 +118,8 @@ div.std-card {
         }
 
         div {
-            gap: 10px;       
-            align-self: stretch; 
+            gap: 10px;
+            align-self: stretch;
             padding-bottom: 0;
             margin-bottom: 30px;
         }
@@ -141,7 +141,7 @@ div.std-card {
                 color: $footer-blue-bg;
                 font-family: Inter;
                 font-size: 14px;
-                line-height: 18px; /* 128.571% */ 
+                line-height: 18px; /* 128.571% */
                 margin-bottom: 10px;
 
                 &.label-helptext {
@@ -158,9 +158,9 @@ div.std-card {
                 align-self: stretch;
                 border-radius: 5px;
                 border: 1px solid $home-page-border-grey;
-                background: #FFF;        
+                background: #FFF;
             }
-            
+
             span.required {
                 color: $brand-darker-bg;
             }
@@ -199,7 +199,7 @@ div.std-card {
             flex-direction: column;
             justify-content: center;
             align-items: center;
-        
+
             border-radius: 5px;
             background: $brand-button-bg;
             color: white;
@@ -233,7 +233,7 @@ div.std-card {
 
         &.edit-profile-page, &.create-account-page, &.my-account-page, &.financial-assistance-page, &.checkout-page {
             div.form-group {
-                margin-bottom: 16px; 
+                margin-bottom: 16px;
             }
 
             div.form-check {
@@ -286,11 +286,11 @@ div.std-card {
             h5 {
                 margin-bottom: 0;
             }
-            
-            div.order-pricing-info{
-                padding: 10px 0px 0px 0px; 
 
-                border-bottom: 1px solid $home-page-border-grey; 
+            div.order-pricing-info{
+                padding: 10px 0px 0px 0px;
+
+                border-bottom: 1px solid $home-page-border-grey;
 
                 div {
                     font-size: 16px;
@@ -316,9 +316,9 @@ div.std-card {
                     padding: 12px 20px !important;
                     width: auto;
                     font-weight: 600;
-                }    
+                }
             }
-    
+
             button.btn-place-order#place-order-button {
                 width: 100%;
                 font-weight: 700;
@@ -370,7 +370,7 @@ div.std-card-body, div.enrolled-item, div.cart-helptext {
         &.std-card-auth {
             width: 100%;
         }
-    
+
         div.std-card-body {
             &.edit-profile-page, &.create-account-page, &.my-account-page, &.financial-assistance-page, &.checkout-page {
                 label.label-helptext {
@@ -393,4 +393,3 @@ div.std-card-body, div.enrolled-item, div.cart-helptext {
         }
     }
 }
-
