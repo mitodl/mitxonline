@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.93.1
+Version 0.93.1 (Released May 14, 2024)
 --------------
 
 - 4111: dashboard crashes when user profile is incomplete (#2206)
