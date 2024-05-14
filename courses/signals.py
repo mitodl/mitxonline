@@ -21,7 +21,7 @@ from hubspot_sync.task_helpers import sync_hubspot_user
     dispatch_uid="courseruncertificate_post_save",
 )
 def handle_create_course_run_certificate(
-    sender,
+    sender,  # pylint: disable=unused-argument  # noqa: ARG001
     instance,
     created,
     **kwargs,  # pylint: disable=unused-argument  # noqa: ARG001
