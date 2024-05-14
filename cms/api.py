@@ -7,7 +7,7 @@ from urllib.parse import urlencode, urljoin
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.cache import cache
+from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from mitol.common.utils import now_in_utc
@@ -320,9 +320,10 @@ def create_featured_items():
 
     This will only be used by cron task or management command.
     """
-    featured_courses = cache.get("CMS_homepage_featured_courses")
+    redis_cache = caches["redis"]
+    featured_courses = redis_cache.get("CMS_homepage_featured_courses")
     if featured_courses is not None:
-        cache.delete("CMS_homepage_featured_courses")
+        redis_cache.delete("CMS_homepage_featured_courses")
 
     now = now_in_utc()
     end_of_day = now + timedelta(days=1)
@@ -370,6 +371,7 @@ def create_featured_items():
     featured_courses.extend(list(started_featured_courses))
 
     # Set the value in cache for 24 hours
-    cache.set("CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE)
-    cache.close()
+    redis_cache.set(
+        "CMS_homepage_featured_courses", featured_courses, HOMEPAGE_CACHE_AGE
+    )
     return featured_courses

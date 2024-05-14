@@ -10,7 +10,7 @@ from urllib.parse import quote_plus
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.cache import cache
+from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -747,15 +747,17 @@ class HomePage(VideoPlayerConfigMixin):
         """
         start_of_day = now_in_utc() - timedelta(days=1)
         end_of_day = now_in_utc() + timedelta(days=1)
-        cached_featured_products = cache.get("CMS_homepage_featured_courses")
-
-        if cached_featured_products:
+        redis_cache = caches["redis"]
+        cached_featured_products = redis_cache.get("CMS_homepage_featured_courses")
+        if len(cached_featured_products) > 0:
             featured_product_ids = [course.id for course in cached_featured_products]
             relevant_run_course_ids = (
                 CourseRun.objects.filter(live=True)
-                .filter(enrollment_start__gte=start_of_day)
-                .filter(enrollment_start__lte=end_of_day)
-                .filter(course__id__in=featured_product_ids)
+                .filter(
+                    course__id__in=featured_product_ids,
+                    enrollment_start__lte=start_of_day,
+                    enrollment_end__gte=end_of_day,
+                )
                 .values_list("course__id", flat=True)
             )
             featured_products = [
@@ -767,24 +769,20 @@ class HomePage(VideoPlayerConfigMixin):
             ]
             featured_product_pages = []
             for page in featured_products:
-                if page.course_product_page:
-                    product_page = page.course_product_page.specific
-                    run = product_page.product.first_unexpired_run
-                    run_data = {
-                        "title": product_page.title,
-                        "description": product_page.description,
-                        "feature_image": product_page.feature_image,
-                        "start_date": run.start_date if run is not None else None,
-                        "url_path": product_page.get_url(),
-                        "is_program": product_page.is_program_page,
-                        "is_self_paced": run.is_self_paced if run is not None else None,
-                        "program_type": (
-                            product_page.product.program_type
-                            if product_page.is_program_page
-                            else None
-                        ),
-                    }
-                    featured_product_pages.append(run_data)
+                run = page.product.first_unexpired_run
+                run_data = {
+                    "title": page.title,
+                    "description": page.description,
+                    "feature_image": page.feature_image,
+                    "start_date": run.start_date if run is not None else None,
+                    "url_path": page.get_url(),
+                    "is_program": page.is_program_page,
+                    "is_self_paced": run.is_self_paced if run is not None else None,
+                    "program_type": (
+                        page.product.program_type if page.is_program_page else None
+                    ),
+                }
+                featured_product_pages.append(run_data)
             return featured_product_pages
         return []
 
@@ -885,7 +883,6 @@ class HomePage(VideoPlayerConfigMixin):
             "hubspot_portal_id": hubspot_portal_id,
             "hubspot_home_page_form_guid": hubspot_home_page_form_guid,
             "show_auto_daily_featured_items": show_auto_daily_featured_items,
-            "cached_items": self.auto_generated_featured_products,
         }
 
 
