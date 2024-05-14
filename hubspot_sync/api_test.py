@@ -251,9 +251,7 @@ def test_sync_line_item_with_hubspot(
 ):
     """Test that the hubspot CRM API is called properly for a line_item sync"""
     line = hubspot_order.lines.first()
-    course_run_enrollment = CourseRunEnrollmentFactory.create(
-        user=line.order.purchaser
-    )  # noqa: F841
+    course_run_enrollment = CourseRunEnrollmentFactory.create(user=line.order.purchaser)  # noqa: F841
     api.sync_line_item_with_hubspot(line)
     assert (
         api.HubspotObject.objects.get(
@@ -415,9 +413,7 @@ def test_sync_deal_hubspot_ids_to_hubspot(
     )
 
 
-@pytest.mark.parametrize(
-    "match_lines,quantity", [[True, 2], [False, 3]]
-)  # noqa: PT006, PT007
+@pytest.mark.parametrize("match_lines,quantity", [[True, 2], [False, 3]])  # noqa: PT006, PT007
 def test_sync_deal_line_hubspot_ids_to_hubspot_two_lines(
     mocker, mock_hubspot_api, match_lines, quantity
 ):
