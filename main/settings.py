@@ -217,6 +217,7 @@ INSTALLED_APPS = (
     "mitol.mail.apps.MailApp",
     "mitol.authentication.apps.TransitionalAuthenticationApp",
     "mitol.payment_gateway.apps.PaymentGatewayApp",
+    "mitol.olposthog.apps.OlPosthog",
     # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
 )
 # Only include the seed data app if this isn't running in prod
