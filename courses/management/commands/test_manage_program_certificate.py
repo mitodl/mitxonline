@@ -11,8 +11,6 @@ from courses.factories import (
     CourseRunGradeFactory,
     ProgramCertificateFactory,
     ProgramFactory,
-    program_with_empty_requirements,  # noqa: F811
-    program_with_requirements,  # noqa: F811
 )
 from courses.management.commands import manage_program_certificates
 from courses.models import ProgramCertificate
