@@ -120,7 +120,9 @@ def test_program_certificate_management_revoke_unrevoke_success(user, revoke, un
 
 
 def test_program_certificate_management_create(
-    user, program_with_empty_requirements, mocker  # noqa: F811
+    user,
+    program_with_empty_requirements,
+    mocker,
 ):
     """
     Test that create operation for program certificate management command
@@ -150,7 +152,9 @@ def test_program_certificate_management_create(
 
 
 def test_program_certificate_management_force_create(
-    user, program_with_requirements, mocker  # noqa: F811
+    user,
+    program_with_requirements,
+    mocker,
 ):
     """
     Test that create operation for program certificate management command
