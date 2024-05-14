@@ -87,6 +87,64 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
         """Applies a filter for the CourseRun's courseware_id"""
         return self.filter(courseware_id=text_id)
 
+class CourseTopicQuerySet(models.QuerySet):
+    """
+    Custom QuerySet for `CourseTopic`
+    """
+
+    def parent_topics(self):
+        """
+        Applies a filter for course topics with parent=None
+        """
+        return self.filter(parent__isnull=True).order_by("name")
+
+    def parent_topic_names(self):
+        """
+        Returns a list of all parent topic names.
+        """
+        return list(self.parent_topics().values_list("name", flat=True))
+
+    def parent_topics_with_annotated_course_counts(self):
+        """
+        Returns parent course topics with annotated course counts including the child topic course counts as well.
+        """
+        from courses.utils import get_catalog_course_filter
+
+        catalog_course_visible_filter = get_catalog_course_filter(
+            relative_filter="coursepage__"
+        )
+        topics_queryset = (
+            self.parent_topics()
+            .annotate(
+                internal_course_count=models.Count(
+                    "coursepage", filter=catalog_course_visible_filter, distinct=True
+                ),
+                external_course_count=models.Count(
+                    "externalcoursepage",
+                    filter=models.Q(externalcoursepage__course__live=True),
+                    distinct=True,
+                ),
+            )
+            .prefetch_related(
+                models.Prefetch(
+                    "subtopics",
+                    self.filter(parent__isnull=False).annotate(
+                        internal_course_count=models.Count(
+                            "coursepage",
+                            filter=catalog_course_visible_filter,
+                            distinct=True,
+                        ),
+                        external_course_count=models.Count(
+                            "externalcoursepage",
+                            filter=models.Q(externalcoursepage__course__live=True),
+                            distinct=True,
+                        ),
+                    ),
+                ),
+            )
+        )
+        return topics_queryset  # noqa: RET504
+
 
 class ActiveEnrollmentManager(models.Manager):
     """Query manager for active enrollment model objects"""
@@ -474,6 +532,59 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
 
     def __str__(self):
         return f"{self.program.readable_id} | {self.program.title}"
+
+
+class CourseTopic(TimestampedModel):
+    """
+    Topics for all courses (e.g. "History")
+    """
+
+    name = models.CharField(max_length=128, unique=True)
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="subtopics",
+    )
+    objects = CourseTopicQuerySet.as_manager()
+
+    def __str__(self):
+        return self.name
+
+    @cached_property
+    def course_count(self):
+        """
+        Returns the sum of course count and child topic course count.
+
+        To avoid the DB queries it assumes that the course counts are annotated.
+        `CourseTopicQuerySet.parent_topics_with_annotated_course_counts` annotates course counts for parent topics.
+        """
+        return sum(
+            [
+                getattr(self, "internal_course_count", 0),
+                getattr(self, "external_course_count", 0),
+                *[
+                    getattr(subtopic, "internal_course_count", 0)
+                    for subtopic in self.subtopics.all()
+                ],
+                *[
+                    getattr(subtopic, "external_course_count", 0)
+                    for subtopic in self.subtopics.all()
+                ],
+            ]
+        )
+
+    @classmethod
+    def parent_topics_with_courses(cls):
+        """
+        Returns parent topics with count > 0
+        """
+        return [
+            topic
+            for topic in cls.objects.parent_topics_with_annotated_course_counts()
+            if topic.course_count > 0
+        ]
 
 
 class Course(TimestampedModel, ValidateOnSaveMixin):
