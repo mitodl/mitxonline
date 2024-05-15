@@ -722,28 +722,10 @@ class HomePage(VideoPlayerConfigMixin):
         return child.specific if child else None
 
     @property
-    def get_featured_products(self):
-        """Gets the featured products for the home page"""
-        # start_of_day and end_of_day should actually be the time that the cron runs, and the time it will next run
-        start_of_day = now_in_utc() - timedelta(days=1)
-        end_of_day = now_in_utc() + timedelta(days=1)
-        relevant_course_runs = (
-            CourseRun.objects.filter(live=True)
-            .filter(course__page__live=True)
-            .filter(enrollment_start__gte=start_of_day)
-            .filter(enrollment_start__lte=end_of_day)
-            .prefetch_related("course")
-        )
-        relevant_courses = relevant_course_runs.values_list("course", flat=True)
-        relevant_programs = Program.objects.filter(live=True).filter(
-            courses__contains=relevant_courses
-        )
-        return relevant_courses, relevant_programs
-
-    @property
-    def auto_generated_featured_products(self):
+    def get_cached_featured_products(self):
         """
-        Get the featured products for the home page that are auto generated
+        Retrieves teh featured products that were generated using cms/api/create_featured_items either from the
+        management command or the daily cron job. This is used to display the featured products on the home page.
         """
         start_of_day = now_in_utc() - timedelta(days=1)
         end_of_day = now_in_utc() + timedelta(days=1)
@@ -788,6 +770,10 @@ class HomePage(VideoPlayerConfigMixin):
 
     @property
     def products(self):
+        """
+        This property returns products from the CMS (self.featured_products) formatted appropriately
+        for the featured products area of the home page
+        """
         future_data = []
         past_data = []
         for page in self.featured_products.filter(course_product_page__live=True):
@@ -866,8 +852,10 @@ class HomePage(VideoPlayerConfigMixin):
             user,
         )
 
+        # If the feature flag is enabled, we will show the auto-generated, cached daily featured items
         if show_auto_daily_featured_items:
-            products = self.auto_generated_featured_products
+            products = self.get_cached_featured_products
+        # Otherwise, we will show the manually selected featured items that are stored in the CMS
         else:
             products = self.products
 
