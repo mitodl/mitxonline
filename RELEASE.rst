@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.93.2
+--------------
+
+- can we just do this? (#2208)
+
 Version 0.93.1 (Released May 14, 2024)
 --------------
 
