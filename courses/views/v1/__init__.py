@@ -11,6 +11,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
+from mitol.olposthog.features import is_enabled
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, status, viewsets
@@ -20,7 +21,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from reversion.models import Version
-from mitol.olposthog.features import is_enabled
 
 from courses.api import (
     create_run_enrollments,
@@ -363,7 +363,7 @@ class UserEnrollmentsApiViewSet(
             return {"user": self.request.user}
 
     def list(self, request, *args, **kwargs):
-        if (features.SYNC_ON_DASHBOARD_LOAD):
+        if features.SYNC_ON_DASHBOARD_LOAD:
             try:
                 sync_enrollments_with_edx(self.request.user)
             except Exception:  # pylint: disable=broad-except

@@ -12,6 +12,7 @@ from django.test.client import RequestFactory
 from django.urls import resolve
 from mitol.common.factories import UserFactory
 from mitol.common.utils.datetime import now_in_utc
+from mitol.olposthog.features import is_enabled
 
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from cms.factories import (
@@ -44,7 +45,6 @@ from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from flexiblepricing.models import FlexiblePrice
-from mitol.olposthog.features import is_enabled
 
 pytestmark = [pytest.mark.django_db]
 

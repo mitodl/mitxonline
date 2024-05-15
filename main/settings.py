@@ -11,7 +11,6 @@ from urllib.parse import urljoin, urlparse
 
 import cssutils
 import dj_database_url
-import posthog
 from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common.envs import (
