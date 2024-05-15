@@ -1,3 +1,4 @@
+from mitol.olposthog.features import is_enabled
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -13,7 +14,6 @@ from courses.serializers.v1.base import (
 from courses.serializers.v1.departments import DepartmentSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
-from mitol.olposthog.features import is_enabled
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
 
