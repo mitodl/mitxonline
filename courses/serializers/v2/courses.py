@@ -16,6 +16,7 @@ from courses.serializers.v1.base import (
 )
 from courses.serializers.v1.departments import DepartmentSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
+from mitol.olposthog.features import is_enabled
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 
@@ -158,7 +159,7 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         successful_enrollments, edx_request_success = create_run_enrollments(
             user,
             [run],
-            keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
         )
         return successful_enrollments
 

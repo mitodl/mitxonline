@@ -44,7 +44,7 @@ from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from flexiblepricing.models import FlexiblePrice
-from main import features
+from mitol.olposthog.features import is_enabled
 
 pytestmark = [pytest.mark.django_db]
 
@@ -168,12 +168,12 @@ def test_course_page_context(  # noqa: PLR0913
             member.linked_instructor_page
             for member in course_page.linked_instructors.order_by("order").all()
         ],
-        "new_design": features.is_enabled(
+        "new_design": is_enabled(
             "mitxonline-new-product-page",
             False,  # noqa: FBT003
             request.user.id if request.user.is_authenticated else "anonymousUser",
         ),
-        "new_footer": features.is_enabled(
+        "new_footer": is_enabled(
             "mitxonline-new-footer",
             False,  # noqa: FBT003
             request.user.id if request.user.is_authenticated else "anonymousUser",
