@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.93.3
+--------------
+
+- Change homepage Featured Items to use teh cached set of courses (#2204)
+
 Version 0.93.2 (Released May 15, 2024)
 --------------
 
