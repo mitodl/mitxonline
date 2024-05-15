@@ -45,11 +45,11 @@ from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from flexiblepricing.models import FlexiblePrice
+from mitol.olposthog.features import is_enabled
 
 pytestmark = [pytest.mark.django_db]
 
 FAKE_READABLE_ID = "some:readable-id"
-
 
 def test_resource_page_site_name(settings, mocker):
     """
@@ -57,7 +57,10 @@ def test_resource_page_site_name(settings, mocker):
     """
     settings.SITE_NAME = "a site's name"
     page = ResourcePageFactory.create()
-    assert page.get_context(mocker.Mock())["site_name"] == settings.SITE_NAME
+    rf = RequestFactory()
+    request = rf.get("/")
+    mocker.patch("cms.models.get_base_context")
+    assert page.get_context(request)["site_name"] == settings.SITE_NAME
 
 
 def test_custom_detail_page_urls(fully_configured_wagtail):

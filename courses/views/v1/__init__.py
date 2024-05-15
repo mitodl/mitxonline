@@ -363,7 +363,7 @@ class UserEnrollmentsApiViewSet(
             return {"user": self.request.user}
 
     def list(self, request, *args, **kwargs):
-        if features.SYNC_ON_DASHBOARD_LOAD:
+        if is_enabled(features.SYNC_ON_DASHBOARD_LOAD):
             try:
                 sync_enrollments_with_edx(self.request.user)
             except Exception:  # pylint: disable=broad-except

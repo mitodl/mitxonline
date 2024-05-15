@@ -441,6 +441,7 @@ def test_user_enrollments_list_sync(
     If the appropriate feature flag is turned on, the enrollments list API call should sync enrollments with
     """
     settings.FEATURES[features.SYNC_ON_DASHBOARD_LOAD] = sync_dashboard_flag
+    settings.POSTHOG_ENABLED = False
     patched_sync = mocker.patch(
         "courses.views.v1.sync_enrollments_with_edx",
     )
