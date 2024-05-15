@@ -26,7 +26,7 @@ from courses.models import (
     ProgramEnrollment,
     ProgramRequirement,
     ProgramRequirementNodeType,
-    ProgramRun,
+    ProgramRun, CoursesTopic,
 )
 from users.factories import UserFactory
 
@@ -192,6 +192,16 @@ class CourseRunGradeFactory(DjangoModelFactory):
 
     class Meta:
         model = CourseRunGrade
+
+
+class CoursesTopicFactory(DjangoModelFactory):
+    """Factory for CoursesTopic"""
+
+    name = fuzzy.FuzzyText(prefix="Topic ")
+    parent = None
+
+    class Meta:
+        model = CoursesTopic
 
 
 class ProgramCertificateFactory(DjangoModelFactory):

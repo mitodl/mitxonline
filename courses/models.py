@@ -87,9 +87,10 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
         """Applies a filter for the CourseRun's courseware_id"""
         return self.filter(courseware_id=text_id)
 
-class CourseTopicQuerySet(models.QuerySet):
+
+class CoursesTopicQuerySet(models.QuerySet):
     """
-    Custom QuerySet for `CourseTopic`
+    Custom QuerySet for `CoursesTopic`
     """
 
     def parent_topics(self):
@@ -116,27 +117,17 @@ class CourseTopicQuerySet(models.QuerySet):
         topics_queryset = (
             self.parent_topics()
             .annotate(
-                internal_course_count=models.Count(
+                course_count=models.Count(
                     "coursepage", filter=catalog_course_visible_filter, distinct=True
-                ),
-                external_course_count=models.Count(
-                    "externalcoursepage",
-                    filter=models.Q(externalcoursepage__course__live=True),
-                    distinct=True,
                 ),
             )
             .prefetch_related(
                 models.Prefetch(
                     "subtopics",
                     self.filter(parent__isnull=False).annotate(
-                        internal_course_count=models.Count(
+                        course_count=models.Count(
                             "coursepage",
                             filter=catalog_course_visible_filter,
-                            distinct=True,
-                        ),
-                        external_course_count=models.Count(
-                            "externalcoursepage",
-                            filter=models.Q(externalcoursepage__course__live=True),
                             distinct=True,
                         ),
                     ),
@@ -534,7 +525,7 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
         return f"{self.program.readable_id} | {self.program.title}"
 
 
-class CourseTopic(TimestampedModel):
+class CoursesTopic(TimestampedModel):
     """
     Topics for all courses (e.g. "History")
     """
@@ -547,7 +538,7 @@ class CourseTopic(TimestampedModel):
         null=True,
         related_name="subtopics",
     )
-    objects = CourseTopicQuerySet.as_manager()
+    objects = CoursesTopicQuerySet.as_manager()
 
     def __str__(self):
         return self.name
@@ -558,18 +549,13 @@ class CourseTopic(TimestampedModel):
         Returns the sum of course count and child topic course count.
 
         To avoid the DB queries it assumes that the course counts are annotated.
-        `CourseTopicQuerySet.parent_topics_with_annotated_course_counts` annotates course counts for parent topics.
+        `CoursesTopicQuerySet.parent_topics_with_annotated_course_counts` annotates course counts for parent topics.
         """
         return sum(
             [
-                getattr(self, "internal_course_count", 0),
-                getattr(self, "external_course_count", 0),
+                getattr(self, "course_count", 0),
                 *[
-                    getattr(subtopic, "internal_course_count", 0)
-                    for subtopic in self.subtopics.all()
-                ],
-                *[
-                    getattr(subtopic, "external_course_count", 0)
+                    getattr(subtopic, "course_count", 0)
                     for subtopic in self.subtopics.all()
                 ],
             ]
