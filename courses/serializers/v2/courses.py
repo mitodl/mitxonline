@@ -169,7 +169,7 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         ]
 
 
-class CoursesTopicSerializer(serializers.ModelSerializer):
+class CourseTopicSerializer(serializers.ModelSerializer):
     """
     CoursesTopic model serializer
     """

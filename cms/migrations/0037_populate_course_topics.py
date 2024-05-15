@@ -14,7 +14,7 @@ def migrate_associate_existing_topics(apps, app_schema):
         if course_page.course:
             topics = Department.objects.filter(course=course_page.course)
             for topic in topics:
-                courses_topic = CoursesTopic.objects.create(name=topic.name)
+                courses_topic, _ = CoursesTopic.objects.get_or_create(name=topic.name)
                 CoursePage.topics.through.objects.create(
                     coursepage_id=course_page.id, coursestopic_id=courses_topic.id
                 )
