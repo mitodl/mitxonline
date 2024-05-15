@@ -1178,7 +1178,7 @@ POSTHOG_FEATURE_FLAG_REQUEST_TIMEOUT_MS = get_int(
 POSTHOG_MAX_RETRIES = get_int(
     name="POSTHOG_MAX_RETRIES",
     default=3,
-    description="Numbers of time requests to PostHog should be retried after failing.",
+    description="Number of times that requests to PostHog should be retried after failing.",
 )
 
 POSTHOG_ENABLED = get_bool(
