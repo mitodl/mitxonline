@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import pytest
 from django.contrib.contenttypes.models import ContentType
-from django.core.cache import cache
+from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
@@ -293,9 +293,10 @@ def test_create_courseware_page():
 def test_create_featured_items():
     # pytest does not clear cache thus if we have a cache value set, it will persist between tests and test runs
     # thus we need to clear the cache before running the test
-    featured_courses = cache.get("CMS_homepage_featured_courses")
+    redis_cache = caches["redis"]
+    featured_courses = redis_cache.get("CMS_homepage_featured_courses")
     if featured_courses is not None:
-        cache.delete("CMS_homepage_featured_courses")
+        redis_cache.delete("CMS_homepage_featured_courses")
 
     now = now_in_utc()
     future_date = now + timedelta(days=1)
@@ -366,7 +367,7 @@ def test_create_featured_items():
     )
 
     create_featured_items()
-    cache_value = cache.get("CMS_homepage_featured_courses")
+    cache_value = redis_cache.get("CMS_homepage_featured_courses")
 
     assert len(cache_value) == 4
     assert enrollable_future_course in cache_value

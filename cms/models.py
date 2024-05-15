@@ -10,6 +10,7 @@ from urllib.parse import quote_plus
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -55,7 +56,13 @@ from cms.constants import (
 )
 from cms.forms import CertificatePageForm
 from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset
-from courses.models import Course, CourseRunCertificate, Program, ProgramCertificate
+from courses.models import (
+    Course,
+    CourseRun,
+    CourseRunCertificate,
+    Program,
+    ProgramCertificate,
+)
 from flexiblepricing.api import (
     determine_auto_approval,
     determine_courseware_flexible_price_discount,
@@ -715,7 +722,58 @@ class HomePage(VideoPlayerConfigMixin):
         return child.specific if child else None
 
     @property
+    def get_cached_featured_products(self):
+        """
+        Retrieves teh featured products that were generated using cms/api/create_featured_items either from the
+        management command or the daily cron job. This is used to display the featured products on the home page.
+        """
+        start_of_day = now_in_utc() - timedelta(days=1)
+        end_of_day = now_in_utc() + timedelta(days=1)
+        redis_cache = caches["redis"]
+        cached_featured_products = redis_cache.get("CMS_homepage_featured_courses")
+        if len(cached_featured_products) > 0:
+            featured_product_ids = [course.id for course in cached_featured_products]
+            relevant_run_course_ids = (
+                CourseRun.objects.filter(live=True)
+                .filter(
+                    course__id__in=featured_product_ids,
+                    enrollment_start__lte=start_of_day,
+                    enrollment_end__gte=end_of_day,
+                )
+                .values_list("course__id", flat=True)
+            )
+            featured_products = [
+                course.page
+                for course in cached_featured_products
+                if course.page is not None
+                and course.page.live
+                and course.id in relevant_run_course_ids
+            ]
+            featured_product_pages = []
+            for page in featured_products:
+                run = page.product.first_unexpired_run
+                run_data = {
+                    "title": page.title,
+                    "description": page.description,
+                    "feature_image": page.feature_image,
+                    "start_date": run.start_date if run is not None else None,
+                    "url_path": page.get_url(),
+                    "is_program": page.is_program_page,
+                    "is_self_paced": run.is_self_paced if run is not None else None,
+                    "program_type": (
+                        page.product.program_type if page.is_program_page else None
+                    ),
+                }
+                featured_product_pages.append(run_data)
+            return featured_product_pages
+        return []
+
+    @property
     def products(self):
+        """
+        This property returns products from the CMS (self.featured_products) formatted appropriately
+        for the featured products area of the home page
+        """
         future_data = []
         past_data = []
         for page in self.featured_products.filter(course_product_page__live=True):
@@ -788,18 +846,31 @@ class HomePage(VideoPlayerConfigMixin):
             False,  # noqa: FBT003
             user,
         )
+        show_auto_daily_featured_items = features.is_enabled(
+            features.ENABLE_AUTO_DAILY_FEATURED_ITEMS,
+            False,  # noqa: FBT003
+            user,
+        )
+
+        # If the feature flag is enabled, we will show the auto-generated, cached daily featured items
+        if show_auto_daily_featured_items:
+            products = self.get_cached_featured_products
+        # Otherwise, we will show the manually selected featured items that are stored in the CMS
+        else:
+            products = self.products
 
         return {
             **super().get_context(request),
             **get_base_context(request),
             "product_cards_section_title": self.product_section_title,
-            "products": self.products,
+            "products": products,
             "show_new_featured_carousel": show_new_featured_carousel,
             "show_new_design_hero": show_new_design_hero,
             "show_home_page_video_component": show_home_page_video_component,
             "show_home_page_contact_form": show_home_page_contact_form,
             "hubspot_portal_id": hubspot_portal_id,
             "hubspot_home_page_form_guid": hubspot_home_page_form_guid,
+            "show_auto_daily_featured_items": show_auto_daily_featured_items,
         }
 
 
