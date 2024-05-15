@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.93.2
+Version 0.93.2 (Released May 15, 2024)
 --------------
 
 - can we just do this? (#2208)
