@@ -45,11 +45,11 @@ from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from flexiblepricing.models import FlexiblePrice
-from mitol.olposthog.features import is_enabled
 
 pytestmark = [pytest.mark.django_db]
 
 FAKE_READABLE_ID = "some:readable-id"
+
 
 def test_resource_page_site_name(settings, mocker):
     """
