@@ -9,7 +9,7 @@ class CourseTopicViewSet(ModelViewSet):
     """Wagtail ModelViewSet for CourseTopic"""
 
     model = CoursesTopic
-    icon = "snippet"
+    icon = "desktop"
     search_fields = ["name"]
     form_fields = ["parent", "name"]
     list_display = ["name", "parent"]
