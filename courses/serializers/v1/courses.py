@@ -1,3 +1,4 @@
+from mitol.olposthog.features import is_enabled
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -146,7 +147,7 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         successful_enrollments, edx_request_success = create_run_enrollments(
             user,
             [run],
-            keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
         )
         return successful_enrollments
 

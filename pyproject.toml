@@ -68,6 +68,7 @@ uwsgi = "^2.0.19"
 uwsgitop = "^0.11"
 wagtail = "^5.0"
 wagtail-metadata = "^5.0.0"
+mitol-django-olposthog = "^2024.5.14"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -9,6 +9,7 @@ from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
+from mitol.olposthog.features import is_enabled
 from rest_framework.pagination import LimitOffsetPagination
 
 from main import features
@@ -19,12 +20,12 @@ def get_base_context(request):
     Returns the template context key/values needed for the base template and all templates that extend it
     """
     context = {
-        "new_design": features.is_enabled(
+        "new_design": is_enabled(
             features.ENABLE_NEW_DESIGN,
             False,  # noqa: FBT003
             request.user.id if request.user.is_authenticated else "anonymousUser",
         ),
-        "new_footer": features.is_enabled(
+        "new_footer": is_enabled(
             features.ENABLE_NEW_FOOTER,
             False,  # noqa: FBT003
             request.user.id if request.user.is_authenticated else "anonymousUser",

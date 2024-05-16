@@ -11,6 +11,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
+from mitol.olposthog.features import is_enabled
 from requests import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
 from rest_framework import mixins, status, viewsets
@@ -277,7 +278,7 @@ def create_enrollment_view(request):
     _, edx_request_success = create_run_enrollments(
         user=user,
         runs=[run],
-        keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
+        keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
     )
 
     def respond(data, status=True):  # noqa: FBT002
@@ -290,7 +291,7 @@ def create_enrollment_view(request):
 
         return HttpResponseRedirect(data)
 
-    if edx_request_success or features.is_enabled(features.IGNORE_EDX_FAILURES):
+    if edx_request_success or is_enabled(features.IGNORE_EDX_FAILURES):
         resp = respond(reverse("user-dashboard"))
         cookie_value = {
             "type": USER_MSG_TYPE_ENROLLED,
@@ -362,7 +363,7 @@ class UserEnrollmentsApiViewSet(
             return {"user": self.request.user}
 
     def list(self, request, *args, **kwargs):
-        if features.is_enabled(features.SYNC_ON_DASHBOARD_LOAD):
+        if is_enabled(features.SYNC_ON_DASHBOARD_LOAD):
             try:
                 sync_enrollments_with_edx(self.request.user)
             except Exception:  # pylint: disable=broad-except
@@ -374,7 +375,7 @@ class UserEnrollmentsApiViewSet(
         deactivated_enrollment = deactivate_run_enrollment(
             enrollment,
             change_status=ENROLL_CHANGE_STATUS_UNENROLLED,
-            keep_failed_enrollments=features.is_enabled(features.IGNORE_EDX_FAILURES),
+            keep_failed_enrollments=is_enabled(features.IGNORE_EDX_FAILURES),
         )
         if deactivated_enrollment is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)

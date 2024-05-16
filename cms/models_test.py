@@ -12,6 +12,7 @@ from django.test.client import RequestFactory
 from django.urls import resolve
 from mitol.common.factories import UserFactory
 from mitol.common.utils.datetime import now_in_utc
+from mitol.olposthog.features import is_enabled
 
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from cms.factories import (
@@ -44,7 +45,6 @@ from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from flexiblepricing.models import FlexiblePrice
-from main import features
 
 pytestmark = [pytest.mark.django_db]
 
@@ -57,7 +57,10 @@ def test_resource_page_site_name(settings, mocker):
     """
     settings.SITE_NAME = "a site's name"
     page = ResourcePageFactory.create()
-    assert page.get_context(mocker.Mock())["site_name"] == settings.SITE_NAME
+    rf = RequestFactory()
+    request = rf.get("/")
+    mocker.patch("cms.models.get_base_context")
+    assert page.get_context(request)["site_name"] == settings.SITE_NAME
 
 
 def test_custom_detail_page_urls(fully_configured_wagtail):
@@ -168,12 +171,12 @@ def test_course_page_context(  # noqa: PLR0913
             member.linked_instructor_page
             for member in course_page.linked_instructors.order_by("order").all()
         ],
-        "new_design": features.is_enabled(
+        "new_design": is_enabled(
             "mitxonline-new-product-page",
             False,  # noqa: FBT003
             request.user.id if request.user.is_authenticated else "anonymousUser",
         ),
-        "new_footer": features.is_enabled(
+        "new_footer": is_enabled(
             "mitxonline-new-footer",
             False,  # noqa: FBT003
             request.user.id if request.user.is_authenticated else "anonymousUser",
