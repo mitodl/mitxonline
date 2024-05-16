@@ -93,7 +93,7 @@ def make_contact_sync_message_from_user(user: User) -> SimplePublicObjectInput:
     Returns:
         SimplePublicObjectInput: Input object for upserting User data to Hubspot
     """
-    from users.serializers import UserSerializer
+    from hubspot_sync.serializers import HubspotContactSerializer
 
     contact_properties_map = {
         "email": "email",
@@ -116,8 +116,10 @@ def make_contact_sync_message_from_user(user: User) -> SimplePublicObjectInput:
         "type_is_professional": "typeisprofessional",
         "type_is_educator": "typeiseducator",
         "type_is_other": "typeisother",
+        "program_certificates": "program_certificates",
+        "course_run_certificates": "course_run_certificates",
     }
-    properties = UserSerializer(user).data
+    properties = HubspotContactSerializer(user).data
     properties.update(properties.pop("legal_address") or {})
     properties.update(properties.pop("user_profile") or {})
     hubspot_props = transform_object_properties(properties, contact_properties_map)

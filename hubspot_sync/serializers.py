@@ -6,13 +6,14 @@ from django.conf import settings
 from mitol.hubspot_api.api import format_app_id
 from rest_framework import serializers
 
-from courses.models import CourseRunEnrollment
+from courses.models import CourseRunCertificate, CourseRunEnrollment, ProgramCertificate
 from ecommerce import models
 from ecommerce.constants import DISCOUNT_TYPE_DOLLARS_OFF, DISCOUNT_TYPE_PERCENT_OFF
 from ecommerce.discounts import resolve_product_version
 from ecommerce.models import Product
 from hubspot_sync.api import format_product_name, get_hubspot_id_for_object
 from main.utils import format_decimal
+from users.serializers import UserSerializer
 
 """
 Map order state to hubspot ids for pipeline stages
@@ -272,6 +273,43 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = ["unique_app_id", "name", "price", "description"]
         read_only_fields = fields
         model = models.Product
+
+
+class HubspotContactSerializer(UserSerializer):
+    """User Serializer for Hubspot"""
+
+    program_certificates = serializers.SerializerMethodField()
+    course_run_certificates = serializers.SerializerMethodField()
+
+    def get_program_certificates(self, instance):
+        """Return a list of program names that the user has a certificate for."""
+        programs_user_has_cert = ProgramCertificate.objects.filter(
+            user=instance, is_revoked=False
+        ).select_related("program")
+        program_name_array = [
+            str(program_cert.program) for program_cert in programs_user_has_cert
+        ]
+        return ";".join(program_name_array)
+
+    def get_course_run_certificates(self, instance):
+        """Return a list of course run names that the user has a certificate for."""
+        course_runs_user_has_cert = CourseRunCertificate.objects.filter(
+            user=instance, is_revoked=False
+        ).select_related("course_run")
+        course_run_name_array = [
+            str(course_run_cert.course_run)
+            for course_run_cert in course_runs_user_has_cert
+        ]
+        return ";".join(course_run_name_array)
+
+    class Meta:
+        fields = (
+            *UserSerializer.Meta.fields,
+            "program_certificates",
+            "course_run_certificates",
+        )
+        read_only_fields = fields
+        model = models.User
 
 
 def get_hubspot_serializer(obj: object) -> serializers.ModelSerializer:

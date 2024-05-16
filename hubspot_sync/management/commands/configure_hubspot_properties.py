@@ -15,6 +15,7 @@ from mitol.hubspot_api.api import (
 )
 
 from courses.constants import ALL_ENROLL_CHANGE_STATUSES
+from courses.models import CourseRun, Program
 from ecommerce import models
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -637,26 +638,86 @@ CUSTOM_ECOMMERCE_PROPERTIES = {
 }
 
 
-def upsert_custom_properties():
+def _get_course_run_certificate_hubspot_property():
+    """
+    Creates a dictionary representation of a Hubspot checkbox,
+    populated with options using the string representation of all course runs.
+
+    Returns:
+        dict: dictionary representing the properties for a HubSpot checkbox,
+        populated with the string representation of all course runs.
+    """
+    course_runs = CourseRun.objects.all()
+    options_array = [
+        {
+            "value": str(course_run),
+            "label": str(course_run),
+            "hidden": False,
+        }
+        for course_run in course_runs
+    ]
+    return {
+        "name": "course_run_certificates",
+        "label": "Course Run certificates",
+        "description": "Earned course run certificates.",
+        "groupName": "contactinformation",
+        "type": "enumeration",
+        "fieldType": "checkbox",
+        "options": options_array,
+    }
+
+
+def _get_program_certificate_hubspot_property():
+    """
+    Creates a dictionary representation of a Hubspot checkbox,
+    populated with options using string representation of all programs.
+
+    Returns:
+        dict: dictionary representing the properties for a HubSpot checkbox,
+        populated with the string representation of all programs.
+    """
+    programs = Program.objects.all()
+    options_array = [
+        {
+            "value": str(program),
+            "label": str(program),
+            "hidden": False,
+        }
+        for program in programs
+    ]
+    return {
+        "name": "program_certificates",
+        "label": "Program certificates",
+        "description": "Earned program certificates.",
+        "groupName": "contactinformation",
+        "type": "enumeration",
+        "fieldType": "checkbox",
+        "options": options_array,
+    }
+
+
+def _upsert_custom_properties():
     """Create or update all custom properties and groups"""
-    for object_type in CUSTOM_ECOMMERCE_PROPERTIES:
-        for group in CUSTOM_ECOMMERCE_PROPERTIES[object_type]["groups"]:
+    for ecommerce_object_type, ecommerce_object in CUSTOM_ECOMMERCE_PROPERTIES.items():
+        for group in ecommerce_object["groups"]:
             sys.stdout.write(f"Adding group {group}\n")
-            sync_property_group(object_type, group["name"], group["label"])
-        for obj_property in CUSTOM_ECOMMERCE_PROPERTIES[object_type]["properties"]:
+            sync_property_group(ecommerce_object_type, group["name"], group["label"])
+        for obj_property in ecommerce_object["properties"]:
             sys.stdout.write(f"Adding property {obj_property}\n")
-            sync_object_property(object_type, obj_property)
+            sync_object_property(ecommerce_object_type, obj_property)
+    sync_object_property("contacts", _get_course_run_certificate_hubspot_property())
+    sync_object_property("contacts", _get_program_certificate_hubspot_property())
 
 
-def delete_custom_properties():
+def _delete_custom_properties():
     """Delete all custom properties and groups"""
-    for object_type in CUSTOM_ECOMMERCE_PROPERTIES:
-        for obj_property in CUSTOM_ECOMMERCE_PROPERTIES[object_type]["properties"]:
-            if object_property_exists(object_type, obj_property):
-                delete_object_property(object_type, obj_property)
-        for group in CUSTOM_ECOMMERCE_PROPERTIES[object_type]["groups"]:
-            if property_group_exists(object_type, group):
-                delete_property_group(object_type, group)
+    for ecommerce_object_type, ecommerce_object in CUSTOM_ECOMMERCE_PROPERTIES.items():
+        for obj_property in ecommerce_object["properties"]:
+            if object_property_exists(ecommerce_object_type, obj_property):
+                delete_object_property(ecommerce_object_type, obj_property)
+        for group in ecommerce_object["groups"]:
+            if property_group_exists(ecommerce_object_type, group):
+                delete_property_group(ecommerce_object_type, group)
 
 
 class Command(BaseCommand):
@@ -679,10 +740,10 @@ class Command(BaseCommand):
     def handle(self, *args, **options):  # noqa: ARG002
         if options["delete"]:
             print("Uninstalling custom groups and properties...")  # noqa: T201
-            delete_custom_properties()
+            _delete_custom_properties()
             print("Uninstall successful")  # noqa: T201
             return
         else:
             print("Configuring custom groups and properties...")  # noqa: T201
-            upsert_custom_properties()
+            _upsert_custom_properties()
             print("Custom properties configured")  # noqa: T201

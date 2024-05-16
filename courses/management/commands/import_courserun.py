@@ -275,4 +275,5 @@ class Command(BaseCommand):
                         )
                     )
 
-        self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))  # noqa: RET503
+        self.stdout.write(self.style.SUCCESS(f"{success_count} course runs created"))
+        return None

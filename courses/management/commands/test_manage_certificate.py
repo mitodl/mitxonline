@@ -122,8 +122,11 @@ def test_certificate_management_revoke_unrevoke_invalid_args(
         (None, True),
     ],
 )
-def test_certificate_management_revoke_unrevoke_success(user, revoke, unrevoke):
+def test_certificate_management_revoke_unrevoke_success(user, revoke, unrevoke, mocker):
     """Test that certificate revoke, un-revoke work as expected and manage the certificate access properly"""
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
     course_run = CourseRunFactory.create()
     certificate = CourseRunCertificateFactory(
         course_run=course_run,
@@ -146,6 +149,9 @@ def test_certificate_management_create(mocker, user, edx_grade_json, revoked):
     """Test that create operation for certificate management command creates the certificates for a single user
     when a user is provided
     """
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
     edx_grade = CurrentGrade(edx_grade_json)
     course_run = CourseRunFactory.create()
     CourseRunEnrollmentFactory.create(
@@ -185,6 +191,9 @@ def test_certificate_management_create_no_user(mocker, edx_grade_json, user):
     """Test that create operation for certificate management command attempts to creates the certificates for all the
     enrolled users in a run when no user is provided
     """
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
     passed_edx_grade = CurrentGrade(edx_grade_json)
     course_run = CourseRunFactory.create()
     users = UserFactory.create_batch(4)

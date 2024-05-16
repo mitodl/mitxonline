@@ -1102,10 +1102,14 @@ def test_course_run_certificate(  # noqa: PLR0913
     exp_certificate,
     exp_created,
     exp_deleted,
+    mocker,
 ):
     """
     Test that the certificate is generated correctly
     """
+    patched_sync_hubspot_user = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
     passed_grade_with_enrollment.grade = grade
     passed_grade_with_enrollment.passed = passed
     if not paid:
@@ -1117,16 +1121,20 @@ def test_course_run_certificate(  # noqa: PLR0913
     certificate, created, deleted = process_course_run_grade_certificate(
         passed_grade_with_enrollment
     )
+    if created:
+        patched_sync_hubspot_user.assert_called_once_with(user)
     assert bool(certificate) is exp_certificate
     assert created is exp_created
     assert deleted is exp_deleted
 
 
-def test_course_run_certificate_idempotent(passed_grade_with_enrollment):
+def test_course_run_certificate_idempotent(passed_grade_with_enrollment, mocker, user):
     """
     Test that the certificate generation is idempotent
     """
-
+    patched_sync_hubspot_user = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
     # Certificate is created the first time
     certificate, created, deleted = process_course_run_grade_certificate(
         passed_grade_with_enrollment
@@ -1134,6 +1142,8 @@ def test_course_run_certificate_idempotent(passed_grade_with_enrollment):
     assert certificate
     assert created
     assert not deleted
+
+    patched_sync_hubspot_user.assert_called_once_with(user)
 
     # Existing certificate is simply returned without any create/delete
     certificate, created, deleted = process_course_run_grade_certificate(
@@ -1148,7 +1158,6 @@ def test_course_run_certificate_not_passing(passed_grade_with_enrollment):
     """
     Test that the certificate is not generated if the grade is set to not passed
     """
-
     # Initially the certificate is created
     certificate, created, deleted = process_course_run_grade_certificate(
         passed_grade_with_enrollment
@@ -1425,10 +1434,13 @@ def test_generate_program_certificate_failure_not_all_passed(
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_generate_program_certificate_success_single_requirement_course(user):
+def test_generate_program_certificate_success_single_requirement_course(user, mocker):
     """
     Test that generate_program_certificate generates a program certificate for a Program with a single required Course.
     """
+    patched_sync_hubspot_user = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
     course = CourseFactory.create()
     program = ProgramFactory.create()
     ProgramRequirementFactory.add_root(program)
@@ -1449,12 +1461,16 @@ def test_generate_program_certificate_success_single_requirement_course(user):
     assert created is True
     assert isinstance(certificate, ProgramCertificate)
     assert len(ProgramCertificate.objects.all()) == 1
+    patched_sync_hubspot_user.assert_called_once_with(user)
 
 
-def test_generate_program_certificate_success_multiple_required_courses(user):
+def test_generate_program_certificate_success_multiple_required_courses(user, mocker):
     """
     Test that generate_program_certificate generate a program certificate
     """
+    patched_sync_hubspot_user = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
     courses = CourseFactory.create_batch(3)
     program = ProgramFactory.create()
     ProgramRequirementFactory.add_root(program)
@@ -1476,11 +1492,12 @@ def test_generate_program_certificate_success_multiple_required_courses(user):
     assert created is True
     assert isinstance(certificate, ProgramCertificate)
     assert len(ProgramCertificate.objects.all()) == 1
+    patched_sync_hubspot_user.assert_called_once_with(user)
 
 
 def test_generate_program_certificate_success_minimum_electives_not_met(user):
     """
-    Test that generate_program_certificate generate a program certificate
+    Test that generate_program_certificate does not generate a program certificate if minimum electives have not been met.
     """
     courses = CourseFactory.create_batch(3)
 
@@ -1524,11 +1541,18 @@ def test_generate_program_certificate_success_minimum_electives_not_met(user):
     assert len(ProgramCertificate.objects.all()) == 0
 
 
-def test_force_generate_program_certificate_success(user, program_with_requirements):  # noqa: F811
+def test_force_generate_program_certificate_success(
+    user,
+    program_with_requirements,  # noqa: F811
+    mocker,
+):
     """
     Test that force creating a program certificate with generate_program_certificate generates
     a program certificate without matching program certificate requirements.
     """
+    patched_sync_hubspot_user = mocker.patch(
+        "hubspot_sync.task_helpers.sync_hubspot_user",
+    )
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     CourseRunCertificateFactory.create_batch(
@@ -1545,6 +1569,7 @@ def test_force_generate_program_certificate_success(user, program_with_requireme
     assert created is True
     assert isinstance(certificate, ProgramCertificate)
     assert len(ProgramCertificate.objects.all()) == 1
+    patched_sync_hubspot_user.assert_called_once_with(user)
 
 
 def test_generate_program_certificate_already_exist(
