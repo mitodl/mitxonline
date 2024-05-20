@@ -847,7 +847,7 @@ class HomePage(VideoPlayerConfigMixin):
             False,  # noqa: FBT003
             user,
         )
-        show_auto_daily_featured_items = features.is_enabled(
+        show_auto_daily_featured_items = is_enabled(
             features.ENABLE_AUTO_DAILY_FEATURED_ITEMS,
             False,  # noqa: FBT003
             user,
