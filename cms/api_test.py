@@ -306,6 +306,7 @@ def test_create_featured_items():
     furthest_future_date = further_future_date + timedelta(days=1)
 
     # Course that starts in the future but is open for enrollment
+    # This should be future date
     enrollable_future_course = CourseFactory.create(page=None, live=True)
     CoursePageFactory.create(course=enrollable_future_course, live=True)
     enrollable_future_courserun = CourseRunFactory.create(
@@ -320,6 +321,7 @@ def test_create_featured_items():
     enrollable_future_courserun.save()
 
     # Course that is open for enrollment, but starts after the one above
+    # This course should start at future date + 1
     enrollable_other_future_course = CourseFactory.create(page=None, live=True)
     CoursePageFactory.create(course=enrollable_other_future_course, live=True)
     enrollable_other_future_courserun = CourseRunFactory.create(
@@ -359,6 +361,10 @@ def test_create_featured_items():
         live=True,
         in_progress=True,
     )
+    in_progress_course.enrollment_start = further_past_date
+    in_progress_course.start_date = past_date
+    in_progress_course.enrollment_end = future_date
+    in_progress_course.end_date = further_future_date
 
     unenrollable_course = CourseFactory.create(page=None, live=False)
     CoursePageFactory.create(course=unenrollable_course, live=False)
@@ -370,10 +376,12 @@ def test_create_featured_items():
     cache_value = redis_cache.get("CMS_homepage_featured_courses")
 
     assert len(cache_value) == 4
-    assert enrollable_future_course in cache_value
-    assert enrollable_other_future_course in cache_value
-    assert enrollable_self_paced_course in cache_value
-    assert in_progress_course in cache_value
+    assert set(cache_value) == {
+        enrollable_future_course,
+        enrollable_other_future_course,
+        enrollable_self_paced_course,
+        in_progress_course,
+    }
 
     assert cache_value[0] == enrollable_self_paced_course
     assert cache_value[1] == enrollable_future_course
