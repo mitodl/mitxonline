@@ -436,7 +436,6 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         "user",
         "course_run",
         "get_revoked_state",
-        "certificate_page_revision",
     ]
     search_fields = [
         "course_run__courseware_id",
@@ -444,6 +443,7 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         "user__username",
         "user__email",
     ]
+    list_filter = ["is_revoked", "course_run__course"]
     raw_id_fields = ("user",)
 
     def get_revoked_state(self, obj):
@@ -469,7 +469,6 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
         "user",
         "program",
         "get_revoked_state",
-        "certificate_page_revision",
     ]
     search_fields = [
         "program__readable_id",
@@ -477,6 +476,7 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
         "user__username",
         "user__email",
     ]
+    list_filter = ["program__title", "is_revoked"]
     raw_id_fields = ("user",)
 
     def get_revoked_state(self, obj):
