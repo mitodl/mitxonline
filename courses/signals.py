@@ -42,4 +42,4 @@ def handle_create_course_run_certificate(
                 lambda: generate_multiple_programs_certificate(user, programs)
             )
         call_command("configure_hubspot_properties")
-        sync_hubspot_user(instance)
+        sync_hubspot_user(instance.user)
