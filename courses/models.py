@@ -108,7 +108,7 @@ class CoursesTopicQuerySet(models.QuerySet):
     def parent_topics_with_annotated_course_counts(self):
         """
         Returns parent course topics with annotated course counts including the child topic course counts as well.
-        The courses counts reflect only active enrollable or soon enrollable runs.
+        The courses counts reflect only active enrollable runs.
         """
         from courses.utils import get_catalog_course_filter
 
