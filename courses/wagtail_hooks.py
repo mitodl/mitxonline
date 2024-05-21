@@ -15,4 +15,4 @@ def register_viewset():
 
 @hooks.register('register_admin_menu_item')
 def register_calendar_menu_item():
-    return MenuItem('Course Topics', 'cms/topics', icon_name='desktop')
+    return MenuItem('Course Topics', '/cms/topics', icon_name='desktop')
