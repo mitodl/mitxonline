@@ -36,6 +36,7 @@ from openedx.api import (
     retry_failed_edx_enrollments,
     subscribe_to_edx_course_emails,
     sync_enrollments_with_edx,
+    unenroll_edx_course_run,
     unsubscribe_from_edx_course_emails,
     update_edx_user_email,
     update_edx_user_name,
@@ -640,6 +641,27 @@ def test_retry_users_grace_period(mocker):
     assert repaired_users == [user_to_repair]
     patched_faulty_user_qset.assert_called_once()
     patched_repair_user.assert_called_once_with(user_to_repair)
+
+
+def test_unenroll_edx_course_run(mocker):
+    """Tests that unenroll_edx_course_run makes a call to unenroll in edX via the API client"""
+    mock_client = mocker.MagicMock()
+    run_enrollment = CourseRunEnrollmentFactory.create(edx_enrolled=True)
+    courseware_id = run_enrollment.run.courseware_id
+    username = run_enrollment.user.username
+    enroll_return_value = mocker.Mock(
+        json={"course_id": courseware_id, "user": username}
+    )
+    mock_client.enrollments.deactivate_enrollment = mocker.Mock(
+        return_value=enroll_return_value
+    )
+    mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
+    deactivated_enrollment = unenroll_edx_course_run(run_enrollment)
+
+    mock_client.enrollments.deactivate_enrollment.assert_called_once_with(
+        courseware_id, username=username
+    )
+    assert deactivated_enrollment == enroll_return_value
 
 
 def test_update_user_edx_name(mocker, user):
