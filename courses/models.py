@@ -531,7 +531,7 @@ class CoursesTopic(TimestampedModel):
     Topics for all courses (e.g. "History")
     """
 
-    name = models.CharField(max_length=128, unique=True)
+    name = models.CharField(max_length=128)
     parent = models.ForeignKey(
         "self",
         on_delete=models.CASCADE,
@@ -540,6 +540,9 @@ class CoursesTopic(TimestampedModel):
         related_name="subtopics",
     )
     objects = CoursesTopicQuerySet.as_manager()
+
+    class Meta:
+        unique_together = ("name", "parent")
 
     def __str__(self):
         return self.name
