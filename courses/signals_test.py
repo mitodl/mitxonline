@@ -25,7 +25,7 @@ def test_create_course_certificate(generate_program_cert_mock, mock_on_commit, m
     Test that generate_multiple_programs_certificate is called when a course
     certificate is created
     """
-    mocker.patch(
+    mocked_hubspot_contact_sync = mocker.patch(
         "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
     )
     user = UserFactory.create()
@@ -36,6 +36,7 @@ def test_create_course_certificate(generate_program_cert_mock, mock_on_commit, m
     generate_program_cert_mock.assert_called_once_with(user, [program])
     cert.save()
     generate_program_cert_mock.assert_called_once_with(user, [program])
+    mocked_hubspot_contact_sync.assert_called_once()
 
 
 @patch("courses.signals.transaction.on_commit", side_effect=lambda callback: callback())
@@ -46,7 +47,7 @@ def test_generate_program_certificate_if_not_live(
     """
     Test that generate_multiple_programs_certificate is not called when a program is not live
     """
-    mocker.patch(
+    mocked_hubspot_contact_sync = mocker.patch(
         "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
     )
     user = UserFactory.create()
@@ -57,6 +58,7 @@ def test_generate_program_certificate_if_not_live(
     generate_program_cert_mock.assert_not_called()
     cert.save()
     generate_program_cert_mock.assert_not_called()
+    mocked_hubspot_contact_sync.assert_called_once()
 
 
 # pylint: disable=unused-argument
@@ -69,7 +71,7 @@ def test_generate_program_certificate_not_called(
     Test that generate_multiple_programs_certificate is not called when a course
     is not associated with program.
     """
-    mocker.patch(
+    mocked_hubspot_contact_sync = mocker.patch(
         "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
     )
     user = UserFactory.create()
@@ -78,3 +80,4 @@ def test_generate_program_certificate_not_called(
     cert = CourseRunCertificateFactory.create(user=user, course_run=course_run)
     cert.save()
     generate_program_cert_mock.assert_not_called()
+    mocked_hubspot_contact_sync.assert_called_once()
