@@ -40,21 +40,21 @@ def refine(request, **kwargs):  # noqa: ARG001
     """
     The refine view for the staff dashboard
     """
-    return render(request, "refine.html", context=get_base_context(request))
+    return render(request, "refine.html", context=get_base_context())
 
 
 def handler404(request, exception):  # pylint: disable=unused-argument  # noqa: ARG001
     """404: NOT FOUND ERROR handler"""
     context = get_base_context(request)  # noqa: F841
     return HttpResponseNotFound(
-        render_to_string("404.html", request=request, context=get_base_context(request))
+        render_to_string("404.html", request=request, context=get_base_context())
     )
 
 
 def handler500(request):
     """500 INTERNAL SERVER ERROR handler"""
     return HttpResponseServerError(
-        render_to_string("500.html", request=request, context=get_base_context(request))
+        render_to_string("500.html", request=request, context=get_base_context())
     )
 
 
