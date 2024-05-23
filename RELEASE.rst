@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.94.0 (Released May 23, 2024)
+--------------
+
+- Fix syncing hubspot user (#2219)
+- fix dates on in_progress_course (#2216)
+- Admin: filtering certificates by course and program (#2215)
+- Update feature flag fetch (#2213)
+- Revert "fix dates on in_progress_course"
+- fix dates on in_progress_course
+- 3783: dedp course certificates in hubspot (#2193)
+- Add ol-django olposthog app (#2211)
+
 Version 0.93.3 (Released May 20, 2024)
 --------------
 
