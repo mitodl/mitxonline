@@ -156,10 +156,6 @@ describe("CatalogPage", function() {
     window.IntersectionObserver = mockIntersectionObserver
 
     renderPage = helper.configureShallowRenderer(CatalogPage, InnerCatalogPage)
-
-    SETTINGS.features = {
-      "mitxonline-new-product-page": true
-    }
   })
 
   afterEach(() => {

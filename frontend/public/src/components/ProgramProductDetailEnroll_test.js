@@ -48,9 +48,6 @@ describe("ProgramProductDetailEnroll", () => {
       },
       {}
     )
-    SETTINGS.features = {
-      "mitxonline-new-product-page": true
-    }
   })
 
   afterEach(() => {

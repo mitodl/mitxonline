@@ -5,10 +5,9 @@
 
 {% block title %}{{ site_name }}{% endblock %}
 
-{% block bodyclass %}{% if show_new_design_hero or show_new_featured_carousel or show_home_page_video_component %}new-design{% endif %}{% endblock %}
+{% block bodyclass %}new-design{% endblock %}
 
 {% block content %}
-{% if show_new_design_hero %}
   <div class="home-page-hero-row d-flex justify-content-md-center align-items-md-center">
     <div class="home-page-hero hero-container col-12">
       <div class="home-page-hero-overlay container hero-content">
@@ -28,21 +27,6 @@
       </div>
     </div>
   </div>
-{% else %}
-  <div id="main" class="hero-container" style="background-image: url('{% wagtail_img_src page.hero%}')">
-    <div class="container hero-content">
-      <div class="hero-title">
-        {% if page.hero_title %}
-          <h2>{{ page.hero_title }}</h2>
-        {% endif %}
-        {% if page.hero_subtitle %}
-          <h3>{{ page.hero_subtitle }}</h3>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-{% endif %}
-{% if show_new_featured_carousel %}
   <div class="featured-product-section-container d-flex flex-column container">
     <div class="featured-product-section d-flex row" id="featuredProductCarousel">
       <div class="featured-product-header d-flex row col-12">
@@ -70,42 +54,6 @@
       </div>
     </div>
   </div>
-{% else %}
-  <div class="course-section">
-    <div class="container">
-      {% if product_cards_section_title %}
-        <h1>{{ product_cards_section_title }}</h1>
-      {% endif %}
-      <ul class="course-listing card-listing">
-        {% for product in products %}
-          {% if not product.is_program %}
-            <li>
-          <div class="course-card highlight-card clickable">
-            <a href="{{ product.url_path }}" class="course-card-link">
-              <img src="{% feature_img_src product.feature_image %}" alt="">
-              <div class="course-info">
-                <h2 class="course-card-title">
-                    {{ product.title }}
-                </h2>
-                <div class="course-card-description">
-                  {{ product.description | richtext }}
-                </div>
-                {% if product.start_date %}
-                  <span class="date">
-                    Start date: {{ product.start_date | date:"F j, Y" }}
-                  </span>
-                {% endif %}
-              </div>
-            </a>
-          </div>
-        </li>
-          {% endif %}
-        {% endfor %}
-      </ul>
-    </div>
-  </div>
-{% endif %}
-{% if show_home_page_video_component and page.video_component_title %}
 <div class="home-page-video-row d-flex justify-content-center container">
   <div class="home-page-video-container row">
     <div class="home-page-video-description col-12 col-xl-5">
@@ -127,8 +75,6 @@
         </div>
       </div>
   </div>
-{% endif %}
-{% if show_home_page_contact_form %}
   <div class="home-page-contact-row">
     <div class="home-page-contact-row-container">
       <div class="home-page-contact-col">
@@ -199,5 +145,4 @@
       </div>
     </div>
   </div>
-{% endif %}
 {% endblock %}
