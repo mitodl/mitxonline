@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.94.0
+Version 0.94.0 (Released May 23, 2024)
 --------------
 
 - Fix syncing hubspot user (#2219)
