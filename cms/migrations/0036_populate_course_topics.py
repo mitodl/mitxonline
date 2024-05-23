@@ -9,7 +9,7 @@ def migrate_associate_existing_topics(apps, app_schema):
 
     CoursesTopic = apps.get_model("courses", "CoursesTopic")
 
-    with open('cms/data/CourseTopics.csv', 'r', newline='') as file:
+    with open('cms/data/CourseTopics.csv', 'r', newline='') as file:  # noqa: PTH123
         reader = csv.reader(file)
         parent_course_topics_row = next(reader, None)
         parent_topic_dict = {}
