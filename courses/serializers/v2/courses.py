@@ -176,4 +176,4 @@ class CourseTopicSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.CoursesTopic
-        fields = ["name", "course_count"]
+        fields = ["name", "parent"]

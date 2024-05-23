@@ -166,33 +166,3 @@ def get_unenrollable_courses(queryset):
         .filter(courseruns__id__in=courseruns_qs.values_list("id", flat=True))
         .distinct()
     )
-
-
-def get_catalog_course_filter(relative_filter=""):
-    """
-    Generates course filter for the catalog visible course pages.
-    """
-    courseware_live_filter = {
-        f"{relative_filter}course__live": True,
-        f"{relative_filter}course__courseruns__live": True,
-        f"{relative_filter}live": True,
-    }
-    courserun_start_date_filter = {
-        f"{relative_filter}course__courseruns__start_date__isnull": False,
-    }
-    courserun_enrollment_start_filter = {
-        f"{relative_filter}course__courseruns__enrollment_start__isnull": False,
-        f"{relative_filter}course__courseruns__enrollment_start__lt": now_in_utc(),
-    }
-    courserun_enrollment_end_filter = {
-        f"{relative_filter}course__courseruns__enrollment_end__isnull": False,
-        f"{relative_filter}course__courseruns__enrollment_end__gt": now_in_utc(),
-    }
-    courserun_archived_filter = {
-        f"{relative_filter}course__courseruns__enrollment_end__isnull": True,
-    }
-
-    return Q(
-        Q(**courseware_live_filter) & Q(**courserun_start_date_filter) & Q(**courserun_enrollment_start_filter)
-        & Q(Q(**courserun_archived_filter) | Q(**courserun_enrollment_end_filter))
-    )

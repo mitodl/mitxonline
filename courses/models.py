@@ -105,38 +105,6 @@ class CoursesTopicQuerySet(models.QuerySet):
         """
         return list(self.parent_topics().values_list("name", flat=True))
 
-    def parent_topics_with_annotated_course_counts(self):
-        """
-        Returns parent course topics with annotated course counts including the child topic course counts as well.
-        The courses counts reflect only active enrollable runs.
-        """
-        from courses.utils import get_catalog_course_filter
-
-        catalog_course_visible_filter = get_catalog_course_filter(
-            relative_filter="coursepage__"
-        )
-        topics_queryset = (
-            self.parent_topics()
-            .annotate(
-                course_count=models.Count(
-                    "coursepage", filter=catalog_course_visible_filter, distinct=True
-                ),
-            )
-            .prefetch_related(
-                models.Prefetch(
-                    "subtopics",
-                    self.filter(parent__isnull=False).annotate(
-                        course_count=models.Count(
-                            "coursepage",
-                            filter=catalog_course_visible_filter,
-                            distinct=True,
-                        ),
-                    ),
-                ),
-            )
-        )
-        return topics_queryset  # noqa: RET504
-
 
 class ActiveEnrollmentManager(models.Manager):
     """Query manager for active enrollment model objects"""
@@ -546,35 +514,6 @@ class CoursesTopic(TimestampedModel):
 
     def __str__(self):
         return self.name
-
-    @cached_property
-    def course_count(self):
-        """
-        Returns the sum of course count and child topic course count.
-
-        To avoid the DB queries it assumes that the course counts are annotated.
-        `CoursesTopicQuerySet.parent_topics_with_annotated_course_counts` annotates course counts for parent topics.
-        """
-        return sum(
-            [
-                getattr(self, "course_count", 0),
-                *[
-                    getattr(subtopic, "course_count", 0)
-                    for subtopic in self.subtopics.all()
-                ],
-            ]
-        )
-
-    @classmethod
-    def parent_topics_with_courses(cls):
-        """
-        Returns parent topics with count > 0
-        """
-        return [
-            topic
-            for topic in cls.objects.parent_topics_with_annotated_course_counts()
-            if topic.course_count > 0
-        ]
 
 
 class Course(TimestampedModel, ValidateOnSaveMixin):
