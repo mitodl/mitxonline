@@ -22,7 +22,6 @@ from courses.serializers.v1.programs import ProgramSerializer
 from ecommerce.serializers import BaseProductSerializer
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory
-from main import features
 from main.test_utils import assert_drf_json_equal, drf_datetime
 
 pytestmark = [pytest.mark.django_db]
@@ -32,7 +31,6 @@ pytestmark = [pytest.mark.django_db]
 @pytest.mark.parametrize("all_runs", [True, False])
 def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings):
     """Test Course serialization"""
-    settings.FEATURES[features.ENABLE_NEW_DESIGN] = True
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
     if all_runs:
