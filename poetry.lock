@@ -2483,19 +2483,19 @@ setuptools = "*"
 
 [[package]]
 name = "mitol-django-payment-gateway"
-version = "1.9.1"
+version = "2023.12.19"
 description = "Django application to handle payment processing"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "mitol-django-payment-gateway-1.9.1.tar.gz", hash = "sha256:6a1c6da5f7ea70422d05c74b0b2a6c2e836a3b4eb2109ed5660518e5972d4521"},
-    {file = "mitol_django_payment_gateway-1.9.1-py3-none-any.whl", hash = "sha256:82b649c231dae02d2b21dc76a5fc04a7cb741eac59e4b2d88516ee1216e865ad"},
+    {file = "mitol-django-payment-gateway-2023.12.19.tar.gz", hash = "sha256:3aa89300237c905e363e40b5d1a9cdfd84437fef67483b85c1984a3131baaf45"},
+    {file = "mitol_django_payment_gateway-2023.12.19-py3-none-any.whl", hash = "sha256:50ce1457bc41ac86c4fa6bdb62f6be4bd5feeff8e24303d3ae1b8e17ba57e36d"},
 ]
 
 [package.dependencies]
 cybersource-rest-client-python = ">=0.0.36"
-django = ">=2.2.12,<4.0"
-mitol-django-common = ">=2.7.0,<2.8.0"
+django = ">=3.0"
+mitol-django-common = "*"
 setuptools = "*"
 
 [[package]]
@@ -4244,4 +4244,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "39d27bd1539f932391d9a4def9f3ea70f7c4ff312c13fdea59a7b7b4edd3ef3f"
+content-hash = "832875bf6f5cb30e4ab463911e8cfdcfd52cfcb7f79e03ae398bbfffc80e732a"
