@@ -9,11 +9,13 @@ from rest_framework.pagination import PageNumberPagination
 
 from courses.models import (
     Course,
+    CoursesTopic,
     Department,
-    Program, CoursesTopic,
+    Program,
 )
 from courses.serializers.v2.courses import (
-    CourseWithCourseRunsSerializer, CourseTopicSerializer,
+    CourseTopicSerializer,
+    CourseWithCourseRunsSerializer,
 )
 from courses.serializers.v2.departments import (
     DepartmentWithCoursesAndProgramsSerializer,

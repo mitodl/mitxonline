@@ -9,19 +9,20 @@ def migrate_associate_existing_topics(apps, app_schema):
 
     CoursesTopic = apps.get_model("courses", "CoursesTopic")
 
-    with open('cms/data/CourseTopics.csv', 'r', newline='') as file:  # noqa: PTH123
+    with open("cms/data/CourseTopics.csv", newline="") as file:  # noqa: PTH123
         reader = csv.reader(file)
         parent_course_topics_row = next(reader, None)
         parent_topic_dict = {}
         for index, topic in enumerate(parent_course_topics_row):
-            parent_topic, _ = CoursesTopic.objects.get_or_create(name=topic, parent=None)
+            parent_topic, _ = CoursesTopic.objects.get_or_create(
+                name=topic, parent=None
+            )
             parent_topic_dict[index] = parent_topic.id
         for row in reader:
             for index, col in enumerate(row):
                 if col:
                     CoursesTopic.objects.get_or_create(
-                        parent_id=parent_topic_dict[index],
-                        name=col
+                        parent_id=parent_topic_dict[index], name=col
                     )
 
 
@@ -31,13 +32,10 @@ def delete_all_topics(apps, app_schema):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('cms', '0035_sitebanner'),
+        ("cms", "0035_sitebanner"),
     ]
 
     operations = [
-        migrations.RunPython(
-            migrate_associate_existing_topics, delete_all_topics
-        )
+        migrations.RunPython(migrate_associate_existing_topics, delete_all_topics)
     ]

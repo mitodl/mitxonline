@@ -18,6 +18,7 @@ from courses.models import (
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
+    CoursesTopic,
     Department,
     LearnerProgramRecordShare,
     PartnerSchool,
@@ -26,7 +27,7 @@ from courses.models import (
     ProgramEnrollment,
     ProgramRequirement,
     ProgramRequirementNodeType,
-    ProgramRun, CoursesTopic,
+    ProgramRun,
 )
 from users.factories import UserFactory
 

@@ -2,6 +2,7 @@
 
 from wagtail import hooks
 from wagtail.admin.menu import MenuItem
+
 from courses.wagtail_views import CourseTopicViewSet
 
 
@@ -13,6 +14,6 @@ def register_viewset():
     return CourseTopicViewSet("topics")
 
 
-@hooks.register('register_admin_menu_item')
+@hooks.register("register_admin_menu_item")
 def register_calendar_menu_item():
-    return MenuItem('Course Topics', '/cms/topics', icon_name='desktop')
+    return MenuItem("Course Topics", "/cms/topics", icon_name="desktop")
