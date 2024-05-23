@@ -841,7 +841,7 @@ class HomePage(VideoPlayerConfigMixin):
             products = self.products
 
         return {
-            **super().get_context(request),
+            **super().get_context(),
             **get_base_context(request),
             "product_cards_section_title": self.product_section_title,
             "products": products,
