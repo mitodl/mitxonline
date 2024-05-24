@@ -3,7 +3,7 @@ import React from "react"
 import moment from "moment"
 import { isNil } from "ramda"
 
-import { notNil, parseDateString, formatPrettyDateTimeAmPmTz } from "./util"
+import {notNil, parseDateString, formatPrettyDateTimeAmPmTz, emptyOrNil} from "./util"
 
 import { NODETYPE_OPERATOR, NODETYPE_COURSE, NODEOPER_ALL } from "../constants"
 
@@ -209,6 +209,12 @@ export const learnerProgramIsCompleted = (learnerRecord: LearnerRecord) => {
   const electivesDone = walkNodes(electiveCourses, learnerRecord)
 
   return requirementsDone && electivesDone
+}
+export const isRunArchived = (run: CourseRunDetail) => {
+  return run ? moment().isAfter(run.end_date) &&
+        (moment().isBefore(run.enrollment_end) ||
+          emptyOrNil(run.enrollment_end))
+    : false
 }
 
 export const getFirstRelevantRun = (

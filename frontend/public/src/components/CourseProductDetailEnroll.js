@@ -30,7 +30,7 @@ import {
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 import {
-  getFirstRelevantRun,
+  getFirstRelevantRun, isRunArchived,
   isEnrollmentFuture,
   isFinancialAssistanceAvailable
 } from "../lib/courseApi"
@@ -481,7 +481,7 @@ export class CourseProductDetailEnroll extends React.Component<
                 className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
                 disabled={!run.is_enrollable}
               >
-              Enroll now
+                {isRunArchived(run) ? "Enroll now" : "Access Course Materials"}
               </button>
             </form>
           )}
