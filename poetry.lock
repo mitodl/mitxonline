@@ -1429,13 +1429,13 @@ djangorestframework = ">=3.9.3"
 
 [[package]]
 name = "edx-api-client"
-version = "1.8.0"
+version = "1.9.0"
 description = "Python interface to the edX REST APIs"
 optional = false
 python-versions = "*"
 files = [
-    {file = "edx-api-client-1.8.0.tar.gz", hash = "sha256:cbf9af4d466cbea465054d78688e6f335a3e485a4e2f90dc82e050202af29ba1"},
-    {file = "edx_api_client-1.8.0-py2.py3-none-any.whl", hash = "sha256:050f0622c2c3a0d4f24902bf6218b2a554b86a5e84800b71d1fefd0bddf3ad13"},
+    {file = "edx-api-client-1.9.0.tar.gz", hash = "sha256:75006eb9d2540da3960993a3050372e52557b2c4c28d1d6f02cc2d6c46e72f57"},
+    {file = "edx_api_client-1.9.0-py2.py3-none-any.whl", hash = "sha256:10d2f1d0a33cf5c3bf77bdabb4862d9724e41d3f1d9084d5545b292383d60acf"},
 ]
 
 [package.dependencies]
@@ -4244,4 +4244,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "9aaf02230938dab256114e3b652aa13f5f288ae0aa3bfb3629ea989b46a76487"
+content-hash = "caf53b2cab83203b3f452da41de8e8bc9be50ce87e72626dc0011a5e906f0607"
