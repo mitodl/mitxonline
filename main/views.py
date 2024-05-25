@@ -12,7 +12,7 @@ from django.views.decorators.cache import never_cache
 from rest_framework.pagination import LimitOffsetPagination
 
 
-def get_base_context():
+def get_base_context(request):  # noqa: ARG001
     """
     Returns the template context key/values needed for the base template and all templates that extend it
     """
