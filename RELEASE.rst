@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.95.0
+--------------
+
+- Adding course topics (#2210)
+- Update displayOrder for line properties (#2224)
+- refactor: remove EdX-Api-Key usage (#2217)
+
 Version 0.94.1 (Released May 28, 2024)
 --------------
 
