@@ -9,10 +9,12 @@ from rest_framework.pagination import PageNumberPagination
 
 from courses.models import (
     Course,
+    CoursesTopic,
     Department,
     Program,
 )
 from courses.serializers.v2.courses import (
+    CourseTopicSerializer,
     CourseWithCourseRunsSerializer,
 )
 from courses.serializers.v2.departments import (
@@ -111,3 +113,18 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return Department.objects.all().order_by("name")
+
+
+class CourseTopicViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Readonly viewset for parent course topics.
+    """
+
+    permission_classes = []
+    serializer_class = CourseTopicSerializer
+
+    def get_queryset(self):
+        """
+        Returns parent topics with course count > 0.
+        """
+        return CoursesTopic.parent_topics_with_courses()

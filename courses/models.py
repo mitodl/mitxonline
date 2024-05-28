@@ -88,6 +88,24 @@ class CourseRunQuerySet(models.QuerySet):  # pylint: disable=missing-docstring
         return self.filter(courseware_id=text_id)
 
 
+class CoursesTopicQuerySet(models.QuerySet):
+    """
+    Custom QuerySet for `CoursesTopic`
+    """
+
+    def parent_topics(self):
+        """
+        Applies a filter for course topics with parent=None
+        """
+        return self.filter(parent__isnull=True).order_by("name")
+
+    def parent_topic_names(self):
+        """
+        Returns a list of all parent topic names.
+        """
+        return list(self.parent_topics().values_list("name", flat=True))
+
+
 class ActiveEnrollmentManager(models.Manager):
     """Query manager for active enrollment model objects"""
 
@@ -474,6 +492,28 @@ class ProgramRun(TimestampedModel, ValidateOnSaveMixin):
 
     def __str__(self):
         return f"{self.program.readable_id} | {self.program.title}"
+
+
+class CoursesTopic(TimestampedModel):
+    """
+    Topics for all courses (e.g. "History")
+    """
+
+    name = models.CharField(max_length=128)
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="subtopics",
+    )
+    objects = CoursesTopicQuerySet.as_manager()
+
+    class Meta:
+        unique_together = ("name", "parent")
+
+    def __str__(self):
+        return self.name
 
 
 class Course(TimestampedModel, ValidateOnSaveMixin):

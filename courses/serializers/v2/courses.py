@@ -167,3 +167,13 @@ class CourseRunEnrollmentSerializer(BaseCourseRunEnrollmentSerializer):
         fields = BaseCourseRunEnrollmentSerializer.Meta.fields + [  # noqa: RUF005
             "run_id",
         ]
+
+
+class CourseTopicSerializer(serializers.ModelSerializer):
+    """
+    CoursesTopic model serializer
+    """
+
+    class Meta:
+        model = models.CoursesTopic
+        fields = ["name", "parent"]
