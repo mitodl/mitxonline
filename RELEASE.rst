@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.94.1 (Released May 28, 2024)
+--------------
+
+- Update dependency mitol-django-google-sheets to v2023 (#2090)
+- Update dependency mitol-django-payment-gateway to v2023 (#2093)
+
 Version 0.94.0 (Released May 23, 2024)
 --------------
 
