@@ -30,7 +30,8 @@ import {
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
 import {
-  getFirstRelevantRun, isRunArchived,
+  getFirstRelevantRun,
+  isRunArchived,
   isEnrollmentFuture,
   isFinancialAssistanceAvailable
 } from "../lib/courseApi"
