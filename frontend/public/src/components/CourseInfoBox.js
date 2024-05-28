@@ -1,7 +1,6 @@
 import React from "react"
 import {
   formatPrettyDate,
-  emptyOrNil,
   getFlexiblePriceForProduct,
   formatLocalePrice,
   parseDateString,

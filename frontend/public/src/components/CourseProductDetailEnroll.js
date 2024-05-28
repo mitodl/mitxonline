@@ -481,7 +481,7 @@ export class CourseProductDetailEnroll extends React.Component<
                 className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
                 disabled={!run.is_enrollable}
               >
-                {isRunArchived(run) ? "Enroll now" : "Access Course Materials"}
+                {isRunArchived(run) ? "Access Course Materials" : "Enroll Now"}
               </button>
             </form>
           )}
