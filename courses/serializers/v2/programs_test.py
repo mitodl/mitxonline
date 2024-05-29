@@ -8,7 +8,7 @@ from courses.factories import (  # noqa: F401
     CourseRunFactory,
     program_with_empty_requirements,
 )
-from courses.models import Department
+from courses.models import Department, CoursesTopic
 from courses.serializers.v2.programs import (
     ProgramRequirementTreeSerializer,
     ProgramSerializer,
@@ -51,6 +51,9 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
         formatted_reqs["electives"] = [
             course.id for course in program_with_empty_requirements.elective_courses
         ]
+    topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
+    course1.topics.set([topics[0], topics[1]])
+    course2.topics.set([topics[1], topics[2]])
 
     data = ProgramSerializer(
         instance=program_with_empty_requirements, context=mock_context
@@ -73,5 +76,6 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
             "program_type": "Series",
             "departments": [],
             "live": True,
+            "topics": [{"name": topic.name} for topic in topics],
         },
     )

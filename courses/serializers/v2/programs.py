@@ -3,7 +3,7 @@ import logging
 from rest_framework import serializers
 
 from cms.serializers import ProgramPageSerializer
-from courses.models import Program, ProgramRequirementNodeType
+from courses.models import Program, ProgramRequirementNodeType, CoursesTopic
 from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
     get_thumbnail_url,
@@ -21,6 +21,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
     departments = serializers.StringRelatedField(many=True, read_only=True)
+    topics = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         return [course[0].id for course in instance.courses if course[0].live]
@@ -45,6 +46,15 @@ class ProgramSerializer(serializers.ModelSerializer):
         else:
             return {"feature_image_src": get_thumbnail_url(None)}
 
+    def get_topics(self, instance):
+        """List all topics in all courses in the program"""
+        topics = (
+            CoursesTopic.objects.filter(course__program=instance)
+            .values("name")
+            .distinct("name")
+        )
+        return list(topics)
+
     class Meta:
         model = Program
         fields = [
@@ -58,6 +68,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "program_type",
             "departments",
             "live",
+            "topics",
         ]
 
 

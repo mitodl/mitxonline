@@ -30,6 +30,7 @@ class CourseSerializer(BaseCourseSerializer):
     next_run_id = serializers.SerializerMethodField()
     page = BaseCoursePageSerializer(read_only=True)
     programs = serializers.SerializerMethodField()
+    topics = serializers.SerializerMethodField()
 
     def get_next_run_id(self, instance):
         """Get next run id"""
@@ -44,6 +45,15 @@ class CourseSerializer(BaseCourseSerializer):
 
         return None
 
+    def get_topics(self, instance):
+        """List topics of a course"""
+        if instance.page:
+            return sorted(
+                [{"name": topic.name} for topic in instance.page.topics.all()],
+                key=lambda topic: topic["name"],
+            )
+        return []
+
     class Meta:
         model = models.Course
         fields = [
@@ -54,6 +64,7 @@ class CourseSerializer(BaseCourseSerializer):
             "departments",
             "page",
             "programs",
+            "topics",
         ]
 
 
