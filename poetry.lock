@@ -2467,17 +2467,17 @@ posthog = ">=3.5.0"
 
 [[package]]
 name = "mitol-django-openedx"
-version = "1.3.0"
+version = "2023.12.19"
 description = "MIT Open Learning django app extensions for edx related utilities"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "mitol-django-openedx-1.3.0.tar.gz", hash = "sha256:2c6180931c3d31a45999e13b273af95f84881ad388495edd4de41f397da324aa"},
-    {file = "mitol_django_openedx-1.3.0-py3-none-any.whl", hash = "sha256:bca1e796d38cbcc5f674b470382f6b1e018e18b55be2737f2882b5ffdb47511b"},
+    {file = "mitol-django-openedx-2023.12.19.tar.gz", hash = "sha256:d91ad3bfddbb2563eabccc643995ccac9bfc83919cf13c3e91ede7e4c8b2aef5"},
+    {file = "mitol_django_openedx-2023.12.19-py3-none-any.whl", hash = "sha256:0e1faf21ed633371f32db8427840479d68450b10603f33e50613dfdfc96fb582"},
 ]
 
 [package.dependencies]
-django = ">=2.2.12,<4.0"
+django = ">=3.0"
 edx-opaque-keys = "2.2.2"
 setuptools = "*"
 
@@ -4244,4 +4244,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "caf53b2cab83203b3f452da41de8e8bc9be50ce87e72626dc0011a5e906f0607"
+content-hash = "16b2c38af8931fb4582d359fb626ad9dbbf308f0e91e549d486587f286d01cdc"
