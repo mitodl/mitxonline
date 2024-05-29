@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.95.0
+Version 0.95.0 (Released May 29, 2024)
 --------------
 
 - Adding course topics (#2210)
