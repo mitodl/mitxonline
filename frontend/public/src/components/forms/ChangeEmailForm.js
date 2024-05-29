@@ -34,10 +34,12 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
         email:           user.email,
         confirmPassword: ""
       }}
+      validateOnChange={false}
+      validateOnBlur={false}
     >
       {({ isSubmitting, errors }) => {
         return (
-          <Form>
+          <Form noValidate>
             <ConnectedFocusError />
             <section className="email-section">
               <h2 aria-label="Change Email Form">Change Email</h2>
@@ -48,7 +50,6 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
                   id="email"
                   className="form-control"
                   component={EmailInput}
-                  autoComplete="email"
                   pattern={changeEmailValidationRegex(user.email)}
                   title="Email must be different than your current one."
                   aria-invalid={errors.email ? "true" : null}
