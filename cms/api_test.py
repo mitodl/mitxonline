@@ -290,7 +290,7 @@ def test_create_courseware_page():
 
 
 @pytest.mark.django_db
-def test_create_featured_items():
+def test_create_featured_items():  # noqa: D103
     # pytest does not clear cache thus if we have a cache value set, it will persist between tests and test runs
     # thus we need to clear the cache before running the test
     redis_cache = caches["redis"]
@@ -308,38 +308,26 @@ def test_create_featured_items():
     # Course that starts in the future but is open for enrollment
     enrollable_future_course = CourseFactory.create(page=None, live=True)
     CoursePageFactory.create(course=enrollable_future_course, live=True)
-    enrollable_future_courserun = CourseRunFactory.create(
+    enrollable_future_courserun = CourseRunFactory.create(  # noqa: F841
         course=enrollable_future_course,
         live=True,
-        in_future=True,
+        start_date=future_date,
+        enrollment_start=further_past_date,
+        enrollment_end=further_future_date,
+        end_date=furthest_future_date,
     )
-    enrollable_future_courserun.enrollment_start = further_past_date
-    enrollable_future_courserun.start_date = future_date
-    enrollable_future_courserun.enrollment_end = further_future_date
-    enrollable_future_courserun.end_date = furthest_future_date
-    enrollable_future_courserun.save()
 
     # Course that is open for enrollment, but starts after the one above
     enrollable_other_future_course = CourseFactory.create(page=None, live=True)
     CoursePageFactory.create(course=enrollable_other_future_course, live=True)
-    enrollable_other_future_courserun = CourseRunFactory.create(
+    enrollable_other_future_courserun = CourseRunFactory.create(  # noqa: F841
         course=enrollable_other_future_course,
         live=True,
-        in_future=True,
+        enrollment_start=further_past_date,
+        start_date=future_date + timedelta(days=2),
+        enrollment_end=further_future_date + timedelta(days=2),
+        end_date=furthest_future_date + timedelta(days=2)
     )
-    enrollable_other_future_courserun.enrollment_start = (
-        enrollable_future_courserun.enrollment_start
-    )
-    enrollable_other_future_courserun.start_date = (
-        enrollable_future_courserun.start_date + timedelta(days=2)
-    )
-    enrollable_other_future_courserun.enrollment_end = (
-        enrollable_future_courserun.enrollment_end + timedelta(days=2)
-    )
-    enrollable_other_future_courserun.end_date = (
-        enrollable_future_courserun.end_date + timedelta(days=2)
-    )
-    enrollable_other_future_courserun.save()
 
     # A self-paced course that is open for enrollment
     enrollable_self_paced_course = CourseFactory.create(page=None, live=True)
@@ -348,6 +336,7 @@ def test_create_featured_items():
         course=enrollable_self_paced_course,
         live=True,
         in_progress=True,
+        enrollment_end=further_future_date + timedelta(days=2),
     )
     self_paced_run.is_self_paced = True
     self_paced_run.save()
@@ -358,11 +347,8 @@ def test_create_featured_items():
         course=in_progress_course,
         live=True,
         in_progress=True,
+        enrollment_end=further_future_date + timedelta(days=2),
     )
-    in_progress_course.enrollment_start = further_past_date
-    in_progress_course.start_date = past_date
-    in_progress_course.enrollment_end = future_date
-    in_progress_course.end_date = further_future_date
 
     unenrollable_course = CourseFactory.create(page=None, live=False)
     CoursePageFactory.create(course=unenrollable_course, live=False)
