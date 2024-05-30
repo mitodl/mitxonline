@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.95.1
+Version 0.95.1 (Released May 30, 2024)
 --------------
 
 - Repair test based on dates (test_create_featured_items)  (#2229)
