@@ -63,14 +63,14 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
               </div>
               <div className="form-group">
                 <CardLabel
-                  htmlFor="confirmPassword"
+                  htmlFor="confirmPasswordEmailChange"
                   isRequired={true}
                   label="Confirm Password"
                   subLabel="Password required to change email address"
                 />
                 <Field
-                  id="confirmPassword"
-                  name="confirmPassword"
+                  id="confirmPasswordEmailChange"
+                  name="confirmPasswordEmailChange"
                   className="form-control"
                   component={PasswordInput}
                   autoComplete="current-password"
@@ -81,7 +81,7 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => {
                   aria-label="Confirm Password"
                 />
                 <ErrorMessage
-                  name="confirmPassword"
+                  name="confirmPasswordEmailChange"
                   id="confirmPasswordError"
                   component={FormError}
                 />
