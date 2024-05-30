@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.95.1
+--------------
+
+- Repair test based on dates (test_create_featured_items)  (#2229)
+- fix(deps): update dependency mitol-django-openedx to v2023 (#2092)
+
 Version 0.95.0 (Released May 29, 2024)
 --------------
 
