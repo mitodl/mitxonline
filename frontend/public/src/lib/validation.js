@@ -8,7 +8,7 @@ export const passwordFieldRegex = /^(?=.*[0-9])(?=.*[a-zA-Z]).{8,}$/
 const newAndConfirmPasswordMatchErrorMessage = "New password and Confirm Password must match."
 
 export const passwordFieldErrorMessage =
-  "Password must be atleast 8 character and contain at least one letter and number."
+  "Password must be atleast 8 characters and contain at least one letter and number."
 
 export const usernameFieldRegex = "^\\S{3,30}$"
 

@@ -6,7 +6,8 @@ import { Formik, Field, Form, ErrorMessage } from "formik"
 import { PasswordInput } from "./elements/inputs"
 import FormError from "./elements/FormError"
 import {
-  changePasswordFormValidation
+  changePasswordFormValidation,
+  passwordFieldErrorMessage
 } from "../../lib/validation"
 import CardLabel from "../input/CardLabel"
 import { ConnectedFocusError } from "focus-formik-error"
@@ -82,7 +83,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
                   errors.newPassword ? "true" : null
                 }
                 aria-describedby={
-                  errors.newPassword ? "newPasswordError" : null
+                  errors.newPassword ? "newPasswordError" : passwordFieldErrorMessage
                 }
               />
               <ErrorMessage
@@ -108,7 +109,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
                   errors.confirmPasswordChangePassword ? "true" : null
                 }
                 aria-describedby={
-                  errors.confirmPasswordChangePassword ? "confirmPasswordChangePasswordError" : null
+                  errors.confirmPasswordChangePassword ? "confirmPasswordChangePasswordError" : passwordFieldErrorMessage
                 }
               />
               <ErrorMessage
