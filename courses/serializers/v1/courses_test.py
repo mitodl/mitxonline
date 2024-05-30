@@ -43,8 +43,6 @@ def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings
     course = courseRun1.course
     department = "a course departments"
     course.departments.set([Department.objects.create(name=department)])
-    topic = "a course topic"
-    course.topics.set([CoursesTopic.objects.create(name=topic)])
 
     CourseRunEnrollmentFactory.create(
         run=courseRun1, **({} if is_anonymous else {"user": user})
@@ -63,7 +61,6 @@ def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings
                 CourseRunSerializer(courseRun2).data,
             ],
             "next_run_id": course.first_unexpired_run.id,
-            "topics": [{"name": topic}],
             "departments": [{"name": department}],
             "page": CoursePageSerializer(course.page).data,
             "programs": ProgramSerializer(course.programs, many=True).data
