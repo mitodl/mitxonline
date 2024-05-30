@@ -9,7 +9,7 @@ from courses.factories import (
     CourseRunFactory,
     CourseRunGradeFactory,
 )
-from courses.models import Department, CoursesTopic
+from courses.models import Department
 from courses.serializers.v1.base import BaseCourseSerializer, CourseRunGradeSerializer
 from courses.serializers.v1.courses import (
     CourseRunEnrollmentSerializer,

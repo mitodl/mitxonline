@@ -3,7 +3,7 @@ import logging
 from rest_framework import serializers
 
 from cms.serializers import ProgramPageSerializer
-from courses.models import Program, ProgramRequirementNodeType, CoursesTopic
+from courses.models import Program, ProgramRequirementNodeType
 from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
     get_thumbnail_url,
