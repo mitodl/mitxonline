@@ -48,12 +48,13 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     def get_topics(self, instance):
         """List all topics in all courses in the program"""
-        topics = (
-            CoursesTopic.objects.filter(course__program=instance)
-            .values("name")
-            .distinct("name")
+        topics = set(  # noqa: C401
+            topic.name
+            for course in instance.courses
+            if course[0].page
+            for topic in course[0].page.topics.all()
         )
-        return list(topics)
+        return [{"name": topic} for topic in sorted(topics)]
 
     class Meta:
         model = Program

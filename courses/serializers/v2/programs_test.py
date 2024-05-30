@@ -3,6 +3,7 @@ from datetime import timedelta
 import pytest
 from django.utils.timezone import now
 
+from cms.factories import CoursePageFactory
 from cms.serializers import ProgramPageSerializer
 from courses.factories import (  # noqa: F401
     CourseRunFactory,
@@ -29,11 +30,13 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
         start_date=now() + timedelta(hours=1),
     )
     course1 = run1.course
+    CoursePageFactory.create(course=run1.course)
     run2 = CourseRunFactory.create(
         course__page=None,
         start_date=now() + timedelta(hours=2),
     )
     course2 = run2.course
+    CoursePageFactory.create(course=run2.course)
     departments = [
         Department.objects.create(name=f"department{num}") for num in range(3)
     ]
@@ -42,6 +45,7 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
 
     formatted_reqs = {"required": [], "electives": []}
 
+    topics = []
     if not remove_tree:
         program_with_empty_requirements.add_requirement(course1)
         program_with_empty_requirements.add_requirement(course2)
@@ -51,9 +55,11 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
         formatted_reqs["electives"] = [
             course.id for course in program_with_empty_requirements.elective_courses
         ]
-    topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
-    course1.topics.set([topics[0], topics[1]])
-    course2.topics.set([topics[1], topics[2]])
+        topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
+        course1.page.topics.set([topics[0], topics[1]])
+        course2.page.topics.set([topics[1], topics[2]])
+        course1.page.save()
+        course2.page.save()
 
     data = ProgramSerializer(
         instance=program_with_empty_requirements, context=mock_context
