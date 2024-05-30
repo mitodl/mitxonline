@@ -290,7 +290,7 @@ def test_create_courseware_page():
 
 
 @pytest.mark.django_db
-def test_create_featured_items():  # noqa: D103
+def test_create_featured_items():
     # pytest does not clear cache thus if we have a cache value set, it will persist between tests and test runs
     # thus we need to clear the cache before running the test
     redis_cache = caches["redis"]
@@ -326,7 +326,7 @@ def test_create_featured_items():  # noqa: D103
         enrollment_start=further_past_date,
         start_date=future_date + timedelta(days=2),
         enrollment_end=further_future_date + timedelta(days=2),
-        end_date=furthest_future_date + timedelta(days=2)
+        end_date=furthest_future_date + timedelta(days=2),
     )
 
     # A self-paced course that is open for enrollment
