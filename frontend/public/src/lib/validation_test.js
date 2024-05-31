@@ -7,7 +7,6 @@ import {
   resetPasswordFormValidation,
   passwordFieldRegex,
   usernameFieldRegex,
-  changeEmailValidationRegex
 } from "./validation"
 
 describe("validation utils", () => {
@@ -99,17 +98,6 @@ describe("validation utils", () => {
     ].forEach(([value, regexMatch]) => {
       it("username regex pattern matching.", () => {
         assert.equal(usernameRegex.test(value), regexMatch)
-      })
-    })
-    ;[
-      ["test@mit.edu", "test+new@mit.edu", true],
-      ["test@mit.edu", "test@mit.edu", false]
-    ].forEach(([currentEmail, futureEmail, regexMatch]) => {
-      it("Change email address field must be different from current email address.", () => {
-        const changeEmailRegex = new RegExp(
-          changeEmailValidationRegex(currentEmail)
-        )
-        assert.equal(changeEmailRegex.test(futureEmail), regexMatch)
       })
     })
   })

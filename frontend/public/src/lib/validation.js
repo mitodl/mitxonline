@@ -15,29 +15,33 @@ export const usernameFieldRegex = "^\\S{3,30}$"
 export const usernameFieldErrorMessage =
   "Username must be between 3 and 30 characters."
 
-export const changeEmailValidationRegex = (email: string) => {
-  const escapedUserEmail = email.replace(
-    /[-[\]{}()*+!<=:?./\\^$|#\s,]/g,
-    "\\$&"
-  )
-  return `^((?!${escapedUserEmail}).)*$`
-}
+const validEmailRegex = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
 
-export const changeEmailFormValidation = yup.object().shape({
-  email: yup
-    .string()
-    .label("New Email")
-    .required(),
-  confirmPassword: yup
-    .string()
-    .label("Confirm Password")
-    .required()
-})
+const validEmailErrorMessage = "Please enter a valid email address."
 
 export const passwordField = yup
   .string()
   .required()
   .label("Password")
+
+export const changeEmailFormValidation = currentEmail => yup.object().shape({
+  email: yup
+    .string()
+    .label("New Email")
+    .required()
+    .matches(
+      validEmailRegex,
+      validEmailErrorMessage
+    ).test(
+      "emails must be different",
+      "New email must be different from current email.",
+      function(newEmail) {
+        if (currentEmail === newEmail) return false
+        return true
+      }
+    ),
+  confirmPasswordEmailChange: passwordField.label("Confirm Password")
+})
 
 export const newPasswordField = passwordField
   .label("New Password")

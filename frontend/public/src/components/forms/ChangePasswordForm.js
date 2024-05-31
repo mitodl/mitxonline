@@ -83,8 +83,9 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
                   errors.newPassword ? "true" : null
                 }
                 aria-describedby={
-                  errors.newPassword ? "newPasswordError" : passwordFieldErrorMessage
+                  errors.newPassword ? "newPasswordError" : null
                 }
+                aria-description={passwordFieldErrorMessage}
               />
               <ErrorMessage
                 name="newPassword"
@@ -109,8 +110,9 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
                   errors.confirmPasswordChangePassword ? "true" : null
                 }
                 aria-describedby={
-                  errors.confirmPasswordChangePassword ? "confirmPasswordChangePasswordError" : passwordFieldErrorMessage
+                  errors.confirmPasswordChangePassword ? "confirmPasswordChangePasswordError" : null
                 }
+                aria-description={passwordFieldErrorMessage}
               />
               <ErrorMessage
                 name="confirmPasswordChangePassword"
