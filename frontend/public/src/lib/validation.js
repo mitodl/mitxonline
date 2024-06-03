@@ -10,12 +10,10 @@ const newAndConfirmPasswordMatchErrorMessage = "New password and Confirm Passwor
 export const passwordFieldErrorMessage =
   "Password must be atleast 8 characters and contain at least one letter and number."
 
-export const usernameFieldRegex = "^\\S{3,30}$"
-
 export const usernameFieldErrorMessage =
   "Username must be between 3 and 30 characters."
 
-const validEmailRegex = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+const validEmailRegex = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
 
 const validEmailErrorMessage = "Please enter a valid email address."
 
@@ -32,7 +30,8 @@ export const changeEmailFormValidation = currentEmail => yup.object().shape({
     .matches(
       validEmailRegex,
       validEmailErrorMessage
-    ).test(
+    )
+    .test(
       "emails must be different",
       "New email must be different from current email.",
       function(newEmail) {
@@ -54,6 +53,8 @@ export const usernameField = yup
   .string()
   .required()
   .label("Username")
+  .min(3, usernameFieldErrorMessage)
+  .max(30, usernameFieldErrorMessage)
 
 export const resetPasswordFormValidation = yup.object().shape({
   newPassword:     newPasswordField.label("New Password")

@@ -7,7 +7,6 @@ import { PasswordInput } from "./elements/inputs"
 import FormError from "./elements/FormError"
 import {
   resetPasswordFormValidation,
-  passwordFieldRegex,
   passwordFieldErrorMessage
 } from "../../lib/validation"
 import CardLabel from "../input/CardLabel"
@@ -33,7 +32,7 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
   >
     {({ isSubmitting, errors }) => {
       return (
-        <Form>
+        <Form noValidate>
           <ConnectedFocusError />
           <div className="form-group">
             <CardLabel
@@ -48,8 +47,8 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
               component={PasswordInput}
               aria-invalid={errors.newPassword ? "true" : null}
               aria-describedby={errors.newPassword ? "newPasswordError" : null}
-              pattern={passwordFieldRegex}
               title={passwordFieldErrorMessage}
+              required
             />
             <ErrorMessage
               name="newPassword"
@@ -72,7 +71,7 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
               aria-describedby={
                 errors.newPassword ? "confirmPasswordError" : null
               }
-              pattern={passwordFieldRegex}
+              required
               title={passwordFieldErrorMessage}
             />
             <ErrorMessage

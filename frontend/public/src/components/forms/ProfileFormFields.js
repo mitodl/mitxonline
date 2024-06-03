@@ -16,16 +16,12 @@ import FormError from "./elements/FormError"
 import CardLabel from "../input/CardLabel"
 
 import {
-  passwordField,
+  newPasswordField,
   usernameField,
-  passwordFieldRegex,
   passwordFieldErrorMessage,
-  usernameFieldRegex,
-  usernameFieldErrorMessage
 } from "../../lib/validation"
 
-export const NAME_REGEX =
-  "^(?![~!@&\\)\\(+:'.?,\\-]+)([^\\/\\^$#*=\\[\\]`%_;\\\\<>\\{\\}\"\\|]+)$"
+export const NAME_REGEX = /^(?![~!@&)(+:'.?,-])(?!.*[(/^$#*=[\]`%_;\\<>{}"|)]).*$/
 
 const seedYear = moment().year()
 
@@ -33,29 +29,37 @@ const seedYear = moment().year()
 export const NAME_REGEX_FAIL_MESSAGE =
   "Name cannot start with a special character (~!@&)(+:'.?,-), and cannot contain any of (/^$#*=[]`%_;\\<>{}\"|)"
 
-export const fullNameRegex = "^.{2,255}$"
-const fullNameErrorMessage = "Full name must be between 2 and 254 characters."
-
-const countryRegex = "^\\S{2,}$"
-
 export const legalAddressValidation = yup.object().shape({
   name: yup
     .string()
     .required()
-    .label("Full Name"),
+    .label("Full Name")
+    .min(2)
+    .max(254),
   legal_address: yup.object().shape({
     first_name: yup
       .string()
       .required()
-      .label("First Name"),
+      .label("First Name")
+      .matches(
+        NAME_REGEX,
+        NAME_REGEX_FAIL_MESSAGE
+      ),
     last_name: yup
       .string()
       .required()
-      .label("Last Name"),
+      .label("Last Name")
+      .matches(
+        NAME_REGEX,
+        NAME_REGEX_FAIL_MESSAGE
+      ),
     country: yup
       .string()
       .required()
-      .label("Country"),
+      .label("Country")
+      .matches(/^[A-Z]+$/, "Country code must be uppercase letters only")
+      .min(2, 'Country code must be exactly 2 letters')
+      .max(2, 'Country code must be exactly 2 letters'),
     state: yup
       .string()
       .label("State")
@@ -71,7 +75,7 @@ export const legalAddressValidation = yup.object().shape({
 })
 
 export const newAccountValidation = yup.object().shape({
-  password: passwordField,
+  password: newPasswordField,
   username: usernameField
 })
 
@@ -130,22 +134,6 @@ export const addlProfileFieldsValidation = yup.object().shape({
   type_is_other:        yup.boolean().nullable()
 })
 
-export const requireLearnerTypeFields = {
-  name:      "require_learner_type_fields",
-  message:   "Please specify which category you fall into.",
-  exclusive: false,
-  params:    {},
-  test:      (testValue: any, context: any) => {
-    return (
-      testValue ||
-      context.parent.type_is_student ||
-      context.parent.type_is_professional ||
-      context.parent.type_is_educator ||
-      context.parent.type_is_other
-    )
-  }
-}
-
 type LegalAddressProps = {
   countries: Array<Country>,
   setFieldValue: Function,
@@ -189,6 +177,7 @@ const renderYearOfBirthField = errors => {
         autoComplete="bday-year"
         aria-invalid={hasError ? "true" : null}
         aria-describedby={hasError ? "year-of-birth-error" : null}
+        required
       >
         <option value="">-----</option>
         {reverse(range(seedYear - 120, seedYear - 13)).map((year, i) => (
@@ -197,7 +186,7 @@ const renderYearOfBirthField = errors => {
           </option>
         ))}
       </Field>
-      <ErrorMessage name="user_profile.year_of_birth" component={FormError} />
+      <ErrorMessage id="year-of-birth-error" name="user_profile.year_of_birth" component={FormError} />
     </div>
   )
 }
@@ -232,12 +221,10 @@ export const LegalAddressFields = ({
               ? "first-name-error"
               : null
           }
-          aria-required="true"
-          aria-label="First Name"
-          pattern={NAME_REGEX}
-          title={NAME_REGEX_FAIL_MESSAGE}
+          aria-description="Name cannot start with, or contain, a special character"
+          required
         />
-        <ErrorMessage name="legal_address.first_name" component={FormError} />
+        <ErrorMessage id="first-name-error" name="legal_address.first_name" component={FormError} />
       </div>
       <div className="form-group">
         <CardLabel
@@ -257,8 +244,8 @@ export const LegalAddressFields = ({
           aria-describedby={
             addressErrors && addressErrors.last_name ? "last-name-error" : null
           }
-          pattern={NAME_REGEX}
-          title={NAME_REGEX_FAIL_MESSAGE}
+          aria-description="Name cannot start with, or contain, a special character"
+          required
         />
         <ErrorMessage name="legal_address.last_name" component={FormError} />
       </div>
@@ -267,7 +254,7 @@ export const LegalAddressFields = ({
           htmlFor="name"
           isRequired={true}
           label="Full Name"
-          subLabel="Name that will appear on your certificate"
+          subLabel="Name that will appear on your certificates"
         />
         <Field
           type="text"
@@ -278,8 +265,7 @@ export const LegalAddressFields = ({
           aria-invalid={errors.name ? "true" : null}
           aria-describedby={errors.name ? "full-name-error" : null}
           aria-label="Full Name"
-          pattern={fullNameRegex}
-          title={fullNameErrorMessage}
+          aria-description="Name that will appear on your certificates"
         />
         <ErrorMessage name="name" component={FormError} />
       </div>
@@ -300,9 +286,7 @@ export const LegalAddressFields = ({
               id="username"
               aria-invalid={errors.username ? "true" : null}
               aria-describedby={errors.username ? "username-error" : null}
-              aria-label="Public Username"
-              pattern={usernameFieldRegex}
-              title={usernameFieldErrorMessage}
+              required
             />
             <ErrorMessage name="username" component={FormError} />
           </div>
@@ -313,16 +297,14 @@ export const LegalAddressFields = ({
               name="password"
               id="password"
               aria-invalid={errors.password ? "true" : null}
-              aria-describedby={errors.password ? "password-error" : null}
+              aria-describedby={errors.password ? "password-error" : "password-subtitle"}
               className="form-control"
               autoComplete="new-password"
-              pattern={passwordFieldRegex}
-              title={passwordFieldErrorMessage}
+              required
             />
             <ErrorMessage name="passwrod" component={FormError} />
             <div id="password-subtitle" className="label-secondary">
-              Passwords must contain at least 8 characters and at least 1 number
-              and 1 letter.
+              {passwordFieldErrorMessage}
             </div>
           </div>
         </React.Fragment>
@@ -343,7 +325,7 @@ export const LegalAddressFields = ({
           }
           className="form-control"
           autoComplete="country"
-          pattern={countryRegex}
+          required
         >
           <option value="">-----</option>
           {countries
@@ -354,7 +336,7 @@ export const LegalAddressFields = ({
             ))
             : null}
         </Field>
-        <ErrorMessage name="legal_address.country" component={FormError} />
+        <ErrorMessage id="country-error" name="legal_address.country" component={FormError} />
       </div>
       {findStates(values.legal_address.country, countries) ? (
         <div className="form-group">
@@ -373,6 +355,7 @@ export const LegalAddressFields = ({
             }
             className="form-control"
             autoComplete="state"
+            required
           >
             <option value="">-----</option>
             {findStates(values.legal_address.country, countries)
@@ -385,7 +368,7 @@ export const LegalAddressFields = ({
               )
               : null}
           </Field>
-          <ErrorMessage name="legal_address.state" component={FormError} />
+          <ErrorMessage id="state-error" name="legal_address.state" component={FormError} />
         </div>
       ) : null}
       {isNewAccount ? (
@@ -395,7 +378,7 @@ export const LegalAddressFields = ({
   )
 }
 
-export const ProfileFields = props => {
+export const GenderAndDOBProfileFields = errors => {
   return (
     <React.Fragment>
       <div className="row small-gap">
@@ -425,7 +408,7 @@ export const ProfileFields = props => {
         </div>
         <div className="col">
           <div className="form-group">
-            {renderYearOfBirthField(props.errors)}
+            {renderYearOfBirthField(errors)}
           </div>
         </div>
       </div>
@@ -434,6 +417,7 @@ export const ProfileFields = props => {
 }
 
 export const AddlProfileFields = ({
+  errors,
   values,
   requireAddlFields
 }: AddlProfileFieldsProps) => (
@@ -443,15 +427,19 @@ export const AddlProfileFields = ({
         <div className="col">
           <CardLabel
             htmlFor="user_profile.highest_education"
-            isRequired={false}
+            isRequired={requireAddlFields}
             label="Highest Level of Education"
           />
-          {requireAddlFields ? <span className="required">*</span> : ""}
           <Field
             component="select"
             name="user_profile.highest_education"
             id="user_profile.highest_education"
             className="form-control"
+            required = {requireAddlFields}
+            aria-invalid={errors && errors.user_profile && errors.user_profile.highest_education ? "true" : null}
+            aria-describedby={
+              errors && errors.user_profile && errors.user_profile.highest_education ? "highest-educaton-level-error-message" : null
+            }
           >
             <option value="">-----</option>
             {HIGHEST_EDUCATION_CHOICES.map((level, i) => (
@@ -460,6 +448,7 @@ export const AddlProfileFields = ({
               </option>
             ))}
           </Field>
+          <ErrorMessage id="highest-educaton-level-error-message" name="user_profile.highest_education" component={FormError} />
         </div>
       </div>
     </div>
@@ -468,11 +457,11 @@ export const AddlProfileFields = ({
         htmlFor="occupation-label"
         id="occupation-label"
         isRequired={requireAddlFields}
-        label="Are you a?"
+        label="Are you a"
       />
       <ErrorMessage
         name="user_profile.type_is_student"
-        id="user_profile.type_is_student_Error"
+        id="user_profile.type_is_studentError"
         component={FormError}
       />
     </div>
@@ -485,7 +474,10 @@ export const AddlProfileFields = ({
             id="user_profile.type_is_student"
             className="form-check-input"
             aria-labelledby="occupation-label student-label"
-            defaultChecked={values.user_profile.type_is_student}
+            aria-invalid={errors && errors.user_profile && errors.user_profile.type_is_student ? "true" : null}
+            aria-describedby={
+              errors && errors.user_profile && errors.user_profile.type_is_student ? "user_profile.type_is_studentError" : null
+            }
           />
           <label
             className="form-check-label"
@@ -503,7 +495,10 @@ export const AddlProfileFields = ({
             id="user_profile.type_is_professional"
             className="form-check-input"
             aria-labelledby="occupation-label professional-label"
-            defaultChecked={values.user_profile.type_is_professional}
+            aria-invalid={errors && errors.user_profile && errors.user_profile.type_is_professional ? "true" : null}
+            aria-describedby={
+              errors && errors.user_profile && errors.user_profile.type_is_professional ? "user_profile.type_is_studentError" : null
+            }
           />
           <label
             className="form-check-label"
@@ -523,7 +518,10 @@ export const AddlProfileFields = ({
             id="user_profile.type_is_educator"
             className="form-check-input"
             aria-labelledby="occupation-label educator-label"
-            defaultChecked={values.user_profile.type_is_educator}
+            aria-invalid={errors && errors.user_profile && errors.user_profile.type_is_educator ? "true" : null}
+            aria-describedby={
+              errors && errors.user_profile && errors.user_profile.type_is_educator ? "user_profile.type_is_studentError" : null
+            }
           />
           <label
             className="form-check-label"
@@ -541,7 +539,10 @@ export const AddlProfileFields = ({
             id="user_profile.type_is_other"
             className="form-check-input"
             aria-labelledby="occupation-label other-label"
-            defaultChecked={values.user_profile.type_is_other}
+            aria-invalid={errors && errors.user_profile && errors.user_profile.type_is_other ? "true" : null}
+            aria-describedby={
+              errors && errors.user_profile && errors.user_profile.type_is_other ? "user_profile.type_is_studentError" : null
+            }
           />
           <label
             className="form-check-label"

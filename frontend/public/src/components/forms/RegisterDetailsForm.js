@@ -44,7 +44,7 @@ const RegisterDetailsForm = ({ onSubmit, countries }: Props) => (
   >
     {({ values, errors, isSubmitting }) => {
       return (
-        <Form>
+        <Form noValidate>
           <ConnectedFocusError />
           <LegalAddressFields
             errors={errors}
