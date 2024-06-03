@@ -5,7 +5,6 @@ import { ValidationError } from "yup"
 import {
   changePasswordFormValidation,
   resetPasswordFormValidation,
-  passwordFieldRegex
 } from "./validation"
 
 describe("validation utils", () => {
