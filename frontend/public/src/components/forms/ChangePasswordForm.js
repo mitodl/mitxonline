@@ -53,9 +53,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
                 component={PasswordInput}
                 autoComplete="current-password"
                 required
-                aria-invalid={
-                  errors.currentPassword ? "true" : null
-                }
+                aria-invalid={errors.currentPassword ? "true" : null}
                 aria-describedby={
                   errors.currentPassword ? "currentPasswordError" : null
                 }
@@ -79,9 +77,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
                 component={PasswordInput}
                 autoComplete="new-password"
                 required
-                aria-invalid={
-                  errors.newPassword ? "true" : null
-                }
+                aria-invalid={errors.newPassword ? "true" : null}
                 aria-describedby={
                   errors.newPassword ? "newPasswordError" : null
                 }
@@ -110,7 +106,9 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
                   errors.confirmPasswordChangePassword ? "true" : null
                 }
                 aria-describedby={
-                  errors.confirmPasswordChangePassword ? "confirmPasswordChangePasswordError" : null
+                  errors.confirmPasswordChangePassword
+                    ? "confirmPasswordChangePasswordError"
+                    : null
                 }
                 aria-description={passwordFieldErrorMessage}
               />

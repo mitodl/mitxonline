@@ -8,9 +8,7 @@ import CardLabel from "../input/CardLabel"
 
 import type { User } from "../../flow/authTypes"
 
-import {
-  changeEmailFormValidation,
-} from "../../lib/validation"
+import { changeEmailFormValidation } from "../../lib/validation"
 import FormError from "./elements/FormError"
 import { ConnectedFocusError } from "focus-formik-error"
 
@@ -73,7 +71,9 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => (
                 autoComplete="current-password"
                 aria-invalid={errors.confirmPasswordEmailChange ? "true" : null}
                 aria-describedby={
-                  errors.confirmPasswordEmailChange ? "confirmPasswordEmailChangeError" : null
+                  errors.confirmPasswordEmailChange
+                    ? "confirmPasswordEmailChangeError"
+                    : null
                 }
                 required
               />
@@ -93,7 +93,7 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => (
                 className="btn btn-primary btn-gradient-red-to-blue"
                 disabled={isSubmitting}
               >
-                  Submit
+                Submit
               </button>
             </div>
           </div>

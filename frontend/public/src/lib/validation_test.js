@@ -6,7 +6,7 @@ import {
   changePasswordFormValidation,
   resetPasswordFormValidation,
   passwordFieldRegex,
-  usernameFieldRegex,
+  usernameFieldRegex
 } from "./validation"
 
 describe("validation utils", () => {

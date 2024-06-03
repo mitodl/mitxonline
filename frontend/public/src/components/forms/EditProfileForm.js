@@ -34,7 +34,7 @@ const getInitialValues = (user: User) => ({
     job_title:         user.user_profile.job_title || null,
     leadership_level:  user.user_profile.leadership_level || null,
     year_of_birth:     user.user_profile.year_of_birth || null,
-    years_experience:  user.user_profile.years_experience || null,
+    years_experience:  user.user_profile.years_experience || null
   }
 })
 
@@ -61,9 +61,7 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
               values={values}
               isNewAccount={false}
             />
-            <GenderAndDOBProfileFields
-              errors={errors}
-            />
+            <GenderAndDOBProfileFields errors={errors} />
             <AddlProfileFields
               touched={touched}
               errors={errors}

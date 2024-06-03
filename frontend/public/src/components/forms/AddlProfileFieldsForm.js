@@ -8,7 +8,7 @@ import {
   GenderAndDOBProfileFields,
   AddlProfileFields,
   profileValidation,
-  addlProfileFieldsValidation,
+  addlProfileFieldsValidation
 } from "./ProfileFormFields"
 
 import type { User } from "../../flow/authTypes"
@@ -38,7 +38,7 @@ const getInitialValues = (user: User) => ({
     type_is_professional: user.user_profile.type_is_professional || false,
     type_is_student:      user.user_profile.type_is_student || false,
     type_is_educator:     user.user_profile.type_is_educator || false,
-    type_is_other:        user.user_profile.type_is_other || false,
+    type_is_other:        user.user_profile.type_is_other || false
   }
 })
 
@@ -50,11 +50,17 @@ const AddlProfileFieldsForm = ({
   let validation = profileValidation.concat(addlProfileFieldsValidation)
 
   const occupationField = yup
-    .boolean().test(
+    .boolean()
+    .test(
       "one occupation must be selected",
       "At least one occupation must be selected",
       function() {
-        return (this.parent.type_is_student || this.parent.type_is_professional || this.parent.type_is_educator || this.parent.type_is_other)
+        return (
+          this.parent.type_is_student ||
+          this.parent.type_is_professional ||
+          this.parent.type_is_educator ||
+          this.parent.type_is_other
+        )
       }
     )
 
@@ -69,7 +75,7 @@ const AddlProfileFieldsForm = ({
           type_is_student:      occupationField,
           type_is_professional: occupationField,
           type_is_educator:     occupationField,
-          type_is_other:        occupationField,
+          type_is_other:        occupationField
         })
       })
     )
