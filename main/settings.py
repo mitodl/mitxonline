@@ -29,7 +29,7 @@ from redbeat import RedBeatScheduler
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 
-VERSION = "0.93.3"
+VERSION = "0.96.0"
 
 log = logging.getLogger()
 
@@ -1017,12 +1017,6 @@ OPENEDX_API_CLIENT_SECRET = get_string(
     name="OPENEDX_API_CLIENT_SECRET",
     default=None,
     description="The OAuth2 client secret to connect to Open edX with",
-    required=True,
-)
-OPENEDX_API_KEY = get_string(
-    name="OPENEDX_API_KEY",
-    default=None,
-    description="edX API key (EDX_API_KEY setting in Open edX)",
     required=True,
 )
 

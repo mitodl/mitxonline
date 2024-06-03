@@ -1429,13 +1429,13 @@ djangorestframework = ">=3.9.3"
 
 [[package]]
 name = "edx-api-client"
-version = "1.8.0"
+version = "1.9.0"
 description = "Python interface to the edX REST APIs"
 optional = false
 python-versions = "*"
 files = [
-    {file = "edx-api-client-1.8.0.tar.gz", hash = "sha256:cbf9af4d466cbea465054d78688e6f335a3e485a4e2f90dc82e050202af29ba1"},
-    {file = "edx_api_client-1.8.0-py2.py3-none-any.whl", hash = "sha256:050f0622c2c3a0d4f24902bf6218b2a554b86a5e84800b71d1fefd0bddf3ad13"},
+    {file = "edx-api-client-1.9.0.tar.gz", hash = "sha256:75006eb9d2540da3960993a3050372e52557b2c4c28d1d6f02cc2d6c46e72f57"},
+    {file = "edx_api_client-1.9.0-py2.py3-none-any.whl", hash = "sha256:10d2f1d0a33cf5c3bf77bdabb4862d9724e41d3f1d9084d5545b292383d60acf"},
 ]
 
 [package.dependencies]
@@ -2351,22 +2351,22 @@ typing-extensions = "*"
 
 [[package]]
 name = "mitol-django-google-sheets"
-version = "2.6.0"
+version = "2023.12.19.1"
 description = "Core library to handle Google Sheets integrations in Django"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "mitol-django-google-sheets-2.6.0.tar.gz", hash = "sha256:87b3defe6a2cdd53cafb77f3dc983d500bfc09dbb33129e1f4c0dcfca1ff34cb"},
-    {file = "mitol_django_google_sheets-2.6.0-py3-none-any.whl", hash = "sha256:c545cd7cf3f57cd727996177db17b878278289f19dc6841d23a3707c240d7855"},
+    {file = "mitol-django-google-sheets-2023.12.19.1.tar.gz", hash = "sha256:0b083cb10d43ebba0d4032b194d3e087a62c5a435fee2b1f919ec3496e1cb878"},
+    {file = "mitol_django_google_sheets-2023.12.19.1-py3-none-any.whl", hash = "sha256:d48acad8e4394fd20104f56858edabe682ac009c9ebe2d17fe955c0ca0507969"},
 ]
 
 [package.dependencies]
-django = ">=2.2.12,<4.0"
+django = ">=3.0"
 factory-boy = ">=3.2,<4.0"
 google-api-python-client = "1.7.11"
 google-auth = "1.6.3"
 google-auth-oauthlib = ">=0.5.2"
-mitol-django-common = ">=2.7.0,<2.8.0"
+mitol-django-common = "*"
 pygsheets = "2.0.2"
 pytz = ">=2020.4"
 setuptools = "*"
@@ -2467,17 +2467,17 @@ posthog = ">=3.5.0"
 
 [[package]]
 name = "mitol-django-openedx"
-version = "1.3.0"
+version = "2023.12.19"
 description = "MIT Open Learning django app extensions for edx related utilities"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "mitol-django-openedx-1.3.0.tar.gz", hash = "sha256:2c6180931c3d31a45999e13b273af95f84881ad388495edd4de41f397da324aa"},
-    {file = "mitol_django_openedx-1.3.0-py3-none-any.whl", hash = "sha256:bca1e796d38cbcc5f674b470382f6b1e018e18b55be2737f2882b5ffdb47511b"},
+    {file = "mitol-django-openedx-2023.12.19.tar.gz", hash = "sha256:d91ad3bfddbb2563eabccc643995ccac9bfc83919cf13c3e91ede7e4c8b2aef5"},
+    {file = "mitol_django_openedx-2023.12.19-py3-none-any.whl", hash = "sha256:0e1faf21ed633371f32db8427840479d68450b10603f33e50613dfdfc96fb582"},
 ]
 
 [package.dependencies]
-django = ">=2.2.12,<4.0"
+django = ">=3.0"
 edx-opaque-keys = "2.2.2"
 setuptools = "*"
 
@@ -4244,4 +4244,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "832875bf6f5cb30e4ab463911e8cfdcfd52cfcb7f79e03ae398bbfffc80e732a"
+content-hash = "16b2c38af8931fb4582d359fb626ad9dbbf308f0e91e549d486587f286d01cdc"

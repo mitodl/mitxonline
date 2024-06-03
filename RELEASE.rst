@@ -1,6 +1,42 @@
 Release Notes
 =============
 
+Version 0.96.0 (Released June 03, 2024)
+--------------
+
+- Renaming enroll now button for archived courses (#2226)
+
+Version 0.95.1 (Released May 30, 2024)
+--------------
+
+- Repair test based on dates (test_create_featured_items)  (#2229)
+- fix(deps): update dependency mitol-django-openedx to v2023 (#2092)
+
+Version 0.95.0 (Released May 29, 2024)
+--------------
+
+- Adding course topics (#2210)
+- Update displayOrder for line properties (#2224)
+- refactor: remove EdX-Api-Key usage (#2217)
+
+Version 0.94.1 (Released May 28, 2024)
+--------------
+
+- Update dependency mitol-django-google-sheets to v2023 (#2090)
+- Update dependency mitol-django-payment-gateway to v2023 (#2093)
+
+Version 0.94.0 (Released May 23, 2024)
+--------------
+
+- Fix syncing hubspot user (#2219)
+- fix dates on in_progress_course (#2216)
+- Admin: filtering certificates by course and program (#2215)
+- Update feature flag fetch (#2213)
+- Revert "fix dates on in_progress_course"
+- fix dates on in_progress_course
+- 3783: dedp course certificates in hubspot (#2193)
+- Add ol-django olposthog app (#2211)
+
 Version 0.93.3 (Released May 20, 2024)
 --------------
 

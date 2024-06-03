@@ -1,13 +1,12 @@
 import React from "react"
 import {
   formatPrettyDate,
-  emptyOrNil,
   getFlexiblePriceForProduct,
   formatLocalePrice,
   parseDateString,
   formatPrettyShortDate
 } from "../lib/util"
-import { getFirstRelevantRun } from "../lib/courseApi"
+import { getFirstRelevantRun, isRunArchived } from "../lib/courseApi"
 import moment from "moment-timezone"
 
 import type { BaseCourseRun } from "../flow/courseTypes"
@@ -166,11 +165,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     const course = courses[0]
     const run = getFirstRelevantRun(course, courseRuns)
     const product = run && run.products.length > 0 && run.products[0]
-    const isArchived = run
-      ? moment().isAfter(run.end_date) &&
-        (moment().isBefore(run.enrollment_end) ||
-          emptyOrNil(run.enrollment_end))
-      : false
+    const isArchived = isRunArchived(run)
 
     const startDates = []
     const moreEnrollableCourseRuns = courseRuns && courseRuns.length > 1

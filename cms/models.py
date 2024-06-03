@@ -22,7 +22,7 @@ from django.utils.functional import cached_property
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
-from modelcluster.fields import ParentalKey
+from modelcluster.fields import ParentalKey, ParentalManyToManyField
 from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel
 from wagtail.blocks import PageChooserBlock, StreamBlock
 from wagtail.contrib.forms.forms import FormBuilder
@@ -1142,6 +1142,12 @@ class CoursePage(ProductPage):
     course = models.OneToOneField(
         "courses.Course", null=True, on_delete=models.SET_NULL, related_name="page"
     )
+    topics = ParentalManyToManyField(
+        "courses.CoursesTopic",
+        null=True,
+        blank=True,
+        help_text="The topics for this course page.",
+    )
 
     search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
@@ -1238,6 +1244,7 @@ class CoursePage(ProductPage):
 
     content_panels = [  # noqa: RUF005
         FieldPanel("course"),
+        FieldPanel("topics"),
     ] + ProductPage.content_panels
 
 

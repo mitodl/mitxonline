@@ -18,6 +18,7 @@ from courses.models import (
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
+    CoursesTopic,
     Department,
     LearnerProgramRecordShare,
     PartnerSchool,
@@ -192,6 +193,16 @@ class CourseRunGradeFactory(DjangoModelFactory):
 
     class Meta:
         model = CourseRunGrade
+
+
+class CoursesTopicFactory(DjangoModelFactory):
+    """Factory for CoursesTopic"""
+
+    name = fuzzy.FuzzyText(prefix="Topic ")
+    parent = None
+
+    class Meta:
+        model = CoursesTopic
 
 
 class ProgramCertificateFactory(DjangoModelFactory):

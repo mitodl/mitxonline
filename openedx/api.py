@@ -480,7 +480,7 @@ def get_edx_api_client(user, ttl_in_seconds=OPENEDX_AUTH_DEFAULT_TTL_IN_SECONDS)
     except OpenEdxApiAuth.DoesNotExist:
         raise NoEdxApiAuthError(f"{user!s} does not have an associated OpenEdxApiAuth")  # noqa: B904, EM102
     return EdxApi(
-        {"access_token": auth.access_token, "api_key": settings.OPENEDX_API_KEY},
+        {"access_token": auth.access_token},
         settings.OPENEDX_API_BASE_URL,
         timeout=settings.EDX_API_CLIENT_TIMEOUT,
     )
@@ -497,10 +497,7 @@ def get_edx_api_service_client():
         raise ImproperlyConfigured("OPENEDX_SERVICE_WORKER_API_TOKEN is not set")  # noqa: EM101
 
     edx_client = EdxApi(
-        {
-            "access_token": settings.OPENEDX_SERVICE_WORKER_API_TOKEN,
-            "api_key": settings.OPENEDX_API_KEY,
-        },
+        {"access_token": settings.OPENEDX_SERVICE_WORKER_API_TOKEN},
         settings.OPENEDX_API_BASE_URL,
         timeout=settings.EDX_API_CLIENT_TIMEOUT,
     )
@@ -729,10 +726,10 @@ def unenroll_edx_course_run(run_enrollment):
         EdxApiEnrollErrorException: Raised if the underlying edX API HTTP request fails
         UnknownEdxApiEnrollException: Raised if an unknown error was encountered during the edX API request
     """
-    edx_client = get_edx_api_client(run_enrollment.user)
+    edx_client = get_edx_api_service_client()
     try:
         deactivated_enrollment = edx_client.enrollments.deactivate_enrollment(
-            run_enrollment.run.courseware_id
+            run_enrollment.run.courseware_id, username=run_enrollment.user.username
         )
     except HTTPError as exc:
         raise EdxApiEnrollErrorException(run_enrollment.user, run_enrollment.run, exc)  # noqa: B904
