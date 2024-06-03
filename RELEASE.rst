@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 0.95.1 (Released May 30, 2024)
+--------------
+
+- Repair test based on dates (test_create_featured_items)  (#2229)
+- fix(deps): update dependency mitol-django-openedx to v2023 (#2092)
+
+Version 0.95.0 (Released May 29, 2024)
+--------------
+
+- Adding course topics (#2210)
+- Update displayOrder for line properties (#2224)
+- refactor: remove EdX-Api-Key usage (#2217)
+
 Version 0.94.1 (Released May 28, 2024)
 --------------
 

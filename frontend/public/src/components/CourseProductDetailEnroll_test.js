@@ -113,11 +113,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         .find(".enroll-now")
         .at(0)
         .text(),
-      "Enroll now"
+      "Enroll Now"
     )
   })
 
-  it("checks for enroll now button should not appear if enrollment start in future", async () => {
+  it("checks for enroll now button should appear disabled if enrollment start in future", async () => {
     const courseRun = makeCourseRunDetail()
     courseRun["is_enrollable"] = false
     const { inner } = await renderPage(
@@ -170,7 +170,52 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         .find(".enroll-now")
         .at(0)
         .text(),
-      "Enroll now"
+      "Enroll Now"
+    )
+  })
+
+  it("checks for access course materials button should appear if course is archived", async () => {
+    const courseRun = {
+      ...makeCourseRunDetail(),
+      enrollment_end:   null,
+      enrollment_start: moment()
+        .subtract(1, "years")
+        .toISOString(),
+      start_date: moment()
+        .subtract(10, "months")
+        .toISOString(),
+      end_date: moment()
+        .subtract(7, "months")
+        .toISOString(),
+      upgrade_deadline: null
+    }
+    const { inner } = await renderPage(
+      {
+        entities: {
+          courseRuns: [courseRun]
+        },
+        queries: {
+          courseRuns: {
+            isPending: false,
+            status:    200
+          }
+        }
+      },
+      {}
+    )
+
+    assert.equal(
+      inner
+        .find(".enroll-now")
+        .at(0)
+        .text(),
+      "Access Course Materials"
+    )
+    assert.isFalse(
+      inner
+        .find(".enroll-now")
+        .at(0)
+        .prop("disabled")
     )
   })
 
@@ -196,7 +241,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         .find("form > button.enroll-now")
         .at(0)
         .text(),
-      "Enroll now"
+      "Enroll Now"
     )
   })
   ;[
