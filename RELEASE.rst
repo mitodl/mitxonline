@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.96.0
+Version 0.96.0 (Released June 03, 2024)
 --------------
 
 - Renaming enroll now button for archived courses (#2226)
