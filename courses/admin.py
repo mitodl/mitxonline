@@ -231,6 +231,7 @@ class CourseRunEnrollmentAdmin(AuditableModelAdmin):
         "get_run_courseware_id",
         "enrollment_mode",
         "change_status",
+        "created_on",
     )
     raw_id_fields = (
         "user",
