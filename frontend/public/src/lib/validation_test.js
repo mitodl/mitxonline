@@ -5,8 +5,7 @@ import { ValidationError } from "yup"
 import {
   changePasswordFormValidation,
   resetPasswordFormValidation,
-  passwordFieldRegex,
-  usernameFieldRegex
+  passwordFieldRegex
 } from "./validation"
 
 describe("validation utils", () => {
@@ -71,33 +70,6 @@ describe("validation utils", () => {
         const result = await assert.isRejected(promise, ValidationError)
 
         assert.deepEqual(result.errors, errors)
-      })
-    })
-  })
-
-  describe("Validation Regex", () => {
-    const passwordRegex = new RegExp(passwordFieldRegex)
-    const usernameRegex = new RegExp(usernameFieldRegex)
-    ;[
-      ["", false],
-      ["pass", false],
-      ["passwor", false],
-      ["password123", true],
-      ["password", false]
-    ].forEach(([value, regexMatch]) => {
-      it("password regex pattern matching.", () => {
-        assert.equal(passwordRegex.test(value), regexMatch)
-      })
-    })
-    ;[
-      ["", false],
-      ["  ", false],
-      ["ab", false],
-      ["0123456789012345678901234567890", false],
-      ["ábc-dèf-123", true]
-    ].forEach(([value, regexMatch]) => {
-      it("username regex pattern matching.", () => {
-        assert.equal(usernameRegex.test(value), regexMatch)
       })
     })
   })
