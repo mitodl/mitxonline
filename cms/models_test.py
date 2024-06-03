@@ -8,17 +8,20 @@ import factory
 import pytest
 from django.contrib.auth.models import AnonymousUser, Group
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.core.cache import caches
 from django.test.client import RequestFactory
 from django.urls import resolve
 from mitol.common.factories import UserFactory
 from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
 
+from cms.api import create_featured_items
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from cms.factories import (
     CertificatePageFactory,
     CoursePageFactory,
     FlexiblePricingFormFactory,
+    HomePageFactory,
     InstructorPageFactory,
     ProgramPageFactory,
     ResourcePageFactory,
@@ -45,6 +48,7 @@ from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from flexiblepricing.models import FlexiblePrice
+from main import features
 
 pytestmark = [pytest.mark.django_db]
 
@@ -681,3 +685,80 @@ def test_flexible_pricing_request_form_context(flex_form_for_course):
     else:
         assert context["product"] is None
     assert context["product_page"] == course_page.url
+
+
+def test_homepage__featured_products(settings, mocker):
+    settings.FEATURES[features.ENABLE_NEW_DESIGN] = True
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    past_date = now - timedelta(days=1)
+    further_future_date = future_date + timedelta(days=1)
+    further_past_date = past_date - timedelta(days=1)
+    furthest_future_date = further_future_date + timedelta(days=1)
+    redis_cache = caches["redis"]
+    # Ensure the key is empty since pytest doesn't clear the cache between tests
+    featured_courses = redis_cache.get("CMS_homepage_featured_courses")
+    if featured_courses is not None:
+        redis_cache.delete("CMS_homepage_featured_courses")
+    assert redis_cache.get("CMS_homepage_featured_courses") is None
+
+    enrollable_future_course = CourseFactory.create(page=None, live=True)
+    enrollable_future_course_page = CoursePageFactory.create(
+        course=enrollable_future_course, live=True
+    )
+    enrollable_future_courserun = CourseRunFactory.create(
+        course=enrollable_future_course,
+        live=True,
+        start_date=future_date,
+        enrollment_start=further_past_date,
+        enrollment_end=further_future_date,
+        end_date=furthest_future_date,
+    )
+    create_featured_items()
+    assert len(redis_cache.get("CMS_homepage_featured_courses")) == 1
+    hf = HomePageFactory.create()
+    assert hf.get_cached_featured_products == [
+        {
+            "title": enrollable_future_course_page.title,
+            "description": enrollable_future_course_page.description,
+            "feature_image": enrollable_future_course_page.feature_image,
+            "start_date": enrollable_future_courserun.start_date,
+            "url_path": enrollable_future_course_page.get_url(),
+            "is_program": enrollable_future_course_page.is_program_page,
+            "is_self_paced": False,
+            "program_type": None,
+        }
+    ]
+    # Remove the previous course from the potential courses to be featured, this will also test a course as unenrollable
+    enrollable_future_course.live = False
+    enrollable_future_course.save()
+
+    enrollable_future_course_with_no_enrollment_end = CourseFactory.create(
+        page=None, live=True
+    )
+    enrollable_future_course_with_no_enrollment_end_page = CoursePageFactory.create(
+        course=enrollable_future_course_with_no_enrollment_end, live=True
+    )
+    enrollable_future_courserun_with_no_enrollment_end = CourseRunFactory.create(
+        course=enrollable_future_course_with_no_enrollment_end,
+        live=True,
+        start_date=future_date,
+        enrollment_start=further_past_date,
+        enrollment_end=None,
+        end_date=furthest_future_date,
+    )
+    create_featured_items()
+    assert len(redis_cache.get("CMS_homepage_featured_courses")) == 1
+    hf = HomePageFactory.create()
+    assert hf.get_cached_featured_products == [
+        {
+            "title": enrollable_future_course_with_no_enrollment_end_page.title,
+            "description": enrollable_future_course_with_no_enrollment_end_page.description,
+            "feature_image": enrollable_future_course_with_no_enrollment_end_page.feature_image,
+            "start_date": enrollable_future_courserun_with_no_enrollment_end.start_date,
+            "url_path": enrollable_future_course_with_no_enrollment_end_page.get_url(),
+            "is_program": enrollable_future_course_with_no_enrollment_end_page.is_program_page,
+            "is_self_paced": False,
+            "program_type": None,
+        }
+    ]
