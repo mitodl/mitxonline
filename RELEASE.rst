@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.96.1
+--------------
+
+- Adding topics to course and program api (#2228)
+
 Version 0.96.0 (Released June 03, 2024)
 --------------
 
