@@ -1,6 +1,5 @@
 // @flow
 import * as yup from "yup"
-import type { EmailFormValues } from "../flow/authTypes"
 
 // Field validations
 
