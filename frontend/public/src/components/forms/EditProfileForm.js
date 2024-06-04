@@ -54,24 +54,18 @@ const EditProfileForm = ({ onSubmit, countries, user }: Props) => {
       validateOnChange={false}
       validateOnBlur={false}
     >
-      {({ values, errors, touched, isSubmitting }) => {
+      {({ values, errors, isSubmitting }) => {
         return (
           <Form noValidate>
             <ConnectedFocusError />
             <LegalAddressFields
-              touched={touched}
               errors={errors}
               countries={countries}
               values={values}
               isNewAccount={false}
             />
             <GenderAndDOBProfileFields errors={errors} />
-            <AddlProfileFields
-              touched={touched}
-              errors={errors}
-              values={values}
-              isNewAccount={false}
-            />
+            <AddlProfileFields errors={errors} values={values} />
             <div className="row submit-row no-gutters">
               <div className="col d-flex justify-content-end">
                 <button

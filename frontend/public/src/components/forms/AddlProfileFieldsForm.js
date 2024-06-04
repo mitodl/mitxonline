@@ -104,7 +104,6 @@ const AddlProfileFieldsForm = ({
             <GenderAndDOBProfileFields errors={errors} />
             <AddlProfileFields
               values={values}
-              isNewAccount={false}
               requireAddlFields={requireTypeFields}
               errors={errors}
             />

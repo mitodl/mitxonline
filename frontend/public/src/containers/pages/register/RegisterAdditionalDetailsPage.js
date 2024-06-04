@@ -110,10 +110,7 @@ export class RegisterAdditionalDetailsPage extends React.Component<Props> {
                   {({ isSubmitting, values }) => {
                     return (
                       <Form>
-                        <AddlProfileFields
-                          values={values}
-                          isNewAccount={false}
-                        />
+                        <AddlProfileFields values={values} />
                         <div className="submit-row">
                           <button
                             type="submit"
