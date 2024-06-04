@@ -24,7 +24,7 @@ export const passwordField = yup
   .required()
   .label("Password")
 
-export const changeEmailFormValidation = (currentEmail: EmailFormValues) =>
+export const changeEmailFormValidation = (currentEmail: string) =>
   yup.object().shape({
     email: yup
       .string()
