@@ -7,6 +7,8 @@ import { EmailInput } from "./elements/inputs"
 import FormError from "./elements/FormError"
 import * as yup from "yup"
 import { ConnectedFocusError } from "focus-formik-error"
+import CardLabel from "../input/CardLabel"
+import { emailField } from "../../lib/validation"
 
 type EmailFormProps = {
   onSubmit: Function,
@@ -18,10 +20,7 @@ export type EmailFormValues = {
 }
 
 const EmailFormValidation = yup.object().shape({
-  email: yup
-    .string()
-    .email("Please enter an email address")
-    .required("Email is required")
+  email: emailField
 })
 
 const EmailForm = ({ onSubmit, children }: EmailFormProps) => (
@@ -34,10 +33,10 @@ const EmailForm = ({ onSubmit, children }: EmailFormProps) => (
   >
     {({ isSubmitting, errors }) => {
       return (
-        <Form>
+        <Form noValidate>
           <ConnectedFocusError />
           <div className="form-group small-gap">
-            <label htmlFor="email">Email</label>
+            <CardLabel htmlFor="email" isRequired={true} label="Email" />
             <Field
               name="email"
               id="email"
@@ -45,7 +44,8 @@ const EmailForm = ({ onSubmit, children }: EmailFormProps) => (
               component={EmailInput}
               autoComplete="email"
               aria-invalid={errors.email ? "true" : null}
-              aria-describedby={errors.email ? "passwordError" : null}
+              aria-describedby={errors.email ? "emailError" : null}
+              required
             />
             <ErrorMessage name="email" id="emailError" component={FormError} />
           </div>

@@ -29,7 +29,7 @@ describe("validation utils", () => {
       const result = await assert.isRejected(promise, ValidationError)
 
       assert.deepEqual(result.errors, [
-        "New password and Confirm Password must match."
+        "New password and Confirm New Password must match."
       ])
     })
   })
@@ -46,7 +46,7 @@ describe("validation utils", () => {
       assert.deepEqual(result, inputs)
     })
 
-    it(`Change password form validation should throw an error with different new and confirm password values.`, async () => {
+    it(`Change password form validation should throw an error with different new and Confirm New Password values.`, async () => {
       const inputs = {
         currentPassword:               "old-password",
         newPassword:                   "password1",
@@ -57,7 +57,7 @@ describe("validation utils", () => {
       const result = await assert.isRejected(promise, ValidationError)
 
       assert.deepEqual(result.errors, [
-        "New password and Confirm Password must match."
+        "New password and Confirm New Password must match."
       ])
     })
   })

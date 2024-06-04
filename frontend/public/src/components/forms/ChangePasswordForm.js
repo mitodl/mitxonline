@@ -93,7 +93,7 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
               <CardLabel
                 htmlFor="confirmPasswordChangePassword"
                 isRequired={true}
-                label="Confirm Password"
+                label="Confirm New Password"
               />
               <Field
                 name="confirmPasswordChangePassword"

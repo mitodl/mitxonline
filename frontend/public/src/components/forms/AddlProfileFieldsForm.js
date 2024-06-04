@@ -78,6 +78,7 @@ const AddlProfileFieldsForm = ({
         user_profile: yup.object().shape({
           highest_education: yup
             .string()
+            .label("Highest Level of Education")
             .required()
             .typeError("Highest Level of Education is a required field"),
           type_is_student:      occupationField,

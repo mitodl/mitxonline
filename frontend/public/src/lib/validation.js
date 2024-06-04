@@ -6,10 +6,10 @@ import * as yup from "yup"
 export const passwordFieldRegex = /^(?=.*[0-9])(?=.*[a-zA-Z]).{8,}$/
 
 const newAndConfirmPasswordMatchErrorMessage =
-  "New password and Confirm Password must match." // pragma: allowlist secret
+  "New password and Confirm New Password must match." // pragma: allowlist secret
 
 export const passwordFieldErrorMessage =
-  "Password must be atleast 8 characters and contain at least one letter and number."
+  "Password must be at least 8 characters and contain at least one letter and number."
 
 export const usernameFieldErrorMessage =
   "Username must be between 3 and 30 characters."
@@ -23,13 +23,16 @@ export const passwordField = yup
   .required()
   .label("Password")
 
+export const emailField = yup
+  .string()
+  .label("Email")
+  .required()
+  .matches(validEmailRegex, validEmailErrorMessage)
+
 export const changeEmailFormValidation = (currentEmail: string) =>
   yup.object().shape({
-    email: yup
-      .string()
+    email: emailField
       .label("New Email")
-      .required()
-      .matches(validEmailRegex, validEmailErrorMessage)
       .test(
         "emails must be different",
         "New email must be different from current email.",
@@ -38,7 +41,7 @@ export const changeEmailFormValidation = (currentEmail: string) =>
           return true
         }
       ),
-    confirmPasswordEmailChange: passwordField.label("Confirm Password")
+    confirmPasswordEmailChange: passwordField.label("Confirm New Password")
   })
 
 export const newPasswordField = passwordField
@@ -48,17 +51,17 @@ export const newPasswordField = passwordField
 export const usernameField = yup
   .string()
   .required()
-  .label("Username")
+  .label("Public Username")
   .min(3, usernameFieldErrorMessage)
   .max(30, usernameFieldErrorMessage)
 
 const confirmPasswordChangePassword = newPasswordField
-  .label("Confirm Password")
+  .label("Confirm New Password")
   .oneOf([yup.ref("newPassword")], newAndConfirmPasswordMatchErrorMessage)
 
 export const resetPasswordFormValidation = yup.object().shape({
   newPassword: newPasswordField.oneOf(
-    [yup.ref("confirmPassword")],
+    [yup.ref("confirmPasswordChangePassword")],
     newAndConfirmPasswordMatchErrorMessage
   ),
   confirmPasswordChangePassword: confirmPasswordChangePassword

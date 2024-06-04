@@ -69,7 +69,7 @@ export const legalAddressValidation = yup.object().shape({
 })
 
 export const newAccountValidation = yup.object().shape({
-  password: newPasswordField,
+  password: newPasswordField.label("Password"),
   username: usernameField
 })
 
@@ -290,6 +290,7 @@ export const LegalAddressFields = ({
               id="username"
               aria-invalid={errors.username ? "true" : null}
               aria-describedby={errors.username ? "username-error" : null}
+              aria-description="Name that will identify you in courses."
               required
             />
             <ErrorMessage name="username" component={FormError} />
@@ -308,7 +309,7 @@ export const LegalAddressFields = ({
               autoComplete="new-password"
               required
             />
-            <ErrorMessage name="passwrod" component={FormError} />
+            <ErrorMessage name="password" component={FormError} />
             <div id="password-subtitle" className="label-secondary">
               {passwordFieldErrorMessage}
             </div>
