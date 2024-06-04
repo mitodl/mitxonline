@@ -52,16 +52,16 @@ export const usernameField = yup
   .min(3, usernameFieldErrorMessage)
   .max(30, usernameFieldErrorMessage)
 
+const confirmPasswordChangePassword = newPasswordField
+  .label("Confirm Password")
+  .oneOf([yup.ref("newPassword")], newAndConfirmPasswordMatchErrorMessage)
+
 export const resetPasswordFormValidation = yup.object().shape({
-  newPassword: newPasswordField
-    .label("New Password")
-    .oneOf(
-      [yup.ref("confirmPassword")],
-      newAndConfirmPasswordMatchErrorMessage
-    ),
-  confirmPassword: newPasswordField
-    .label("Confirm Password")
-    .oneOf([yup.ref("newPassword")], newAndConfirmPasswordMatchErrorMessage)
+  newPassword: newPasswordField.oneOf(
+    [yup.ref("confirmPassword")],
+    newAndConfirmPasswordMatchErrorMessage
+  ),
+  confirmPasswordChangePassword: confirmPasswordChangePassword
 })
 
 export const changePasswordFormValidation = yup.object().shape({
@@ -72,7 +72,5 @@ export const changePasswordFormValidation = yup.object().shape({
     newAndConfirmPasswordMatchErrorMessage
   ),
 
-  confirmPasswordChangePassword: newPasswordField
-    .label("Confirm Password")
-    .oneOf([yup.ref("newPassword")], newAndConfirmPasswordMatchErrorMessage)
+  confirmPasswordChangePassword: confirmPasswordChangePassword
 })

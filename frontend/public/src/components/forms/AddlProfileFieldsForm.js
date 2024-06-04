@@ -57,28 +57,28 @@ const AddlProfileFieldsForm = ({
 }: Props) => {
   let validation = profileValidation.concat(addlProfileFieldsValidation)
 
-  const occupationField = yup
-    .boolean()
-    .test(
-      "one occupation must be selected",
-      "At least one occupation must be selected",
-      function() {
-        return (
-          this.parent.type_is_student ||
-          this.parent.type_is_professional ||
-          this.parent.type_is_educator ||
-          this.parent.type_is_other
-        )
-      }
-    )
-
   if (requireTypeFields) {
+    const occupationField = yup
+      .boolean()
+      .test(
+        "one occupation must be selected",
+        "At least one occupation must be selected",
+        function() {
+          return (
+            this.parent.type_is_student ||
+            this.parent.type_is_professional ||
+            this.parent.type_is_educator ||
+            this.parent.type_is_other
+          )
+        }
+      )
+
     validation = validation.concat(
       yup.object().shape({
         user_profile: yup.object().shape({
           highest_education: yup
             .string()
-            .required("Highest Level of Education is a required field")
+            .required()
             .typeError("Highest Level of Education is a required field"),
           type_is_student:      occupationField,
           type_is_professional: occupationField,
