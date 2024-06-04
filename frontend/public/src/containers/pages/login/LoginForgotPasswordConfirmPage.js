@@ -31,7 +31,7 @@ type Props = {
 
 export class LoginForgotPasswordConfirmPage extends React.Component<Props> {
   async onSubmit(
-    { newPassword, confirmPassword }: ResetPasswordFormValues,
+    { newPassword, confirmPasswordChangePassword }: ResetPasswordFormValues,
     { setSubmitting }: any
   ) {
     const {
@@ -50,7 +50,7 @@ export class LoginForgotPasswordConfirmPage extends React.Component<Props> {
     try {
       const response = await forgotPasswordConfirm(
         newPassword,
-        confirmPassword,
+        confirmPasswordChangePassword,
         token,
         uid
       )
