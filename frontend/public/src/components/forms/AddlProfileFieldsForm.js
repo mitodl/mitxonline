@@ -24,10 +24,11 @@ const getInitialValues = (user: User) => ({
   email:         user.email,
   legal_address: user.legal_address,
   user_profile:  {
-    gender:            (user.user_profile && user.user_profile.gender) || "",
-    addl_field_flag:   user.user_profile && user.user_profile.addl_field_flag,
-    company:           (user.user_profile && user.user_profile.company) || "",
-    company_size:      (user.user_profile && user.user_profile.company_size) || undefined,
+    gender:          (user.user_profile && user.user_profile.gender) || "",
+    addl_field_flag: user.user_profile && user.user_profile.addl_field_flag,
+    company:         (user.user_profile && user.user_profile.company) || "",
+    company_size:
+      (user.user_profile && user.user_profile.company_size) || undefined,
     highest_education:
       (user.user_profile && user.user_profile.highest_education) || "",
     industry:         (user.user_profile && user.user_profile.industry) || "",
