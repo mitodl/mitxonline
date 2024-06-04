@@ -77,13 +77,13 @@ export class AccountSettingsPage extends React.Component<Props> {
   }
 
   async onSubmitEmailForm(
-    { email, confirmPassword }: ChangeEmailFormValues,
+    { email, confirmPasswordEmailChange }: ChangeEmailFormValues,
     { setSubmitting, resetForm }: any
   ) {
     const { addUserNotification, changeEmail, history } = this.props
 
     try {
-      const response = await changeEmail(email, confirmPassword)
+      const response = await changeEmail(email, confirmPasswordEmailChange)
 
       let alertText, color
       if (response.status === 200 || response.status === 201) {
