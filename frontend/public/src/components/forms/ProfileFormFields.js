@@ -332,7 +332,7 @@ export const LegalAddressFields = ({
           className="form-control"
           autoComplete="country"
           required
-          title="The country in which you reside."
+          title="The country where you live."
         >
           <option value="">-----</option>
           {countries
@@ -364,9 +364,10 @@ export const LegalAddressFields = ({
             aria-describedby={
               addressErrors && addressErrors.state ? "state-error" : null
             }
+            aria-description="The state, territory, or province where you live."
             className="form-control"
             autoComplete="state"
-            title="The state in which you reside."
+            title="The state, territory, or province where you live."
             required
           >
             <option value="">-----</option>
