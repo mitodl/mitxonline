@@ -19,57 +19,46 @@ describe("validation utils", () => {
       assert.deepEqual(result, inputs)
     })
 
-    //
-    ;[
-      [
-        { newPassword: "password1", confirmPassword: "password2" },
-        ["Passwords must match"]
-      ]
-    ].forEach(([inputs, errors]) => {
-      it(`should throw an error with inputs=${JSON.stringify(
-        inputs
-      )}`, async () => {
-        const promise = resetPasswordFormValidation.validate(inputs)
+    it(`Reset password form validation should throw an error with different newPassword and confirmPassword values.`, async () => {
+      const inputs = {
+        newPassword:     "password1",
+        confirmPassword: "password2"
+      }
+      const promise = resetPasswordFormValidation.validate(inputs)
 
-        const result = await assert.isRejected(promise, ValidationError)
+      const result = await assert.isRejected(promise, ValidationError)
 
-        assert.deepEqual(result.errors, errors)
-      })
+      assert.deepEqual(result.errors, [
+        "New password and Confirm Password must match."
+      ])
     })
   })
 
   describe("ChangePasswordFormValidation", () => {
-    it(`should validate with matching passwords`, async () => {
+    it(`Change password form validation should pass with matching passwords`, async () => {
       const inputs = {
-        oldPassword:     "old-password",
-        newPassword:     "password1",
-        confirmPassword: "password1"
+        currentPassword:               "old-password",
+        newPassword:                   "password1",
+        confirmPasswordChangePassword: "password1"
       }
       const result = await changePasswordFormValidation.validate(inputs)
 
       assert.deepEqual(result, inputs)
     })
 
-    //
-    ;[
-      [
-        {
-          oldPassword:     "password1",
-          newPassword:     "password1",
-          confirmPassword: "password2"
-        },
-        ["Passwords must match"]
-      ]
-    ].forEach(([inputs, errors]) => {
-      it(`should throw an error with inputs=${JSON.stringify(
-        inputs
-      )}`, async () => {
-        const promise = changePasswordFormValidation.validate(inputs)
+    it(`Change password form validation should throw an error with different new and confirm password values.`, async () => {
+      const inputs = {
+        currentPassword:               "old-password",
+        newPassword:                   "password1",
+        confirmPasswordChangePassword: "password2"
+      }
+      const promise = changePasswordFormValidation.validate(inputs)
 
-        const result = await assert.isRejected(promise, ValidationError)
+      const result = await assert.isRejected(promise, ValidationError)
 
-        assert.deepEqual(result.errors, errors)
-      })
+      assert.deepEqual(result.errors, [
+        "New password and Confirm Password must match."
+      ])
     })
   })
 })

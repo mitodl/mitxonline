@@ -34,7 +34,9 @@ describe("ChangeEmailForm", () => {
 
     const form = wrapper.find("Formik").dive()
     assert.ok(findFormikFieldByName(form, "email").exists())
-    assert.ok(findFormikFieldByName(form, "confirmPassword").exists())
+    assert.ok(
+      findFormikFieldByName(form, "confirmPasswordEmailChange").exists()
+    )
     assert.ok(form.find("button[type='submit']").exists())
   })
 })

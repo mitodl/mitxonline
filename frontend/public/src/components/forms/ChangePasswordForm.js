@@ -17,9 +17,9 @@ type Props = {
 }
 
 export type ChangePasswordFormValues = {
-  oldPassword: string,
+  currentPassword: string,
   newPassword: string,
-  confirmPassword: string
+  confirmPasswordChangePassword: string
 }
 
 const ChangePasswordForm = ({ onSubmit }: Props) => (
@@ -27,9 +27,9 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
     onSubmit={onSubmit}
     validationSchema={changePasswordFormValidation}
     initialValues={{
-      oldPassword:     "",
-      newPassword:     "",
-      confirmPassword: ""
+      currentPassword:               "",
+      newPassword:                   "",
+      confirmPasswordChangePassword: ""
     }}
     validateOnChange={false}
     validateOnBlur={false}

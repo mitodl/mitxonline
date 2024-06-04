@@ -65,14 +65,14 @@ export const resetPasswordFormValidation = yup.object().shape({
 })
 
 export const changePasswordFormValidation = yup.object().shape({
-  oldPassword: passwordField.label("Old Password"),
+  currentPassword: passwordField.label("Old Password"),
 
   newPassword: newPasswordField.oneOf(
-    [yup.ref("confirmPassword")],
+    [yup.ref("confirmPasswordChangePassword")],
     newAndConfirmPasswordMatchErrorMessage
   ),
 
-  confirmPassword: newPasswordField
+  confirmPasswordChangePassword: newPasswordField
     .label("Confirm Password")
     .oneOf([yup.ref("newPassword")], newAndConfirmPasswordMatchErrorMessage)
 })

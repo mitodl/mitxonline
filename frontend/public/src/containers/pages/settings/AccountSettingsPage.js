@@ -27,9 +27,9 @@ import type { ChangeEmailFormValues } from "../../../components/forms/ChangeEmai
 type Props = {
   history: RouterHistory,
   changePassword: (
-    oldPassword: string,
+    currentPassword: string,
     newPassword: string,
-    confirmPassword: string
+    confirmPasswordChangePassword: string
   ) => Promise<any>,
   changeEmail: (newEmail: string, password: string) => Promise<any>,
   addUserNotification: Function,
@@ -38,16 +38,20 @@ type Props = {
 
 export class AccountSettingsPage extends React.Component<Props> {
   async onSubmitPasswordForm(
-    { oldPassword, newPassword, confirmPassword }: ChangePasswordFormValues,
+    {
+      currentPassword,
+      newPassword,
+      confirmPasswordChangePassword
+    }: ChangePasswordFormValues,
     { setSubmitting, resetForm }: any
   ) {
     const { addUserNotification, changePassword, history } = this.props
 
     try {
       const response = await changePassword(
-        oldPassword,
+        currentPassword,
         newPassword,
-        confirmPassword
+        confirmPasswordChangePassword
       )
 
       let alertText, color
@@ -55,7 +59,7 @@ export class AccountSettingsPage extends React.Component<Props> {
         alertText = "Your password has been updated successfully."
         color = "success"
       } else {
-        alertText = "Unable to reset your password, please try again later."
+        alertText = "Unable to update your password, please try again later."
         color = "danger"
       }
 
