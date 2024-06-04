@@ -11,8 +11,8 @@ describe("validation utils", () => {
   describe("resetPasswordFormValidation", () => {
     it(`should validate with matching passwords`, async () => {
       const inputs = {
-        newPassword:     "password1",
-        confirmPassword: "password1"
+        newPassword:                   "password1",
+        confirmPasswordChangePassword: "password1"
       }
       const result = await resetPasswordFormValidation.validate(inputs)
 
@@ -21,8 +21,8 @@ describe("validation utils", () => {
 
     it(`Reset password form validation should throw an error with different newPassword and confirmPassword values.`, async () => {
       const inputs = {
-        newPassword:     "password1",
-        confirmPassword: "password2"
+        newPassword:                   "password1",
+        confirmPasswordChangePassword: "password2"
       }
       const promise = resetPasswordFormValidation.validate(inputs)
 
