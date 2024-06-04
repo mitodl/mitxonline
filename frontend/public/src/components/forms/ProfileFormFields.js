@@ -172,6 +172,7 @@ const renderYearOfBirthField = errors => {
         aria-invalid={hasError ? "true" : null}
         aria-describedby={hasError ? "year-of-birth-error" : null}
         required
+        title="Select your year of birth."
       >
         <option value="">-----</option>
         {reverse(range(seedYear - 120, seedYear - 13)).map((year, i) => (
@@ -220,6 +221,7 @@ export const LegalAddressFields = ({
               : null
           }
           aria-description="Name cannot start with, or contain, a special character"
+          title="Name cannot start with, or contain, a special character."
           required
         />
         <ErrorMessage
@@ -330,6 +332,7 @@ export const LegalAddressFields = ({
           className="form-control"
           autoComplete="country"
           required
+          title="The country in which you reside."
         >
           <option value="">-----</option>
           {countries
@@ -363,6 +366,7 @@ export const LegalAddressFields = ({
             }
             className="form-control"
             autoComplete="state"
+            title="The state in which you reside."
             required
           >
             <option value="">-----</option>
@@ -403,6 +407,7 @@ export const GenderAndDOBProfileFields = errors => {
               name="user_profile.gender"
               id="user_profile.gender"
               className="form-control"
+              title="Select your gender."
             >
               <option value="">-----</option>
               <option value="f">Female</option>
@@ -460,6 +465,7 @@ export const AddlProfileFields = ({
                 ? "highest-educaton-level-error-message"
                 : null
             }
+            title="Select the highest level of education you have completed."
           >
             <option value="">-----</option>
             {HIGHEST_EDUCATION_CHOICES.map((level, i) => (
@@ -512,6 +518,7 @@ export const AddlProfileFields = ({
                 ? "user_profile.type_is_studentError"
                 : null
             }
+            title="Select if you are a student."
           />
           <label
             className="form-check-label"
@@ -543,6 +550,7 @@ export const AddlProfileFields = ({
                 ? "user_profile.type_is_studentError"
                 : null
             }
+            title="Select if you are a professional."
           />
           <label
             className="form-check-label"
@@ -576,6 +584,7 @@ export const AddlProfileFields = ({
                 ? "user_profile.type_is_studentError"
                 : null
             }
+            title="Select if you are an educator."
           />
           <label
             className="form-check-label"
@@ -603,6 +612,7 @@ export const AddlProfileFields = ({
                 ? "user_profile.type_is_studentError"
                 : null
             }
+            title="Select if you are in an occupation not shown."
           />
           <label
             className="form-check-label"
@@ -631,6 +641,7 @@ export const AddlProfileFields = ({
             autoComplete="organization"
             aria-describedby="user_profile.companyError"
             className="form-control"
+            title="The name of the company you work for."
           />
           <ErrorMessage
             name="user_profile.company"
@@ -649,6 +660,7 @@ export const AddlProfileFields = ({
                 autoComplete="organization-title"
                 aria-describedby="user_profile.job_title_error"
                 className="form-control"
+                title="Your job title at your company."
               />
               <ErrorMessage
                 name="user_profile.job_title"
@@ -668,6 +680,7 @@ export const AddlProfileFields = ({
                 name="user_profile.company_size"
                 id="user_profile.company_size"
                 className="form-control"
+                title="Select the size of the company you work for."
               >
                 <option value="">-----</option>
                 {EMPLOYMENT_SIZE.map(([value, label], i) => (
@@ -688,6 +701,7 @@ export const AddlProfileFields = ({
                 name="user_profile.industry"
                 id="user_profile.industry"
                 className="form-control"
+                title="Select the industry you work in."
               >
                 <option value="">-----</option>
                 {EMPLOYMENT_INDUSTRY.map((industry, i) => (
@@ -709,6 +723,7 @@ export const AddlProfileFields = ({
                 name="user_profile.job_function"
                 id="user_profile.job_function"
                 className="form-control"
+                title="Select the function that best matches your job role."
               >
                 <option value="">-----</option>
                 {EMPLOYMENT_FUNCTION.map((jobFunction, i) => (
@@ -732,6 +747,7 @@ export const AddlProfileFields = ({
                 name="user_profile.years_experience"
                 id="user_profile.years_experience"
                 className="form-control"
+                title="Select the number of years of work experience you have."
               >
                 <option value="">-----</option>
                 {EMPLOYMENT_EXPERIENCE.map(([value, label], i) => (
@@ -753,6 +769,7 @@ export const AddlProfileFields = ({
                 name="user_profile.leadership_level"
                 id="user_profile.leadership_level"
                 className="form-control"
+                title="Select your leadership level."
               >
                 <option value="">-----</option>
                 {EMPLOYMENT_LEVEL.map((level, i) => (
