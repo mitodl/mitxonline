@@ -18,6 +18,7 @@ from cms import models as cms_models
 from cms.constants import CERTIFICATE_INDEX_SLUG, INSTRUCTOR_INDEX_SLUG
 from cms.exceptions import WagtailSpecificPageError
 from cms.models import Page
+from courses.constants import HOMEPAGE_CACHE_AGE
 from courses.models import Course, Program
 from courses.utils import (
     get_enrollable_courseruns_qs,
@@ -39,7 +40,6 @@ RESOURCE_PAGE_TITLES = [
 ]
 RESOURCE_PAGE_SLUGS = [slugify(title) for title in RESOURCE_PAGE_TITLES]
 PROGRAM_INDEX_PAGE_PROPERTIES = dict(title="Programs")  # noqa: C408
-HOMEPAGE_CACHE_AGE = 86400  # 24 hours
 
 
 def get_home_page(raise_if_missing=True, check_specific=False) -> Page:  # noqa: FBT002
