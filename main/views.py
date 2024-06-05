@@ -30,7 +30,7 @@ def index(request, **kwargs):  # noqa: ARG001
     """
     The index view. Display available programs
     """
-    context = get_base_context()
+    context = get_base_context(request)
     return render(request, "index.html", context=context)
 
 
@@ -44,7 +44,7 @@ def refine(request, **kwargs):  # noqa: ARG001
 
 def handler404(request, exception):  # pylint: disable=unused-argument  # noqa: ARG001
     """404: NOT FOUND ERROR handler"""
-    context = get_base_context()  # noqa: F841
+    context = get_base_context(request)  # noqa: F841
     return HttpResponseNotFound(
         render_to_string("404.html", request=request, context=get_base_context(request))
     )
