@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.96.1
+--------------
+
+- Fixing CoursePage related name overlap (#2235)
+- Fix Featured Items on Homepage (#2232)
+- Adding topics to course and program api (#2228)
+
 Version 0.96.0 (Released June 03, 2024)
 --------------
 
