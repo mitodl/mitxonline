@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.96.1
+Version 0.96.1 (Released June 05, 2024)
 --------------
 
 - Fixing CoursePage related name overlap (#2235)
