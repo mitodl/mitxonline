@@ -728,8 +728,7 @@ class HomePage(VideoPlayerConfigMixin):
         Retrieves teh featured products that were generated using cms/api/create_featured_items either from the
         management command or the daily cron job. This is used to display the featured products on the home page.
         """
-        start_of_day = now_in_utc() - timedelta(days=1)
-        end_of_day = now_in_utc() + timedelta(days=1)
+        now = now_in_utc()
         redis_cache = caches["redis"]
         cached_featured_products = redis_cache.get("CMS_homepage_featured_courses")
         if len(cached_featured_products) > 0:
@@ -737,9 +736,12 @@ class HomePage(VideoPlayerConfigMixin):
             relevant_run_course_ids = (
                 CourseRun.objects.filter(live=True)
                 .filter(
-                    course__id__in=featured_product_ids,
-                    enrollment_start__lte=start_of_day,
-                    enrollment_end__gte=end_of_day,
+                    models.Q(course__id__in=featured_product_ids)
+                    & models.Q(enrollment_start__lte=now)
+                    & (
+                        models.Q(enrollment_end__gte=now)
+                        | models.Q(enrollment_end__isnull=True)
+                    )
                 )
                 .values_list("course__id", flat=True)
             )

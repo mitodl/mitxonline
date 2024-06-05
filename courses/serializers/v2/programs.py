@@ -21,6 +21,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
     departments = serializers.StringRelatedField(many=True, read_only=True)
+    topics = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         return [course[0].id for course in instance.courses if course[0].live]
@@ -45,6 +46,16 @@ class ProgramSerializer(serializers.ModelSerializer):
         else:
             return {"feature_image_src": get_thumbnail_url(None)}
 
+    def get_topics(self, instance):
+        """List all topics in all courses in the program"""
+        topics = set(  # noqa: C401
+            topic.name
+            for course in instance.courses
+            if hasattr(course[0], "page") and course[0].page is not None
+            for topic in course[0].page.topics.all()
+        )
+        return [{"name": topic} for topic in sorted(topics)]
+
     class Meta:
         model = Program
         fields = [
@@ -58,6 +69,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "program_type",
             "departments",
             "live",
+            "topics",
         ]
 
 
