@@ -549,9 +549,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return self.readable_id.split("+")[-1]
 
     @cached_property
-    def course_page(self):
+    def page(self):
         """Gets the associated CoursePage"""
-        return getattr(self, "page", None)
+        return getattr(self, "coursepage", None)
 
     @cached_property
     def active_products(self):

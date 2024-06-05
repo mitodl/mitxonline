@@ -47,9 +47,9 @@ class CourseSerializer(BaseCourseSerializer):
 
     def get_topics(self, instance):
         """List topics of a course"""
-        if instance.course_page:
+        if hasattr(instance, "page") and instance.page is not None:
             return sorted(
-                [{"name": topic.name} for topic in instance.course_page.topics.all()],
+                [{"name": topic.name} for topic in instance.page.topics.all()],
                 key=lambda topic: topic["name"],
             )
         return []
