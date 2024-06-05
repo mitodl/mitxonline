@@ -51,7 +51,7 @@ class ProgramSerializer(serializers.ModelSerializer):
         topics = set(  # noqa: C401
             topic.name
             for course in instance.courses
-            if course[0].page
+            if hasattr(course[0], "page") and course[0].page is not None
             for topic in course[0].page.topics.all()
         )
         return [{"name": topic} for topic in sorted(topics)]
