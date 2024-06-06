@@ -6,6 +6,7 @@ from django.core.cache import cache
 from mitol.common.decorators import single_task
 
 from cms.api import create_featured_items
+from cms.constants import ONE_MINUTE
 from cms.models import Page
 from main.celery import app
 from main.settings import (
@@ -108,8 +109,9 @@ def refresh_featured_homepage_items():
     """
     logger = logging.getLogger("refresh_featured_homepage_items__task")
     logger.info("Refreshing featured homepage items...")
-    featured_courses = cache.get("CMS_homepage_featured_courses")
-    if featured_courses is not None:
+    # if the key is not found, the ttl will be 0 per their docs
+    # https://github.com/jazzband/django-redis?tab=readme-ov-file#get-ttl-time-to-live-from-key
+    if cache.ttl("CMS_homepage_featured_courses") > ONE_MINUTE:
         logger.info("Featured courses found in cache, moving on")
         return
     logger.info("No featured courses found in cache, refreshing")

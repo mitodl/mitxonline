@@ -7,3 +7,5 @@ PROGRAM_INDEX_SLUG = "programs"
 CERTIFICATE_INDEX_SLUG = "certificate"
 SIGNATORY_INDEX_SLUG = "signatories"
 INSTRUCTOR_INDEX_SLUG = "instructors"
+
+ONE_MINUTE = 60
