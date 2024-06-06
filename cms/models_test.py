@@ -47,7 +47,6 @@ from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from flexiblepricing.models import FlexiblePrice
-from main import features
 
 pytestmark = [pytest.mark.django_db]
 
@@ -677,7 +676,6 @@ def test_flexible_pricing_request_form_context(flex_form_for_course):
 
 
 def test_homepage__featured_products(settings, mocker):
-    settings.FEATURES[features.ENABLE_NEW_DESIGN] = True
     now = now_in_utc()
     future_date = now + timedelta(days=1)
     past_date = now - timedelta(days=1)
