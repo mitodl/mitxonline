@@ -6,7 +6,7 @@ x-environment:
   NODE_ENV: 'development'
   DEV_ENV: 'True'  # necessary to have nginx connect to web container
   SECRET_KEY: local_unsafe_key
-  DATABASE_URL: postgres://postgres@db:5432/postgres
+  DATABASE_URL: postgres://postgres:postgres@db:5432/postgres
   MITX_ONLINE_BASE_URL: ${MITX_ONLINE_BASE_URL:-http://mitxonline.odl.local:8013}
   MITX_ONLINE_SECURE_SSL_REDIRECT: 'False'
   MITX_ONLINE_DB_DISABLE_SSL: 'True'
@@ -25,9 +25,11 @@ x-extra-hosts:
 
 services:
   db:
-    image: postgres:11.6
+    image: postgres:15.7
     ports:
       - "5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
 
   redis:
     image: redis:6.0.5
