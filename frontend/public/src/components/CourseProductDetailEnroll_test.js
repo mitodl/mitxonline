@@ -1,4 +1,3 @@
-/* global SETTINGS: false */
 // @flow
 import { assert } from "chai"
 import moment from "moment-timezone"
@@ -60,10 +59,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         }
       }
     )
-
-    SETTINGS.features = {
-      "mitxonline-new-product-page": true
-    }
 
     isFinancialAssistanceAvailableStub = helper.sandbox.stub(
       courseApi,

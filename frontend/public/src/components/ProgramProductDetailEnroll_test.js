@@ -1,4 +1,3 @@
-/* global SETTINGS: false */
 // @flow
 import { assert } from "chai"
 
@@ -48,9 +47,6 @@ describe("ProgramProductDetailEnroll", () => {
       },
       {}
     )
-    SETTINGS.features = {
-      "mitxonline-new-product-page": true
-    }
   })
 
   afterEach(() => {

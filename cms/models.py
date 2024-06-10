@@ -829,26 +829,6 @@ class HomePage(VideoPlayerConfigMixin):
                 request.session["anonymous_session_id"] = str(uuid.uuid4())
             user = request.session["anonymous_session_id"]
 
-        show_new_featured_carousel = is_enabled(
-            features.ENABLE_NEW_HOME_PAGE_FEATURED,
-            False,  # noqa: FBT003
-            user,
-        )
-        show_new_design_hero = is_enabled(
-            features.ENABLE_NEW_HOME_PAGE_HERO,
-            False,  # noqa: FBT003
-            user,
-        )
-        show_home_page_video_component = is_enabled(
-            features.ENABLE_NEW_HOME_PAGE_VIDEO,
-            False,  # noqa: FBT003
-            user,
-        )
-        show_home_page_contact_form = is_enabled(
-            features.ENABLE_NEW_HOME_PAGE_CONTACT_FORM,
-            False,  # noqa: FBT003
-            user,
-        )
         show_auto_daily_featured_items = is_enabled(
             features.ENABLE_AUTO_DAILY_FEATURED_ITEMS,
             False,  # noqa: FBT003
@@ -867,10 +847,6 @@ class HomePage(VideoPlayerConfigMixin):
             **get_base_context(request),
             "product_cards_section_title": self.product_section_title,
             "products": products,
-            "show_new_featured_carousel": show_new_featured_carousel,
-            "show_new_design_hero": show_new_design_hero,
-            "show_home_page_video_component": show_home_page_video_component,
-            "show_home_page_contact_form": show_home_page_contact_form,
             "hubspot_portal_id": hubspot_portal_id,
             "hubspot_home_page_form_guid": hubspot_home_page_form_guid,
             "show_auto_daily_featured_items": show_auto_daily_featured_items,
