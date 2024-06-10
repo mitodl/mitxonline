@@ -153,6 +153,7 @@ def test_get_user_relevant_course_run_invalid_dates(user, dates, course):
     get_user_relevant_course_run should ignore course runs with any of the following properties when the user is not enrolled:
     1) No start date or enrollment start date
     2) An enrollment end date in the past
+    3) The course run is not live
 
     """
     CourseRunFactory.create_batch(
@@ -167,6 +168,7 @@ def test_get_user_relevant_course_run_invalid_dates(user, dates, course):
             [dates.future_60_days, None, dates.past_10_days]
         ),
     )
+    CourseRunFactory.create(course=course, live=False)
     returned_run = get_user_relevant_course_run(course=course, user=user)
     assert returned_run is None
 

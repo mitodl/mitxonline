@@ -130,7 +130,11 @@ def get_user_relevant_course_run_qset(
     Returns a QuerySet of relevant course runs
     """
     now = now or now_in_utc()
-    run_qset = course.courseruns.exclude(start_date=None).exclude(enrollment_start=None)
+    run_qset = (
+        course.courseruns.exclude(start_date=None)
+        .exclude(enrollment_start=None)
+        .exclude(live=False)
+    )
     return _relevant_course_qset_filter(run_qset, user, now)
 
 
@@ -147,6 +151,7 @@ def get_user_relevant_program_course_run_qset(
         CourseRun.objects.filter(course__in=program.courses_qset.all())
         .exclude(start_date=None)
         .exclude(enrollment_start=None)
+        .exclude(live=False)
     )
     return _relevant_course_qset_filter(run_qset, user, now)
 

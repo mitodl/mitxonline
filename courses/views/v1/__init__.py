@@ -207,7 +207,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
             return (
                 CourseRun.objects.select_related("course")
                 .prefetch_related("course__departments", "course__page")
-                .all()
+                .filter(live=True)
             )
 
     def get_serializer_context(self):
