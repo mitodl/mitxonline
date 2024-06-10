@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.96.2
+--------------
+
+- 4244: no error message is shown when education level is not specified in additional details modal (#2233)
+
 Version 0.96.1 (Released June 05, 2024)
 --------------
 
