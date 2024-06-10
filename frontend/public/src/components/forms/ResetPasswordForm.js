@@ -7,7 +7,6 @@ import { PasswordInput } from "./elements/inputs"
 import FormError from "./elements/FormError"
 import {
   resetPasswordFormValidation,
-  passwordFieldRegex,
   passwordFieldErrorMessage
 } from "../../lib/validation"
 import CardLabel from "../input/CardLabel"
@@ -19,7 +18,7 @@ type Props = {
 
 export type ResetPasswordFormValues = {
   newPassword: string,
-  confirmPassword: string
+  confirmPasswordChangePassword: string
 }
 
 const ResetPasswordForm = ({ onSubmit }: Props) => (
@@ -30,10 +29,12 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
       newPassword:   "",
       reNewPassword: ""
     }}
+    validateOnChange={false}
+    validateOnBlur={false}
   >
     {({ isSubmitting, errors }) => {
       return (
-        <Form>
+        <Form noValidate>
           <ConnectedFocusError />
           <div className="form-group">
             <CardLabel
@@ -48,8 +49,9 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
               component={PasswordInput}
               aria-invalid={errors.newPassword ? "true" : null}
               aria-describedby={errors.newPassword ? "newPasswordError" : null}
-              pattern={passwordFieldRegex}
               title={passwordFieldErrorMessage}
+              autoComplete="new-password"
+              required
             />
             <ErrorMessage
               name="newPassword"
@@ -59,25 +61,30 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
           </div>
           <div className="form-group">
             <CardLabel
-              htmlFor="confirmPassword"
+              htmlFor="confirmPasswordChangePassword"
               isRequired={true}
-              label="Confirm Password"
+              label="Confirm New Password"
             />
             <Field
-              name="confirmPassword"
-              id="confirmPassword"
+              name="confirmPasswordChangePassword"
+              id="confirmPasswordChangePassword"
               className="form-control"
               component={PasswordInput}
-              aria-invalid={errors.newPassword ? "true" : null}
-              aria-describedby={
-                errors.newPassword ? "confirmPasswordError" : null
+              aria-invalid={
+                errors.confirmPasswordChangePassword ? "true" : null
               }
-              pattern={passwordFieldRegex}
+              aria-describedby={
+                errors.confirmPasswordChangePassword
+                  ? "confirmPasswordChangePasswordError"
+                  : null
+              }
+              autoComplete="new-password"
+              required
               title={passwordFieldErrorMessage}
             />
             <ErrorMessage
-              name="confirmPassword"
-              id="confirmPasswordError"
+              name="confirmPasswordChangePassword"
+              id="confirmPasswordChangePasswordError"
               component={FormError}
             />
           </div>

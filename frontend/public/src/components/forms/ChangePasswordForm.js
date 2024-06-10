@@ -6,9 +6,8 @@ import { Formik, Field, Form, ErrorMessage } from "formik"
 import { PasswordInput } from "./elements/inputs"
 import FormError from "./elements/FormError"
 import {
-  passwordFieldRegex,
-  passwordFieldErrorMessage,
-  changePasswordFormValidation
+  changePasswordFormValidation,
+  passwordFieldErrorMessage
 } from "../../lib/validation"
 import CardLabel from "../input/CardLabel"
 import { ConnectedFocusError } from "focus-formik-error"
@@ -18,9 +17,9 @@ type Props = {
 }
 
 export type ChangePasswordFormValues = {
-  oldPassword: string,
+  currentPassword: string,
   newPassword: string,
-  confirmPassword: string
+  confirmPasswordChangePassword: string
 }
 
 const ChangePasswordForm = ({ onSubmit }: Props) => (
@@ -28,40 +27,40 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
     onSubmit={onSubmit}
     validationSchema={changePasswordFormValidation}
     initialValues={{
-      oldPassword:     "",
-      newPassword:     "",
-      confirmPassword: ""
+      currentPassword:               "",
+      newPassword:                   "",
+      confirmPasswordChangePassword: ""
     }}
     validateOnChange={false}
     validateOnBlur={false}
   >
     {({ isSubmitting, errors }) => {
       return (
-        <Form>
+        <Form noValidate>
           <ConnectedFocusError />
           <section className="email-section">
             <h2 aria-label="Change Password Form">Change Password</h2>
             <div className="form-group">
               <CardLabel
-                htmlFor="oldPassword"
+                htmlFor="currentPassword"
                 isRequired={true}
-                label="Old Password"
+                label="Current Password"
               />
               <Field
-                name="oldPassword"
-                id="oldPassword"
+                name="currentPassword"
+                id="currentPassword"
                 className="form-control"
                 component={PasswordInput}
                 autoComplete="current-password"
-                aria-label="Old Password"
-                aria-invalid={errors.oldPassword ? "true" : null}
+                required
+                aria-invalid={errors.currentPassword ? "true" : null}
                 aria-describedby={
-                  errors.oldPassword ? "odlPasswordError" : null
+                  errors.currentPassword ? "currentPasswordError" : null
                 }
               />
               <ErrorMessage
-                name="oldPassword"
-                id="oldPasswordError"
+                name="currentPassword"
+                id="currentPasswordError"
                 component={FormError}
               />
             </div>
@@ -77,13 +76,12 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
                 className="form-control"
                 component={PasswordInput}
                 autoComplete="new-password"
-                aria-label="New Password"
+                required
                 aria-invalid={errors.newPassword ? "true" : null}
                 aria-describedby={
                   errors.newPassword ? "newPasswordError" : null
                 }
-                pattern={passwordFieldRegex}
-                title={passwordFieldErrorMessage}
+                aria-description={passwordFieldErrorMessage}
               />
               <ErrorMessage
                 name="newPassword"
@@ -93,27 +91,30 @@ const ChangePasswordForm = ({ onSubmit }: Props) => (
             </div>
             <div className="form-group">
               <CardLabel
-                htmlFor="confirmPassword"
+                htmlFor="confirmPasswordChangePassword"
                 isRequired={true}
-                label="Confirm Password"
+                label="Confirm New Password"
               />
               <Field
-                name="confirmPassword"
-                id="confirmPassword"
+                name="confirmPasswordChangePassword"
+                id="confirmPasswordChangePassword"
                 className="form-control"
                 component={PasswordInput}
                 autoComplete="new-password"
-                aria-label="Confirm Password"
-                aria-invalid={errors.confirmPassword ? "true" : null}
-                aria-describedby={
-                  errors.confirmPassword ? "confirmPasswordError" : null
+                required
+                aria-invalid={
+                  errors.confirmPasswordChangePassword ? "true" : null
                 }
-                pattern={passwordFieldRegex}
-                title={passwordFieldErrorMessage}
+                aria-describedby={
+                  errors.confirmPasswordChangePassword
+                    ? "confirmPasswordChangePasswordError"
+                    : null
+                }
+                aria-description={passwordFieldErrorMessage}
               />
               <ErrorMessage
-                name="confirmPassword"
-                id="confirmPasswordError"
+                name="confirmPasswordChangePassword"
+                id="confirmPasswordChangePasswordError"
                 component={FormError}
               />
             </div>

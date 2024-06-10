@@ -10,15 +10,14 @@ import { EmailInput } from "./elements/inputs"
 import FormError from "./elements/FormError"
 import { routes } from "../../lib/urls"
 import { ConnectedFocusError } from "focus-formik-error"
+import { emailField } from "../../lib/validation"
+import CardLabel from "../input/CardLabel"
 
 const emailValidation = yup.object().shape({
   recaptcha: SETTINGS.recaptchaKey
     ? yup.string().required("Please verify you're not a robot")
     : yup.mixed().notRequired(),
-  email: yup
-    .string()
-    .email("Please enter an email address")
-    .required("Email is required")
+  email: emailField
 })
 
 type Props = {
@@ -43,10 +42,10 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
   >
     {({ errors, setFieldValue, isSubmitting }) => {
       return (
-        <Form>
+        <Form noValidate>
           <ConnectedFocusError />
           <div className="form-group">
-            <label htmlFor="email">Email</label>
+            <CardLabel htmlFor="email" isRequired={true} label="Email" />
             <Field
               name="email"
               id="email"
@@ -55,8 +54,9 @@ const RegisterEmailForm = ({ onSubmit }: Props) => (
               component={EmailInput}
               aria-invalid={errors.email ? "true" : null}
               aria-describedby={errors.email ? "emailError" : null}
+              required
             />
-            <ErrorMessage name="email" component={FormError} />
+            <ErrorMessage name="email" id="emailError" component={FormError} />
             <p>
               By creating an account I agree to the
               <br />

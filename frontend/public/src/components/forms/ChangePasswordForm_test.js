@@ -33,9 +33,11 @@ describe("ChangePasswordForm", () => {
     const wrapper = renderForm()
 
     const form = wrapper.find("Formik").dive()
-    assert.ok(findFormikFieldByName(form, "oldPassword").exists())
+    assert.ok(findFormikFieldByName(form, "currentPassword").exists())
     assert.ok(findFormikFieldByName(form, "newPassword").exists())
-    assert.ok(findFormikFieldByName(form, "confirmPassword").exists())
+    assert.ok(
+      findFormikFieldByName(form, "confirmPasswordChangePassword").exists()
+    )
     assert.ok(form.find("button[type='submit']").exists())
   })
 })

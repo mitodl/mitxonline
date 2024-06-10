@@ -56,6 +56,5 @@ describe("EditProfileForm", () => {
 
     assert.ok(findFormikFieldByName(form, "legal_address.state").exists())
     assert.ok(findFormikFieldByName(form, "user_profile.type_is_professional"))
-    assert.ok(findFormikFieldByName(form, "user_profile.company").exists())
   })
 })

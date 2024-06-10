@@ -11,7 +11,7 @@ import { ALERT_TYPE_TEXT } from "../../../constants"
 
 describe("LoginForgotPasswordConfirmPage", () => {
   const newPassword = "pass1"
-  const confirmPassword = "pass2"
+  const confirmPasswordChangePassword = "pass2"
   const token = "token1"
   const uid = "uid1"
   let helper, renderPage, setSubmittingStub
@@ -67,7 +67,7 @@ describe("LoginForgotPasswordConfirmPage", () => {
       const onSubmit = inner.find("ResetPasswordForm").prop("onSubmit")
 
       await onSubmit(
-        { newPassword, confirmPassword },
+        { newPassword, confirmPasswordChangePassword },
         { setSubmitting: setSubmittingStub }
       )
       sinon.assert.calledWith(
@@ -77,7 +77,7 @@ describe("LoginForgotPasswordConfirmPage", () => {
         {
           body: {
             new_password:    newPassword,
-            re_new_password: confirmPassword,
+            re_new_password: confirmPasswordChangePassword,
             token,
             uid
           },

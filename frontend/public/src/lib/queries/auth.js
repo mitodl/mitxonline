@@ -113,11 +113,11 @@ export default {
     }
   }),
 
-  changePasswordMutation: (oldPassword: string, newPassword: string) => ({
+  changePasswordMutation: (currentPassword: string, newPassword: string) => ({
     url:     "/api/set_password/",
     options: getCsrfOptions(),
     body:    {
-      current_password: oldPassword,
+      current_password: currentPassword,
       new_password:     newPassword
     }
   }),

@@ -11,11 +11,11 @@ import { ALERT_TYPE_TEXT } from "../../../constants"
 import { makeUser } from "../../../factories/user"
 
 describe("AccountSettingsPage", () => {
-  const oldPassword = "password1"
+  const currentPassword = "password1"
   const newPassword = "password2"
   const user = makeUser()
   const email = "abc@example.com"
-  const confirmPassword = newPassword
+  const confirmPasswordChangePassword = newPassword
 
   let helper, renderPage, setSubmittingStub
 
@@ -41,8 +41,6 @@ describe("AccountSettingsPage", () => {
 
     assert.ok(inner.find("ChangePasswordForm").exists())
   })
-
-  //
   ;[
     [
       200,
@@ -55,7 +53,7 @@ describe("AccountSettingsPage", () => {
       400,
       routes.accountSettings,
       "danger",
-      "Unable to reset your password, please try again later."
+      "Unable to update your password, please try again later."
     ]
   ].forEach(([status, expectedUrl, expectedColor, expectedMessage]) => {
     it(`handles onSubmit with status=${status}`, async () => {
@@ -67,11 +65,11 @@ describe("AccountSettingsPage", () => {
 
       const onSubmit = inner.find("ChangePasswordForm").prop("onSubmit")
 
-      const resetFormStub = helper.sandbox.stub()
+      const changePasswordFormStub = helper.sandbox.stub()
 
       await onSubmit(
-        { oldPassword, newPassword, confirmPassword },
-        { setSubmitting: setSubmittingStub, resetForm: resetFormStub }
+        { currentPassword, newPassword, confirmPasswordChangePassword },
+        { setSubmitting: setSubmittingStub, resetForm: changePasswordFormStub }
       )
       sinon.assert.calledWith(
         helper.handleRequestStub,
@@ -79,7 +77,7 @@ describe("AccountSettingsPage", () => {
         "POST",
         {
           body: {
-            current_password: oldPassword,
+            current_password: currentPassword,
             new_password:     newPassword
           },
           credentials: undefined,
@@ -93,7 +91,7 @@ describe("AccountSettingsPage", () => {
         search:   ""
       })
       sinon.assert.calledWith(setSubmittingStub, false)
-      sinon.assert.calledWith(resetFormStub)
+      sinon.assert.calledWith(changePasswordFormStub)
 
       const { ui } = store.getState()
       assert.deepEqual(ui.userNotifications, {
@@ -140,7 +138,7 @@ describe("AccountSettingsPage", () => {
       const resetFormStub = helper.sandbox.stub()
 
       await onSubmit(
-        { email, oldPassword, newPassword, user },
+        { email, confirmPasswordChangePassword, newPassword, user },
         { setSubmitting: setSubmittingStub, resetForm: resetFormStub }
       )
       sinon.assert.calledWith(

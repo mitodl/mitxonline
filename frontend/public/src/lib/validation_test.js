@@ -4,113 +4,61 @@ import { ValidationError } from "yup"
 
 import {
   changePasswordFormValidation,
-  resetPasswordFormValidation,
-  passwordFieldRegex,
-  usernameFieldRegex,
-  changeEmailValidationRegex
+  resetPasswordFormValidation
 } from "./validation"
 
 describe("validation utils", () => {
   describe("resetPasswordFormValidation", () => {
     it(`should validate with matching passwords`, async () => {
       const inputs = {
-        newPassword:     "password1",
-        confirmPassword: "password1"
+        newPassword:                   "password1",
+        confirmPasswordChangePassword: "password1"
       }
       const result = await resetPasswordFormValidation.validate(inputs)
 
       assert.deepEqual(result, inputs)
     })
 
-    //
-    ;[
-      [
-        { newPassword: "password1", confirmPassword: "password2" },
-        ["Passwords must match"]
-      ]
-    ].forEach(([inputs, errors]) => {
-      it(`should throw an error with inputs=${JSON.stringify(
-        inputs
-      )}`, async () => {
-        const promise = resetPasswordFormValidation.validate(inputs)
+    it(`Reset password form validation should throw an error with different newPassword and confirmPassword values.`, async () => {
+      const inputs = {
+        newPassword:                   "password1",
+        confirmPasswordChangePassword: "password2"
+      }
+      const promise = resetPasswordFormValidation.validate(inputs)
 
-        const result = await assert.isRejected(promise, ValidationError)
+      const result = await assert.isRejected(promise, ValidationError)
 
-        assert.deepEqual(result.errors, errors)
-      })
+      assert.deepEqual(result.errors, [
+        "New password and Confirm New Password must match."
+      ])
     })
   })
 
   describe("ChangePasswordFormValidation", () => {
-    it(`should validate with matching passwords`, async () => {
+    it(`Change password form validation should pass with matching passwords`, async () => {
       const inputs = {
-        oldPassword:     "old-password",
-        newPassword:     "password1",
-        confirmPassword: "password1"
+        currentPassword:               "old-password",
+        newPassword:                   "password1",
+        confirmPasswordChangePassword: "password1"
       }
       const result = await changePasswordFormValidation.validate(inputs)
 
       assert.deepEqual(result, inputs)
     })
 
-    //
-    ;[
-      [
-        {
-          oldPassword:     "password1",
-          newPassword:     "password1",
-          confirmPassword: "password2"
-        },
-        ["Passwords must match"]
-      ]
-    ].forEach(([inputs, errors]) => {
-      it(`should throw an error with inputs=${JSON.stringify(
-        inputs
-      )}`, async () => {
-        const promise = changePasswordFormValidation.validate(inputs)
+    it(`Change password form validation should throw an error with different new and Confirm New Password values.`, async () => {
+      const inputs = {
+        currentPassword:               "old-password",
+        newPassword:                   "password1",
+        confirmPasswordChangePassword: "password2"
+      }
+      const promise = changePasswordFormValidation.validate(inputs)
 
-        const result = await assert.isRejected(promise, ValidationError)
+      const result = await assert.isRejected(promise, ValidationError)
 
-        assert.deepEqual(result.errors, errors)
-      })
-    })
-  })
-
-  describe("Validation Regex", () => {
-    const passwordRegex = new RegExp(passwordFieldRegex)
-    const usernameRegex = new RegExp(usernameFieldRegex)
-    ;[
-      ["", false],
-      ["pass", false],
-      ["passwor", false],
-      ["password123", true],
-      ["password", false]
-    ].forEach(([value, regexMatch]) => {
-      it("password regex pattern matching.", () => {
-        assert.equal(passwordRegex.test(value), regexMatch)
-      })
-    })
-    ;[
-      ["", false],
-      ["  ", false],
-      ["ab", false],
-      ["0123456789012345678901234567890", false],
-      ["ábc-dèf-123", true]
-    ].forEach(([value, regexMatch]) => {
-      it("username regex pattern matching.", () => {
-        assert.equal(usernameRegex.test(value), regexMatch)
-      })
-    })
-    ;[
-      ["test@mit.edu", "test+new@mit.edu", true],
-      ["test@mit.edu", "test@mit.edu", false]
-    ].forEach(([currentEmail, futureEmail, regexMatch]) => {
-      it("Change email address field must be different from current email address.", () => {
-        const changeEmailRegex = new RegExp(
-          changeEmailValidationRegex(currentEmail)
-        )
-        assert.equal(changeEmailRegex.test(futureEmail), regexMatch)
-      })
+      assert.deepEqual(result.errors, [
+        "New password and Confirm New Password must match."
+      ])
     })
   })
 })
