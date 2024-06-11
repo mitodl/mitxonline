@@ -11,7 +11,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.db.models.query import QuerySet
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
@@ -60,7 +60,6 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
-from users.models import User
 
 log = logging.getLogger(__name__)
 UserEnrollments = namedtuple(  # noqa: PYI024
@@ -84,9 +83,13 @@ def _relevant_course_qset_filter(
     user_relevant_program_course_run_qset.
     """
 
-    return run_qset.filter(
-        Q(enrollment_end=None) | Q(enrollment_end__gt=now)
-    ).exclude(start_date=None).exclude(enrollment_start=None).filter(live=True).order_by("enrollment_start")
+    return (
+        run_qset.filter(Q(enrollment_end=None) | Q(enrollment_end__gt=now))
+        .exclude(start_date=None)
+        .exclude(enrollment_start=None)
+        .filter(live=True)
+        .order_by("enrollment_start")
+    )
 
 
 def get_relevant_course_run_qset(
@@ -109,9 +112,7 @@ def get_user_relevant_program_course_run_qset(
     Returns a QuerySet of relevant course runs
     """
     now = now or now_in_utc()
-    run_qset = (
-        CourseRun.objects.filter(course__in=program.courses_qset.all())
-    )
+    run_qset = CourseRun.objects.filter(course__in=program.courses_qset.all())
     return _relevant_course_qset_filter(run_qset, now)
 
 

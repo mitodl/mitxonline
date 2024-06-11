@@ -230,9 +230,7 @@ def test_course_page_context_edx_access(  # noqa: PLR0913
     request.user = request_user
     context = course_page.get_context(request=request)
     assert context["can_access_edx_course"] is exp_can_access
-    patched_get_relevant_run.assert_called_once_with(
-        course=course_page.course
-    )
+    patched_get_relevant_run.assert_called_once_with(course=course_page.course)
 
 
 def generate_flexible_pricing_response(request_user, flexible_pricing_form):

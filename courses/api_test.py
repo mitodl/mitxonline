@@ -22,8 +22,8 @@ from courses.api import (
     defer_enrollment,
     generate_course_run_certificates,
     generate_program_certificate,
-    get_user_enrollments,
     get_relevant_course_run,
+    get_user_enrollments,
     manage_course_run_certificate_access,
     manage_program_certificate_access,
     override_user_grade,
@@ -151,7 +151,6 @@ def test_get_relevant_course_run(user, dates, course, is_live, is_enrolled):
     course_runs[0].save()
     returned_run = get_relevant_course_run(course=course)
     assert returned_run == (course_runs[0] if is_live else course_runs[2])
-
 
 
 def test_get_relevant_course_run_invalid_dates(user, dates, course):

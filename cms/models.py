@@ -1203,12 +1203,8 @@ class CoursePage(ProductPage):
         return f"{self.course.readable_id} | {self.title}"
 
     def get_context(self, request, *args, **kwargs):
-        relevant_run = get_relevant_course_run(
-            course=self.product
-        )
-        relevant_runs = list(
-            get_relevant_course_run_qset(course=self.product)
-        )
+        relevant_run = get_relevant_course_run(course=self.product)
+        relevant_runs = list(get_relevant_course_run_qset(course=self.product))
         sign_in_url = (
             None
             if request.user.is_authenticated
