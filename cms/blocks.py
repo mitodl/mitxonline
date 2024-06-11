@@ -6,7 +6,6 @@ from django import forms
 from django.apps import apps
 from django.core.exceptions import ValidationError
 from wagtail import blocks
-from wagtail.images.blocks import ImageChooserBlock
 
 
 class ResourceBlock(blocks.StructBlock):
@@ -31,6 +30,7 @@ class PriceBlock(blocks.StructBlock):
         required=False,
         help="Specify the URL to redirect the user for the product's price details page.",
     )
+
 
 class CourseRunFieldBlock(blocks.FieldBlock):
     """
