@@ -32,21 +32,6 @@ class PriceBlock(blocks.StructBlock):
         help="Specify the URL to redirect the user for the product's price details page.",
     )
 
-
-class FacultyBlock(blocks.StructBlock):
-    """
-    Block class that defines a faculty member
-    """
-
-    name = blocks.CharBlock(max_length=100, help_text="Name of the faculty member.")
-    image = ImageChooserBlock(
-        help_text="Profile image size must be at least 300x300 pixels."
-    )
-    description = blocks.RichTextBlock(
-        help_text="A brief description about the faculty member."
-    )
-
-
 class CourseRunFieldBlock(blocks.FieldBlock):
     """
     Block class that allows selecting a course run
