@@ -346,7 +346,7 @@ def test_get_course_runs_relevant(  # noqa: PLR0913
             f"{reverse('v1:course_runs_api-list')}?relevant_to={course_run.course.readable_id}"
         )
     duplicate_queries_check(context)
-    patched_run_qset.assert_called_once_with(course_run.course, user)
+    patched_run_qset.assert_called_once_with(course_run.course)
     course_run_data = resp.json()[0]
 
     assert course_run_data["is_enrolled"] == is_enrolled

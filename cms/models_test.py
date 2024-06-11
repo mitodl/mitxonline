@@ -159,7 +159,6 @@ def test_course_page_context(  # noqa: PLR0913
         "request": request,
         "run": run,
         "course_runs": relevant_runs,
-        "is_enrolled": exp_is_enrolled,
         "sign_in_url": f"/signin/?next={quote_plus(course_page.get_url())}"
         if exp_sign_in_url
         else None,
@@ -232,7 +231,7 @@ def test_course_page_context_edx_access(  # noqa: PLR0913
     context = course_page.get_context(request=request)
     assert context["can_access_edx_course"] is exp_can_access
     patched_get_relevant_run.assert_called_once_with(
-        course=course_page.course, user=request_user
+        course=course_page.course
     )
 
 
