@@ -332,7 +332,7 @@ def test_get_course_runs_relevant(  # noqa: PLR0913
         ),
     )
     patched_run_qset = mocker.patch(
-        "courses.views.v1.get_user_relevant_course_run_qset",
+        "courses.views.v1.get_relevant_course_run_qset",
         return_value=CourseRun.objects.filter(id=course_run.id)
         .annotate(user_enrollments=user_enrollments)
         .order_by("-user_enrollments", "enrollment_start"),
@@ -346,7 +346,7 @@ def test_get_course_runs_relevant(  # noqa: PLR0913
             f"{reverse('v1:course_runs_api-list')}?relevant_to={course_run.course.readable_id}"
         )
     duplicate_queries_check(context)
-    patched_run_qset.assert_called_once_with(course_run.course, user)
+    patched_run_qset.assert_called_once_with(course_run.course)
     course_run_data = resp.json()[0]
 
     assert course_run_data["is_enrolled"] == is_enrolled

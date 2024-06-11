@@ -22,8 +22,8 @@ from courses.api import (
     defer_enrollment,
     generate_course_run_certificates,
     generate_program_certificate,
+    get_relevant_course_run,
     get_user_enrollments,
-    get_user_relevant_course_run,
     manage_course_run_certificate_access,
     manage_program_certificate_access,
     override_user_grade,
@@ -119,10 +119,11 @@ def courses_api_logs(mocker):
 
 
 @pytest.mark.parametrize("is_enrolled", [True, False])
-def test_get_user_relevant_course_run(client, user, dates, course, is_enrolled):
+@pytest.mark.parametrize("is_live", [True, False])
+def test_get_relevant_course_run(user, dates, course, is_live, is_enrolled):
     """
-    get_user_relevant_course_run should return an enrolled run or the soonest course
-    run that does not have a past enrollment end date.
+    get_relevant_course_run should return the soonest course
+    run that is enrollable, even if the user is already enrolled.
     """
     # One run in the near future, one run in progress with an expired enrollment period, and one run in the far future.
     course_runs = CourseRunFactory.create_batch(
@@ -144,15 +145,20 @@ def test_get_user_relevant_course_run(client, user, dates, course, is_enrolled):
         CourseRunEnrollmentFactory.create(
             run=course_runs[1], user=user, edx_enrolled=True, active=True
         )
-    returned_run = get_user_relevant_course_run(course=course, user=user)
-    assert returned_run == (course_runs[1] if is_enrolled else course_runs[0])
+    returned_run = get_relevant_course_run(course=course)
+    assert returned_run == course_runs[0]
+    course_runs[0].live = is_live
+    course_runs[0].save()
+    returned_run = get_relevant_course_run(course=course)
+    assert returned_run == (course_runs[0] if is_live else course_runs[2])
 
 
-def test_get_user_relevant_course_run_invalid_dates(user, dates, course):
+def test_get_relevant_course_run_invalid_dates(user, dates, course):
     """
-    get_user_relevant_course_run should ignore course runs with any of the following properties when the user is not enrolled:
+    get_relevant_course_run should ignore course runs with any of the following properties when the user is not enrolled:
     1) No start date or enrollment start date
     2) An enrollment end date in the past
+    3) The course run is not live
 
     """
     CourseRunFactory.create_batch(
@@ -167,42 +173,9 @@ def test_get_user_relevant_course_run_invalid_dates(user, dates, course):
             [dates.future_60_days, None, dates.past_10_days]
         ),
     )
-    returned_run = get_user_relevant_course_run(course=course, user=user)
+    CourseRunFactory.create(course=course, live=False)
+    returned_run = get_relevant_course_run(course=course)
     assert returned_run is None
-
-
-def test_get_user_relevant_course_run_ignore_enrolled(user, dates, course):
-    """
-    get_user_relevant_course_run return a future course run if an enrolled run's end date is in the past, or if an
-    enrollment for an open course is not flagged as edX-enrolled
-    """
-    course_runs = CourseRunFactory.create_batch(
-        3,
-        course=course,
-        start_date=factory.Iterator(
-            [dates.past_30_days, dates.now, dates.future_10_days]
-        ),
-        end_date=factory.Iterator(
-            [dates.past_10_days, dates.future_10_days, dates.future_30_days]
-        ),
-        enrollment_start=factory.Iterator(
-            [dates.past_30_days, dates.past_30_days, dates.future_10_days]
-        ),
-        enrollment_end=factory.Iterator(
-            [dates.past_10_days, dates.past_10_days, dates.future_30_days]
-        ),
-    )
-    # Enroll in a past course run
-    CourseRunEnrollmentFactory.create(
-        run=course_runs[0], user=user, edx_enrolled=True, active=True
-    )
-    # Enroll in a currently-open course run with a closed enrollment period, but set to inactive
-    CourseRunEnrollmentFactory.create(
-        run=course_runs[1], user=user, edx_enrolled=False, active=True
-    )
-    returned_run = get_user_relevant_course_run(course=course, user=user)
-    # Returned course run should be the one the user is enrolled in that is active in edx
-    assert returned_run == course_runs[0]
 
 
 def test_get_user_enrollments(user, program_with_empty_requirements):  # noqa: F811
