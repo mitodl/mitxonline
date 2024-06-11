@@ -30,6 +30,8 @@ services:
       - "5432"
     environment:
       POSTGRES_PASSWORD: postgres # pragma: allowlist secret
+    volumes:
+      - db-data:/var/lib/postgresql/data
 
   redis:
     image: redis:6.0.5
