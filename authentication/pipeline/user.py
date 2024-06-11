@@ -130,7 +130,7 @@ def create_user_via_email(
                 "username": f"The username '{username}' is already taken. Please try a different username."
             },
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise UserCreationFailedException(backend, current_partial) from exc
 
     return {"is_new": True, "user": created_user, "username": created_user.username}

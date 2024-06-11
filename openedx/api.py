@@ -346,7 +346,7 @@ def repair_faulty_edx_user(user):
     created_user, created_auth_token = False, False
     try:
         created_user = create_edx_user(user)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         # 409 means we have a username conflict - pass in that case so we can
         # try to create the api auth tokens; re-raise otherwise
 
@@ -672,7 +672,7 @@ def enroll_in_edx_course_runs(
             results.append(enrollment)
         except HTTPError as exc:  # noqa: PERF203
             raise EdxApiEnrollErrorException(user, course_run, exc) from exc
-        except Exception as exc:  # pylint: disable=broad-except  # noqa: BLE001
+        except Exception as exc:  # pylint: disable=broad-except
             raise UnknownEdxApiEnrollException(user, course_run, exc) from exc
     return results
 
@@ -848,7 +848,7 @@ def subscribe_to_edx_course_emails(user, course_run):
         result = edx_client.email_settings.subscribe(course_run.courseware_id)
     except HTTPError as exc:
         raise EdxApiEmailSettingsErrorException(user, course_run, exc) from exc
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise UnknownEdxApiEmailSettingsException(user, course_run, exc) from exc
     return result
 
@@ -874,7 +874,7 @@ def unsubscribe_from_edx_course_emails(user, course_run):
         result = edx_client.email_settings.unsubscribe(course_run.courseware_id)
     except HTTPError as exc:
         raise EdxApiEmailSettingsErrorException(user, course_run, exc) from exc
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise UnknownEdxApiEmailSettingsException(user, course_run, exc) from exc
     return result
 
