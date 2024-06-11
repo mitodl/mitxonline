@@ -1209,11 +1209,6 @@ class CoursePage(ProductPage):
         relevant_runs = list(
             get_user_relevant_course_run_qset(course=self.product, user=request.user)
         )
-        is_enrolled = (
-            False
-            if (relevant_run is None or not request.user.is_authenticated)
-            else (relevant_run.enrollments.filter(user_id=request.user.id).exists())
-        )
         sign_in_url = (
             None
             if request.user.is_authenticated
@@ -1236,7 +1231,6 @@ class CoursePage(ProductPage):
             **get_base_context(request),
             "run": relevant_run,
             "course_runs": relevant_runs,
-            "is_enrolled": is_enrolled,
             "sign_in_url": sign_in_url,
             "start_date": start_date,
             "can_access_edx_course": can_access_edx_course,

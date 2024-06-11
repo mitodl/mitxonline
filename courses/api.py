@@ -85,39 +85,9 @@ def _relevant_course_qset_filter(
     user_relevant_program_course_run_qset.
     """
 
-    if user and user.is_authenticated:
-        user_enrollments = Count(
-            "enrollments",
-            filter=Q(
-                enrollments__user=user,
-                enrollments__active=True,
-                enrollments__edx_enrolled=True,
-            ),
-        )
-        run_qset = run_qset.annotate(user_enrollments=user_enrollments).order_by(
-            "-user_enrollments", "enrollment_start"
-        )
-
-        verified_enrollments = Count(
-            "enrollments",
-            filter=Q(
-                enrollments__user=user,
-                enrollments__active=True,
-                enrollments__edx_enrolled=True,
-                enrollments__enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            ),
-        )
-        run_qset = run_qset.annotate(verified_enrollments=verified_enrollments)
-
-        runs = run_qset.filter(
-            Q(user_enrollments__gt=0)
-            | Q(enrollment_end=None)
-            | Q(enrollment_end__gt=now)
-        )
-    else:
-        runs = run_qset.filter(
-            Q(enrollment_end=None) | Q(enrollment_end__gt=now)
-        ).order_by("enrollment_start")
+    runs = run_qset.filter(
+        Q(enrollment_end=None) | Q(enrollment_end__gt=now)
+    ).exclude(start_date=None).exclude(enrollment_start=None).filter(live=True).order_by("enrollment_start")
     return runs
 
 
@@ -130,11 +100,7 @@ def get_user_relevant_course_run_qset(
     Returns a QuerySet of relevant course runs
     """
     now = now or now_in_utc()
-    run_qset = (
-        course.courseruns.exclude(start_date=None)
-        .exclude(enrollment_start=None)
-        .exclude(live=False)
-    )
+    run_qset = course.courseruns
     return _relevant_course_qset_filter(run_qset, user, now)
 
 
@@ -149,9 +115,6 @@ def get_user_relevant_program_course_run_qset(
     now = now or now_in_utc()
     run_qset = (
         CourseRun.objects.filter(course__in=program.courses_qset.all())
-        .exclude(start_date=None)
-        .exclude(enrollment_start=None)
-        .exclude(live=False)
     )
     return _relevant_course_qset_filter(run_qset, user, now)
 
