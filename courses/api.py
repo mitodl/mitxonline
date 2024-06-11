@@ -90,7 +90,7 @@ def _relevant_course_qset_filter(
     return runs
 
 
-def get_user_relevant_course_run_qset(
+def get_relevant_course_run_qset(
     course: Course,
     now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
@@ -116,7 +116,7 @@ def get_user_relevant_program_course_run_qset(
     return _relevant_course_qset_filter(run_qset, now)
 
 
-def get_user_relevant_course_run(
+def get_relevant_course_run(
     course: Course,
 ) -> CourseRun:
     """
@@ -124,7 +124,7 @@ def get_user_relevant_course_run(
     For anonymous users, this means the soonest enrollable course run.
     For logged-in users, this means an active course run that they're enrolled in, or the soonest enrollable course run.
     """
-    runs = get_user_relevant_course_run_qset(course)
+    runs = get_relevant_course_run_qset(course)
     run = first_or_none(runs)
     return run  # noqa: RET504
 

@@ -216,7 +216,7 @@ def test_course_page_context_edx_access(  # noqa: PLR0913
         )
     )
     patched_get_relevant_run = mocker.patch(
-        "cms.models.get_user_relevant_course_run", return_value=run
+        "cms.models.get_relevant_course_run", return_value=run
     )
     if not is_authed:  # noqa: SIM108
         request_user = AnonymousUser()

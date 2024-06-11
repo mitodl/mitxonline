@@ -56,7 +56,7 @@ from cms.constants import (
     SIGNATORY_INDEX_SLUG,
 )
 from cms.forms import CertificatePageForm
-from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset
+from courses.api import get_relevant_course_run, get_relevant_course_run_qset
 from courses.models import (
     Course,
     CourseRun,
@@ -1203,11 +1203,11 @@ class CoursePage(ProductPage):
         return f"{self.course.readable_id} | {self.title}"
 
     def get_context(self, request, *args, **kwargs):
-        relevant_run = get_user_relevant_course_run(
+        relevant_run = get_relevant_course_run(
             course=self.product
         )
         relevant_runs = list(
-            get_user_relevant_course_run_qset(course=self.product)
+            get_relevant_course_run_qset(course=self.product)
         )
         sign_in_url = (
             None
