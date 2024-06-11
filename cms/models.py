@@ -1204,10 +1204,10 @@ class CoursePage(ProductPage):
 
     def get_context(self, request, *args, **kwargs):
         relevant_run = get_user_relevant_course_run(
-            course=self.product, user=request.user
+            course=self.product
         )
         relevant_runs = list(
-            get_user_relevant_course_run_qset(course=self.product, user=request.user)
+            get_user_relevant_course_run_qset(course=self.product)
         )
         sign_in_url = (
             None

@@ -77,7 +77,6 @@ UserEnrollments = namedtuple(  # noqa: PYI024
 
 def _relevant_course_qset_filter(
     run_qset: QuerySet,
-    user: Optional[User],  # noqa: FA100
     now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
@@ -93,7 +92,6 @@ def _relevant_course_qset_filter(
 
 def get_user_relevant_course_run_qset(
     course: Course,
-    user: Optional[User],  # noqa: FA100
     now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
@@ -101,12 +99,11 @@ def get_user_relevant_course_run_qset(
     """
     now = now or now_in_utc()
     run_qset = course.courseruns
-    return _relevant_course_qset_filter(run_qset, user, now)
+    return _relevant_course_qset_filter(run_qset, now)
 
 
 def get_user_relevant_program_course_run_qset(
     program: Program,
-    user: Optional[User],  # noqa: FA100
     now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
@@ -116,20 +113,18 @@ def get_user_relevant_program_course_run_qset(
     run_qset = (
         CourseRun.objects.filter(course__in=program.courses_qset.all())
     )
-    return _relevant_course_qset_filter(run_qset, user, now)
+    return _relevant_course_qset_filter(run_qset, now)
 
 
 def get_user_relevant_course_run(
     course: Course,
-    user: Optional[User],  # noqa: FA100
-    now: Optional[datetime] = None,  # noqa: FA100
 ) -> CourseRun:
     """
     For a given Course, finds the course run that is the most relevant to the user.
     For anonymous users, this means the soonest enrollable course run.
     For logged-in users, this means an active course run that they're enrolled in, or the soonest enrollable course run.
     """
-    runs = get_user_relevant_course_run_qset(course, user, now)
+    runs = get_user_relevant_course_run_qset(course)
     run = first_or_none(runs)
     return run  # noqa: RET504
 
