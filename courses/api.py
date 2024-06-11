@@ -84,10 +84,9 @@ def _relevant_course_qset_filter(
     user_relevant_program_course_run_qset.
     """
 
-    runs = run_qset.filter(
+    return run_qset.filter(
         Q(enrollment_end=None) | Q(enrollment_end__gt=now)
     ).exclude(start_date=None).exclude(enrollment_start=None).filter(live=True).order_by("enrollment_start")
-    return runs
 
 
 def get_relevant_course_run_qset(

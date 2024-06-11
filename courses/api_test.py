@@ -120,7 +120,7 @@ def courses_api_logs(mocker):
 
 @pytest.mark.parametrize("is_enrolled", [True, False])
 @pytest.mark.parametrize("is_live", [True, False])
-def test_get_relevant_course_run(client, user, dates, course, is_live, is_enrolled):
+def test_get_relevant_course_run(user, dates, course, is_live, is_enrolled):
     """
     get_relevant_course_run should return the soonest course
     run that is enrollable, even if the user is already enrolled.
