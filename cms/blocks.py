@@ -32,6 +32,7 @@ class PriceBlock(blocks.StructBlock):
         help="Specify the URL to redirect the user for the product's price details page.",
     )
 
+
 class CourseRunFieldBlock(blocks.FieldBlock):
     """
     Block class that allows selecting a course run
