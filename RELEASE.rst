@@ -1,6 +1,16 @@
 Release Notes
 =============
 
+Version 0.96.2
+--------------
+
+- Update with saved data (#2243)
+- Filter relevant course runs to be live (#2244)
+- [pre-commit.ci] pre-commit autoupdate (#2191)
+- Update color of disabled enroll button (#2239)
+- Tech Debt: Remove feature flags that are no longer in use (#2222)
+- 4244: no error message is shown when education level is not specified in additional details modal (#2233)
+
 Version 0.96.1 (Released June 05, 2024)
 --------------
 
