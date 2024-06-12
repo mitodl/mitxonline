@@ -429,7 +429,7 @@ export class CourseProductDetailEnroll extends React.Component<
           href={`${routes.login}?next=${encodeURIComponent(
             window.location.pathname
           )}`}
-          className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
+          className="btn btn-primary btn-enrollment-button btn-lg  btn-gradient-red-to-blue highlight"
         >
           Enroll now
         </a>
@@ -467,7 +467,7 @@ export class CourseProductDetailEnroll extends React.Component<
         (courseRuns && courseRuns.length > 1) ? (
             <button
               id="upgradeEnrollBtn"
-              className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
+              className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red-to-blue highlight enroll-now"
               onClick={() => this.toggleUpgradeDialogVisibility()}
               disabled={!run.is_enrollable}
             >
@@ -479,7 +479,7 @@ export class CourseProductDetailEnroll extends React.Component<
               <input type="hidden" name="run" value={run ? run.id : ""} />
               <button
                 type="submit"
-                className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+                className="btn btn-primary btn-enrollment-button btn-gradient-red-to-blue highlight enroll-now"
                 disabled={!run.is_enrollable}
               >
                 {isRunArchived(run) ? "Access Course Materials" : "Enroll Now"}
