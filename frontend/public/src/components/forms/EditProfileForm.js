@@ -38,7 +38,15 @@ const getInitialValues = (user: User) => ({
       (user.user_profile && user.user_profile.leadership_level) || "",
     year_of_birth:    (user.user_profile && user.user_profile.year_of_birth) || "",
     years_experience:
-      (user.user_profile && user.user_profile.years_experience) || undefined
+      (user.user_profile && user.user_profile.years_experience) || undefined,
+    type_is_professional:
+      (user.user_profile && user.user_profile.type_is_professional) || false,
+    type_is_student:
+      (user.user_profile && user.user_profile.type_is_student) || false,
+    type_is_educator:
+      (user.user_profile && user.user_profile.type_is_educator) || false,
+    type_is_other:
+      (user.user_profile && user.user_profile.type_is_other) || false
   }
 })
 
