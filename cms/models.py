@@ -56,7 +56,7 @@ from cms.constants import (
     SIGNATORY_INDEX_SLUG,
 )
 from cms.forms import CertificatePageForm
-from courses.api import get_user_relevant_course_run, get_user_relevant_course_run_qset
+from courses.api import get_relevant_course_run, get_relevant_course_run_qset
 from courses.models import (
     Course,
     CourseRun,
@@ -1203,17 +1203,8 @@ class CoursePage(ProductPage):
         return f"{self.course.readable_id} | {self.title}"
 
     def get_context(self, request, *args, **kwargs):
-        relevant_run = get_user_relevant_course_run(
-            course=self.product, user=request.user
-        )
-        relevant_runs = list(
-            get_user_relevant_course_run_qset(course=self.product, user=request.user)
-        )
-        is_enrolled = (
-            False
-            if (relevant_run is None or not request.user.is_authenticated)
-            else (relevant_run.enrollments.filter(user_id=request.user.id).exists())
-        )
+        relevant_run = get_relevant_course_run(course=self.product)
+        relevant_runs = list(get_relevant_course_run_qset(course=self.product))
         sign_in_url = (
             None
             if request.user.is_authenticated
@@ -1236,7 +1227,6 @@ class CoursePage(ProductPage):
             **get_base_context(request),
             "run": relevant_run,
             "course_runs": relevant_runs,
-            "is_enrolled": is_enrolled,
             "sign_in_url": sign_in_url,
             "start_date": start_date,
             "can_access_edx_course": can_access_edx_course,

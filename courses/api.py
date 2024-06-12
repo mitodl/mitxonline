@@ -11,7 +11,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.db.models.query import QuerySet
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
@@ -60,7 +60,6 @@ from openedx.exceptions import (
     NoEdxApiAuthError,
     UnknownEdxApiEnrollException,
 )
-from users.models import User
 
 log = logging.getLogger(__name__)
 UserEnrollments = namedtuple(  # noqa: PYI024
@@ -77,7 +76,6 @@ UserEnrollments = namedtuple(  # noqa: PYI024
 
 def _relevant_course_qset_filter(
     run_qset: QuerySet,
-    user: Optional[User],  # noqa: FA100
     now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
@@ -85,83 +83,48 @@ def _relevant_course_qset_filter(
     user_relevant_program_course_run_qset.
     """
 
-    if user and user.is_authenticated:
-        user_enrollments = Count(
-            "enrollments",
-            filter=Q(
-                enrollments__user=user,
-                enrollments__active=True,
-                enrollments__edx_enrolled=True,
-            ),
-        )
-        run_qset = run_qset.annotate(user_enrollments=user_enrollments).order_by(
-            "-user_enrollments", "enrollment_start"
-        )
-
-        verified_enrollments = Count(
-            "enrollments",
-            filter=Q(
-                enrollments__user=user,
-                enrollments__active=True,
-                enrollments__edx_enrolled=True,
-                enrollments__enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            ),
-        )
-        run_qset = run_qset.annotate(verified_enrollments=verified_enrollments)
-
-        runs = run_qset.filter(
-            Q(user_enrollments__gt=0)
-            | Q(enrollment_end=None)
-            | Q(enrollment_end__gt=now)
-        )
-    else:
-        runs = run_qset.filter(
-            Q(enrollment_end=None) | Q(enrollment_end__gt=now)
-        ).order_by("enrollment_start")
-    return runs
+    return (
+        run_qset.filter(Q(enrollment_end=None) | Q(enrollment_end__gt=now))
+        .exclude(start_date=None)
+        .exclude(enrollment_start=None)
+        .filter(live=True)
+        .order_by("enrollment_start")
+    )
 
 
-def get_user_relevant_course_run_qset(
+def get_relevant_course_run_qset(
     course: Course,
-    user: Optional[User],  # noqa: FA100
     now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
     Returns a QuerySet of relevant course runs
     """
     now = now or now_in_utc()
-    run_qset = course.courseruns.exclude(start_date=None).exclude(enrollment_start=None)
-    return _relevant_course_qset_filter(run_qset, user, now)
+    run_qset = course.courseruns
+    return _relevant_course_qset_filter(run_qset, now)
 
 
 def get_user_relevant_program_course_run_qset(
     program: Program,
-    user: Optional[User],  # noqa: FA100
     now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
     Returns a QuerySet of relevant course runs
     """
     now = now or now_in_utc()
-    run_qset = (
-        CourseRun.objects.filter(course__in=program.courses_qset.all())
-        .exclude(start_date=None)
-        .exclude(enrollment_start=None)
-    )
-    return _relevant_course_qset_filter(run_qset, user, now)
+    run_qset = CourseRun.objects.filter(course__in=program.courses_qset.all())
+    return _relevant_course_qset_filter(run_qset, now)
 
 
-def get_user_relevant_course_run(
+def get_relevant_course_run(
     course: Course,
-    user: Optional[User],  # noqa: FA100
-    now: Optional[datetime] = None,  # noqa: FA100
 ) -> CourseRun:
     """
     For a given Course, finds the course run that is the most relevant to the user.
     For anonymous users, this means the soonest enrollable course run.
     For logged-in users, this means an active course run that they're enrolled in, or the soonest enrollable course run.
     """
-    runs = get_user_relevant_course_run_qset(course, user, now)
+    runs = get_relevant_course_run_qset(course)
     run = first_or_none(runs)
     return run  # noqa: RET504
 

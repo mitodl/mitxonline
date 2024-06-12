@@ -25,7 +25,7 @@ from reversion.models import Version
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
-    get_user_relevant_course_run_qset,
+    get_relevant_course_run_qset,
     get_user_relevant_program_course_run_qset,
 )
 from courses.constants import ENROLL_CHANGE_STATUS_UNENROLLED
@@ -193,13 +193,11 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
         if relevant_to:
             course = Course.objects.filter(readable_id=relevant_to).first()
             if course:
-                return get_user_relevant_course_run_qset(course, self.request.user)
+                return get_relevant_course_run_qset(course)
             else:
                 program = Program.objects.filter(readable_id=relevant_to).first()
                 return (
-                    get_user_relevant_program_course_run_qset(
-                        program, self.request.user
-                    )
+                    get_user_relevant_program_course_run_qset(program)
                     if program
                     else Program.objects.none()
                 )
@@ -207,7 +205,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
             return (
                 CourseRun.objects.select_related("course")
                 .prefetch_related("course__departments", "course__page")
-                .all()
+                .filter(live=True)
             )
 
     def get_serializer_context(self):

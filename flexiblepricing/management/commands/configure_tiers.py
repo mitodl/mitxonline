@@ -78,7 +78,7 @@ class Command(BaseCommand):
                 if "course" in kwargs and kwargs["course"] is not None
                 else None
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise CommandError(
                 f"Couldn't find the course {kwargs['course']}, stopping."  # noqa: EM102
             ) from exc
@@ -89,7 +89,7 @@ class Command(BaseCommand):
                 if "program" in kwargs and kwargs["program"] is not None
                 else None
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise CommandError(
                 f"Couldn't find the program {kwargs['program']}, stopping."  # noqa: EM102
             ) from exc

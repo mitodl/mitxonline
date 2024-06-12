@@ -159,7 +159,6 @@ def test_course_page_context(  # noqa: PLR0913
         "request": request,
         "run": run,
         "course_runs": relevant_runs,
-        "is_enrolled": exp_is_enrolled,
         "sign_in_url": f"/signin/?next={quote_plus(course_page.get_url())}"
         if exp_sign_in_url
         else None,
@@ -216,7 +215,7 @@ def test_course_page_context_edx_access(  # noqa: PLR0913
         )
     )
     patched_get_relevant_run = mocker.patch(
-        "cms.models.get_user_relevant_course_run", return_value=run
+        "cms.models.get_relevant_course_run", return_value=run
     )
     if not is_authed:  # noqa: SIM108
         request_user = AnonymousUser()
@@ -231,9 +230,7 @@ def test_course_page_context_edx_access(  # noqa: PLR0913
     request.user = request_user
     context = course_page.get_context(request=request)
     assert context["can_access_edx_course"] is exp_can_access
-    patched_get_relevant_run.assert_called_once_with(
-        course=course_page.course, user=request_user
-    )
+    patched_get_relevant_run.assert_called_once_with(course=course_page.course)
 
 
 def generate_flexible_pricing_response(request_user, flexible_pricing_form):

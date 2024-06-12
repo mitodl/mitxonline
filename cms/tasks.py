@@ -40,7 +40,7 @@ def call_fastly_purge_api(relative_url):
 
     api_url = urljoin(MITX_ONLINE_FASTLY_URL, relative_url)
 
-    resp = requests.request("PURGE", api_url, headers=headers)
+    resp = requests.request("PURGE", api_url, headers=headers)  # noqa: S113
 
     if resp.status_code >= 400:  # noqa: PLR2004
         logger.error(f"Fastly API Purge call failed: {resp.status_code} {resp.reason}")  # noqa: G004
