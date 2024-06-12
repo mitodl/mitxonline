@@ -731,7 +731,7 @@ class HomePage(VideoPlayerConfigMixin):
         now = now_in_utc()
         redis_cache = caches["redis"]
         cached_featured_products = redis_cache.get("CMS_homepage_featured_courses")
-        if len(cached_featured_products) > 0:
+        if cached_featured_products:
             featured_product_ids = [course.id for course in cached_featured_products]
             relevant_run_course_ids = (
                 CourseRun.objects.filter(live=True)
