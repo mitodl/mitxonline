@@ -299,7 +299,7 @@ body.new-design {
         }
 
         button.btn-enrollment-button:hover {
-          color: $brand-darker-bg;
+          color: $brand-darker-bg !important;;
         }
 
         .enrollment-info-box, .program-info-box {
