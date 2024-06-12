@@ -102,7 +102,7 @@ a.link-button {
   &:hover {
     opacity: 1;
     border: 1px solid $brand-darker-bg;
-	  color: $brand-darker-bg;
+	  color: $brand-darker-bg !important;
 	  background: linear-gradient(174deg, $tile-background, $tile-background) !important;
   }
 
