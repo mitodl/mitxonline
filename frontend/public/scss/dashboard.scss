@@ -198,9 +198,9 @@ $enrolled-passed-fg: #ffffff;
     background: $home-page-grey-lite;
 
     div.certificate-upgrade-message {
+      display: contents;
       width: 80%;
       height: 30px;
-
       font-size: 16px;
       line-height: 30px;
 
