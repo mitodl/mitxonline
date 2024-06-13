@@ -405,7 +405,7 @@ export class ProgramProductDetailEnroll extends React.Component<
               {enrollment ? (
                 <Fragment>
                   <div
-                    className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline`}
+                    className={`btn btn-primary btn-enrollment-button highlight outline`}
                   >
                     Enrolled &#10003;
                   </div>
@@ -417,14 +417,14 @@ export class ProgramProductDetailEnroll extends React.Component<
                       href={`${routes.login}?next=${encodeURIComponent(
                         window.location.pathname
                       )}`}
-                      className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
+                      className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red-to-blue highlight"
                     >
                       Enroll now
                     </a>
                   ) : (
                     <Fragment>
                       <button
-                        className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+                        className="btn btn-primary btn-enrollment-button btn-gradient-red-to-blue highlight enroll-now"
                         onClick={this.toggleUpgradeDialogVisibility}
                       >
                         Enroll now
