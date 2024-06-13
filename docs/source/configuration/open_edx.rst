@@ -88,8 +88,8 @@ Install via pip
 Install from local Build
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-* Checkout the `open-edx-plugins <https://github.com/mitodl/open-edx-plugins>`_ project and build the package per the project instructions
-* Copy the ``openedx-companion-auth-$VERSION.tar.gz`` file into devstack's ``edx-platform`` directory
+* Checkout the `openedx-companion-auth <https://github.com/mitodl/open-edx-plugins/tree/main/src/openedx_companion_auth>`_ project and build the package per the project instructions
+* Copy the ``openedx-companion-auth-$VERSION.tar.gz`` file from the ``dist`` folder into devstack's ``edx-platform`` directory
 * In devstack, run ``make lms-shell`` and within that shell ``pip install openedx-companion-auth-$VERSION.tar.gz``
 
   * To update to a new development version without having to actually bump the package version, simply ``pip uninstall -y openedx-companion-auth``, then install again
