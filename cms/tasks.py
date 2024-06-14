@@ -111,7 +111,7 @@ def refresh_featured_homepage_items():
     logger.info("Refreshing featured homepage items...")
     # if the key is not found, the ttl will be 0 per their docs
     # https://github.com/jazzband/django-redis?tab=readme-ov-file#get-ttl-time-to-live-from-key
-    if cache.ttl("CMS_homepage_featured_courses") > ONE_MINUTE:
+    if cache.ttl("CMS_homepage_featured_courses") > (10 * ONE_MINUTE):
         logger.info("Featured courses found in cache, moving on")
         return
     logger.info("No featured courses found in cache, refreshing")
