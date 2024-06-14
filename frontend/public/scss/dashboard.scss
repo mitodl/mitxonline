@@ -192,17 +192,21 @@ $enrolled-passed-fg: #ffffff;
 
   .upgrade-item-description {
     width: 100%;
-    flex-direction: row;
+    flex-direction: row !important;
     padding: 25px 30px ;
     border-top: $home-page-border-grey;
     background: $home-page-grey-lite;
 
     div.certificate-upgrade-message {
-      display: inline-table;
       width: 80%;
       height: 30px;
       font-size: 16px;
       line-height: 30px;
+
+      @include media-breakpoint-down(sm) {
+        height: auto;
+        width: auto;
+      }
 
       strong {
         color: $brand-darker-bg;
