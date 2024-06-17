@@ -75,6 +75,7 @@ $enrolled-passed-fg: #ffffff;
     div.row {
       margin: 0 !important;
       padding: 20px;
+      height: 100%;
     }
 
     @include media-breakpoint-down(sm)  {
@@ -83,16 +84,6 @@ $enrolled-passed-fg: #ffffff;
 
         div.enrollment-details-container {
           padding: 16px !important;
-        }
-      }
-    }
-
-    @include media-breakpoint-up(md) {
-      .row {
-        height: auto;
-
-        > * {
-          height: 100%;
         }
       }
     }
@@ -203,7 +194,7 @@ $enrolled-passed-fg: #ffffff;
       font-size: 16px;
       line-height: 30px;
 
-      @include media-breakpoint-down(sm) {
+      @include media-breakpoint-down(md) {
         height: auto;
         width: auto;
       }
