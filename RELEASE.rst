@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.96.2
+Version 0.96.2 (Released June 17, 2024)
 --------------
 
 - important enroll color on hover (#2250)
