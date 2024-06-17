@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.96.3 (Released June 17, 2024)
+--------------
+
+- Add -E flag to worker subcommand for sending task events
+- Revert "Add flag for Celery to send task state change events"
+- Fix hover color (#2255)
+- Add spacing to program badge (#2254)
+- docs: replaced mitxpro-openedx-extensions with openedx-companion-auth in readme (#2253)
+- Add flag for Celery to send task state change events
+- Enroll Now button styles (#2252)
+
 Version 0.96.2 (Released June 17, 2024)
 --------------
 
