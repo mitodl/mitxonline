@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.96.3
+Version 0.96.3 (Released June 17, 2024)
 --------------
 
 - Add -E flag to worker subcommand for sending task events
