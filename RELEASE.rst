@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.96.4
+--------------
+
+- Adding TTL check and coursepage (#2245)
+- Update course serializer (#2257)
+
 Version 0.96.3 (Released June 17, 2024)
 --------------
 
