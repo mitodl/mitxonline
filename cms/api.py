@@ -328,9 +328,15 @@ def create_featured_items():
     now = now_in_utc()
     end_of_day = now + timedelta(days=1)
 
+    valid_coursepages = cms_models.CoursePage.objects.filter(live=True).values_list(
+        "course_id", flat=True
+    )
+
     enrollable_courseruns = get_enrollable_courseruns_qs(
         end_of_day,
-        Course.objects.select_related("page").filter(page__live=True, live=True),
+        Course.objects.select_related("page").filter(
+            id__in=valid_coursepages, live=True
+        ),
     )
 
     # Figure out which courses are self-paced and select 2 at random
