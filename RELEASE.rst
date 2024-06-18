@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.96.4
+Version 0.96.4 (Released June 18, 2024)
 --------------
 
 - Adding TTL check and coursepage (#2245)
