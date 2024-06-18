@@ -1,9 +1,11 @@
 import logging
+
 from celery.exceptions import SoftTimeLimitExceeded
 from mitol.google_sheets_deferrals.api import DeferralRequestHandler
 from mitol.google_sheets_refunds.api import RefundRequestHandler
 
 from main.celery import app
+
 log = logging.getLogger(__name__)
 
 
@@ -22,4 +24,3 @@ def process_google_sheets_requests():
             deferral_request_handler.process_sheet()
     except SoftTimeLimitExceeded:
         log.info(f"Google sheets requests exceeded time limit")
-
