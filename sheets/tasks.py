@@ -23,4 +23,4 @@ def process_google_sheets_requests():
         if deferral_request_handler.is_configured():
             deferral_request_handler.process_sheet()
     except SoftTimeLimitExceeded:
-        log.info(f"Google sheets requests exceeded time limit")
+        log.info("Google sheets requests exceeded time limit")
