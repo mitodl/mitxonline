@@ -8,7 +8,7 @@ log = logging.getLogger(__name__)
 
 
 @app.task(time_limit=120, soft_time_limit=60)
-def process_google_sheets_requests(self):
+def process_google_sheets_requests():
     """
     Task to process refund and deferral requests from Google sheets
     """

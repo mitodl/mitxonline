@@ -781,7 +781,7 @@ CRON_COURSERUN_SYNC_DAYS = get_string(
 )
 CRON_PROCESS_REFUND_REQUESTS_MINUTES = get_string(
     name="CRON_PROCESS_REFUND_REQUESTS_MINUTES",
-    default="*/5",
+    default="*",
     description="minute value for scheduled task to process refund requests",
 )
 CRON_COURSE_CERTIFICATES_HOURS = get_string(
@@ -859,7 +859,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "process-google-sheets-requests": {
         "task": "sheets.tasks.process_google_sheets_requests",
-        "schedule": crontab(minute=CRON_PROCESS_REFUND_REQUESTS_MINUTES, hour='8-22'),
+        "schedule": crontab(minute=CRON_PROCESS_REFUND_REQUESTS_MINUTES, hour="6-22"),
     },
     "generate-course-certificate": {
         "task": "courses.tasks.generate_course_certificates",
