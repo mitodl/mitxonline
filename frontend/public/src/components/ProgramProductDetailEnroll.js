@@ -404,9 +404,7 @@ export class ProgramProductDetailEnroll extends React.Component<
             <>
               {enrollment ? (
                 <Fragment>
-                  <div
-                    className={`btn btn-enrollment-button highlight`}
-                  >
+                  <div className={`btn btn-enrollment-button highlight`}>
                     Enrolled &#10003;
                   </div>
                 </Fragment>
