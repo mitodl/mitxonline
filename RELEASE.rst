@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.96.5
+Version 0.96.5 (Released June 20, 2024)
 --------------
 
 - Change the cache from memcache to redis in the task as well as it is in the util function itself (#2263)
