@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.96.5
+--------------
+
+- Change the cache from memcache to redis in the task as well as it is in the util function itself (#2263)
+- Set time limit for task process_google_sheet_requests (#2261)
+
 Version 0.96.4 (Released June 18, 2024)
 --------------
 
