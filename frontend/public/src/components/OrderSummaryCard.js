@@ -124,23 +124,23 @@ export class OrderSummaryCard extends React.Component<Props> {
     const fmtDiscountPrice = formatLocalePrice(discountedPrice)
     const title = cardTitle ? cardTitle : "Order Summary"
 
-    const dataLayerPurchase =
+    const dataLayerPurchase  =
       {
-        "transaction_id": orderReceipt.reference_number, // order or transaction id
-        "value": orderReceipt.total_price_paid, // total purchase value excluding discounts
-        "tax": 0.00,
-        "shipping": 0.00,
-        "currency": "USD",
-        "coupon": discounts[0].discount_code, // coupon code the user used. leave blank if none
-        "items":
+        transaction_id: this.orderReceipt.reference_number, // order or transaction id
+        value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
+        tax:            0.00,
+        shipping:       0.00,
+        currency:       "USD",
+        coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
+        items:
         [{
-          "item_id": "course-v1:MITxT+14.100x+2T2024", // courserun courseware_id
-          "item_name": "Microeconomics", //course title
-          "affiliation": "MITx Online", // always MITx Online
-          "discount": discountAmount,
-          "item_category": "MicroMasters", // course category if possible
-          "price": 50.00,
-          "quantity": 1 // 1 as you can only purchase one course at a time, but I need to double check that
+          item_id:       "course-v1:MITxT+14.100x+2T2024", // courserun courseware_id
+          item_name:     "Microeconomics", //course title
+          affiliation:   "MITx Online", // always MITx Online
+          discount:      this.fmtDiscountPrice, // discount amount
+          item_category: "MicroMasters", // course category if possible
+          price:         50.00,
+          quantity:      1 // 1 as you can only purchase one course at a time, but I need to double check that
         }]
       }
 
