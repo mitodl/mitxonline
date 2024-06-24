@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.96.6
+Version 0.96.6 (Released June 24, 2024)
 --------------
 
 - Program enroll button text does not appear on about page (#2265)
