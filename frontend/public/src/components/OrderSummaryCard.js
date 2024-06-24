@@ -4,7 +4,18 @@ import React from "react"
 import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
-import type { Discount, Refund } from "../flow/cartTypes"
+import type { BasketItem, Discount, Refund } from "../flow/cartTypes"
+
+// Need to make sure this is in head
+// <!-- Google tag (gtag.js) -->
+//     <script async src="https://www.googletagmanager.com/gtag/js?id=TAG_ID"></script>
+//     <script>
+//         window.dataLayer = window.dataLayer || [];
+//         function gtag(){dataLayer.push(arguments);}
+//         gtag('js', new Date());
+//
+//         gtag('config', 'TAG_ID');
+//     </script>
 
 type Props = {
   totalPrice: number,
@@ -14,7 +25,8 @@ type Props = {
   refunds: Array<Refund>,
   addDiscount?: Function,
   discountCode: string,
-  cardTitle?: string
+  cardTitle?: string,
+  cartItems?: Array<BasketItem>
 }
 
 export class OrderSummaryCard extends React.Component<Props> {
@@ -90,12 +102,36 @@ export class OrderSummaryCard extends React.Component<Props> {
   }
 
   renderFulfilledTag() {
-    const { orderFulfilled } = this.props
+    const { cartItems, discountedPrice, discounts, orderFulfilled } = this.props
 
     if (orderFulfilled !== true) {
       return null
     }
 
+    let purchasedItems = []
+
+    for (let cartItem in cartItems) {
+      purchasedItems.append({
+        item_id:       cartItem.product.id,
+        item_name:     cartItem.description,
+        affiliation:   "MITx Online", // always MITx Online
+        discount:      discountedPrice,
+        item_category: "MicroMasters", // course category if possible
+        price:         cartItem.price,
+        quantity:      1
+      })
+    }
+
+    const GADataLayerPurchase  =
+      {
+        transaction_id: this.orderReceipt.reference_number, // order or transaction id
+        value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
+        tax:            0.00,
+        shipping:       0.00,
+        currency:       "USD",
+        coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
+        items:          purchasedItems
+      }
     return (
       <div className="row order-summary-total">
         <div className="col-12 px-3 py-3 py-md-0">
@@ -103,6 +139,9 @@ export class OrderSummaryCard extends React.Component<Props> {
             <div className="flex-grow-1">
               <Badge className="bg-success float-right">Paid</Badge>
             </div>
+            <script>
+              gtag('event', 'purchase', {GADataLayerPurchase});
+            </script>
           </div>
         </div>
       </div>
@@ -123,26 +162,6 @@ export class OrderSummaryCard extends React.Component<Props> {
     const fmtPrice = formatLocalePrice(totalPrice)
     const fmtDiscountPrice = formatLocalePrice(discountedPrice)
     const title = cardTitle ? cardTitle : "Order Summary"
-
-    const dataLayerPurchase  =
-      {
-        transaction_id: this.orderReceipt.reference_number, // order or transaction id
-        value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
-        tax:            0.00,
-        shipping:       0.00,
-        currency:       "USD",
-        coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
-        items:
-        [{
-          item_id:       "course-v1:MITxT+14.100x+2T2024", // courserun courseware_id
-          item_name:     "Microeconomics", //course title
-          affiliation:   "MITx Online", // always MITx Online
-          discount:      this.fmtDiscountPrice, // discount amount
-          item_category: "MicroMasters", // course category if possible
-          price:         50.00,
-          quantity:      1 // 1 as you can only purchase one course at a time, but I need to double check that
-        }]
-      }
 
     return (
       <div className="order-summary container std-card" key="ordersummarycard">

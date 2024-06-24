@@ -113,6 +113,7 @@ export class CartPage extends React.Component<Props, CartState> {
         refunds={refunds}
         addDiscount={this.addDiscount.bind(this)}
         discountCode={this.state.discountCode}
+        cartItems={this.props.cartItems}
       />
     )
   }
