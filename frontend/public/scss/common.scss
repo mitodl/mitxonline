@@ -44,29 +44,6 @@ h4 {
   font-weight: 600;
 }
 
-a.link-button {
-  display: inline-block;
-  padding: 10px;
-  text-align: center;
-  text-decoration: none;
-
-  &:hover, &:visited {
-    text-decoration: none;
-  }
-
-  &.red {
-    border-radius: 5px;
-    background-color: rgb(163, 31, 52);
-    color: #ffffff;
-  }
-
-  &.light-blue {
-    border-radius: 5px;
-    background-color: $light-blue;
-    color: #ffffff;
-  }
-}
-
 .form-error {
   color: $primary;
 }
@@ -169,40 +146,10 @@ button.btn-secondary.unstyled {
   }
 }
 
-.link-light-blue {
-  &, &:hover, &:visited, &:active {
-    color: $light-blue;
-  }
-}
-
 .link-black {
   text-decoration: underline;
   color: black;
   font-weight: bold;
-}
-
-.text-ribbon {
-  position: relative;
-  width: 160px;
-  height: 40px;
-
-  svg {
-    width: 160px;
-    height: 40px;
-    -webkit-filter: drop-shadow(-1px 2px 2px rgba(0, 0, 0, 0.4)); // sass-lint:disable-line no-vendor-prefixes
-    filter: drop-shadow(-1px 2px 2px rgba(0, 0, 0, 0.4));
-    fill: black;
-  }
-
-  .text {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    line-height: 40px;
-    text-align: center;
-    color: white;
-  }
 }
 
 .card {
@@ -241,11 +188,6 @@ button.btn-secondary.unstyled {
   background: url(/static/images/user.svg) left no-repeat;
   height: 120px;
   width: 120px;
-}
-
-.dotted {
-  border-bottom: 2px dashed #8a8b8c;
-  margin-top: 25px;
 }
 
 .dropdown-menu {
@@ -292,22 +234,6 @@ button.btn-secondary.unstyled {
   cursor: pointer;
 }
 
-.flexible-pricing-head {
-  margin-left: 15px;
-
-  h1 {
-    font-size: 38px;
-    line-height: 38px;
-    font-weight: bold;
-  }
-
-  p {
-    line-height: 24px;
-    font-size: 18px;
-    font-weight: 100;
-  }
-}
-
 .flexible-price-certificate-btn {
   float: left;
   margin-top: 28px;
@@ -315,94 +241,6 @@ button.btn-secondary.unstyled {
   margin-left: 15px;
   @include media-breakpoint-down(sm) {
     margin-bottom: 100px;
-  }
-}
-
-.flexible-pricing-form {
-  margin-top: 44px;
-  margin-left: auto;
-  margin-right: auto;
-  max-width: 425px;
-  padding: 24px 24px 32px 24px !important;
-  border-width: 0 !important;
-
-  .form-group {
-    margin-bottom: 1.5rem;
-    padding-bottom: 0;
-  }
-
-  .auth-header {
-    .tell-us-about-your-income {
-      font-size: 22px;
-      line-height: 22px;
-    }
-  }
-
-  div {
-    button {
-      line-height: 59px;
-      width: 285px;
-      padding: 0 50px !important;
-      margin-top: 7px;
-    }
-  }
-
-  .form-group {
-    margin-bottom: 1.5rem;
-
-    input[type=number], select {
-      height: 48px;
-      max-width: 377px;
-    }
-
-    #your_income_label {
-      margin-top: 16px;
-      font-size: 16px;
-      line-height: 16px;
-      @include media-breakpoint-down(sm) {
-        margin-top: 15px;
-      }
-    }
-
-    .income_currency_label {
-      float: right;
-      margin: 5px 0;
-      height: 16px;
-      width: 192px;
-      color: #666666;
-      font-size: 14px;
-      letter-spacing: 0;
-      line-height: 16px;
-      text-align: right;
-
-      @include media-breakpoint-down(sm) {
-        font-size: 12px;
-        margin: -27px 0 0 0;
-      }
-    }
-      /* Chrome, Safari, Edge, Opera */
-    #your_income::-webkit-outer-spin-button,
-    #your_income::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-
-    /* Firefox */
-    #your_income{
-      -moz-appearance: textfield;
-    }
-
-    .financial-assist-testify {
-      color: grey;
-      max-width: 350px;
-      line-height: 16px;
-      display: inline-flex;
-      text-align: left;
-      font-size: 14px;
-      @include media-breakpoint-down(sm) {
-        max-width: 275px;
-      }
-    }
   }
 }
 
@@ -422,9 +260,4 @@ button.btn-secondary.unstyled {
 
 .display-none {
   display: none !important;
-}
-
-.alert-dark-success {
-  background-color: rgba(40, 151, 126, 1);
-  color: white;
 }
