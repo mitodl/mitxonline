@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.96.6
+--------------
+
+- Program enroll button text does not appear on about page (#2265)
+- [pre-commit.ci] pre-commit autoupdate (#2260)
+
 Version 0.96.5 (Released June 20, 2024)
 --------------
 
