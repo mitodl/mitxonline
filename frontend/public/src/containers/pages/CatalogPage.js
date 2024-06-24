@@ -881,6 +881,7 @@ export class CatalogPage extends React.Component<Props> {
                       className="catalog-count-animation"
                       role="status"
                       aria-atomic="true"
+                      aria-relevant="all"
                     >
                       <TransitionGroup id="count-animation-grid">
                         <CSSTransition
