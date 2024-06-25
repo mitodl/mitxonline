@@ -617,6 +617,7 @@ body.new-design {
     .modal-dialog {
       max-width: 770px;
       border-radius: 5px;
+      z-index: 2000;
 
       @include media-breakpoint-down(md) {
         width:500px;
