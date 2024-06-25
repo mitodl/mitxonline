@@ -359,7 +359,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       assert.isTrue(inner.exists())
       const infobox = inner.find("CourseInfoBox").dive()
       assert.isTrue(infobox.exists())
-      const pacingBtn = infobox.find(".info-link more-info").at(0)
+      const pacingBtn = infobox.find("info-link more-info").at(0)
       await pacingBtn.prop("onClick")()
       assert.isTrue(
         infobox
