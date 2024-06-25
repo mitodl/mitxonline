@@ -96,7 +96,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
           {message}{" "}
           {isArchived ? (
             <button
-              className="info-link more-info float-none explain-archived-btn"
+              className="info-link more-info float-none"
               onClick={() => this.togglePacingInfoDialogVisibility("Archived")}
             >
               Learn More
