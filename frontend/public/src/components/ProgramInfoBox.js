@@ -130,10 +130,10 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
                 />
               </div>
               <div className="enrollment-info-text">
-                {program.page.length}
+                {program.page.length}{" "}
                 {run && run.is_self_paced ? (
                   <>
-                    <span className="badge badge-pacing">SELF-PACED</span>
+                    <span className="badge badge-pacing">SELF-PACED</span>{" "}
                     <a
                       className="info-link more-info"
                       href="https://mitxonline.zendesk.com/hc/en-us/articles/21994872904475-What-are-Self-Paced-courses-on-MITx-Online-"

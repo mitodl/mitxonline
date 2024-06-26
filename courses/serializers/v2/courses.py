@@ -6,7 +6,7 @@ from mitol.olposthog.features import is_enabled
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from cms.serializers import BaseCoursePageSerializer
+from cms.serializers import CoursePageSerializer
 from courses import models
 from courses.api import create_run_enrollments
 from courses.serializers.v1.base import (
@@ -28,7 +28,7 @@ class CourseSerializer(BaseCourseSerializer):
 
     departments = DepartmentSerializer(many=True, read_only=True)
     next_run_id = serializers.SerializerMethodField()
-    page = BaseCoursePageSerializer(read_only=True)
+    page = CoursePageSerializer(read_only=True)
     programs = serializers.SerializerMethodField()
     topics = serializers.SerializerMethodField()
 

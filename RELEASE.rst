@@ -1,6 +1,48 @@
 Release Notes
 =============
 
+Version 0.96.6 (Released June 24, 2024)
+--------------
+
+- Program enroll button text does not appear on about page (#2265)
+- [pre-commit.ci] pre-commit autoupdate (#2260)
+
+Version 0.96.5 (Released June 20, 2024)
+--------------
+
+- Change the cache from memcache to redis in the task as well as it is in the util function itself (#2263)
+- Set time limit for task process_google_sheet_requests (#2261)
+
+Version 0.96.4 (Released June 18, 2024)
+--------------
+
+- Adding TTL check and coursepage (#2245)
+- Update course serializer (#2257)
+
+Version 0.96.3 (Released June 17, 2024)
+--------------
+
+- Add -E flag to worker subcommand for sending task events
+- Revert "Add flag for Celery to send task state change events"
+- Fix hover color (#2255)
+- Add spacing to program badge (#2254)
+- docs: replaced mitxpro-openedx-extensions with openedx-companion-auth in readme (#2253)
+- Add flag for Celery to send task state change events
+- Enroll Now button styles (#2252)
+
+Version 0.96.2 (Released June 17, 2024)
+--------------
+
+- important enroll color on hover (#2250)
+- fix (#2247)
+- Remove FacultyBlock class (#2248)
+- Update with saved data (#2243)
+- Filter relevant course runs to be live (#2244)
+- [pre-commit.ci] pre-commit autoupdate (#2191)
+- Update color of disabled enroll button (#2239)
+- Tech Debt: Remove feature flags that are no longer in use (#2222)
+- 4244: no error message is shown when education level is not specified in additional details modal (#2233)
+
 Version 0.96.1 (Released June 05, 2024)
 --------------
 

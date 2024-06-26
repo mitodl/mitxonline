@@ -29,7 +29,7 @@ from redbeat import RedBeatScheduler
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
 
-VERSION = "0.96.1"
+VERSION = "0.96.6"
 
 log = logging.getLogger()
 
@@ -859,7 +859,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "process-google-sheets-requests": {
         "task": "sheets.tasks.process_google_sheets_requests",
-        "schedule": crontab(minute=CRON_PROCESS_REFUND_REQUESTS_MINUTES),
+        "schedule": crontab(minute=CRON_PROCESS_REFUND_REQUESTS_MINUTES, hour="6-22"),
     },
     "generate-course-certificate": {
         "task": "courses.tasks.generate_course_certificates",

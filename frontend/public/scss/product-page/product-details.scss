@@ -290,6 +290,9 @@ body.new-design {
           padding: 0!important;
           text-align: center;
           color: $white;
+          background: $primary;
+          font-size: 20px;
+          font-weight: 700;
         }
 
         .btn-enrollment-button:disabled, .btn-gradient-red:disabled {
