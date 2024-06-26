@@ -243,7 +243,7 @@ export class DashboardPage extends React.Component<
           <div role="banner" className="std-page-header">
             <h1>{DASHBOARD_PAGE_TITLE}</h1>
           </div>
-          <div className="std-page-body dashboard container">
+          <div className="dashboard std-page-body container">
             <Loader isLoading={isLoading}>
               <nav className="tabs d-flex" aria-controls="enrollment-items">
                 {programEnrollmentsLength === 0 ? (
