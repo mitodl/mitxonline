@@ -80,11 +80,7 @@ $enrolled-passed-fg: #ffffff;
 
     @include media-breakpoint-down(sm)  {
       div.row.enrolled-item-info {
-        padding: 0 !important;
-
-        div.enrollment-details-container {
-          padding: 15px !important;
-        }
+        padding: 15px;
       }
     }
 
