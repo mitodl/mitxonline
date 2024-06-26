@@ -20,7 +20,7 @@ const Header = ({ currentUser, location }: Props) => {
       email:    currentUser.email,
       username: currentUser.username,
       name:     currentUser.name
-      })
+    })
     posthog.identify(currentUser.id, {
       environment: SETTINGS.environment,
       user_id:     currentUser.id
