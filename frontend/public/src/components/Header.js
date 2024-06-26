@@ -26,9 +26,7 @@ const Header = ({ currentUser, location }: Props) => {
       user_id:     currentUser.id
     })
   } else {
-    Sentry.configureScope(scope => {
-      scope.setUser(null)
-    })
+    Sentry.getCurrentScope().setUser(null)
   }
   return (
     <React.Fragment>
