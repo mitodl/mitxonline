@@ -59,7 +59,7 @@ export class CartItemCard extends React.Component<Props> {
             <div className="img-container">{courseImage}</div>
           </div>
 
-          <div className="col-12 col-md enrollment-details-container">
+          <div className="col-12 col-md">
             <h2 className="">{title}</h2>
             <div className="detail">
               {readableId}
