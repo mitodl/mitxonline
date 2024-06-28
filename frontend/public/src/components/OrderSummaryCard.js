@@ -103,25 +103,12 @@ export class OrderSummaryCard extends React.Component<Props> {
   }
 
   renderFulfilledTag() {
-    const { cartItems, discountedPrice, discounts, orderFulfilled } = this.props
+    const { orderFulfilled } = this.props
 
     if (orderFulfilled !== true) {
       return null
     }
 
-    const purchasedItems = []
-
-    for (const cartItem in cartItems) {
-      purchasedItems.append({
-        item_id:       cartItem.product.id,
-        item_name:     cartItem.description,
-        affiliation:   "MITx Online", // always MITx Online
-        discount:      discountedPrice,
-        item_category: "MicroMasters", // course category if possible
-        price:         cartItem.price,
-        quantity:      1
-      })
-    }
     return (
       <div className="row order-summary-total">
         <div className="col-12 px-3 py-3 py-md-0">
@@ -137,12 +124,26 @@ export class OrderSummaryCard extends React.Component<Props> {
 
   handlePlaceOrderClick() {
     if (checkFeatureFlag("mitxonline-4099-dedp-google-analytics")) {
+
       this.sendGAEvent()
     }
     window.location = "/checkout/to_payment"
   }
 
   sendGAEvent() {
+    const { cartItems, discountedPrice, discounts } = this.props
+    const purchasedItems = []
+    for (const cartItem in cartItems) {
+      purchasedItems.append({
+        item_id:       cartItem.product.id,
+        item_name:     cartItem.description,
+        affiliation:   "MITx Online", // always MITx Online
+        discount:      discountedPrice,
+        item_category: "MicroMasters", // course category if possible
+        price:         cartItem.price,
+        quantity:      1
+      })
+    }
     const GADataLayerPurchase =
         {
           transaction_id: this.orderReceipt.reference_number, // order or transaction id
