@@ -497,7 +497,7 @@ export class EnrolledItemCard extends React.Component<
             </div>
           )}
 
-          <div className="col-12 col-md enrollment-details-container">
+          <div className="col-12 col-md course-card-text-details d-grid">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100">
               <div className="d-flex flex-column">
                 <div className="align-content-start d-flex enrollment-mode-container flex-wrap pb-1">
@@ -626,7 +626,7 @@ export class EnrolledItemCard extends React.Component<
             </div>
           </div>
 
-          <div className="col-12 col-md enrollment-details-container">
+          <div className="col-12 col-md">
             <div className="d-flex justify-content-between align-content-start flex-nowrap w-100 enrollment-mode-container">
               <div className="d-flex flex-column">
                 <div className="align-content-start d-flex enrollment-mode-container flex-wrap pb-1">
