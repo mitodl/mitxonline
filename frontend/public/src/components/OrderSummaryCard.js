@@ -6,17 +6,7 @@ import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
 import type { BasketItem, Discount, Refund } from "../flow/cartTypes"
 import {checkFeatureFlag} from "../lib/util"
-
-// Need to make sure this is in head
-// <!-- Google tag (gtag.js) -->
-//     <script async src="https://www.googletagmanager.com/gtag/js?id=TAG_ID"></script>
-//     <script>
-//         window.dataLayer = window.dataLayer || [];
-//         function gtag(){dataLayer.push(arguments);}
-//         gtag('js', new Date());
-//
-//         gtag('config', 'TAG_ID');
-//     </script>
+import ReactGA from "react-ga4"
 
 type Props = {
   totalPrice: number,
@@ -154,6 +144,7 @@ export class OrderSummaryCard extends React.Component<Props> {
           coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
           items:          purchasedItems
         }
+    ReactGA.event()
     return (
       <script>
             gtag('event', 'purchase', {GADataLayerPurchase});
