@@ -5,6 +5,7 @@ import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
 import type { BasketItem, Discount, Refund } from "../flow/cartTypes"
+import {checkFeatureFlag} from "../lib/util"
 
 // Need to make sure this is in head
 // <!-- Google tag (gtag.js) -->
@@ -108,9 +109,9 @@ export class OrderSummaryCard extends React.Component<Props> {
       return null
     }
 
-    let purchasedItems = []
+    const purchasedItems = []
 
-    for (let cartItem in cartItems) {
+    for (const cartItem in cartItems) {
       purchasedItems.append({
         item_id:       cartItem.product.id,
         item_name:     cartItem.description,
@@ -121,17 +122,6 @@ export class OrderSummaryCard extends React.Component<Props> {
         quantity:      1
       })
     }
-
-    const GADataLayerPurchase  =
-      {
-        transaction_id: this.orderReceipt.reference_number, // order or transaction id
-        value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
-        tax:            0.00,
-        shipping:       0.00,
-        currency:       "USD",
-        coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
-        items:          purchasedItems
-      }
     return (
       <div className="row order-summary-total">
         <div className="col-12 px-3 py-3 py-md-0">
@@ -139,12 +129,34 @@ export class OrderSummaryCard extends React.Component<Props> {
             <div className="flex-grow-1">
               <Badge className="bg-success float-right">Paid</Badge>
             </div>
-            <script>
-              gtag('event', 'purchase', {GADataLayerPurchase});
-            </script>
           </div>
         </div>
       </div>
+    )
+  }
+
+  handlePlaceOrderClick() {
+    if (checkFeatureFlag("mitxonline-4099-dedp-google-analytics")) {
+      this.sendGAEvent()
+    }
+    window.location = "/checkout/to_payment"
+  }
+
+  sendGAEvent() {
+    const GADataLayerPurchase =
+        {
+          transaction_id: this.orderReceipt.reference_number, // order or transaction id
+          value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
+          tax:            0.00,
+          shipping:       0.00,
+          currency:       "USD",
+          coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
+          items:          purchasedItems
+        }
+    return (
+      <script>
+            gtag('event', 'purchase', {GADataLayerPurchase});
+      </script>
     )
   }
 
@@ -204,7 +216,7 @@ export class OrderSummaryCard extends React.Component<Props> {
                 type="link"
                 id="place-order-button"
                 className="btn btn-primary btn-gradient-red-to-blue btn-place-order"
-                onClick={() => (window.location = "/checkout/to_payment")}
+                onClick={this.handlePlaceOrderClick()}
               >
                 Place your order
               </Button>
