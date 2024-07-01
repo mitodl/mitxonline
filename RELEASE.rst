@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.96.7
+--------------
+
+- 4495 mitx online consolidate abandoned and duplicate css styling (#2267)
+- Fix pre-commit secret issue (#2271)
+- 4545 mitx online program drawercourse upgrade formatting (#2256)
+- [pre-commit.ci] pre-commit autoupdate (#2268)
+- Update postgres (#2240)
+
 Version 0.96.6 (Released June 24, 2024)
 --------------
 
