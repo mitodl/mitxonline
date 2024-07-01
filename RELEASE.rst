@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.96.7
+Version 0.96.7 (Released July 01, 2024)
 --------------
 
 - 4495 mitx online consolidate abandoned and duplicate css styling (#2267)
