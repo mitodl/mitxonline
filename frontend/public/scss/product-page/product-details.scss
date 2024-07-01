@@ -27,6 +27,13 @@ body.new-design {
       flex: none;
     }
 
+    .container {
+      max-width: 1260px;
+      padding: 0 15px;
+      box-sizing: border-box;
+      margin: 0 auto;
+    }
+
     .breadcrumb-item {
       color: var(--GreyText, #6F7175);
       font-size: 14px;
@@ -169,7 +176,6 @@ body.new-design {
     }
 
     .ofac-message {
-      border: 1px solid #e4e9ef;
       padding: 2rem;
       clear: both;
     }
@@ -614,6 +620,7 @@ body.new-design {
     .modal-dialog {
       max-width: 770px;
       border-radius: 5px;
+      z-index: 2000;
 
       @include media-breakpoint-down(md) {
         width:500px;

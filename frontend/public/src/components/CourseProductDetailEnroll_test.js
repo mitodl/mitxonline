@@ -359,7 +359,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       assert.isTrue(inner.exists())
       const infobox = inner.find("CourseInfoBox").dive()
       assert.isTrue(infobox.exists())
-      const pacingBtn = infobox.find(".explain-format-btn").at(0)
+      const pacingBtn = infobox.find(".info-link").at(0)
       await pacingBtn.prop("onClick")()
       assert.isTrue(
         infobox
@@ -425,7 +425,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         .text()
         .includes("Course content available anytime")
     )
-    const archivedLearnMoreBtn = infobox.find(".explain-archived-btn").at(0)
+    const archivedLearnMoreBtn = infobox.find(".info-link").at(0)
     await archivedLearnMoreBtn.prop("onClick")()
     assert.isTrue(
       infobox
