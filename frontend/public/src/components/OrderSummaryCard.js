@@ -4,7 +4,9 @@ import React from "react"
 import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
-import type { Discount, Refund } from "../flow/cartTypes"
+import type { BasketItem, Discount, Refund } from "../flow/cartTypes"
+import {checkFeatureFlag} from "../lib/util"
+import ReactGA from "react-ga4"
 
 type Props = {
   totalPrice: number,
@@ -14,7 +16,8 @@ type Props = {
   refunds: Array<Refund>,
   addDiscount?: Function,
   discountCode: string,
-  cardTitle?: string
+  cardTitle?: string,
+  cartItems?: Array<BasketItem>
 }
 
 export class OrderSummaryCard extends React.Component<Props> {
@@ -109,6 +112,37 @@ export class OrderSummaryCard extends React.Component<Props> {
     )
   }
 
+  handlePlaceOrderClick() {
+    if (checkFeatureFlag("mitxonline-4099-dedp-google-analytics")) {
+      const { cartItems, discountedPrice, discounts } = this.props
+      const purchasedItems = []
+      for (const cartItem in cartItems) {
+        purchasedItems.append({
+          item_id:       cartItem.product.id,
+          item_name:     cartItem.description,
+          affiliation:   "MITx Online", // always MITx Online
+          discount:      discountedPrice,
+          item_category: "MicroMasters", // course category if possible
+          price:         cartItem.price,
+          quantity:      1
+        })
+      }
+      const GADataLayerPurchase =
+              {
+                transaction_id: this.orderReceipt.reference_number, // order or transaction id
+                value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
+                tax:            0.00,
+                shipping:       0.00,
+                currency:       "USD",
+                coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
+                items:          purchasedItems
+              }
+          ReactGA.event('purchase', GADataLayerPurchase)
+      this.sendGAEvent()
+    }
+    window.location = "/checkout/to_payment"
+  }
+
   render() {
     const {
       orderFulfilled,
@@ -123,6 +157,7 @@ export class OrderSummaryCard extends React.Component<Props> {
     const fmtPrice = formatLocalePrice(totalPrice)
     const fmtDiscountPrice = formatLocalePrice(discountedPrice)
     const title = cardTitle ? cardTitle : "Order Summary"
+
     return (
       <div className="order-summary container std-card" key="ordersummarycard">
         <div className="std-card-body checkout-page">
@@ -164,7 +199,7 @@ export class OrderSummaryCard extends React.Component<Props> {
                 type="link"
                 id="place-order-button"
                 className="btn btn-primary btn-gradient-red-to-blue btn-place-order"
-                onClick={() => (window.location = "/checkout/to_payment")}
+                onClick={this.handlePlaceOrderClick()}
               >
                 Place your order
               </Button>
