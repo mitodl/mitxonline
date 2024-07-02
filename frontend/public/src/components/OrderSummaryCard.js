@@ -114,42 +114,33 @@ export class OrderSummaryCard extends React.Component<Props> {
 
   handlePlaceOrderClick() {
     if (checkFeatureFlag("mitxonline-4099-dedp-google-analytics")) {
-
+      const { cartItems, discountedPrice, discounts } = this.props
+      const purchasedItems = []
+      for (const cartItem in cartItems) {
+        purchasedItems.append({
+          item_id:       cartItem.product.id,
+          item_name:     cartItem.description,
+          affiliation:   "MITx Online", // always MITx Online
+          discount:      discountedPrice,
+          item_category: "MicroMasters", // course category if possible
+          price:         cartItem.price,
+          quantity:      1
+        })
+      }
+      const GADataLayerPurchase =
+              {
+                transaction_id: this.orderReceipt.reference_number, // order or transaction id
+                value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
+                tax:            0.00,
+                shipping:       0.00,
+                currency:       "USD",
+                coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
+                items:          purchasedItems
+              }
+          ReactGA.event('purchase', GADataLayerPurchase)
       this.sendGAEvent()
     }
     window.location = "/checkout/to_payment"
-  }
-
-  sendGAEvent() {
-    const { cartItems, discountedPrice, discounts } = this.props
-    const purchasedItems = []
-    for (const cartItem in cartItems) {
-      purchasedItems.append({
-        item_id:       cartItem.product.id,
-        item_name:     cartItem.description,
-        affiliation:   "MITx Online", // always MITx Online
-        discount:      discountedPrice,
-        item_category: "MicroMasters", // course category if possible
-        price:         cartItem.price,
-        quantity:      1
-      })
-    }
-    const GADataLayerPurchase =
-        {
-          transaction_id: this.orderReceipt.reference_number, // order or transaction id
-          value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
-          tax:            0.00,
-          shipping:       0.00,
-          currency:       "USD",
-          coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
-          items:          purchasedItems
-        }
-    ReactGA.event()
-    return (
-      <script>
-            gtag('event', 'purchase', {GADataLayerPurchase});
-      </script>
-    )
   }
 
   render() {
