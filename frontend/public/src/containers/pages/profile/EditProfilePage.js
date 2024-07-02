@@ -2,7 +2,7 @@
 /* global SETTINGS: false */
 import React from "react"
 import DocumentTitle from "react-document-title"
-import { EDIT_PROFILE_PAGE_TITLE } from "../../../constants"
+import { VIEW_PROFILE_PAGE_TITLE, EDIT_PROFILE_PAGE_TITLE } from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { mutateAsync, requestAsync } from "redux-query"
@@ -77,7 +77,7 @@ export class EditProfilePage extends React.Component<Props> {
           <div className="std-page-body container auth-page">
             <div className="std-card std-card-auth">
               <div className="std-card-body edit-profile-page">
-                <h2>Profile Information</h2>
+                <h2>VIEW_PROFILE_PAGE_TITLE</h2>
                 <EditProfileForm
                   countries={countries}
                   user={currentUser}

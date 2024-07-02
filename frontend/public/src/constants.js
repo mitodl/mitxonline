@@ -3,10 +3,6 @@
 export const ENROLLABLE_ITEM_ID_SEPARATOR = "+"
 export const PRODUCT_TYPE_PROGRAM = "program"
 export const PRODUCT_TYPE_COURSERUN = "courserun"
-export const PRODUCT_TYPE_LABELS = {
-  [PRODUCT_TYPE_COURSERUN]: "Course Run",
-  [PRODUCT_TYPE_PROGRAM]:   "Program"
-}
 
 export const GENDER_CHOICES = [
   ["m", "Male"],
@@ -128,7 +124,6 @@ export const ALERT_TYPE_SUCCESS = "success"
 export const ALERT_TYPE_DANGER = "danger"
 
 // HTML title for different pages
-export const CHECKOUT_PAGE_TITLE = "Checkout"
 export const DASHBOARD_PAGE_TITLE = "Dashboard"
 
 export const LOGIN_EMAIL_PAGE_TITLE = "Sign In"
