@@ -6,7 +6,7 @@ import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
 import type { BasketItem, Discount, Refund } from "../flow/cartTypes"
 import {checkFeatureFlag} from "../lib/util"
-import ReactGA from "react-ga4"
+import TagManager from 'react-gtm-module'
 
 type Props = {
   totalPrice: number,
@@ -128,17 +128,27 @@ export class OrderSummaryCard extends React.Component<Props> {
         })
       }
       const GADataLayerPurchase =
-              {
-                transaction_id: this.orderReceipt.reference_number, // order or transaction id
-                value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
-                tax:            0.00,
-                shipping:       0.00,
-                currency:       "USD",
-                coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
-                items:          purchasedItems
-              }
-          ReactGA.event('purchase', GADataLayerPurchase)
-      this.sendGAEvent()
+        {
+          transaction_id: this.orderReceipt.reference_number, // order or transaction id
+          value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
+          tax:            0.00,
+          shipping:       0.00,
+          currency:       "USD",
+          coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
+          items:          purchasedItems
+        }
+      const tagManagerArgs = {
+        gtmId:      "to import",
+        dataLayer: {
+          js:         new Date(),
+          event:      'Purchase',
+          ecommerce: {
+            purchase: GADataLayerPurchase
+          }
+        },
+        dataLayerName: 'purchaseDataLayer'
+      }
+      TagManager.dataLayer(tagManagerArgs)
     }
     window.location = "/checkout/to_payment"
   }
