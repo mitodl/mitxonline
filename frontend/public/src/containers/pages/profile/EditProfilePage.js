@@ -2,7 +2,10 @@
 /* global SETTINGS: false */
 import React from "react"
 import DocumentTitle from "react-document-title"
-import { VIEW_PROFILE_PAGE_TITLE, EDIT_PROFILE_PAGE_TITLE } from "../../../constants"
+import {
+  VIEW_PROFILE_PAGE_TITLE,
+  EDIT_PROFILE_PAGE_TITLE
+} from "../../../constants"
 import { compose } from "redux"
 import { connect } from "react-redux"
 import { mutateAsync, requestAsync } from "redux-query"
