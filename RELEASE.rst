@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.97.0
+--------------
+
+- Update mitol-django-google-sheets (#2276)
+- Fix invalid compose project (#2277)
+- Celery beat schedule for refunds (#2269)
+
 Version 0.96.7 (Released July 01, 2024)
 --------------
 
