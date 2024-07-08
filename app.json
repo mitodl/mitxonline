@@ -274,6 +274,10 @@
       "description": "Name of the app processing the request",
       "required": false
     },
+    "MITOL_GOOGLE_SHEETS_PROCESS_ONLY_LAST_ROWS_NUM": {
+      "description": "Process only the last N rows of data. If set to 0 then process all rows. ",
+      "required": false
+    },
     "MITOL_GOOGLE_SHEETS_REFUNDS_COMPLETED_DATE_COL": {
       "description": "The zero-based index of the enrollment change sheet column that contains the row completion date",
       "required": false
