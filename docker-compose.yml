@@ -180,3 +180,4 @@ volumes:
   npm-cache: {}
   django_media: {}
   yarn-cache: {}
+  db-data: {}
