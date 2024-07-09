@@ -422,7 +422,7 @@ export class CourseProductDetailEnroll extends React.Component<
     )
   }
 
-  renderEnrollLoginButton(run) {
+  renderEnrollLoginButton(run: EnrollmentFlaggedCourseRun) {
     return (
       <h2>
         <a
