@@ -6,7 +6,7 @@ import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
 import type { BasketItem, Discount, Refund } from "../flow/cartTypes"
 import {checkFeatureFlag} from "../lib/util"
-import TagManager from 'react-gtm-module'
+import ReactGA4 from "react-ga4";
 
 type Props = {
   totalPrice: number,
@@ -137,18 +137,13 @@ export class OrderSummaryCard extends React.Component<Props> {
           coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
           items:          purchasedItems
         }
-      const tagManagerArgs = {
-        gtmId:      "to import",
-        dataLayer: {
-          js:         new Date(),
+      const googleArgs = {
           event:      'Purchase',
           ecommerce: {
             purchase: GADataLayerPurchase
-          }
         },
-        dataLayerName: 'purchaseDataLayer'
       }
-      TagManager.dataLayer(tagManagerArgs)
+      ReactGA4.event(googleArgs)
     }
     window.location = "/checkout/to_payment"
   }

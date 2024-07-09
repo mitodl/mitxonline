@@ -15290,7 +15290,6 @@ __metadata:
     react-dom: 16.14.0
     react-ga4: ^2.1.0
     react-google-recaptcha: 1.1.0
-    react-gtm-module: ^2.0.11
     react-hot-loader: 4.13.1
     react-markdown: 5.0.3
     react-page-click: 4.0.4
@@ -18759,13 +18758,6 @@ __metadata:
   peerDependencies:
     react: ">=16.4.1"
   checksum: 65846f015d92b7ae38d62224636501ccd46aabdd2c5e49cae824c44a7b795ec2afffb69708810a6dbf66af05703efe8e28e5ccc961373447413e5e52c6613521
-  languageName: node
-  linkType: hard
-
-"react-gtm-module@npm:^2.0.11":
-  version: 2.0.11
-  resolution: "react-gtm-module@npm:2.0.11"
-  checksum: 93b4659f0d10248f59113a3eb488ea8848712cab2e28b7c45d080b373d6736a96b9855d637c4447819493366bf25185c3f88e6b4107a8f06d8ab2a39f7a725b9
   languageName: node
   linkType: hard
 
