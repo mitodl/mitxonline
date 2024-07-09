@@ -422,7 +422,7 @@ export class CourseProductDetailEnroll extends React.Component<
     )
   }
 
-  renderEnrollLoginButton() {
+  renderEnrollLoginButton(run: EnrollmentFlaggedCourseRun) {
     return (
       <h2>
         <a
@@ -431,7 +431,7 @@ export class CourseProductDetailEnroll extends React.Component<
           )}`}
           className="btn btn-primary btn-enrollment-button btn-lg  btn-gradient-red-to-blue highlight"
         >
-          Enroll now
+          {isRunArchived(run) ? "Access Course Materials" : "Enroll Now"}
         </a>
       </h2>
     )
@@ -523,7 +523,7 @@ export class CourseProductDetailEnroll extends React.Component<
               {run
                 ? currentUser && currentUser.id
                   ? this.renderEnrollNowButton(run, product)
-                  : this.renderEnrollLoginButton()
+                  : this.renderEnrollLoginButton(run)
                 : this.renderAccessCourseButton()}
 
               {run && currentUser ? this.renderAddlProfileFieldsModal() : null}
