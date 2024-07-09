@@ -4,14 +4,12 @@
 // From https://github.com/ReactTraining/react-router/issues/4278#issuecomment-299692502
 import React from "react"
 import ReactGA from "react-ga4"
-import TagManager from "react-gtm-module"
 
 const withTracker = (WrappedComponent: Class<React.Component<*, *>>) => {
   const debug = SETTINGS.reactGaDebug === "true"
 
   if (SETTINGS.gaTrackingID) {
     ReactGA.initialize(SETTINGS.gaTrackingID, { debug: debug })
-    TagManager.initialize({ gtmId: SETTINGS.gaTrackingID })
   }
 
   const HOC = (props: Object) => {
