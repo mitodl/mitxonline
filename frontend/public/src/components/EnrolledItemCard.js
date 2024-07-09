@@ -469,7 +469,7 @@ export class EnrolledItemCard extends React.Component<
     const startDateDescription = generateStartDateText(enrollment.run)
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
     const courseId = enrollment.run.course_number
-    const pageLocation = enrollment.run.course.page
+    const pageLocation = enrollment.run.course.page.live ? enrollment.run.course.page : null
     const menuTitle = `Course options for ${enrollment.run.course.title}`
 
     const courseRunStatusMessageText = courseRunStatusMessage(enrollment.run)
