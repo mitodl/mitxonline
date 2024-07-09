@@ -219,22 +219,22 @@ describe("EnrolledItemCard", () => {
   it("Course detail does not display course details (about page) link if course page is not published", async () => {
     enrollmentCardProps.enrollment.run.course.page.live = false
     const inner = await renderedCard()
-    const enrollmentExtraLinks = inner.find(".enrolled-item").find(".enrollment-extra-links")
+    const enrollmentExtraLinks = inner
+      .find(".enrolled-item")
+      .find(".enrollment-extra-links")
     assert.isTrue(enrollmentExtraLinks.exists())
-    const courseDetailsPageLink = enrollmentExtraLinks
-      .find("a")
-      .at(0)
+    const courseDetailsPageLink = enrollmentExtraLinks.find("a").at(0)
     assert.isFalse(courseDetailsPageLink.exists())
   })
 
   it("Course detail does display course details (about page) link if course page is published", async () => {
     enrollmentCardProps.enrollment.run.course.page.live = true
     const inner = await renderedCard()
-    const enrollmentExtraLinks = inner.find(".enrolled-item").find(".enrollment-extra-links")
+    const enrollmentExtraLinks = inner
+      .find(".enrolled-item")
+      .find(".enrollment-extra-links")
     assert.isTrue(enrollmentExtraLinks.exists())
-    const courseDetailsPageLink = enrollmentExtraLinks
-      .find("a")
-      .at(0)
+    const courseDetailsPageLink = enrollmentExtraLinks.find("a").at(0)
     assert.isTrue(courseDetailsPageLink.exists())
   })
 
