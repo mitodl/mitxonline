@@ -14,14 +14,12 @@ export const passwordFieldErrorMessage =
 export const usernameFieldErrorMessage =
   "Username must be between 3 and 30 characters."
 
-const validEmailRegex = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+const validEmailRegex =
+  /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
 
 const validEmailErrorMessage = "Please enter a valid email address."
 
-export const passwordField = yup
-  .string()
-  .required()
-  .label("Password")
+export const passwordField = yup.string().required().label("Password")
 
 export const emailField = yup
   .string()

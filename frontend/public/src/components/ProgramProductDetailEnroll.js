@@ -325,9 +325,9 @@ export class ProgramProductDetailEnroll extends React.Component<
   }
 
   updateDate(run: EnrollmentFlaggedCourseRun) {
-    let date = emptyOrNil(run.start_date)
-      ? undefined
-      : moment(new Date(run.start_date))
+    let date = emptyOrNil(run.start_date) ?
+      undefined :
+      moment(new Date(run.start_date))
     date = date ? date.utc() : date
     const dateElem = document.getElementById("start_date")
     if (dateElem) {

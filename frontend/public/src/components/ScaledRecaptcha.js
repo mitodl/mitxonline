@@ -55,9 +55,9 @@ export default class ScaledRecaptcha extends React.Component<Props, State> {
       } = this.recaptcha
       // compute this as a fractional scale of the scale that ReCAPTCHA wants to render at if our container is smaller
       const recaptchaScale =
-        clientWidth < RECAPTCHA_NATURAL_WIDTH
-          ? clientWidth / RECAPTCHA_NATURAL_WIDTH
-          : 1.0
+        clientWidth < RECAPTCHA_NATURAL_WIDTH ?
+          clientWidth / RECAPTCHA_NATURAL_WIDTH :
+          1.0
 
       this.setState({ recaptchaScale })
     }

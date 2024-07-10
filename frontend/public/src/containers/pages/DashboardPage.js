@@ -233,9 +233,9 @@ export class DashboardPage extends React.Component<
     const programsClasses = `dash-tab${
       this.state.currentTab === DashboardTab.programs ? " active" : ""
     }`
-    const programEnrollmentsLength = programEnrollments
-      ? programEnrollments.length
-      : 0
+    const programEnrollmentsLength = programEnrollments ?
+      programEnrollments.length :
+      0
 
     return (
       <DocumentTitle title={`${SETTINGS.site_name} | ${DASHBOARD_PAGE_TITLE}`}>

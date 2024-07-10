@@ -152,9 +152,9 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
         passed += elem.grades.reduce(
           (acc, grade) => (grade.passed ? (acc += 1) : acc),
           0
-        )
-          ? 1
-          : 0
+        ) ?
+          1 :
+          0
       })
 
       return [enrollment.program.courses.length, passed]
@@ -218,9 +218,9 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
       })
     }
 
-    const backgroundClass = isHidden
-      ? "drawer-background open"
-      : "drawer-background"
+    const backgroundClass = isHidden ?
+      "drawer-background open" :
+      "drawer-background"
 
     const drawerClass = `nav-drawer ${isHidden ? "open" : "closed"}`
 
@@ -229,9 +229,9 @@ export class ProgramEnrollmentDrawer extends React.Component<ProgramEnrollmentDr
     }
 
     const enrolledItemCards =
-      enrollment.program.requirements.length === 0
-        ? this.renderFlatCourseCards()
-        : this.renderCourseCards()
+      enrollment.program.requirements.length === 0 ?
+        this.renderFlatCourseCards() :
+        this.renderCourseCards()
 
     return (
       <div className={backgroundClass}>
