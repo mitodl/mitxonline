@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.97.2
+--------------
+
+- 4548 dashboard dont display course detail link when the course about page is not published (#2280)
+
 Version 0.97.1 (Released July 10, 2024)
 --------------
 
