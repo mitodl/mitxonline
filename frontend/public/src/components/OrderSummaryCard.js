@@ -118,15 +118,17 @@ export class OrderSummaryCard extends React.Component<Props> {
       const purchasedItems = []
       if (cartItems && cartItems.length > 0) {
         for (const cartItem in cartItems) {
-          purchasedItems.append({
-            item_id:       cartItem.product.id,
-            item_name:     cartItem.description,
-            affiliation:   "MITx Online", // always MITx Online
-            discount:      discountedPrice,
-            item_category: "MicroMasters", // course category if possible
-            price:         cartItem.price,
-            quantity:      1
-          })
+          if (!cartItem.product === null) {
+            purchasedItems.append({
+              item_id:        cartItem.product.id,
+              item_name:      cartItem.description,
+              affiliation:    "MITx Online", // always MITx Online
+              discount:       discountedPrice,
+              item_category: "MicroMasters", // course category if possible
+              price:          cartItem.price,
+              quantity:       1
+            })
+          }
         }
       }
       const GADataLayerPurchase = {
