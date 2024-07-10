@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.97.1
+--------------
+
+- Update dependency @sentry/browser to v8 (#1058)
+- Login button should indicate when course is archived (#2279)
+- Clean up constants (#2275)
+
 Version 0.97.0 (Released July 10, 2024)
 --------------
 
