@@ -90,9 +90,9 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
       ? "This course is no longer active, but you can still access selected content."
       : "No sessions of this course are currently open for enrollment. More sessions may be added in the future."
     return (
-      <div className="row d-flex align-self-stretch callout callout-warning course-status-message">
+      <div className="row d-flex callout callout-warning course-status-message">
         <i className="material-symbols-outlined warning">error</i>
-        <p>
+        <p className="p-0">
           {message}{" "}
           {isArchived ? (
             <button
