@@ -5,8 +5,8 @@ import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
 import type { BasketItem, Discount, Refund } from "../flow/cartTypes"
-import {checkFeatureFlag} from "../lib/util"
-import ReactGA4 from "react-ga4";
+import { checkFeatureFlag } from "../lib/util"
+import ReactGA4 from "react-ga4"
 
 type Props = {
   totalPrice: number,
@@ -127,21 +127,20 @@ export class OrderSummaryCard extends React.Component<Props> {
           quantity:      1
         })
       }
-      const GADataLayerPurchase =
-        {
-          transaction_id: this.orderReceipt.reference_number, // order or transaction id
-          value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
-          tax:            0.00,
-          shipping:       0.00,
-          currency:       "USD",
-          coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
-          items:          purchasedItems
-        }
+      const GADataLayerPurchase = {
+        transaction_id: this.orderReceipt.reference_number, // order or transaction id
+        value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
+        tax:            0.0,
+        shipping:       0.0,
+        currency:       "USD",
+        coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
+        items:          purchasedItems
+      }
       const googleArgs = {
-          event:      'Purchase',
-          ecommerce: {
-            purchase: GADataLayerPurchase
-        },
+        event:     "Purchase",
+        ecommerce: {
+          purchase: GADataLayerPurchase
+        }
       }
       ReactGA4.event(googleArgs)
     }
