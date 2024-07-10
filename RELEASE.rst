@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.97.1
+Version 0.97.1 (Released July 10, 2024)
 --------------
 
 - Update dependency @sentry/browser to v8 (#1058)
