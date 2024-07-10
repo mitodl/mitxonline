@@ -41,7 +41,7 @@ from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
     exception_logging_generator,
     is_grade_valid,
-    is_letter_grade_valid,
+    is_letter_grade_valid, get_enrollable_courseruns_qs,
 )
 from openedx.api import (
     enroll_in_edx_course_runs,
@@ -74,46 +74,24 @@ UserEnrollments = namedtuple(  # noqa: PYI024
 )
 
 
-def _relevant_course_qset_filter(
-    run_qset: QuerySet,
-    now: Optional[datetime] = None,  # noqa: FA100
-) -> QuerySet:
-    """
-    Does the actual filtering for user_relevant_course_run_qset and
-    user_relevant_program_course_run_qset.
-    """
-
-    return (
-        run_qset.filter(Q(enrollment_end=None) | Q(enrollment_end__gt=now))
-        .exclude(start_date=None)
-        .exclude(enrollment_start=None)
-        .filter(live=True)
-        .order_by("enrollment_start")
-    )
-
-
 def get_relevant_course_run_qset(
     course: Course,
-    now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
     Returns a QuerySet of relevant course runs
     """
-    now = now or now_in_utc()
-    run_qset = course.courseruns
-    return _relevant_course_qset_filter(run_qset, now)
+    enrollable_run_qset = get_enrollable_courseruns_qs(valid_courses=[course])
+    return enrollable_run_qset.order_by("enrollment_start")
 
 
 def get_user_relevant_program_course_run_qset(
     program: Program,
-    now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
     Returns a QuerySet of relevant course runs
     """
-    now = now or now_in_utc()
-    run_qset = CourseRun.objects.filter(course__in=program.courses_qset.all())
-    return _relevant_course_qset_filter(run_qset, now)
+    enrollable_run_qset = get_enrollable_courseruns_qs(valid_courses=program.courses_qset.all())
+    return enrollable_run_qset.order_by("enrollment_start")
 
 
 def get_relevant_course_run(

@@ -117,14 +117,8 @@ def get_self_paced_courses(queryset, enrollment_end_date=None):
     if enrollment_end_date is None:
         enrollment_end_date = now
     course_ids = queryset.values_list("id", flat=True)
-    all_runs = CourseRun.objects.filter(
-        Q(live=True)
-        & Q(course_id__in=course_ids)
-        & Q(start_date__isnull=False)
-        & Q(enrollment_start__lt=now)
-        & (Q(enrollment_end=None) | Q(enrollment_end__gt=enrollment_end_date))
-    )
-    self_paced_runs = all_runs.filter(is_self_paced=True)
+    all_enrollable_runs = get_enrollable_courseruns_qs(valid_courses=course_ids)
+    self_paced_runs = all_enrollable_runs.filter(is_self_paced=True)
     return (
         queryset.prefetch_related(Prefetch("courseruns", queryset=self_paced_runs))
         .prefetch_related("courseruns__course")
