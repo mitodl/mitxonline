@@ -120,24 +120,24 @@ export class OrderSummaryCard extends React.Component<Props> {
         for (const cartItem in cartItems) {
           if (!cartItem.product === null) {
             purchasedItems.append({
-              item_id:        cartItem.product.id,
-              item_name:      cartItem.description,
-              affiliation:    "MITx Online", // always MITx Online
-              discount:       discountedPrice,
+              item_id:       cartItem.product.id,
+              item_name:     cartItem.description,
+              affiliation:   "MITx Online", // always MITx Online
+              discount:      discountedPrice,
               item_category: "MicroMasters", // course category if possible
-              price:          cartItem.price,
-              quantity:       1
+              price:         cartItem.price,
+              quantity:      1
             })
           }
         }
       }
       const GADataLayerPurchase = {
-        transaction_id: this.orderReceipt.reference_number, // order or transaction id
-        value:          this.orderReceipt.total_price_paid, // total purchase value excluding discounts
+        transaction_id: this.orderReceipt.reference_number || "", // order or transaction id
+        value:          this.orderReceipt.total_price_paid || 0.0, // total purchase value excluding discounts
         tax:            0.0,
         shipping:       0.0,
         currency:       "USD",
-        coupon:         discounts[0].discount_code, // coupon code the user used. leave blank if none
+        coupon:         discounts[0].discount_code || "",
         items:          purchasedItems
       }
       const googleArgs = {
