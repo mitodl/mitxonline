@@ -116,16 +116,18 @@ export class OrderSummaryCard extends React.Component<Props> {
     if (checkFeatureFlag("mitxonline-4099-dedp-google-analytics")) {
       const { cartItems, discountedPrice, discounts } = this.props
       const purchasedItems = []
-      for (const cartItem in cartItems) {
-        purchasedItems.append({
-          item_id:       cartItem.product.id,
-          item_name:     cartItem.description,
-          affiliation:   "MITx Online", // always MITx Online
-          discount:      discountedPrice,
-          item_category: "MicroMasters", // course category if possible
-          price:         cartItem.price,
-          quantity:      1
-        })
+      if (cartItems && cartItems.length > 0) {
+        for (const cartItem in cartItems) {
+          purchasedItems.append({
+            item_id:       cartItem.product.id,
+            item_name:     cartItem.description,
+            affiliation:   "MITx Online", // always MITx Online
+            discount:      discountedPrice,
+            item_category: "MicroMasters", // course category if possible
+            price:         cartItem.price,
+            quantity:      1
+          })
+        }
       }
       const GADataLayerPurchase = {
         transaction_id: this.orderReceipt.reference_number, // order or transaction id
