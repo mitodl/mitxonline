@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.97.0
+Version 0.97.0 (Released July 10, 2024)
 --------------
 
 - Update mitol-django-google-sheets (#2276)
