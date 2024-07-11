@@ -38,9 +38,10 @@ from courses.models import (
 )
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
+    get_enrollable_courseruns_qs,
     exception_logging_generator,
     is_grade_valid,
-    is_letter_grade_valid, get_enrollable_courseruns_qs,
+    is_letter_grade_valid
 )
 from openedx.api import (
     enroll_in_edx_course_runs,
@@ -645,7 +646,7 @@ def sync_course_runs(runs):
     return success_count, failure_count
 
 
-def sync_course_mode(runs: List[CourseRun]) -> List[str]:  # noqa: UP006
+def sync_course_mode(runs: list[CourseRun]) -> list[str]:
     """
     Updates course run upgrade expiration dates from Open edX
 
