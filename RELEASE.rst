@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.97.3
+Version 0.97.3 (Released July 11, 2024)
 --------------
 
 - fix (#2284)
