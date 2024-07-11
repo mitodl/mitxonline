@@ -3,9 +3,9 @@
 import itertools
 import logging
 from collections import namedtuple
-from datetime import datetime, timedelta
+from datetime import timedelta
 from traceback import format_exc
-from typing import List, Optional  # noqa: UP035
+from typing import List
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -90,7 +90,9 @@ def get_user_relevant_program_course_run_qset(
     """
     Returns a QuerySet of relevant course runs
     """
-    enrollable_run_qset = get_enrollable_courseruns_qs(valid_courses=program.courses_qset.all())
+    enrollable_run_qset = get_enrollable_courseruns_qs(
+        valid_courses=program.courses_qset.all()
+    )
     return enrollable_run_qset.order_by("enrollment_start")
 
 
