@@ -5,7 +5,6 @@ import logging
 from collections import namedtuple
 from datetime import timedelta
 from traceback import format_exc
-from typing import List
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
