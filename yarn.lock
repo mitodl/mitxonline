@@ -9462,9 +9462,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint-config-mitodl@https://github.com/mitodl/eslint-config.git#cc2b4acddc0dfb89d4c83e15cc60decf7876574b":
-  version: 2.0.0
-  resolution: "eslint-config-mitodl@https://github.com/mitodl/eslint-config.git#commit=cc2b4acddc0dfb89d4c83e15cc60decf7876574b"
+"eslint-config-mitodl@npm:^2.1.0":
+  version: 2.1.0
+  resolution: "eslint-config-mitodl@npm:2.1.0"
   dependencies:
     "@babel/eslint-parser": ^7.11.0
     "@typescript-eslint/parser": ^7.0.1
@@ -9479,7 +9479,7 @@ __metadata:
       optional: true
     eslint-plugin-mocha:
       optional: true
-  checksum: 6fd9592450980068115a2334fde22be0d4a0775fd94d0817f4e9d1599d1080593053f658b34c8dd76a8c3ce3d9414f2d02d9dca324022c762e26d1b451d397e0
+  checksum: 0687671b61e2b318b7594be0e4420d138bd74d65435649189425abd57d6bb53b5e0f36eee6cac57ef09ad16224672ebb61c21e4af809bfc7a18b2cbb1f55156d
   languageName: node
   linkType: hard
 
@@ -15088,7 +15088,7 @@ __metadata:
     enzyme-adapter-react-16: 1.15.8
     eslint: ^8.x
     eslint-config-google: 0.9.1
-    eslint-config-mitodl: "https://github.com/mitodl/eslint-config.git#cc2b4acddc0dfb89d4c83e15cc60decf7876574b"
+    eslint-config-mitodl: ^2.1.0
     eslint-plugin-babel: 5.3.1
     eslint-plugin-flow-vars: 0.5.0
     eslint-plugin-flowtype: ^8.0.3
