@@ -49,8 +49,7 @@ export class RegisterConfirmPage extends React.Component<Props> {
             "email-verified": {
               type:  ALERT_TYPE_SUCCESS,
               props: {
-                text:
-                  "Success! We've verified your email. Please finish your account creation below."
+                text: "Success! We've verified your email. Please finish your account creation below."
               }
             }
           })

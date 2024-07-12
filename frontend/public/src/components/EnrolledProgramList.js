@@ -30,11 +30,11 @@ export class EnrolledProgramList extends React.Component<EnrolledProgramListProp
   render() {
     const { enrollments } = this.props
 
-    return enrollments && enrollments.length > 0
-      ? enrollments.map<ProgramEnrollment>(enrollment =>
+    return enrollments && enrollments.length > 0 ?
+      enrollments.map<ProgramEnrollment>(enrollment =>
         this.renderEnrolledProgramCard(enrollment)
-      )
-      : null
+      ) :
+      null
   }
 }
 

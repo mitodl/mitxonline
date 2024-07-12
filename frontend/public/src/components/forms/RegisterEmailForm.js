@@ -14,9 +14,9 @@ import { emailField } from "../../lib/validation"
 import CardLabel from "../input/CardLabel"
 
 const emailValidation = yup.object().shape({
-  recaptcha: SETTINGS.recaptchaKey
-    ? yup.string().required("Please verify you're not a robot")
-    : yup.mixed().notRequired(),
+  recaptcha: SETTINGS.recaptchaKey ?
+    yup.string().required("Please verify you're not a robot") :
+    yup.mixed().notRequired(),
   email: emailField
 })
 

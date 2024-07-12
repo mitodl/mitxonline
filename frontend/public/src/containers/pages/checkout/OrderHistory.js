@@ -185,11 +185,11 @@ export class OrderHistory extends React.Component<Props> {
                       </div>
                     ))}
                   </div>
-                  {orderHistory && orderHistory.results.length > 0
-                    ? orderHistory.results.map(
+                  {orderHistory && orderHistory.results.length > 0 ?
+                    orderHistory.results.map(
                       this.renderMobileOrderCard.bind(this)
-                    )
-                    : null}
+                    ) :
+                    null}
                 </div>
                 <div className="d-none d-md-block">
                   <div className="row">
@@ -202,19 +202,19 @@ export class OrderHistory extends React.Component<Props> {
                           <tr>{columns}</tr>
                         </thead>
                         <tbody>
-                          {orderHistory && orderHistory.results.length > 0
-                            ? orderHistory.results.map(
+                          {orderHistory && orderHistory.results.length > 0 ?
+                            orderHistory.results.map(
                               this.renderOrderCard.bind(this)
-                            )
-                            : null}
+                            ) :
+                            null}
                         </tbody>
                         <tfoot>
                           <tr>
                             <td>
                               Page {this.offset + 1} of{" "}
-                              {orderHistory
-                                ? Math.ceil(orderHistory.count / 10)
-                                : 0}{" "}
+                              {orderHistory ?
+                                Math.ceil(orderHistory.count / 10) :
+                                0}{" "}
                               | {orderHistory ? orderHistory.count : "0"} orders
                               total
                             </td>

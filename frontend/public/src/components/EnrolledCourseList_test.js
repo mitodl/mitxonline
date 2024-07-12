@@ -42,11 +42,6 @@ describe("EnrolledCourseList", () => {
 
     const enrolledItems = inner.find(".no-enrollments")
     assert.lengthOf(enrolledItems, 1)
-    assert.isTrue(
-      enrolledItems
-        .at(0)
-        .text()
-        .includes("You are not enrolled")
-    )
+    assert.isTrue(enrolledItems.at(0).text().includes("You are not enrolled"))
   })
 })
