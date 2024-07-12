@@ -142,44 +142,6 @@ def test_course_run_invalid_expiration_date(start_delta, end_delta, expiration_d
 
 
 @pytest.mark.parametrize(
-    "end_days, enroll_start_days, enroll_end_days, expected",  # noqa: PT006
-    [
-        [None, None, None, True],  # noqa: PT007
-        [None, None, 1, True],  # noqa: PT007
-        [None, None, -1, False],  # noqa: PT007
-        [1, None, None, True],  # noqa: PT007
-        [-1, None, None, True],  # noqa: PT007
-        [1, None, -1, False],  # noqa: PT007
-        [None, 1, None, False],  # noqa: PT007
-        [None, -1, None, True],  # noqa: PT007
-    ],
-)
-def test_course_run_is_enrollable(
-    end_days, enroll_start_days, enroll_end_days, expected
-):
-    """
-    Test that CourseRun.is_beyond_enrollment returns the expected boolean value
-    """
-    now = now_in_utc()
-    end_date = None if end_days is None else now + timedelta(days=end_days)
-    enr_end_date = (
-        None if enroll_end_days is None else now + timedelta(days=enroll_end_days)
-    )
-    enr_start_date = (
-        None if enroll_start_days is None else now + timedelta(days=enroll_start_days)
-    )
-
-    assert (
-        CourseRunFactory.create(
-            end_date=end_date,
-            enrollment_end=enr_end_date,
-            enrollment_start=enr_start_date,
-        ).is_enrollable
-        is expected
-    )
-
-
-@pytest.mark.parametrize(
     "start_delta, end_delta, expected_result",  # noqa: PT006
     [
         [-1, 2, True],  # noqa: PT007
@@ -204,24 +166,6 @@ def test_course_run_in_progress(start_delta, end_delta, expected_result):
         is expected_result
     )
 
-
-@pytest.mark.parametrize(
-    "end_days,enroll_days,expected",  # noqa: PT006
-    [[-1, 1, False], [1, -1, False], [1, 1, True]],  # noqa: PT007
-)
-def test_course_run_unexpired(end_days, enroll_days, expected):
-    """
-    Test that CourseRun.is_unexpired returns the expected boolean value
-    """
-    now = now_in_utc()
-    end_date = now + timedelta(days=end_days)
-    enr_end_date = now + timedelta(days=enroll_days)
-    assert (
-        CourseRunFactory.create(
-            end_date=end_date, enrollment_end=enr_end_date
-        ).is_unexpired
-        is expected
-    )
 
 
 def test_course_first_unexpired_run():

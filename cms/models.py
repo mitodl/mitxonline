@@ -42,6 +42,9 @@ from wagtail.search import index
 from wagtail.snippets.models import register_snippet
 from wagtailmetadata.models import MetadataPageMixin
 
+from mitol.common.utils.collections import (
+    first_or_none,
+)
 from cms.blocks import (
     CourseRunCertificateOverrides,
     PriceBlock,
@@ -1203,8 +1206,8 @@ class CoursePage(ProductPage):
         return f"{self.course.readable_id} | {self.title}"
 
     def get_context(self, request, *args, **kwargs):
-        relevant_run = get_relevant_course_run(course=self.product)
         relevant_runs = list(get_relevant_course_run_qset(course=self.product))
+        relevant_run = relevant_runs[0] if relevant_runs else None
         sign_in_url = (
             None
             if request.user.is_authenticated

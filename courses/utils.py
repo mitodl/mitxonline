@@ -96,7 +96,7 @@ def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
     )
 
     if valid_courses:
-        q_filters += Q(course__in=valid_courses)
+        q_filters = q_filters & Q(course__in=valid_courses)
 
     return CourseRun.objects.filter(q_filters)
 

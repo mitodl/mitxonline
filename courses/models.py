@@ -567,7 +567,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             relevant_run.products.filter(is_active=True).all() if relevant_run else None
         )
 
-    @property
+    @cached_property
     def first_unexpired_run(self):
         """
         Gets the first unexpired CourseRun associated with this Course
@@ -583,23 +583,22 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         eligible_course_runs = [
             course_run
             for course_run in course_runs
-            if course_run.live and course_run.start_date and course_run.is_unexpired
+            if course_run.is_enrollable
         ]
         return first_matching_item(
             sorted(eligible_course_runs, key=lambda course_run: course_run.start_date),
             lambda course_run: True,  # noqa: ARG005
         )
 
-    @property
-    def unexpired_runs(self):
+    @cached_property
+    def is_enrollable(self):
         """
-        Gets all the unexpired CourseRuns associated with this Course
+        Determines if a run is enrollable
         """
-        return list(
-            filter(
-                op.attrgetter("is_unexpired"),
-                self.courseruns.filter(live=True).order_by("start_date"),
-            )
+        now = now_in_utc()
+        return ((self.enrollment_end is None or self.enrollment_end > now)
+                and self.enrollment_start is not None and self.enrollment_start <= now
+                and self.live is True and self.start_date is not None
         )
 
     @cached_property
@@ -640,22 +639,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return self.blocked_countries.filter(
             country=user.legal_address.country
         ).exists()
-
-    def available_runs(self, user):
-        """
-        Get all enrollable runs for a Course that a user has not already enrolled in.
-
-        Args:
-            user (users.models.User): The user to check available runs for.
-
-        Returns:
-            list of CourseRun: Unexpired and unenrolled Course runs
-
-        """
-        enrolled_runs = user.courserunenrollment_set.filter(
-            run__course=self
-        ).values_list("run__id", flat=True)
-        return [run for run in self.unexpired_runs if run.id not in enrolled_runs]
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
@@ -744,30 +727,6 @@ class CourseRun(TimestampedModel):
         if not self.end_date:
             return False
         return self.end_date < now_in_utc()
-
-    @property
-    def is_enrollable(self):
-        """
-        Checks if the course is not beyond its enrollment period
-
-
-        Returns:
-            boolean: True if enrollment period has begun but not ended
-        """
-        now = now_in_utc()
-        return (self.enrollment_end is None or self.enrollment_end > now) and (
-            self.enrollment_start is None or self.enrollment_start <= now
-        )
-
-    @property
-    def is_unexpired(self):
-        """
-        Checks if the course is not expired
-
-        Returns:
-            boolean: True if course is not expired
-        """
-        return not self.is_past and self.is_enrollable
 
     @property
     def is_in_progress(self) -> bool:
