@@ -38,10 +38,10 @@ from courses.models import (
 )
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
-    get_enrollable_courseruns_qs,
     exception_logging_generator,
+    get_enrollable_courseruns_qs,
     is_grade_valid,
-    is_letter_grade_valid
+    is_letter_grade_valid,
 )
 from openedx.api import (
     enroll_in_edx_course_runs,
