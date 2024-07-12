@@ -88,7 +88,7 @@ def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
     if enrollment_end_date is None:
         enrollment_end_date = now
 
-    valid_course_runs = CourseRun.objects.filter(
+    q_filters = (
         Q(live=True)
         & Q(start_date__isnull=False)
         & Q(enrollment_start__lt=now)
@@ -96,9 +96,9 @@ def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
     )
 
     if valid_courses:
-        return valid_course_runs.filter(course__in=valid_courses)
+        q_filters += Q(course__in=valid_courses)
 
-    return valid_course_runs
+    return CourseRun.objects.filter(q_filters)
 
 
 def get_unenrollable_courseruns_qs():
