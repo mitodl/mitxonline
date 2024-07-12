@@ -134,10 +134,10 @@ def test_get_relevant_course_run(user, dates, course, is_live, is_enrolled):
         ),
         end_date=factory.Iterator([None, dates.future_10_days, dates.future_60_days]),
         enrollment_start=factory.Iterator(
-            [dates.future_10_days, dates.past_60_days, dates.future_30_days]
+            [dates.past_60_days, dates.past_10_days, dates.past_30_days]
         ),
         enrollment_end=factory.Iterator(
-            [None, dates.past_30_days, dates.future_60_days]
+            [None, dates.future_30_days, dates.future_60_days]
         ),
     )
     if is_enrolled:
