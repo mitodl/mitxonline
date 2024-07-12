@@ -124,7 +124,7 @@ export class OrderSummaryCard extends React.Component<Props> {
               item_name:     cartItem.description,
               affiliation:   "MITx Online", // always MITx Online
               discount:      discountedPrice,
-              item_category: "MicroMasters", // course category if possible
+              item_category: cartItem.product.item_category,
               price:         cartItem.price,
               quantity:      1
             })
