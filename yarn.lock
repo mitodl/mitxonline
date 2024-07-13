@@ -4524,12 +4524,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/react-dom@npm:17.0.15":
-  version: 17.0.15
-  resolution: "@types/react-dom@npm:17.0.15"
+"@types/react-dom@npm:17.0.25":
+  version: 17.0.25
+  resolution: "@types/react-dom@npm:17.0.25"
   dependencies:
     "@types/react": ^17
-  checksum: 7b90372bd7207d3860e1043ebfe10fd21fbd9ec3417a29593ca14359774830c888ba4ebb25cf0510628607496f8d35b09d23d329ea709b9311f5866185c5fd67
+  checksum: d1e582682478e0848c8d54ea3e89d02047bac6d916266b85ce63731b06987575919653ea7159d98fda47ade3362b8c4d5796831549564b83088e7aa9ce8b60ed
   languageName: node
   linkType: hard
 
@@ -15091,7 +15091,7 @@ __metadata:
     "@testing-library/jest-dom": 5.17.0
     "@testing-library/react": 11.2.7
     "@trust/webcrypto": 0.9.2
-    "@types/react": 18.0.3
+    "@types/react": 18.3.3
     autoprefixer: 9.8.8
     babel-loader: 8.2.4
     babel-plugin-istanbul: 5.2.0
@@ -15224,8 +15224,8 @@ __metadata:
     "@testing-library/user-event": 14.1.0
     "@types/jest": 27.4.1
     "@types/node": 17.0.24
-    "@types/react": 17.0.44
-    "@types/react-dom": 17.0.15
+    "@types/react": 17.0.80
+    "@types/react-dom": 17.0.25
     craco-less: 2.0.0
     dayjs: ^1.11.7
     eslint-config-react: 1.1.7
