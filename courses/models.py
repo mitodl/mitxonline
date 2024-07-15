@@ -591,17 +591,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         )
 
     @cached_property
-    def is_enrollable(self):
-        """
-        Determines if a run is enrollable
-        """
-        now = now_in_utc()
-        return ((self.enrollment_end is None or self.enrollment_end > now)
-                and self.enrollment_start is not None and self.enrollment_start <= now
-                and self.live is True and self.start_date is not None
-        )
-
-    @cached_property
     def programs(self):
         """
         Returns a list of Programs which have this Course (self) as a dependency.
@@ -747,6 +736,17 @@ class CourseRun(TimestampedModel):
         A null value means that the upgrade window is always open
         """
         return self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
+
+    @cached_property
+    def is_enrollable(self):
+        """
+        Determines if a run is enrollable
+        """
+        now = now_in_utc()
+        return ((self.enrollment_end is None or self.enrollment_end > now)
+                and self.enrollment_start is not None and self.enrollment_start <= now
+                and self.live is True and self.start_date is not None
+                )
 
     @property
     def courseware_url(self):

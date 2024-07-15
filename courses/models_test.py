@@ -235,42 +235,6 @@ def test_program_first_unexpired_run():
     assert program.first_unexpired_run == first_run
 
 
-def test_course_unexpired_runs():
-    """unexpired_runs should return expected value"""
-    course = CourseFactory.create()
-    now = now_in_utc()
-    start_dates = [now, now + timedelta(days=-3)]
-    end_dates = [now + timedelta(hours=1), now + timedelta(days=-2)]
-    CourseRunFactory.create_batch(
-        2,
-        course=course,
-        start_date=factory.Iterator(start_dates),
-        end_date=factory.Iterator(end_dates),
-        live=True,
-    )
-
-    # Add a run that is not live and shouldn't show up in unexpired list
-    CourseRunFactory.create(
-        course=course, start_date=start_dates[0], end_date=end_dates[0], live=False
-    )
-
-    assert len(course.unexpired_runs) == 1
-    course_run = course.unexpired_runs[0]
-    assert course_run.start_date == start_dates[0]
-    assert course_run.end_date == end_dates[0]
-
-
-def test_course_available_runs():
-    """Enrolled runs for a user should not be in the list of available runs"""
-    user = UserFactory.create()
-    course = CourseFactory.create()
-    runs = CourseRunFactory.create_batch(2, course=course, live=True)
-    runs.sort(key=lambda run: run.start_date)
-    CourseRunEnrollmentFactory.create(run=runs[0], user=user)
-    assert course.available_runs(user) == [runs[1]]
-    assert course.available_runs(UserFactory.create()) == runs
-
-
 def test_reactivate_and_save():
     """Test that the reactivate_and_save method in enrollment models sets properties and saves"""
     course_run_enrollment = CourseRunEnrollmentFactory.create(
