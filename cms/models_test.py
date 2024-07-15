@@ -196,7 +196,6 @@ def test_course_page_context(  # noqa: PLR0913
     ],
 )
 def test_course_page_context_edx_access(  # noqa: PLR0913
-    mocker,
     fully_configured_wagtail,
     is_authed,
     is_editor,
@@ -206,16 +205,10 @@ def test_course_page_context_edx_access(  # noqa: PLR0913
 ):
     """CoursePage.get_context should correctly indicate if user can access the edX course"""
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
-    run = (
-        None
-        if not has_relevant_run
-        else CourseRunFactory.create(
-            course=course_page.course,
-            **(dict(in_progress=True) if is_in_progress else dict(in_future=True)),  # noqa: C408
-        )
-    )
-    patched_get_relevant_run = mocker.patch(
-        "cms.models.get_relevant_course_run", return_value=run
+    if has_relevant_run:
+        CourseRunFactory.create(
+        course=course_page.course,
+        **(dict(in_progress=True) if is_in_progress else dict(in_future=True)),  # noqa: C408
     )
     if not is_authed:  # noqa: SIM108
         request_user = AnonymousUser()
@@ -230,7 +223,6 @@ def test_course_page_context_edx_access(  # noqa: PLR0913
     request.user = request_user
     context = course_page.get_context(request=request)
     assert context["can_access_edx_course"] is exp_can_access
-    patched_get_relevant_run.assert_called_once_with(course=course_page.course)
 
 
 def generate_flexible_pricing_response(request_user, flexible_pricing_form):
