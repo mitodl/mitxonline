@@ -76,9 +76,9 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
         return None
 
 
-def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
+def get_enrollable_course_run_filter(enrollment_end_date=None, valid_courses=None):
     """
-    Returns all course runs that are open for enrollment.
+    Returns a queryset of all course runs that are open for enrollment.
 
     args:
         enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
@@ -97,6 +97,19 @@ def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
 
     if valid_courses:
         q_filters = q_filters & Q(course__in=valid_courses)
+
+    return q_filters
+
+
+def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
+    """
+    Returns all course runs that are open for enrollment.
+
+    args:
+        enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
+        valid_courses: Queryset of Course objects, to filter the course runs by if needed
+    """
+    q_filters = get_enrollable_course_run_filter(enrollment_end_date, valid_courses)
 
     return CourseRun.objects.filter(q_filters)
 
