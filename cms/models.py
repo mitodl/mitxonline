@@ -21,6 +21,7 @@ from django.urls import reverse
 from django.utils.functional import cached_property
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
+from mitol.common.utils.collections import first_or_none
 from mitol.olposthog.features import is_enabled
 from modelcluster.fields import ParentalKey, ParentalManyToManyField
 from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel
@@ -56,7 +57,7 @@ from cms.constants import (
     SIGNATORY_INDEX_SLUG,
 )
 from cms.forms import CertificatePageForm
-from courses.api import get_relevant_course_run, get_relevant_course_run_qset
+from courses.api import get_relevant_course_run_qset
 from courses.models import (
     Course,
     CourseRun,
@@ -1109,18 +1110,6 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             ),
         )
 
-    @property
-    def get_current_finaid(self):
-        """
-        Returns information about financial aid for the current learner.
-
-        If the learner has a flexible pricing(financial aid) request that's
-        approved, this should return the learner's adjusted price. If they
-        don't, this should return the Page for the applicable request form.
-        If they're not logged in, this should return None.
-        """
-        raise NotImplementedError
-
     def get_context(self, request, *args, **kwargs):  # noqa: ARG002
         instructors = [
             member.linked_instructor_page
@@ -1165,7 +1154,7 @@ class CoursePage(ProductPage):
         """Gets the product associated with this page"""
         return self.course
 
-    def get_current_finaid(self, request):
+    def _get_current_finaid(self, request):
         """
         Returns information about financial aid for the current learner.
 
@@ -1176,8 +1165,7 @@ class CoursePage(ProductPage):
         """
         ecommerce_product = self.product.active_products
         if (
-            is_courseware_flexible_price_approved(self.product, request.user)
-            and ecommerce_product
+            ecommerce_product and is_courseware_flexible_price_approved(self.product, request.user)
         ):
             ecommerce_product = ecommerce_product.first()
 
@@ -1203,8 +1191,8 @@ class CoursePage(ProductPage):
         return f"{self.course.readable_id} | {self.title}"
 
     def get_context(self, request, *args, **kwargs):
-        relevant_run = get_relevant_course_run(course=self.product)
         relevant_runs = list(get_relevant_course_run_qset(course=self.product))
+        relevant_run = first_or_none(relevant_runs)
         sign_in_url = (
             None
             if request.user.is_authenticated
@@ -1216,7 +1204,7 @@ class CoursePage(ProductPage):
             and relevant_run is not None
             and (relevant_run.is_in_progress or request.user.is_editor)
         )
-        finaid_price = self.get_current_finaid(request)
+        finaid_price = self._get_current_finaid(request)
         product = (
             relevant_run.products.filter(is_active=True).first()
             if relevant_run

@@ -732,7 +732,7 @@ class CourseRun(TimestampedModel):
     class Meta:
         unique_together = ("course", "run_tag")
 
-    @property
+    @cached_property
     def is_past(self):
         """
         Checks if the course run in the past
@@ -745,7 +745,7 @@ class CourseRun(TimestampedModel):
             return False
         return self.end_date < now_in_utc()
 
-    @property
+    @cached_property
     def is_enrollable(self):
         """
         Checks if the course is not beyond its enrollment period
@@ -759,7 +759,7 @@ class CourseRun(TimestampedModel):
             self.enrollment_start is None or self.enrollment_start <= now
         )
 
-    @property
+    @cached_property
     def is_unexpired(self):
         """
         Checks if the course is not expired
@@ -769,7 +769,7 @@ class CourseRun(TimestampedModel):
         """
         return not self.is_past and self.is_enrollable
 
-    @property
+    @cached_property
     def is_in_progress(self) -> bool:
         """
         Returns True if the course run has started and has not yet ended
@@ -781,7 +781,7 @@ class CourseRun(TimestampedModel):
             and (self.end_date is None or self.end_date > now)
         )
 
-    @property
+    @cached_property
     def is_upgradable(self):
         """
         Checks if the course can be upgraded
@@ -789,7 +789,7 @@ class CourseRun(TimestampedModel):
         """
         return self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
 
-    @property
+    @cached_property
     def courseware_url(self):
         """
         Full URL for this CourseRun as it exists in the courseware
@@ -803,12 +803,12 @@ class CourseRun(TimestampedModel):
             else None
         )
 
-    @property
+    @cached_property
     def text_id(self):
         """Gets the courseware_id"""
         return self.courseware_id
 
-    @property
+    @cached_property
     def course_number(self):
         """
         Returns:
@@ -816,7 +816,7 @@ class CourseRun(TimestampedModel):
         """
         return get_course_number(self.courseware_id)
 
-    @property
+    @cached_property
     def readable_id(self):
         """Alias for the courseware_id so this is consistent with Course and Program"""
         return self.courseware_id
