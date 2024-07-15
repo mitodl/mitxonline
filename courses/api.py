@@ -1,6 +1,5 @@
 """API for the Courses app"""
 
-import itertools
 import logging
 from collections import namedtuple
 from datetime import datetime, timedelta
@@ -17,7 +16,6 @@ from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
     has_equal_properties,
-    partition,
 )
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError

@@ -176,6 +176,7 @@ def test_get_relevant_course_run_invalid_dates(user, dates, course):
     returned_run = get_relevant_course_run(course=course)
     assert returned_run is None
 
+
 @pytest.mark.parametrize(
     "enrollment_mode", [EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE]
 )

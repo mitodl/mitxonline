@@ -20,8 +20,8 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.functional import cached_property
 from django.utils.text import slugify
-from mitol.common.utils.datetime import now_in_utc
 from mitol.common.utils.collections import first_or_none
+from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
 from modelcluster.fields import ParentalKey, ParentalManyToManyField
 from wagtail.admin.panels import FieldPanel, InlinePanel, PageChooserPanel
@@ -1164,8 +1164,8 @@ class CoursePage(ProductPage):
             None, or a tuple of the original price and the discount to apply
         """
         ecommerce_product = self.product.active_products
-        if (
-            ecommerce_product and is_courseware_flexible_price_approved(self.product, request.user)
+        if ecommerce_product and is_courseware_flexible_price_approved(
+            self.product, request.user
         ):
             ecommerce_product = ecommerce_product.first()
 
