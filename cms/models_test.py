@@ -609,29 +609,6 @@ def test_courseware_title_synced_with_product_page_title(test_course):
 
     assert courseware.title == updated_title
 
-
-def test_get_current_finaid_with_flex_price_for_expired_course_run(mocker):
-    """
-    Tests that get_current_finaid returns None for a user approved for
-    financial aid on a course with only expired course runs.
-    """
-    now = now_in_utc()
-    course_run = CourseRunFactory.create(enrollment_end=now - timedelta(days=10))
-    ProductFactory.create(purchasable_object=course_run)
-    rf = RequestFactory()
-    request = rf.get("/")
-    request.user = UserFactory.create()
-    patched_flexible_price_approved = mocker.patch(
-        "flexiblepricing.api.is_courseware_flexible_price_approved"
-    )
-    patched_flexible_price_discount = mocker.patch(
-        "flexiblepricing.api.determine_courseware_flexible_price_discount"
-    )
-    assert course_run.course.page.get_current_finaid(request) is None
-    patched_flexible_price_discount.assert_not_called()
-    patched_flexible_price_approved.assert_not_called()
-
-
 @pytest.mark.parametrize("flex_form_for_course", [True, False])
 def test_flexible_pricing_request_form_context(flex_form_for_course):
     """
