@@ -41,9 +41,9 @@ const getCourseDates = (run, isArchived = false, isMoreDates = false) => {
       </>
     )
   }
-  let startDate = isMoreDates
-    ? formatPrettyShortDate(parseDateString(run.start_date))
-    : formatPrettyDate(parseDateString(run.start_date))
+  let startDate = isMoreDates ?
+    formatPrettyShortDate(parseDateString(run.start_date)) :
+    formatPrettyDate(parseDateString(run.start_date))
   if (run.is_self_paced && moment(run.start_date).isBefore(moment())) {
     startDate = "Anytime"
   }
@@ -53,9 +53,9 @@ const getCourseDates = (run, isArchived = false, isMoreDates = false) => {
       {run.end_date ? (
         <>
           <b>End:</b>{" "}
-          {isMoreDates
-            ? formatPrettyShortDate(parseDateString(run.end_date))
-            : formatPrettyDate(parseDateString(run.end_date))}
+          {isMoreDates ?
+            formatPrettyShortDate(parseDateString(run.end_date)) :
+            formatPrettyDate(parseDateString(run.end_date))}
         </>
       ) : null}
     </>
@@ -86,17 +86,17 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
   }
 
   warningMessage(isArchived) {
-    const message = isArchived
-      ? "This course is no longer active, but you can still access selected content."
-      : "No sessions of this course are currently open for enrollment. More sessions may be added in the future."
+    const message = isArchived ?
+      "This course is no longer active, but you can still access selected content." :
+      "No sessions of this course are currently open for enrollment. More sessions may be added in the future."
     return (
-      <div className="row d-flex align-self-stretch callout callout-warning course-status-message">
+      <div className="row d-flex callout callout-warning course-status-message">
         <i className="material-symbols-outlined warning">error</i>
-        <p>
+        <p className="p-0">
           {message}{" "}
           {isArchived ? (
             <button
-              className="info-link more-info float-none explain-archived-btn"
+              className="info-link more-info float-none"
               onClick={() => this.togglePacingInfoDialogVisibility("Archived")}
             >
               Learn More
@@ -214,9 +214,9 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                     className="info-link more-info more-dates"
                     onClick={() => this.toggleShowMoreEnrollDates()}
                   >
-                    {this.state.showMoreEnrollDates
-                      ? "Show Less"
-                      : "More Dates"}
+                    {this.state.showMoreEnrollDates ?
+                      "Show Less" :
+                      "More Dates"}
                   </button>
                   {this.state.showMoreEnrollDates ? (
                     <ul className="more-dates-enrollment-list">{startDates}</ul>
@@ -249,7 +249,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                   <>
                     Self-paced
                     <button
-                      className="info-link more-info explain-format-btn"
+                      className="info-link more-info"
                       onClick={() =>
                         this.togglePacingInfoDialogVisibility("Self-Paced")
                       }
@@ -261,7 +261,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                   <>
                     Instructor-paced
                     <button
-                      className="info-link more-info explain-format-btn"
+                      className="info-link more-info"
                       onClick={() =>
                         this.togglePacingInfoDialogVisibility(
                           "Instructor-Paced"

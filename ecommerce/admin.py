@@ -48,9 +48,9 @@ class ProductAdmin(VersionAdmin):
     model = Product
     search_fields = (
         "description",
-        "courseruns__title",
+        "courserunproducts__title",
         "programruns__program__title",
-        "courseruns__courseware_id",
+        "courserunproducts__courseware_id",
         "programruns__program__readable_id",
     )
     list_display = ("id", "content_object", "description", "price", "is_active")

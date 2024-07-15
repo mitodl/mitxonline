@@ -19,7 +19,7 @@ div.std-page-header {
 }
 
 div.std-page-header + div.std-page-body {
-    padding-top: 40px !important;
+    padding-top: 40px;
 }
 
 div.std-card {
@@ -344,6 +344,7 @@ button.btn.btn-gradient-red-to-blue, a.btn.btn-gradient-red-to-blue {
 button.btn.btn-gradient-red-to-blue:hover, a.btn.btn-gradient-red-to-blue:hover {
     border-color: $home-page-header-blue;
     background: $home-page-header-blue !important;
+    color: white !important;
 }
 
 div.std-card-body, div.enrolled-item, div.cart-helptext {

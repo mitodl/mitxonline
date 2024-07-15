@@ -75,25 +75,12 @@ $enrolled-passed-fg: #ffffff;
     div.row {
       margin: 0 !important;
       padding: 20px;
+      height: 100%;
     }
 
     @include media-breakpoint-down(sm)  {
       div.row.enrolled-item-info {
-        padding: 0 !important;
-
-        div.enrollment-details-container {
-          padding: 16px !important;
-        }
-      }
-    }
-
-    @include media-breakpoint-up(md) {
-      .row {
-        height: auto;
-
-        > * {
-          height: 100%;
-        }
+        padding: 15px;
       }
     }
 
@@ -101,7 +88,10 @@ $enrolled-passed-fg: #ffffff;
       @include media-breakpoint-down(sm)  {
         width: 100%;
         height: $featureImgMobileHeight;
-        border-radius: 0;
+
+        img {
+          border-radius: 5px 5px 0px 0px;
+        }
       }
 
       width: $featureImgWidth;
@@ -117,16 +107,33 @@ $enrolled-passed-fg: #ffffff;
       }
     }
 
-    .detail {
-      color: $gray;
+    .course-card-text-details {
 
-      strong {
-        color: $primary;
+      @include media-breakpoint-down(sm)  {
+        padding: 15px 0px 15px 0px;
+        gap: 15px;
+
+        h2 {
+          margin: 0;
+        }
+      }
+
+      .detail {
+        color: $gray;
+
+        strong {
+          color: $primary;
+        }
       }
     }
 
     div.row.certificate-row {
       padding: 0;
+
+      @include media-breakpoint-down(sm)  {
+        gap: 20px;
+        border: 1px 0px 0px 0px;
+      }
     }
   }
 
@@ -192,17 +199,24 @@ $enrolled-passed-fg: #ffffff;
 
   .upgrade-item-description {
     width: 100%;
-    flex-direction: row;
-    padding: 25px 30px ;
+    flex-direction: row !important;
+    padding: 25px 30px;
     border-top: $home-page-border-grey;
     background: $home-page-grey-lite;
 
+    @include media-breakpoint-down(sm) {
+      padding: 20px 15px;
+    }
+
     div.certificate-upgrade-message {
       width: 80%;
-      height: 30px;
-
       font-size: 16px;
       line-height: 30px;
+
+      @include media-breakpoint-down(md) {
+        height: auto;
+        width: auto;
+      }
 
       strong {
         color: $brand-darker-bg;
@@ -212,6 +226,10 @@ $enrolled-passed-fg: #ffffff;
 
   .enrollment-extra-links {
     margin-top: 20px;
+
+    @include media-breakpoint-down(sm) {
+      margin-top: 15px;
+    }
 
     a {
       text-decoration: underline;
@@ -255,6 +273,10 @@ $enrolled-passed-fg: #ffffff;
 
   .get-cert-button-container button, .finaid-link-container {
     font-size: 14px !important;
+
+    @include media-breakpoint-down(sm) {
+      width: 100%;
+    }
   }
 
   .finaid-link-container {
@@ -270,6 +292,9 @@ $enrolled-passed-fg: #ffffff;
 
 .dashboard {
   font-family: "Inter", sans-serif;
+  @include media-breakpoint-down(md) {
+    padding-top: 0 !important;
+  }
 }
 
 .dashboard .tabs {
@@ -279,6 +304,8 @@ $enrolled-passed-fg: #ffffff;
 
   @include media-breakpoint-down(md) {
     margin-bottom: 30px;
+    gap: 0px;
+    justify-content: space-between;
   }
 }
 
@@ -292,6 +319,15 @@ $enrolled-passed-fg: #ffffff;
 
   @include media-breakpoint-down(sm) {
     margin-right: 1em;
+    padding: 20px 10px 20px 10px;
+    gap: 0px;
+    font-family: Inter;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 19.36px;
+    text-align: left;
+    width: 100%;
+    text-align: center;
   }
 }
 

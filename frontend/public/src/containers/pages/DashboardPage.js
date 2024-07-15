@@ -233,9 +233,9 @@ export class DashboardPage extends React.Component<
     const programsClasses = `dash-tab${
       this.state.currentTab === DashboardTab.programs ? " active" : ""
     }`
-    const programEnrollmentsLength = programEnrollments
-      ? programEnrollments.length
-      : 0
+    const programEnrollmentsLength = programEnrollments ?
+      programEnrollments.length :
+      0
 
     return (
       <DocumentTitle title={`${SETTINGS.site_name} | ${DASHBOARD_PAGE_TITLE}`}>
@@ -243,9 +243,9 @@ export class DashboardPage extends React.Component<
           <div role="banner" className="std-page-header">
             <h1>{DASHBOARD_PAGE_TITLE}</h1>
           </div>
-          <div className="std-page-body dashboard container">
+          <div className="dashboard std-page-body container">
             <Loader isLoading={isLoading}>
-              <nav className="tabs" aria-controls="enrollment-items">
+              <nav className="tabs d-flex" aria-controls="enrollment-items">
                 {programEnrollmentsLength === 0 ? (
                   <>
                     <button

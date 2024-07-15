@@ -2,10 +2,11 @@ import logging
 from urllib.parse import urljoin, urlparse
 
 import requests
-from django.core.cache import cache
+from django.core.cache import caches
 from mitol.common.decorators import single_task
 
 from cms.api import create_featured_items
+from cms.constants import ONE_MINUTE
 from cms.models import Page
 from main.celery import app
 from main.settings import (
@@ -104,12 +105,14 @@ def queue_fastly_full_purge():
 @single_task(10)
 def refresh_featured_homepage_items():
     """
-    Refresh the featured homepage items in the memcached cache.
+    Refresh the featured homepage items in the redis cache.
     """
     logger = logging.getLogger("refresh_featured_homepage_items__task")
     logger.info("Refreshing featured homepage items...")
-    featured_courses = cache.get("CMS_homepage_featured_courses")
-    if featured_courses is not None:
+    # if the key is not found, the ttl will be 0 per their docs
+    # https://github.com/jazzband/django-redis?tab=readme-ov-file#get-ttl-time-to-live-from-key
+    redis_cache = caches["redis"]
+    if redis_cache.ttl("CMS_homepage_featured_courses") > (10 * ONE_MINUTE):
         logger.info("Featured courses found in cache, moving on")
         return
     logger.info("No featured courses found in cache, refreshing")

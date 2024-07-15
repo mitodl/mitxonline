@@ -31,14 +31,22 @@ const getInitialValues = (user: User) => ({
       (user.user_profile && user.user_profile.company_size) || undefined,
     highest_education:
       (user.user_profile && user.user_profile.highest_education) || "",
-    industry:         (user.user_profile && user.user_profile.industry) || "",
-    job_function:     (user.user_profile && user.user_profile.job_function) || "",
-    job_title:        (user.user_profile && user.user_profile.job_title) || "",
+    industry:     (user.user_profile && user.user_profile.industry) || "",
+    job_function: (user.user_profile && user.user_profile.job_function) || "",
+    job_title:    (user.user_profile && user.user_profile.job_title) || "",
     leadership_level:
       (user.user_profile && user.user_profile.leadership_level) || "",
-    year_of_birth:    (user.user_profile && user.user_profile.year_of_birth) || "",
+    year_of_birth: (user.user_profile && user.user_profile.year_of_birth) || "",
     years_experience:
-      (user.user_profile && user.user_profile.years_experience) || undefined
+      (user.user_profile && user.user_profile.years_experience) || undefined,
+    type_is_professional:
+      (user.user_profile && user.user_profile.type_is_professional) || false,
+    type_is_student:
+      (user.user_profile && user.user_profile.type_is_student) || false,
+    type_is_educator:
+      (user.user_profile && user.user_profile.type_is_educator) || false,
+    type_is_other:
+      (user.user_profile && user.user_profile.type_is_other) || false
   }
 })
 

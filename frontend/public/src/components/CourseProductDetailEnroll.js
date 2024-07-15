@@ -229,9 +229,9 @@ export class CourseProductDetailEnroll extends React.Component<
 
   updateDate(run: EnrollmentFlaggedCourseRun) {
     // for original design - not used in course infobox design
-    let date = emptyOrNil(run.start_date)
-      ? undefined
-      : moment(new Date(run.start_date))
+    let date = emptyOrNil(run.start_date) ?
+      undefined :
+      moment(new Date(run.start_date))
     date = date ? date.utc() : date
     const dateElem = document.getElementById("start_date")
     if (dateElem) {
@@ -264,11 +264,11 @@ export class CourseProductDetailEnroll extends React.Component<
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run && run.products ? run.products[0] : null
     const canUpgrade = run && run.is_upgradable && product
-    const upgradableCourseRuns = courseRuns
-      ? courseRuns.filter(
+    const upgradableCourseRuns = courseRuns ?
+      courseRuns.filter(
         (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
-      )
-      : []
+      ) :
+      []
 
     return upgradableCourseRuns.length > 0 || hasMultipleEnrollableRuns ? (
       <Modal
@@ -422,16 +422,16 @@ export class CourseProductDetailEnroll extends React.Component<
     )
   }
 
-  renderEnrollLoginButton() {
+  renderEnrollLoginButton(run: EnrollmentFlaggedCourseRun) {
     return (
       <h2>
         <a
           href={`${routes.login}?next=${encodeURIComponent(
             window.location.pathname
           )}`}
-          className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
+          className="btn btn-primary btn-enrollment-button btn-lg  btn-gradient-red-to-blue highlight"
         >
-          Enroll now
+          {isRunArchived(run) ? "Access Course Materials" : "Enroll Now"}
         </a>
       </h2>
     )
@@ -467,7 +467,7 @@ export class CourseProductDetailEnroll extends React.Component<
         (courseRuns && courseRuns.length > 1) ? (
             <button
               id="upgradeEnrollBtn"
-              className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight enroll-now"
+              className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red-to-blue highlight enroll-now"
               onClick={() => this.toggleUpgradeDialogVisibility()}
               disabled={!run.is_enrollable}
             >
@@ -479,7 +479,7 @@ export class CourseProductDetailEnroll extends React.Component<
               <input type="hidden" name="run" value={run ? run.id : ""} />
               <button
                 type="submit"
-                className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+                className="btn btn-primary btn-enrollment-button btn-gradient-red-to-blue highlight enroll-now"
                 disabled={!run.is_enrollable}
               >
                 {isRunArchived(run) ? "Access Course Materials" : "Enroll Now"}
@@ -520,11 +520,11 @@ export class CourseProductDetailEnroll extends React.Component<
             isLoading={courseIsLoading || enrollmentsIsLoading}
           >
             <>
-              {run
-                ? currentUser && currentUser.id
-                  ? this.renderEnrollNowButton(run, product)
-                  : this.renderEnrollLoginButton()
-                : this.renderAccessCourseButton()}
+              {run ?
+                currentUser && currentUser.id ?
+                  this.renderEnrollNowButton(run, product) :
+                  this.renderEnrollLoginButton(run) :
+                this.renderAccessCourseButton()}
 
               {run && currentUser ? this.renderAddlProfileFieldsModal() : null}
               {run ? this.renderUpgradeEnrollmentDialog(run) : null}

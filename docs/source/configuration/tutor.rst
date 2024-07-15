@@ -124,7 +124,7 @@ These steps will also disable the AuthN SSO MFE, so from here on you'll get norm
 #. Create a ``env/build/openedx/requirements/private.txt`` with the required extensions::
 
       social-auth-mitxpro
-      mitxpro-openedx-extensions
+      openedx-companion-auth
 
 #. Edit the ``env/apps/openedx/config/lms.env.yml`` file and add::
 

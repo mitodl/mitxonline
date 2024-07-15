@@ -27,6 +27,13 @@ body.new-design {
       flex: none;
     }
 
+    .container {
+      max-width: 1260px;
+      padding: 0 15px;
+      box-sizing: border-box;
+      margin: 0 auto;
+    }
+
     .breadcrumb-item {
       color: var(--GreyText, #6F7175);
       font-size: 14px;
@@ -169,7 +176,6 @@ body.new-design {
     }
 
     .ofac-message {
-      border: 1px solid #e4e9ef;
       padding: 2rem;
       clear: both;
     }
@@ -290,16 +296,15 @@ body.new-design {
           padding: 0!important;
           text-align: center;
           color: $white;
+          background: $primary;
+          font-size: 20px;
+          font-weight: 700;
         }
 
         .btn-enrollment-button:disabled, .btn-gradient-red:disabled {
           background: #6F7175 !important;
           border-color: #6F7175;
           opacity: 1;
-        }
-
-        button.btn-enrollment-button:hover {
-          color: $brand-darker-bg;
         }
 
         .enrollment-info-box, .program-info-box {
@@ -328,25 +333,27 @@ body.new-design {
           }
 
           .callout {
-            padding: 0.9375rem;
             flex-wrap: nowrap;
+            padding: 15px;
             i.warning {
               font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-              color: $warning;
-              padding: 0;
+              color: #B87A00;
+              padding-right: 10px;
               width: fit-content;
+              padding-left: 0;
             }
-            p{
-              width: 95%;
-              font-size: 0.875rem;
-              color: $home-page-header-blue;
+            p {
               font-family: Inter, sans-serif;
-              line-height: 15px;
+              font-size: 13px;
+              font-weight: 400;
+              line-height: 15.73px;
+              text-align: left;
+              color: $home-page-header-blue;
               margin: 0;
-              padding: 0 10px 0 10px;
+              flex-shrink: 1;
             }
           }
-          .callout-warning{
+          .callout-warning {
             border: 1px solid rgba(255, 171, 0, 0.30);
             border-left: 2px solid $warning;
             background: #FFF3CC;
@@ -615,6 +622,7 @@ body.new-design {
     .modal-dialog {
       max-width: 770px;
       border-radius: 5px;
+      z-index: 2000;
 
       @include media-breakpoint-down(md) {
         width:500px;

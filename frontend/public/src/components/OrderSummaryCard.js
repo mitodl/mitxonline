@@ -179,9 +179,9 @@ export class OrderSummaryCard extends React.Component<Props> {
 
             {this.renderAppliedCoupons()}
 
-            {refunds === null || refunds.length === 0
-              ? this.renderFulfilledTag()
-              : this.renderRefunds()}
+            {refunds === null || refunds.length === 0 ?
+              this.renderFulfilledTag() :
+              this.renderRefunds()}
           </div>
 
           <div className="d-flex justify-content-between">

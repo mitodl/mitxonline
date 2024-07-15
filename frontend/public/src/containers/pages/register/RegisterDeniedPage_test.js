@@ -48,13 +48,13 @@ describe("RegisterDeniedPage", () => {
     )} in the query string`, async () => {
       const { inner } = await renderPage(
         {},
-        hasError
-          ? {
+        hasError ?
+          {
             location: {
               search: `?error=${error}`
             }
-          }
-          : {}
+          } :
+          {}
       )
 
       const detail = inner.find(".error-detail")

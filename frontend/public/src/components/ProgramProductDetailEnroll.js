@@ -325,9 +325,9 @@ export class ProgramProductDetailEnroll extends React.Component<
   }
 
   updateDate(run: EnrollmentFlaggedCourseRun) {
-    let date = emptyOrNil(run.start_date)
-      ? undefined
-      : moment(new Date(run.start_date))
+    let date = emptyOrNil(run.start_date) ?
+      undefined :
+      moment(new Date(run.start_date))
     date = date ? date.utc() : date
     const dateElem = document.getElementById("start_date")
     if (dateElem) {
@@ -404,9 +404,7 @@ export class ProgramProductDetailEnroll extends React.Component<
             <>
               {enrollment ? (
                 <Fragment>
-                  <div
-                    className={`btn btn-primary btn-enrollment-button btn-gradient-red highlight outline`}
-                  >
+                  <div className={`btn btn-enrollment-button highlight`}>
                     Enrolled &#10003;
                   </div>
                 </Fragment>
@@ -417,14 +415,14 @@ export class ProgramProductDetailEnroll extends React.Component<
                       href={`${routes.login}?next=${encodeURIComponent(
                         window.location.pathname
                       )}`}
-                      className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red highlight"
+                      className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red-to-blue highlight"
                     >
                       Enroll now
                     </a>
                   ) : (
                     <Fragment>
                       <button
-                        className="btn btn-primary btn-enrollment-button btn-gradient-red highlight enroll-now"
+                        className="btn btn-primary btn-enrollment-button btn-gradient-red-to-blue highlight enroll-now"
                         onClick={this.toggleUpgradeDialogVisibility}
                       >
                         Enroll now
