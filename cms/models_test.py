@@ -207,9 +207,9 @@ def test_course_page_context_edx_access(  # noqa: PLR0913
     course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
     if has_relevant_run:
         CourseRunFactory.create(
-        course=course_page.course,
-        **(dict(in_progress=True) if is_in_progress else dict(in_future=True)),  # noqa: C408
-    )
+            course=course_page.course,
+            **(dict(in_progress=True) if is_in_progress else dict(in_future=True)),  # noqa: C408
+        )
     if not is_authed:  # noqa: SIM108
         request_user = AnonymousUser()
     else:
