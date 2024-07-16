@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.98.0
+--------------
+
+- Clarify enrollable run (#2285)
+- Update Node.js to v17.9.1 (#2293)
+- Update react monorepo (#2292)
+- Update dependency video.js to v7.21.6 (#2291)
+- Update dependency react-markdown to v8.0.7 (#2290)
+- Update dependency postcss to v8.4.39 (#2289)
+- Update dependency chai-as-promised to v7.1.2 (#2288)
+- Update eslint-config and friends (#2282)
+
 Version 0.97.3 (Released July 11, 2024)
 --------------
 
