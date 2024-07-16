@@ -1,8 +1,8 @@
 from django.db.models import Q
 from rest_framework import serializers
 
-from courses.models import Department, CourseRun
-from courses.utils import get_enrollable_courseruns_qs, get_enrollable_course_run_filter
+from courses.models import CourseRun, Department
+from courses.utils import get_enrollable_course_run_filter
 
 
 class DepartmentSerializer(serializers.ModelSerializer):

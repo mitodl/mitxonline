@@ -3,7 +3,6 @@ Course models
 """
 
 import logging
-import operator as op
 import uuid
 from decimal import ROUND_HALF_EVEN, Decimal
 
@@ -350,7 +349,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         heap = []
         main_ops = ProgramRequirement.objects.filter(program=self, depth=2).all()
 
-        for op in main_ops:  # noqa: F402
+        for op in main_ops:
             reqs = (
                 ProgramRequirement.objects.filter(
                     program__id=self.id,
@@ -581,9 +580,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """
         course_runs = self.courseruns.all()
         eligible_course_runs = [
-            course_run
-            for course_run in course_runs
-            if course_run.is_enrollable
+            course_run for course_run in course_runs if course_run.is_enrollable
         ]
         return first_matching_item(
             sorted(eligible_course_runs, key=lambda course_run: course_run.start_date),
@@ -743,10 +740,13 @@ class CourseRun(TimestampedModel):
         Determines if a run is enrollable
         """
         now = now_in_utc()
-        return ((self.enrollment_end is None or self.enrollment_end > now)
-                and self.enrollment_start is not None and self.enrollment_start <= now
-                and self.live is True and self.start_date is not None
-                )
+        return (
+            (self.enrollment_end is None or self.enrollment_end > now)
+            and self.enrollment_start is not None
+            and self.enrollment_start <= now
+            and self.live is True
+            and self.start_date is not None
+        )
 
     @property
     def courseware_url(self):

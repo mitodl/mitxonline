@@ -2,7 +2,6 @@
 
 from datetime import timedelta
 
-import factory
 import pytest
 from django.core.exceptions import ValidationError
 from mitol.common.utils.datetime import now_in_utc
@@ -165,7 +164,6 @@ def test_course_run_in_progress(start_delta, end_delta, expected_result):
         ).is_in_progress
         is expected_result
     )
-
 
 
 def test_course_first_unexpired_run():

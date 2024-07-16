@@ -42,9 +42,6 @@ from wagtail.search import index
 from wagtail.snippets.models import register_snippet
 from wagtailmetadata.models import MetadataPageMixin
 
-from mitol.common.utils.collections import (
-    first_or_none,
-)
 from cms.blocks import (
     CourseRunCertificateOverrides,
     PriceBlock,
@@ -59,7 +56,7 @@ from cms.constants import (
     SIGNATORY_INDEX_SLUG,
 )
 from cms.forms import CertificatePageForm
-from courses.api import get_relevant_course_run, get_relevant_course_run_qset
+from courses.api import get_relevant_course_run_qset
 from courses.models import (
     Course,
     CourseRun,
