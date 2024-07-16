@@ -76,9 +76,9 @@ def get_program_certificate_by_enrollment(enrollment, program=None):
         return None
 
 
-def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
+def get_enrollable_course_run_filter(enrollment_end_date=None, valid_courses=None):
     """
-    Returns all course runs that are open for enrollment.
+    Returns a queryset of all course runs that are open for enrollment.
 
     args:
         enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
@@ -88,7 +88,7 @@ def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
     if enrollment_end_date is None:
         enrollment_end_date = now
 
-    valid_course_runs = CourseRun.objects.filter(
+    q_filters = (
         Q(live=True)
         & Q(start_date__isnull=False)
         & Q(enrollment_start__lt=now)
@@ -96,9 +96,22 @@ def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
     )
 
     if valid_courses:
-        return valid_course_runs.filter(course__in=valid_courses)
+        q_filters = q_filters & Q(course__in=valid_courses)
 
-    return valid_course_runs
+    return q_filters
+
+
+def get_enrollable_courseruns_qs(enrollment_end_date=None, valid_courses=None):
+    """
+    Returns all course runs that are open for enrollment.
+
+    args:
+        enrollment_end_date: datetime, the date to check for enrollment end if a future date is needed
+        valid_courses: Queryset of Course objects, to filter the course runs by if needed
+    """
+    q_filters = get_enrollable_course_run_filter(enrollment_end_date, valid_courses)
+
+    return CourseRun.objects.filter(q_filters)
 
 
 def get_unenrollable_courseruns_qs():
@@ -117,14 +130,8 @@ def get_self_paced_courses(queryset, enrollment_end_date=None):
     if enrollment_end_date is None:
         enrollment_end_date = now
     course_ids = queryset.values_list("id", flat=True)
-    all_runs = CourseRun.objects.filter(
-        Q(live=True)
-        & Q(course_id__in=course_ids)
-        & Q(start_date__isnull=False)
-        & Q(enrollment_start__lt=now)
-        & (Q(enrollment_end=None) | Q(enrollment_end__gt=enrollment_end_date))
-    )
-    self_paced_runs = all_runs.filter(is_self_paced=True)
+    all_enrollable_runs = get_enrollable_courseruns_qs(valid_courses=course_ids)
+    self_paced_runs = all_enrollable_runs.filter(is_self_paced=True)
     return (
         queryset.prefetch_related(Prefetch("courseruns", queryset=self_paced_runs))
         .prefetch_related("courseruns__course")
