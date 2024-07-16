@@ -1,5 +1,4 @@
 from django.db.models import Q
-from mitol.common.utils import now_in_utc
 from rest_framework import serializers
 
 from courses.models import Department, CourseRun
@@ -33,7 +32,6 @@ class DepartmentWithCoursesAndProgramsSerializer(DepartmentSerializer):
         Returns:
             list: Course IDs associated with the Department.
         """
-        now = now_in_utc()
         related_courses = instance.course_set.filter(live=True, page__live=True)
         relevant_courseruns = CourseRun.objects.filter(
             get_enrollable_course_run_filter() & Q(course__in=related_courses)
