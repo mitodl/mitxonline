@@ -69,6 +69,7 @@ wagtail = "^5.0"
 wagtail-metadata = "^5.0.0"
 mitol-django-olposthog = "^2024.5.14"
 mitol-django-google-sheets = "^2024.7.3"
+django-silk = "^5.1.0"
 
 
 [tool.poetry.group.dev.dependencies]

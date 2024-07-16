@@ -164,6 +164,7 @@ INSTALLED_APPS = (
     "django_filters",
     "corsheaders",
     "webpack_loader",
+    "silk",
     # WAGTAIL
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -228,6 +229,7 @@ MIDDLEWARE = (
     "django.contrib.sessions.middleware.SessionMiddleware",
     "oauth2_provider.middleware.OAuth2TokenMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    'silk.middleware.SilkyMiddleware',
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -573,7 +575,7 @@ NPLUSONE_LOG_LEVEL = logging.ERROR
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "filters": {"require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}},
+    "filters": {"require_debug_true": {"()": "django.utils.log.RequireDebugTrue"}, "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}},
     "formatters": {
         "verbose": {
             "format": (
@@ -587,6 +589,7 @@ LOGGING = {
     "handlers": {
         "console": {
             "level": "DEBUG",
+            "filters": ["require_debug_true"],
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
@@ -613,6 +616,11 @@ LOGGING = {
             "handlers": ["mail_admins"],
             "level": DJANGO_LOG_LEVEL,
             "propagate": True,
+        },
+        "django.db.backends": {
+            "level": "DEBUG",
+            "handlers": ["console"],
+            "propagate": False,
         },
         "nplusone": {"handlers": ["console"], "level": "ERROR"},
     },
