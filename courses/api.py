@@ -2,9 +2,8 @@
 
 import logging
 from collections import namedtuple
-from datetime import datetime, timedelta
+from datetime import timedelta
 from traceback import format_exc
-from typing import List, Optional  # noqa: UP035
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -38,6 +37,7 @@ from courses.models import (
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
     exception_logging_generator,
+    get_enrollable_courseruns_qs,
     is_grade_valid,
     is_letter_grade_valid,
 )
@@ -72,46 +72,26 @@ UserEnrollments = namedtuple(  # noqa: PYI024
 )
 
 
-def _relevant_course_qset_filter(
-    run_qset: QuerySet,
-    now: Optional[datetime] = None,  # noqa: FA100
-) -> QuerySet:
-    """
-    Does the actual filtering for user_relevant_course_run_qset and
-    user_relevant_program_course_run_qset.
-    """
-
-    return (
-        run_qset.filter(Q(enrollment_end=None) | Q(enrollment_end__gt=now))
-        .exclude(start_date=None)
-        .exclude(enrollment_start=None)
-        .filter(live=True)
-        .order_by("enrollment_start")
-    )
-
-
 def get_relevant_course_run_qset(
     course: Course,
-    now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
     Returns a QuerySet of relevant course runs
     """
-    now = now or now_in_utc()
-    run_qset = course.courseruns
-    return _relevant_course_qset_filter(run_qset, now)
+    enrollable_run_qset = get_enrollable_courseruns_qs(valid_courses=[course])
+    return enrollable_run_qset.order_by("enrollment_start")
 
 
 def get_user_relevant_program_course_run_qset(
     program: Program,
-    now: Optional[datetime] = None,  # noqa: FA100
 ) -> QuerySet:
     """
     Returns a QuerySet of relevant course runs
     """
-    now = now or now_in_utc()
-    run_qset = CourseRun.objects.filter(course__in=program.courses_qset.all())
-    return _relevant_course_qset_filter(run_qset, now)
+    enrollable_run_qset = get_enrollable_courseruns_qs(
+        valid_courses=program.courses_qset.all()
+    )
+    return enrollable_run_qset.order_by("enrollment_start")
 
 
 def create_run_enrollments(  # noqa: C901
@@ -572,7 +552,7 @@ def sync_course_runs(runs):
     return success_count, failure_count
 
 
-def sync_course_mode(runs: List[CourseRun]) -> List[str]:  # noqa: UP006
+def sync_course_mode(runs: list[CourseRun]) -> list[str]:
     """
     Updates course run upgrade expiration dates from Open edX
 

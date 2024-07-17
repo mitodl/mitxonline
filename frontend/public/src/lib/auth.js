@@ -64,11 +64,11 @@ export type StateHandlers = {
 }
 
 const getErrorQs = (errors: Array<string>) =>
-  !isEmpty(errors)
-    ? qs.stringify({
+  !isEmpty(errors) ?
+    qs.stringify({
       error: errors[0]
-    })
-    : ""
+    }) :
+    ""
 
 export const handleAuthResponse = (
   history: RouterHistory,

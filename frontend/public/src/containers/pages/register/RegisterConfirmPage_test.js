@@ -53,8 +53,7 @@ describe("RegisterConfirmPage", () => {
       "email-verified": {
         type:  "success",
         props: {
-          text:
-            "Success! We've verified your email. Please finish your account creation below."
+          text: "Success! We've verified your email. Please finish your account creation below."
         }
       }
     })

@@ -21,7 +21,8 @@ import {
   passwordFieldErrorMessage
 } from "../../lib/validation"
 
-export const NAME_REGEX = /^(?![~!@&)(+:'.?,-])(?!.*[(/^$#*=[\]`%_;\\<>{}"|)]).*$/
+export const NAME_REGEX =
+  /^(?![~!@&)(+:'.?,-])(?!.*[(/^$#*=[\]`%_;\\<>{}"|)]).*$/
 
 const seedYear = moment().year()
 
@@ -30,12 +31,7 @@ export const NAME_REGEX_FAIL_MESSAGE =
   "Name cannot start with a special character (~!@&)(+:'.?,-), and cannot contain any of (/^$#*=[]`%_;\\<>{}\"|)"
 
 export const legalAddressValidation = yup.object().shape({
-  name: yup
-    .string()
-    .required()
-    .label("Full Name")
-    .min(2)
-    .max(254),
+  name:          yup.string().required().label("Full Name").min(2).max(254),
   legal_address: yup.object().shape({
     first_name: yup
       .string()
@@ -58,11 +54,8 @@ export const legalAddressValidation = yup.object().shape({
       .string()
       .label("State")
       .when("country", {
-        is:   value => value === "US" || value === "CA",
-        then: yup
-          .string()
-          .required()
-          .typeError("State is a required field"),
+        is:        value => value === "US" || value === "CA",
+        then:      yup.string().required().typeError("State is a required field"),
         otherwise: yup.string().nullable()
       })
   })
@@ -75,10 +68,7 @@ export const newAccountValidation = yup.object().shape({
 
 export const profileValidation = yup.object().shape({
   user_profile: yup.object().shape({
-    gender: yup
-      .string()
-      .label("Gender")
-      .nullable(),
+    gender:        yup.string().label("Gender").nullable(),
     year_of_birth: yup
       .number()
       .min(13 - new Date().getFullYear())
@@ -89,34 +79,13 @@ export const profileValidation = yup.object().shape({
 
 export const addlProfileFieldsValidation = yup.object().shape({
   user_profile: yup.object().shape({
-    company: yup
-      .string()
-      .label("Company")
-      .nullable(),
-    job_title: yup
-      .string()
-      .label("Job Title")
-      .nullable(),
-    industry: yup
-      .string()
-      .label("Industry")
-      .nullable(),
-    job_function: yup
-      .string()
-      .label("Job Function")
-      .nullable(),
-    company_size: yup
-      .string()
-      .label("Company Size")
-      .nullable(),
-    years_experience: yup
-      .string()
-      .label("Years of Work Experience")
-      .nullable(),
-    leadership_level: yup
-      .string()
-      .label("Leadership Level")
-      .nullable()
+    company:          yup.string().label("Company").nullable(),
+    job_title:        yup.string().label("Job Title").nullable(),
+    industry:         yup.string().label("Industry").nullable(),
+    job_function:     yup.string().label("Job Function").nullable(),
+    company_size:     yup.string().label("Company Size").nullable(),
+    years_experience: yup.string().label("Years of Work Experience").nullable(),
+    leadership_level: yup.string().label("Leadership Level").nullable()
   }),
   highest_education: yup
     .string()
@@ -148,9 +117,9 @@ const findStates = (country: string, countries: Array<Country>) => {
   }
 
   const foundCountry = countries.find(elem => elem.code === country)
-  return foundCountry && foundCountry.states && foundCountry.states.length > 0
-    ? foundCountry.states
-    : null
+  return foundCountry && foundCountry.states && foundCountry.states.length > 0 ?
+    foundCountry.states :
+    null
 }
 
 const renderYearOfBirthField = errors => {
@@ -216,9 +185,9 @@ export const LegalAddressFields = ({
             addressErrors && addressErrors.first_name ? "true" : null
           }
           aria-describedby={
-            addressErrors && addressErrors.first_name
-              ? "first-name-error"
-              : null
+            addressErrors && addressErrors.first_name ?
+              "first-name-error" :
+              null
           }
           aria-description="Name cannot start with, or contain, a special character"
           title="Name cannot start with, or contain, a special character."
@@ -336,13 +305,13 @@ export const LegalAddressFields = ({
           title="The country where you live."
         >
           <option value="">-----</option>
-          {countries
-            ? countries.map((country, i) => (
+          {countries ?
+            countries.map((country, i) => (
               <option key={i} value={country.code}>
                 {country.name}
               </option>
-            ))
-            : null}
+            )) :
+            null}
         </Field>
         <ErrorMessage
           id="country-error"
@@ -372,15 +341,15 @@ export const LegalAddressFields = ({
             required
           >
             <option value="">-----</option>
-            {findStates(values.legal_address.country, countries)
-              ? findStates(values.legal_address.country, countries).map(
+            {findStates(values.legal_address.country, countries) ?
+              findStates(values.legal_address.country, countries).map(
                 (state, i) => (
                   <option key={i} value={state.code}>
                     {state.name}
                   </option>
                 )
-              )
-              : null}
+              ) :
+              null}
           </Field>
           <ErrorMessage
             id="state-error"
@@ -456,16 +425,16 @@ export const AddlProfileFields = ({
             aria-invalid={
               errors &&
               errors.user_profile &&
-              errors.user_profile.highest_education
-                ? "true"
-                : null
+              errors.user_profile.highest_education ?
+                "true" :
+                null
             }
             aria-describedby={
               errors &&
               errors.user_profile &&
-              errors.user_profile.highest_education
-                ? "highest-educaton-level-error-message"
-                : null
+              errors.user_profile.highest_education ?
+                "highest-educaton-level-error-message" :
+                null
             }
             title="Select the highest level of education you have completed."
           >
@@ -509,16 +478,16 @@ export const AddlProfileFields = ({
             aria-invalid={
               errors &&
               errors.user_profile &&
-              errors.user_profile.type_is_student
-                ? "true"
-                : null
+              errors.user_profile.type_is_student ?
+                "true" :
+                null
             }
             aria-describedby={
               errors &&
               errors.user_profile &&
-              errors.user_profile.type_is_student
-                ? "user_profile.type_is_studentError"
-                : null
+              errors.user_profile.type_is_student ?
+                "user_profile.type_is_studentError" :
+                null
             }
             title="Select if you are a student."
           />
@@ -541,16 +510,16 @@ export const AddlProfileFields = ({
             aria-invalid={
               errors &&
               errors.user_profile &&
-              errors.user_profile.type_is_professional
-                ? "true"
-                : null
+              errors.user_profile.type_is_professional ?
+                "true" :
+                null
             }
             aria-describedby={
               errors &&
               errors.user_profile &&
-              errors.user_profile.type_is_professional
-                ? "user_profile.type_is_studentError"
-                : null
+              errors.user_profile.type_is_professional ?
+                "user_profile.type_is_studentError" :
+                null
             }
             title="Select if you are a professional."
           />
@@ -575,16 +544,16 @@ export const AddlProfileFields = ({
             aria-invalid={
               errors &&
               errors.user_profile &&
-              errors.user_profile.type_is_educator
-                ? "true"
-                : null
+              errors.user_profile.type_is_educator ?
+                "true" :
+                null
             }
             aria-describedby={
               errors &&
               errors.user_profile &&
-              errors.user_profile.type_is_educator
-                ? "user_profile.type_is_studentError"
-                : null
+              errors.user_profile.type_is_educator ?
+                "user_profile.type_is_studentError" :
+                null
             }
             title="Select if you are an educator."
           />
@@ -605,14 +574,14 @@ export const AddlProfileFields = ({
             className="form-check-input"
             aria-labelledby="occupation-label other-label"
             aria-invalid={
-              errors && errors.user_profile && errors.user_profile.type_is_other
-                ? "true"
-                : null
+              errors && errors.user_profile && errors.user_profile.type_is_other ?
+                "true" :
+                null
             }
             aria-describedby={
-              errors && errors.user_profile && errors.user_profile.type_is_other
-                ? "user_profile.type_is_studentError"
-                : null
+              errors && errors.user_profile && errors.user_profile.type_is_other ?
+                "user_profile.type_is_studentError" :
+                null
             }
             title="Select if you are in an occupation not shown."
           />

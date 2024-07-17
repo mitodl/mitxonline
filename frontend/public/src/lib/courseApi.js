@@ -87,13 +87,13 @@ export const generateStartDateText = (run: CourseRunDetail) => {
     const formattedStartDate = formatPrettyDateTimeAmPmTz(startDate)
     if (run.end_date) {
       const endDate = parseDateString(run.end_date)
-      return now.isAfter(startDate) && now.isBefore(endDate)
-        ? { active: true, datestr: formattedStartDate }
-        : { active: false, datestr: formattedStartDate }
+      return now.isAfter(startDate) && now.isBefore(endDate) ?
+        { active: true, datestr: formattedStartDate } :
+        { active: false, datestr: formattedStartDate }
     } else {
-      return now.isAfter(startDate)
-        ? { active: true, datestr: formattedStartDate }
-        : { active: false, datestr: formattedStartDate }
+      return now.isAfter(startDate) ?
+        { active: true, datestr: formattedStartDate } :
+        { active: false, datestr: formattedStartDate }
     }
   }
 
@@ -101,9 +101,9 @@ export const generateStartDateText = (run: CourseRunDetail) => {
 }
 
 export const isFinancialAssistanceAvailable = (run: CourseRunDetail) => {
-  return run.course.page
-    ? !!run.course.page.financial_assistance_form_url
-    : false
+  return run.course.page ?
+    !!run.course.page.financial_assistance_form_url :
+    false
 }
 
 const isNodeCompleted = (
@@ -216,11 +216,11 @@ export const learnerProgramIsCompleted = (learnerRecord: LearnerRecord) => {
   return requirementsDone && electivesDone
 }
 export const isRunArchived = (run: CourseRunDetail) => {
-  return run
-    ? moment().isAfter(run.end_date) &&
+  return run ?
+    moment().isAfter(run.end_date) &&
         (moment().isBefore(run.enrollment_end) ||
-          emptyOrNil(run.enrollment_end))
-    : false
+          emptyOrNil(run.enrollment_end)) :
+    false
 }
 
 export const getFirstRelevantRun = (
@@ -266,9 +266,9 @@ export const getFirstRelevantRun = (
           run => run.start_date && moment(run.start_date).isSameOrAfter(now)
         )
         .reduce((prev, curr) =>
-          moment(curr.start_date).isBefore(moment(prev.start_date))
-            ? curr
-            : prev
+          moment(curr.start_date).isBefore(moment(prev.start_date)) ?
+            curr :
+            prev
         )
     }
 

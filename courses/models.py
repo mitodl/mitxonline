@@ -3,7 +3,6 @@ Course models
 """
 
 import logging
-import operator as op
 import uuid
 from decimal import ROUND_HALF_EVEN, Decimal
 
@@ -350,7 +349,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         heap = []
         main_ops = ProgramRequirement.objects.filter(program=self, depth=2).all()
 
-        for op in main_ops:  # noqa: F402
+        for op in main_ops:
             reqs = (
                 ProgramRequirement.objects.filter(
                     program__id=self.id,
@@ -567,7 +566,7 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
             relevant_run.products.filter(is_active=True).all() if relevant_run else None
         )
 
-    @property
+    @cached_property
     def first_unexpired_run(self):
         """
         Gets the first unexpired CourseRun associated with this Course
@@ -581,25 +580,11 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """
         course_runs = self.courseruns.all()
         eligible_course_runs = [
-            course_run
-            for course_run in course_runs
-            if course_run.live and course_run.start_date and course_run.is_unexpired
+            course_run for course_run in course_runs if course_run.is_enrollable
         ]
         return first_matching_item(
             sorted(eligible_course_runs, key=lambda course_run: course_run.start_date),
             lambda course_run: True,  # noqa: ARG005
-        )
-
-    @property
-    def unexpired_runs(self):
-        """
-        Gets all the unexpired CourseRuns associated with this Course
-        """
-        return list(
-            filter(
-                op.attrgetter("is_unexpired"),
-                self.courseruns.filter(live=True).order_by("start_date"),
-            )
         )
 
     @cached_property
@@ -640,22 +625,6 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         return self.blocked_countries.filter(
             country=user.legal_address.country
         ).exists()
-
-    def available_runs(self, user):
-        """
-        Get all enrollable runs for a Course that a user has not already enrolled in.
-
-        Args:
-            user (users.models.User): The user to check available runs for.
-
-        Returns:
-            list of CourseRun: Unexpired and unenrolled Course runs
-
-        """
-        enrolled_runs = user.courserunenrollment_set.filter(
-            run__course=self
-        ).values_list("run__id", flat=True)
-        return [run for run in self.unexpired_runs if run.id not in enrolled_runs]
 
     def __str__(self):
         title = f"{self.readable_id} | {self.title}"
@@ -745,31 +714,7 @@ class CourseRun(TimestampedModel):
             return False
         return self.end_date < now_in_utc()
 
-    @cached_property
-    def is_enrollable(self):
-        """
-        Checks if the course is not beyond its enrollment period
-
-
-        Returns:
-            boolean: True if enrollment period has begun but not ended
-        """
-        now = now_in_utc()
-        return (self.enrollment_end is None or self.enrollment_end > now) and (
-            self.enrollment_start is None or self.enrollment_start <= now
-        )
-
-    @cached_property
-    def is_unexpired(self):
-        """
-        Checks if the course is not expired
-
-        Returns:
-            boolean: True if course is not expired
-        """
-        return not self.is_past and self.is_enrollable
-
-    @cached_property
+    @property
     def is_in_progress(self) -> bool:
         """
         Returns True if the course run has started and has not yet ended
@@ -790,6 +735,20 @@ class CourseRun(TimestampedModel):
         return self.upgrade_deadline is None or (self.upgrade_deadline > now_in_utc())
 
     @cached_property
+    def is_enrollable(self):
+        """
+        Determines if a run is enrollable
+        """
+        now = now_in_utc()
+        return (
+            (self.enrollment_end is None or self.enrollment_end > now)
+            and self.enrollment_start is not None
+            and self.enrollment_start <= now
+            and self.live is True
+            and self.start_date is not None
+        )
+
+    @property
     def courseware_url(self):
         """
         Full URL for this CourseRun as it exists in the courseware

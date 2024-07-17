@@ -74,9 +74,9 @@ const ResetPasswordForm = ({ onSubmit }: Props) => (
                 errors.confirmPasswordChangePassword ? "true" : null
               }
               aria-describedby={
-                errors.confirmPasswordChangePassword
-                  ? "confirmPasswordChangePasswordError"
-                  : null
+                errors.confirmPasswordChangePassword ?
+                  "confirmPasswordChangePasswordError" :
+                  null
               }
               autoComplete="new-password"
               required

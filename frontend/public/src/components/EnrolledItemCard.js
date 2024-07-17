@@ -159,11 +159,8 @@ export class EnrolledItemCard extends React.Component<
   }
 
   async onProgramUnenrollment(program: Program) {
-    const {
-      deactivateProgramEnrollment,
-      addUserNotification,
-      onUnenroll
-    } = this.props
+    const { deactivateProgramEnrollment, addUserNotification, onUnenroll } =
+      this.props
 
     this.toggleProgramUnenrollmentModalVisibility()
 
@@ -209,9 +206,9 @@ export class EnrolledItemCard extends React.Component<
 
       let userMessage, messageType
       if (isSuccessResponse(resp)) {
-        const message = payload.subscribeEmails
-          ? "subscribed to"
-          : "unsubscribed from"
+        const message = payload.subscribeEmails ?
+          "subscribed to" :
+          "unsubscribed from"
         messageType = ALERT_TYPE_SUCCESS
         userMessage = `You have been successfully ${message} course ${payload.courseNumber} emails.`
       } else {
@@ -301,9 +298,9 @@ export class EnrolledItemCard extends React.Component<
   renderRunUnenrollmentModal(enrollment: RunEnrollment) {
     const { runUnenrollmentModalVisibility } = this.state
     const now = moment()
-    const endDate = enrollment.run.enrollment_end
-      ? parseDateString(enrollment.run.enrollment_end)
-      : null
+    const endDate = enrollment.run.enrollment_end ?
+      parseDateString(enrollment.run.enrollment_end) :
+      null
     const formattedEndDate = endDate ? formatPrettyDateTimeAmPmTz(endDate) : ""
     return (
       <Modal
@@ -324,11 +321,11 @@ export class EnrolledItemCard extends React.Component<
         <ModalBody id={`run-unenrollment-${enrollment.id}-modal-body`}>
           <p>
             Are you sure you wish to unenroll from {enrollment.run.title}?
-            {endDate
-              ? now.isAfter(endDate)
-                ? " You won't be able to re-enroll."
-                : ` You won't be able to re-enroll after ${formattedEndDate}.`
-              : null}
+            {endDate ?
+              now.isAfter(endDate) ?
+                " You won't be able to re-enroll." :
+                ` You won't be able to re-enroll after ${formattedEndDate}.` :
+              null}
           </p>
           {enrollment.enrollment_mode === "verified" ? (
             <p>
@@ -400,12 +397,8 @@ export class EnrolledItemCard extends React.Component<
   }
 
   renderCourseEnrollment() {
-    const {
-      enrollment,
-      currentUser,
-      isProgramCard,
-      redirectToCourseHomepage
-    } = this.props
+    const { enrollment, currentUser, isProgramCard, redirectToCourseHomepage } =
+      this.props
 
     const { menuVisibility } = this.state
 
@@ -435,12 +428,12 @@ export class EnrolledItemCard extends React.Component<
           </a>
         ) : null
 
-    const certificateLinksStyles = isProgramCard
-      ? "upgrade-item-description d-md-flex align-items-start justify-content-between flex-column"
-      : "upgrade-item-description d-md-flex align-items-start justify-content-between"
-    const certificateLinksIntStyles = isProgramCard
-      ? "d-flex d-md-flex flex-column align-items-start justify-content-center"
-      : "d-flex d-md-flex flex-column align-items-start justify-content-center"
+    const certificateLinksStyles = isProgramCard ?
+      "upgrade-item-description d-md-flex align-items-start justify-content-between flex-column" :
+      "upgrade-item-description d-md-flex align-items-start justify-content-between"
+    const certificateLinksIntStyles = isProgramCard ?
+      "d-flex d-md-flex flex-column align-items-start justify-content-center" :
+      "d-flex d-md-flex flex-column align-items-start justify-content-center"
 
     const certificateLinks =
       enrollment.run.products.length > 0 &&
@@ -467,9 +460,9 @@ export class EnrolledItemCard extends React.Component<
 
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
     const courseId = enrollment.run.course_number
-    const pageLocation = enrollment.run.course.page.live
-      ? enrollment.run.course.page
-      : null
+    const pageLocation = enrollment.run.course.page.live ?
+      enrollment.run.course.page :
+      null
     const menuTitle = `Course options for ${enrollment.run.course.title}`
 
     const courseRunStatusMessageText = courseRunStatusMessage(enrollment.run)
@@ -716,9 +709,9 @@ export class EnrolledItemCard extends React.Component<
   render() {
     const { enrollment } = this.props
 
-    return enrollment.run
-      ? this.renderCourseEnrollment()
-      : this.renderProgramEnrollment()
+    return enrollment.run ?
+      this.renderCourseEnrollment() :
+      this.renderProgramEnrollment()
   }
 }
 
