@@ -668,6 +668,7 @@ def enroll_in_edx_course_runs(
                     mode=mode,
                     username=username,
                     force_enrollment=force_enrollment,
+                    enrollment_attributes={"is_active": True},
                 )
             results.append(enrollment)
         except HTTPError as exc:  # noqa: PERF203
