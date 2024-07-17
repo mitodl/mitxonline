@@ -460,7 +460,6 @@ export class EnrolledItemCard extends React.Component<
 
     const onUnenrollClick = partial(this.onDeactivate.bind(this), [enrollment])
     const courseId = enrollment.run.course_number
-    console.log(enrollment.run.course.page)
     const pageLocation =
       enrollment.run.course.page && enrollment.run.course.page.live ?
         enrollment.run.course.page :
