@@ -1,6 +1,5 @@
 {
-  "extends": ["eslint-config-mitodl", "eslint-config-mitodl/flow", "eslint-config-mitodl/mocha"],
-  "plugins": ["import"],
+  "extends": "eslint-config-mitodl",
   "settings": {
     "react": {
       "version": "detect"

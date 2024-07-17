@@ -94,7 +94,13 @@ describe("ProgramProductDetailEnroll", () => {
   it("checks for enroll now button", async () => {
     const { inner } = await renderPage()
 
-    assert.equal(inner.find(".enroll-now").at(0).text(), "Enroll now")
+    assert.equal(
+      inner
+        .find(".enroll-now")
+        .at(0)
+        .text(),
+      "Enroll now"
+    )
   })
 
   it("shows course chooser dialog when Enroll Now is clicked", async () => {

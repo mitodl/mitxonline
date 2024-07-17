@@ -13,8 +13,9 @@ export const createParamSelector = (param: string, defaultValue?: any) => {
 }
 
 export const qsPartialTokenSelector = createParamSelector("partial_token")
-export const qsVerificationCodeSelector =
-  createParamSelector("verification_code")
+export const qsVerificationCodeSelector = createParamSelector(
+  "verification_code"
+)
 export const qsNextSelector = createParamSelector("next")
 export const qsErrorSelector = createParamSelector("error")
 export const qsEmailSelector = createParamSelector("email")

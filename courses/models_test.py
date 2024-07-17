@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+import factory
 import pytest
 from django.core.exceptions import ValidationError
 from mitol.common.utils.datetime import now_in_utc
@@ -141,6 +142,44 @@ def test_course_run_invalid_expiration_date(start_delta, end_delta, expiration_d
 
 
 @pytest.mark.parametrize(
+    "end_days, enroll_start_days, enroll_end_days, expected",  # noqa: PT006
+    [
+        [None, None, None, True],  # noqa: PT007
+        [None, None, 1, True],  # noqa: PT007
+        [None, None, -1, False],  # noqa: PT007
+        [1, None, None, True],  # noqa: PT007
+        [-1, None, None, True],  # noqa: PT007
+        [1, None, -1, False],  # noqa: PT007
+        [None, 1, None, False],  # noqa: PT007
+        [None, -1, None, True],  # noqa: PT007
+    ],
+)
+def test_course_run_is_enrollable(
+    end_days, enroll_start_days, enroll_end_days, expected
+):
+    """
+    Test that CourseRun.is_beyond_enrollment returns the expected boolean value
+    """
+    now = now_in_utc()
+    end_date = None if end_days is None else now + timedelta(days=end_days)
+    enr_end_date = (
+        None if enroll_end_days is None else now + timedelta(days=enroll_end_days)
+    )
+    enr_start_date = (
+        None if enroll_start_days is None else now + timedelta(days=enroll_start_days)
+    )
+
+    assert (
+        CourseRunFactory.create(
+            end_date=end_date,
+            enrollment_end=enr_end_date,
+            enrollment_start=enr_start_date,
+        ).is_enrollable
+        is expected
+    )
+
+
+@pytest.mark.parametrize(
     "start_delta, end_delta, expected_result",  # noqa: PT006
     [
         [-1, 2, True],  # noqa: PT007
@@ -163,6 +202,25 @@ def test_course_run_in_progress(start_delta, end_delta, expected_result):
             expiration_date=now + timedelta(days=10),
         ).is_in_progress
         is expected_result
+    )
+
+
+@pytest.mark.parametrize(
+    "end_days,enroll_days,expected",  # noqa: PT006
+    [[-1, 1, False], [1, -1, False], [1, 1, True]],  # noqa: PT007
+)
+def test_course_run_unexpired(end_days, enroll_days, expected):
+    """
+    Test that CourseRun.is_unexpired returns the expected boolean value
+    """
+    now = now_in_utc()
+    end_date = now + timedelta(days=end_days)
+    enr_end_date = now + timedelta(days=enroll_days)
+    assert (
+        CourseRunFactory.create(
+            end_date=end_date, enrollment_end=enr_end_date
+        ).is_unexpired
+        is expected
     )
 
 
@@ -231,6 +289,42 @@ def test_program_first_unexpired_run():
 
     assert first_run.start_date < second_run.start_date
     assert program.first_unexpired_run == first_run
+
+
+def test_course_unexpired_runs():
+    """unexpired_runs should return expected value"""
+    course = CourseFactory.create()
+    now = now_in_utc()
+    start_dates = [now, now + timedelta(days=-3)]
+    end_dates = [now + timedelta(hours=1), now + timedelta(days=-2)]
+    CourseRunFactory.create_batch(
+        2,
+        course=course,
+        start_date=factory.Iterator(start_dates),
+        end_date=factory.Iterator(end_dates),
+        live=True,
+    )
+
+    # Add a run that is not live and shouldn't show up in unexpired list
+    CourseRunFactory.create(
+        course=course, start_date=start_dates[0], end_date=end_dates[0], live=False
+    )
+
+    assert len(course.unexpired_runs) == 1
+    course_run = course.unexpired_runs[0]
+    assert course_run.start_date == start_dates[0]
+    assert course_run.end_date == end_dates[0]
+
+
+def test_course_available_runs():
+    """Enrolled runs for a user should not be in the list of available runs"""
+    user = UserFactory.create()
+    course = CourseFactory.create()
+    runs = CourseRunFactory.create_batch(2, course=course, live=True)
+    runs.sort(key=lambda run: run.start_date)
+    CourseRunEnrollmentFactory.create(run=runs[0], user=user)
+    assert course.available_runs(user) == [runs[1]]
+    assert course.available_runs(UserFactory.create()) == runs
 
 
 def test_reactivate_and_save():

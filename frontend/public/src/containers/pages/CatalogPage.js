@@ -421,12 +421,11 @@ export class CatalogPage extends React.Component<Props> {
           this.setState({
             allCoursesRetrieved: allCourses
           })
-          const filteredCourses =
-            this.filteredCoursesOrProgramsByDepartmentSlug(
-              this.state.selectedDepartment,
-              allCourses,
-              COURSES_TAB
-            )
+          const filteredCourses = this.filteredCoursesOrProgramsByDepartmentSlug(
+            this.state.selectedDepartment,
+            allCourses,
+            COURSES_TAB
+          )
           this.setState({ filteredCourses: filteredCourses })
           this.setState({ filterCoursesCalled: true })
         }
@@ -481,8 +480,11 @@ export class CatalogPage extends React.Component<Props> {
    * If this is not defined when calling the method, the value of this.state.selectedDepartment will be used.
    */
   retrieveMorePrograms(selectedDepartmentSlug: string) {
-    const { programsIsLoading, programsNextPage, getNextProgramPage } =
-      this.props
+    const {
+      programsIsLoading,
+      programsNextPage,
+      getNextProgramPage
+    } = this.props
     let currentDepartmentSlug = this.state.selectedDepartment
     if (typeof selectedDepartmentSlug !== "undefined") {
       currentDepartmentSlug = selectedDepartmentSlug
@@ -612,9 +614,9 @@ export class CatalogPage extends React.Component<Props> {
       tabSelectedValue = this.state.tabSelected
     }
     if (this.state.selectedDepartment === ALL_DEPARTMENTS) {
-      return tabSelectedValue === COURSES_TAB ?
-        this.state.allCoursesCount :
-        this.state.allProgramsCount
+      return tabSelectedValue === COURSES_TAB
+        ? this.state.allCoursesCount
+        : this.state.allProgramsCount
     } else if (!departments) return 0
     const departmentSlugs = this.state.filteredDepartments.map(
       department => department.slug
@@ -752,9 +754,9 @@ export class CatalogPage extends React.Component<Props> {
       departmentSideBarListItems.push(
         <li
           className={`sidebar-link ${
-            this.state.selectedDepartment === department.slug ?
-              "department-selected-link" :
-              "department-link"
+            this.state.selectedDepartment === department.slug
+              ? "department-selected-link"
+              : "department-link"
           }`}
           key={this.state.tabSelected + department.slug}
         >
@@ -801,9 +803,9 @@ export class CatalogPage extends React.Component<Props> {
               <h1>
                 Catalog
                 <small>
-                  {this.state.selectedDepartment === ALL_DEPARTMENTS ?
-                    "" :
-                    this.state.selectedDepartment}
+                  {this.state.selectedDepartment === ALL_DEPARTMENTS
+                    ? ""
+                    : this.state.selectedDepartment}
                 </small>
               </h1>
             </div>
@@ -813,9 +815,9 @@ export class CatalogPage extends React.Component<Props> {
               {/* Only visible on small screen when mobileFilterWindowExpanded is true. */}
               <div
                 className={`mobile-filter-overlay ${
-                  this.state.mobileFilterWindowExpanded ?
-                    "slide-mobile-filter-overlay" :
-                    "hidden-mobile-filter-overlay"
+                  this.state.mobileFilterWindowExpanded
+                    ? "slide-mobile-filter-overlay"
+                    : "hidden-mobile-filter-overlay"
                 }`}
               >
                 {this.renderDepartmentSideBarList()}
@@ -832,9 +834,9 @@ export class CatalogPage extends React.Component<Props> {
                         <div className="row" id="tabs">
                           <div
                             className={`col ${
-                              this.state.tabSelected === COURSES_TAB ?
-                                "selected-tab" :
-                                "unselected-tab"
+                              this.state.tabSelected === COURSES_TAB
+                                ? "selected-tab"
+                                : "unselected-tab"
                             }`}
                           >
                             <button
@@ -851,9 +853,9 @@ export class CatalogPage extends React.Component<Props> {
                           </div>
                           <div
                             className={`col ${
-                              this.state.tabSelected === PROGRAMS_TAB ?
-                                "selected-tab" :
-                                "unselected-tab"
+                              this.state.tabSelected === PROGRAMS_TAB
+                                ? "selected-tab"
+                                : "unselected-tab"
                             } ${
                               this.props.programsCount ? "" : "display-none"
                             }`}

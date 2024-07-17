@@ -17,9 +17,9 @@ export default function configureStore(initialState: Object) {
   if (process.env.NODE_ENV !== "production" && !global.TESTING) {
     createStoreWithMiddleware = compose(
       applyMiddleware(...COMMON_MIDDLEWARE, createLogger()),
-      window.__REDUX_DEVTOOLS_EXTENSION__ ?
-        window.__REDUX_DEVTOOLS_EXTENSION__() :
-        f => f
+      window.__REDUX_DEVTOOLS_EXTENSION__
+        ? window.__REDUX_DEVTOOLS_EXTENSION__()
+        : f => f
     )(createStore)
   } else {
     createStoreWithMiddleware = compose(applyMiddleware(...COMMON_MIDDLEWARE))(

@@ -174,9 +174,9 @@ export class CartPage extends React.Component<Props, CartState> {
                 <p className="purchase-block-intro">
                   You are about to purchase the following:
                 </p>
-                {cartItems && cartItems.length > 0 ?
-                  cartItems.map(this.renderCartItemCard.bind(this)) :
-                  this.renderEmptyCartCard()}
+                {cartItems && cartItems.length > 0
+                  ? cartItems.map(this.renderCartItemCard.bind(this))
+                  : this.renderEmptyCartCard()}
               </div>
               <div className="col-lg-4 summary-cards">
                 <div className="d-md-flex cart-helptext">

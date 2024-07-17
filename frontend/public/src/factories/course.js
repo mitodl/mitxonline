@@ -71,9 +71,11 @@ export const makeCourseRun = (): CourseRun => {
 
 export const makeCourseRunWithProduct = (): CourseRun => ({
   ...makeCourseRun(),
-  upgrade_deadline: moment().add(4, "M").format(),
-  is_upgradable:    true,
-  products:         [
+  upgrade_deadline: moment()
+    .add(4, "M")
+    .format(),
+  is_upgradable: true,
+  products:      [
     {
       description:            casual.text,
       id:                     genProductId.next().value,

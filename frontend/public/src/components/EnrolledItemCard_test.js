@@ -83,9 +83,9 @@ describe("EnrolledItemCard", () => {
   ;["audit", "verified", "program"].forEach(mode => {
     it(`renders the card for enrollment mode ${mode}`, async () => {
       const testEnrollment =
-        mode === "program" ?
-          makeProgramEnrollment() :
-          makeCourseRunEnrollmentWithProduct()
+        mode === "program"
+          ? makeProgramEnrollment()
+          : makeCourseRunEnrollmentWithProduct()
       userEnrollment = testEnrollment
       enrollmentCardProps.enrollment = testEnrollment
       const inner = await renderedCard()
@@ -170,7 +170,11 @@ describe("EnrolledItemCard", () => {
     const inner = await renderedCard()
     const detail = inner.find(".enrolled-item").find(".detail")
     assert.isTrue(detail.exists())
-    const detailText = detail.find("span").find("span").at(0).text()
+    const detailText = detail
+      .find("span")
+      .find("span")
+      .at(0)
+      .text()
     assert.isTrue(detailText.startsWith(" | Active"))
   })
 
@@ -180,7 +184,10 @@ describe("EnrolledItemCard", () => {
     const inner = await renderedCard()
     const detail = inner.find(".enrolled-item").find(".detail")
     assert.isTrue(detail.exists())
-    const detailText = detail.find("span").at(0).text()
+    const detailText = detail
+      .find("span")
+      .at(0)
+      .text()
     assert.isTrue(detailText.startsWith(" | Starts"))
   })
 
@@ -190,7 +197,10 @@ describe("EnrolledItemCard", () => {
     const inner = await renderedCard()
     const detail = inner.find(".enrolled-item").find(".detail")
     assert.isTrue(detail.exists())
-    const detailText = detail.find("span").at(0).text()
+    const detailText = detail
+      .find("span")
+      .at(0)
+      .text()
     assert.isTrue(detailText.startsWith(" | Starts"))
   })
 
@@ -199,7 +209,10 @@ describe("EnrolledItemCard", () => {
     const inner = await renderedCard()
     const detail = inner.find(".enrolled-item").find(".detail")
     assert.isTrue(detail.exists())
-    const detailText = detail.find("span").at(0).text()
+    const detailText = detail
+      .find("span")
+      .at(0)
+      .text()
     assert.isTrue(detailText.startsWith(" | Ended"))
   })
 
@@ -264,7 +277,10 @@ describe("EnrolledItemCard", () => {
         const text = extraLinks.find("a").at(0)
         assert.isFalse(text.exists())
       } else {
-        const text = extraLinks.find("a").at(0).text()
+        const text = extraLinks
+          .find("a")
+          .at(0)
+          .text()
         assert.equal(text, "Financial assistance?")
       }
     })

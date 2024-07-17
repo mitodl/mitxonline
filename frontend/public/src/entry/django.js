@@ -23,7 +23,9 @@ $(document).ready(function() {
 })
 $(".dates-tooltip").on("shown.bs.popover", () => {
   $(".date-link").attr("tabindex", 0)
-  $(".date-link").first().focus()
+  $(".date-link")
+    .first()
+    .focus()
   $(".date-link").on("click", () => {
     $(".dates-tooltip").popover("hide")
     $(".dates-tooltip").focus()
@@ -74,7 +76,9 @@ $(document).ready(function() {
     $(".nav .dropdown-toggle").text($(this).text())
     const self = this
     setTimeout(function() {
-      $(".nav").find(".active").removeClass("active")
+      $(".nav")
+        .find(".active")
+        .removeClass("active")
       $(self).addClass("active")
     }, 300)
   })

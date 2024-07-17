@@ -52,9 +52,9 @@ export class ProgramCourseInfoCard extends React.Component<ProgramCourseInfoCard
             </div>
             <div className="detail pt-1">
               {course.readable_id.split("+")[1] || course.readable_id}
-              {courseRunStatusDetail !== null ?
-                courseRunStatusMessageText :
-                null}
+              {courseRunStatusDetail !== null
+                ? courseRunStatusMessageText
+                : null}
               <div className="enrollment-extra-links d-flex">
                 {courseDetailsPage ? (
                   <a href={courseDetailsPage}>Course details</a>

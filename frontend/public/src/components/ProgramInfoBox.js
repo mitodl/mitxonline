@@ -23,9 +23,9 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
     let courseRun: BaseCourseRun | null = null
 
     programs[0].courses.forEach((course: CourseDetailWithRuns) => {
-      const thisNextRun = course.next_run_id ?
-        course.courseruns.find(elem => elem.id === course.next_run_id) :
-        course.courseruns[0]
+      const thisNextRun = course.next_run_id
+        ? course.courseruns.find(elem => elem.id === course.next_run_id)
+        : course.courseruns[0]
 
       if (
         !courseRun ||

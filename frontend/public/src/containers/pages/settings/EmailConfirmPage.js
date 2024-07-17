@@ -36,15 +36,20 @@ type Props = {
 
 export class EmailConfirmPage extends React.Component<Props> {
   async componentDidUpdate(prevProps: Props) {
-    const { addUserNotification, updateEmail, history, getCurrentUser } =
-      this.props
+    const {
+      addUserNotification,
+      updateEmail,
+      history,
+      getCurrentUser
+    } = this.props
     const prevState = path(["updateEmail", "state"], prevProps)
     if (updateEmail && updateEmail !== prevState && updateEmail.confirmed) {
       addUserNotification({
         "email-verified": {
           type:  ALERT_TYPE_SUCCESS,
           props: {
-            text: "Success! We've verified your email. Your email has been updated."
+            text:
+              "Success! We've verified your email. Your email has been updated."
           }
         }
       })

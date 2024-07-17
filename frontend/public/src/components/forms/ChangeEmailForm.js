@@ -71,9 +71,9 @@ const ChangeEmailForm = ({ onSubmit, user }: Props) => (
                 autoComplete="current-password"
                 aria-invalid={errors.confirmPasswordEmailChange ? "true" : null}
                 aria-describedby={
-                  errors.confirmPasswordEmailChange ?
-                    "confirmPasswordEmailChangeError" :
-                    null
+                  errors.confirmPasswordEmailChange
+                    ? "confirmPasswordEmailChangeError"
+                    : null
                 }
                 required
               />

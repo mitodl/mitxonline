@@ -474,9 +474,9 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
             <div className="m-0 d-flex flex-column">
               <div>
                 <h3 className="learner-record-program-title">
-                  {learnerRecord ?
-                    learnerRecord.program.title :
-                    "MITx Online Program Record"}
+                  {learnerRecord
+                    ? learnerRecord.program.title
+                    : "MITx Online Program Record"}
                 </h3>
                 <p>Program Record</p>
               </div>
@@ -499,9 +499,9 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
             <h4>Courses</h4>
             <div className="mt-2 d-flex justify-content-between">
               <div className="list-group">
-                {learnerRecord ?
-                  learnerRecord.program.courses.map(this.renderCourseListItem) :
-                  null}
+                {learnerRecord
+                  ? learnerRecord.program.courses.map(this.renderCourseListItem)
+                  : null}
               </div>
             </div>
           </div>
@@ -577,11 +577,11 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                     </tr>
                   </thead>
                   <tbody>
-                    {learnerRecord ?
-                      learnerRecord.program.courses.map(
+                    {learnerRecord
+                      ? learnerRecord.program.courses.map(
                         this.renderCourseTableRow
-                      ) :
-                      null}
+                      )
+                      : null}
                   </tbody>
                 </table>
               </div>
@@ -661,16 +661,16 @@ export class LearnerRecordsPage extends React.Component<Props, State> {
                     </div>
                   ) : null}
                 </div>
-                {learnerRecord ?
-                  this.renderLearnerRecordTable(learnerRecord) :
-                  null}
+                {learnerRecord
+                  ? this.renderLearnerRecordTable(learnerRecord)
+                  : null}
 
-                {learnerRecord ?
-                  this.renderPartnerSchoolSharingDialog(learnerRecord) :
-                  null}
-                {learnerRecord ?
-                  this.renderSharingLinkDialog(learnerRecord) :
-                  null}
+                {learnerRecord
+                  ? this.renderPartnerSchoolSharingDialog(learnerRecord)
+                  : null}
+                {learnerRecord
+                  ? this.renderSharingLinkDialog(learnerRecord)
+                  : null}
               </div>
             </div>
           </div>
@@ -706,9 +706,9 @@ const mapDispatchToProps = {
 }
 
 const mapPropsToConfig = props => [
-  props.match.params.program.length !== 36 ?
-    learnerRecordQuery(props.match.params.program) :
-    sharedLearnerRecordQuery(props.match.params.program)
+  props.match.params.program.length !== 36
+    ? learnerRecordQuery(props.match.params.program)
+    : sharedLearnerRecordQuery(props.match.params.program)
 ]
 
 export default compose(

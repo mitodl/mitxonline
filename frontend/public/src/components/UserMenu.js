@@ -47,12 +47,12 @@ const UserMenu = ({ currentUser, useScreenOverlay }: Props) => {
       text
     )
   }
-  menuChildProps = useScreenOverlay ?
-    {
+  menuChildProps = useScreenOverlay
+    ? {
       li:                 overlayListItemProps,
       dropdownIdentifier: dropdownIdentifier.concat("Mobile")
-    } :
-    {
+    }
+    : {
       container:          newDesktopMenuContainerProps,
       ul:                 desktopUListProps,
       li:                 desktopListItemProps,

@@ -34,8 +34,12 @@ export class LoginForgotPasswordConfirmPage extends React.Component<Props> {
     { newPassword, confirmPasswordChangePassword }: ResetPasswordFormValues,
     { setSubmitting }: any
   ) {
-    const { addUserNotification, forgotPasswordConfirm, history, match } =
-      this.props
+    const {
+      addUserNotification,
+      forgotPasswordConfirm,
+      history,
+      match
+    } = this.props
     const { token, uid } = match.params
 
     if (!token || !uid) {

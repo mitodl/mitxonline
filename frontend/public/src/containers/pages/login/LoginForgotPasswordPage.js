@@ -92,9 +92,9 @@ export class LoginForgotPasswordPage extends React.Component<Props, State> {
   }
 
   render() {
-    const titleText = this.state.forgotEmailSent ?
-      "Forgot Password" :
-      "Password Reset"
+    const titleText = this.state.forgotEmailSent
+      ? "Forgot Password"
+      : "Password Reset"
 
     return (
       <DocumentTitle

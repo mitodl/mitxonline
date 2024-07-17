@@ -114,9 +114,9 @@ export class OrderReceiptPage extends React.Component<Props> {
             <div className="enrolled-items">
               {orderReceipt &&
               orderReceipt.lines &&
-              orderReceipt.lines.length > 0 ?
-                this.renderReceiptPageDetailCard() :
-                this.renderEmptyCartCard()}
+              orderReceipt.lines.length > 0
+                ? this.renderReceiptPageDetailCard()
+                : this.renderEmptyCartCard()}
             </div>
           </div>
         </Loader>

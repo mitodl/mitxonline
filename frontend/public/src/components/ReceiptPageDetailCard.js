@@ -116,12 +116,12 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                     <dl>
                       <dt>Payment Method:</dt>
                       <dd id="paymentMethod">
-                        {orderReceipt.transactions.card_type ?
-                          `${orderReceipt.transactions.card_type} | ` :
-                          null}
-                        {orderReceipt.transactions.card_number ?
-                          orderReceipt.transactions.card_number :
-                          null}
+                        {orderReceipt.transactions.card_type
+                          ? `${orderReceipt.transactions.card_type} | `
+                          : null}
+                        {orderReceipt.transactions.card_number
+                          ? orderReceipt.transactions.card_number
+                          : null}
                       </dd>
                     </dl>
                   </div>

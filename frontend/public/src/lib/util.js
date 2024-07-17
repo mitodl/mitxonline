@@ -110,9 +110,9 @@ export const makeUUID = (len: number) =>
     .slice(0, len)
 
 export const removeTrailingSlash = (str: string) =>
-  str.length > 0 && str[str.length - 1] === "/" ?
-    str.substr(0, str.length - 1) :
-    str
+  str.length > 0 && str[str.length - 1] === "/"
+    ? str.substr(0, str.length - 1)
+    : str
 
 export const emptyOrNil = either(isEmpty, isNil)
 export const allEmptyOrNil = all(emptyOrNil)
@@ -245,13 +245,13 @@ export const formatLocalePrice = (amount: number | null) => {
 
 export const getFlexiblePriceForProduct = (product: Product) => {
   const flexDiscountAmount =
-    product && product.product_flexible_price ?
-      product.product_flexible_price.amount :
-      0
+    product && product.product_flexible_price
+      ? product.product_flexible_price.amount
+      : 0
   const flexDiscountType =
-    product && product.product_flexible_price ?
-      product.product_flexible_price.discount_type :
-      null
+    product && product.product_flexible_price
+      ? product.product_flexible_price.discount_type
+      : null
 
   switch (flexDiscountType) {
   case DISCOUNT_TYPE_DOLLARS_OFF:
@@ -344,9 +344,9 @@ export const reverseCompareCourseRunStartDates = (
 export const getStartDateText = (
   courseware: BaseCourseRun | CourseDetailWithRuns
 ) => {
-  const courseRun = courseware.courseruns ?
-    courseware.courseruns.sort(compareCourseRunStartDates)[0] :
-    courseware
+  const courseRun = courseware.courseruns
+    ? courseware.courseruns.sort(compareCourseRunStartDates)[0]
+    : courseware
 
   if (moment(courseRun.start_date).isAfter(moment())) {
     return `Starts: ${formatPrettyDate(parseDateString(courseRun.start_date))}`

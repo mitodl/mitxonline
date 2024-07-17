@@ -355,9 +355,9 @@ describe("utility functions", () => {
           courseruns: [
             {
               start_date:
-                startDatePosition === "future" ?
-                  moment().add(1, "days") :
-                  moment().subtract(1, "days"),
+                startDatePosition === "future"
+                  ? moment().add(1, "days")
+                  : moment().subtract(1, "days"),
               is_self_paced: false
             }
           ]

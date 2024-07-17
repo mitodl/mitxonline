@@ -229,9 +229,9 @@ export class CourseProductDetailEnroll extends React.Component<
 
   updateDate(run: EnrollmentFlaggedCourseRun) {
     // for original design - not used in course infobox design
-    let date = emptyOrNil(run.start_date) ?
-      undefined :
-      moment(new Date(run.start_date))
+    let date = emptyOrNil(run.start_date)
+      ? undefined
+      : moment(new Date(run.start_date))
     date = date ? date.utc() : date
     const dateElem = document.getElementById("start_date")
     if (dateElem) {
@@ -264,11 +264,11 @@ export class CourseProductDetailEnroll extends React.Component<
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run && run.products ? run.products[0] : null
     const canUpgrade = run && run.is_upgradable && product
-    const upgradableCourseRuns = courseRuns ?
-      courseRuns.filter(
+    const upgradableCourseRuns = courseRuns
+      ? courseRuns.filter(
         (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
-      ) :
-      []
+      )
+      : []
 
     return upgradableCourseRuns.length > 0 || hasMultipleEnrollableRuns ? (
       <Modal
@@ -520,11 +520,11 @@ export class CourseProductDetailEnroll extends React.Component<
             isLoading={courseIsLoading || enrollmentsIsLoading}
           >
             <>
-              {run ?
-                currentUser && currentUser.id ?
-                  this.renderEnrollNowButton(run, product) :
-                  this.renderEnrollLoginButton(run) :
-                this.renderAccessCourseButton()}
+              {run
+                ? currentUser && currentUser.id
+                  ? this.renderEnrollNowButton(run, product)
+                  : this.renderEnrollLoginButton(run)
+                : this.renderAccessCourseButton()}
 
               {run && currentUser ? this.renderAddlProfileFieldsModal() : null}
               {run ? this.renderUpgradeEnrollmentDialog(run) : null}

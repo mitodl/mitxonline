@@ -45,9 +45,9 @@ export function parseStoredUserMessage(
   switch (msgType) {
   case USER_MSG_TYPE_ENROLLED:
     alertType = ALERT_TYPE_SUCCESS
-    msgText = userMsgJson.run ?
-      `Success! You've been enrolled in ${userMsgJson.run}.` :
-      null
+    msgText = userMsgJson.run
+      ? `Success! You've been enrolled in ${userMsgJson.run}.`
+      : null
     break
   case USER_MSG_TYPE_ENROLL_FAILED:
     alertType = ALERT_TYPE_DANGER
@@ -90,15 +90,15 @@ export function parseStoredUserMessage(
     break
   case USER_MSG_TYPE_PAYMENT_ACCEPTED:
     alertType = ALERT_TYPE_SUCCESS
-    msgText = userMsgJson.run ?
-      `Success! You are now enrolled for the paid version of ${userMsgJson.run}.` :
-      null
+    msgText = userMsgJson.run
+      ? `Success! You are now enrolled for the paid version of ${userMsgJson.run}.`
+      : null
     break
   case USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE:
     alertType = ALERT_TYPE_SUCCESS
-    msgText = userMsgJson.run ?
-      `Success! You are now enrolled for the certificate version of ${userMsgJson.run}.` :
-      null
+    msgText = userMsgJson.run
+      ? `Success! You are now enrolled for the certificate version of ${userMsgJson.run}.`
+      : null
     break
   case USER_MSG_TYPE_DISCOUNT_INVALID:
     alertType = ALERT_TYPE_DANGER

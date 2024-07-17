@@ -103,7 +103,13 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       {}
     )
 
-    assert.equal(inner.find(".enroll-now").at(0).text(), "Enroll Now")
+    assert.equal(
+      inner
+        .find(".enroll-now")
+        .at(0)
+        .text(),
+      "Enroll Now"
+    )
   })
 
   it("checks for enroll now button should appear disabled if enrollment start in future", async () => {
@@ -123,8 +129,18 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       },
       {}
     )
-    assert.isTrue(inner.find(".enroll-now").at(0).exists())
-    assert.isTrue(inner.find(".enroll-now").at(0).prop("disabled"))
+    assert.isTrue(
+      inner
+        .find(".enroll-now")
+        .at(0)
+        .exists()
+    )
+    assert.isTrue(
+      inner
+        .find(".enroll-now")
+        .at(0)
+        .prop("disabled")
+    )
   })
 
   it("checks for enroll now button should appear if enrollment start not in future", async () => {
@@ -144,16 +160,28 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       {}
     )
 
-    assert.equal(inner.find(".enroll-now").at(0).text(), "Enroll Now")
+    assert.equal(
+      inner
+        .find(".enroll-now")
+        .at(0)
+        .text(),
+      "Enroll Now"
+    )
   })
 
   it("checks for access course materials button should appear if course is archived", async () => {
     const courseRun = {
       ...makeCourseRunDetail(),
       enrollment_end:   null,
-      enrollment_start: moment().subtract(1, "years").toISOString(),
-      start_date:       moment().subtract(10, "months").toISOString(),
-      end_date:         moment().subtract(7, "months").toISOString(),
+      enrollment_start: moment()
+        .subtract(1, "years")
+        .toISOString(),
+      start_date: moment()
+        .subtract(10, "months")
+        .toISOString(),
+      end_date: moment()
+        .subtract(7, "months")
+        .toISOString(),
       upgrade_deadline: null
     }
     const { inner } = await renderPage(
@@ -172,10 +200,18 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     )
 
     assert.equal(
-      inner.find(".enroll-now").at(0).text(),
+      inner
+        .find(".enroll-now")
+        .at(0)
+        .text(),
       "Access Course Materials"
     )
-    assert.isFalse(inner.find(".enroll-now").at(0).prop("disabled"))
+    assert.isFalse(
+      inner
+        .find(".enroll-now")
+        .at(0)
+        .prop("disabled")
+    )
   })
 
   it("checks for form-based enrollment form if there is no product", async () => {
@@ -196,7 +232,10 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     )
 
     assert.equal(
-      inner.find("form > button.enroll-now").at(0).text(),
+      inner
+        .find("form > button.enroll-now")
+        .at(0)
+        .text(),
       "Enroll Now"
     )
   })
@@ -294,10 +333,16 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       if (pacing === "Self-Paced") {
         courseRun = {
           ...makeCourseRunDetail(),
-          is_self_paced:    true,
-          enrollment_end:   moment().add(7, "months").toISOString(),
-          enrollment_start: moment().subtract(1, "years").toISOString(),
-          end_date:         moment().add(1, "years").toISOString()
+          is_self_paced:  true,
+          enrollment_end: moment()
+            .add(7, "months")
+            .toISOString(),
+          enrollment_start: moment()
+            .subtract(1, "years")
+            .toISOString(),
+          end_date: moment()
+            .add(1, "years")
+            .toISOString()
         }
       } else {
         courseRun["is_self_paced"] = false
@@ -316,9 +361,17 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       assert.isTrue(infobox.exists())
       const pacingBtn = infobox.find(".info-link").at(0)
       await pacingBtn.prop("onClick")()
-      assert.isTrue(infobox.find(".pacing-info-dialog").at(0).exists())
+      assert.isTrue(
+        infobox
+          .find(".pacing-info-dialog")
+          .at(0)
+          .exists()
+      )
       assert.include(
-        infobox.find("ModalHeader").dive().text(),
+        infobox
+          .find("ModalHeader")
+          .dive()
+          .text(),
         `What are ${pacing} courses?`
       )
     })
@@ -328,9 +381,15 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       ...makeCourseRunDetail(),
       is_self_paced:    true,
       enrollment_end:   null,
-      enrollment_start: moment().subtract(1, "years").toISOString(),
-      start_date:       moment().subtract(10, "months").toISOString(),
-      end_date:         moment().subtract(7, "months").toISOString(),
+      enrollment_start: moment()
+        .subtract(1, "years")
+        .toISOString(),
+      start_date: moment()
+        .subtract(10, "months")
+        .toISOString(),
+      end_date: moment()
+        .subtract(7, "months")
+        .toISOString(),
       upgrade_deadline: null
     }
     const course = {
@@ -368,9 +427,17 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     )
     const archivedLearnMoreBtn = infobox.find(".info-link").at(0)
     await archivedLearnMoreBtn.prop("onClick")()
-    assert.isTrue(infobox.find(".pacing-info-dialog").at(0).exists())
+    assert.isTrue(
+      infobox
+        .find(".pacing-info-dialog")
+        .at(0)
+        .exists()
+    )
     assert.include(
-      infobox.find("ModalHeader").dive().text(),
+      infobox
+        .find("ModalHeader")
+        .dive()
+        .text(),
       `What are Archived courses?`
     )
   })
@@ -429,7 +496,13 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
       assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
 
-      assert.equal(inner.find("#certificate-price-info").at(0).text(), "$9.00")
+      assert.equal(
+        inner
+          .find("#certificate-price-info")
+          .at(0)
+          .text(),
+        "$9.00"
+      )
     })
     it(`shows dialog to upgrade user enrollment with flexible percent-off discount and handles ${returnedStatusCode} response`, async () => {
       courseRun["products"] = [
@@ -454,7 +527,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
 
       assert.equal(
-        inner.find("#certificate-price-info").at(0).text().at(1),
+        inner
+          .find("#certificate-price-info")
+          .at(0)
+          .text()
+          .at(1),
         "9"
       )
     })
@@ -482,7 +559,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
 
       assert.equal(
-        inner.find("#certificate-price-info").at(0).text().at(1),
+        inner
+          .find("#certificate-price-info")
+          .at(0)
+          .text()
+          .at(1),
         "9"
       )
     })
@@ -578,7 +659,10 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         assert.isTrue(selectorControlItems.length === 3)
         assert.isTrue(selectorControlItems.at(0).text() === "Please Select")
         assert.isTrue(
-          upgradeForm.find("button.btn-upgrade").at(0).prop("disabled")
+          upgradeForm
+            .find("button.btn-upgrade")
+            .at(0)
+            .prop("disabled")
         )
         assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
         modal
@@ -598,7 +682,10 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         assert.isFalse(selectorControl.exists())
         assert.isFalse(getDisabledProp(inner, "button.enroll-now-free"))
         assert.isFalse(
-          upgradeForm.find("button.btn-upgrade").at(0).prop("disabled")
+          upgradeForm
+            .find("button.btn-upgrade")
+            .at(0)
+            .prop("disabled")
         )
       }
     })
@@ -767,16 +854,26 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       if (courseMode === "self-paced") {
         courseRun = {
           ...makeCourseRunDetail(),
-          is_self_paced:    true,
-          enrollment_end:   moment().add(7, "months").toISOString(),
-          enrollment_start: moment().subtract(1, "years").toISOString(),
-          end_date:         moment().add(1, "years").toISOString()
+          is_self_paced:  true,
+          enrollment_end: moment()
+            .add(7, "months")
+            .toISOString(),
+          enrollment_start: moment()
+            .subtract(1, "years")
+            .toISOString(),
+          end_date: moment()
+            .add(1, "years")
+            .toISOString()
         }
       }
       if (startInFuture) {
-        courseRun["start_date"] = moment().add(10, "months").toISOString()
+        courseRun["start_date"] = moment()
+          .add(10, "months")
+          .toISOString()
       } else {
-        courseRun["start_date"] = moment().subtract(10, "months").toISOString()
+        courseRun["start_date"] = moment()
+          .subtract(10, "months")
+          .toISOString()
       }
       const courseRuns = [courseRun]
 
@@ -796,14 +893,20 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
       if (courseMode === "self-paced" && !startInFuture) {
         assert.include(
-          infobox.find(".enrollment-info-text").at(0).text(),
+          infobox
+            .find(".enrollment-info-text")
+            .at(0)
+            .text(),
           `Start: Anytime End: ${formatPrettyDate(
             parseDateString(courseRun.end_date)
           )}`
         )
       } else {
         assert.include(
-          infobox.find(".enrollment-info-text").at(0).text(),
+          infobox
+            .find(".enrollment-info-text")
+            .at(0)
+            .text(),
           `Start: ${formatPrettyDate(
             parseDateString(courseRun.start_date)
           )} End: ${formatPrettyDate(parseDateString(courseRun.end_date))}`

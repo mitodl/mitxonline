@@ -41,9 +41,9 @@ export class CartItemCard extends React.Component<Props> {
     const courseDetail = this.courseAboutLink("Course details", course)
 
     const readableId =
-      course !== undefined ?
-        purchasableObject.course_number :
-        purchasableObject.run_tag
+      course !== undefined
+        ? purchasableObject.course_number
+        : purchasableObject.run_tag
 
     const courseRunStatusMessageText = courseRunStatusMessage(purchasableObject)
     const courseImage =
