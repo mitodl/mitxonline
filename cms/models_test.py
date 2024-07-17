@@ -609,7 +609,6 @@ def test_courseware_title_synced_with_product_page_title(test_course):
 
     assert courseware.title == updated_title
 
-
 @pytest.mark.parametrize("flex_form_for_course", [True, False])
 def test_flexible_pricing_request_form_context(flex_form_for_course):
     """
