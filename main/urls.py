@@ -63,7 +63,7 @@ urlpatterns = [
         index,
         name="password-reset-confirm",
     ),
-    path('silk/', include('silk.urls', namespace='silk')),
+    path("silk/", include("silk.urls", namespace="silk")),
     path("create-account/", index, name="signup"),
     path("create-account/confirm-sent/", index, name="confirm-sent"),
     path("create-account/details/", index, name="signup-details"),
