@@ -18,6 +18,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import RedirectView, TemplateView, View
 from mitol.common.utils import now_in_utc
+from mitol.olposthog.features import is_enabled as is_posthog_enabled
 from mitol.payment_gateway.api import PaymentGateway
 from rest_framework import mixins, status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
@@ -68,6 +69,7 @@ from ecommerce.serializers import (
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
+from main import features
 from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
@@ -721,10 +723,22 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
         if "invalid_discounts" in checkout_payload:
             return checkout_payload["response"]
 
+        ga_purchase_flag = is_posthog_enabled(
+            features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH,
+            False,  # noqa: FBT003
+            self.request.user,
+        )
+        ga_purchase_payload = {}
+
         return render(
             request,
             self.template_name,
-            {"checkout_payload": checkout_payload, "form": checkout_payload["payload"]},
+            {
+                "checkout_payload": checkout_payload,
+                "form": checkout_payload["payload"],
+                "ga-purchase-flag": ga_purchase_flag,
+                "ga-purchase-payload": ga_purchase_payload,
+            },
         )
 
 

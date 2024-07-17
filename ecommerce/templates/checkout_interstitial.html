@@ -10,15 +10,22 @@
                 <div class="content-col">
                     <div class="text">
                         <h1 class="mt-4">Redirecting to the payment processor...</h1>
-
                         <form id="checkout_form" method="post" action="{{ checkout_payload.url }}">
                             {% for key, value in form.items %}
                             <input type="hidden" readonly="readonly" name="{{ key }}" value="{{ value }}" />
                             {% endfor %}
                         </form>
-
+                    {% if ga-purchase-flag %}
                         <script type="text/javascript">
-                    document.getElementById('checkout_form').submit();
+                            gtag("event", "purchase", {
+                                "transaction_id": "{{ checkout_payload.transaction_id }}",
+                                "value": "{{ checkout_payload.amount }}",
+                                "currency": "{{ checkout_payload.currency }}"
+                            });
+                        </script>
+                    {% endif %}
+                        <script type="text/javascript">
+                            document.getElementById('checkout_form').submit();
                         </script>
                     </div>
                 </div>
