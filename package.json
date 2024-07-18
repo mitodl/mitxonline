@@ -11,7 +11,6 @@
     "packageManager": "yarn@3.2.0",
     "dependencies": {
         "react-content-loader": "^6.2.1",
-        "react-ga4": "^2.1.0",
         "redux-query": "3.3.1",
         "redux-query-interface-superagent": "3.3.1",
         "redux-query-react": "3.3.1"

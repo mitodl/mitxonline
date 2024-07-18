@@ -4,7 +4,7 @@ import React from "react"
 import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
-import type { BasketItem, Discount, Refund } from "../flow/cartTypes"
+import type { Discount, Refund } from "../flow/cartTypes"
 
 type Props = {
   totalPrice: number,
@@ -14,8 +14,7 @@ type Props = {
   refunds: Array<Refund>,
   addDiscount?: Function,
   discountCode: string,
-  cardTitle?: string,
-  cartItems?: Array<BasketItem>
+  cardTitle?: string
 }
 
 export class OrderSummaryCard extends React.Component<Props> {
@@ -124,7 +123,6 @@ export class OrderSummaryCard extends React.Component<Props> {
     const fmtPrice = formatLocalePrice(totalPrice)
     const fmtDiscountPrice = formatLocalePrice(discountedPrice)
     const title = cardTitle ? cardTitle : "Order Summary"
-
     return (
       <div className="order-summary container std-card" key="ordersummarycard">
         <div className="std-card-body checkout-page">
@@ -166,7 +164,7 @@ export class OrderSummaryCard extends React.Component<Props> {
                 type="link"
                 id="place-order-button"
                 className="btn btn-primary btn-gradient-red-to-blue btn-place-order"
-                onClick={window.location = "/checkout/to_payment"}
+                onClick={() => (window.location = "/checkout/to_payment")}
               >
                 Place your order
               </Button>
