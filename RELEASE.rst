@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.98.1
+Version 0.98.1 (Released July 18, 2024)
 --------------
 
 - Enrollment in a course run without a course page crashes the dashboard (#2299)
