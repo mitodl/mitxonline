@@ -5,8 +5,6 @@ import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
 import type { BasketItem, Discount, Refund } from "../flow/cartTypes"
-import { checkFeatureFlag } from "../lib/util"
-import ReactGA4 from "react-ga4"
 
 type Props = {
   totalPrice: number,
@@ -112,45 +110,6 @@ export class OrderSummaryCard extends React.Component<Props> {
     )
   }
 
-  handlePlaceOrderClick() {
-    if (checkFeatureFlag("mitxonline-4099-dedp-google-analytics")) {
-      const { cartItems, discountedPrice, discounts } = this.props
-      const purchasedItems = []
-      if (cartItems && cartItems.length > 0) {
-        for (const cartItem in cartItems) {
-          if (!cartItem.product === null) {
-            purchasedItems.append({
-              item_id:       cartItem.product.id,
-              item_name:     cartItem.description,
-              affiliation:   "MITx Online", // always MITx Online
-              discount:      discountedPrice,
-              item_category: cartItem.product.item_category,
-              price:         cartItem.price,
-              quantity:      1
-            })
-          }
-        }
-      }
-      const GADataLayerPurchase = {
-        transaction_id: this.orderReceipt.reference_number || "", // order or transaction id
-        value:          this.orderReceipt.total_price_paid || 0.0, // total purchase value excluding discounts
-        tax:            0.0,
-        shipping:       0.0,
-        currency:       "USD",
-        coupon:         discounts[0].discount_code || "",
-        items:          purchasedItems
-      }
-      const googleArgs = {
-        event:     "Purchase",
-        ecommerce: {
-          purchase: GADataLayerPurchase
-        }
-      }
-      ReactGA4.event(googleArgs)
-    }
-    window.location = "/checkout/to_payment"
-  }
-
   render() {
     const {
       orderFulfilled,
@@ -207,7 +166,7 @@ export class OrderSummaryCard extends React.Component<Props> {
                 type="link"
                 id="place-order-button"
                 className="btn btn-primary btn-gradient-red-to-blue btn-place-order"
-                onClick={this.handlePlaceOrderClick()}
+                onClick={window.location = "/checkout/to_payment"}
               >
                 Place your order
               </Button>
