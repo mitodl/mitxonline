@@ -22,8 +22,6 @@ from courses.api import (
     defer_enrollment,
     generate_course_run_certificates,
     generate_program_certificate,
-    get_relevant_course_run,
-    get_user_enrollments,
     manage_course_run_certificate_access,
     manage_program_certificate_access,
     override_user_grade,
@@ -116,67 +114,6 @@ def passed_grade_with_enrollment(user):
 def courses_api_logs(mocker):
     """Logger fixture for tasks"""
     return mocker.patch("courses.api.log")
-
-
-@pytest.mark.parametrize("is_enrolled", [True, False])
-@pytest.mark.parametrize("is_live", [True, False])
-def test_get_relevant_course_run(user, dates, course, is_live, is_enrolled):
-    """
-    get_relevant_course_run should return the soonest course
-    run that is enrollable, even if the user is already enrolled.
-    """
-    # One run in the near future, one run in progress with an expired enrollment period, and one run in the far future.
-    course_runs = CourseRunFactory.create_batch(
-        3,
-        course=course,
-        start_date=factory.Iterator(
-            [dates.future_10_days, dates.past_10_days, dates.future_30_days]
-        ),
-        end_date=factory.Iterator([None, dates.future_10_days, dates.future_60_days]),
-        enrollment_start=factory.Iterator(
-            [dates.past_60_days, dates.past_10_days, dates.past_30_days]
-        ),
-        enrollment_end=factory.Iterator(
-            [None, dates.future_30_days, dates.future_60_days]
-        ),
-    )
-    if is_enrolled:
-        # Enroll in the in-progress course run
-        CourseRunEnrollmentFactory.create(
-            run=course_runs[1], user=user, edx_enrolled=True, active=True
-        )
-    returned_run = get_relevant_course_run(course=course)
-    assert returned_run == course_runs[0]
-    course_runs[0].live = is_live
-    course_runs[0].save()
-    returned_run = get_relevant_course_run(course=course)
-    assert returned_run == (course_runs[0] if is_live else course_runs[2])
-
-
-def test_get_relevant_course_run_invalid_dates(user, dates, course):
-    """
-    get_relevant_course_run should ignore course runs with any of the following properties when the user is not enrolled:
-    1) No start date or enrollment start date
-    2) An enrollment end date in the past
-    3) The course run is not live
-
-    """
-    CourseRunFactory.create_batch(
-        3,
-        course=course,
-        start_date=factory.Iterator([None, dates.future_10_days, dates.past_30_days]),
-        end_date=factory.Iterator([None, dates.future_60_days, dates.past_10_days]),
-        enrollment_start=factory.Iterator(
-            [dates.future_10_days, None, dates.past_30_days]
-        ),
-        enrollment_end=factory.Iterator(
-            [dates.future_60_days, None, dates.past_10_days]
-        ),
-    )
-    CourseRunFactory.create(course=course, live=False)
-    returned_run = get_relevant_course_run(course=course)
-    assert returned_run is None
-
 
 def test_get_user_enrollments(user, program_with_empty_requirements):  # noqa: F811
     """Test that get_user_enrollments returns an object with a user's program and course enrollments"""
