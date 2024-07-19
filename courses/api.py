@@ -1,6 +1,5 @@
 """API for the Courses app"""
 
-import itertools
 import logging
 from collections import namedtuple
 from datetime import timedelta
@@ -16,7 +15,6 @@ from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
     has_equal_properties,
-    partition,
 )
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
@@ -94,6 +92,7 @@ def get_user_relevant_program_course_run_qset(
         valid_courses=program.courses_qset.all()
     )
     return enrollable_run_qset.order_by("enrollment_start")
+
 
 def create_run_enrollments(  # noqa: C901
     user,
