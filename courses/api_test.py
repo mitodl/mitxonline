@@ -115,6 +115,7 @@ def courses_api_logs(mocker):
     """Logger fixture for tasks"""
     return mocker.patch("courses.api.log")
 
+
 def test_get_user_enrollments(user, program_with_empty_requirements):  # noqa: F811
     """Test that get_user_enrollments returns an object with a user's program and course enrollments"""
     past_date = now_in_utc() - timedelta(days=1)
