@@ -728,7 +728,25 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             False,  # noqa: FBT003
             self.request.user,
         )
-        ga_purchase_payload = {}
+        ga_purchase_payload = {
+            "transaction_id": request.orderReceipt.reference_number,
+            "value": request.totalPrice,
+            "tax": 0.00,
+            "shipping": 0.00,
+            "currency": "USD",
+            "coupon": request.discounts[0].discount_code,
+            "items": [
+                {
+                    "item_id": "course-v1:MITxT+14.100x+2T2024",
+                    "item_name": "Microeconomics",
+                    "affiliation": "MITx Online",
+                    "discount": request.discountAmount,
+                    "item_category": "MicroMasters",
+                    "price": 50.00,
+                    "quantity": 1,
+                }
+            ],
+        }
 
         return render(
             request,
