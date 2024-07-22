@@ -495,7 +495,7 @@ export class CourseProductDetailEnroll extends React.Component<
       const courseRuns = courses[0] ? courses[0].courseruns : null
       if (courseRuns) {
         run = getFirstRelevantRun(courses[0], courseRuns)
-  
+
         if (run) {
           product = run && run.products ? run.products[0] : null
           this.updateDate(run)
