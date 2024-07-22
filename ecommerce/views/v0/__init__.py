@@ -756,6 +756,11 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
         if "invalid_discounts" in checkout_payload:
             return checkout_payload["response"]
 
+        context = {
+            "checkout_payload": checkout_payload,
+            "form": checkout_payload["payload"],
+        }
+
         ga_purchase_flag = is_posthog_enabled(
             features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH,
             False,  # noqa: FBT003
@@ -768,16 +773,13 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             )
             if order:
                 ga_purchase_payload = self._create_ga4_context(order)
+            context["ga_purchase_flag"] = ga_purchase_flag
+            context["ga_purchase_payload"] = ga_purchase_payload
 
         return render(
             request,
             self.template_name,
-            {
-                "checkout_payload": checkout_payload,
-                "form": checkout_payload["payload"],
-                "ga_purchase_flag": ga_purchase_flag,
-                "ga_purchase_payload": ga_purchase_payload,
-            },
+            context,
         )
 
 
