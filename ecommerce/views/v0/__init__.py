@@ -2,7 +2,6 @@
 MITxOnline ecommerce views
 """
 
-import json
 import logging
 from distutils.util import strtobool  # noqa: F401
 
@@ -777,7 +776,7 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                 "checkout_payload": checkout_payload,
                 "form": checkout_payload["payload"],
                 "ga_purchase_flag": ga_purchase_flag,
-                "ga_purchase_payload": json.dumps(ga_purchase_payload),
+                "ga_purchase_payload": ga_purchase_payload,
             },
         )
 
