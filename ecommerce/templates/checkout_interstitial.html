@@ -15,13 +15,9 @@
                             <input type="hidden" readonly="readonly" name="{{ key }}" value="{{ value }}" />
                             {% endfor %}
                         </form>
-                    {% if ga-purchase-flag %}
+                    {% if ga_purchase_flag %}
                         <script type="text/javascript">
-                            gtag("event", "purchase", {
-                                "transaction_id": "{{ checkout_payload.transaction_id }}",
-                                "value": "{{ checkout_payload.amount }}",
-                                "currency": "{{ checkout_payload.currency }}"
-                            });
+                            gtag("event", "purchase", {{ ga_purchase_payload }});
                         </script>
                     {% endif %}
                         <script type="text/javascript">
