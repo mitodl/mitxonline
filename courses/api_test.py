@@ -115,6 +115,7 @@ def courses_api_logs(mocker):
     """Logger fixture for tasks"""
     return mocker.patch("courses.api.log")
 
+
 @pytest.mark.parametrize(
     "enrollment_mode", [EDX_DEFAULT_ENROLLMENT_MODE, EDX_ENROLLMENT_VERIFIED_MODE]
 )
