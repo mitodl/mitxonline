@@ -16,7 +16,6 @@ import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 type CourseInfoBoxProps = {
   courses: Array<BaseCourseRun>,
-  enrollments: ?Array<RunEnrollment>,
   currentUser: CurrentUser,
   setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>
 }

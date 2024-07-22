@@ -18,11 +18,6 @@ import {
   coursesQuery,
   coursesQueryKey
 } from "../lib/queries/courseRuns"
-import {
-  enrollmentsQuery,
-  enrollmentsQueryKey,
-  enrollmentsSelector
-} from "../lib/queries/enrollment"
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
@@ -47,12 +42,9 @@ type Props = {
   courseId: ?string,
   isLoading: ?boolean,
   courses: ?Array<any>,
-  enrollments: ?Array<RunEnrollment>,
   status: ?number,
   courseIsLoading: ?boolean,
   courseStatus: ?number,
-  enrollmentsIsLoading: ?boolean,
-  enrollmentsStatus: ?number,
   upgradeEnrollmentDialogVisibility: boolean,
   addProductToBasket: (user: number, productId: number) => Promise<any>,
   currentUser: User,
@@ -496,8 +488,6 @@ export class CourseProductDetailEnroll extends React.Component<
       courses,
       courseIsLoading,
       currentUser,
-      enrollments,
-      enrollmentsIsLoading
     } = this.props
     let run,
       product = null
@@ -519,7 +509,7 @@ export class CourseProductDetailEnroll extends React.Component<
           // $FlowFixMe: isLoading null or undefined
           <Loader
             key="product_detail_enroll_loader"
-            isLoading={courseIsLoading || enrollmentsIsLoading}
+            isLoading={courseIsLoading}
           >
             <>
               {run ?
@@ -538,13 +528,12 @@ export class CourseProductDetailEnroll extends React.Component<
             // $FlowFixMe: isLoading null or undefined
             <Loader
               key="course_info_loader"
-              isLoading={courseIsLoading || enrollmentsIsLoading}
+              isLoading={courseIsLoading}
             >
               <CourseInfoBox
                 courses={courses}
                 currentUser={currentUser}
                 setCurrentCourseRun={this.setCurrentCourseRun}
-                enrollments={enrollments}
               ></CourseInfoBox>
             </Loader>
           }
@@ -577,20 +566,12 @@ const updateAddlFields = (currentUser: User) => {
 const mapStateToProps = createStructuredSelector({
   courses:              coursesSelector,
   currentUser:          currentUserSelector,
-  enrollments:          enrollmentsSelector,
   courseIsLoading:      pathOr(true, ["queries", coursesQueryKey, "isPending"]),
-  enrollmentsIsLoading: pathOr(true, [
-    "queries",
-    enrollmentsQueryKey,
-    "isPending"
-  ]),
   courseStatus:      pathOr(true, ["queries", coursesQueryKey, "status"]),
-  enrollmentsStatus: pathOr(true, ["queries", enrollmentsQueryKey, "status"])
 })
 
 const mapPropsToConfig = props => [
   coursesQuery(props.courseId),
-  enrollmentsQuery(),
   users.currentUserQuery()
 ]
 
