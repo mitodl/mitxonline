@@ -32,7 +32,6 @@ import moment from "moment-timezone"
 import {
   getFirstRelevantRun,
   isRunArchived,
-  isEnrollmentFuture,
   isFinancialAssistanceAvailable
 } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
@@ -178,7 +177,11 @@ export class CourseProductDetailEnroll extends React.Component<
 
   renderRunSelectorButtons() {
     const { courseRuns } = this.props
-
+    const enrollableCourseRuns = courseRuns ?
+      courseRuns.filter(
+        (run: EnrollmentFlaggedCourseRun) => run.is_enrollable
+      ) :
+      []
     return (
       <>
         {courseRuns && courseRuns.length > 1 ? (
@@ -195,13 +198,12 @@ export class CourseProductDetailEnroll extends React.Component<
           <option value="default" key="default-select">
             Please Select
           </option>
-          {courseRuns &&
-            courseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
+          {enrollableCourseRuns &&
+            enrollableCourseRuns.map((elem: EnrollmentFlaggedCourseRun) => (
               <option value={elem.id} key={`courserun-selection-${elem.id}`}>
                 {formatPrettyDate(moment(new Date(elem.start_date)))} -{" "}
                 {formatPrettyDate(moment(new Date(elem.end_date)))}{" "}
                 {elem.is_upgradable ? "" : "(no certificate available)"}
-                {isEnrollmentFuture(elem) ? "(enrollment opens soon)" : ""}
               </option>
             ))}
         </select>
