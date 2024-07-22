@@ -16,7 +16,6 @@ import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 type CourseInfoBoxProps = {
   courses: Array<BaseCourseRun>,
-  courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
   enrollments: ?Array<RunEnrollment>,
   currentUser: CurrentUser,
   setCurrentCourseRun: (run: EnrollmentFlaggedCourseRun) => Promise<any>
@@ -156,21 +155,21 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
   }
 
   render() {
-    const { courses, courseRuns } = this.props
+    const { courses } = this.props
 
     if (!courses || courses.length < 1) {
       return null
     }
 
     const course = courses[0]
-    const run = getFirstRelevantRun(course, courseRuns)
+    const run = getFirstRelevantRun(course, course.courseruns)
     const product = run && run.products.length > 0 && run.products[0]
     const isArchived = isRunArchived(run)
 
     const startDates = []
-    const moreEnrollableCourseRuns = courseRuns && courseRuns.length > 1
+    const moreEnrollableCourseRuns = course.courseruns && course.courseruns.length > 1
     if (moreEnrollableCourseRuns) {
-      courseRuns.forEach((courseRun, index) => {
+      course.courseruns.forEach((courseRun, index) => {
         if (courseRun.id !== run.id) {
           startDates.push(
             <li key={index}>{getCourseDates(courseRun, isArchived, true)}</li>

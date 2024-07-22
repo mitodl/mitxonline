@@ -14,9 +14,6 @@ import { routes } from "../lib/urls"
 import { getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
 import { EnrollmentFlaggedCourseRun, RunEnrollment } from "../flow/courseTypes"
 import {
-  courseRunsSelector,
-  courseRunsQuery,
-  courseRunsQueryKey,
   coursesSelector,
   coursesQuery,
   coursesQueryKey
@@ -33,7 +30,6 @@ import {
   getFirstRelevantRun,
   isRunArchived,
   isEnrollmentFuture,
-  isFinancialAssistanceAvailable
 } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import users, { currentUserSelector } from "../lib/queries/users"
@@ -50,7 +46,6 @@ import type { Product } from "../flow/cartTypes"
 type Props = {
   courseId: ?string,
   isLoading: ?boolean,
-  courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
   courses: ?Array<any>,
   enrollments: ?Array<RunEnrollment>,
   status: ?number,
@@ -148,7 +143,8 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   hndSetCourseRun = (event: any) => {
-    const { courseRuns } = this.props
+    const { courses } = this.props
+    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
     if (event.target.value === "default") {
       this.setCurrentCourseRun(null)
       return
@@ -177,7 +173,8 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   renderRunSelectorButtons() {
-    const { courseRuns } = this.props
+    const { courses } = this.props
+    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
 
     return (
       <>
@@ -240,16 +237,18 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   renderUpgradeEnrollmentDialog(firstRelevantRun: EnrollmentFlaggedCourseRun) {
-    const { courseRuns } = this.props
+    const { courses } = this.props
+    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
     let run = this.getCurrentCourseRun()
-    const course = courseRuns && courseRuns[0].course
+    const course = courses[0]
     const hasMultipleEnrollableRuns = courseRuns && courseRuns.length > 1
     if (!run && !hasMultipleEnrollableRuns) {
       run = firstRelevantRun
     }
     const needFinancialAssistanceLink =
       run &&
-      isFinancialAssistanceAvailable(run) &&
+      course.page &&
+      course.page.financial_assistance_form_url &&
       !run.approved_flexible_price_exists ? (
           <p className="financial-assistance-link">
             <a
@@ -459,7 +458,9 @@ export class CourseProductDetailEnroll extends React.Component<
     run: EnrollmentFlaggedCourseRun,
     product: Product | null
   ) {
-    const { courseRuns } = this.props
+    const { courses } = this.props
+    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
+    // COLLIN WHAT IS GOING ON HERE with run and courseruns
     const csrfToken = getCookie("csrftoken")
     return run ? (
       <h2>
@@ -492,7 +493,6 @@ export class CourseProductDetailEnroll extends React.Component<
 
   render() {
     const {
-      courseRuns,
       courses,
       courseIsLoading,
       currentUser,
@@ -501,13 +501,15 @@ export class CourseProductDetailEnroll extends React.Component<
     } = this.props
     let run,
       product = null
-
-    if (courses && courseRuns) {
-      run = getFirstRelevantRun(courses[0], courseRuns)
-
-      if (run) {
-        product = run && run.products ? run.products[0] : null
-        this.updateDate(run)
+    if (courses) {
+      const courseRuns = courses[0] ? courses[0].courseruns : null
+      if (courseRuns) {
+        run = getFirstRelevantRun(courses[0], courseRuns)
+  
+        if (run) {
+          product = run && run.products ? run.products[0] : null
+          this.updateDate(run)
+        }
       }
     }
 
@@ -540,7 +542,6 @@ export class CourseProductDetailEnroll extends React.Component<
             >
               <CourseInfoBox
                 courses={courses}
-                courseRuns={courseRuns}
                 currentUser={currentUser}
                 setCurrentCourseRun={this.setCurrentCourseRun}
                 enrollments={enrollments}
@@ -574,24 +575,20 @@ const updateAddlFields = (currentUser: User) => {
 }
 
 const mapStateToProps = createStructuredSelector({
-  courseRuns:           courseRunsSelector,
   courses:              coursesSelector,
   currentUser:          currentUserSelector,
   enrollments:          enrollmentsSelector,
-  isLoading:            pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
   courseIsLoading:      pathOr(true, ["queries", coursesQueryKey, "isPending"]),
   enrollmentsIsLoading: pathOr(true, [
     "queries",
     enrollmentsQueryKey,
     "isPending"
   ]),
-  status:            pathOr(null, ["queries", courseRunsQueryKey, "status"]),
   courseStatus:      pathOr(true, ["queries", coursesQueryKey, "status"]),
   enrollmentsStatus: pathOr(true, ["queries", enrollmentsQueryKey, "status"])
 })
 
 const mapPropsToConfig = props => [
-  courseRunsQuery(props.courseId),
   coursesQuery(props.courseId),
   enrollmentsQuery(),
   users.currentUserQuery()
