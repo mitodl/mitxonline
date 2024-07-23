@@ -723,7 +723,7 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                         "quantity": line.quantity,
                         "item_category": "Series",
                     }
-                    if related_learning_object.content_type.model == "programrun":
+                    if line.purchased_content_type.model == "programrun":
                         line_object["item_category"] = (
                             related_learning_object.program.program_type
                         )
@@ -736,8 +736,10 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             "currency": "USD",
             "items": payload_items,
         }
-        if len(order.discounts) > 0:
-            ga_purchase_payload["coupon"] = ",".join(order.discounts)
+        if order.discounts.count() > 0:
+            ga_purchase_payload["coupon"] = ",".join(
+                [discount.discount_code for discount in order.discounts]
+            )
         return ga_purchase_payload
 
     def get(self, request):  # noqa: PLR0911
@@ -764,7 +766,7 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
         ga_purchase_flag = is_posthog_enabled(
             features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH,
             False,  # noqa: FBT003
-            self.request.user,
+            self.request.user.id,
         )
         ga_purchase_payload = None
         if ga_purchase_flag:
