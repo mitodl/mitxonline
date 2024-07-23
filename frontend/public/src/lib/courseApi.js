@@ -40,11 +40,6 @@ export const isLinkableCourseRun = (
   return notNil(run.start_date) && moment(run.start_date).isBefore(now)
 }
 
-export const isEnrollmentFuture = (run: CourseRunDetail): boolean => {
-  const enrollStart = run.enrollment_start ? moment(run.enrollment_start) : null
-  return !!enrollStart && moment().isBefore(enrollStart)
-}
-
 export const courseRunStatusMessage = (run: CourseRun) => {
   const startDateDescription = generateStartDateText(run)
   if (startDateDescription !== null) {
