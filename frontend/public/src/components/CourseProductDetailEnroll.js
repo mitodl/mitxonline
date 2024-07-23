@@ -24,7 +24,7 @@ import moment from "moment-timezone"
 import {
   getFirstRelevantRun,
   isRunArchived,
-  isEnrollmentFuture,
+  isEnrollmentFuture
 } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import users, { currentUserSelector } from "../lib/queries/users"
@@ -484,11 +484,7 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   render() {
-    const {
-      courses,
-      courseIsLoading,
-      currentUser,
-    } = this.props
+    const { courses, courseIsLoading, currentUser } = this.props
     let run,
       product = null
     if (courses) {
@@ -526,10 +522,7 @@ export class CourseProductDetailEnroll extends React.Component<
         <>
           {
             // $FlowFixMe: isLoading null or undefined
-            <Loader
-              key="course_info_loader"
-              isLoading={courseIsLoading}
-            >
+            <Loader key="course_info_loader" isLoading={courseIsLoading}>
               <CourseInfoBox
                 courses={courses}
                 currentUser={currentUser}
@@ -564,10 +557,10 @@ const updateAddlFields = (currentUser: User) => {
 }
 
 const mapStateToProps = createStructuredSelector({
-  courses:              coursesSelector,
-  currentUser:          currentUserSelector,
-  courseIsLoading:      pathOr(true, ["queries", coursesQueryKey, "isPending"]),
-  courseStatus:      pathOr(true, ["queries", coursesQueryKey, "status"]),
+  courses:         coursesSelector,
+  currentUser:     currentUserSelector,
+  courseIsLoading: pathOr(true, ["queries", coursesQueryKey, "isPending"]),
+  courseStatus:    pathOr(true, ["queries", coursesQueryKey, "status"])
 })
 
 const mapPropsToConfig = props => [

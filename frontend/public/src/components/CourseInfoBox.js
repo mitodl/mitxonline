@@ -166,7 +166,8 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     const isArchived = isRunArchived(run)
 
     const startDates = []
-    const moreEnrollableCourseRuns = course.courseruns && course.courseruns.length > 1
+    const moreEnrollableCourseRuns =
+      course.courseruns && course.courseruns.length > 1
     if (moreEnrollableCourseRuns) {
       course.courseruns.forEach((courseRun, index) => {
         if (courseRun.id !== run.id) {
