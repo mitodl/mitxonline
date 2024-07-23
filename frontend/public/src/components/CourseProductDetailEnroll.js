@@ -239,6 +239,7 @@ export class CourseProductDetailEnroll extends React.Component<
     }
     const needFinancialAssistanceLink =
       run &&
+      course &&
       course.page &&
       course.page.financial_assistance_form_url &&
       !run.approved_flexible_price_exists ? (
