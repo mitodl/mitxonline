@@ -10,7 +10,7 @@ import { getFirstRelevantRun, isRunArchived } from "../lib/courseApi"
 import moment from "moment-timezone"
 
 import type { BaseCourseRun } from "../flow/courseTypes"
-import { EnrollmentFlaggedCourseRun, RunEnrollment } from "../flow/courseTypes"
+import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import type { CurrentUser } from "../flow/authTypes"
 import { Modal, ModalBody, ModalHeader } from "reactstrap"
 

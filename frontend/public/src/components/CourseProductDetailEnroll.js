@@ -12,7 +12,7 @@ import { Modal, ModalBody, ModalHeader } from "reactstrap"
 import Loader from "./Loader"
 import { routes } from "../lib/urls"
 import { getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
-import { EnrollmentFlaggedCourseRun, RunEnrollment } from "../flow/courseTypes"
+import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
   coursesSelector,
   coursesQuery,
