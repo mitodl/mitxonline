@@ -231,8 +231,8 @@ export class CourseProductDetailEnroll extends React.Component<
   renderUpgradeEnrollmentDialog(firstRelevantRun: EnrollmentFlaggedCourseRun) {
     const { courses } = this.props
     const courseRuns = courses && courses[0] ? courses[0].courseruns : null
+    const course = courses && courses[0] ? courses[0] : null
     let run = this.getCurrentCourseRun()
-    const course = courses[0]
     const hasMultipleEnrollableRuns = courseRuns && courseRuns.length > 1
     if (!run && !hasMultipleEnrollableRuns) {
       run = firstRelevantRun
