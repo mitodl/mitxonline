@@ -278,8 +278,23 @@ describe("CourseProductDetailEnrollShallowRender", () => {
           financial_assistance_form_url: "google.com"
         }
       }
+      const course = makeCourseDetailNoRuns()
+      course.courseruns = [courseRun]
       isFinancialAssistanceAvailableStub.returns(true)
-      const { inner } = await renderPage()
+      const { inner } = await renderPage(
+        {
+          entities: {
+            courses: [course]
+          },
+          queries: {
+            courses: {
+              isPending: false,
+              status:    200
+            }
+          }
+        },
+        {}
+      )
       inner.setState({ currentCourseRun: courseRun })
 
       const enrollBtn = inner.find(".enroll-now").at(0)
@@ -309,11 +324,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       } else {
         courseRun["is_self_paced"] = false
       }
-      const courseRuns = [courseRun]
+      const course = makeCourseDetailNoRuns()
+      course.courseruns = [courseRun]
       const entities = {
         currentUser: currentUser,
-        enrollments: [],
-        courseRuns:  courseRuns
+        courses:  [course]
       }
       const { inner } = await renderPage({
         entities: entities
@@ -385,18 +400,14 @@ describe("CourseProductDetailEnrollShallowRender", () => {
   it(`shows form based enrollment button when upgrade deadline has passed but course is within enrollment period`, async () => {
     courseRun.is_upgradable = false
     course.next_run_id = courseRun.id
+    course.courseruns = [courseRun]
 
     const { inner } = await renderPage(
       {
         entities: {
-          courseRuns: [courseRun],
           courses:    [course]
         },
         queries: {
-          courseRuns: {
-            isPending: false,
-            status:    200
-          },
           courses: {
             isPending: false,
             status:    200
