@@ -20,11 +20,17 @@ pytestmark = [pytest.mark.django_db]
 
 
 @pytest.mark.parametrize(
-    "remove_tree",
-    [True, False],
+    "remove_tree, certificate_type",
+    [(True, "Certificate of Completion"),
+     (False, "Certificate of Completion"),
+     (False, "MicroMasters Credential"),
+     (True, "MicroMasters Credential")]
 )
-def test_serialize_program(mock_context, remove_tree, program_with_empty_requirements):  # noqa: F811
+def test_serialize_program(mock_context, remove_tree, certificate_type, program_with_empty_requirements):  # noqa: F811
     """Test Program serialization"""
+    if certificate_type == "MicroMasters Credential":
+        program_with_empty_requirements.program_type = "MicroMasters®"
+        program_with_empty_requirements.save()
     run1 = CourseRunFactory.create(
         course__page=None,
         start_date=now() + timedelta(hours=1),
@@ -79,7 +85,8 @@ def test_serialize_program(mock_context, remove_tree, program_with_empty_require
                 program_with_empty_requirements.requirements_root
             ).data,
             "page": ProgramPageSerializer(program_with_empty_requirements.page).data,
-            "program_type": "Series",
+            "program_type": program_with_empty_requirements.program_type,
+            "certificate_type": certificate_type,
             "departments": [],
             "live": True,
             "topics": [{"name": topic.name} for topic in topics],
