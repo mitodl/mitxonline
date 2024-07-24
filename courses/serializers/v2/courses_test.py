@@ -2,17 +2,18 @@ import pytest
 from django.contrib.auth.models import AnonymousUser
 
 from cms.serializers import CoursePageSerializer
+
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
 )
 from courses.models import Department, CoursesTopic
+from courses.serializers.v1.base import BaseProgramSerializer
 from courses.serializers.v2.courses import (
     CourseRunSerializer,
     CourseWithCourseRunsSerializer,
 )
-from courses.serializers.v2.programs import ProgramSerializer
 from main.test_utils import assert_drf_json_equal
 
 pytestmark = [pytest.mark.django_db]
@@ -62,7 +63,7 @@ def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, certific
             "page": CoursePageSerializer(course.page).data,
             "certificate_type": certificate_type,
             "topics": [{"name": topic.name} for topic in topics],
-            "programs": ProgramSerializer(course.programs, many=True).data
+            "programs": BaseProgramSerializer(course.programs, many=True).data
             if all_runs
             else None,
         },
