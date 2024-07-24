@@ -131,13 +131,15 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
   it("checks for enroll now button should appear if enrollment start not in future", async () => {
     const courseRun = makeCourseRunDetail()
+    const course = makeCourseDetailNoRuns()
+    course.courseruns = [courseRun]
     const { inner } = await renderPage(
       {
         entities: {
-          courseRuns: [courseRun]
+          courses: [course]
         },
         queries: {
-          courseRuns: {
+          courses: {
             isPending: false,
             status:    200
           }
@@ -158,13 +160,15 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       end_date:         moment().subtract(7, "months").toISOString(),
       upgrade_deadline: null
     }
+    const course = makeCourseDetailNoRuns()
+    course.courseruns = [courseRun]
     const { inner } = await renderPage(
       {
         entities: {
-          courseRuns: [courseRun]
+          courses: [course]
         },
         queries: {
-          courseRuns: {
+          courses: {
             isPending: false,
             status:    200
           }
@@ -213,7 +217,6 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     }`, async () => {
       const entities = {
         currentUser: userExists ? currentUser : makeAnonymousUser(),
-        enrollments: []
       }
 
       const { inner } = await renderPage({
@@ -238,10 +241,12 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         courseRuns.push(makeCourseRunDetail())
       }
 
+      const course = makeCourseDetailNoRuns()
+      course.courseruns = courseRuns
+
       const entities = {
         currentUser: userExists ? currentUser : makeAnonymousUser(),
-        enrollments: [],
-        courseRuns:  courseRuns
+        courses:  [course]
       }
 
       const { inner } = await renderPage({
