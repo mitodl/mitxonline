@@ -56,9 +56,10 @@ class CourseSerializer(BaseCourseSerializer):
         return []
 
     def get_certificate_type(self, instance):
-        program = instance.programs[0]
-        if "MicroMasters" in program.program_type:
-            return "MicroMasters Credential"
+        if instance.programs:
+            program = instance.programs[0]
+            if "MicroMasters" in program.program_type:
+                return "MicroMasters Credential"
         return "Certificate of Completion"
 
     class Meta:
