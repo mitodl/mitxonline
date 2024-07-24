@@ -109,13 +109,15 @@ describe("CourseProductDetailEnrollShallowRender", () => {
   it("checks for enroll now button should appear disabled if enrollment start in future", async () => {
     const courseRun = makeCourseRunDetail()
     courseRun["is_enrollable"] = false
+    const course = makeCourseDetailNoRuns()
+    course.courseruns = [courseRun]
     const { inner } = await renderPage(
       {
         entities: {
-          courseRuns: [courseRun]
+          courses: [course]
         },
         queries: {
-          courseRuns: {
+          courses: {
             isPending: false,
             status:    200
           }
