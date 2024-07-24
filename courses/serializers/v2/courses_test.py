@@ -7,12 +7,12 @@ from courses.factories import (
     CourseRunFactory,
     ProgramFactory,
 )
-from courses.models import Department
-from courses.serializers.v1.courses import (
+from courses.models import Department, CoursesTopic
+from courses.serializers.v2.courses import (
     CourseRunSerializer,
     CourseWithCourseRunsSerializer,
 )
-from courses.serializers.v1.programs import ProgramSerializer
+from courses.serializers.v2.programs import ProgramSerializer
 from main.test_utils import assert_drf_json_equal
 
 pytestmark = [pytest.mark.django_db]
@@ -21,7 +21,7 @@ pytestmark = [pytest.mark.django_db]
 @pytest.mark.parametrize("is_anonymous", [True, False])
 @pytest.mark.parametrize("all_runs", [True, False])
 @pytest.mark.parametrize("certificate_type", ["MicroMasters Credential", "Certificate of Completion"])
-def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, certificate_type, settings):
+def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, certificate_type):
     """Test Course serialization"""
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
@@ -31,11 +31,15 @@ def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, certific
     courseRun1 = CourseRunFactory.create()
     courseRun2 = CourseRunFactory.create(course=courseRun1.course)
     course = courseRun1.course
+    topics = [CoursesTopic.objects.create(name=f"topic{num}") for num in range(3)]
+    course.page.topics.set([topics[0], topics[1], topics[2]])
     department = "a course departments"
     course.departments.set([Department.objects.create(name=department)])
+    program = ProgramFactory.create(program_type="Series")
     if certificate_type == "MicroMasters Credential":
-        program = ProgramFactory.create(program_type="MicroMasters®")
-        program.add_requirement(course)
+        program.program_type = "MicroMasters®"
+    program.add_requirement(course)
+    program.save()
 
     CourseRunEnrollmentFactory.create(
         run=courseRun1, **({} if is_anonymous else {"user": user})
@@ -57,6 +61,7 @@ def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, certific
             "departments": [{"name": department}],
             "page": CoursePageSerializer(course.page).data,
             "certificate_type": certificate_type,
+            "topics": [{"name": topic.name} for topic in topics],
             "programs": ProgramSerializer(course.programs, many=True).data
             if all_runs
             else None,
