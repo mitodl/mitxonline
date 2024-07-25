@@ -18,6 +18,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import RedirectView, TemplateView, View
 from mitol.common.utils import now_in_utc
+from mitol.olposthog.features import is_enabled as is_posthog_enabled
 from mitol.payment_gateway.api import PaymentGateway
 from rest_framework import mixins, status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
@@ -68,6 +69,7 @@ from ecommerce.serializers import (
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
+from main import features
 from main.constants import (
     USER_MSG_TYPE_PAYMENT_ACCEPTED,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
@@ -705,6 +707,41 @@ class CheckoutProductView(LoginRequiredMixin, RedirectView):
 class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
     template_name = "checkout_interstitial.html"
 
+    def _create_ga4_context(self, order):
+        lines = order.lines.all()
+        payload_items = []
+        if len(lines) > 0:
+            for line in lines:
+                related_learning_object = line.purchased_object
+                if related_learning_object:
+                    line_object = {
+                        "item_id": line.purchased_object_id,
+                        "item_name": line.item_description,
+                        "affiliation": "MITx Online",
+                        "discount": line.discounted_price,
+                        "price": line.total_price,
+                        "quantity": line.quantity,
+                        "item_category": "Series",
+                    }
+                    if line.purchased_content_type.model == "programrun":
+                        line_object["item_category"] = (
+                            related_learning_object.program.program_type
+                        )
+                    payload_items.append(line_object)
+        ga_purchase_payload = {
+            "transaction_id": order.reference_number,
+            "value": order.total_price_paid,
+            "tax": 0.00,
+            "shipping": 0.00,
+            "currency": "USD",
+            "items": payload_items,
+        }
+        if order.discounts.count() > 0:
+            ga_purchase_payload["coupon"] = ",".join(
+                [discount.discount_code for discount in order.discounts]
+            )
+        return ga_purchase_payload
+
     def get(self, request):  # noqa: PLR0911
         try:
             checkout_payload = api.generate_checkout_payload(request)
@@ -721,10 +758,30 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
         if "invalid_discounts" in checkout_payload:
             return checkout_payload["response"]
 
+        context = {
+            "checkout_payload": checkout_payload,
+            "form": checkout_payload["payload"],
+        }
+
+        ga_purchase_flag = is_posthog_enabled(
+            features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH,
+            False,  # noqa: FBT003
+            self.request.user.id,
+        )
+        ga_purchase_payload = None
+        if ga_purchase_flag:
+            order = Order.objects.get(
+                reference_number=checkout_payload["payload"]["reference_number"]
+            )
+            if order:
+                ga_purchase_payload = self._create_ga4_context(order)
+            context["ga_purchase_flag"] = ga_purchase_flag
+            context["ga_purchase_payload"] = ga_purchase_payload
+
         return render(
             request,
             self.template_name,
-            {"checkout_payload": checkout_payload, "form": checkout_payload["payload"]},
+            context,
         )
 
 

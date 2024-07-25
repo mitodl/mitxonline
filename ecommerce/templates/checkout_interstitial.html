@@ -10,15 +10,19 @@
                 <div class="content-col">
                     <div class="text">
                         <h1 class="mt-4">Redirecting to the payment processor...</h1>
-
                         <form id="checkout_form" method="post" action="{{ checkout_payload.url }}">
                             {% for key, value in form.items %}
                             <input type="hidden" readonly="readonly" name="{{ key }}" value="{{ value }}" />
                             {% endfor %}
                         </form>
-
+                    {% if ga_purchase_flag %}
                         <script type="text/javascript">
-                    document.getElementById('checkout_form').submit();
+                            const ga_purchase_payload = JSON.parse({{ ga_purchase_payload|safe }});
+                            gtag("event", "purchase", ga_purchase_payload);
+                        </script>
+                    {% endif %}
+                        <script type="text/javascript">
+                            document.getElementById('checkout_form').submit();
                         </script>
                     </div>
                 </div>
