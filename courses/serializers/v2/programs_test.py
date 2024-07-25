@@ -19,12 +19,11 @@ from main.test_utils import assert_drf_json_equal
 pytestmark = [pytest.mark.django_db]
 
 
-@pytest.mark.parametrize(
-    "remove_tree",
-    [True, False]
-)
+@pytest.mark.parametrize("remove_tree", [True, False])
 @pytest.mark.parametrize("certificate_type", ["MicroMasters Credential", "Certificate of Completion"])
-def test_serialize_program(mock_context, remove_tree, certificate_type, program_with_empty_requirements):  # noqa: F811
+def test_serialize_program(
+    mock_context, remove_tree, certificate_type, program_with_empty_requirements
+):  # noqa: F811
     """Test Program serialization"""
     if certificate_type == "MicroMasters Credential":
         program_with_empty_requirements.program_type = "MicroMasters®"

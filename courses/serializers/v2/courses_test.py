@@ -2,13 +2,12 @@ import pytest
 from django.contrib.auth.models import AnonymousUser
 
 from cms.serializers import CoursePageSerializer
-
 from courses.factories import (
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
 )
-from courses.models import Department, CoursesTopic
+from courses.models import CoursesTopic, Department
 from courses.serializers.v1.base import BaseProgramSerializer
 from courses.serializers.v2.courses import (
     CourseRunSerializer,
@@ -21,8 +20,11 @@ pytestmark = [pytest.mark.django_db]
 
 @pytest.mark.parametrize("is_anonymous", [True, False])
 @pytest.mark.parametrize("all_runs", [True, False])
-@pytest.mark.parametrize("certificate_type", ["MicroMasters Credential", "Certificate of Completion"])
-def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, certificate_type):
+@pytest.mark.parametrize(
+    "certificate_type", ["MicroMasters Credential", "Certificate of Completion"])
+def test_serialize_course(
+    mocker, mock_context, is_anonymous, all_runs, certificate_type
+):
     """Test Course serialization"""
     if is_anonymous:
         mock_context["request"].user = AnonymousUser()
