@@ -21,10 +21,7 @@ import {
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
-import {
-  getFirstRelevantRun,
-  isRunArchived,
-} from "../lib/courseApi"
+import { getFirstRelevantRun, isRunArchived } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import users, { currentUserSelector } from "../lib/queries/users"
 import {
