@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.98.2 (Released July 25, 2024)
+--------------
+
+- Show only enrollable runs in the enrollment dialog (#2305)
+- Update dependency @sentry/browser to v8.18.0 (#2302)
+
 Version 0.98.1 (Released July 18, 2024)
 --------------
 
