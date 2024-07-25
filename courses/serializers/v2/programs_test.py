@@ -23,8 +23,8 @@ pytestmark = [pytest.mark.django_db]
 @pytest.mark.parametrize(
     "certificate_type", ["MicroMasters Credential", "Certificate of Completion"]
 )
-def test_serialize_program(  # noqa: F811
-    mock_context, remove_tree, certificate_type, program_with_empty_requirements
+def test_serialize_program(
+    mock_context, remove_tree, certificate_type, program_with_empty_requirements  # noqa: F811
 ):
     """Test Program serialization"""
     if certificate_type == "MicroMasters Credential":
