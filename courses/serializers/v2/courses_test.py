@@ -21,7 +21,8 @@ pytestmark = [pytest.mark.django_db]
 @pytest.mark.parametrize("is_anonymous", [True, False])
 @pytest.mark.parametrize("all_runs", [True, False])
 @pytest.mark.parametrize(
-    "certificate_type", ["MicroMasters Credential", "Certificate of Completion"])
+    "certificate_type", ["MicroMasters Credential", "Certificate of Completion"]
+)
 def test_serialize_course(
     mocker, mock_context, is_anonymous, all_runs, certificate_type
 ):
