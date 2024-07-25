@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.98.4
+Version 0.98.4 (Released July 25, 2024)
 --------------
 
 - Fix GA4 output for purchase (#2310)
