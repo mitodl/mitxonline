@@ -718,8 +718,8 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                         "item_id": line.purchased_object_id,
                         "item_name": line.item_description,
                         "affiliation": "MITx Online",
-                        "discount": line.discounted_price,
-                        "price": line.total_price,
+                        "discount": str(line.discounted_price),
+                        "price": str(line.total_price),
                         "quantity": line.quantity,
                         "item_category": "Series",
                     }
@@ -730,7 +730,7 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                     payload_items.append(line_object)
         ga_purchase_payload = {
             "transaction_id": order.reference_number,
-            "value": order.total_price_paid,
+            "value": str(order.total_price_paid),
             "tax": 0.00,
             "shipping": 0.00,
             "currency": "USD",
