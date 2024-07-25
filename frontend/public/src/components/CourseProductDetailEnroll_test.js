@@ -781,149 +781,160 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         }
       }
     ]
-    course.courseruns = [pastCourseRun, currentCourseRun]
+    const course = {
+      ...makeCourseDetailWithRuns(),
+      courseruns: [pastCourseRun, currentCourseRun]
+    }
 
-    const { inner } = await renderPage({
-      entities: {
-        courses:    [course],
-        currentUser: currentUser
+    const { inner } = await renderPage(
+      {
+        entities: {
+          courses:    [course],
+          currentUser: currentUser
+        },
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          }
+        }
       }
-    })
-    inner.setState({ currentCourseRun: currentCourseRun })
+    )
     const enrollBtn = inner.find(".enroll-now").at(0)
     assert.isTrue(enrollBtn.exists())
-
+    inner.setState({ currentCourseRun: currentCourseRun })
     await enrollBtn.prop("onClick")()
-
+    inner.setState({ currentCourseRun: currentCourseRun })
     const modal = inner.find(".upgrade-enrollment-modal")
     const upgradeForm = modal.find("form").at(0)
     assert.isTrue(upgradeForm.exists())
 
     const certPricing = modal.find(".certificate-pricing").at(0)
     assert.isTrue(certPricing.exists())
+    inner.setState({ currentCourseRun: currentCourseRun })
     assert.isTrue(
       certPricing
         .text()
         .includes(currentCourseRun["upgrade_deadline"].format("MMMM D, YYYY"))
     )
   })
-  // ;[
-  //   ["self-paced", true],
-  //   ["self-paced", false],
-  //   ["instructor-paced", true],
-  //   ["instructor-paced", false]
-  // ].forEach(([courseMode, startInFuture]) => {
-  //   it(`CourseInfoBox renders the course start and end dates when the course is ${courseMode} and has ${
-  //     startInFuture ? "future" : "past"
-  //   } start date`, async () => {
-  //     if (courseMode === "self-paced") {
-  //       courseRun = {
-  //         ...makeCourseRunDetail(),
-  //         is_self_paced:    true,
-  //         enrollment_end:   moment().add(7, "months").toISOString(),
-  //         enrollment_start: moment().subtract(1, "years").toISOString(),
-  //         end_date:         moment().add(1, "years").toISOString()
-  //       }
-  //     }
-  //     if (startInFuture) {
-  //       courseRun["start_date"] = moment().add(10, "months").toISOString()
-  //     } else {
-  //       courseRun["start_date"] = moment().subtract(10, "months").toISOString()
-  //     }
-  //     const courseRuns = [courseRun]
+  ;[
+    ["self-paced", true],
+    ["self-paced", false],
+    ["instructor-paced", true],
+    ["instructor-paced", false]
+  ].forEach(([courseMode, startInFuture]) => {
+    it(`CourseInfoBox renders the course start and end dates when the course is ${courseMode} and has ${
+      startInFuture ? "future" : "past"
+    } start date`, async () => {
+      if (courseMode === "self-paced") {
+        courseRun = {
+          ...makeCourseRunDetail(),
+          is_self_paced:    true,
+          enrollment_end:   moment().add(7, "months").toISOString(),
+          enrollment_start: moment().subtract(1, "years").toISOString(),
+          end_date:         moment().add(1, "years").toISOString()
+        }
+      }
+      if (startInFuture) {
+        courseRun["start_date"] = moment().add(10, "months").toISOString()
+      } else {
+        courseRun["start_date"] = moment().subtract(10, "months").toISOString()
+      }
+      course.courseruns = [courseRun]
 
-  //     const entities = {
-  //       currentUser: currentUser,
-  //       enrollments: [],
-  //       courseRuns:  courseRuns
-  //     }
+      const entities = {
+        currentUser: currentUser,
+        courses:  [course]
+      }
 
-  //     const { inner } = await renderPage({
-  //       entities: entities
-  //     })
+      const { inner } = await renderPage({
+        entities: entities
+      })
 
-  //     assert.isTrue(inner.exists())
-  //     const infobox = inner.find("CourseInfoBox").dive()
-  //     assert.isTrue(infobox.exists())
+      assert.isTrue(inner.exists())
+      const infobox = inner.find("CourseInfoBox").dive()
+      assert.isTrue(infobox.exists())
 
-  //     if (courseMode === "self-paced" && !startInFuture) {
-  //       assert.include(
-  //         infobox.find(".enrollment-info-text").at(0).text(),
-  //         `Start: Anytime End: ${formatPrettyDate(
-  //           parseDateString(courseRun.end_date)
-  //         )}`
-  //       )
-  //     } else {
-  //       assert.include(
-  //         infobox.find(".enrollment-info-text").at(0).text(),
-  //         `Start: ${formatPrettyDate(
-  //           parseDateString(courseRun.start_date)
-  //         )} End: ${formatPrettyDate(parseDateString(courseRun.end_date))}`
-  //       )
-  //     }
-  //   })
-  // })
-  // ;[
-  //   [true, false],
-  //   [false, false],
-  //   [true, true],
-  //   [true, true]
-  // ].forEach(([userExists, hasMoreDates]) => {
-  //   it(`renders the CourseInfoBox if the user ${
-  //     userExists ? "is logged in" : "is anonymous"
-  //   }`, async () => {
-  //     const entities = {
-  //       currentUser: userExists ? currentUser : makeAnonymousUser(),
-  //       enrollments: []
-  //     }
+      if (courseMode === "self-paced" && !startInFuture) {
+        assert.include(
+          infobox.find(".enrollment-info-text").at(0).text(),
+          `Start: Anytime End: ${formatPrettyDate(
+            parseDateString(courseRun.end_date)
+          )}`
+        )
+      } else {
+        assert.include(
+          infobox.find(".enrollment-info-text").at(0).text(),
+          `Start: ${formatPrettyDate(
+            parseDateString(courseRun.start_date)
+          )} End: ${formatPrettyDate(parseDateString(courseRun.end_date))}`
+        )
+      }
+    })
+  })
+  ;[
+    [true, false],
+    [false, false],
+    [true, true],
+    [true, true]
+  ].forEach(([userExists, hasMoreDates]) => {
+    it(`renders the CourseInfoBox if the user ${
+      userExists ? "is logged in" : "is anonymous"
+    }`, async () => {
+      const entities = {
+        currentUser: userExists ? currentUser : makeAnonymousUser(),
+        enrollments: []
+      }
 
-  //     const { inner } = await renderPage({
-  //       entities: entities
-  //     })
+      const { inner } = await renderPage({
+        entities: entities
+      })
 
-  //     assert.isTrue(inner.exists())
-  //     const infobox = inner.find("CourseInfoBox").dive()
-  //     assert.isTrue(infobox.exists())
-  //   })
+      assert.isTrue(inner.exists())
+      const infobox = inner.find("CourseInfoBox").dive()
+      assert.isTrue(infobox.exists())
+    })
 
-  //   it(`CourseInfoBox ${
-  //     hasMoreDates ? "renders" : "does not render"
-  //   } the date selector when the user ${
-  //     userExists ? "is logged in" : "is anonymous"
-  //   } and there is ${
-  //     hasMoreDates ? ">1 courserun" : "one courserun"
-  //   }`, async () => {
-  //     const courseRuns = [courseRun]
+    it(`CourseInfoBox ${
+      hasMoreDates ? "renders" : "does not render"
+    } the date selector when the user ${
+      userExists ? "is logged in" : "is anonymous"
+    } and there is ${
+      hasMoreDates ? ">1 courserun" : "one courserun"
+    }`, async () => {
+      const courseRuns = [courseRun]
 
-  //     if (hasMoreDates) {
-  //       courseRuns.push(makeCourseRunDetail())
-  //     }
+      if (hasMoreDates) {
+        courseRuns.push(makeCourseRunDetail())
+      }
 
-  //     const entities = {
-  //       currentUser: userExists ? currentUser : makeAnonymousUser(),
-  //       enrollments: [],
-  //       courseRuns:  courseRuns
-  //     }
+      course.courseruns = courseRuns
 
-  //     const { inner } = await renderPage({
-  //       entities: entities
-  //     })
+      const entities = {
+        currentUser: userExists ? currentUser : makeAnonymousUser(),
+        courses:  [course]
+      }
 
-  //     assert.isTrue(inner.exists())
-  //     const infobox = inner.find("CourseInfoBox").dive()
-  //     assert.isTrue(infobox.exists())
+      const { inner } = await renderPage({
+        entities: entities
+      })
 
-  //     const moreDatesLink = infobox.find("button.more-dates").first()
+      assert.isTrue(inner.exists())
+      const infobox = inner.find("CourseInfoBox").dive()
+      assert.isTrue(infobox.exists())
 
-  //     if (!hasMoreDates) {
-  //       assert.isFalse(moreDatesLink.exists())
-  //     } else {
-  //       assert.isTrue(moreDatesLink.exists())
-  //       await moreDatesLink.prop("onClick")()
+      const moreDatesLink = infobox.find("button.more-dates").first()
 
-  //       const selectorBar = infobox.find(".more-dates-enrollment-list")
-  //       assert.isTrue(selectorBar.exists())
-  //     }
-  //   })
-  // })
+      if (!hasMoreDates) {
+        assert.isFalse(moreDatesLink.exists())
+      } else {
+        assert.isTrue(moreDatesLink.exists())
+        await moreDatesLink.prop("onClick")()
+
+        const selectorBar = infobox.find(".more-dates-enrollment-list")
+        assert.isTrue(selectorBar.exists())
+      }
+    })
+  })
 })
