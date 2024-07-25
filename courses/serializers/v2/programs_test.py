@@ -5,7 +5,7 @@ from django.utils.timezone import now
 
 from cms.factories import CoursePageFactory
 from cms.serializers import ProgramPageSerializer
-from courses.factories import ( # noqa: F401
+from courses.factories import (  # noqa: F401
     CourseRunFactory,
     program_with_empty_requirements,
 )
@@ -24,7 +24,10 @@ pytestmark = [pytest.mark.django_db]
     "certificate_type", ["MicroMasters Credential", "Certificate of Completion"]
 )
 def test_serialize_program(
-    mock_context, remove_tree, certificate_type, program_with_empty_requirements  # noqa: F811
+    mock_context,
+    remove_tree,
+    certificate_type,
+    program_with_empty_requirements,  # noqa: F811
 ):
     """Test Program serialization"""
     if certificate_type == "MicroMasters Credential":
