@@ -24,7 +24,6 @@ import moment from "moment-timezone"
 import {
   getFirstRelevantRun,
   isRunArchived,
-  isFinancialAssistanceAvailable
 } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import users, { currentUserSelector } from "../lib/queries/users"
