@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.98.2
+Version 0.98.2 (Released July 25, 2024)
 --------------
 
 - Show only enrollable runs in the enrollment dialog (#2305)
