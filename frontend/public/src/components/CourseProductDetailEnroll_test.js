@@ -216,7 +216,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       userExists ? "is logged in" : "is anonymous"
     }`, async () => {
       const entities = {
-        currentUser: userExists ? currentUser : makeAnonymousUser(),
+        currentUser: userExists ? currentUser : makeAnonymousUser()
       }
 
       const { inner } = await renderPage({
@@ -246,7 +246,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
       const entities = {
         currentUser: userExists ? currentUser : makeAnonymousUser(),
-        courses:  [course]
+        courses:     [course]
       }
 
       const { inner } = await renderPage({
@@ -328,7 +328,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       course.courseruns = [courseRun]
       const entities = {
         currentUser: currentUser,
-        courses:  [course]
+        courses:     [course]
       }
       const { inner } = await renderPage({
         entities: entities
@@ -405,7 +405,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     const { inner } = await renderPage(
       {
         entities: {
-          courses:    [course]
+          courses: [course]
         },
         queries: {
           courses: {
@@ -439,7 +439,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       const { inner } = await renderPage(
         {
           entities: {
-            courses:    [course]
+            courses: [course]
           },
           queries: {
             courses: {
@@ -478,7 +478,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       const { inner } = await renderPage(
         {
           entities: {
-            courses:    [course]
+            courses: [course]
           },
           queries: {
             courses: {
@@ -520,7 +520,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       const { inner } = await renderPage(
         {
           entities: {
-            courses:    [course]
+            courses: [course]
           },
           queries: {
             courses: {
@@ -587,7 +587,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     const { inner } = await renderPage(
       {
         entities: {
-          courses:    [course]
+          courses: [course]
         },
         queries: {
           courses: {
@@ -713,7 +713,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
       const { inner } = await renderPage({
         entities: {
-          courses:    [course],
+          courses:     [course],
           currentUser: currentUser
         }
       })
@@ -786,20 +786,18 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       courseruns: [pastCourseRun, currentCourseRun]
     }
 
-    const { inner } = await renderPage(
-      {
-        entities: {
-          courses:    [course],
-          currentUser: currentUser
-        },
-        queries: {
-          courses: {
-            isPending: false,
-            status:    200
-          }
+    const { inner } = await renderPage({
+      entities: {
+        courses:     [course],
+        currentUser: currentUser
+      },
+      queries: {
+        courses: {
+          isPending: false,
+          status:    200
         }
       }
-    )
+    })
     const enrollBtn = inner.find(".enroll-now").at(0)
     assert.isTrue(enrollBtn.exists())
     inner.setState({ currentCourseRun: currentCourseRun })
@@ -845,7 +843,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
       const entities = {
         currentUser: currentUser,
-        courses:  [course]
+        courses:     [course]
       }
 
       const { inner } = await renderPage({
@@ -913,7 +911,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
       const entities = {
         currentUser: userExists ? currentUser : makeAnonymousUser(),
-        courses:  [course]
+        courses:     [course]
       }
 
       const { inner } = await renderPage({
