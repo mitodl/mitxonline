@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.98.3
+Version 0.98.3 (Released July 25, 2024)
 --------------
 
 - GA4 Data Layer Push for purchase events (#2246)
