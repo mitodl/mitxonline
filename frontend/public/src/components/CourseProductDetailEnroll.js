@@ -233,9 +233,11 @@ export class CourseProductDetailEnroll extends React.Component<
     const courseRuns = courses && courses[0] ? courses[0].courseruns : null
     const course = courses && courses[0] ? courses[0] : null
     let run = this.getCurrentCourseRun()
+    console.log("run", run)
     const hasMultipleEnrollableRuns = courseRuns && courseRuns.length > 1
     if (!run && !hasMultipleEnrollableRuns) {
       run = firstRelevantRun
+      console.log("firstRelevantRun", firstRelevantRun)
     }
     const needFinancialAssistanceLink =
       run &&
@@ -256,6 +258,7 @@ export class CourseProductDetailEnroll extends React.Component<
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run && run.products ? run.products[0] : null
     const canUpgrade = run && run.is_upgradable && product
+    console.log("canUpgrade", canUpgrade)
     const upgradableCourseRuns = courseRuns ?
       courseRuns.filter(
         (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
@@ -453,7 +456,6 @@ export class CourseProductDetailEnroll extends React.Component<
   ) {
     const { courses } = this.props
     const courseRuns = courses && courses[0] ? courses[0].courseruns : null
-    // COLLIN WHAT IS GOING ON HERE with run and courseruns
     const csrfToken = getCookie("csrftoken")
     return run ? (
       <h2>
