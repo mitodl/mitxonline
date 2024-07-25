@@ -7,6 +7,7 @@ from cms.factories import CoursePageFactory
 from cms.serializers import ProgramPageSerializer
 from courses.factories import (  # noqa: F401
     CourseRunFactory,
+    program_with_empty_requirements,
 )
 from courses.models import CoursesTopic, Department
 from courses.serializers.v2.programs import (
