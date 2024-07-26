@@ -738,7 +738,7 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
         }
         if order.discounts.count() > 0:
             ga_purchase_payload["coupon"] = ",".join(
-                [discount.discount_code for discount in order.discounts]
+                [discount.discount_code for discount in order.discounts.all()]
             )
         return ga_purchase_payload
 
