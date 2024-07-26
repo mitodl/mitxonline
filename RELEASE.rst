@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.98.5
+--------------
+
+- Fixing discount code payload generation for Google Analytics (#2313)
+- Add certificate_type to courses and programs serializer (#2307)
+
 Version 0.98.4 (Released July 25, 2024)
 --------------
 
