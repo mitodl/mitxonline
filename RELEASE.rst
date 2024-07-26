@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.98.5
+--------------
+
+- Add certificate_type to courses and programs serializer (#2307)
+
 Version 0.98.4 (Released July 25, 2024)
 --------------
 
