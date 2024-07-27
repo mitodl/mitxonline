@@ -668,8 +668,14 @@ def enroll_in_edx_course_runs(
                     mode=mode,
                     username=username,
                     force_enrollment=force_enrollment,
-                    enrollment_attributes={"name": "is_active", "value": True},
                 )
+                if not enrollment.is_active:
+                    enrollment = edx_client.enrollments.create_student_enrollment(
+                        course_run.courseware_id,
+                        mode=mode,
+                        username=username,
+                        force_enrollment=force_enrollment,
+                    )
             results.append(enrollment)
         except HTTPError as exc:  # noqa: PERF203
             raise EdxApiEnrollErrorException(user, course_run, exc) from exc
