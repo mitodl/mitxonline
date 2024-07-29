@@ -139,10 +139,6 @@ export class ProgramProductDetailEnroll extends React.Component<
     })
   }
 
-  getCurrentCourseRun = (): EnrollmentFlaggedCourseRun => {
-    return this.state.currentCourseRun
-  }
-
   renderCertificateInfoPanel() {
     const { currentCourseRun: run } = this.state
 

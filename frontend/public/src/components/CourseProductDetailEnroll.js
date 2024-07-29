@@ -12,28 +12,16 @@ import { Modal, ModalBody, ModalHeader } from "reactstrap"
 import Loader from "./Loader"
 import { routes } from "../lib/urls"
 import { getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
-import { EnrollmentFlaggedCourseRun, RunEnrollment } from "../flow/courseTypes"
+import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
-  courseRunsSelector,
-  courseRunsQuery,
-  courseRunsQueryKey,
   coursesSelector,
   coursesQuery,
   coursesQueryKey
 } from "../lib/queries/courseRuns"
-import {
-  enrollmentsQuery,
-  enrollmentsQueryKey,
-  enrollmentsSelector
-} from "../lib/queries/enrollment"
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
-import {
-  getFirstRelevantRun,
-  isRunArchived,
-  isFinancialAssistanceAvailable
-} from "../lib/courseApi"
+import { getFirstRelevantRun, isRunArchived } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import users, { currentUserSelector } from "../lib/queries/users"
 import {
@@ -49,14 +37,10 @@ import type { Product } from "../flow/cartTypes"
 type Props = {
   courseId: ?string,
   isLoading: ?boolean,
-  courseRuns: ?Array<EnrollmentFlaggedCourseRun>,
   courses: ?Array<any>,
-  enrollments: ?Array<RunEnrollment>,
   status: ?number,
   courseIsLoading: ?boolean,
   courseStatus: ?number,
-  enrollmentsIsLoading: ?boolean,
-  enrollmentsStatus: ?number,
   upgradeEnrollmentDialogVisibility: boolean,
   addProductToBasket: (user: number, productId: number) => Promise<any>,
   currentUser: User,
@@ -147,7 +131,8 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   hndSetCourseRun = (event: any) => {
-    const { courseRuns } = this.props
+    const { courses } = this.props
+    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
     if (event.target.value === "default") {
       this.setCurrentCourseRun(null)
       return
@@ -176,7 +161,8 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   renderRunSelectorButtons() {
-    const { courseRuns } = this.props
+    const { courses } = this.props
+    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
     const enrollableCourseRuns = courseRuns ?
       courseRuns.filter(
         (run: EnrollmentFlaggedCourseRun) => run.is_enrollable
@@ -242,16 +228,19 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   renderUpgradeEnrollmentDialog(firstRelevantRun: EnrollmentFlaggedCourseRun) {
-    const { courseRuns } = this.props
+    const { courses } = this.props
+    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
+    const course = courses && courses[0] ? courses[0] : null
     let run = this.getCurrentCourseRun()
-    const course = courseRuns && courseRuns[0].course
     const hasMultipleEnrollableRuns = courseRuns && courseRuns.length > 1
     if (!run && !hasMultipleEnrollableRuns) {
       run = firstRelevantRun
     }
     const needFinancialAssistanceLink =
       run &&
-      isFinancialAssistanceAvailable(run) &&
+      course &&
+      course.page &&
+      course.page.financial_assistance_form_url &&
       !run.approved_flexible_price_exists ? (
           <p className="financial-assistance-link">
             <a
@@ -265,7 +254,7 @@ export class CourseProductDetailEnroll extends React.Component<
         ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run && run.products ? run.products[0] : null
-    const canUpgrade = run && run.is_upgradable && product
+    const canUpgrade = !!(run && run.is_upgradable && product)
     const upgradableCourseRuns = courseRuns ?
       courseRuns.filter(
         (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
@@ -461,7 +450,8 @@ export class CourseProductDetailEnroll extends React.Component<
     run: EnrollmentFlaggedCourseRun,
     product: Product | null
   ) {
-    const { courseRuns } = this.props
+    const { courses } = this.props
+    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
     const csrfToken = getCookie("csrftoken")
     return run ? (
       <h2>
@@ -493,23 +483,18 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   render() {
-    const {
-      courseRuns,
-      courses,
-      courseIsLoading,
-      currentUser,
-      enrollments,
-      enrollmentsIsLoading
-    } = this.props
+    const { courses, courseIsLoading, currentUser } = this.props
     let run,
       product = null
+    if (courses) {
+      const courseRuns = courses[0] ? courses[0].courseruns : null
+      if (courseRuns) {
+        run = getFirstRelevantRun(courses[0], courseRuns)
 
-    if (courses && courseRuns) {
-      run = getFirstRelevantRun(courses[0], courseRuns)
-
-      if (run) {
-        product = run && run.products ? run.products[0] : null
-        this.updateDate(run)
+        if (run) {
+          product = run && run.products ? run.products[0] : null
+          this.updateDate(run)
+        }
       }
     }
 
@@ -519,7 +504,7 @@ export class CourseProductDetailEnroll extends React.Component<
           // $FlowFixMe: isLoading null or undefined
           <Loader
             key="product_detail_enroll_loader"
-            isLoading={courseIsLoading || enrollmentsIsLoading}
+            isLoading={courseIsLoading}
           >
             <>
               {run ?
@@ -536,16 +521,11 @@ export class CourseProductDetailEnroll extends React.Component<
         <>
           {
             // $FlowFixMe: isLoading null or undefined
-            <Loader
-              key="course_info_loader"
-              isLoading={courseIsLoading || enrollmentsIsLoading}
-            >
+            <Loader key="course_info_loader" isLoading={courseIsLoading}>
               <CourseInfoBox
                 courses={courses}
-                courseRuns={courseRuns}
                 currentUser={currentUser}
                 setCurrentCourseRun={this.setCurrentCourseRun}
-                enrollments={enrollments}
               ></CourseInfoBox>
             </Loader>
           }
@@ -576,26 +556,14 @@ const updateAddlFields = (currentUser: User) => {
 }
 
 const mapStateToProps = createStructuredSelector({
-  courseRuns:           courseRunsSelector,
-  courses:              coursesSelector,
-  currentUser:          currentUserSelector,
-  enrollments:          enrollmentsSelector,
-  isLoading:            pathOr(true, ["queries", courseRunsQueryKey, "isPending"]),
-  courseIsLoading:      pathOr(true, ["queries", coursesQueryKey, "isPending"]),
-  enrollmentsIsLoading: pathOr(true, [
-    "queries",
-    enrollmentsQueryKey,
-    "isPending"
-  ]),
-  status:            pathOr(null, ["queries", courseRunsQueryKey, "status"]),
-  courseStatus:      pathOr(true, ["queries", coursesQueryKey, "status"]),
-  enrollmentsStatus: pathOr(true, ["queries", enrollmentsQueryKey, "status"])
+  courses:         coursesSelector,
+  currentUser:     currentUserSelector,
+  courseIsLoading: pathOr(true, ["queries", coursesQueryKey, "isPending"]),
+  courseStatus:    pathOr(true, ["queries", coursesQueryKey, "status"])
 })
 
 const mapPropsToConfig = props => [
-  courseRunsQuery(props.courseId),
   coursesQuery(props.courseId),
-  enrollmentsQuery(),
   users.currentUserQuery()
 ]
 
