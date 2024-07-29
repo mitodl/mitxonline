@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.98.5
+Version 0.98.5 (Released July 29, 2024)
 --------------
 
 - Fixing discount code payload generation for Google Analytics (#2313)
