@@ -447,10 +447,8 @@ def test_enroll_in_edx_course_runs(settings, mocker, user):
     """Tests that enroll_in_edx_course_runs uses the EdxApi client to enroll in course runs"""
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     mock_client = mocker.MagicMock()
-    enroll_return_values = [{"is_active": True}, {"is_active": False}, {"is_active": True}]
-    mock_client.enrollments.create_student_enrollment = mocker.Mock(
-        side_effect=enroll_return_values
-    )
+    enroll_return_values = [mocker.Mock(is_active=True), mocker.Mock(is_active=False), mocker.Mock(is_active=True)]
+    mock_client.enrollments.create_student_enrollment = mocker.Mock(side_effect=enroll_return_values)
     mocker.patch("openedx.api.get_edx_api_client", return_value=mock_client)
     mocker.patch("openedx.api.get_edx_api_service_client", return_value=mock_client)
     course_runs = CourseRunFactory.build_batch(2)
@@ -467,7 +465,7 @@ def test_enroll_in_edx_course_runs(settings, mocker, user):
         username=user.username,
         force_enrollment=True,
     )
-    assert enroll_results == [{"is_active": True}, {"is_active": True}]
+    assert enroll_results == [enroll_return_values[0], enroll_return_values[2]]
 
 
 def test_enroll_api_fail(mocker, user):

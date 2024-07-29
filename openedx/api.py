@@ -669,7 +669,7 @@ def enroll_in_edx_course_runs(
                     username=username,
                     force_enrollment=force_enrollment,
                 )
-                if not enrollment["is_active"]:
+                if not enrollment.is_active:
                     enrollment = edx_client.enrollments.create_student_enrollment(
                         course_run.courseware_id,
                         mode=mode,
