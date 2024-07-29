@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.98.6
+--------------
+
+- Info box slow render fixes (#2304)
+
 Version 0.98.5 (Released July 29, 2024)
 --------------
 
