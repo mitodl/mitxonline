@@ -100,7 +100,7 @@ class CourseSerializer(BaseCourseSerializer):
     def get_availability(self, instance):
         """Get course availability"""
         archived_course_runs = get_archived_courseruns(
-            instance.courseruns(is_self_paced=False)
+            instance.courseruns.filter(is_self_paced=False)
         )
         if archived_course_runs.count() == 0:
             return "dated"
