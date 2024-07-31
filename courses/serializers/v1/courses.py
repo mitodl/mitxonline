@@ -32,9 +32,13 @@ class CourseSerializer(BaseCourseSerializer):
         return run.id if run is not None else None
     
     def get_required_prerequisites(self, instance):
-        if instance.page and instance.page.prerequisites:
-            return True
-        return False
+        """
+        Check if the prerequisites field is populated in the course page CMS.
+
+        Returns:
+            bool: True when the prerequisites field is populated in the course page CMS.  False otherwise.
+        """
+        return bool(instance.page and instance.page.prerequisites)
 
     def get_programs(self, instance):
         if self.context.get("all_runs", False):
