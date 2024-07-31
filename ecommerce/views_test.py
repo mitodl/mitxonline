@@ -1080,3 +1080,23 @@ def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
     assert discounts[0].redemption_type == REDEMPTION_TYPE_ONE_TIME
     assert discounts[0].amount == 50
     assert discounts[0].is_bulk
+
+
+def test_checkout_interstitial_google_analytics_object(
+    settings, user, user_client, products
+):
+    """
+    Tests that the interstitial page receives the correct GA structure
+    """
+    product = products[0]
+    product.purchasable_object = CourseRunFactory.create()
+    product.save()
+
+    create_basket_with_product(user, product)
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+    assert resp.status_code == 200
+
+    assert resp.url
+    response_body = resp.json()
+    assert response_body == []
