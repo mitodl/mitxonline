@@ -30,7 +30,7 @@ class CourseSerializer(BaseCourseSerializer):
         """Get next run id"""
         run = instance.first_unexpired_run
         return run.id if run is not None else None
-    
+
     def get_required_prerequisites(self, instance):
         """
         Check if the prerequisites field is populated in the course page CMS.
@@ -66,7 +66,7 @@ class CourseSerializer(BaseCourseSerializer):
             "departments",
             "page",
             "programs",
-            "required_prerequisites"
+            "required_prerequisites",
         ]
 
 
