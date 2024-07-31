@@ -38,7 +38,7 @@ class CourseSerializer(BaseCourseSerializer):
         Returns:
             bool: True when the prerequisites field is populated in the course page CMS.  False otherwise.
         """
-        return bool(instance.page and instance.page.prerequisites)
+        return bool(hasattr(instance, "page") and hasattr(instance.page, "prerequisites") and instance.page.prerequisites != "")
 
     def get_programs(self, instance):
         if self.context.get("all_runs", False):
