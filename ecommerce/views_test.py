@@ -1088,15 +1088,19 @@ def test_checkout_interstitial_google_analytics_object(
     """
     Tests that the interstitial page receives the correct GA structure
     """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
     product = products[0]
-    product.purchasable_object = CourseRunFactory.create()
-    product.save()
-
-    create_basket_with_product(user, product)
-
+    basket = create_basket_with_product(user, product)
+    PendingOrder.create_from_basket(basket)
     resp = user_client.get(reverse("checkout_interstitial_page"))
     assert resp.status_code == 200
 
-    assert resp.url
-    response_body = resp.json()
-    assert response_body == []
+    ga_purchase_payload = resp.context["ga_purchase_payload"]
+    assert isinstance(ga_purchase_payload["value"], float)
+    assert isinstance(ga_purchase_payload["items"], list)
+    assert isinstance(ga_purchase_payload["shipping"], float)
+    assert isinstance(ga_purchase_payload["tax"], float)
+    for item in ga_purchase_payload["items"]:
+        assert isinstance(item["discount"], float)
+        assert isinstance(item["price"], float)
+        assert isinstance(item["quantity"], int)
