@@ -2,18 +2,21 @@
 
 from django.db import migrations
 
+
 def deactivate_program_enrollments(apps, schema_editor):
     """Deactivate all Enrollments for this not yet live program"""
     ProgramEnrollments = apps.get_model("courses", "ProgramEnrollment")
-    enrollments = ProgramEnrollments.objects.filter(program__readable_id="program-v1:MITxT+18.01x")
+    enrollments = ProgramEnrollments.objects.filter(
+        program__readable_id="program-v1:MITxT+18.01x"
+    )
     for enrollment in enrollments:
         enrollment.active = False
         enrollment.save()
 
-class Migration(migrations.Migration):
 
+class Migration(migrations.Migration):
     dependencies = [
-        ('courses', '0051_coursestopic'),
+        ("courses", "0051_coursestopic"),
     ]
 
     operations = [
