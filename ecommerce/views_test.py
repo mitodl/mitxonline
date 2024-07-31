@@ -46,6 +46,7 @@ from ecommerce.serializers import (
 )
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
+from main import features
 from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
@@ -1047,7 +1048,6 @@ def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
     """
     Try to make some bulk discounts.
     """
-
     test_payload = {
         "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
         "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
@@ -1089,6 +1089,8 @@ def test_checkout_interstitial_google_analytics_object(
     Tests that the interstitial page receives the correct GA structure
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    settings.FEATURES[features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH] = True
+
     product = products[0]
     basket = create_basket_with_product(user, product)
     PendingOrder.create_from_basket(basket)
