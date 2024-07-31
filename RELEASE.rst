@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.98.7
+--------------
+
+- When creating enrollment set is_active explicitly in the enrollment api call (#2300)
+
 Version 0.98.6 (Released July 29, 2024)
 --------------
 
