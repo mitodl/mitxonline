@@ -24,11 +24,17 @@ class CourseSerializer(BaseCourseSerializer):
     next_run_id = serializers.SerializerMethodField()
     page = CoursePageSerializer(read_only=True)
     programs = serializers.SerializerMethodField()
+    required_prerequisites = serializers.SerializerMethodField()
 
     def get_next_run_id(self, instance):
         """Get next run id"""
         run = instance.first_unexpired_run
         return run.id if run is not None else None
+    
+    def get_required_prerequisites(self, instance):
+        if instance.page and instance.page.prerequisites:
+            return True
+        return False
 
     def get_programs(self, instance):
         if self.context.get("all_runs", False):
@@ -56,6 +62,7 @@ class CourseSerializer(BaseCourseSerializer):
             "departments",
             "page",
             "programs",
+            "required_prerequisites"
         ]
 
 
