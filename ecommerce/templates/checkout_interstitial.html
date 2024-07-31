@@ -16,9 +16,9 @@
                             {% endfor %}
                         </form>
                     {% if ga_purchase_flag %}
+                        {{ ga_purchase_payload | json_script:"ga-purchase-payload" }}
                         <script type="text/javascript">
-                            const ga_purchase_payload = JSON.parse({{ ga_purchase_payload|safe }});
-                            gtag("event", "purchase", ga_purchase_payload);
+                            gtag("event", "purchase", JSON.parse(document.getElementById('ga-purchase-payload').textContent));
                         </script>
                     {% endif %}
                         <script type="text/javascript">

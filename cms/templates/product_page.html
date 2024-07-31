@@ -9,8 +9,8 @@
 
 {% block seohead %}
     {% meta_tags page %}
-    {% if page.thumbnail_image %}
-      <meta property="og:image" content="{% feature_img_src page.thumbnail_image %}" />
+    {% if page.feature_image %}
+      <meta property="og:image" content="{% feature_img_src page.feature_image %}" />
     {% endif %}
 {% endblock %}
 
@@ -129,7 +129,7 @@
               {{ page.prerequisites |richtext }}
               </section>{% endif %}
 
-            {% if instructors or page.faculty_members %}
+            {% if instructors %}
             <section class="faculty-section" id="instructors">
               <div class="container">
                 <h2>{{ page.faculty_section_title }}</h2>

@@ -109,13 +109,15 @@ describe("CourseProductDetailEnrollShallowRender", () => {
   it("checks for enroll now button should appear disabled if enrollment start in future", async () => {
     const courseRun = makeCourseRunDetail()
     courseRun["is_enrollable"] = false
+    const course = makeCourseDetailNoRuns()
+    course.courseruns = [courseRun]
     const { inner } = await renderPage(
       {
         entities: {
-          courseRuns: [courseRun]
+          courses: [course]
         },
         queries: {
-          courseRuns: {
+          courses: {
             isPending: false,
             status:    200
           }
@@ -129,13 +131,15 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
   it("checks for enroll now button should appear if enrollment start not in future", async () => {
     const courseRun = makeCourseRunDetail()
+    const course = makeCourseDetailNoRuns()
+    course.courseruns = [courseRun]
     const { inner } = await renderPage(
       {
         entities: {
-          courseRuns: [courseRun]
+          courses: [course]
         },
         queries: {
-          courseRuns: {
+          courses: {
             isPending: false,
             status:    200
           }
@@ -156,13 +160,15 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       end_date:         moment().subtract(7, "months").toISOString(),
       upgrade_deadline: null
     }
+    const course = makeCourseDetailNoRuns()
+    course.courseruns = [courseRun]
     const { inner } = await renderPage(
       {
         entities: {
-          courseRuns: [courseRun]
+          courses: [course]
         },
         queries: {
-          courseRuns: {
+          courses: {
             isPending: false,
             status:    200
           }
@@ -210,8 +216,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       userExists ? "is logged in" : "is anonymous"
     }`, async () => {
       const entities = {
-        currentUser: userExists ? currentUser : makeAnonymousUser(),
-        enrollments: []
+        currentUser: userExists ? currentUser : makeAnonymousUser()
       }
 
       const { inner } = await renderPage({
@@ -236,10 +241,12 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         courseRuns.push(makeCourseRunDetail())
       }
 
+      const course = makeCourseDetailNoRuns()
+      course.courseruns = courseRuns
+
       const entities = {
         currentUser: userExists ? currentUser : makeAnonymousUser(),
-        enrollments: [],
-        courseRuns:  courseRuns
+        courses:     [course]
       }
 
       const { inner } = await renderPage({
@@ -271,8 +278,23 @@ describe("CourseProductDetailEnrollShallowRender", () => {
           financial_assistance_form_url: "google.com"
         }
       }
+      const course = makeCourseDetailNoRuns()
+      course.courseruns = [courseRun]
       isFinancialAssistanceAvailableStub.returns(true)
-      const { inner } = await renderPage()
+      const { inner } = await renderPage(
+        {
+          entities: {
+            courses: [course]
+          },
+          queries: {
+            courses: {
+              isPending: false,
+              status:    200
+            }
+          }
+        },
+        {}
+      )
       inner.setState({ currentCourseRun: courseRun })
 
       const enrollBtn = inner.find(".enroll-now").at(0)
@@ -302,11 +324,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       } else {
         courseRun["is_self_paced"] = false
       }
-      const courseRuns = [courseRun]
+      const course = makeCourseDetailNoRuns()
+      course.courseruns = [courseRun]
       const entities = {
         currentUser: currentUser,
-        enrollments: [],
-        courseRuns:  courseRuns
+        courses:     [course]
       }
       const { inner } = await renderPage({
         entities: entities
@@ -378,18 +400,14 @@ describe("CourseProductDetailEnrollShallowRender", () => {
   it(`shows form based enrollment button when upgrade deadline has passed but course is within enrollment period`, async () => {
     courseRun.is_upgradable = false
     course.next_run_id = courseRun.id
+    course.courseruns = [courseRun]
 
     const { inner } = await renderPage(
       {
         entities: {
-          courseRuns: [courseRun],
-          courses:    [course]
+          courses: [course]
         },
         queries: {
-          courseRuns: {
-            isPending: false,
-            status:    200
-          },
           courses: {
             isPending: false,
             status:    200
@@ -417,7 +435,21 @@ describe("CourseProductDetailEnrollShallowRender", () => {
           }
         }
       ]
-      const { inner } = await renderPage()
+      course.courseruns = [courseRun]
+      const { inner } = await renderPage(
+        {
+          entities: {
+            courses: [course]
+          },
+          queries: {
+            courses: {
+              isPending: false,
+              status:    200
+            }
+          }
+        },
+        { courseId: course.id }
+      )
 
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
@@ -442,7 +474,21 @@ describe("CourseProductDetailEnrollShallowRender", () => {
           }
         }
       ]
-      const { inner } = await renderPage()
+      course.courseruns = [courseRun]
+      const { inner } = await renderPage(
+        {
+          entities: {
+            courses: [course]
+          },
+          queries: {
+            courses: {
+              isPending: false,
+              status:    200
+            }
+          }
+        },
+        { courseId: course.id }
+      )
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
       await enrollBtn.prop("onClick")()
@@ -470,7 +516,21 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         }
       ]
       isFinancialAssistanceAvailableStub.returns(false)
-      const { inner } = await renderPage()
+      course.courseruns = [courseRun]
+      const { inner } = await renderPage(
+        {
+          entities: {
+            courses: [course]
+          },
+          queries: {
+            courses: {
+              isPending: false,
+              status:    200
+            }
+          }
+        },
+        { courseId: course.id }
+      )
       const enrollBtn = inner.find(".enroll-now").at(0)
       assert.isTrue(enrollBtn.exists())
       await enrollBtn.prop("onClick")()
@@ -523,8 +583,21 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         product_flexible_price: {}
       }
     ]
-
-    const { inner } = await renderPage()
+    course.courseruns = [courseRun]
+    const { inner } = await renderPage(
+      {
+        entities: {
+          courses: [course]
+        },
+        queries: {
+          courses: {
+            isPending: false,
+            status:    200
+          }
+        }
+      },
+      { courseId: course.id }
+    )
 
     const enrollBtn = inner.find(".enroll-now").at(0)
     assert.isTrue(enrollBtn.exists())
@@ -541,12 +614,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       if (multiples) {
         courseRuns.push(courseRun)
       }
+      course.courseruns = courseRuns
 
       const { inner } = await renderPage({
         entities: {
-          courseRuns:  courseRuns,
           courses:     [course],
-          enrollments: [enrollment],
           currentUser: currentUser
         }
       })
@@ -598,12 +670,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     courseRun["is_upgradable"] = false
     const courseRuns = [courseRun]
     courseRuns.push(courseRun)
+    course.courseruns = courseRuns
 
     const { inner } = await renderPage({
       entities: {
-        courseRuns:  courseRuns,
         courses:     [course],
-        enrollments: [enrollment],
         currentUser: currentUser
       }
     })
@@ -638,12 +709,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       }
       const courseRuns = [courseRun]
       courseRuns.push(runWithMixedInfo)
+      course.courseruns = courseRuns
 
       const { inner } = await renderPage({
         entities: {
-          courseRuns:  courseRuns,
           courses:     [course],
-          enrollments: [enrollment],
           currentUser: currentUser
         }
       })
@@ -711,33 +781,35 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         }
       }
     ]
-
     const course = {
       ...makeCourseDetailWithRuns(),
       courseruns: [pastCourseRun, currentCourseRun]
     }
 
-    const entities = {
-      courseRuns:  [currentCourseRun],
-      courses:     [course],
-      enrollments: [pastCourseRunEnrollment],
-      currentUser: currentUser
-    }
-
     const { inner } = await renderPage({
-      entities: entities
+      entities: {
+        courses:     [course],
+        currentUser: currentUser
+      },
+      queries: {
+        courses: {
+          isPending: false,
+          status:    200
+        }
+      }
     })
     const enrollBtn = inner.find(".enroll-now").at(0)
     assert.isTrue(enrollBtn.exists())
-
+    inner.setState({ currentCourseRun: currentCourseRun })
     await enrollBtn.prop("onClick")()
-
+    inner.setState({ currentCourseRun: currentCourseRun })
     const modal = inner.find(".upgrade-enrollment-modal")
     const upgradeForm = modal.find("form").at(0)
     assert.isTrue(upgradeForm.exists())
 
     const certPricing = modal.find(".certificate-pricing").at(0)
     assert.isTrue(certPricing.exists())
+    inner.setState({ currentCourseRun: currentCourseRun })
     assert.isTrue(
       certPricing
         .text()
@@ -767,12 +839,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       } else {
         courseRun["start_date"] = moment().subtract(10, "months").toISOString()
       }
-      const courseRuns = [courseRun]
+      course.courseruns = [courseRun]
 
       const entities = {
         currentUser: currentUser,
-        enrollments: [],
-        courseRuns:  courseRuns
+        courses:     [course]
       }
 
       const { inner } = await renderPage({
@@ -836,10 +907,11 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         courseRuns.push(makeCourseRunDetail())
       }
 
+      course.courseruns = courseRuns
+
       const entities = {
         currentUser: userExists ? currentUser : makeAnonymousUser(),
-        enrollments: [],
-        courseRuns:  courseRuns
+        courses:     [course]
       }
 
       const { inner } = await renderPage({

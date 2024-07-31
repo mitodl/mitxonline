@@ -19,11 +19,11 @@ def get_thumbnail_url(page):
             A page URL
     """
     relative_url = (
-        page.thumbnail_image.file.url
+        page.feature_image.file.url
         if page
-        and page.thumbnail_image
-        and page.thumbnail_image.file
-        and page.thumbnail_image.file.url
+        and page.feature_image
+        and page.feature_image.file
+        and page.feature_image.file.url
         else static("images/mit-dome.png")
     )
     return urljoin(settings.SITE_BASE_URL, relative_url)

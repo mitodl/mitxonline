@@ -1109,18 +1109,6 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
             ),
         )
 
-    @property
-    def get_current_finaid(self):
-        """
-        Returns information about financial aid for the current learner.
-
-        If the learner has a flexible pricing(financial aid) request that's
-        approved, this should return the learner's adjusted price. If they
-        don't, this should return the Page for the applicable request form.
-        If they're not logged in, this should return None.
-        """
-        raise NotImplementedError
-
     def get_context(self, request, *args, **kwargs):  # noqa: ARG002
         instructors = [
             member.linked_instructor_page
@@ -1165,7 +1153,7 @@ class CoursePage(ProductPage):
         """Gets the product associated with this page"""
         return self.course
 
-    def get_current_finaid(self, request):
+    def _get_current_finaid(self, request):
         """
         Returns information about financial aid for the current learner.
 
@@ -1216,7 +1204,7 @@ class CoursePage(ProductPage):
             and relevant_run is not None
             and (relevant_run.is_in_progress or request.user.is_editor)
         )
-        finaid_price = self.get_current_finaid(request)
+        finaid_price = self._get_current_finaid(request)
         product = (
             relevant_run.products.filter(is_active=True).first()
             if relevant_run

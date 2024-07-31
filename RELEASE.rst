@@ -1,6 +1,27 @@
 Release Notes
 =============
 
+Version 0.98.6 (Released July 29, 2024)
+--------------
+
+- Info box slow render fixes (#2304)
+
+Version 0.98.5 (Released July 29, 2024)
+--------------
+
+- Fixing discount code payload generation for Google Analytics (#2313)
+- Add certificate_type to courses and programs serializer (#2307)
+
+Version 0.98.4 (Released July 25, 2024)
+--------------
+
+- Fix GA4 output for purchase (#2310)
+
+Version 0.98.3 (Released July 25, 2024)
+--------------
+
+- GA4 Data Layer Push for purchase events (#2246)
+
 Version 0.98.2 (Released July 25, 2024)
 --------------
 

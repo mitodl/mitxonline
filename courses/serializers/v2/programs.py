@@ -22,6 +22,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     page = serializers.SerializerMethodField()
     departments = serializers.StringRelatedField(many=True, read_only=True)
     topics = serializers.SerializerMethodField()
+    certificate_type = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         return [course[0].id for course in instance.courses if course[0].live]
@@ -56,6 +57,11 @@ class ProgramSerializer(serializers.ModelSerializer):
         )
         return [{"name": topic} for topic in sorted(topics)]
 
+    def get_certificate_type(self, instance):
+        if "MicroMasters" in instance.program_type:
+            return "MicroMasters Credential"
+        return "Certificate of Completion"
+
     class Meta:
         model = Program
         fields = [
@@ -67,6 +73,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "req_tree",
             "page",
             "program_type",
+            "certificate_type",
             "departments",
             "live",
             "topics",

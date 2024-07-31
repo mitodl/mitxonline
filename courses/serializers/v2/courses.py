@@ -33,6 +33,7 @@ class CourseSerializer(BaseCourseSerializer):
     programs = serializers.SerializerMethodField()
     topics = serializers.SerializerMethodField()
     availability = serializers.SerializerMethodField()
+    certificate_type = serializers.SerializerMethodField()
 
     def get_next_run_id(self, instance):
         """Get next run id"""
@@ -65,6 +66,13 @@ class CourseSerializer(BaseCourseSerializer):
             return "dated"
         return "anytime"
 
+    def get_certificate_type(self, instance):
+        if instance.programs:
+            program = instance.programs[0]
+            if "MicroMasters" in program.program_type:
+                return "MicroMasters Credential"
+        return "Certificate of Completion"
+
     class Meta:
         model = models.Course
         fields = [
@@ -76,6 +84,7 @@ class CourseSerializer(BaseCourseSerializer):
             "page",
             "programs",
             "topics",
+            "certificate_type",
             "availability",
         ]
 
