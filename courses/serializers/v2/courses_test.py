@@ -66,6 +66,7 @@ def test_serialize_course(
             "departments": [{"name": department}],
             "page": CoursePageSerializer(course.page).data,
             "certificate_type": certificate_type,
+            "availability": "dated",
             "topics": [{"name": topic.name} for topic in topics],
             "required_prerequisites": True,
             "duration": course.page.length,
