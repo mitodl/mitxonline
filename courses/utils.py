@@ -179,7 +179,7 @@ def get_archived_courseruns(queryset):
     """
     Returns course runs that are archived. This is defined as:
     - The course run end date has passed
-    - The course run enrollment date is in the future or None
+    - The course run enrollment end date is in the future or None.
     This logic is set to match the logic found in frontend/public/src/lib/courseApi.js isRunArchived
 
     Args:
@@ -188,5 +188,5 @@ def get_archived_courseruns(queryset):
     now = now_in_utc()
     return queryset.filter(
         Q(end_date__lt=now)
-        & (Q(enrollment_start__isnull=True) | Q(enrollment_start__gt=now))
+        & (Q(enrollment_end__isnull=True) | Q(enrollment_end__gt=now))
     )
