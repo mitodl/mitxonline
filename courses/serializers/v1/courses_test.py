@@ -245,8 +245,11 @@ def test_serialize_course_run_enrollments_with_grades():
         "grades": CourseRunGradeSerializer([grade], many=True).data,
     }
 
+
 @pytest.mark.parametrize("prerequisites_cms_value", ["mock value", None, ""])
-def test_serialize_course_required_prerequisites(mocker, mock_context, prerequisites_cms_value, settings):
+def test_serialize_course_required_prerequisites(
+    mocker, mock_context, prerequisites_cms_value, settings
+):
     """Test Course serialization to ensure that required_prerequisites is set to True if prerequisites is defined in the CMS and no an empty string, otherwise False"""
     courseRun1 = CourseRunFactory.create()
     course = courseRun1.course
