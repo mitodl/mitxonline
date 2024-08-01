@@ -62,9 +62,7 @@ def test_serialize_course(mocker, mock_context, is_anonymous, all_runs, settings
             "departments": [{"name": department}],
             "page": CoursePageSerializer(course.page).data,
             "programs": ProgramSerializer(course.programs, many=True).data,
-            'required_prerequisites': True
-            if all_runs
-            else None,
+            "required_prerequisites": True if all_runs else None,
         },
     )
 
