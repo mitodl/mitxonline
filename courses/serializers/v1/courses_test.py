@@ -5,6 +5,7 @@ from django.contrib.auth.models import AnonymousUser
 from cms.factories import CoursePageFactory, FlexiblePricingFormFactory
 from cms.serializers import CoursePageSerializer
 from courses.factories import (
+    CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     CourseRunGradeFactory,
@@ -251,8 +252,7 @@ def test_serialize_course_required_prerequisites(
     mocker, mock_context, prerequisites_cms_value, settings
 ):
     """Test Course serialization to ensure that required_prerequisites is set to True if prerequisites is defined in the CMS and no an empty string, otherwise False"""
-    courseRun1 = CourseRunFactory.create()
-    course = courseRun1.course
+    course = CourseFactory.create()
     expected_required_prerequisites = False
     if prerequisites_cms_value is not None:
         # When prerequisites_cms_value is None, the course page has been created but prerequisites has never been populated.
@@ -269,10 +269,8 @@ def test_serialize_course_required_prerequisites(
             "title": course.title,
             "readable_id": course.readable_id,
             "id": course.id,
-            "courseruns": [
-                CourseRunSerializer(courseRun1).data,
-            ],
-            "next_run_id": course.first_unexpired_run.id,
+            "courseruns": [],
+            "next_run_id": None,
             "departments": [],
             "page": CoursePageSerializer(course.page).data,
             "required_prerequisites": expected_required_prerequisites,
