@@ -187,6 +187,7 @@ def get_archived_courseruns(queryset):
     """
     now = now_in_utc()
     return queryset.filter(
-        Q(end_date__lt=now)
+        get_enrollable_course_run_filter(now)
+        & Q(end_date__lt=now)
         & (Q(enrollment_end__isnull=True) | Q(enrollment_end__gt=now))
     )
