@@ -74,7 +74,6 @@ export class NotificationContainer extends React.Component<Props, State> {
   render() {
     const { userNotifications } = this.props
     const { hiddenNotifications } = this.state
-    console.log(userNotifications)
 
     return (
       <div className="notifications order-2" id="notifications-container" ref={this.headingRef}>
