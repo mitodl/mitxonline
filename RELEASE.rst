@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.98.8
+--------------
+
+- Change value and add new test for Google Analytics (#2318)
+- Add migration to deactivate program enrollments (#2320)
+
 Version 0.98.7 (Released August 01, 2024)
 --------------
 
