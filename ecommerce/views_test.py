@@ -46,6 +46,7 @@ from ecommerce.serializers import (
 )
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
+from main import features
 from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
@@ -1047,7 +1048,6 @@ def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
     """
     Try to make some bulk discounts.
     """
-
     test_payload = {
         "discount_type": DISCOUNT_TYPE_PERCENT_OFF,
         "payment_type": PAYMENT_TYPE_CUSTOMER_SUPPORT,
@@ -1080,3 +1080,29 @@ def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
     assert discounts[0].redemption_type == REDEMPTION_TYPE_ONE_TIME
     assert discounts[0].amount == 50
     assert discounts[0].is_bulk
+
+
+def test_checkout_interstitial_google_analytics_object(
+    settings, user, user_client, products
+):
+    """
+    Tests that the interstitial page receives the correct GA structure
+    """
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    settings.FEATURES[features.ENABLE_GOOGLE_ANALYTICS_DATA_PUSH] = True
+
+    product = products[0]
+    basket = create_basket_with_product(user, product)
+    PendingOrder.create_from_basket(basket)
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+    assert resp.status_code == 200
+
+    ga_purchase_payload = resp.context["ga_purchase_payload"]
+    assert isinstance(ga_purchase_payload["value"], float)
+    assert isinstance(ga_purchase_payload["items"], list)
+    assert isinstance(ga_purchase_payload["shipping"], float)
+    assert isinstance(ga_purchase_payload["tax"], float)
+    for item in ga_purchase_payload["items"]:
+        assert isinstance(item["discount"], float)
+        assert isinstance(item["price"], float)
+        assert isinstance(item["quantity"], int)
