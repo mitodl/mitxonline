@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.98.9
+Version 0.98.9 (Released August 05, 2024)
 --------------
 
 - Rectivate enrollments for Differential Calculus (#2325)
