@@ -99,6 +99,8 @@ def test_serialize_course_required_prerequisites(
             "next_run_id": None,
             "departments": [],
             "page": CoursePageSerializer(course.page).data,
+            "certificate_type": None,
+            "topics": [],
             "required_prerequisites": expected_required_prerequisites,
             "programs": None,
         },
