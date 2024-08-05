@@ -73,7 +73,7 @@ export class OrderHistory extends React.Component<Props> {
     const orderTitle =
       order.titles.length > 0 ? order.titles.join("<br />") : <em>No Items</em>
     const orderDate = formatPrettyDateTimeAmPmTz(
-      parseDateString(order.created_on)
+      parseDateString(order.updated_on)
     )
     return (
       <tr scope="row" key={`ordercard_${order.id}`}>
