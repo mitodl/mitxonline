@@ -149,7 +149,7 @@
     "fmt": "LOG_LEVEL= prettier-eslint --write --no-semi --ignore 'src/flow/**/*.js' 'src/**/*.js'",
     "fmt:check": "LOG_LEVEL= prettier-eslint --list-different --no-semi --ignore 'src/flow/**/*.js' 'src/**/*.js'"
   },
-  "packageManager": "yarn@3.2.0",
+  "packageManager": "yarn@3.8.3",
   "browserslist": [
     "> 1%"
   ],
