@@ -3,6 +3,7 @@ from django.contrib.auth.models import AnonymousUser
 
 from cms.serializers import CoursePageSerializer
 from courses.factories import (
+    CourseFactory,
     CourseRunEnrollmentFactory,
     CourseRunFactory,
     ProgramFactory,
@@ -66,8 +67,43 @@ def test_serialize_course(
             "page": CoursePageSerializer(course.page).data,
             "certificate_type": certificate_type,
             "topics": [{"name": topic.name} for topic in topics],
+            "required_prerequisites": True,
             "programs": BaseProgramSerializer(course.programs, many=True).data
             if all_runs
             else None,
+        },
+    )
+
+
+@pytest.mark.parametrize("prerequisites_cms_value", ["mock value", None, ""])
+def test_serialize_course_required_prerequisites(
+    mocker, mock_context, prerequisites_cms_value, settings
+):
+    """Test Course serialization to ensure that required_prerequisites is set to True if prerequisites is defined in the CMS and no an empty string, otherwise False"""
+    course = CourseFactory.create()
+    expected_required_prerequisites = False
+    if prerequisites_cms_value is not None:
+        # When prerequisites_cms_value is None, the course page has been created but prerequisites has never been populated.
+        # If the prerequisites have previously been populated but are now empty, the value of prerequisites will be an empty string.
+        course.page.prerequisites = prerequisites_cms_value
+    if prerequisites_cms_value != "":
+        expected_required_prerequisites = True
+
+    data = CourseWithCourseRunsSerializer(instance=course, context=mock_context).data
+
+    assert_drf_json_equal(
+        data,
+        {
+            "title": course.title,
+            "readable_id": course.readable_id,
+            "id": course.id,
+            "courseruns": [],
+            "next_run_id": None,
+            "departments": [],
+            "page": CoursePageSerializer(course.page).data,
+            "certificate_type": "Certificate of Completion",
+            "topics": [],
+            "required_prerequisites": expected_required_prerequisites,
+            "programs": None,
         },
     )
