@@ -32,6 +32,19 @@ class CourseSerializer(BaseCourseSerializer):
     programs = serializers.SerializerMethodField()
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
+    required_prerequisites = serializers.SerializerMethodField()
+    
+    def get_required_prerequisites(self, instance):
+        """
+        Check if the prerequisites field is populated in the course page CMS.
+        Returns:
+            bool: True when the prerequisites field is populated in the course page CMS.  False otherwise.
+        """
+        return bool(
+            hasattr(instance, "page")
+            and hasattr(instance.page, "prerequisites")
+            and instance.page.prerequisites != ""
+        )
 
     def get_next_run_id(self, instance):
         """Get next run id"""
@@ -74,6 +87,7 @@ class CourseSerializer(BaseCourseSerializer):
             "programs",
             "topics",
             "certificate_type",
+            "required_prerequisites",
         ]
 
 
