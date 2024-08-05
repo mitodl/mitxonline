@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.98.8
+Version 0.98.8 (Released August 05, 2024)
 --------------
 
 - Change value and add new test for Google Analytics (#2318)
