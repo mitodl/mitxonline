@@ -16,6 +16,7 @@ from courses.serializers.v1.base import (
     ProductRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
+from courses.utils import get_archived_courseruns
 from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -31,6 +32,7 @@ class CourseSerializer(BaseCourseSerializer):
     page = CoursePageSerializer(read_only=True)
     programs = serializers.SerializerMethodField()
     topics = serializers.SerializerMethodField()
+    availability = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
 
     def get_next_run_id(self, instance):
@@ -55,6 +57,15 @@ class CourseSerializer(BaseCourseSerializer):
             )
         return []
 
+    def get_availability(self, instance):
+        """Get course availability"""
+        archived_course_runs = get_archived_courseruns(
+            instance.courseruns.filter(is_self_paced=False)
+        )
+        if archived_course_runs.count() == 0:
+            return "dated"
+        return "anytime"
+
     def get_certificate_type(self, instance):
         if instance.programs:
             program = instance.programs[0]
@@ -74,6 +85,7 @@ class CourseSerializer(BaseCourseSerializer):
             "programs",
             "topics",
             "certificate_type",
+            "availability",
         ]
 
 
