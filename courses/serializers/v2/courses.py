@@ -33,7 +33,7 @@ class CourseSerializer(BaseCourseSerializer):
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
     required_prerequisites = serializers.SerializerMethodField()
-    
+
     def get_required_prerequisites(self, instance):
         """
         Check if the prerequisites field is populated in the course page CMS.

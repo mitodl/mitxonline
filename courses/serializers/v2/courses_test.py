@@ -73,6 +73,8 @@ def test_serialize_course(
             else None,
         },
     )
+
+
 @pytest.mark.parametrize("prerequisites_cms_value", ["mock value", None, ""])
 def test_serialize_course_required_prerequisites(
     mocker, mock_context, prerequisites_cms_value, settings
