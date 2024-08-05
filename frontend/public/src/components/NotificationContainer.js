@@ -76,7 +76,11 @@ export class NotificationContainer extends React.Component<Props, State> {
     const { hiddenNotifications } = this.state
 
     return (
-      <div className="notifications order-2" id="notifications-container" ref={this.headingRef}>
+      <div
+        className="notifications order-2"
+        id="notifications-container"
+        ref={this.headingRef}
+      >
         {Object.keys(userNotifications).map((notificationKey, i) => {
           const dismiss = partial(this.onDismiss, [notificationKey])
           const notification = userNotifications[notificationKey]
