@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.98.10
+Version 0.98.10 (Released August 05, 2024)
 ---------------
 
 - Add prerequisites to courses API (#2321)
