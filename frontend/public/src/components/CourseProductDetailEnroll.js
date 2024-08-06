@@ -160,17 +160,10 @@ export class CourseProductDetailEnroll extends React.Component<
     })
   }
 
-  renderRunSelectorButtons() {
-    const { courses } = this.props
-    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
-    const enrollableCourseRuns = courseRuns ?
-      courseRuns.filter(
-        (run: EnrollmentFlaggedCourseRun) => run.is_enrollable
-      ) :
-      []
+  renderRunSelectorButtons(enrollableCourseRuns: Array<EnrollmentFlaggedCourseRun>) {
     return (
       <>
-        {courseRuns && courseRuns.length > 1 ? (
+        {enrollableCourseRuns && enrollableCourseRuns.length > 1 ? (
           <label htmlFor="choose-courserun">Choose a date:</label>
         ) : (
           <label htmlFor="choose-courserun">
@@ -227,15 +220,20 @@ export class CourseProductDetailEnroll extends React.Component<
     }
   }
 
-  renderUpgradeEnrollmentDialog(firstRelevantRun: EnrollmentFlaggedCourseRun) {
+  renderUpgradeEnrollmentDialog() {
     const { courses } = this.props
     const courseRuns = courses && courses[0] ? courses[0].courseruns : null
-    const course = courses && courses[0] ? courses[0] : null
-    let run = this.getCurrentCourseRun()
-    const hasMultipleEnrollableRuns = courseRuns && courseRuns.length > 1
-    if (!run && !hasMultipleEnrollableRuns) {
-      run = firstRelevantRun
+    const enrollableCourseRuns = courseRuns ?
+      courseRuns.filter(
+        (run: EnrollmentFlaggedCourseRun) => run.is_enrollable
+      ) :
+      []
+    const upgradableCourseRuns = enrollableCourseRuns.filter((run: EnrollmentFlaggedCourseRun) => run.is_upgradable)
+    if (upgradableCourseRuns.length < 1 && enrollableCourseRuns.length < 1) {
+      return null
     }
+    const course = courses && courses[0] ? courses[0] : null
+    const run = this.getCurrentCourseRun()
     const needFinancialAssistanceLink =
       run &&
       course &&
@@ -255,13 +253,7 @@ export class CourseProductDetailEnroll extends React.Component<
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run && run.products ? run.products[0] : null
     const canUpgrade = !!(run && run.is_upgradable && product)
-    const upgradableCourseRuns = courseRuns ?
-      courseRuns.filter(
-        (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
-      ) :
-      []
-
-    return upgradableCourseRuns.length > 0 || hasMultipleEnrollableRuns ? (
+    return upgradableCourseRuns.length > 0 || enrollableCourseRuns.length > 1 ? (
       <Modal
         id={`upgrade-enrollment-dialog`}
         className="upgrade-enrollment-modal"
@@ -273,10 +265,10 @@ export class CourseProductDetailEnroll extends React.Component<
           {course && course.title}
         </ModalHeader>
         <ModalBody>
-          {hasMultipleEnrollableRuns ? (
+          {enrollableCourseRuns.length > 0 ? (
             <div className="row date-selector-button-bar">
               <div className="col-12">
-                <div>{this.renderRunSelectorButtons()}</div>
+                <div>{this.renderRunSelectorButtons(enrollableCourseRuns)}</div>
               </div>
             </div>
           ) : null}
@@ -448,15 +440,13 @@ export class CourseProductDetailEnroll extends React.Component<
 
   renderEnrollNowButton(
     run: EnrollmentFlaggedCourseRun,
+    hasMultipleEnrollableRuns: boolean,
     product: Product | null
   ) {
-    const { courses } = this.props
-    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
     const csrfToken = getCookie("csrftoken")
     return run ? (
       <h2>
-        {(product && run.is_upgradable) ||
-        (courseRuns && courseRuns.length > 1) ? (
+        {(product && run.is_upgradable) || hasMultipleEnrollableRuns ? (
             <button
               id="upgradeEnrollBtn"
               className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red-to-blue highlight enroll-now"
@@ -484,19 +474,23 @@ export class CourseProductDetailEnroll extends React.Component<
 
   render() {
     const { courses, courseIsLoading, currentUser } = this.props
-    let run,
-      product = null
-    if (courses) {
-      const courseRuns = courses[0] ? courses[0].courseruns : null
-      if (courseRuns) {
-        run = getFirstRelevantRun(courses[0], courseRuns)
+    let run, product = null
+    const courseRuns = courses && courses[0] ? courses[0].courseruns : null
+    const enrollableCourseRuns = courseRuns ?
+      courseRuns.filter(
+        (run: EnrollmentFlaggedCourseRun) => run.is_enrollable
+      ) :
+      []
+    if (courseRuns) {
+      run = getFirstRelevantRun(courses[0], courseRuns)
 
-        if (run) {
-          product = run && run.products ? run.products[0] : null
-          this.updateDate(run)
-        }
+      if (run) {
+        product = run && run.products ? run.products[0] : null
+        this.updateDate(run)
       }
     }
+    const hasMultipleEnrollableRuns = enrollableCourseRuns && enrollableCourseRuns.length > 1
+
 
     return (
       <>
@@ -509,12 +503,12 @@ export class CourseProductDetailEnroll extends React.Component<
             <>
               {run ?
                 currentUser && currentUser.id ?
-                  this.renderEnrollNowButton(run, product) :
+                  this.renderEnrollNowButton(run, hasMultipleEnrollableRuns, product) :
                   this.renderEnrollLoginButton(run) :
                 this.renderAccessCourseButton()}
 
               {run && currentUser ? this.renderAddlProfileFieldsModal() : null}
-              {run ? this.renderUpgradeEnrollmentDialog(run) : null}
+              {this.renderUpgradeEnrollmentDialog()}
             </>
           </Loader>
         }
@@ -525,6 +519,7 @@ export class CourseProductDetailEnroll extends React.Component<
               <CourseInfoBox
                 courses={courses}
                 currentUser={currentUser}
+                enrollableCourseRuns={enrollableCourseRuns}
                 setCurrentCourseRun={this.setCurrentCourseRun}
               ></CourseInfoBox>
             </Loader>
