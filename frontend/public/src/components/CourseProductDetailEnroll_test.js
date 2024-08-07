@@ -311,8 +311,10 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         .simulate("change", { target: { value: courseRun["id"] } })
       inner.update()
 
-      assert.equal(inner.find("input[type='hidden']").at(0).prop("value"), courseRun.products[0].id)
-
+      assert.equal(
+        inner.find("input[type='hidden']").at(0).prop("value"),
+        courseRun.products[0].id
+      )
 
       const flexiblePricingLink = modal.find(".financial-assistance-link").at(0)
       if (flexPriceApproved) {
