@@ -487,7 +487,7 @@ export class CourseProductDetailEnroll extends React.Component<
         (run: EnrollmentFlaggedCourseRun) => run.is_enrollable
       ) :
       []
-    if (courseRuns) {
+    if (courses && courseRuns) {
       run = getFirstRelevantRun(courses[0], courseRuns)
 
       if (run) {
