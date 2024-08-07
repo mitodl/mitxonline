@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.98.11
+Version 0.98.11 (Released August 07, 2024)
 ---------------
 
 - Update dependency sentry-sdk to v2 (#2303)
