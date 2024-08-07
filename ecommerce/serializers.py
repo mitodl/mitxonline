@@ -427,6 +427,7 @@ class OrderHistorySerializer(serializers.ModelSerializer):
             "lines",
             "created_on",
             "titles",
+            "updated_on",
         ]
         model = models.Order
         depth = 1
