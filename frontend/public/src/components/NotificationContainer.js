@@ -31,7 +31,7 @@ type State = {
 }
 
 export class NotificationContainer extends React.Component<Props, State> {
-  headingRef: { current: null | HTMLHeadingElement }
+  headingRef: { current: null | HTMLDivElement }
 
   constructor(props: Props) {
     super(props)
