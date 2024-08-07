@@ -160,7 +160,9 @@ export class CourseProductDetailEnroll extends React.Component<
     })
   }
 
-  renderRunSelectorButtons(enrollableCourseRuns: Array<EnrollmentFlaggedCourseRun>) {
+  renderRunSelectorButtons(
+    enrollableCourseRuns: Array<EnrollmentFlaggedCourseRun>
+  ) {
     return (
       <>
         {enrollableCourseRuns && enrollableCourseRuns.length > 1 ? (
@@ -228,7 +230,9 @@ export class CourseProductDetailEnroll extends React.Component<
         (run: EnrollmentFlaggedCourseRun) => run.is_enrollable
       ) :
       []
-    const upgradableCourseRuns = enrollableCourseRuns.filter((run: EnrollmentFlaggedCourseRun) => run.is_upgradable)
+    const upgradableCourseRuns = enrollableCourseRuns.filter(
+      (run: EnrollmentFlaggedCourseRun) => run.is_upgradable
+    )
     if (upgradableCourseRuns.length < 1 && enrollableCourseRuns.length < 1) {
       return null
     }
@@ -253,118 +257,119 @@ export class CourseProductDetailEnroll extends React.Component<
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run && run.products ? run.products[0] : null
     const canUpgrade = !!(run && run.is_upgradable && product)
-    return upgradableCourseRuns.length > 0 || enrollableCourseRuns.length > 1 ? (
-      <Modal
-        id={`upgrade-enrollment-dialog`}
-        className="upgrade-enrollment-modal"
-        isOpen={upgradeEnrollmentDialogVisibility}
-        toggle={() => this.cancelEnrollment()}
-        centered
-      >
-        <ModalHeader toggle={() => this.cancelEnrollment()}>
-          {course && course.title}
-        </ModalHeader>
-        <ModalBody>
-          {enrollableCourseRuns.length > 0 ? (
-            <div className="row date-selector-button-bar">
-              <div className="col-12">
-                <div>{this.renderRunSelectorButtons(enrollableCourseRuns)}</div>
+    return upgradableCourseRuns.length > 0 ||
+      enrollableCourseRuns.length > 1 ? (
+        <Modal
+          id={`upgrade-enrollment-dialog`}
+          className="upgrade-enrollment-modal"
+          isOpen={upgradeEnrollmentDialogVisibility}
+          toggle={() => this.cancelEnrollment()}
+          centered
+        >
+          <ModalHeader toggle={() => this.cancelEnrollment()}>
+            {course && course.title}
+          </ModalHeader>
+          <ModalBody>
+            {enrollableCourseRuns.length > 0 ? (
+              <div className="row date-selector-button-bar">
+                <div className="col-12">
+                  <div>{this.renderRunSelectorButtons(enrollableCourseRuns)}</div>
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
 
-          {upgradableCourseRuns.length > 0 ? (
-            <>
-              <div className="row upsell-messaging-header">
-                <div className="col-12 p-0 font-weight-bold">
+            {upgradableCourseRuns.length > 0 ? (
+              <>
+                <div className="row upsell-messaging-header">
+                  <div className="col-12 p-0 font-weight-bold">
                   Do you want to earn a certificate?
+                  </div>
                 </div>
-              </div>
-              <div className="row d-sm-flex flex-md-row flex-sm-column">
-                <div className="col-md-6 col-sm-12">
-                  <ul>
-                    <li> Certificate is signed by MIT faculty</li>
-                    <li>
-                      {" "}
+                <div className="row d-sm-flex flex-md-row flex-sm-column">
+                  <div className="col-md-6 col-sm-12">
+                    <ul>
+                      <li> Certificate is signed by MIT faculty</li>
+                      <li>
+                        {" "}
                       Demonstrates knowledge and skills taught in this course
-                    </li>
-                    <li> Enhance your college &amp; earn a promotion</li>
-                  </ul>
-                </div>
-                <div className="col-md-6 col-sm-12">
-                  <ul>
-                    <li>Highlight on your resume/CV</li>
-                    <li>Share on your social channels &amp; LinkedIn</li>
-                    <li>
+                      </li>
+                      <li> Enhance your college &amp; earn a promotion</li>
+                    </ul>
+                  </div>
+                  <div className="col-md-6 col-sm-12">
+                    <ul>
+                      <li>Highlight on your resume/CV</li>
+                      <li>Share on your social channels &amp; LinkedIn</li>
+                      <li>
                       Enhance your college application with an earned
                       certificate from MIT
-                    </li>
-                  </ul>
-                </div>
-              </div>
-              <div className="row certificate-pricing-row d-sm-flex flex-md-row flex-sm-column">
-                <div
-                  className={`col-md-6 col-sm-12 certificate-pricing d-flex align-items-center ${
-                    run ? "" : "opacity-50"
-                  }`}
-                >
-                  <div className="certificate-pricing-logo">
-                    <img src="/static/images/certificates/certificate-logo.svg" />
+                      </li>
+                    </ul>
                   </div>
-                  <p>
+                </div>
+                <div className="row certificate-pricing-row d-sm-flex flex-md-row flex-sm-column">
+                  <div
+                    className={`col-md-6 col-sm-12 certificate-pricing d-flex align-items-center ${
+                      run ? "" : "opacity-50"
+                    }`}
+                  >
+                    <div className="certificate-pricing-logo">
+                      <img src="/static/images/certificates/certificate-logo.svg" />
+                    </div>
+                    <p>
                     Certificate track:{" "}
-                    <strong id="certificate-price-info">
-                      {product &&
+                      <strong id="certificate-price-info">
+                        {product &&
                         run.is_upgradable &&
                         formatLocalePrice(getFlexiblePriceForProduct(product))}
-                    </strong>
-                    <>
-                      <br />
-                      {canUpgrade ? (
-                        <span className="text-danger">
+                      </strong>
+                      <>
+                        <br />
+                        {canUpgrade ? (
+                          <span className="text-danger">
                           Payment date:{" "}
-                          {formatPrettyDate(moment(run.upgrade_deadline))}
-                        </span>
-                      ) : (
-                        <strong id="certificate-price-info">
+                            {formatPrettyDate(moment(run.upgrade_deadline))}
+                          </span>
+                        ) : (
+                          <strong id="certificate-price-info">
                           not available
-                        </strong>
-                      )}
-                    </>
-                  </p>
-                </div>
-                <div className="col-md-6 col-sm-12 pr-0 enroll-and-pay">
-                  <form
-                    action="/cart/add/"
-                    method="get"
-                    className="text-center"
-                  >
-                    <input
-                      type="hidden"
-                      name="product_id"
-                      value={(product && product.id) || ""}
-                    />
-                    <button
-                      type="submit"
-                      className="btn btn-upgrade"
-                      disabled={!canUpgrade}
+                          </strong>
+                        )}
+                      </>
+                    </p>
+                  </div>
+                  <div className="col-md-6 col-sm-12 pr-0 enroll-and-pay">
+                    <form
+                      action="/cart/add/"
+                      method="get"
+                      className="text-center"
                     >
-                      <strong>Enroll and Pay</strong>
-                      <br />
-                      <span>for the certificate track</span>
-                    </button>
-                  </form>
+                      <input
+                        type="hidden"
+                        name="product_id"
+                        value={(product && product.id) || ""}
+                      />
+                      <button
+                        type="submit"
+                        className="btn btn-upgrade"
+                        disabled={!canUpgrade}
+                      >
+                        <strong>Enroll and Pay</strong>
+                        <br />
+                        <span>for the certificate track</span>
+                      </button>
+                    </form>
+                  </div>
                 </div>
-              </div>
-            </>
-          ) : null}
-          <div className="row upgrade-options-row">
-            <div>{needFinancialAssistanceLink}</div>
-            <div>{this.getEnrollmentForm(run)}</div>
-          </div>
-        </ModalBody>
-      </Modal>
-    ) : null
+              </>
+            ) : null}
+            <div className="row upgrade-options-row">
+              <div>{needFinancialAssistanceLink}</div>
+              <div>{this.getEnrollmentForm(run)}</div>
+            </div>
+          </ModalBody>
+        </Modal>
+      ) : null
   }
 
   renderAddlProfileFieldsModal() {
@@ -447,34 +452,35 @@ export class CourseProductDetailEnroll extends React.Component<
     return run ? (
       <h2>
         {(product && run.is_upgradable) || hasMultipleEnrollableRuns ? (
+          <button
+            id="upgradeEnrollBtn"
+            className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red-to-blue highlight enroll-now"
+            onClick={() => this.toggleUpgradeDialogVisibility()}
+            disabled={!run.is_enrollable}
+          >
+            Enroll now
+          </button>
+        ) : (
+          <form action="/enrollments/" method="post">
+            <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+            <input type="hidden" name="run" value={run ? run.id : ""} />
             <button
-              id="upgradeEnrollBtn"
-              className="btn btn-primary btn-enrollment-button btn-lg btn-gradient-red-to-blue highlight enroll-now"
-              onClick={() => this.toggleUpgradeDialogVisibility()}
+              type="submit"
+              className="btn btn-primary btn-enrollment-button btn-gradient-red-to-blue highlight enroll-now"
               disabled={!run.is_enrollable}
             >
-            Enroll now
+              {isRunArchived(run) ? "Access Course Materials" : "Enroll Now"}
             </button>
-          ) : (
-            <form action="/enrollments/" method="post">
-              <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
-              <input type="hidden" name="run" value={run ? run.id : ""} />
-              <button
-                type="submit"
-                className="btn btn-primary btn-enrollment-button btn-gradient-red-to-blue highlight enroll-now"
-                disabled={!run.is_enrollable}
-              >
-                {isRunArchived(run) ? "Access Course Materials" : "Enroll Now"}
-              </button>
-            </form>
-          )}
+          </form>
+        )}
       </h2>
     ) : null
   }
 
   render() {
     const { courses, courseIsLoading, currentUser } = this.props
-    let run, product = null
+    let run,
+      product = null
     const courseRuns = courses && courses[0] ? courses[0].courseruns : null
     const enrollableCourseRuns = courseRuns ?
       courseRuns.filter(
@@ -489,8 +495,8 @@ export class CourseProductDetailEnroll extends React.Component<
         this.updateDate(run)
       }
     }
-    const hasMultipleEnrollableRuns = enrollableCourseRuns && enrollableCourseRuns.length > 1
-
+    const hasMultipleEnrollableRuns =
+      enrollableCourseRuns && enrollableCourseRuns.length > 1
 
     return (
       <>
@@ -503,7 +509,11 @@ export class CourseProductDetailEnroll extends React.Component<
             <>
               {run ?
                 currentUser && currentUser.id ?
-                  this.renderEnrollNowButton(run, hasMultipleEnrollableRuns, product) :
+                  this.renderEnrollNowButton(
+                    run,
+                    hasMultipleEnrollableRuns,
+                    product
+                  ) :
                   this.renderEnrollLoginButton(run) :
                 this.renderAccessCourseButton()}
 
