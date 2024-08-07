@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.98.12
+Version 0.98.12 (Released August 07, 2024)
 ---------------
 
 - Make the enrollment alert read by screen reader (#2324)
