@@ -31,8 +31,25 @@ type State = {
 }
 
 export class NotificationContainer extends React.Component<Props, State> {
+  headingRef: { current: null | HTMLDivElement }
+
+  constructor(props: Props) {
+    super(props)
+    this.headingRef = React.createRef()
+  }
   state = {
     hiddenNotifications: new Set()
+  }
+
+  componentDidMount() {
+    if (this.headingRef.current) {
+      this.headingRef.current.focus()
+    }
+  }
+  componentDidUpdate() {
+    if (this.headingRef.current) {
+      this.headingRef.current.focus()
+    }
   }
 
   onDismiss = (notificationKey: string) => {
@@ -59,7 +76,11 @@ export class NotificationContainer extends React.Component<Props, State> {
     const { hiddenNotifications } = this.state
 
     return (
-      <div className="notifications order-2" id="notifications-container">
+      <div
+        className="notifications order-2"
+        id="notifications-container"
+        ref={this.headingRef}
+      >
         {Object.keys(userNotifications).map((notificationKey, i) => {
           const dismiss = partial(this.onDismiss, [notificationKey])
           const notification = userNotifications[notificationKey]
@@ -81,6 +102,7 @@ export class NotificationContainer extends React.Component<Props, State> {
               toggle={dismiss}
               fade={true}
               closeClassName="btn-close-white"
+              closeAriaLabel="Close Enrollment Notification Button"
             >
               <AlertBodyComponent dismiss={dismiss} {...notification.props} />
             </Alert>
