@@ -316,7 +316,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
         courseRun.products[0].id
       )
 
-      const flexiblePricingLink = modal.find(".financial-assistance-link").at(0)
+      const flexiblePricingLink = inner.find(".financial-assistance-link").at(0)
       if (flexPriceApproved) {
         assert.isFalse(flexiblePricingLink.exists())
       } else {
