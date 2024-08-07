@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.98.12
+---------------
+
+- Make the enrollment alert read by screen reader (#2324)
+- MITx Online receipt displays wrong date (#2331)
+
 Version 0.98.11 (Released August 07, 2024)
 ---------------
 
