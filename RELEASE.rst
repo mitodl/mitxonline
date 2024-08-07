@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.98.11 (Released August 07, 2024)
+---------------
+
+- Update dependency sentry-sdk to v2 (#2303)
+- Update Yarn to v3.8.3 (#2294)
+
 Version 0.98.10 (Released August 05, 2024)
 ---------------
 
