@@ -581,7 +581,9 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """
         course_runs = self.courseruns.all()
         eligible_course_runs = [
-            course_run for course_run in course_runs if (course_run.is_enrollable and not course_run.is_past)
+            course_run
+            for course_run in course_runs
+            if (course_run.is_enrollable and not course_run.is_past)
         ]
         if len(eligible_course_runs) < 1:
             # check for archived courses
