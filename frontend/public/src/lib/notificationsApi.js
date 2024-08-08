@@ -19,10 +19,12 @@ import {
   USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
   USER_MSG_TYPE_DISCOUNT_INVALID
 } from "../constants"
+import { checkFeatureFlag } from "../lib/util"
 
 type UserMessage = {
   type: string,
-  text: string
+  text: string,
+  gaObject?: Object
 }
 
 export function getStoredUserMessage(): UserMessage | null {
@@ -31,7 +33,24 @@ export function getStoredUserMessage(): UserMessage | null {
     return null
   }
   const userMsgObject = JSON.parse(decodeURIComponent(userMsgValue))
+  const ga_purchase_feature_flag = checkFeatureFlag(ENABLE_GOOGLE_ANALYTICS_DATA_PUSH)
+  if (ga_purchase_feature_flag) {
+    const user_action = determineUserActionForGoogleAnalytics(userMsgObject)
+    if (user_action) {
+      userMsgObject.gaObject = user_action
+    }
+  }
   return parseStoredUserMessage(userMsgObject)
+}
+
+export function determineUserActionForGoogleAnalytics(userMsgJson: Object) {
+  const msgType = userMsgJson.type || null
+  if (!msgType) {
+    return null
+  }
+  if (msgType === USER_MSG_TYPE_PAYMENT_ACCEPTED) {
+    return userMsgJson.gaObject
+  }
 }
 
 export function parseStoredUserMessage(

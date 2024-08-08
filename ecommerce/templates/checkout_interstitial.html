@@ -15,12 +15,6 @@
                             <input type="hidden" readonly="readonly" name="{{ key }}" value="{{ value }}" />
                             {% endfor %}
                         </form>
-                    {% if ga_purchase_flag %}
-                        {{ ga_purchase_payload | json_script:"ga-purchase-payload" }}
-                        <script type="text/javascript">
-                            gtag("event", "purchase", JSON.parse(document.getElementById('ga-purchase-payload').textContent));
-                        </script>
-                    {% endif %}
                         <script type="text/javascript">
                             document.getElementById('checkout_form').submit();
                         </script>

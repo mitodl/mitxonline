@@ -5,6 +5,7 @@ import { compose } from "redux"
 import { partial } from "ramda"
 // $FlowFixMe
 import { Alert } from "reactstrap"
+import ga from "react-ga"
 
 import { removeUserNotification } from "../actions"
 import {
@@ -15,6 +16,7 @@ import {
 } from "../lib/util"
 import { getNotificationAlertProps } from "../lib/notificationsApi"
 import { notificationTypeMap, TextNotification } from "./notifications"
+import { checkFeatureFlag } from "../lib/util"
 
 import type { UserNotificationMapping } from "../reducers/notifications"
 
@@ -57,6 +59,8 @@ export class NotificationContainer extends React.Component<Props, State> {
   render() {
     const { userNotifications } = this.props
     const { hiddenNotifications } = this.state
+
+    const ga_feature_flag = checkFeatureFlag("", )
 
     return (
       <div className="notifications order-2" id="notifications-container">
