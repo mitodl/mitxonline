@@ -33,6 +33,8 @@ class CourseSerializer(BaseCourseSerializer):
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
     required_prerequisites = serializers.SerializerMethodField()
+    duration = serializers.SerializerMethodField()
+    time_commitment = serializers.SerializerMethodField()
 
     def get_required_prerequisites(self, instance):
         """
@@ -45,6 +47,24 @@ class CourseSerializer(BaseCourseSerializer):
             and hasattr(instance.page, "prerequisites")
             and instance.page.prerequisites != ""
         )
+
+    def get_duration(self, instance):
+        """
+        Get the duration of the course from the course page CMS.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "length"):
+            return instance.page.length
+
+        return None
+
+    def get_time_commitment(self, instance):
+        """
+        Get the time commitment of the course from the course page CMS.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "effort"):
+            return instance.page.effort
+
+        return None
 
     def get_next_run_id(self, instance):
         """Get next run id"""
@@ -88,6 +108,8 @@ class CourseSerializer(BaseCourseSerializer):
             "topics",
             "certificate_type",
             "required_prerequisites",
+            "duration",
+            "time_commitment",
         ]
 
 
