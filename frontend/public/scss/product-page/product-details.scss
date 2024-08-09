@@ -309,7 +309,8 @@ body.new-design {
 
         .enrollment-info-box, .program-info-box {
           margin: 10px 0;
-          padding: 0;
+          padding-top: 10px;
+          border-top: 1px solid #d1d1d1;
 
           .related-programs-info {
             font-size: 16px;
@@ -322,11 +323,7 @@ body.new-design {
         }
 
         .enrollment-info-box {
-          border: 1px solid #d1d1d1;
-          border-left: none;
-          border-right: none;
           font-size: 15px;
-          padding-top: 10px;
 
           .row {
             margin: 0 0 20px 0;
