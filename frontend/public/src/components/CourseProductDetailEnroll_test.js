@@ -302,8 +302,21 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       await enrollBtn.prop("onClick")()
 
       const modal = inner.find(".upgrade-enrollment-modal")
+      const selectorControl = modal.find(".date-selector-button-bar").at(0)
+      const selectorControlItems = selectorControl.find("option")
+      assert.isTrue(selectorControlItems.at(0).text() === "Please Select")
+      assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
+      modal
+        .find("select.form-control")
+        .simulate("change", { target: { value: courseRun["id"] } })
+      inner.update()
 
-      const flexiblePricingLink = modal.find(".financial-assistance-link").at(0)
+      assert.equal(
+        inner.find("input[type='hidden']").at(0).prop("value"),
+        courseRun.products[0].id
+      )
+
+      const flexiblePricingLink = inner.find(".financial-assistance-link").at(0)
       if (flexPriceApproved) {
         assert.isFalse(flexiblePricingLink.exists())
       } else {
@@ -456,10 +469,16 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       enrollBtn.prop("onClick")()
 
       const modal = inner.find(".upgrade-enrollment-modal")
-      const upgradeForm = modal.find("form").at(0)
-      assert.isTrue(upgradeForm.exists())
+      const selectorControl = modal.find(".date-selector-button-bar").at(0)
+      const selectorControlItems = selectorControl.find("option")
+      assert.isTrue(selectorControlItems.at(0).text() === "Please Select")
+      assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
+      modal
+        .find("select.form-control")
+        .simulate("change", { target: { value: courseRun["id"] } })
+      inner.update()
 
-      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
+      assert.equal(inner.find("input[type='hidden']").at(0).prop("value"), "1")
 
       assert.equal(inner.find("#certificate-price-info").at(0).text(), "$9.00")
     })
@@ -494,10 +513,16 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       await enrollBtn.prop("onClick")()
 
       const modal = inner.find(".upgrade-enrollment-modal")
-      const upgradeForm = modal.find("form").at(0)
-      assert.isTrue(upgradeForm.exists())
+      const selectorControl = modal.find(".date-selector-button-bar").at(0)
+      const selectorControlItems = selectorControl.find("option")
+      assert.isTrue(selectorControlItems.at(0).text() === "Please Select")
+      assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
+      modal
+        .find("select.form-control")
+        .simulate("change", { target: { value: courseRun["id"] } })
+      inner.update()
 
-      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
+      assert.equal(inner.find("input[type='hidden']").at(0).prop("value"), "1")
 
       assert.equal(
         inner.find("#certificate-price-info").at(0).text().at(1),
@@ -539,12 +564,33 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       const upgradeForm = modal.find("form").at(0)
       assert.isTrue(upgradeForm.exists())
 
-      assert.equal(upgradeForm.find("input[type='hidden']").prop("value"), "1")
-
+      const selectorControl = modal.find(".date-selector-button-bar").at(0)
+      assert.isTrue(selectorControl.exists())
+      const selectorControlItems = selectorControl.find("option")
+      assert.isTrue(selectorControlItems.at(0).text() === "Please Select")
+      assert.isTrue(
+        upgradeForm.find("button.btn-upgrade").at(0).prop("disabled")
+      )
+      assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
+      modal
+        .find("select.form-control")
+        .simulate("change", { target: { value: courseRun["id"] } })
+      inner.update()
+      assert.isFalse(getDisabledProp(inner, "button.enroll-now-free"))
+      assert.isFalse(getDisabledProp(inner, "button.btn-upgrade"))
+      assert.equal(inner.find("input[type='hidden']").at(0).prop("value"), "1")
       assert.equal(
         inner.find("#certificate-price-info").at(0).text().at(1),
         "9"
       )
+
+      // check if default selected it resets back
+      modal
+        .find("select.form-control")
+        .simulate("change", { target: { value: "default" } })
+      inner.update()
+      assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
+      assert.isTrue(getDisabledProp(inner, "button.btn-upgrade"))
     })
   })
 
@@ -604,10 +650,10 @@ describe("CourseProductDetailEnrollShallowRender", () => {
     await enrollBtn.prop("onClick")()
   })
   ;[
-    ["does not show", "one", false],
-    ["shows", "multiple", true]
-  ].forEach(([showsQualifier, runsQualifier, multiples]) => {
-    it(`${showsQualifier} the course run selector for a course with ${runsQualifier} active run${
+    ["one", false],
+    ["multiple", true]
+  ].forEach(([runsQualifier, multiples]) => {
+    it(`shows the course run selector for a course with ${runsQualifier} active run${
       multiples ? "s" : ""
     } and enables enroll buttons on selection`, async () => {
       const courseRuns = [courseRun]
@@ -632,35 +678,31 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       assert.isTrue(upgradeForm.exists())
 
       const selectorControl = modal.find(".date-selector-button-bar").at(0)
+      assert.isTrue(selectorControl.exists())
+      const selectorControlItems = selectorControl.find("option")
+      assert.isTrue(selectorControlItems.at(0).text() === "Please Select")
+      assert.isTrue(
+        upgradeForm.find("button.btn-upgrade").at(0).prop("disabled")
+      )
+      assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
+      modal
+        .find("select.form-control")
+        .simulate("change", { target: { value: courseRun["id"] } })
+      inner.update()
+      assert.isFalse(getDisabledProp(inner, "button.enroll-now-free"))
+      assert.isFalse(getDisabledProp(inner, "button.btn-upgrade"))
+      // check if default selected it resets back
+      modal
+        .find("select.form-control")
+        .simulate("change", { target: { value: "default" } })
+      inner.update()
+      assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
+      assert.isTrue(getDisabledProp(inner, "button.btn-upgrade"))
 
       if (multiples) {
-        assert.isTrue(selectorControl.exists())
-        const selectorControlItems = selectorControl.find("option")
         assert.isTrue(selectorControlItems.length === 3)
-        assert.isTrue(selectorControlItems.at(0).text() === "Please Select")
-        assert.isTrue(
-          upgradeForm.find("button.btn-upgrade").at(0).prop("disabled")
-        )
-        assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
-        modal
-          .find("select.form-control")
-          .simulate("change", { target: { value: courseRun["id"] } })
-        inner.update()
-        assert.isFalse(getDisabledProp(inner, "button.enroll-now-free"))
-        assert.isFalse(getDisabledProp(inner, "button.btn-upgrade"))
-        // check if default selected it resets back
-        modal
-          .find("select.form-control")
-          .simulate("change", { target: { value: "default" } })
-        inner.update()
-        assert.isTrue(getDisabledProp(inner, "button.enroll-now-free"))
-        assert.isTrue(getDisabledProp(inner, "button.btn-upgrade"))
       } else {
-        assert.isFalse(selectorControl.exists())
-        assert.isFalse(getDisabledProp(inner, "button.enroll-now-free"))
-        assert.isFalse(
-          upgradeForm.find("button.btn-upgrade").at(0).prop("disabled")
-        )
+        assert.isTrue(selectorControlItems.length === 2)
       }
     })
   })
