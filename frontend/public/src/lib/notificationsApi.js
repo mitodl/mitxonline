@@ -42,10 +42,13 @@ export function getStoredUserMessage(): UserMessage | null {
 export function determineUserActionForGoogleAnalytics() {
   const userMsg = ingestUserMessage()
   if (!userMsg) return null
-  const msgType = userMsgJson.type || null
+  const msgType = userMsg.type || null
   if (!msgType) return null
   if (msgType === USER_MSG_TYPE_PAYMENT_ACCEPTED) {
-    return "purchase"
+    return {
+      action: GOOGLE_ANALYTICS_EVENT_TYPE["GA_PURCHASE"],
+      order: userMsg.order
+    }
   }
 }
 

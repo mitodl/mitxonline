@@ -10,6 +10,7 @@ import urljoin from "url-join"
 import users, { currentUserSelector } from "../lib/queries/users"
 import { routes } from "../lib/urls"
 import {
+  determineUserActionForGoogleAnalytics,
   getStoredUserMessage,
   removeStoredUserMessage
 } from "../lib/notificationsApi"
@@ -32,6 +33,9 @@ import CatalogPage from "./pages/CatalogPage"
 
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
+import {checkFeatureFlag} from "../lib/util";
+import {GOOGLE_ANALYTICS_EVENT_TYPE} from "../constants";
+import {sendGAEcommerceEvent} from "../util/gaUtils";
 
 type Props = {
   match: Match,
@@ -44,6 +48,15 @@ export class App extends React.Component<Props, void> {
   componentDidMount() {
     const { addUserNotification } = this.props
     const { currentUser } = this.props
+
+    const ga_feature_flag = checkFeatureFlag("mitxonline-4099-dedp-google-analytics", currentUser)
+    if (ga_feature_flag) {
+      let gaEcommerceEventObject = determineUserActionForGoogleAnalytics(currentUser)
+      if (gaEcommerceEventObject.action === GOOGLE_ANALYTICS_EVENT_TYPE["GA_PURCHASE"]) {
+        let event = gaEcommerceEventObject.order
+        sendGAEcommerceEvent(gaEcommerceEventObject.action, event)
+      }
+    }
 
     const userMsg = getStoredUserMessage(currentUser)
     if (userMsg) {
