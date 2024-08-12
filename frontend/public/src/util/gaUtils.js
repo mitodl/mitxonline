@@ -1,10 +1,10 @@
 import ga4 from "react-ga4"
 
-export function sendGAEvent({ category, action, label }) {
+export function sendGAEvent({ category, action, label, value }) {
   let event = {
     category: category,
-    action: action,
-    label: label,
+    action:   action,
+    label:    label,
   }
   if (value !== undefined) {
     event.value = value
@@ -12,6 +12,6 @@ export function sendGAEvent({ category, action, label }) {
   ga4.event(event)
 }
 
-export function sendGAEcommerceEvent({ event_type, event_data }) {
-  ga4.gtag("event", event_type, event_data)
+export function sendGAEcommerceEvent({ eventType, eventData }) {
+  ga4.gtag("event", eventType, eventData)
 }
