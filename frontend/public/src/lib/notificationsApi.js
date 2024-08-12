@@ -4,6 +4,7 @@ import { isEmptyText } from "./util"
 import {
   ALERT_TYPE_DANGER,
   ALERT_TYPE_SUCCESS,
+  GOOGLE_ANALYTICS_EVENT_TYPE,
   USER_MSG_COOKIE_NAME,
   USER_MSG_TYPE_COMPLETED_AUTH,
   USER_MSG_TYPE_ENROLL_BLOCKED,
@@ -23,7 +24,6 @@ import {
 type UserMessage = {
   type: string,
   text: string,
-  gaObject?: Object
 }
 
 function ingestUserMessage(): userJson | null {
@@ -36,6 +36,9 @@ function ingestUserMessage(): userJson | null {
 
 export function getStoredUserMessage(): UserMessage | null {
   const userMsgObject = ingestUserMessage()
+  if (!userMsgObject) {
+    return null
+  }
   return parseStoredUserMessage(userMsgObject)
 }
 
