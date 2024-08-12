@@ -15150,7 +15150,6 @@ __metadata:
     react-device-detect: 1.17.0
     react-document-title: 2.0.3
     react-dom: 16.14.0
-    react-ga: 2.7.0
     react-ga4: ^2.1.0
     react-google-recaptcha: 1.1.0
     react-hot-loader: 4.13.1
@@ -18559,16 +18558,6 @@ __metadata:
   version: 2.1.0
   resolution: "react-ga4@npm:2.1.0"
   checksum: f7fb41141418d4ad14756f1126a1e9958db37d4d84ae6cd798043dc03a390b6dba74d69311af0349f0b9580a43bda8930138194ccc29c4100efe446e2d6eb057
-  languageName: node
-  linkType: hard
-
-"react-ga@npm:2.7.0":
-  version: 2.7.0
-  resolution: "react-ga@npm:2.7.0"
-  peerDependencies:
-    prop-types: ^15.6.0
-    react: ^15.6.2 || ^16.0
-  checksum: 15d8571c156edfaa204ff0041db7a901b0eeca3e3b21774e918269b0fe48204bb5b6a3df882caea5e0077aa3a32be39a48e7082e556563338f2a78b402a59463
   languageName: node
   linkType: hard
 
