@@ -2391,17 +2391,17 @@ setuptools = "*"
 
 [[package]]
 name = "mitol-django-google-sheets-refunds"
-version = "2023.6.9"
+version = "2023.12.19"
 description = "Library to handle Refund requests using Google Sheets integrations in Django"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "mitol-django-google-sheets-refunds-2023.6.9.tar.gz", hash = "sha256:1f7bdd8dcc7823ce9d950626ad4b2ef3fa4a2a1ff4e64235f793cbf72fc72918"},
-    {file = "mitol_django_google_sheets_refunds-2023.6.9-py3-none-any.whl", hash = "sha256:890d76df8dcc561d80cd8ee03c55c68b023e3247ef561324eb08bceebf070936"},
+    {file = "mitol-django-google-sheets-refunds-2023.12.19.tar.gz", hash = "sha256:c62fd7a6076130cfb1b436345133e9a909b678b1706f048512097280a911d90a"},
+    {file = "mitol_django_google_sheets_refunds-2023.12.19-py3-none-any.whl", hash = "sha256:97e04903a0f2dbb722905c3ba5a9efb92197d7c041783b471fad11ee2a6ebfe0"},
 ]
 
 [package.dependencies]
-django = ">=2.2.12,<4.0"
+django = ">=3.0"
 mitol-django-common = "*"
 mitol-django-google-sheets = "*"
 pluggy = "0.13.1"
@@ -4247,4 +4247,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "6a44b2a01ab033dde66a22f42ade34012721001934208233184723ecde0bcde9"
+content-hash = "811fab604fc552e92c7b32273e45465bf2cfd3b7c110e78f1f3b337020ec67d9"
