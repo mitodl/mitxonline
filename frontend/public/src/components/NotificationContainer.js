@@ -5,7 +5,6 @@ import { compose } from "redux"
 import { partial } from "ramda"
 // $FlowFixMe
 import { Alert } from "reactstrap"
-import ga from "react-ga"
 
 import { removeUserNotification } from "../actions"
 import {
@@ -14,11 +13,13 @@ import {
   newSetWithout,
   timeoutPromise
 } from "../lib/util"
-import { getNotificationAlertProps } from "../lib/notificationsApi"
+import { determineUserActionForGoogleAnalytics, getNotificationAlertProps } from "../lib/notificationsApi"
 import { notificationTypeMap, TextNotification } from "./notifications"
 import { checkFeatureFlag } from "../lib/util"
+import { sendGAEcommerceEvent } from "../util/gaUtils"
 
 import type { UserNotificationMapping } from "../reducers/notifications"
+import {GOOGLE_ANALYTICS_EVENT_TYPE} from "../constants";
 
 const DEFAULT_REMOVE_DELAY_MS = 1000
 
@@ -58,9 +59,16 @@ export class NotificationContainer extends React.Component<Props, State> {
 
   render() {
     const { userNotifications } = this.props
+    const { currentUser } = this.props
     const { hiddenNotifications } = this.state
 
-    const ga_feature_flag = checkFeatureFlag("", )
+    const ga_feature_flag = checkFeatureFlag("mitxonline-4099-dedp-google-analytics", currentUser)
+    if (ga_feature_flag) {
+      let gaEcommerceEventType = determineUserActionForGoogleAnalytics(currentUser)
+      if (gaEcommerceEventType === GOOGLE_ANALYTICS_EVENT_TYPE["GA_PURCHASE"]) {
+        sendGAEcommerceEvent(gaEcommerceEventType, event)
+      }
+    }
 
     return (
       <div className="notifications order-2" id="notifications-container">

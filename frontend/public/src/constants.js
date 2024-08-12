@@ -173,3 +173,7 @@ export const NODETYPE_COURSE = "course"
 
 export const NODEOPER_ALL = "all_of"
 export const NODEOPER_MIN = "min_number_of"
+
+export const GOOGLE_ANALYTICS_EVENT_TYPE = {
+  GA_PURCHASE: "purchase",
+}

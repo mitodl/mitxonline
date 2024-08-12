@@ -19,7 +19,6 @@ import {
   USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
   USER_MSG_TYPE_DISCOUNT_INVALID
 } from "../constants"
-import { checkFeatureFlag } from "../lib/util"
 
 type UserMessage = {
   type: string,
@@ -27,29 +26,26 @@ type UserMessage = {
   gaObject?: Object
 }
 
-export function getStoredUserMessage(): UserMessage | null {
+function ingestUserMessage(): userJson | null {
   const userMsgValue = getCookie(USER_MSG_COOKIE_NAME)
   if (!userMsgValue || isEmptyText(userMsgValue)) {
     return null
   }
-  const userMsgObject = JSON.parse(decodeURIComponent(userMsgValue))
-  const ga_purchase_feature_flag = checkFeatureFlag(ENABLE_GOOGLE_ANALYTICS_DATA_PUSH)
-  if (ga_purchase_feature_flag) {
-    const user_action = determineUserActionForGoogleAnalytics(userMsgObject)
-    if (user_action) {
-      userMsgObject.gaObject = user_action
-    }
-  }
+  return JSON.parse(decodeURIComponent(userMsgValue))
+}
+
+export function getStoredUserMessage(): UserMessage | null {
+  const userMsgObject = ingestUserMessage()
   return parseStoredUserMessage(userMsgObject)
 }
 
-export function determineUserActionForGoogleAnalytics(userMsgJson: Object) {
+export function determineUserActionForGoogleAnalytics() {
+  const userMsg = ingestUserMessage()
+  if (!userMsg) return null
   const msgType = userMsgJson.type || null
-  if (!msgType) {
-    return null
-  }
+  if (!msgType) return null
   if (msgType === USER_MSG_TYPE_PAYMENT_ACCEPTED) {
-    return userMsgJson.gaObject
+    return "purchase"
   }
 }
 
