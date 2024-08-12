@@ -23,7 +23,7 @@ import {
 
 type UserMessage = {
   type: string,
-  text: string,
+  text: string
 }
 
 function ingestUserMessage(): userJson | null {

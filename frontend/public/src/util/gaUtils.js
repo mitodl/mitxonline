@@ -4,7 +4,7 @@ export function sendGAEvent({ category, action, label, value }) {
   const event = {
     category: category,
     action:   action,
-    label:    label,
+    label:    label
   }
   if (value !== undefined) {
     event.value = value

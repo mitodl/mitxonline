@@ -33,9 +33,9 @@ import CatalogPage from "./pages/CatalogPage"
 
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
-import {checkFeatureFlag} from "../lib/util"
-import {GOOGLE_ANALYTICS_EVENT_TYPE} from "../constants"
-import {sendGAEcommerceEvent} from "../util/gaUtils"
+import { checkFeatureFlag } from "../lib/util"
+import { GOOGLE_ANALYTICS_EVENT_TYPE } from "../constants"
+import { sendGAEcommerceEvent } from "../util/gaUtils"
 
 type Props = {
   match: Match,
@@ -49,10 +49,17 @@ export class App extends React.Component<Props, void> {
     const { addUserNotification } = this.props
     const { currentUser } = this.props
 
-    const gaFeatureFlag = checkFeatureFlag("mitxonline-4099-dedp-google-analytics", currentUser)
+    const gaFeatureFlag = checkFeatureFlag(
+      "mitxonline-4099-dedp-google-analytics",
+      currentUser
+    )
     if (gaFeatureFlag) {
-      const gaEcommerceEventObject = determineUserActionForGoogleAnalytics(currentUser)
-      if (gaEcommerceEventObject.action === GOOGLE_ANALYTICS_EVENT_TYPE["GA_PURCHASE"]) {
+      const gaEcommerceEventObject =
+        determineUserActionForGoogleAnalytics(currentUser)
+      if (
+        gaEcommerceEventObject.action ===
+        GOOGLE_ANALYTICS_EVENT_TYPE["GA_PURCHASE"]
+      ) {
         const event = gaEcommerceEventObject.order
         sendGAEcommerceEvent(gaEcommerceEventObject.action, event)
       }

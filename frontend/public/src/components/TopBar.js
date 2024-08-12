@@ -31,7 +31,10 @@ const TopBar = ({ currentUser }: Props) => {
   return (
     <header className="site-header new-design d-flex d-flex flex-column">
       {showComponent ? (
-        <NotificationContainer id="notifications-container" currentUser={currentUser} />
+        <NotificationContainer
+          id="notifications-container"
+          currentUser={currentUser}
+        />
       ) : null}
       <nav
         className={`order-1 sub-nav navbar navbar-expand-md top-navbar ${
