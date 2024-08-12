@@ -50,7 +50,7 @@ export function determineUserActionForGoogleAnalytics() {
   if (msgType === USER_MSG_TYPE_PAYMENT_ACCEPTED) {
     return {
       action: GOOGLE_ANALYTICS_EVENT_TYPE["GA_PURCHASE"],
-      order: userMsg.order
+      order:  userMsg.order
     }
   }
 }

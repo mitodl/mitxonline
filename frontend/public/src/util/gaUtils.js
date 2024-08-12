@@ -1,7 +1,7 @@
 import ga4 from "react-ga4"
 
 export function sendGAEvent({ category, action, label, value }) {
-  let event = {
+  const event = {
     category: category,
     action:   action,
     label:    label,
