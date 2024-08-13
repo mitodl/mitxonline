@@ -182,7 +182,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         className="info-link more-info"
         target="_blank"
         rel="noreferrer"
-        href="https://mitxonline.zendesk.com/hc/en-us/articles/16928404973979-Does-MITx-Online-offer-free-certificates-"
+        href="https://mitxonline.zendesk.com/hc/en-us/articles/28158506908699-What-is-the-Certificate-Track-What-are-Course-and-Program-Certificates"
       >
         Learn more
       </a>
@@ -309,7 +309,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
             <div className="enrollment-info-text course-certificate-message">
               {run && product && !isArchived ? (
                 <>
-                  <span>Earn a Certificate: </span>
+                  <span>Certificate Track: </span>
                   {formatLocalePrice(getFlexiblePriceForProduct(product))}
                   {certificateInfoLink}
                   {course.page.financial_assistance_form_url ? (

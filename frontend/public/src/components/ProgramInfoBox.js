@@ -182,7 +182,11 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
                 <>
                   Certificate track: {program.page.price}
                   <div>
-                    <a target="_blank" rel="noreferrer" href="#">
+                    <a
+                      target="_blank"
+                      rel="noreferrer"
+                      href="https://mitxonline.zendesk.com/hc/en-us/articles/28158506908699-What-is-the-Certificate-Track-What-are-Course-and-Program-Certificates"
+                    >
                       What's the certificate track?
                     </a>
                   </div>
