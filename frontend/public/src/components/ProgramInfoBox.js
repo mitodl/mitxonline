@@ -185,7 +185,7 @@ export default class ProgramInfoBox extends React.PureComponent<ProgramInfoBoxPr
                     <a
                       target="_blank"
                       rel="noreferrer"
-                      href="https://mitxonline.zendesk.com/hc/en-us/articles/16928404973979-Does-MITx-Online-offer-free-certificates"
+                      href="https://mitxonline.zendesk.com/hc/en-us/articles/28158506908699-What-is-the-Certificate-Track-What-are-Course-and-Program-Certificates"
                     >
                       What's the certificate track?
                     </a>
