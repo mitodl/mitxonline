@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 0.98.14
+---------------
+
+- Updated URL for program cert track (#2319)
+- Styling Course Info Box when no program (#2335)
+- Update postgres Docker tag to v15.8 (#2345)
+- Update nginx Docker tag to v1.27 (#2344)
+- Update docker.elastic.co/elasticsearch/elasticsearch Docker tag to v6.8.23 (#2343)
+- Update dependency uwsgitop to ^0.12 (#2342)
+- Update dependency mitol-django-hubspot-api to v2023.12.19 (#2340)
+- Update dependency mitol-django-google-sheets-refunds to v2023.12.19 (#2339)
+- Update dependency mitol-django-google-sheets-deferrals to v2023.12.19 (#2338)
+
 Version 0.98.13 (Released August 13, 2024)
 ---------------
 
