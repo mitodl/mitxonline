@@ -4024,12 +4024,12 @@ files = [
 
 [[package]]
 name = "uwsgitop"
-version = "0.11"
+version = "0.12"
 description = "uWSGI top-like interface"
 optional = false
 python-versions = "*"
 files = [
-    {file = "uwsgitop-0.11.tar.gz", hash = "sha256:99ca245119e4a0600840a62b7b4e020c9870fe90952b24eecfff0c9090c75d14"},
+    {file = "uwsgitop-0.12.tar.gz", hash = "sha256:4f9330951f0fb9633226de36cf0c28c04dcf323efab608834aa81f638b6019b2"},
 ]
 
 [[package]]
@@ -4246,4 +4246,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "dbcfd6b2f2ec3b01e7ed65ad83e08826b503a4b648200d907eb70213078b57bd"
+content-hash = "d60649a132bca316a4246da510a9fb918bb2015209070da8ca411564eaaca2f1"
