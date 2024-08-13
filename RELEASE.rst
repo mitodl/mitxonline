@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.98.13
+Version 0.98.13 (Released August 13, 2024)
 ---------------
 
 - Filtering only enrollable runs on the product page (#2332)
