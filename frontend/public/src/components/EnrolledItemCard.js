@@ -1,7 +1,7 @@
 /* global SETTINGS:false */
 import React from "react"
 import moment from "moment"
-import { parseDateString, formatPrettyDateTimeAmPmTz } from "../lib/util"
+import {parseDateString, formatPrettyDateTimeAmPmTz, formatPrettyDate} from "../lib/util"
 import { Formik, Form, Field } from "formik"
 import {
   Dropdown,
@@ -415,30 +415,25 @@ export class EnrolledItemCard extends React.Component<
 
     const certificateLinksStyles = isProgramCard ?
       "upgrade-item-description d-md-flex align-items-start justify-content-between flex-column" :
-      "upgrade-item-description d-md-flex align-items-start justify-content-between"
+      "upgrade-item-description d-md-flex justify-content-between"
     const certificateLinksIntStyles = isProgramCard ?
       "d-flex d-md-flex flex-column align-items-start justify-content-center" :
-      "d-flex d-md-flex flex-column align-items-start justify-content-center"
+      "d-flex d-md-flex flex-column justify-content-center"
 
     const certificateLinks =
       enrollment.run.products.length > 0 &&
       enrollment.enrollment_mode === "audit" &&
       enrollment.run.is_upgradable ? (
           <div className={certificateLinksStyles}>
-            <div className="certificate-upgrade-message">
-              <p>
-                <strong>Upgrade today</strong> and, upon passing, receive your
-              certificate signed by MIT faculty to highlight the knowledge and
-              skills you've gained from this MITx course.
-              </p>
-            </div>
             <div className={certificateLinksIntStyles}>
               <div className="get-cert-button-container w-100">
-                <GetCertificateButton productId={enrollment.run.products[0].id} />
+                <GetCertificateButton productId={enrollment.run.products[0].id}/>
               </div>
-              <div className="finaid-link-container">
-                {financialAssistanceLink}
-              </div>
+            </div>
+            <div className="certificate-upgrade-message">
+              <strong>Upgrade today</strong> and, upon passing, receive your
+              certificate signed by MIT faculty to highlight the knowledge and
+                skills you've gained from this MITx course. <b>Upgrade expires: {formatPrettyDateTimeAmPmTz(moment(enrollment.run.upgrade_deadline))}</b>
             </div>
           </div>
         ) : null
