@@ -1,7 +1,7 @@
 /* global SETTINGS:false */
 import React from "react"
 import moment from "moment"
-import {parseDateString, formatPrettyDateTimeAmPmTz, formatPrettyDate} from "../lib/util"
+import {parseDateString, formatPrettyDateTimeAmPmTz, formatPrettyShortDate, formatPrettyMonthDate} from "../lib/util"
 import { Formik, Form, Field } from "formik"
 import {
   Dropdown,
@@ -35,6 +35,7 @@ import GetCertificateButton from "./GetCertificateButton"
 import {
   isFinancialAssistanceAvailable,
   isLinkableCourseRun,
+  getStartDate,
   courseRunStatusMessage
 } from "../lib/courseApi"
 import { isSuccessResponse } from "../lib/util"
@@ -447,7 +448,7 @@ export class EnrolledItemCard extends React.Component<
     const menuTitle = `Course options for ${enrollment.run.course.title}`
 
     const courseRunStatusMessageText = courseRunStatusMessage(enrollment.run)
-
+    console.log(isLinkableCourseRun(enrollment.run, currentUser))
     return (
       <div className="enrolled-item container card" key={enrollment.run.id}>
         <div className="row flex-grow-1 enrolled-item-info">
@@ -503,7 +504,9 @@ export class EnrolledItemCard extends React.Component<
                     rel="noopener noreferrer"
                   >
                     Go to Course
-                  </a>) : null}
+                  </a>) : <a className="btn btn-primary btn-gradient-red-to-blue disabled" rel="noopener noreferrer">
+                  Starts {formatPrettyMonthDate(parseDateString(enrollment.run.start_date))}
+                </a>}
               </div>
               <Dropdown
                 isOpen={menuVisibility}
