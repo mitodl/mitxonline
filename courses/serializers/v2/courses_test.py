@@ -68,6 +68,8 @@ def test_serialize_course(
             "certificate_type": certificate_type,
             "topics": [{"name": topic.name} for topic in topics],
             "required_prerequisites": True,
+            "duration": course.page.length,
+            "time_commitment": course.page.effort,
             "programs": BaseProgramSerializer(course.programs, many=True).data
             if all_runs
             else None,
@@ -104,6 +106,8 @@ def test_serialize_course_required_prerequisites(
             "certificate_type": "Certificate of Completion",
             "topics": [],
             "required_prerequisites": expected_required_prerequisites,
+            "duration": course.page.length,
+            "time_commitment": course.page.effort,
             "programs": None,
         },
     )
