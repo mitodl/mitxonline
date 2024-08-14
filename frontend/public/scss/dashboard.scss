@@ -147,8 +147,7 @@ $enrolled-passed-fg: #ffffff;
   }
 
   button.dot-menu {
-    // Setting height so the button element doesn't expand to cover the full height of the row
-    height: $material-icon-height;
+    vertical-align: -webkit-baseline-middle;
   }
 
   .certificate-container {
@@ -270,9 +269,13 @@ $enrolled-passed-fg: #ffffff;
       }
     }
   }
-
-  .get-cert-button-container button, .finaid-link-container {
-    font-size: 14px !important;
+  .goto-course-wrapper {
+    a {
+      width: fit-content;
+    }
+  }
+  .get-cert-button-container button, .finaid-link-container, a.btn-primary {
+    font-size: 14px;
 
     @include media-breakpoint-down(sm) {
       width: 100%;

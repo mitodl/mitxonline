@@ -402,21 +402,6 @@ export class EnrolledItemCard extends React.Component<
 
     const { menuVisibility } = this.state
 
-    const title = isLinkableCourseRun(enrollment.run, currentUser) ? (
-      <a
-        href={enrollment.run.courseware_url}
-        onClick={ev =>
-          redirectToCourseHomepage(enrollment.run.courseware_url, ev)
-        }
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        {enrollment.run.course.title}
-      </a>
-    ) : (
-      enrollment.run.course.title
-    )
-
     const financialAssistanceLink =
       isFinancialAssistanceAvailable(enrollment.run) &&
       !enrollment.approved_flexible_price_exists ? (
@@ -492,8 +477,8 @@ export class EnrolledItemCard extends React.Component<
           )}
 
           <div className="col-12 col-md course-card-text-details d-grid">
-            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100">
-              <div className="d-flex flex-column">
+            <div className="d-flex justify-content-between flex-nowrap w-100">
+              <div className="d-flex flex-column flex-grow-1">
                 <div className="align-content-start d-flex enrollment-mode-container flex-wrap pb-1">
                   {enrollment.certificate ? (
                     <span className="badge badge-enrolled-passed mr-2">
@@ -509,7 +494,21 @@ export class EnrolledItemCard extends React.Component<
                     ) : null}
                 </div>
 
-                <h2>{title}</h2>
+                <h2>{enrollment.run.course.title}</h2>
+              </div>
+              <div className="d-flex flex-column goto-course-wrapper px-4">
+                {isLinkableCourseRun(enrollment.run, currentUser) ? (
+                  <a
+                    href={enrollment.run.courseware_url}
+                    onClick={ev =>
+                      redirectToCourseHomepage(enrollment.run.courseware_url, ev)
+                    }
+                    className="btn btn-primary btn-gradient-red-to-blue"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Go to Course
+                  </a>) : null}
               </div>
               <Dropdown
                 isOpen={menuVisibility}
