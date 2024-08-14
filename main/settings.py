@@ -786,7 +786,7 @@ CRON_PROCESS_REFUND_REQUESTS_MINUTES = get_string(
 )
 CRON_COURSE_CERTIFICATES_HOURS = get_string(
     name="CRON_COURSE_CERTIFICATES_HOURS",
-    default=0,
+    default="0,12",
     description="'hours' value for the 'generate-course-certificate' scheduled task (defaults to midnight)",
 )
 CRON_COURSE_CERTIFICATES_DAYS = get_string(
