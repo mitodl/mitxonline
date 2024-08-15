@@ -15,7 +15,6 @@ import {
   makeLearnerRecordGrade
 } from "../factories/course"
 import { makeUser } from "../factories/user"
-import * as courseApi from "../lib/courseApi"
 
 describe("EnrolledItemCard", () => {
   let helper,
