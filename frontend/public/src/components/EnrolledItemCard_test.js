@@ -23,7 +23,6 @@ describe("EnrolledItemCard", () => {
     userEnrollment,
     currentUser,
     enrollmentCardProps,
-    isFinancialAssistanceAvailableStub,
     toggleProgramDrawer,
     redirectToCourseHomepage
 
@@ -48,10 +47,6 @@ describe("EnrolledItemCard", () => {
         .returns(Promise),
       addUserNotification: helper.sandbox.stub().returns(Function)
     }
-    isFinancialAssistanceAvailableStub = helper.sandbox.stub(
-      courseApi,
-      "isFinancialAssistanceAvailable"
-    )
     toggleProgramDrawer = helper.sandbox.stub().returns(Function)
     redirectToCourseHomepage = helper.sandbox.stub().returns(Function)
 
