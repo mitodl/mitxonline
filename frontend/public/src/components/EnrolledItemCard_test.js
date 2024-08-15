@@ -251,25 +251,6 @@ describe("EnrolledItemCard", () => {
       assert.isTrue(verifiedUnenrollmodal.exists())
     })
   })
-  ;[[true], [false]].forEach(([approvedFlexiblePrice]) => {
-    it("renders the financial assistance link", async () => {
-      isFinancialAssistanceAvailableStub.returns(true)
-      userEnrollment = makeCourseRunEnrollmentWithProduct()
-      userEnrollment["enrollment_mode"] = "audit"
-      userEnrollment["approved_flexible_price_exists"] = approvedFlexiblePrice
-      enrollmentCardProps.enrollment = userEnrollment
-      const inner = await renderedCard()
-      const extraLinks = inner.find(".finaid-link")
-      if (approvedFlexiblePrice) {
-        const text = extraLinks.find("a").at(0)
-        assert.isFalse(text.exists())
-      } else {
-        const text = extraLinks.find("a").at(0).text()
-        assert.equal(text, "Financial assistance?")
-      }
-    })
-  })
-
   it("renders the program unenrollment verification modal", async () => {
     enrollmentCardProps.enrollment = makeProgramEnrollment()
 

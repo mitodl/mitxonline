@@ -441,7 +441,7 @@ export class EnrolledItemCard extends React.Component<
               <b>
               Upgrade expires:{" "}
                 {formatPrettyDateTimeAmPmTz(
-                  moment(enrollment.run.upgrade_deadline)
+                  parseDateString(enrollment.run.upgrade_deadline)
                 )}
               </b>
             </div>
