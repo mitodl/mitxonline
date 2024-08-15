@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.98.14
+Version 0.98.14 (Released August 15, 2024)
 ---------------
 
 - Updated URL for program cert track (#2319)
