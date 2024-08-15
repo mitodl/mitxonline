@@ -7,7 +7,7 @@ import {
   notNil,
   parseDateString,
   formatPrettyDateTimeAmPmTz,
-  emptyOrNil, formatPrettyDate, formatPrettyShortDate
+  emptyOrNil
 } from "./util"
 
 import { NODETYPE_OPERATOR, NODETYPE_COURSE, NODEOPER_ALL } from "../constants"

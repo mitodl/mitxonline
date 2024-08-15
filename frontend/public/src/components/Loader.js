@@ -24,7 +24,7 @@ const Loader = (props: LoaderProps) => {
       notNil(delayMs) ? delayMs : defaultLoaderDelayMs
     )
     return () => clearTimeout(timer)
-  }, [])
+  }, [isLoading, delayMs])
 
   if (!isLoading) {
     return children
