@@ -457,7 +457,7 @@ export class EnrolledItemCard extends React.Component<
     const menuTitle = `Course options for ${enrollment.run.course.title}`
 
     const courseRunStatusMessageText = courseRunStatusMessage(enrollment.run)
-    console.log(isLinkableCourseRun(enrollment.run, currentUser))
+
     return (
       <div className="enrolled-item container card" key={enrollment.run.id}>
         <div className="row flex-grow-1 enrolled-item-info">
