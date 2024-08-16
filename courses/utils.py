@@ -173,3 +173,21 @@ def get_unenrollable_courses(queryset):
         .filter(courseruns__id__in=courseruns_qs.values_list("id", flat=True))
         .distinct()
     )
+
+
+def get_archived_courseruns(queryset):
+    """
+    Returns course runs that are archived. This is defined as:
+    - The course run end date has passed
+    - The course run enrollment end date is in the future or None.
+    This logic is set to match the logic found in frontend/public/src/lib/courseApi.js isRunArchived
+
+    Args:
+        queryset: Queryset of CourseRun objects
+    """
+    now = now_in_utc()
+    return queryset.filter(
+        get_enrollable_course_run_filter(now)
+        & Q(end_date__lt=now)
+        & (Q(enrollment_end__isnull=True) | Q(enrollment_end__gt=now))
+    )
