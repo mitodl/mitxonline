@@ -419,7 +419,7 @@ export class EnrolledItemCard extends React.Component<
 
     const certificateLinksStyles = isProgramCard ?
       "upgrade-item-description d-md-flex align-items-start justify-content-between flex-column" :
-      "upgrade-item-description d-md-flex justify-content-between"
+      "upgrade-item-description d-md-flex"
     const certificateLinksIntStyles = isProgramCard ?
       "d-flex d-md-flex flex-column align-items-start justify-content-center" :
       "d-flex d-md-flex flex-column justify-content-center"
