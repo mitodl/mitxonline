@@ -1,7 +1,11 @@
 /* global SETTINGS:false */
 import React from "react"
 import moment from "moment"
-import { parseDateString, formatPrettyDateTimeAmPmTz } from "../lib/util"
+import {
+  parseDateString,
+  formatPrettyDateTimeAmPmTz,
+  formatPrettyMonthDate
+} from "../lib/util"
 import { Formik, Form, Field } from "formik"
 import {
   Dropdown,
@@ -402,21 +406,6 @@ export class EnrolledItemCard extends React.Component<
 
     const { menuVisibility } = this.state
 
-    const title = isLinkableCourseRun(enrollment.run, currentUser) ? (
-      <a
-        href={enrollment.run.courseware_url}
-        onClick={ev =>
-          redirectToCourseHomepage(enrollment.run.courseware_url, ev)
-        }
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        {enrollment.run.course.title}
-      </a>
-    ) : (
-      enrollment.run.course.title
-    )
-
     const financialAssistanceLink =
       isFinancialAssistanceAvailable(enrollment.run) &&
       !enrollment.approved_flexible_price_exists ? (
@@ -430,30 +419,31 @@ export class EnrolledItemCard extends React.Component<
 
     const certificateLinksStyles = isProgramCard ?
       "upgrade-item-description d-md-flex align-items-start justify-content-between flex-column" :
-      "upgrade-item-description d-md-flex align-items-start justify-content-between"
+      "upgrade-item-description d-md-flex"
     const certificateLinksIntStyles = isProgramCard ?
       "d-flex d-md-flex flex-column align-items-start justify-content-center" :
-      "d-flex d-md-flex flex-column align-items-start justify-content-center"
+      "d-flex d-md-flex flex-column justify-content-center"
 
     const certificateLinks =
       enrollment.run.products.length > 0 &&
       enrollment.enrollment_mode === "audit" &&
       enrollment.run.is_upgradable ? (
           <div className={certificateLinksStyles}>
-            <div className="certificate-upgrade-message">
-              <p>
-                <strong>Upgrade today</strong> and, upon passing, receive your
-              certificate signed by MIT faculty to highlight the knowledge and
-              skills you've gained from this MITx course.
-              </p>
-            </div>
             <div className={certificateLinksIntStyles}>
               <div className="get-cert-button-container w-100">
                 <GetCertificateButton productId={enrollment.run.products[0].id} />
               </div>
-              <div className="finaid-link-container">
-                {financialAssistanceLink}
-              </div>
+            </div>
+            <div className="certificate-upgrade-message">
+              <strong>Upgrade today</strong> and, upon passing, receive your
+            certificate signed by MIT faculty to highlight the knowledge and
+            skills you've gained from this MITx course.{" "}
+              <b>
+              Upgrade expires:{" "}
+                {formatPrettyDateTimeAmPmTz(
+                  parseDateString(enrollment.run.upgrade_deadline)
+                )}
+              </b>
             </div>
           </div>
         ) : null
@@ -492,8 +482,8 @@ export class EnrolledItemCard extends React.Component<
           )}
 
           <div className="col-12 col-md course-card-text-details d-grid">
-            <div className="d-flex justify-content-between align-content-start flex-nowrap w-100">
-              <div className="d-flex flex-column">
+            <div className="d-flex justify-content-between flex-nowrap w-100">
+              <div className="d-flex flex-column flex-grow-1">
                 <div className="align-content-start d-flex enrollment-mode-container flex-wrap pb-1">
                   {enrollment.certificate ? (
                     <span className="badge badge-enrolled-passed mr-2">
@@ -509,7 +499,35 @@ export class EnrolledItemCard extends React.Component<
                     ) : null}
                 </div>
 
-                <h2>{title}</h2>
+                <h2>{enrollment.run.course.title}</h2>
+              </div>
+              <div className="d-flex flex-column goto-course-wrapper px-4">
+                {isLinkableCourseRun(enrollment.run, currentUser) ? (
+                  <a
+                    href={enrollment.run.courseware_url}
+                    onClick={ev =>
+                      redirectToCourseHomepage(
+                        enrollment.run.courseware_url,
+                        ev
+                      )
+                    }
+                    className="btn btn-primary btn-gradient-red-to-blue"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Go to Course
+                  </a>
+                ) : (
+                  <a
+                    className="btn btn-primary btn-gradient-red-to-blue disabled"
+                    rel="noopener noreferrer"
+                  >
+                    Starts{" "}
+                    {formatPrettyMonthDate(
+                      parseDateString(enrollment.run.start_date)
+                    )}
+                  </a>
+                )}
               </div>
               <Dropdown
                 isOpen={menuVisibility}
