@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.99.0
+Version 0.99.0 (Released August 20, 2024)
 --------------
 
 - Revert "Update nginx Docker tag to v1.27" (#2352)
