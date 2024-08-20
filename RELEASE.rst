@@ -1,6 +1,17 @@
 Release Notes
 =============
 
+Version 0.99.0
+--------------
+
+- Revert "Update nginx Docker tag to v1.27" (#2352)
+- Add Go To Course button (#2349)
+- Add availability to Courses API endpoint (#2308)
+- Generate certificates twice a day (#2348)
+- Add time_commitment and durations to the courses api (#2334)
+- Update dependency django-anymail to v11 (#2341)
+- Update redis Docker tag to v6.2.14 (#2346)
+
 Version 0.98.14 (Released August 15, 2024)
 ---------------
 
