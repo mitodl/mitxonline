@@ -17,8 +17,9 @@ from courses.factories import (
     ProgramFactory,  # noqa: F401
     program_with_requirements,  # noqa: F401
 )
-from courses.models import Course
+from courses.models import Course, CourseRun
 from courses.utils import (
+    get_dated_courseruns,
     get_enrollable_courseruns_qs,
     get_enrollable_courses,
     get_program_certificate_by_enrollment,
@@ -266,3 +267,41 @@ def test_get_unenrollable_courses():
     unenrollable_courses = get_unenrollable_courses(Course.objects.all())
     assert unenrollable_course in unenrollable_courses
     assert enrollable_course not in unenrollable_courses
+
+
+def test_get_dated_courseruns():
+    """
+    Test get_dated_courseruns
+    """
+    now = now_in_utc()
+    future_date = now + timedelta(days=1)
+    past_date = now - timedelta(days=1)
+    enrollable_course = CourseFactory.create()
+    unenrollable_course = CourseFactory.create()
+    self_paced_course = CourseFactory.create()
+    enrollable_courserun = CourseRunFactory.create(
+        course=enrollable_course,
+        live=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+    unenrollable_courserun = CourseRunFactory.create(
+        course=unenrollable_course,
+        live=True,
+        start_date=future_date,
+        enrollment_start=future_date,
+        enrollment_end=None,
+    )
+    self_paced_courserun = CourseRunFactory.create(
+        course=self_paced_course,
+        live=True,
+        self_paced=True,
+        start_date=now,
+        enrollment_start=past_date,
+        enrollment_end=future_date,
+    )
+    dated_courseruns = get_dated_courseruns(CourseRun.objects.all())
+    assert enrollable_courserun in dated_courseruns
+    assert unenrollable_courserun not in dated_courseruns
+    assert self_paced_courserun not in dated_courseruns

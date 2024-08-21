@@ -191,3 +191,21 @@ def get_archived_courseruns(queryset):
         & Q(end_date__lt=now)
         & (Q(enrollment_end__isnull=True) | Q(enrollment_end__gt=now))
     )
+
+
+def get_dated_courseruns(queryset):
+    """
+    Returns course runs that are dated meaning they are
+    - Not self-paced
+    - Have a start date
+    - End date can be dated and greater than now or null
+    - Enrollable (enrollment start is in the past and enrollment end is in the future or null)
+    """
+    now = now_in_utc()
+    return queryset.filter(
+        Q(is_self_paced=False)
+        & Q(start_date__isnull=False)
+        & (Q(end_date__isnull=True) | Q(end_date__gt=now))
+        & (Q(enrollment_end__isnull=True) | Q(enrollment_end__gt=now))
+        & Q(enrollment_start__lt=now)
+    )
