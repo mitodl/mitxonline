@@ -366,6 +366,10 @@ body.new-design {
               max-width: 18px;
             }
           }
+          .enrollment-info-text.pacing-badge-position {
+            width: min-content;
+            text-align: right;
+          }
 
           .enrollment-info-text {
             width: auto;
@@ -374,6 +378,9 @@ body.new-design {
             padding-left: 10px;
             padding-right: 0;
 
+            .enrollment-length-info {
+              max-width: 165px;
+            }
             span {
               font-weight: 700;
               color: black;
@@ -385,9 +392,9 @@ body.new-design {
             }
 
             .badge-pacing {
+              display: inline-flex;
               background-color: $black;
               text-transform: uppercase;
-              margin-left: .5rem;
               padding: 3px;
               font-weight: normal;
               color: white;
@@ -409,6 +416,7 @@ body.new-design {
             }
           }
           .more-info {
+            display: inline-flex;
             width: auto;
             border-color: transparent;
             background-color: transparent;
