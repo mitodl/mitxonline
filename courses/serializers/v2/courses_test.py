@@ -106,7 +106,7 @@ def test_serialize_course_required_prerequisites(
             "page": CoursePageSerializer(course.page).data,
             "certificate_type": "Certificate of Completion",
             "topics": [],
-            "availability": "dated",
+            "availability": "anytime",
             "required_prerequisites": expected_required_prerequisites,
             "duration": course.page.length,
             "time_commitment": course.page.effort,

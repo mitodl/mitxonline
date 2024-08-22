@@ -16,7 +16,7 @@ from courses.serializers.v1.base import (
     ProductRelatedField,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
-from courses.utils import get_archived_courseruns
+from courses.utils import get_dated_courseruns
 from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -99,12 +99,10 @@ class CourseSerializer(BaseCourseSerializer):
 
     def get_availability(self, instance):
         """Get course availability"""
-        archived_course_runs = get_archived_courseruns(
-            instance.courseruns.filter(is_self_paced=False)
-        )
-        if archived_course_runs.count() == 0:
-            return "dated"
-        return "anytime"
+        dated_courseruns = get_dated_courseruns(instance.courseruns)
+        if dated_courseruns.count() == 0:
+            return "anytime"
+        return "dated"
 
     class Meta:
         model = models.Course
