@@ -268,7 +268,7 @@ def test_get_unenrollable_courses():
     assert unenrollable_course in unenrollable_courses
     assert enrollable_course not in unenrollable_courses
 
-
+@pytest.mark.django_db
 def test_get_dated_courseruns():
     """
     Test get_dated_courseruns
@@ -296,7 +296,7 @@ def test_get_dated_courseruns():
     self_paced_courserun = CourseRunFactory.create(
         course=self_paced_course,
         live=True,
-        self_paced=True,
+        is_self_paced=True,
         start_date=now,
         enrollment_start=past_date,
         enrollment_end=future_date,
