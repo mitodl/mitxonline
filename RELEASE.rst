@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.99.1
+--------------
+
+- Add get_dated_courseruns function for availability to check for dated courses (#2354)
+- Updating styles for program info box (#2355)
+
 Version 0.99.0 (Released August 20, 2024)
 --------------
 
