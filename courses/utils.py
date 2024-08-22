@@ -201,7 +201,8 @@ def get_dated_courseruns(queryset):
     - End date can be dated and greater than now or null
     - Enrollable (enrollment start is in the past and enrollment end is in the future or null)
     """
-    return queryset.filter(get_enrollable_course_run_filter()
+    return queryset.filter(
+        get_enrollable_course_run_filter()
         & Q(is_self_paced=False)
         & Q(enrollment_end__isnull=False)
     )

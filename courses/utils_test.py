@@ -268,6 +268,7 @@ def test_get_unenrollable_courses():
     assert unenrollable_course in unenrollable_courses
     assert enrollable_course not in unenrollable_courses
 
+
 @pytest.mark.django_db
 def test_get_dated_courseruns():
     """
