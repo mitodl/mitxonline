@@ -6,7 +6,7 @@ import {
   parseDateString,
   formatPrettyShortDate
 } from "../lib/util"
-import { getFirstRelevantRun, isRunArchived } from "../lib/courseApi"
+import { getFirstRelevantRun } from "../lib/courseApi"
 import moment from "moment-timezone"
 
 import type { BaseCourseRun } from "../flow/courseTypes"
@@ -26,12 +26,11 @@ type CourseInfoBoxProps = {
  * If the run is under the toggle "More Dates" the format is inline and month
  * is shortened to 3 letters.
  * @param {EnrollmentFlaggedCourseRun} run
- * @param {boolean} isArchived if the course ended, but still enrollable
  * @param {boolean} isMoreDates true if this run is going to show up under the More Dates toggle
  * */
 
-const getCourseDates = (run, isArchived = false, isMoreDates = false) => {
-  if (isArchived) {
+const getCourseDates = (run, isMoreDates = false) => {
+  if (run.is_archived) {
     return (
       <>
         <span>Course content available anytime</span>
@@ -164,7 +163,6 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     const course = courses[0]
     const run = getFirstRelevantRun(course, course.courseruns)
     const product = run && run.products.length > 0 && run.products[0]
-    const isArchived = isRunArchived(run)
 
     const startDates = []
     const moreEnrollableCourseRuns = enrollableCourseRuns.length > 1
@@ -172,7 +170,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
       enrollableCourseRuns.forEach((courseRun, index) => {
         if (courseRun.id !== run.id) {
           startDates.push(
-            <li key={index}>{getCourseDates(courseRun, isArchived, true)}</li>
+            <li key={index}>{getCourseDates(courseRun, true)}</li>
           )
         }
       })
@@ -190,7 +188,9 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     return (
       <>
         <div className="enrollment-info-box componentized">
-          {!run || isArchived ? this.warningMessage(isArchived) : null}
+          {!run || run.is_archived ?
+            this.warningMessage(run.is_archived) :
+            null}
           {run ? (
             <div className="row d-flex course-timing-message">
               <div className="enrollment-info-icon">
@@ -204,10 +204,10 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                 aria-level="3"
                 role="heading"
               >
-                {getCourseDates(run, isArchived)}
+                {getCourseDates(run)}
               </div>
 
-              {!isArchived && moreEnrollableCourseRuns ? (
+              {!run.is_archived && moreEnrollableCourseRuns ? (
                 <>
                   <button
                     className="info-link more-info more-dates"
@@ -244,7 +244,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
                 role="heading"
               >
                 <b>Course Format: </b>
-                {isArchived || run.is_self_paced ? (
+                {run.is_archived || run.is_self_paced ? (
                   <>
                     Self-paced
                     <button
@@ -307,7 +307,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
               <b>Price: </b> <span>Free</span> to Learn
             </div>
             <div className="enrollment-info-text course-certificate-message">
-              {run && product && !isArchived ? (
+              {run && product && !run.is_archived ? (
                 <>
                   <span>Certificate Track: </span>
                   {formatLocalePrice(getFlexiblePriceForProduct(product))}

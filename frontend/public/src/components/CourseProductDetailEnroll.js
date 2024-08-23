@@ -21,7 +21,7 @@ import {
 
 import { formatPrettyDate, emptyOrNil } from "../lib/util"
 import moment from "moment-timezone"
-import { getFirstRelevantRun, isRunArchived } from "../lib/courseApi"
+import { getFirstRelevantRun } from "../lib/courseApi"
 import { getCookie } from "../lib/api"
 import users, { currentUserSelector } from "../lib/queries/users"
 import {
@@ -419,7 +419,7 @@ export class CourseProductDetailEnroll extends React.Component<
           )}`}
           className="btn btn-primary btn-enrollment-button btn-lg  btn-gradient-red-to-blue highlight"
         >
-          {isRunArchived(run) ? "Access Course Materials" : "Enroll Now"}
+          {run.is_archived ? "Access Course Materials" : "Enroll Now"}
         </a>
       </h2>
     )
@@ -469,7 +469,7 @@ export class CourseProductDetailEnroll extends React.Component<
               className="btn btn-primary btn-enrollment-button btn-gradient-red-to-blue highlight enroll-now"
               disabled={!run.is_enrollable}
             >
-              {isRunArchived(run) ? "Access Course Materials" : "Enroll Now"}
+              {run.is_archived ? "Access Course Materials" : "Enroll Now"}
             </button>
           </form>
         )}
