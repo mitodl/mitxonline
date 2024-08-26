@@ -84,9 +84,10 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
   }
 
   warningMessage(run) {
-    const message = run && run.is_archived ?
-      "This course is no longer active, but you can still access selected content." :
-      "No sessions of this course are currently open for enrollment. More sessions may be added in the future."
+    const message =
+      run && run.is_archived ?
+        "This course is no longer active, but you can still access selected content." :
+        "No sessions of this course are currently open for enrollment. More sessions may be added in the future."
     return (
       <div className="row d-flex callout callout-warning course-status-message">
         <i className="material-symbols-outlined warning">error</i>
@@ -188,9 +189,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     return (
       <>
         <div className="enrollment-info-box componentized">
-          {!run || run.is_archived ?
-            this.warningMessage(run) :
-            null}
+          {!run || run.is_archived ? this.warningMessage(run) : null}
           {run ? (
             <div className="row d-flex course-timing-message">
               <div className="enrollment-info-icon">
