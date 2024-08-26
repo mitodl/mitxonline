@@ -3,11 +3,7 @@ import React from "react"
 import moment from "moment"
 import { isNil } from "ramda"
 
-import {
-  notNil,
-  parseDateString,
-  formatPrettyDateTimeAmPmTz,
-} from "./util"
+import { notNil, parseDateString, formatPrettyDateTimeAmPmTz } from "./util"
 
 import { NODETYPE_OPERATOR, NODETYPE_COURSE, NODEOPER_ALL } from "../constants"
 
