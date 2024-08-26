@@ -39,10 +39,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
     is_archived = serializers.SerializerMethodField()
 
     def get_is_archived(self, instance):
-        return (
-            instance.is_enrollable
-            and instance.is_past
-        )
+        return instance.is_enrollable and instance.is_past
 
     class Meta:
         model = models.CourseRun
