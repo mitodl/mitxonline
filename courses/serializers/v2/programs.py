@@ -77,6 +77,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "departments",
             "live",
             "topics",
+            "availability",
         ]
 
 
