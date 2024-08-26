@@ -40,9 +40,9 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
 
     def get_is_archived(self, instance):
         return (
-            instance.is_enrollable and
-            instance.enrollment_end is None and
-            instance.is_past
+            instance.is_enrollable
+            and instance.enrollment_end is None
+            and instance.is_past
         )
 
     class Meta:
