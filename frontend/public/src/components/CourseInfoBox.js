@@ -83,8 +83,8 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
     })
   }
 
-  warningMessage(isArchived) {
-    const message = isArchived ?
+  warningMessage(run) {
+    const message = run && run.is_archived ?
       "This course is no longer active, but you can still access selected content." :
       "No sessions of this course are currently open for enrollment. More sessions may be added in the future."
     return (
@@ -92,7 +92,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
         <i className="material-symbols-outlined warning">error</i>
         <p className="p-0">
           {message}{" "}
-          {isArchived ? (
+          {run && run.is_archived ? (
             <button
               className="info-link more-info float-none"
               onClick={() => this.togglePacingInfoDialogVisibility("Archived")}
@@ -189,7 +189,7 @@ export default class CourseInfoBox extends React.PureComponent<CourseInfoBoxProp
       <>
         <div className="enrollment-info-box componentized">
           {!run || run.is_archived ?
-            this.warningMessage(run.is_archived) :
+            this.warningMessage(run) :
             null}
           {run ? (
             <div className="row d-flex course-timing-message">

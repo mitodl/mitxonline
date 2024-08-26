@@ -158,6 +158,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       enrollment_start: moment().subtract(1, "years").toISOString(),
       start_date:       moment().subtract(10, "months").toISOString(),
       end_date:         moment().subtract(7, "months").toISOString(),
+      is_archived:      true,
       upgrade_deadline: null
     }
     const course = makeCourseDetailNoRuns()
@@ -366,6 +367,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
       enrollment_start: moment().subtract(1, "years").toISOString(),
       start_date:       moment().subtract(10, "months").toISOString(),
       end_date:         moment().subtract(7, "months").toISOString(),
+      is_archived:      true,
       upgrade_deadline: null
     }
     const course = {
@@ -596,6 +598,7 @@ describe("CourseProductDetailEnrollShallowRender", () => {
 
   it(`shows the disabled enroll button and warning message when no active runs`, async () => {
     course = makeCourseDetailNoRuns()
+    courseRun["is_archived"] = true
 
     const { inner } = await renderPage(
       {
