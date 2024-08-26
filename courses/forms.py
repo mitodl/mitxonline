@@ -410,7 +410,7 @@ class ProgramAdminForm(ModelForm):
             "departments",
             "live",
             "requirements",
-            "availability"
+            "availability",
         ]
 
     class Media:
