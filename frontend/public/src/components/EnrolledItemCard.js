@@ -438,13 +438,14 @@ export class EnrolledItemCard extends React.Component<
               <strong>Upgrade today</strong> and, upon passing, receive your
             certificate signed by MIT faculty to highlight the knowledge and
             skills you've gained from this MITx course.{" "}
-              {enrollment.run.upgrade_deadline ?
-              (<b>
-              Upgrade expires:{" "}
-                {formatPrettyDateTimeAmPmTz(
-                  parseDateString(enrollment.run.upgrade_deadline)
-                )}
-              </b>) : null}
+              {enrollment.run.upgrade_deadline ? (
+                <b>
+                Upgrade expires:{" "}
+                  {formatPrettyDateTimeAmPmTz(
+                    parseDateString(enrollment.run.upgrade_deadline)
+                  )}
+                </b>
+              ) : null}
             </div>
           </div>
         ) : null
