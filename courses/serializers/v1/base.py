@@ -36,6 +36,11 @@ class BaseCourseSerializer(serializers.ModelSerializer):
 class BaseCourseRunSerializer(serializers.ModelSerializer):
     """Minimal CourseRun model serializer"""
 
+    is_archived = serializers.SerializerMethodField()
+
+    def get_is_archived(self, instance):
+        return instance.is_enrollable and instance.is_past
+
     class Meta:
         model = models.CourseRun
         fields = [
@@ -51,6 +56,7 @@ class BaseCourseRunSerializer(serializers.ModelSerializer):
             "upgrade_deadline",
             "is_upgradable",
             "is_enrollable",
+            "is_archived",
             "is_self_paced",
             "run_tag",
             "id",

@@ -354,7 +354,7 @@ export const getStartDateText = (
   if (moment(courseRun.start_date).isAfter(moment())) {
     return `Starts: ${formatPrettyDate(parseDateString(courseRun.start_date))}`
   } else {
-    if (courseRun.is_self_paced) {
+    if (courseRun.is_self_paced || courseRun.is_archived) {
       return "Start Anytime"
     } else {
       return `Started: ${formatPrettyDate(
