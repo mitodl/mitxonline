@@ -632,7 +632,7 @@ class InstructorPageLink(models.Model):  # noqa: DJ008
         InstructorPage,
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         related_name="+",
     )
     order = models.SmallIntegerField(default=1, null=True, blank=True)
