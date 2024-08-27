@@ -24,6 +24,8 @@ from treebeard.mp_tree import MP_Node
 from wagtail.models import Revision
 
 from courses.constants import (
+    AVAILABILITY_ANYTIME,
+    AVAILABILITY_CHOICES,
     ENROLL_CHANGE_STATUS_CHOICES,
     ENROLLABLE_ITEM_ID_SEPARATOR,
     SYNCED_COURSE_RUN_FIELD_MSG,
@@ -156,6 +158,9 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
         null=True,
     )
     departments = models.ManyToManyField(Department, blank=False)
+    availability = models.CharField(
+        choices=AVAILABILITY_CHOICES, default=AVAILABILITY_ANYTIME, max_length=255
+    )
 
     @cached_property
     def page(self):

@@ -92,5 +92,6 @@ def test_serialize_program(
             "departments": [],
             "live": True,
             "topics": [{"name": topic.name} for topic in topics],
+            "availability": "anytime",
         },
     )
