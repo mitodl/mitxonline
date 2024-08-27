@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.100.0
+Version 0.100.0 (Released August 27, 2024)
 ---------------
 
 - Catalog card should show Start Anytime if the course is archived (#2359)
