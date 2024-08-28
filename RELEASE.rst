@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.100.1
+---------------
+
+- rename migration versions (#2367)
+- Delete linked instructor page from product pages (#2364)
+- Add availability to programs in models.py (#2322)
+
 Version 0.100.0 (Released August 27, 2024)
 ---------------
 
