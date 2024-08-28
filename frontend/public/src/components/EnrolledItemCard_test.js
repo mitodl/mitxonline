@@ -253,4 +253,46 @@ describe("EnrolledItemCard", () => {
     const modals = inner.find(`#${modalId}`)
     assert.lengthOf(modals, 1)
   })
+  ;["audit", "verified", "program"].forEach(mode => {
+    it(`renders the card for enrollment mode ${mode}`, async () => {
+      const testEnrollment =
+        mode === "program" ?
+          makeProgramEnrollment() :
+          makeCourseRunEnrollmentWithProduct()
+      userEnrollment = testEnrollment
+      enrollmentCardProps.enrollment = testEnrollment
+      const inner = await renderedCard()
+      const enrolledItems = inner.find(".enrolled-item")
+      assert.lengthOf(enrolledItems, 1)
+      const enrolledItem = enrolledItems.at(0)
+      if (mode !== "program") {
+        assert.equal(
+          enrolledItem.find("h2").text(),
+          userEnrollment.run.course.title
+        )
+        if (mode === "verified") {
+          const pricingLinks = inner.find(".pricing-links")
+          assert.isFalse(pricingLinks.exists())
+        }
+      } else {
+        assert.equal(
+          enrolledItem.find("h2").text(),
+          testEnrollment.program.title
+        )
+      }
+    })
+  })
+  it("Test", async () => {
+    const testEnrollment = makeCourseRunEnrollmentWithProduct()
+    userEnrollment = testEnrollment
+    enrollmentCardProps.enrollment = testEnrollment
+    enrollmentCardProps.enrollment.enrollment_mode = "audit"
+    const inner = await renderedCard()
+    const enrollmentExtraLinks = inner
+      .find(".enrolled-item")
+      .find(".certificate-upgrade-message")
+    assert.isTrue(enrollmentExtraLinks.exists())
+    const courseDetailsPageLink = enrollmentExtraLinks.find("b").at(0)
+    assert.isTrue(courseDetailsPageLink.exists())
+  })
 })
