@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0051_coursestopic"),
+        ("courses", "0053_reactivate_wrong_program_enrollments"),
     ]
 
     operations = [

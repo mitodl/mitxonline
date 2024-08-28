@@ -16,7 +16,7 @@ def deactivate_program_enrollments(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("courses", "0052_add_program_availability"),
+        ("courses", "0051_coursestopic"),
     ]
 
     operations = [
