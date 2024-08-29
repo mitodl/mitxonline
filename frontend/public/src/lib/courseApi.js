@@ -213,8 +213,6 @@ export const getFirstRelevantRun = (
   /*
    Finds the next most relevant course run:
    - If the course has a next_run_id, return that run
-   - If there are future runs, return the run closer to now
-   - If all runs are in the past, return the most recently ended run
    - If there are no runs, return null
 
    Args:
@@ -234,41 +232,6 @@ export const getFirstRelevantRun = (
 
   if (course.next_run_id) {
     return courseRuns.find(run => run.id === course.next_run_id)
-  }
-
-  const now = moment()
-  const enrollableRuns = courseRuns.filter(run => run.is_enrollable)
-  if (enrollableRuns.length > 0) {
-    if (
-      enrollableRuns.some(
-        run => run.start_date && moment(run.start_date).isSameOrAfter(now)
-      )
-    ) {
-      return enrollableRuns
-        .filter(
-          run => run.start_date && moment(run.start_date).isSameOrAfter(now)
-        )
-        .reduce((prev, curr) =>
-          moment(curr.start_date).isBefore(moment(prev.start_date)) ?
-            curr :
-            prev
-        )
-    }
-
-    return enrollableRuns
-      .filter(run => run.start_date && moment(run.start_date).isBefore(now))
-      .reduce((prev, curr) =>
-        moment(curr.start_date).isBefore(moment(prev.start_date)) ? prev : curr
-      )
-  }
-  // no enrollable runs, then check for future runs
-  const futureRuns = courseRuns.filter(
-    run => run.start_date && moment(run.start_date).isSameOrAfter(now)
-  )
-  if (futureRuns.length > 0) {
-    return futureRuns.reduce((prev, curr) =>
-      moment(curr.start_date).isBefore(moment(prev.start_date)) ? curr : prev
-    )
   }
   return null
 }

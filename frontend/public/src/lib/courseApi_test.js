@@ -28,11 +28,8 @@ import type { LoggedInUser } from "../flow/authTypes"
 
 describe("Course API", () => {
   const past = moment().add(-10, "days").toISOString(),
-    farPast = moment().add(-50, "days").toISOString(),
-    farFarPast = moment().add(-100, "days").toISOString(),
     future = moment().add(10, "days").toISOString(),
     farFuture = moment().add(50, "days").toISOString(),
-    farFarFuture = moment().add(100, "days").toISOString(),
     exampleUrl = "http://example.com"
   let courseRun: CourseRunDetail, user: LoggedInUser
 
@@ -302,7 +299,7 @@ describe("Course API", () => {
       assert.equal(result, null)
     })
 
-    it("returns null if there aren't course runs in the course", () => {
+    it("returns null if next_run_id is not provided for the course", () => {
       const testCourse = {
         ...makeCourseDetailWithRuns(),
         courseruns: []
@@ -310,113 +307,12 @@ describe("Course API", () => {
       const result = getFirstRelevantRun(testCourse, [makeCourseRunDetail()])
       assert.equal(result, null)
     })
-    ;[
-      ["in order", true],
-      ["out of order", false]
-    ].forEach(([isInOrderDesc, isInOrder]) => {
-      it(`returns the first run that is in the future and runs are ${isInOrderDesc}`, () => {
-        const runs = [
-          {
-            ...makeCourseRunDetail(),
-            start_date:       future,
-            enrollment_start: future,
-            end_date:         farFuture,
-            enrollment_end:   farFuture
-          },
-          {
-            ...makeCourseRunDetail(),
-            start_date:       farFuture,
-            enrollment_start: farFuture,
-            end_date:         farFarFuture,
-            enrollment_end:   farFarFuture
-          }
-        ]
-
-        if (!isInOrder) {
-          runs.reverse()
-        }
-
-        const testCourse = {
-          ...makeCourseDetailWithRuns(),
-          next_run_id: null,
-          courseruns:  runs
-        }
-
-        const result = getFirstRelevantRun(testCourse, runs)
-        assert.equal(result, isInOrder ? runs[0] : runs[1])
-      })
-    })
-    ;[
-      ["in order", true],
-      ["out of order", false]
-    ].forEach(([isInOrderDesc, isInOrder]) => {
-      it(`returns the first run that is in the future and runs are ${isInOrderDesc}`, () => {
-        const runs = [
-          {
-            ...makeCourseRunDetail(),
-            start_date:       future,
-            enrollment_start: future,
-            end_date:         farFuture,
-            enrollment_end:   farFuture
-          },
-          {
-            ...makeCourseRunDetail(),
-            start_date:       farPast,
-            enrollment_start: farPast,
-            end_date:         past,
-            enrollment_end:   past
-          }
-        ]
-
-        if (!isInOrder) {
-          runs.reverse()
-        }
-
-        const testCourse = {
-          ...makeCourseDetailWithRuns(),
-          next_run_id: null,
-          courseruns:  runs
-        }
-
-        const result = getFirstRelevantRun(testCourse, runs)
-        assert.equal(result, isInOrder ? runs[0] : runs[1])
-      })
-    })
-    ;[
-      ["in order", true],
-      ["out of order", false]
-    ].forEach(([isInOrderDesc, isInOrder]) => {
-      it(`returns the most recent run that is in the past if all runs are done and runs are ${isInOrderDesc}`, () => {
-        const runs = [
-          {
-            ...makeCourseRunDetail(),
-            start_date:       farPast,
-            enrollment_start: farPast,
-            end_date:         past,
-            enrollment_end:   past
-          },
-          {
-            ...makeCourseRunDetail(),
-            start_date:       farFarPast,
-            enrollment_start: farFarPast,
-            end_date:         farPast,
-            enrollment_end:   farPast
-          }
-        ]
-
-        if (!isInOrder) {
-          runs.reverse()
-        }
-
-        const testCourse = {
-          ...makeCourseDetailWithRuns(),
-          next_run_id: null,
-          courseruns:  runs
-        }
-
-        const result = getFirstRelevantRun(testCourse, runs)
-        assert.equal(result, isInOrder ? runs[0] : runs[1])
-      })
+    it("returns next_run_id for the course", () => {
+      const testCourse = makeCourseDetailWithRuns()
+      const courseRun = testCourse.courseruns[0]
+      testCourse.next_run_id = courseRun.id
+      const result = getFirstRelevantRun(testCourse, [courseRun])
+      assert.equal(result, courseRun)
     })
   })
 })
