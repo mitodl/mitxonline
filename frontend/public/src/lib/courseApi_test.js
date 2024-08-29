@@ -28,11 +28,8 @@ import type { LoggedInUser } from "../flow/authTypes"
 
 describe("Course API", () => {
   const past = moment().add(-10, "days").toISOString(),
-    farPast = moment().add(-50, "days").toISOString(),
-    farFarPast = moment().add(-100, "days").toISOString(),
     future = moment().add(10, "days").toISOString(),
     farFuture = moment().add(50, "days").toISOString(),
-    farFarFuture = moment().add(100, "days").toISOString(),
     exampleUrl = "http://example.com"
   let courseRun: CourseRunDetail, user: LoggedInUser
 
