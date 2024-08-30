@@ -3,12 +3,12 @@ import logging
 from rest_framework import serializers
 
 from cms.serializers import ProgramPageSerializer
-from courses.serializers.v1.departments import DepartmentSerializer
 from courses.models import Program, ProgramRequirementNodeType
 from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
     get_thumbnail_url,
 )
+from courses.serializers.v1.departments import DepartmentSerializer
 from main.serializers import StrictFieldsSerializer
 
 logger = logging.getLogger(__name__)
