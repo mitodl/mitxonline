@@ -122,7 +122,7 @@
     "video.js": "7.21.6",
     "videojs-youtube": "2.6.1",
     "waait": "1.0.5",
-    "webpack": "5.76.0",
+    "webpack": "5.94.0",
     "webpack-bundle-analyzer": "^4.6.1",
     "webpack-bundle-tracker": "1.4.0",
     "webpack-cli": "4.10.0",
