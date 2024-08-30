@@ -5,12 +5,12 @@ from django.utils.timezone import now
 
 from cms.factories import CoursePageFactory
 from cms.serializers import ProgramPageSerializer
-from courses.serializers.v1.departments import DepartmentSerializer
 from courses.factories import (  # noqa: F401
     CourseRunFactory,
     program_with_empty_requirements,
 )
 from courses.models import CoursesTopic, Department
+from courses.serializers.v1.departments import DepartmentSerializer
 from courses.serializers.v2.programs import (
     ProgramRequirementTreeSerializer,
     ProgramSerializer,
