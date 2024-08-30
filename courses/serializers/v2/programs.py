@@ -3,6 +3,7 @@ import logging
 from rest_framework import serializers
 
 from cms.serializers import ProgramPageSerializer
+from courses.serializers.v1.departments import DepartmentSerializer
 from courses.models import Program, ProgramRequirementNodeType
 from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
@@ -20,7 +21,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     requirements = serializers.SerializerMethodField()
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
-    departments = serializers.StringRelatedField(many=True, read_only=True)
+    departments = DepartmentSerializer(many=True, read_only=True)
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
 
