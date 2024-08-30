@@ -5,6 +5,7 @@ from django.utils.timezone import now
 
 from cms.factories import CoursePageFactory
 from cms.serializers import ProgramPageSerializer
+from courses.serializers.v1.departments import DepartmentSerializer
 from courses.factories import (  # noqa: F401
     CourseRunFactory,
     program_with_empty_requirements,
@@ -45,11 +46,6 @@ def test_serialize_program(
     )
     course2 = run2.course
     CoursePageFactory.create(course=run2.course)
-    departments = [
-        Department.objects.create(name=f"department{num}") for num in range(3)
-    ]
-    course1.departments.set([departments[0], departments[1]])
-    course2.departments.set([departments[1], departments[2]])
 
     formatted_reqs = {"required": [], "electives": []}
 
@@ -68,6 +64,8 @@ def test_serialize_program(
         course2.page.topics.set([topics[1], topics[2]])
         course1.page.save()
         course2.page.save()
+    program_department = Department.objects.create(name="Math")
+    program_with_empty_requirements.departments.add(program_department)
 
     data = ProgramSerializer(
         instance=program_with_empty_requirements, context=mock_context
@@ -89,7 +87,7 @@ def test_serialize_program(
             "page": ProgramPageSerializer(program_with_empty_requirements.page).data,
             "program_type": program_with_empty_requirements.program_type,
             "certificate_type": certificate_type,
-            "departments": [],
+            "departments": [DepartmentSerializer(program_department).data],
             "live": True,
             "topics": [{"name": topic.name} for topic in topics],
             "availability": "anytime",
