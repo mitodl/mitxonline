@@ -3,7 +3,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as ContribUserAdmin
 from django.utils.translation import gettext_lazy as _
-from hijack_admin.admin import HijackUserAdminMixin
+from hijack.contrib.admin import HijackUserAdminMixin
 from mitol.common.admin import TimestampedModelAdmin
 
 from users.models import BlockList, LegalAddress, User, UserProfile
@@ -51,6 +51,7 @@ _username_warning = """
 """
 
 
+@admin.register(User)
 class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
     """Admin views for user"""
 
@@ -98,6 +99,7 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
     inlines = [UserLegalAddressInline, UserProfileInline]
 
 
+@admin.register(BlockList)
 class BlockListAdmin(admin.ModelAdmin):
     """Admin for BlockList"""
 
@@ -108,5 +110,3 @@ class BlockListAdmin(admin.ModelAdmin):
         return False
 
 
-admin.site.register(User, UserAdmin)
-admin.site.register(BlockList, BlockListAdmin)

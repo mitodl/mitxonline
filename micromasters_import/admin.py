@@ -10,6 +10,7 @@ from micromasters_import.models import (
 )
 
 
+@admin.register(ProgramId)
 class ProgramIdAdmin(admin.ModelAdmin):
     """Admin for ProgramId"""
 
@@ -18,6 +19,7 @@ class ProgramIdAdmin(admin.ModelAdmin):
     raw_id_fields = ("program_certificate_revision",)
 
 
+@admin.register(CourseId)
 class CourseIdAdmin(admin.ModelAdmin):
     """Admin for CourseId"""
 
@@ -25,6 +27,7 @@ class CourseIdAdmin(admin.ModelAdmin):
     list_display = ("course", "micromasters_id")
 
 
+@admin.register(ProgramTierId)
 class ProgramTieIdAdmin(admin.ModelAdmin):
     """Admin for ProgramTierId"""
 
@@ -32,6 +35,7 @@ class ProgramTieIdAdmin(admin.ModelAdmin):
     list_display = ("micromasters_tier_program_id", "flexible_price_tier")
 
 
+@admin.register(CourseCertificateRevisionId)
 class CourseCertificateRevisionIdAdmin(admin.ModelAdmin):
     """Admin for CourseCertificateRevisionId"""
 
@@ -40,7 +44,3 @@ class CourseCertificateRevisionIdAdmin(admin.ModelAdmin):
     raw_id_fields = ("certificate_page_revision",)
 
 
-admin.site.register(CourseId, CourseIdAdmin)
-admin.site.register(ProgramId, ProgramIdAdmin)
-admin.site.register(ProgramTierId, ProgramTieIdAdmin)
-admin.site.register(CourseCertificateRevisionId, CourseCertificateRevisionIdAdmin)

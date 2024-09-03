@@ -1,6 +1,6 @@
 """Course API URL routes"""
 
-from django.urls import include, path, re_path
+from django.urls import include, path
 from rest_framework import routers
 
 import courses.urls.v1.urls as urls_v1
@@ -11,9 +11,9 @@ router = routers.SimpleRouter()
 
 
 urlpatterns = [
-    re_path("^api/", include(urls_v1, "v1")),
-    re_path("^api/v1/", include(urls_v1, "v1")),
-    re_path("^api/v2/", include(urls_v2, "v2")),
+    path("api/", include(urls_v1, "v1")),
+    path("api/v1/", include(urls_v1, "v1")),
+    path("api/v2/", include(urls_v2, "v2")),
 ]
 
 urlpatterns += [

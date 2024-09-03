@@ -1542,10 +1542,7 @@ class ProgramRequirement(MP_Node):
                 condition=Q(depth=1),
             ),
         )
-        index_together = (
-            ("program", "course"),
-            ("course", "program"),
-        )
+        indexes = [models.Index(fields=("program", "course")), models.Index(fields=("course", "program"))]
 
 
 class PartnerSchool(TimestampedModel):

@@ -200,9 +200,7 @@ INSTALLED_APPS = (
     # "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
-    "compat",
     "hijack",
-    "hijack_admin",
     "ecommerce",
     "flexiblepricing",
     "micromasters_import",
@@ -324,7 +322,6 @@ TIME_ZONE = "UTC"
 
 USE_I18N = True
 
-USE_L10N = True
 
 USE_TZ = True
 
