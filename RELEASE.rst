@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.100.1
+Version 0.100.1 (Released September 03, 2024)
 ---------------
 
 - rename migration versions (#2367)
