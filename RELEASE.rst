@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.100.2 (Released September 03, 2024)
+---------------
+
+- Update dependency webpack to v5.94.0 [SECURITY] (#2370)
+- Fix typo in unenrollment email (#2369)
+- Most relevant run should be determined in the backend only (#2363)
+- mitxonline dashboard crashes when courserun has no upgrade deadline (#2362)
+
 Version 0.100.1 (Released September 03, 2024)
 ---------------
 
