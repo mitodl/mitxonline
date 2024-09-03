@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.100.2
+Version 0.100.2 (Released September 03, 2024)
 ---------------
 
 - Update dependency webpack to v5.94.0 [SECURITY] (#2370)
