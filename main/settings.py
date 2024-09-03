@@ -1177,7 +1177,7 @@ POSTHOG_MAX_RETRIES = get_int(
 POSTHOG_ENABLED = get_bool(
     name="POSTHOG_ENABLED",
     default=False,
-    description="API host for PostHog",
+    description="Whether PostHog is enabled",
 )
 
 # HomePage Hubspot Form Settings
