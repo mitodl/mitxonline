@@ -8,6 +8,7 @@ from courses.serializers.base import (
     BaseProgramRequirementTreeSerializer,
     get_thumbnail_url,
 )
+from courses.serializers.v1.departments import DepartmentSerializer
 from main.serializers import StrictFieldsSerializer
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     requirements = serializers.SerializerMethodField()
     req_tree = serializers.SerializerMethodField()
     page = serializers.SerializerMethodField()
-    departments = serializers.StringRelatedField(many=True, read_only=True)
+    departments = DepartmentSerializer(many=True, read_only=True)
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
 
