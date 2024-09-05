@@ -234,7 +234,6 @@ MIDDLEWARE = (
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
     "django_user_agents.middleware.UserAgentMiddleware",
-    "django.middleware.locale.LocaleMiddleware",
     "main.middleware.CachelessAPIMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
 )
