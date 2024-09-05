@@ -22,6 +22,7 @@ from django.utils.translation import gettext_lazy as _
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
+from viewflow import fsm, this
 
 from courses.api import create_run_enrollments
 from courses.models import CourseRun, PaidCourseRun
@@ -447,8 +448,9 @@ class OrderStatus(TextChoices):
 class OrderFlow(object):
     state = State(OrderStatus, default=OrderStatus.PENDING)
 
-    def __init__(self, order):
+    def __init__(self, order, user):
         self.order = order
+        self.user = user
 
     @state.setter()
     def _set_order_state(self, value):
@@ -467,7 +469,10 @@ class OrderFlow(object):
         """Cancel this order"""
         pass
 
-    @state.transition(source=OrderStatus.PENDING, target=OrderStatus.DECLINED)
+    def is_approver(self, user):
+        return user.is_staff
+
+    @state.transition(source=OrderStatus.PENDING, target=OrderStatus.DECLINED, permission=this.is_approver)
     def decline(self):
         """
         Decline this order. This additionally clears the discount redemptions
@@ -528,6 +533,41 @@ class OrderFlow(object):
         send_order_refund_email.delay(self.id)
 
         return refund_transaction
+
+    def create_transaction(self, payment_data):
+        log = logging.getLogger(__name__)  # noqa: F841
+        transaction_id = payment_data.get("transaction_id")
+        amount = payment_data.get("amount")
+        # There are two use cases:
+        # No payment required - no cybersource involved, so we need to generate UUID as transaction id
+        # Payment STATE_ACCEPTED - there should always be transaction_id in payment data, if not, throw ValidationError
+        if amount == 0 and transaction_id is None:
+            transaction_id = uuid.uuid1()
+        elif transaction_id is None:
+            raise ValidationError(
+                "Failed to record transaction: Missing transaction id from payment API response"  # noqa: EM101
+            )
+
+        self.transactions.get_or_create(
+            transaction_id=transaction_id,
+            data=payment_data,
+            amount=self.total_price_paid,
+        )
+
+    def create_paid_courseruns(self):
+        for run in self.purchased_runs:
+            PaidCourseRun.objects.get_or_create(
+                order=self, course_run=run, user=self.purchaser
+            )
+
+    def create_enrollments(self):
+        # create enrollments for what the learner has paid for
+        create_run_enrollments(
+            self.purchaser,
+            self.purchased_runs,
+            mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            keep_failed_enrollments=True,
+        )
 
     @state.transition(
         source=OrderStatus.PENDING,
@@ -608,41 +648,6 @@ class Order(TimestampedModel):
     @staticmethod
     def decode_reference_number(refno):
         return refno.replace(f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-", "")
-    
-    def create_transaction(self, payment_data):
-        log = logging.getLogger(__name__)  # noqa: F841
-        transaction_id = payment_data.get("transaction_id")
-        amount = payment_data.get("amount")
-        # There are two use cases:
-        # No payment required - no cybersource involved, so we need to generate UUID as transaction id
-        # Payment STATE_ACCEPTED - there should always be transaction_id in payment data, if not, throw ValidationError
-        if amount == 0 and transaction_id is None:
-            transaction_id = uuid.uuid1()
-        elif transaction_id is None:
-            raise ValidationError(
-                "Failed to record transaction: Missing transaction id from payment API response"  # noqa: EM101
-            )
-
-        self.transactions.get_or_create(
-            transaction_id=transaction_id,
-            data=payment_data,
-            amount=self.total_price_paid,
-        )
-
-    def create_paid_courseruns(self):
-        for run in self.purchased_runs:
-            PaidCourseRun.objects.get_or_create(
-                order=self, course_run=run, user=self.purchaser
-            )
-
-    def create_enrollments(self):
-        # create enrollments for what the learner has paid for
-        create_run_enrollments(
-            self.purchaser,
-            self.purchased_runs,
-            mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            keep_failed_enrollments=True,
-        )
 
     def send_ecommerce_order_receipt(self):
         send_ecommerce_order_receipt.delay(self.id)

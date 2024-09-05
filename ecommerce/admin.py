@@ -25,6 +25,8 @@ from ecommerce.models import (
     FulfilledOrder,
     Line,
     Order,
+    OrderFlow,
+    OrderStatus,
     PendingOrder,
     Product,
     RefundedOrder,
@@ -217,6 +219,15 @@ class BaseOrderAdmin(fsm.FlowAdminMixin, TimestampedModelAdmin):
     list_filter = ["state"]
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     readonly_fields = ["reference_number"]
+    flow_state = OrderFlow.state
+    
+    def get_transition_fields(self, request, obj, slug):
+        return ['state']
+    
+    def get_object_flow(self, request, obj):
+        return OrderFlow(
+            obj, user=request.user
+        )
 
     def has_change_permission(self, request, obj=None):  # noqa: ARG002
         return False
@@ -250,7 +261,7 @@ class PendingOrderAdmin(BaseOrderAdmin):
 
     def get_queryset(self, request):
         """Filter only to pending orders"""
-        return super().get_queryset(request).filter(state=Order.STATE.PENDING)
+        return super().get_queryset(request).filter(state=OrderStatus.PENDING)
 
 
 @admin.register(CanceledOrder)
@@ -261,7 +272,7 @@ class CanceledOrderAdmin(BaseOrderAdmin):
 
     def get_queryset(self, request):
         """Filter only to canceled orders"""
-        return super().get_queryset(request).filter(state=Order.STATE.CANCELED)
+        return super().get_queryset(request).filter(state=OrderStatus.CANCELED)
 
 
 @admin.register(FulfilledOrder)
