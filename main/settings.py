@@ -157,7 +157,6 @@ INSTALLED_APPS = (
     "django.contrib.sites",
     "django_user_agents",
     "social_django",
-    "server_status",
     "oauth2_provider",
     "rest_framework",
     "anymail",
@@ -180,8 +179,7 @@ INSTALLED_APPS = (
     "modelcluster",
     "taggit",
     # django-fsm-admin
-    "django_fsm",
-    "fsm_admin",
+    "viewflow",
     # django-robots
     "robots",
     # django-reversion
@@ -201,6 +199,7 @@ INSTALLED_APPS = (
     "openedx",
     # must be after "users" to pick up custom user model
     "hijack",
+    "hijack.contrib.admin",
     "ecommerce",
     "flexiblepricing",
     "micromasters_import",

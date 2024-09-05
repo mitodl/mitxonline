@@ -8,9 +8,9 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.views.generic import TemplateView
-from fsm_admin.mixins import FSMTransitionMixin
 from mitol.common.admin import TimestampedModelAdmin
 from reversion.admin import VersionAdmin
+from viewflow import fsm
 
 from ecommerce.api import refund_order
 from ecommerce.forms import AdminRefundOrderForm
@@ -203,7 +203,7 @@ class OrderTransactionInline(admin.TabularInline):
     can_add = False
 
 
-class BaseOrderAdmin(FSMTransitionMixin, TimestampedModelAdmin):
+class BaseOrderAdmin(fsm.FlowAdminMixin, TimestampedModelAdmin):
     """Base admin for Order"""
 
     search_fields = [

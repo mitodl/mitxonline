@@ -40,7 +40,6 @@ urlpatterns = [
         ),
     ),
     path("admin/", admin.site.urls),
-    path("status/", include("server_status.urls")),
     path("hijack/", include("hijack.urls")),
     path("robots.txt", include("robots.urls")),
     path("", include("authentication.urls")),
