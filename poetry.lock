@@ -983,19 +983,6 @@ postal = ["cryptography"]
 resend = ["svix"]
 
 [[package]]
-name = "django-compat"
-version = "1.0.15"
-description = "For- and backwards compatibility layer for Django 1.4, 1.7, 1.8, 1.9, 1.10, and 1.11"
-optional = false
-python-versions = "*"
-files = [
-    {file = "django-compat-1.0.15.tar.gz", hash = "sha256:3ac9a3bedc56b9365d9eb241bc5157d0c193769bf995f9a78dc1bc24e7c2331b"},
-]
-
-[package.dependencies]
-six = ">=1.10.0"
-
-[[package]]
 name = "django-cors-headers"
 version = "3.14.0"
 description = "django-cors-headers is a Django application for handling the server headers required for Cross-Origin Resource Sharing (CORS)."
@@ -1100,23 +1087,6 @@ django = ">=3.2"
 
 [package.extras]
 test = ["pytest", "pytest-cov", "pytest-django"]
-
-[[package]]
-name = "django-hijack-admin"
-version = "2.1.10"
-description = "Django admin integration for Django Hijack (https://github.com/arteria/django-hijack/)"
-optional = false
-python-versions = "*"
-files = [
-    {file = "django-hijack-admin-2.1.10.tar.gz", hash = "sha256:330f9be331ada831248c9cee5a21202aea70fb9911b443249ce4c28d57d9e2e3"},
-]
-
-[package.dependencies]
-django-compat = ">=1.0.13"
-django-hijack = ">=2.1.5"
-
-[package.extras]
-dev = ["flake8"]
 
 [[package]]
 name = "django-ipware"
@@ -4250,4 +4220,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "82b67593ea7a19d55ae97e576dfa8e70686af2d64a94e8d9ca93454bec2a7361"
+content-hash = "4e6c5e86c91299603fa9d4b41b7aee0eb0af357bd0f80bcdd78c7cf1e6c68967"

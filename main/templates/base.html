@@ -1,4 +1,4 @@
-{% load static hijack_tags js_interop %}
+{% load static hijack js_interop %}
 {% load wagtailcore_tags startswith noindex_meta banner %}
 {% load render_bundle from webpack_loader %}
 <!DOCTYPE html>
@@ -33,7 +33,7 @@
   <div class="main-panel">
     <a href="#main" class="visually-hidden visually-hidden-focusable">Skip to main content</a>
     {% include "partials/gtm_body.html" %}
-    {% hijack_notification %}
+  {% include 'hijack/notification.html' %}
     {% if not request.path|startswith:'/certificate/' %}
       {% banner %}
       {% block headercontent %}
