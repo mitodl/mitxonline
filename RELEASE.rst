@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.100.3
+Version 0.100.3 (Released September 06, 2024)
 ---------------
 
 - Fix description for POSTHOG_ENABLED variable (#2380)
