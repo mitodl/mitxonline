@@ -33,7 +33,8 @@
   <div class="main-panel">
     <a href="#main" class="visually-hidden visually-hidden-focusable">Skip to main content</a>
     {% include "partials/gtm_body.html" %}
-  {% include 'hijack/notification.html' %}
+
+    {% include 'hijack/notification.html' %}
     {% if not request.path|startswith:'/certificate/' %}
       {% banner %}
       {% block headercontent %}

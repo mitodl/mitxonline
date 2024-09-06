@@ -263,10 +263,16 @@ button.btn-secondary.unstyled {
 }
 
 .djhj {
-  position: fixed;
+  position: relative !important;
   top: 0;
 
-  .djhj-notification {
+  .djhj-message, .djhj-actions {
+    width: fit-content;
+  }
 
+  .djhj-notification {
+    max-width: unset;
+    background: $navy-blue;
+    margin: 0;
   }
 }
