@@ -478,11 +478,8 @@ class OrderFlow(object):
         Decline this order. This additionally clears the discount redemptions
         for the order so the discounts can be reused.
         """
-        for redemption in self.discounts.all():
+        for redemption in self.order.discounts.all():
             redemption.delete()
-
-        self.state = OrderStatus.DECLINED
-        self.save()
 
         return self
 
@@ -494,6 +491,7 @@ class OrderFlow(object):
     @state.transition(
         source=OrderStatus.FULFILLED,
         target=OrderStatus.REFUNDED,
+        permission=this.is_approver
     )
     def refund(self, *, api_response_data: dict = None, **kwargs):  # noqa: RUF013
         """
@@ -520,15 +518,13 @@ class OrderFlow(object):
                 "Failed to record transaction: Missing transaction id from refund API response"  # noqa: EM101
             )
 
-        refund_transaction, created = self.transactions.get_or_create(
+        refund_transaction, created = self.order.transactions.get_or_create(
             transaction_id=transaction_id,
             data=api_response_data,
             amount=amount,
             transaction_type=TRANSACTION_TYPE_REFUND,
             reason=reason,
         )
-        self.state = OrderStatus.REFUNDED
-        self.save()
 
         send_order_refund_email.delay(self.id)
 
@@ -555,16 +551,16 @@ class OrderFlow(object):
         )
 
     def create_paid_courseruns(self):
-        for run in self.purchased_runs:
+        for run in self.order.purchased_runs:
             PaidCourseRun.objects.get_or_create(
-                order=self, course_run=run, user=self.purchaser
+                order=self, course_run=run, user=self.order.purchaser
             )
 
     def create_enrollments(self):
         # create enrollments for what the learner has paid for
         create_run_enrollments(
-            self.purchaser,
-            self.purchased_runs,
+            self.order.purchaser,
+            self.order.purchased_runs,
             mode=EDX_ENROLLMENT_VERIFIED_MODE,
             keep_failed_enrollments=True,
         )
@@ -588,7 +584,7 @@ class OrderFlow(object):
         # No email is required as this order is generated from management command
         if not already_enrolled:
             # send the receipt emails
-            transaction.on_commit(self.send_ecommerce_order_receipt)
+            transaction.on_commit(self.order.send_ecommerce_order_receipt)
 class Order(TimestampedModel):
     """An order containing information for a purchase."""
 
