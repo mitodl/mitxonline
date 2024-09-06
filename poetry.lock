@@ -1146,19 +1146,20 @@ taggit = ["django-taggit (>=3.1)"]
 
 [[package]]
 name = "django-oauth-toolkit"
-version = "1.7.1"
+version = "2.4.0"
 description = "OAuth2 Provider for Django"
 optional = false
-python-versions = "*"
+python-versions = ">=3.8"
 files = [
-    {file = "django-oauth-toolkit-1.7.1.tar.gz", hash = "sha256:37b690fa53f340c7391bdbc0fdbb32fd9ef8a7c012e72ee8754c331a2d7b4adb"},
-    {file = "django_oauth_toolkit-1.7.1-py3-none-any.whl", hash = "sha256:756e44421d0993f27705736b6c33a3d89018393859a31ac926296950f76e4433"},
+    {file = "django_oauth_toolkit-2.4.0-py3-none-any.whl", hash = "sha256:4931d6bf64b6aee32a42f989f218769d1876f3daa53c6bf883d8ab793fb302ee"},
+    {file = "django_oauth_toolkit-2.4.0.tar.gz", hash = "sha256:8975eaf697413a8d54208ee068bc5ad6d1ed76f1df84e4882fbb25e7e6966e1b"},
 ]
 
 [package.dependencies]
-django = ">=2.2,<4.0.0 || >4.0.0"
+django = ">=3.2,<4.0.0 || >4.0.0"
 jwcrypto = ">=0.8.0"
 oauthlib = ">=3.1.0"
+pytz = ">=2024.1"
 requests = ">=2.13.0"
 
 [[package]]
@@ -4247,4 +4248,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "895c86bcf09a319053bad44d1ed8e96bdf8d66a17076f3df9285279921bdf947"
+content-hash = "d9b55a00fb994a7872d4e175a08ae8e0704b5bbe578000e1eb815110a71cafca"
