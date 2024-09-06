@@ -261,3 +261,18 @@ button.btn-secondary.unstyled {
 .display-none {
   display: none !important;
 }
+
+.djhj {
+  position: relative !important;
+  top: 0;
+
+  .djhj-message, .djhj-actions {
+    width: fit-content;
+  }
+
+  .djhj-notification {
+    max-width: unset;
+    background: $navy-blue;
+    margin: 0;
+  }
+}

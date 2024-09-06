@@ -983,19 +983,6 @@ postal = ["cryptography"]
 resend = ["svix"]
 
 [[package]]
-name = "django-compat"
-version = "1.0.15"
-description = "For- and backwards compatibility layer for Django 1.4, 1.7, 1.8, 1.9, 1.10, and 1.11"
-optional = false
-python-versions = "*"
-files = [
-    {file = "django-compat-1.0.15.tar.gz", hash = "sha256:3ac9a3bedc56b9365d9eb241bc5157d0c193769bf995f9a78dc1bc24e7c2331b"},
-]
-
-[package.dependencies]
-six = ">=1.10.0"
-
-[[package]]
 name = "django-cors-headers"
 version = "3.14.0"
 description = "django-cors-headers is a Django application for handling the server headers required for Cross-Origin Resource Sharing (CORS)."
@@ -1086,34 +1073,20 @@ django-fsm = ">=2.1.0"
 
 [[package]]
 name = "django-hijack"
-version = "2.3.0"
+version = "3.4.5"
 description = "django-hijack allows superusers to hijack (=login as) and work on behalf of another user."
 optional = false
 python-versions = "*"
 files = [
-    {file = "django-hijack-2.3.0.tar.gz", hash = "sha256:216de6ff863b5f48314795083e96267ff0829ff7f7180c26ca3c17d8a134e1cf"},
-    {file = "django_hijack-2.3.0-py3-none-any.whl", hash = "sha256:8b820b6fe605cf2f3b50817985d7245285a18c027b7e3eb424d18b7908ecd2e1"},
+    {file = "django-hijack-3.4.5.tar.gz", hash = "sha256:7e45b1de786bdc130628e4230b359dde6d8744ecd3bcd668d2b27c5d614a071c"},
+    {file = "django_hijack-3.4.5-py3-none-any.whl", hash = "sha256:129cbe75444b163135871a947d38ffb72181f4f2583544703fc9efe083c9ddad"},
 ]
 
 [package.dependencies]
-django = ">=2.2"
-
-[[package]]
-name = "django-hijack-admin"
-version = "2.1.10"
-description = "Django admin integration for Django Hijack (https://github.com/arteria/django-hijack/)"
-optional = false
-python-versions = "*"
-files = [
-    {file = "django-hijack-admin-2.1.10.tar.gz", hash = "sha256:330f9be331ada831248c9cee5a21202aea70fb9911b443249ce4c28d57d9e2e3"},
-]
-
-[package.dependencies]
-django-compat = ">=1.0.13"
-django-hijack = ">=2.1.5"
+django = ">=3.2"
 
 [package.extras]
-dev = ["flake8"]
+test = ["pytest", "pytest-cov", "pytest-django"]
 
 [[package]]
 name = "django-ipware"
@@ -4247,4 +4220,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "895c86bcf09a319053bad44d1ed8e96bdf8d66a17076f3df9285279921bdf947"
+content-hash = "bcef460938d1ab6d8be34d5f5d159ef8d3d46900023593500c5a26f667aac5d7"

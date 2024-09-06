@@ -200,9 +200,8 @@ INSTALLED_APPS = (
     # "compliance",
     "openedx",
     # must be after "users" to pick up custom user model
-    "compat",
     "hijack",
-    "hijack_admin",
+    "hijack.contrib.admin",
     "ecommerce",
     "flexiblepricing",
     "micromasters_import",
@@ -235,6 +234,7 @@ MIDDLEWARE = (
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
     "django_user_agents.middleware.UserAgentMiddleware",
+    "hijack.middleware.HijackUserMiddleware",
     "main.middleware.CachelessAPIMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
 )

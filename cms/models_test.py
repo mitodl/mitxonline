@@ -166,6 +166,7 @@ def test_course_page_context(  # noqa: PLR0913
         "can_access_edx_course": is_authenticated and has_relevant_run,
         "finaid_price": finaid_price,
         "product": product,
+        "hijack_logout_redirect_url": "/admin/users/user",
         "instructors": []
         if not has_instructor
         else [
