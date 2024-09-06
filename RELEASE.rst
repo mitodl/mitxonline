@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.100.4
+---------------
+
+- Update django-hijack to 3.x (#2384)
+- Update dependency django-reversion to v5 (#2377)
+
 Version 0.100.3 (Released September 06, 2024)
 ---------------
 
