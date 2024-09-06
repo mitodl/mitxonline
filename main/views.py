@@ -21,9 +21,7 @@ def get_base_context(request):  # noqa: ARG001
         context["domain_verification_tag"] = (
             settings.GOOGLE_DOMAIN_VERIFICATION_TAG_VALUE
         )
-    context["hijack_logout_redirect_url"] = (
-        settings.HIJACK_LOGOUT_REDIRECT_URL
-    )
+    context["hijack_logout_redirect_url"] = settings.HIJACK_LOGOUT_REDIRECT_URL
 
     return context
 
