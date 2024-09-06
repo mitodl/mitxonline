@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.100.3 (Released September 06, 2024)
+---------------
+
+- Fix description for POSTHOG_ENABLED variable (#2380)
+- Department serializer for programs API (#2371)
+- Migrations to release phase (#2379)
+
 Version 0.100.2 (Released September 03, 2024)
 ---------------
 
