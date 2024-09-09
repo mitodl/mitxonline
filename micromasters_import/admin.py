@@ -42,5 +42,3 @@ class CourseCertificateRevisionIdAdmin(admin.ModelAdmin):
     model = CourseCertificateRevisionId
     list_display = ("course", "certificate_page_revision")
     raw_id_fields = ("certificate_page_revision",)
-
-

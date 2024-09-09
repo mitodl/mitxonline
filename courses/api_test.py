@@ -58,7 +58,7 @@ from courses.models import (
     ProgramRequirementNodeType,
 )
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-from ecommerce.models import Order, OrderStatus
+from ecommerce.models import OrderStatus
 from main.test_utils import MockHttpError
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,

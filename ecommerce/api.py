@@ -36,7 +36,6 @@ from ecommerce.models import (
     DiscountRedemption,
     FulfilledOrder,
     Order,
-    OrderFlow,
     OrderStatus,
     PendingOrder,
     UserDiscount,

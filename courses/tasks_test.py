@@ -15,7 +15,7 @@ from courses.tasks import (
     subscribe_edx_course_emails,
 )
 from ecommerce.factories import OrderFactory
-from ecommerce.models import Order, OrderStatus
+from ecommerce.models import OrderStatus
 
 pytestmark = pytest.mark.django_db
 

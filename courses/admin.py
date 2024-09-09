@@ -162,7 +162,6 @@ class ProgramEnrollmentAdmin(AuditableModelAdmin):
         """Returns the related User email"""
         return obj.user.email
 
-
     @admin.display(
         description="Program",
         ordering="program__readable_id",
@@ -170,7 +169,6 @@ class ProgramEnrollmentAdmin(AuditableModelAdmin):
     def get_program_readable_id(self, obj):
         """Returns the related Program readable_id"""
         return obj.program.readable_id
-
 
 
 @admin.register(ProgramEnrollmentAudit)
@@ -190,7 +188,6 @@ class ProgramEnrollmentAuditAdmin(TimestampedModelAdmin):
         """Returns the related Program readable_id"""
         return obj.enrollment.program.readable_id
 
-
     @admin.display(
         description="User",
         ordering="enrollment__user__email",
@@ -198,7 +195,6 @@ class ProgramEnrollmentAuditAdmin(TimestampedModelAdmin):
     def get_user(self, obj):
         """Returns the related User's email"""
         return obj.enrollment.user.email
-
 
     def has_add_permission(self, request):  # noqa: ARG002
         return False
@@ -276,7 +272,6 @@ class CourseRunEnrollmentAdmin(AuditableModelAdmin):
         """Returns the related User email"""
         return obj.user.email
 
-
     @admin.display(
         description="Course Run",
         ordering="run__courseware_id",
@@ -284,7 +279,6 @@ class CourseRunEnrollmentAdmin(AuditableModelAdmin):
     def get_run_courseware_id(self, obj):
         """Returns the related CourseRun courseware_id"""
         return obj.run.courseware_id
-
 
 
 @admin.register(CourseRunEnrollmentAudit)
@@ -309,7 +303,6 @@ class CourseRunEnrollmentAuditAdmin(TimestampedModelAdmin):
         """Returns the related CourseRun courseware_id"""
         return obj.enrollment.run.courseware_id
 
-
     @admin.display(
         description="User",
         ordering="enrollment__user__email",
@@ -317,7 +310,6 @@ class CourseRunEnrollmentAuditAdmin(TimestampedModelAdmin):
     def get_user(self, obj):
         """Returns the related User's email"""
         return obj.enrollment.user.email
-
 
     def has_add_permission(self, request):  # noqa: ARG002
         return False
@@ -364,7 +356,6 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
         """Returns the related User username"""
         return obj.user.username
 
-
     @admin.display(
         description="Course Run",
         ordering="course_run__courseware_id",
@@ -372,7 +363,6 @@ class CourseRunGradeAdmin(admin.ModelAdmin):
     def get_run_courseware_id(self, obj):
         """Returns the related CourseRun courseware_id"""
         return obj.course_run.courseware_id
-
 
 
 @admin.register(CourseRunGradeAudit)
@@ -397,7 +387,6 @@ class CourseRunGradeAuditAdmin(TimestampedModelAdmin):
         """Returns the related User email"""
         return obj.course_run_grade.user.email
 
-
     @admin.display(
         description="Course Run",
         ordering="course_run_grade__course_run__courseware_id",
@@ -405,7 +394,6 @@ class CourseRunGradeAuditAdmin(TimestampedModelAdmin):
     def get_run_courseware_id(self, obj):
         """Returns the related CourseRun courseware_id"""
         return obj.course_run_grade.course_run.courseware_id
-
 
     def has_add_permission(self, request):  # noqa: ARG002
         return False
@@ -493,7 +481,6 @@ class CourseRunCertificateAdmin(TimestampedModelAdmin):
         """Return the revoked state"""
         return obj.is_revoked is not True
 
-
     def get_queryset(self, request):  # noqa: ARG002
         return self.model.all_objects.get_queryset().select_related(
             "user", "course_run"
@@ -529,7 +516,6 @@ class ProgramCertificateAdmin(TimestampedModelAdmin):
         """Return the revoked state"""
         return obj.is_revoked is not True
 
-
     def get_queryset(self, request):  # noqa: ARG002
         return self.model.all_objects.get_queryset().select_related("user", "program")
 
@@ -559,5 +545,3 @@ class RelatedProgramAdmin(admin.ModelAdmin):
     model = RelatedProgram
     list_display = ("id", "first_program", "second_program")
     list_filter = ["first_program", "second_program"]
-
-

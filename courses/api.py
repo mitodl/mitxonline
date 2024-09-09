@@ -11,7 +11,6 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.db.models.query import QuerySet
-from ecommerce.models import OrderStatus
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
@@ -42,6 +41,7 @@ from courses.utils import (
     is_grade_valid,
     is_letter_grade_valid,
 )
+from ecommerce.models import OrderStatus
 from openedx.api import (
     enroll_in_edx_course_runs,
     get_edx_api_course_detail_client,
@@ -260,7 +260,7 @@ def deactivate_run_enrollment(
     Returns:
         CourseRunEnrollment: The deactivated enrollment
     """
-    from ecommerce.models import Line, Order
+    from ecommerce.models import Line
     from hubspot_sync.task_helpers import sync_hubspot_line_by_line_id
 
     try:

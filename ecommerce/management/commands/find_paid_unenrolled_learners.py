@@ -12,7 +12,7 @@ from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 
 from courses.models import CourseRun, CourseRunEnrollment
-from ecommerce.models import Line, Order, OrderStatus
+from ecommerce.models import Line, OrderStatus
 
 
 class Command(BaseCommand):

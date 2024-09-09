@@ -66,5 +66,3 @@ class FlexiblePriceTierAdmin(admin.ModelAdmin):
         "current",
     )
     raw_id_fields = ("discount",)
-
-

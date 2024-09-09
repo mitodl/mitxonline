@@ -107,5 +107,3 @@ class BlockListAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):  # noqa: ARG002
         return False
-
-

@@ -5,8 +5,6 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional  # noqa: UP035
-from enum import Enum
-from django.db.models import TextChoices
 
 import pytz
 import reversion
@@ -16,13 +14,13 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models import TextChoices
 from django.utils.functional import cached_property
-from viewflow.fsm import State
-from django.utils.translation import gettext_lazy as _
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
 from viewflow import this
+from viewflow.fsm import State
 
 from courses.models import CourseRun, PaidCourseRun
 from ecommerce.constants import (
@@ -434,6 +432,8 @@ class UserDiscount(TimestampedModel):
 
     def __str__(self):
         return f"{self.discount} {self.user}"
+
+
 class OrderStatus(TextChoices):
     PENDING = "pending"
     FULFILLED = "fulfilled"
@@ -443,8 +443,9 @@ class OrderStatus(TextChoices):
     REFUNDED = "refunded"
     REVIEW = "review"
     PARTIALLY_REFUNDED = "partially_refunded"
-        
-class OrderFlow(object):
+
+
+class OrderFlow:
     state = State(OrderStatus, default=OrderStatus.PENDING)
 
     def __init__(self, order, user):
@@ -460,18 +461,21 @@ class OrderFlow(object):
         return self.order.state
 
     @state.on_success()
-    def _on_transition_success(self, descriptor, source, target, **kwargs):  # noqa: FBT002
+    def _on_transition_success(self, descriptor, source, target, **kwargs):
         self.order.save()
-        
+
     @state.transition(source=State.ANY, target=OrderStatus.CANCELED)
     def cancel(self):
         """Cancel this order"""
-        pass
 
     def is_approver(self, user):
         return user.is_staff
 
-    @state.transition(source=OrderStatus.PENDING, target=OrderStatus.DECLINED, permission=this.is_approver)
+    @state.transition(
+        source=OrderStatus.PENDING,
+        target=OrderStatus.DECLINED,
+        permission=this.is_approver,
+    )
     def decline(self):
         """
         Decline this order. This additionally clears the discount redemptions
@@ -485,12 +489,11 @@ class OrderFlow(object):
     @state.transition(source=State.ANY, target=OrderStatus.ERRORED)
     def errored(self):
         """Error this order"""
-        pass
 
     @state.transition(
         source=OrderStatus.FULFILLED,
         target=OrderStatus.REFUNDED,
-        permission=this.is_approver
+        permission=this.is_approver,
     )
     def refund(self, *, api_response_data: dict = None, **kwargs):  # noqa: RUF013
         """
@@ -558,6 +561,7 @@ class OrderFlow(object):
     def create_enrollments(self):
         # create enrollments for what the learner has paid for
         from courses.api import create_run_enrollments
+
         create_run_enrollments(
             self.order.purchaser,
             self.order.purchased_runs,
@@ -585,6 +589,8 @@ class OrderFlow(object):
         if not already_enrolled:
             # send the receipt emails
             transaction.on_commit(self.order.send_ecommerce_order_receipt)
+
+
 class Order(TimestampedModel):
     """An order containing information for a purchase."""
 
@@ -599,12 +605,10 @@ class Order(TimestampedModel):
         max_digits=20,
     )
     reference_number = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
-    
+
     def get_object_flow(self):
         """Instantiate the flow without default constructor"""
-        return OrderFlow(
-            self, user=self.purchaser
-    )
+        return OrderFlow(self, user=self.purchaser)
 
     # override save method to auto-fill generated_rerefence_number
     def save(self, *args, **kwargs):
@@ -653,6 +657,7 @@ class Order(TimestampedModel):
 
     def send_ecommerce_order_receipt(self):
         send_ecommerce_order_receipt.delay(self.id)
+
 
 class PendingOrder(Order):
     """An order that is pending payment"""
