@@ -4,15 +4,26 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('ecommerce', '0035_delete_duplicate_discountredemption'),
+        ("ecommerce", "0035_delete_duplicate_discountredemption"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='order',
-            name='state',
-            field=models.CharField(choices=[('pending', 'Pending'), ('fulfilled', 'Fulfilled'), ('canceled', 'Canceled'), ('declined', 'Declined'), ('errored', 'Errored'), ('refunded', 'Refunded'), ('review', 'Review'), ('partially_refunded', 'Partially Refunded')], max_length=150),
+            model_name="order",
+            name="state",
+            field=models.CharField(
+                choices=[
+                    ("pending", "Pending"),
+                    ("fulfilled", "Fulfilled"),
+                    ("canceled", "Canceled"),
+                    ("declined", "Declined"),
+                    ("errored", "Errored"),
+                    ("refunded", "Refunded"),
+                    ("review", "Review"),
+                    ("partially_refunded", "Partially Refunded"),
+                ],
+                max_length=150,
+            ),
         ),
     ]

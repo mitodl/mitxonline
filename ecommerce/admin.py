@@ -220,14 +220,12 @@ class BaseOrderAdmin(fsm.FlowAdminMixin, TimestampedModelAdmin):
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     readonly_fields = ["reference_number"]
     flow_state = OrderFlow.state
-    
+
     def get_transition_fields(self, request, obj, slug):
-        return ['state']
-    
+        return ["state"]
+
     def get_object_flow(self, request, obj):
-        return OrderFlow(
-            obj, user=request.user
-        )
+        return OrderFlow(obj, user=request.user)
 
     def has_change_permission(self, request, obj=None):  # noqa: ARG002
         return False

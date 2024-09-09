@@ -28,7 +28,7 @@ from ecommerce.factories import (
     DiscountRedemptionFactory,
     ProductFactory,
 )
-from ecommerce.models import Order, OrderStatus, Product
+from ecommerce.models import OrderStatus, Product
 from hubspot_sync.serializers import (
     ORDER_STATUS_MAPPING,
     HubspotContactSerializer,

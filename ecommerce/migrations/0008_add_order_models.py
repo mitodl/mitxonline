@@ -31,7 +31,17 @@ class Migration(migrations.Migration):
                 ("updated_on", models.DateTimeField(auto_now=True)),
                 (
                     "state",
-                    models.CharField(choices=[('pending', 'Pending'), ('fulfilled', 'Fulfilled'), ('canceled', 'Canceled'), ('declined', 'Declined'), ('errored', 'Errored'), ('refunded', 'Refunded'), ('review', 'Review'), ('partially_refunded', 'Partially Refunded')],
+                    models.CharField(
+                        choices=[
+                            ("pending", "Pending"),
+                            ("fulfilled", "Fulfilled"),
+                            ("canceled", "Canceled"),
+                            ("declined", "Declined"),
+                            ("errored", "Errored"),
+                            ("refunded", "Refunded"),
+                            ("review", "Review"),
+                            ("partially_refunded", "Partially Refunded"),
+                        ],
                         default="pending",
                         max_length=50,
                     ),

@@ -21,7 +21,17 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="order",
             name="state",
-            field=models.CharField(choices=[('pending', 'Pending'), ('fulfilled', 'Fulfilled'), ('canceled', 'Canceled'), ('declined', 'Declined'), ('errored', 'Errored'), ('refunded', 'Refunded'), ('review', 'Review'), ('partially_refunded', 'Partially Refunded')],
+            field=models.CharField(
+                choices=[
+                    ("pending", "Pending"),
+                    ("fulfilled", "Fulfilled"),
+                    ("canceled", "Canceled"),
+                    ("declined", "Declined"),
+                    ("errored", "Errored"),
+                    ("refunded", "Refunded"),
+                    ("review", "Review"),
+                    ("partially_refunded", "Partially Refunded"),
+                ],
                 default="pending",
                 max_length=50,
             ),

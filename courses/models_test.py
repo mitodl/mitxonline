@@ -36,7 +36,7 @@ from courses.models import (
     limit_to_certificate_pages,
 )
 from ecommerce.factories import OrderFactory, ProductFactory
-from ecommerce.models import Order, OrderStatus
+from ecommerce.models import OrderStatus
 from main.test_utils import format_as_iso8601
 from users.factories import UserFactory
 

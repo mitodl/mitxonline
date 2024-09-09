@@ -14,7 +14,7 @@ from courses.factories import (
 )
 from courses.management.commands import unenroll_enrollment
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-from ecommerce.models import Order, OrderStatus
+from ecommerce.models import OrderStatus
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]

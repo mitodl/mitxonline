@@ -5,7 +5,6 @@ Tasks for the courses app
 import logging
 
 from django.db.models import Q
-from ecommerce.models import OrderStatus
 from mitol.common.utils.datetime import now_in_utc
 
 from courses.models import (
@@ -14,6 +13,7 @@ from courses.models import (
     LearnerProgramRecordShare,
     PaidCourseRun,
 )
+from ecommerce.models import OrderStatus
 from main.celery import app
 
 log = logging.getLogger(__name__)
@@ -81,7 +81,6 @@ def clear_unenrolled_paid_course_run(enrollment_id):
     these exist, the user won't be able to re-buy into the course later if they
     want to.
     """
-    from ecommerce.models import Order
 
     try:
         enrollment = CourseRunEnrollment.all_objects.filter(id=enrollment_id).get()
