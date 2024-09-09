@@ -346,8 +346,8 @@ def test_create_transaction_with_no_transaction_id():
 
     with pytest.raises(ValidationError):  # noqa: PT012
         pending_order = OrderFactory.create(state=OrderStatus.PENDING)
-        pending_order.fulfill({})
-        pending_order.save()
+        pending_order_flow = pending_order.get_object_flow()
+        pending_order_flow.fulfill({})
     assert (
         Transaction.objects.filter(
             transaction_type="payment",
@@ -356,8 +356,9 @@ def test_create_transaction_with_no_transaction_id():
     )
 
     fulfilled_order = OrderFactory.create(state=OrderStatus.FULFILLED)
+    fulfilled_order_flow = fulfilled_order.get_object_flow()
     with pytest.raises(ValidationError):
-        fulfilled_order.refund(
+        fulfilled_order_flow.refund(
             api_response_data={},
             amount=fulfilled_order.total_price_paid,
             reason="Test refund",

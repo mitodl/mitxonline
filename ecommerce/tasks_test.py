@@ -53,8 +53,8 @@ def test_delayed_order_refund_sends_email(
 
     transaction_data = {"id": "refunded-transaction"}
     refund_amount = order.total_price_paid / 2
-
-    order.refund(
+    order_flow = order.get_order_flow()
+    order_flow.refund(
         api_response_data=transaction_data, amount=refund_amount, reason="testing"
     )
 

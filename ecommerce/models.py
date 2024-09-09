@@ -460,7 +460,7 @@ class OrderFlow(object):
         return self.order.state
 
     @state.on_success()
-    def _on_transition_success(self, descriptor, source, target, already_enrolled=False):
+    def _on_transition_success(self, descriptor, source, target, **kwargs):  # noqa: FBT002
         self.order.save()
         
     @state.transition(source=State.ANY, target=OrderStatus.CANCELED)
@@ -525,7 +525,7 @@ class OrderFlow(object):
             reason=reason,
         )
 
-        send_order_refund_email.delay(self.id)
+        send_order_refund_email.delay(self.order.id)
 
         return refund_transaction
 
