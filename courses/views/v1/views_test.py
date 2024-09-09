@@ -38,7 +38,7 @@ from courses.views.test_utils import (
 )
 from courses.views.v1 import UserEnrollmentsApiViewSet
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-from ecommerce.models import Order
+from ecommerce.models import Order, OrderStatus
 from main import features
 from main.constants import (
     USER_MSG_COOKIE_NAME,
@@ -602,9 +602,9 @@ def test_create_enrollments(mocker, user_client, api_request, product_exists):
     if api_request:
         assert "Ok" in str(resp.content)
         if product_exists:
-            assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
+            assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
         else:
-            assert Order.objects.filter(state=Order.STATE.PENDING).count() == 0
+            assert Order.objects.filter(state=OrderStatus.PENDING).count() == 0
     else:
         assert resp.status_code == status.HTTP_302_FOUND
         assert resp.url == reverse("user-dashboard")
@@ -777,7 +777,7 @@ def test_create_enrollments_with_existing_fulfilled_order(
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=run)
     if fulfilled_order_exists:
-        order = OrderFactory.create(state=Order.STATE.FULFILLED, purchaser=user)
+        order = OrderFactory.create(state=OrderStatus.FULFILLED, purchaser=user)
         version = Version.objects.get_for_object(product).first()
         LineFactory.create(order=order, purchased_object=run, product_version=version)
     resp = user_client.post(
@@ -787,7 +787,7 @@ def test_create_enrollments_with_existing_fulfilled_order(
 
     assert "Ok" in str(resp.content)
     if fulfilled_order_exists:
-        assert Order.objects.filter(state=Order.STATE.PENDING).count() == 0
+        assert Order.objects.filter(state=OrderStatus.PENDING).count() == 0
     else:
-        assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
+        assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
     patched_create_enrollments.assert_called_once()

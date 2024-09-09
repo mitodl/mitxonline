@@ -15,7 +15,7 @@ from courses.tasks import (
     subscribe_edx_course_emails,
 )
 from ecommerce.factories import OrderFactory
-from ecommerce.models import Order
+from ecommerce.models import Order, OrderStatus
 
 pytestmark = pytest.mark.django_db
 
@@ -62,7 +62,7 @@ def test_clear_unenrolled_paid_course_runs(user):
 
     course_run = CourseRunFactory.create()
     enrollment = CourseRunEnrollment.objects.create(user=user, run=course_run)
-    order = OrderFactory.create(purchaser=user, state=Order.STATE.FULFILLED)
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
 
     PaidCourseRun.objects.create(user=user, course_run=course_run, order=order)
 

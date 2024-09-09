@@ -48,6 +48,7 @@ from ecommerce.models import (
     DiscountProduct,
     DiscountRedemption,
     Order,
+    OrderStatus,
     Product,
     UserDiscount,
 )
@@ -555,19 +556,19 @@ class CheckoutCallbackView(View):
 
         Returns: HttpResponse
         """
-        if order_state == Order.STATE.CANCELED:
+        if order_state == OrderStatus.CANCELED:
             return redirect_with_user_message(
                 reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
             )
-        elif order_state == Order.STATE.ERRORED:
+        elif order_state == OrderStatus.ERRORED:
             return redirect_with_user_message(
                 reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_ERROR}
             )
-        elif order_state == Order.STATE.DECLINED:
+        elif order_state == OrderStatus.DECLINED:
             return redirect_with_user_message(
                 reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_DECLINED}
             )
-        elif order_state == Order.STATE.FULFILLED:
+        elif order_state == OrderStatus.FULFILLED:
             return redirect_with_user_message(
                 reverse("user-dashboard"),
                 {
@@ -618,7 +619,7 @@ class CheckoutCallbackView(View):
             # If it isn't, then we just need to redirect the user with the
             # proper message.
 
-            if order.state == Order.STATE.PENDING:
+            if order.state == OrderStatus.PENDING:
                 processed_order_state = api.process_cybersource_payment_response(
                     request, order
                 )
@@ -654,7 +655,7 @@ class BackofficeCallbackView(APIView):
             # the user's browser.
             if order is None:
                 raise Http404
-            elif order.state == Order.STATE.PENDING:
+            elif order.state == OrderStatus.PENDING:
                 api.process_cybersource_payment_response(request, order)
 
             return Response(status=status.HTTP_200_OK)
@@ -796,7 +797,7 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
     def get_queryset(self):
         return (
             Order.objects.filter(purchaser=self.request.user)
-            .filter(state__in=[Order.STATE.FULFILLED, Order.STATE.REFUNDED])
+            .filter(state__in=[OrderStatus.FULFILLED, OrderStatus.REFUNDED])
             .order_by("-created_on")
             .all()
         )

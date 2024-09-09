@@ -36,6 +36,7 @@ from ecommerce.models import (
     DiscountRedemption,
     FulfilledOrder,
     Order,
+    OrderStatus,
     PendingOrder,
     UserDiscount,
 )
@@ -240,8 +241,8 @@ def apply_user_discounts(request):
 
 
 def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=False):  # noqa: FBT002
-    order.fulfill(payment_data, already_enrolled=already_enrolled)
-    order.save()
+    order_flow = order.get_object_flow(order, order.purchaser)
+    order_flow.fulfill(payment_data, already_enrolled=already_enrolled)
     sync_hubspot_deal(order)
 
     if basket and basket.compare_to_order(order):
@@ -304,16 +305,16 @@ def process_cybersource_payment_response(request, order):
         # This probably means the order needed to go through the process
         # again so maybe tell the user to do a thing.
         log.debug(f"Transaction declined: {processor_response.message}")  # noqa: G004
-        order.decline()
-        order.save()
+        order_flow = order.get_object_flow(order, order.purchaser)
+        order_flow.decline()
         return_message = order.state
     elif processor_response.state == ProcessorResponse.STATE_ERROR:
         # Error - something went wrong with the request
         log.debug(
             f"Error happened submitting the transaction: {processor_response.message}"  # noqa: G004
         )
-        order.error()
-        order.save()
+        order_flow = order.get_object_flow(order, order.purchaser)
+        order_flow.error()
         return_message = order.state
     elif processor_response.state in [
         ProcessorResponse.STATE_CANCELLED,
@@ -325,8 +326,8 @@ def process_cybersource_payment_response(request, order):
         # the order here (other than set it to Cancelled).
         # Transaction could be
         log.debug(f"Transaction cancelled/reviewed: {processor_response.message}")  # noqa: G004
-        order.cancel()
-        order.save()
+        order_flow = order.get_object_flow(order, order.purchaser)
+        order_flow.cancel()
         return_message = order.state
 
     elif (
@@ -349,8 +350,8 @@ def process_cybersource_payment_response(request, order):
         log.error(
             f"Unknown state {processor_response.state} found: transaction ID {transaction_id}, reason code {reason_code}, response message {processor_response.message}"  # noqa: G004
         )
-        order.cancel()
-        order.save()
+        order_flow = order.get_object_flow(order, order.purchaser)
+        order_flow.cancel()
         return_message = order.state
 
     sync_hubspot_deal(order)
@@ -396,7 +397,7 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
         message = "Either order_id or reference_number is required to fetch the Order."
         log.error(message)
         return False, message
-    if order.state != Order.STATE.FULFILLED:
+    if order.state != OrderStatus.FULFILLED:
         message = f"Order with order_id {order.id} is not in fulfilled state."
         log.error(message)
         return False, message
@@ -510,11 +511,11 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
 
     if refnos is not None:
         pending_orders = PendingOrder.objects.filter(
-            state=PendingOrder.STATE.PENDING, reference_number__in=refnos
+            state=OrderStatus.PENDING, reference_number__in=refnos
         ).values_list("reference_number", flat=True)
     else:
         pending_orders = PendingOrder.objects.filter(
-            state=PendingOrder.STATE.PENDING
+            state=OrderStatus.PENDING
         ).values_list("reference_number", flat=True)
 
     if len(pending_orders) == 0:
@@ -535,12 +536,11 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
         if int(payload["reason_code"]) == 100:  # noqa: PLR2004
             try:
                 order = PendingOrder.objects.filter(
-                    state=PendingOrder.STATE.PENDING,
+                    state=OrderStatus.PENDING,
                     reference_number=payload["req_reference_number"],
                 ).get()
-
-                order.fulfill(payload)
-                order.save()
+                order_flow = order.get_object_flow(order, order.purchaser)
+                order_flow.fulfill(payload)
                 sync_hubspot_deal(order)
                 fulfilled_count += 1
 
@@ -553,11 +553,11 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
         else:
             try:
                 order = PendingOrder.objects.filter(
-                    state=PendingOrder.STATE.PENDING,
+                    state=OrderStatus.PENDING,
                     reference_number=payload["req_reference_number"],
                 ).get()
-
-                order.cancel()
+                order_flow = order.get_object_flow(order, order.purchaser)
+                order_flow.cancel()
                 order.transactions.create(
                     transaction_id=payload["transaction_id"],
                     amount=order.total_price_paid,
@@ -597,7 +597,7 @@ def check_for_duplicate_discount_redemptions():
             Q(redeemed_discount__redemption_type=REDEMPTION_TYPE_ONE_TIME)
             | Q(redeemed_discount__redemption_type=REDEMPTION_TYPE_ONE_TIME_PER_USER)
         )
-        .filter(redeemed_order__state=Order.STATE.FULFILLED)
+        .filter(redeemed_order__state=OrderStatus.FULFILLED)
         .prefetch_related("redeemed_discount")
         .all()
     )
@@ -611,7 +611,7 @@ def check_for_duplicate_discount_redemptions():
         if (
             redemption.redeemed_discount.redemption_type == REDEMPTION_TYPE_ONE_TIME
             and redemption.redeemed_discount.order_redemptions.filter(
-                redeemed_order__state=Order.STATE.FULFILLED
+                redeemed_order__state=OrderStatus.FULFILLED
             ).count()
             > 1
         ):
@@ -623,7 +623,7 @@ def check_for_duplicate_discount_redemptions():
             redemption.redeemed_discount.redemption_type
             == REDEMPTION_TYPE_ONE_TIME_PER_USER
             and redemption.redeemed_discount.order_redemptions.filter(
-                redeemed_order__state=Order.STATE.FULFILLED
+                redeemed_order__state=OrderStatus.FULFILLED
             ).count()
             > 1
         ):
@@ -632,7 +632,7 @@ def check_for_duplicate_discount_redemptions():
             for (
                 user_redemption
             ) in redemption.redeemed_discount.order_redemptions.filter(
-                redeemed_order__state=Order.STATE.FULFILLED
+                redeemed_order__state=OrderStatus.FULFILLED
             ).all():
                 if user_redemption.redeemed_by.id in seen_user:
                     continue

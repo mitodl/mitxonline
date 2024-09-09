@@ -22,9 +22,8 @@ from django.utils.translation import gettext_lazy as _
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
-from viewflow import fsm, this
+from viewflow import this
 
-from courses.api import create_run_enrollments
 from courses.models import CourseRun, PaidCourseRun
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -309,7 +308,7 @@ class Discount(TimestampedModel):
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME
             and DiscountRedemption.objects.filter(
                 redeemed_discount=self,
-                redeemed_order__state=Order.STATE.FULFILLED,
+                redeemed_order__state=OrderStatus.FULFILLED,
             ).count()
             > 0
         ):
@@ -319,7 +318,7 @@ class Discount(TimestampedModel):
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME_PER_USER
             and DiscountRedemption.objects.filter(
                 redeemed_discount=self,
-                redeemed_order__state=Order.STATE.FULFILLED,
+                redeemed_order__state=OrderStatus.FULFILLED,
                 redeemed_by=user,
             ).count()
             > 0
@@ -330,7 +329,7 @@ class Discount(TimestampedModel):
             self.max_redemptions > 0
             and DiscountRedemption.objects.filter(
                 redeemed_discount=self,
-                redeemed_order__state=Order.STATE.FULFILLED,
+                redeemed_order__state=OrderStatus.FULFILLED,
             ).count()
             >= self.max_redemptions
         ):
@@ -558,6 +557,7 @@ class OrderFlow(object):
 
     def create_enrollments(self):
         # create enrollments for what the learner has paid for
+        from courses.api import create_run_enrollments
         create_run_enrollments(
             self.order.purchaser,
             self.order.purchased_runs,
@@ -599,6 +599,12 @@ class Order(TimestampedModel):
         max_digits=20,
     )
     reference_number = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
+    
+    def get_object_flow(self, user, obj):
+        """Instantiate the flow without default constructor"""
+        return OrderFlow(
+            obj, user=user
+    )
 
     # override save method to auto-fill generated_rerefence_number
     def save(self, *args, **kwargs):
@@ -690,7 +696,7 @@ class PendingOrder(Order):
                 lines__purchased_object_id__in=product_object_ids,
                 lines__purchased_content_type_id__in=product_content_types,
                 lines__product_version__in=product_versions,
-                state=Order.STATE.PENDING,
+                state=OrderStatus.PENDING,
                 purchaser=user,
             )
         )
@@ -706,7 +712,7 @@ class PendingOrder(Order):
             order.refresh_from_db()
         else:
             order = Order.objects.create(
-                state=Order.STATE.PENDING,
+                state=OrderStatus.PENDING,
                 purchaser=user,
                 total_price_paid=0,
             )

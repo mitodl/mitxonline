@@ -32,6 +32,7 @@ from ecommerce.models import (
     FulfilledOrder,
     Line,
     Order,
+    OrderStatus,
     PendingOrder,
     Product,
     Transaction,
@@ -74,7 +75,7 @@ def basket():
 
 def perform_discount_redemption(user, discount):
     """Redeems a discount."""
-    order = Order(purchaser=user, state=Order.STATE.FULFILLED, total_price_paid=10)
+    order = Order(purchaser=user, state=OrderStatus.FULFILLED, total_price_paid=10)
     order.save()
 
     redemption = DiscountRedemption(
@@ -210,14 +211,14 @@ def test_order_refund(settings):
         basket_item = BasketItemFactory.create()
 
     order = PendingOrder.create_from_basket(basket_item.basket)
-    order.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
-    order.save()
+    order_flow = order.get_object_flow(order, order.purchaser)
+    order_flow.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
 
     fulfilled_order = FulfilledOrder.objects.get(pk=order.id)
 
     assert fulfilled_order.transactions.count() == 1
 
-    fulfilled_order.refund(
+    order_flow.refund(
         # API response for refund doesn't have transaction_id, it has different id
         api_response_data={
             "id": "45678",
@@ -226,11 +227,10 @@ def test_order_refund(settings):
         reason="Test refund",
         unenroll_learner=True,
     )
-    fulfilled_order.save()
 
     fulfilled_order.refresh_from_db()
 
-    assert fulfilled_order.state == Order.STATE.REFUNDED
+    assert fulfilled_order.state == OrderStatus.REFUNDED
     assert fulfilled_order.transactions.count() == 2
 
 
@@ -345,7 +345,7 @@ def test_create_transaction_with_no_transaction_id():
     """Test that creating payment or refund transaction without transaction id in payment data will raise exception"""
 
     with pytest.raises(ValidationError):  # noqa: PT012
-        pending_order = OrderFactory.create(state=Order.STATE.PENDING)
+        pending_order = OrderFactory.create(state=OrderStatus.PENDING)
         pending_order.fulfill({})
         pending_order.save()
     assert (
@@ -355,7 +355,7 @@ def test_create_transaction_with_no_transaction_id():
         == 0
     )
 
-    fulfilled_order = OrderFactory.create(state=Order.STATE.FULFILLED)
+    fulfilled_order = OrderFactory.create(state=OrderStatus.FULFILLED)
     with pytest.raises(ValidationError):
         fulfilled_order.refund(
             api_response_data={},
@@ -429,12 +429,12 @@ def test_pending_order_is_reused(basket):
     basket_item.save()
     order = PendingOrder.create_from_basket(basket)
     order.save()
-    assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
+    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
     order = PendingOrder.create_from_basket(basket)
     order.save()
     # Verify that the existing PendingOrder is reused and a duplicate is not created.
     # This is to ensure that we also reuse the HubSpot Deal associated with Orders.
-    assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
+    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
 
 
 @pytest.mark.parametrize(
@@ -466,7 +466,7 @@ def test_pending_order_is_reused_but_discounts_cleared(
 
     order = PendingOrder.create_from_basket(basket)
     order.save()
-    assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
+    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
 
     if apply_discount == "to_order":
         redemption = DiscountRedemption(
@@ -502,7 +502,7 @@ def test_pending_order_is_reused_but_discounts_cleared(
     # This is to ensure that we also reuse the HubSpot Deal associated with Orders.
     # Also ensure the discounts aren't reattached to the order if we just attached
     # the discount to the order - if it's in the basket, it should be reattached, but we should only get one
-    assert Order.objects.filter(state=Order.STATE.PENDING).count() == 1
+    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 1
     if apply_discount == "to_order":
         assert order.discounts.count() == 0
     else:
@@ -533,7 +533,7 @@ def test_new_pending_order_is_created_if_product_is_different():
     order = PendingOrder.create_from_product(product=products[1], user=user)
     order.save()
     assert order.lines.count() == 1
-    assert Order.objects.filter(state=Order.STATE.PENDING).count() == 2
+    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 2
 
 
 def test_pending_order_is_reused_if_multiple_exist(basket):
@@ -548,7 +548,7 @@ def test_pending_order_is_reused_if_multiple_exist(basket):
 
     # Create 2 PendingOrders
     order1 = Order.objects.create(
-        state=Order.STATE.PENDING,
+        state=OrderStatus.PENDING,
         purchaser=basket.user,
         total_price_paid=0,
     )
@@ -560,7 +560,7 @@ def test_pending_order_is_reused_if_multiple_exist(basket):
         quantity=1,
     )
     order2 = Order.objects.create(
-        state=Order.STATE.PENDING,
+        state=OrderStatus.PENDING,
         purchaser=basket.user,
         total_price_paid=0,
     )
@@ -578,7 +578,7 @@ def test_pending_order_is_reused_if_multiple_exist(basket):
     order.save()
     # Verify that one of the existing PendingOrder's is reused insteading of
     # creating a third.
-    assert Order.objects.filter(state=Order.STATE.PENDING).count() == 2
+    assert Order.objects.filter(state=OrderStatus.PENDING).count() == 2
 
 
 def test_discount_expires_in_past(unlimited_discount):

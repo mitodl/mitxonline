@@ -58,7 +58,7 @@ from courses.utils import (
     get_program_certificate_by_enrollment,
     get_unenrollable_courses,
 )
-from ecommerce.models import FulfilledOrder, Order, PendingOrder, Product
+from ecommerce.models import FulfilledOrder, Order, OrderStatus, PendingOrder, Product
 from hubspot_sync.task_helpers import sync_hubspot_deal
 from main import features
 from main.constants import (
@@ -310,7 +310,7 @@ def create_enrollment_view(request):
             product_object_id = product.object_id
             product_content_type = product.content_type_id
             order = FulfilledOrder.objects.filter(
-                state=Order.STATE.FULFILLED,
+                state=OrderStatus.FULFILLED,
                 purchaser=user,
                 lines__purchased_object_id=product_object_id,
                 lines__purchased_content_type_id=product_content_type,

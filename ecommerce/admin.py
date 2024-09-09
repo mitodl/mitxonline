@@ -305,7 +305,7 @@ class FulfilledOrderAdmin(TimestampedModelAdmin):
             super()
             .get_queryset(request)
             .prefetch_related("purchaser", "lines__product_version")
-            .filter(state=Order.STATE.FULFILLED)
+            .filter(state=OrderStatus.FULFILLED)
         )
 
     def response_change(self, request, obj):
@@ -325,7 +325,7 @@ class RefundedOrderAdmin(BaseOrderAdmin):
 
     def get_queryset(self, request):
         """Filter only to refunded orders"""
-        return super().get_queryset(request).filter(state=Order.STATE.REFUNDED)
+        return super().get_queryset(request).filter(state=OrderStatus.REFUNDED)
 
 
 class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
@@ -406,7 +406,7 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
     def get(self, request):
         try:
             order = FulfilledOrder.objects.get(pk=request.GET["order"])
-            if order.state != Order.STATE.FULFILLED:
+            if order.state != OrderStatus.FULFILLED:
                 raise ObjectDoesNotExist()  # noqa: RSE102, TRY301
         except ObjectDoesNotExist:
             messages.error(

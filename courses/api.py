@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.db.models.query import QuerySet
+from ecommerce.models import OrderStatus
 from mitol.common.utils import now_in_utc
 from mitol.common.utils.collections import (
     first_or_none,
@@ -286,7 +287,7 @@ def deactivate_run_enrollment(
     line = Line.objects.filter(
         purchased_object_id=run_enrollment.run.id,
         purchased_content_type=content_type,
-        order__state__in=[Order.STATE.FULFILLED, Order.STATE.PENDING],
+        order__state__in=[OrderStatus.FULFILLED, OrderStatus.PENDING],
         order__purchaser=run_enrollment.user,
     )
     if line:

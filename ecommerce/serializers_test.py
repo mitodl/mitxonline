@@ -20,7 +20,7 @@ from ecommerce.factories import (
     ProductFactory,
     UnlimitedUseDiscountFactory,
 )
-from ecommerce.models import BasketDiscount, Order
+from ecommerce.models import BasketDiscount, Order, OrderStatus
 from ecommerce.serializers import (
     BaseProductSerializer,
     BasketItemSerializer,
@@ -281,7 +281,7 @@ def create_order_receipt(mocker, user, products, user_client):
         "transaction_id": "12345",
     }
 
-    order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)
+    order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
 
     resp = user_client.post(reverse("checkout-result-callback"), payload)
 

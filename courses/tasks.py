@@ -5,6 +5,7 @@ Tasks for the courses app
 import logging
 
 from django.db.models import Q
+from ecommerce.models import OrderStatus
 from mitol.common.utils.datetime import now_in_utc
 
 from courses.models import (
@@ -88,7 +89,7 @@ def clear_unenrolled_paid_course_run(enrollment_id):
         PaidCourseRun.objects.filter(
             user=enrollment.user,
             course_run=enrollment.run,
-            order__state=Order.STATE.FULFILLED,
+            order__state=OrderStatus.FULFILLED,
         ).delete()
     except Exception as e:  # noqa: BLE001
         log.error(  # noqa: TRY400

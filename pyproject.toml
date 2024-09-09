@@ -67,7 +67,6 @@ mitol-django-common = "2023.12.19"
 mitol-django-authentication = "2023.12.19"
 django-hijack = "^3.6.0"
 django-viewflow = "^2.2.7"
-django-fsm = "^3.0.0"
 
 
 [tool.poetry.group.dev.dependencies]

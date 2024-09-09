@@ -28,7 +28,7 @@ from ecommerce.factories import (
     DiscountRedemptionFactory,
     ProductFactory,
 )
-from ecommerce.models import Order, Product
+from ecommerce.models import Order, OrderStatus, Product
 from hubspot_sync.serializers import (
     ORDER_STATUS_MAPPING,
     HubspotContactSerializer,
@@ -110,7 +110,7 @@ def test_serialize_line_no_corresponding_enrollment(hubspot_order):
     }
 
 
-@pytest.mark.parametrize("status", [Order.STATE.FULFILLED, Order.STATE.PENDING])
+@pytest.mark.parametrize("status", [OrderStatus.FULFILLED, OrderStatus.PENDING])
 def test_serialize_order(settings, hubspot_order, status):
     """Test that OrderToDealSerializer produces the correct serialized data"""
     hubspot_order.state = status
@@ -124,7 +124,7 @@ def test_serialize_order(settings, hubspot_order, status):
         "discount_percent": "0",
         "closedate": (
             int(hubspot_order.updated_on.timestamp() * 1000)
-            if status == Order.STATE.FULFILLED
+            if status == OrderStatus.FULFILLED
             else None
         ),
         "coupon_code": None,
@@ -164,7 +164,7 @@ def test_serialize_order_with_coupon(  # noqa: PLR0913
         "discount_amount": amount_off,
         "closedate": (
             int(hubspot_order.updated_on.timestamp() * 1000)
-            if hubspot_order.state == Order.STATE.FULFILLED
+            if hubspot_order.state == OrderStatus.FULFILLED
             else None
         ),
         "coupon_code": coupon_redemption.redeemed_discount.discount_code,

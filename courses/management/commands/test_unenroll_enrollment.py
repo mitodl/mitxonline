@@ -14,7 +14,7 @@ from courses.factories import (
 )
 from courses.management.commands import unenroll_enrollment
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-from ecommerce.models import Order
+from ecommerce.models import Order, OrderStatus
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -86,7 +86,7 @@ def test_unenroll_enrollment(patches):
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=enrollment.run)
     version = Version.objects.get_for_object(product).first()
-    order = OrderFactory.create(state=Order.STATE.PENDING, purchaser=enrollment.user)
+    order = OrderFactory.create(state=OrderStatus.PENDING, purchaser=enrollment.user)
     LineFactory.create(
         order=order, purchased_object=enrollment.run, product_version=version
     )
@@ -113,7 +113,7 @@ def test_unenroll_enrollment_without_edx(mocker):
     with reversion.create_revision():
         product = ProductFactory.create(purchasable_object=enrollment.run)
     version = Version.objects.get_for_object(product).first()
-    order = OrderFactory.create(state=Order.STATE.PENDING, purchaser=enrollment.user)
+    order = OrderFactory.create(state=OrderStatus.PENDING, purchaser=enrollment.user)
     LineFactory.create(
         order=order, purchased_object=enrollment.run, product_version=version
     )

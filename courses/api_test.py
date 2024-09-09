@@ -58,7 +58,7 @@ from courses.models import (
     ProgramRequirementNodeType,
 )
 from ecommerce.factories import LineFactory, OrderFactory, ProductFactory
-from ecommerce.models import Order
+from ecommerce.models import Order, OrderStatus
 from main.test_utils import MockHttpError
 from openedx.constants import (
     EDX_DEFAULT_ENROLLMENT_MODE,
@@ -454,7 +454,7 @@ class TestDeactivateEnrollments:
             product = ProductFactory.create(purchasable_object=enrollment.run)
         version = Version.objects.get_for_object(product).first()
         order = OrderFactory.create(
-            state=Order.STATE.PENDING, purchaser=enrollment.user
+            state=OrderStatus.PENDING, purchaser=enrollment.user
         )
         LineFactory.create(
             order=order, purchased_object=enrollment.run, product_version=version
@@ -483,7 +483,7 @@ class TestDeactivateEnrollments:
             product = ProductFactory.create(purchasable_object=enrollment.run)
         version = Version.objects.get_for_object(product).first()
         order = OrderFactory.create(
-            state=Order.STATE.PENDING, purchaser=enrollment.user
+            state=OrderStatus.PENDING, purchaser=enrollment.user
         )
         LineFactory.create(
             order=order, purchased_object=enrollment.run, product_version=version
@@ -531,7 +531,7 @@ class TestDeactivateEnrollments:
             with reversion.create_revision():
                 product = ProductFactory.create(purchasable_object=run)
             version = Version.objects.get_for_object(product).first()
-            order = OrderFactory.create(state=Order.STATE.PENDING, purchaser=user)
+            order = OrderFactory.create(state=OrderStatus.PENDING, purchaser=user)
             LineFactory.create(
                 order=order, purchased_object=run, product_version=version
             )
@@ -592,7 +592,7 @@ def test_defer_enrollment(
     """
     course_runs = CourseRunFactory.create_batch(3, course=course)
     existing_enrollment = CourseRunEnrollmentFactory.create(run=course_runs[0])
-    fulfilled_order = OrderFactory.create(state=Order.STATE.FULFILLED)
+    fulfilled_order = OrderFactory.create(state=OrderStatus.FULFILLED)
     paid_course_run = PaidCourseRun.objects.create(
         user=existing_enrollment.user, course_run=course_runs[0], order=fulfilled_order
     )
