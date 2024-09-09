@@ -1117,17 +1117,17 @@ redis = ">=3.0.0"
 
 [[package]]
 name = "django-reversion"
-version = "4.0.2"
+version = "5.0.12"
 description = "An extension to the Django web framework that provides version control for model instances."
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 files = [
-    {file = "django-reversion-4.0.2.tar.gz", hash = "sha256:5d33ba944dbf19c7030c9e70e3731248ae34368cf2afede10e0d08fbf89e6f8c"},
-    {file = "django_reversion-4.0.2-py3-none-any.whl", hash = "sha256:095ec684626a07b48a1a32640e30cae93eb2acd3c452a9111f77ac934c2efb91"},
+    {file = "django-reversion-5.0.12.tar.gz", hash = "sha256:c047cc99a9f1ba4aae6db89c3ac243478d6de98ec8a60c7073fcc875d89c5cdb"},
+    {file = "django_reversion-5.0.12-py3-none-any.whl", hash = "sha256:5884e9f77f55c341b3f0a8d3b0af000f060530653776997267c8b1e5349d8fee"},
 ]
 
 [package.dependencies]
-django = ">=2.0"
+django = ">=3.2"
 
 [[package]]
 name = "django-robots"

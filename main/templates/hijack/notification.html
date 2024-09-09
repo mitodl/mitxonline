@@ -1,0 +1,20 @@
+<!-- hijack/notification.html -->
+
+{% load static %}
+{% if request.user.is_hijacked %}
+<link rel="stylesheet" type="text/css" href="{% static 'hijack/hijack.min.css' %}" media="screen">
+<div class="djhj" id="djhj">
+  <div class="djhj-notification">
+    <div class="djhj-message">
+        You are currently working on behalf of <em>{{ request.user.username }}</em>.
+    </div>
+    <form action="{% url 'hijack:release' %}" method="POST" class="djhj-actions">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ hijack_logout_redirect_url }}">
+      <button class="djhj-button" type="submit">
+        release
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
