@@ -850,7 +850,7 @@ def test_paid_and_unpaid_courserun_checkout(
     product = products[0]
     basket = create_basket_with_product(user, product)
     order = PendingOrder.create_from_basket(basket)
-    order_flow = order.get_object_flow(order, order.purchaser)
+    order_flow = order.get_object_flow()
     order_flow.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
 
     basket.delete()

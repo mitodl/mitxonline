@@ -460,7 +460,7 @@ class OrderFlow(object):
         return self.order.state
 
     @state.on_success()
-    def _on_transition_success(self, descriptor, source, target):
+    def _on_transition_success(self, descriptor, source, target, already_enrolled=False):
         self.order.save()
         
     @state.transition(source=State.ANY, target=OrderStatus.CANCELED)
@@ -543,16 +543,16 @@ class OrderFlow(object):
                 "Failed to record transaction: Missing transaction id from payment API response"  # noqa: EM101
             )
 
-        self.transactions.get_or_create(
+        self.order.transactions.get_or_create(
             transaction_id=transaction_id,
             data=payment_data,
-            amount=self.total_price_paid,
+            amount=self.order.total_price_paid,
         )
 
     def create_paid_courseruns(self):
         for run in self.order.purchased_runs:
             PaidCourseRun.objects.get_or_create(
-                order=self, course_run=run, user=self.order.purchaser
+                order=self.order, course_run=run, user=self.order.purchaser
             )
 
     def create_enrollments(self):
@@ -600,10 +600,10 @@ class Order(TimestampedModel):
     )
     reference_number = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
     
-    def get_object_flow(self, user, obj):
+    def get_object_flow(self):
         """Instantiate the flow without default constructor"""
         return OrderFlow(
-            obj, user=user
+            self, user=self.purchaser
     )
 
     # override save method to auto-fill generated_rerefence_number

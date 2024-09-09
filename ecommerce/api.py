@@ -36,6 +36,7 @@ from ecommerce.models import (
     DiscountRedemption,
     FulfilledOrder,
     Order,
+    OrderFlow,
     OrderStatus,
     PendingOrder,
     UserDiscount,
@@ -241,7 +242,7 @@ def apply_user_discounts(request):
 
 
 def fulfill_completed_order(order, payment_data, basket=None, already_enrolled=False):  # noqa: FBT002
-    order_flow = order.get_object_flow(order, order.purchaser)
+    order_flow = order.get_object_flow()
     order_flow.fulfill(payment_data, already_enrolled=already_enrolled)
     sync_hubspot_deal(order)
 
@@ -305,7 +306,7 @@ def process_cybersource_payment_response(request, order):
         # This probably means the order needed to go through the process
         # again so maybe tell the user to do a thing.
         log.debug(f"Transaction declined: {processor_response.message}")  # noqa: G004
-        order_flow = order.get_object_flow(order, order.purchaser)
+        order_flow = order.get_object_flow()
         order_flow.decline()
         return_message = order.state
     elif processor_response.state == ProcessorResponse.STATE_ERROR:
@@ -313,8 +314,8 @@ def process_cybersource_payment_response(request, order):
         log.debug(
             f"Error happened submitting the transaction: {processor_response.message}"  # noqa: G004
         )
-        order_flow = order.get_object_flow(order, order.purchaser)
-        order_flow.error()
+        order_flow = order.get_object_flow()
+        order_flow.errored()
         return_message = order.state
     elif processor_response.state in [
         ProcessorResponse.STATE_CANCELLED,
@@ -326,7 +327,7 @@ def process_cybersource_payment_response(request, order):
         # the order here (other than set it to Cancelled).
         # Transaction could be
         log.debug(f"Transaction cancelled/reviewed: {processor_response.message}")  # noqa: G004
-        order_flow = order.get_object_flow(order, order.purchaser)
+        order_flow = order.get_object_flow()
         order_flow.cancel()
         return_message = order.state
 
@@ -350,7 +351,7 @@ def process_cybersource_payment_response(request, order):
         log.error(
             f"Unknown state {processor_response.state} found: transaction ID {transaction_id}, reason code {reason_code}, response message {processor_response.message}"  # noqa: G004
         )
-        order_flow = order.get_object_flow(order, order.purchaser)
+        order_flow = order.get_object_flow()
         order_flow.cancel()
         return_message = order.state
 
@@ -539,7 +540,7 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
                     state=OrderStatus.PENDING,
                     reference_number=payload["req_reference_number"],
                 ).get()
-                order_flow = order.get_object_flow(order, order.purchaser)
+                order_flow = order.get_object_flow()
                 order_flow.fulfill(payload)
                 sync_hubspot_deal(order)
                 fulfilled_count += 1
@@ -556,7 +557,7 @@ def check_and_process_pending_orders_for_resolution(refnos=None):
                     state=OrderStatus.PENDING,
                     reference_number=payload["req_reference_number"],
                 ).get()
-                order_flow = order.get_object_flow(order, order.purchaser)
+                order_flow = order.get_object_flow()
                 order_flow.cancel()
                 order.transactions.create(
                     transaction_id=payload["transaction_id"],

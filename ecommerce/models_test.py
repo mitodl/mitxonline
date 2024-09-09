@@ -211,7 +211,7 @@ def test_order_refund(settings):
         basket_item = BasketItemFactory.create()
 
     order = PendingOrder.create_from_basket(basket_item.basket)
-    order_flow = order.get_object_flow(order, order.purchaser)
+    order_flow = order.get_object_flow()
     order_flow.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
 
     fulfilled_order = FulfilledOrder.objects.get(pk=order.id)
