@@ -434,7 +434,8 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
 
     if response.state in REFUND_SUCCESS_STATES:
         # Record refund transaction with PaymentGateway's refund response
-        order.refund(
+        order_flow = order.get_object_flow()
+        order_flow.refund(
             api_response_data=response.response_data,
             amount=transaction_dict["req_amount"],
             reason=refund_reason,

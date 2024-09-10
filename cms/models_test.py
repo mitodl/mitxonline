@@ -288,7 +288,7 @@ def test_flex_pricing_form_display(mocker, is_authed, has_submission):
                 courseware_object=flex_form.selected_course,
             )
 
-    response = generate_flexible_pricing_response(request_user, flex_form)
+    response = generate_flexible_pricing_response(mocker, request_user, flex_form)
 
     # simple string checking for the rendered content
     # should match what's in the factory
@@ -330,7 +330,7 @@ def test_flex_pricing_form_state_display(mocker, submission_status):
         courseware_object=course_page.course,
     )
 
-    response = generate_flexible_pricing_response(request_user, flex_form)
+    response = generate_flexible_pricing_response(mocker, request_user, flex_form)
 
     if submission_status == FlexiblePriceStatus.CREATED:
         assert "Application Processing" in response.rendered_content
@@ -481,13 +481,13 @@ def test_flex_pricing_single_submission(
 
     # test to make sure we get back a status message from the first form
 
-    response = generate_flexible_pricing_response(request_user, first_sub_form)
+    response = generate_flexible_pricing_response(mocker, request_user, first_sub_form)
 
     assert "Application Processing" in response.rendered_content
 
     # then test to make sure we get a status message back from the second form too
 
-    response = generate_flexible_pricing_response(request_user, second_sub_form)
+    response = generate_flexible_pricing_response(mocker, request_user, second_sub_form)
 
     # should not get a form here - should get Application Processing
 
@@ -534,7 +534,7 @@ def test_flex_pricing_form_state_display_no_discount_tier(
         tier=tier,
     )
 
-    response = generate_flexible_pricing_response(request_user, flex_form)
+    response = generate_flexible_pricing_response(mocker, request_user, flex_form)
 
     assert "No Discount Text" in response.rendered_content
 
@@ -542,7 +542,7 @@ def test_flex_pricing_form_state_display_no_discount_tier(
     flexprice.save()
     flexprice.refresh_from_db()
 
-    response = generate_flexible_pricing_response(request_user, flex_form)
+    response = generate_flexible_pricing_response(mocker, request_user, flex_form)
 
     assert "Approved" in response.rendered_content
 

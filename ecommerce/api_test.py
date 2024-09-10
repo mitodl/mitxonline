@@ -519,10 +519,10 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
     # mocking out the create_enrollment and create_paid_courserun calls
     # we don't really care that it hits edX for this
     mocker.patch(
-        "ecommerce.models.FulfillableOrder.create_enrollments", return_value=True
+        "ecommerce.models.OrderFlow.create_enrollments", return_value=True
     )
     mocker.patch(
-        "ecommerce.models.FulfillableOrder.create_paid_courseruns", return_value=True
+        "ecommerce.models.OrderFlow.create_paid_courseruns", return_value=True
     )
 
     test_payload = {
