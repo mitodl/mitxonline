@@ -11,9 +11,10 @@ from social_django.utils import load_backend, load_strategy
 from authentication.middleware import SocialAuthExceptionRedirectMiddleware
 
 
-def test_process_exception_no_strategy(rf, settings):
+def test_process_exception_no_strategy(mocker, rf, settings):
     """Tests that if the request has no strategy it does nothing"""
     settings.DEBUG = False
+    get_response = mocker.MagicMock()
     request = rf.get(reverse("social:complete", args=("email",)))
     middleware = SocialAuthExceptionRedirectMiddleware(get_response)
     assert middleware.process_exception(request, None) is None
