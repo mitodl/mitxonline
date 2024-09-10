@@ -61,9 +61,8 @@ pytestmark = [pytest.mark.django_db]
 def test_parse_country_income_thresholds_no_header(tmp_path):
     """parse_country_income_thresholds should throw error if no header is found"""
     path = tmp_path / "test.csv"
-    with open(path, "w"):  # create a file  # noqa: SIM115, PTH123
-        with pytest.raises(CountryIncomeThresholdException) as exc:
-            parse_country_income_thresholds(path)
+    with open(path, "w"), pytest.raises(CountryIncomeThresholdException) as exc:  # create a file  # noqa: SIM115, PTH123
+        parse_country_income_thresholds(path)
 
     assert exc.value.args[0] == "Unable to find the header row"
 

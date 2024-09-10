@@ -58,7 +58,7 @@ from courses.utils import (
     get_program_certificate_by_enrollment,
     get_unenrollable_courses,
 )
-from ecommerce.models import FulfilledOrder, Order, OrderStatus, PendingOrder, Product
+from ecommerce.models import FulfilledOrder, OrderStatus, PendingOrder, Product
 from hubspot_sync.task_helpers import sync_hubspot_deal
 from main import features
 from main.constants import (

@@ -3,6 +3,7 @@
 from django.shortcuts import redirect
 from social_core.exceptions import SocialAuthBaseException
 from social_django.middleware import SocialAuthExceptionMiddleware
+from urllib.parse import quote
 
 
 class SocialAuthExceptionRedirectMiddleware(SocialAuthExceptionMiddleware):
@@ -30,5 +31,5 @@ class SocialAuthExceptionRedirectMiddleware(SocialAuthExceptionMiddleware):
             if url:  # noqa: RET503
                 url += (
                     "?" in url and "&" or "?"
-                ) + f"message={urlquote(message)}&backend={backend_name}"
+                ) + f"message={quote(message)}&backend={backend_name}"
                 return redirect(url)

@@ -461,7 +461,7 @@ class OrderFlow:
         return self.order.state
 
     @state.on_success()
-    def _on_transition_success(self, descriptor, source, target, **kwargs):
+    def _on_transition_success(self, descriptor, source, target, **kwargs): # noqa: ARG002
         self.order.save()
 
     @state.transition(source=State.ANY, target=OrderStatus.CANCELED)
