@@ -15,7 +15,7 @@ def test_process_exception_no_strategy(rf, settings):
     """Tests that if the request has no strategy it does nothing"""
     settings.DEBUG = False
     request = rf.get(reverse("social:complete", args=("email",)))
-    middleware = SocialAuthExceptionRedirectMiddleware()
+    middleware = SocialAuthExceptionRedirectMiddleware(get_response)
     assert middleware.process_exception(request, None) is None
 
 
@@ -31,7 +31,7 @@ def test_process_exception(mocker, rf, settings):
     request.social_strategy = strategy
     request.backend = backend
 
-    middleware = SocialAuthExceptionRedirectMiddleware()
+    middleware = SocialAuthExceptionRedirectMiddleware(get_response)
     error = AuthAlreadyAssociated(backend)
     result = middleware.process_exception(request, error)
     assert result.status_code == status.HTTP_302_FOUND
@@ -52,7 +52,7 @@ def test_process_exception_non_auth_error(mocker, rf, settings):
     request.social_strategy = strategy
     request.backend = backend
 
-    middleware = SocialAuthExceptionRedirectMiddleware()
+    middleware = SocialAuthExceptionRedirectMiddleware(get_response)
     assert (
         middleware.process_exception(request, Exception("something bad happened"))
         is None
