@@ -1,6 +1,5 @@
 """Authentication middleware"""
 
-
 from django.shortcuts import redirect
 from social_core.exceptions import SocialAuthBaseException
 from social_django.middleware import SocialAuthExceptionMiddleware
