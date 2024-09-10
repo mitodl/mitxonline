@@ -1462,9 +1462,6 @@ def test_generate_program_certificate_failure_not_all_passed_nested_elective_sti
     courses = CourseFactory.create_batch(3)
     course_runs = CourseRunFactory.create_batch(3, course=factory.Iterator(courses))
     mocker.patch(
-      "hubspot_sync.task_helpers.sync_hubspot_user",
-    )
-    mocker.patch(
         "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
     )
     # Create Program
