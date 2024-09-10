@@ -23,7 +23,8 @@ def test_send_verification_email(mocker, rf):
     email = "test@localhost"
     request = rf.post(reverse("social:complete", args=("email",)), {"email": email})
     # social_django depends on request.session, so use the middleware to set that
-    SessionMiddleware().process_request(request)
+    get_response = mocker.MagicMock()
+    SessionMiddleware(get_response).process_request(request)
     strategy = load_strategy(request)
     backend = load_backend(strategy, EmailAuth.name, None)
     code = mocker.Mock(code="abc")

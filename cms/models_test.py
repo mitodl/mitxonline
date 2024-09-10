@@ -234,7 +234,7 @@ def test_course_page_context_edx_access(  # noqa: PLR0913
     patched_get_relevant_run_qset.assert_called_once_with(course=course_page.course)
 
 
-def generate_flexible_pricing_response(request_user, flexible_pricing_form):
+def generate_flexible_pricing_response(mocker, request_user, flexible_pricing_form):
     """
     Generates a fully realized request for the Flexible Pricing tests.
 
@@ -248,8 +248,8 @@ def generate_flexible_pricing_response(request_user, flexible_pricing_form):
     rf = RequestFactory()
     request = rf.get("/")
     request.user = request_user
-
-    middleware = SessionMiddleware()
+    get_response = mocker.MagicMock()
+    middleware = SessionMiddleware(get_response)
     middleware.process_request(request)
     request.session.save()
 

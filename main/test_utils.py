@@ -137,7 +137,7 @@ def list_of_dicts(specialty_dict_iter):
     return list(map(dict, specialty_dict_iter))
 
 
-def set_request_session(request, session_dict):
+def set_request_session(mocker, request, session_dict):
     """
     Sets session variables on a RequestFactory object
     Args:
@@ -147,7 +147,8 @@ def set_request_session(request, session_dict):
     Returns:
         RequestFactory: The same request object with session variables set
     """
-    middleware = SessionMiddleware()
+    get_response = mocker.MagicMock()
+    middleware = SessionMiddleware(get_response)
     middleware.process_request(request)
     for key, value in session_dict.items():
         request.session[key] = value
