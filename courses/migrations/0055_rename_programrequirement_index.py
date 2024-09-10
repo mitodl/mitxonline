@@ -4,20 +4,19 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0054_add_program_availability'),
+        ("courses", "0054_add_program_availability"),
     ]
 
     operations = [
         migrations.RenameIndex(
-            model_name='programrequirement',
-            new_name='courses_pro_course__fdcdb6_idx',
-            old_fields=('course', 'program'),
+            model_name="programrequirement",
+            new_name="courses_pro_course__fdcdb6_idx",
+            old_fields=("course", "program"),
         ),
         migrations.RenameIndex(
-            model_name='programrequirement',
-            new_name='courses_pro_program_c8ff7c_idx',
-            old_fields=('program', 'course'),
+            model_name="programrequirement",
+            new_name="courses_pro_program_c8ff7c_idx",
+            old_fields=("program", "course"),
         ),
     ]
