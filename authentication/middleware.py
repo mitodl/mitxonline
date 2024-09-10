@@ -1,9 +1,10 @@
 """Authentication middleware"""
 
+from urllib.parse import quote
+
 from django.shortcuts import redirect
 from social_core.exceptions import SocialAuthBaseException
 from social_django.middleware import SocialAuthExceptionMiddleware
-from urllib.parse import quote
 
 
 class SocialAuthExceptionRedirectMiddleware(SocialAuthExceptionMiddleware):
