@@ -414,10 +414,13 @@ def test_course_course_number():
     assert course.course_number == "Test101"
 
 
-def test_course_run_certificate_start_end_dates_and_page_revision():
+def test_course_run_certificate_start_end_dates_and_page_revision(mocker):
     """
     Test that the CourseRunCertificate start_end_dates property works properly
     """
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
     certificate = CourseRunCertificateFactory.create(
         course_run__course__page__certificate_page__product_name="product_name"
     )
@@ -430,12 +433,15 @@ def test_course_run_certificate_start_end_dates_and_page_revision():
     )
 
 
-def test_program_certificate_start_end_dates_and_page_revision(user):
+def test_program_certificate_start_end_dates_and_page_revision(user, mocker):
     """
     Test that the ProgramCertificate start_end_dates property works properly.
     The start date is the start date of the first course run passed.
     The end date is the date the user received the program certificate.
     """
+    mocker.patch(
+        "hubspot_sync.management.commands.configure_hubspot_properties._upsert_custom_properties",
+    )
     now = now_in_utc()
     start_date = now + timedelta(days=1)
     end_date = now + timedelta(days=100)
