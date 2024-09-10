@@ -221,7 +221,7 @@ class BaseOrderAdmin(fsm.FlowAdminMixin, TimestampedModelAdmin):
     readonly_fields = ["reference_number"]
     flow_state = OrderFlow.state
 
-    def get_transition_fields(self, request, obj, slug): # noqa: ARG002
+    def get_transition_fields(self, request, obj, slug):  # noqa: ARG002
         return ["state"]
 
     def get_object_flow(self, request, obj):
