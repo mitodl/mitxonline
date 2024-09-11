@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.100.4
+---------------
+
+- Fix missing migration on Program.availability (#2389)
+- Update django-hijack to 3.x (#2384)
+- Update dependency django-reversion to v5 (#2377)
+
 Version 0.100.3 (Released September 06, 2024)
 ---------------
 
