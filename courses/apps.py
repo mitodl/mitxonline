@@ -11,4 +11,7 @@ class CoursesConfig(AppConfig):
     name = "courses"
 
     def ready(self):
-        pass
+        """
+        Ready handler. Import signals.
+        """
+        import courses.signals  # noqa: F401
