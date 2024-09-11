@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.100.4
+Version 0.100.4 (Released September 11, 2024)
 ---------------
 
 - Fix missing migration on Program.availability (#2389)
