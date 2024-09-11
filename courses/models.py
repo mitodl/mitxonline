@@ -159,7 +159,7 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     )
     departments = models.ManyToManyField(Department, blank=False)
     availability = models.CharField(
-        choices=AVAILABILITY_CHOICES, default=AVAILABILITY_ANYTIME, max_length=255
+        choices=[("anytime", "anytime"), ("dated", "dated")], default=AVAILABILITY_ANYTIME, max_length=255
     )
 
     @cached_property
