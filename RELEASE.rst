@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.100.5
+---------------
+
+- Make post_save CourseRunCertificate signal work (#2388)
+
 Version 0.100.4 (Released September 11, 2024)
 ---------------
 
