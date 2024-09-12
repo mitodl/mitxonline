@@ -240,14 +240,14 @@ export class EnrolledItemCard extends React.Component<
     return (
       <Modal
         id={`enrollment-${enrollment.id}-modal`}
-        className="text-center"
         isOpen={emailSettingsModalVisibility}
         toggle={() => this.toggleEmailSettingsModalVisibility()}
       >
         <ModalHeader toggle={() => this.toggleEmailSettingsModalVisibility()}>
-          Email Settings for {enrollment.run.course_number}
+          Email Settings
         </ModalHeader>
         <ModalBody>
+          <p>Update your email preferences for <b>{enrollment.run.course_number}</b></p>
           <Formik
             onSubmit={this.onSubmitEmailSettings.bind(this)}
             initialValues={{
@@ -258,7 +258,7 @@ export class EnrolledItemCard extends React.Component<
           >
             {({ values }) => {
               return (
-                <Form className="text-center">
+                <Form>
                   <section>
                     <Field
                       type="hidden"
@@ -282,16 +282,17 @@ export class EnrolledItemCard extends React.Component<
                       Receive course emails
                     </label>
                   </section>
-                  <Button type="submit" color="success">
-                    Save Settings
-                  </Button>{" "}
-                  <Button
-                    onClick={() => this.toggleEmailSettingsModalVisibility()}
-                  >
-                    Cancel
-                  </Button>
-                </Form>
-              )
+                  <div className="float-container">
+                    <Button
+                      onClick={() => this.toggleEmailSettingsModalVisibility()}
+                    >
+                      Cancel
+                    </Button>
+                    <Button className="btn btn-gradient-red-to-blue" type="submit">
+                      Save Settings
+                    </Button>
+                  </div>
+                </Form>)
             }}
           </Formik>
         </ModalBody>
@@ -309,7 +310,6 @@ export class EnrolledItemCard extends React.Component<
     return (
       <Modal
         id={`run-unenrollment-${enrollment.id}-modal`}
-        className="text-center"
         isOpen={runUnenrollmentModalVisibility}
         toggle={() => this.toggleRunUnenrollmentModalVisibility()}
         role="dialog"
@@ -342,19 +342,20 @@ export class EnrolledItemCard extends React.Component<
               for assistance.
             </p>
           ) : null}
-          <Button
-            type="submit"
-            color="success"
-            onClick={() => this.onRunUnenrollment(enrollment)}
-          >
-            Unenroll
-          </Button>{" "}
-          <Button onClick={() => this.toggleRunUnenrollmentModalVisibility()}>
-            Cancel
-          </Button>
+          <div className="float-container">
+            <Button
+              type="submit"
+              color="success"
+              onClick={() => this.onRunUnenrollment(enrollment)}
+            >
+              Unenroll
+            </Button>{" "}
+            <Button onClick={() => this.toggleRunUnenrollmentModalVisibility()}>
+              Cancel
+            </Button>
+          </div>
         </ModalBody>
-      </Modal>
-    )
+      </Modal>)
   }
 
   renderProgramUnenrollmentModal(enrollment: ProgramEnrollment) {
@@ -363,7 +364,6 @@ export class EnrolledItemCard extends React.Component<
     return (
       <Modal
         id={`program-unenrollment-${enrollment.program.id}-modal`}
-        className="text-center"
         isOpen={programUnenrollmentModalVisibility}
         toggle={() => this.toggleProgramUnenrollmentModalVisibility()}
         role="dialog"
@@ -383,18 +383,20 @@ export class EnrolledItemCard extends React.Component<
             Are you sure you wish to unenroll from {enrollment.program.title}?
             You will not be unenrolled from any courses within the program.
           </p>
-          <Button
-            type="submit"
-            color="success"
-            onClick={() => this.onProgramUnenrollment(enrollment.program)}
-          >
-            Unenroll
-          </Button>{" "}
-          <Button
-            onClick={() => this.toggleProgramUnenrollmentModalVisibility()}
-          >
-            Cancel
-          </Button>
+          <div className="float-container">
+            <Button
+              type="submit"
+              color="success"
+              onClick={() => this.onProgramUnenrollment(enrollment.program)}
+            >
+              Unenroll
+            </Button>{" "}
+            <Button
+              onClick={() => this.toggleProgramUnenrollmentModalVisibility()}
+            >
+              Cancel
+            </Button>
+          </div>
         </ModalBody>
       </Modal>
     )

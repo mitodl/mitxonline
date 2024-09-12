@@ -276,3 +276,20 @@ button.btn-secondary.unstyled {
     margin: 0;
   }
 }
+
+.modal-dialog {
+  .modal-header {
+    border-bottom: none;
+  }
+  .modal-content {
+    padding: 5px 14px;
+}
+  .modal-title {
+    font-weight: bold;
+
+  }
+  .float-container {
+    float: right;
+  }
+}
+
