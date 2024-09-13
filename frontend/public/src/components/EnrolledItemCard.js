@@ -247,16 +247,22 @@ export class EnrolledItemCard extends React.Component<
           Email Settings
         </ModalHeader>
         <ModalBody>
-          <p>Update your email preferences for <b>{enrollment.run.course_number}</b></p>
+          <div className="modal-subheader">Update your email preferences for <b>{enrollment.run.course_number}</b></div>
+          <div className="d-flex callout callout-warning">
+            <i className="material-symbols-outlined warning">error</i>
+            <p className="p-0">
+              Unchecking the box will prevent you from receiving important course updates and emails.
+            </p>
+          </div>
           <Formik
             onSubmit={this.onSubmitEmailSettings.bind(this)}
             initialValues={{
               subscribeEmails: enrollment.edx_emails_subscription,
-              enrollmentId:    enrollment.id,
-              courseNumber:    enrollment.run.course_number
+              enrollmentId: enrollment.id,
+              courseNumber: enrollment.run.course_number
             }}
           >
-            {({ values }) => {
+            {({values}) => {
               return (
                 <Form>
                   <section>
@@ -284,6 +290,7 @@ export class EnrolledItemCard extends React.Component<
                   </section>
                   <div className="float-container">
                     <Button
+                      className="btn btn-gradient-white-to-blue"
                       onClick={() => this.toggleEmailSettingsModalVisibility()}
                     >
                       Cancel
@@ -301,7 +308,7 @@ export class EnrolledItemCard extends React.Component<
   }
 
   renderRunUnenrollmentModal(enrollment: RunEnrollment) {
-    const { runUnenrollmentModalVisibility } = this.state
+    const {runUnenrollmentModalVisibility} = this.state
     const now = moment()
     const endDate = enrollment.run.enrollment_end ?
       parseDateString(enrollment.run.enrollment_end) :
@@ -344,14 +351,16 @@ export class EnrolledItemCard extends React.Component<
           ) : null}
           <div className="float-container">
             <Button
+              className="btn btn-gradient-white-to-blue"
+              onClick={() => this.toggleRunUnenrollmentModalVisibility()}>
+              Cancel
+            </Button>
+            <Button
               type="submit"
-              color="success"
+              className="btn btn-gradient-red-to-blue"
               onClick={() => this.onRunUnenrollment(enrollment)}
             >
               Unenroll
-            </Button>{" "}
-            <Button onClick={() => this.toggleRunUnenrollmentModalVisibility()}>
-              Cancel
             </Button>
           </div>
         </ModalBody>

@@ -334,19 +334,6 @@ div.std-card {
     }
 }
 
-button.btn.btn-gradient-red-to-blue, a.btn.btn-gradient-red-to-blue {
-    color: white;
-    border: 1px solid $brand-darker-bg;
-    background: $brand-darker-bg !important;
-    transition: 0.25s;
-}
-
-button.btn.btn-gradient-red-to-blue:hover, a.btn.btn-gradient-red-to-blue:hover {
-    border-color: $home-page-header-blue;
-    background: $home-page-header-blue !important;
-    color: white !important;
-}
-
 div.std-card-body, div.enrolled-item, div.cart-helptext {
     a:not(.btn) {
         color: $home-page-header-blue;
