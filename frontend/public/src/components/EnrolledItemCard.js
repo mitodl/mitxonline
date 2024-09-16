@@ -247,22 +247,26 @@ export class EnrolledItemCard extends React.Component<
           Email Settings
         </ModalHeader>
         <ModalBody>
-          <div className="modal-subheader">Update your email preferences for <b>{enrollment.run.course_number}</b></div>
+          <div className="modal-subheader">
+            Update your email preferences for{" "}
+            <b>{enrollment.run.course_number}</b>
+          </div>
           <div className="d-flex callout callout-warning">
             <i className="material-symbols-outlined warning">error</i>
             <p className="p-0">
-              Unchecking the box will prevent you from receiving important course updates and emails.
+              Unchecking the box will prevent you from receiving important
+              course updates and emails.
             </p>
           </div>
           <Formik
             onSubmit={this.onSubmitEmailSettings.bind(this)}
             initialValues={{
               subscribeEmails: enrollment.edx_emails_subscription,
-              enrollmentId: enrollment.id,
-              courseNumber: enrollment.run.course_number
+              enrollmentId:    enrollment.id,
+              courseNumber:    enrollment.run.course_number
             }}
           >
-            {({values}) => {
+            {({ values }) => {
               return (
                 <Form>
                   <section>
@@ -295,11 +299,15 @@ export class EnrolledItemCard extends React.Component<
                     >
                       Cancel
                     </Button>
-                    <Button className="btn btn-gradient-red-to-blue" type="submit">
+                    <Button
+                      className="btn btn-gradient-red-to-blue"
+                      type="submit"
+                    >
                       Save Settings
                     </Button>
                   </div>
-                </Form>)
+                </Form>
+              )
             }}
           </Formik>
         </ModalBody>
@@ -308,7 +316,7 @@ export class EnrolledItemCard extends React.Component<
   }
 
   renderRunUnenrollmentModal(enrollment: RunEnrollment) {
-    const {runUnenrollmentModalVisibility} = this.state
+    const { runUnenrollmentModalVisibility } = this.state
     const now = moment()
     const endDate = enrollment.run.enrollment_end ?
       parseDateString(enrollment.run.enrollment_end) :
@@ -352,7 +360,8 @@ export class EnrolledItemCard extends React.Component<
           <div className="float-container">
             <Button
               className="btn btn-gradient-white-to-blue"
-              onClick={() => this.toggleRunUnenrollmentModalVisibility()}>
+              onClick={() => this.toggleRunUnenrollmentModalVisibility()}
+            >
               Cancel
             </Button>
             <Button
@@ -364,7 +373,8 @@ export class EnrolledItemCard extends React.Component<
             </Button>
           </div>
         </ModalBody>
-      </Modal>)
+      </Modal>
+    )
   }
 
   renderProgramUnenrollmentModal(enrollment: ProgramEnrollment) {
