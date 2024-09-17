@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.101.0
+Version 0.101.0 (Released September 17, 2024)
 ---------------
 
 - updating styles for dashboard dialogs (#2392)
