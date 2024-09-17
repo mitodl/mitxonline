@@ -276,3 +276,116 @@ button.btn-secondary.unstyled {
     margin: 0;
   }
 }
+
+.modal-dialog {
+  font-family: Inter;
+  .modal-header {
+    border-bottom: none;
+    .btn-close {
+      border-radius: 100px;
+      color: $home-page-header-blue;
+      background-color: $home-page-grey-lite;
+      opacity: 0.7;
+      font-size: 13px;
+    }
+    .btn-close:hover {
+      color: $brand-darker-bg;
+      opacity: 1;
+    }
+  }
+  .modal-content {
+    padding: 5px 14px;
+    font-size: 15px;
+}
+  .modal-title {
+    font-family: Poppins, sans-serif;
+    font-weight: 700;
+  }
+
+  }
+  .modal-subheader {
+    margin-top: -20px;
+  }
+  .float-container {
+    float: right;
+    margin-top: 30px;
+
+    button {
+      margin-left: 16px;
+      font-family: Poppins;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 21px;
+      text-align: center;
+      padding: 10px 25px;
+    }
+
+    button.cancel {
+      background-color: inherit;
+      color: inherit;
+    }
+  }
+  input[type=checkbox] {
+    accent-color: $brand-darker-bg;
+    width: 20px;
+    height: 20px;
+  }
+  label, input[type=checkbox] {
+    vertical-align: middle;
+  }
+  label {
+    font-size: 14px;
+    margin-left: 10px;
+  }
+  .callout {
+    margin-bottom: 20px;
+    margin-top: 30px;
+    font-size: 15px;
+  }
+
+button.btn.btn-gradient-red-to-blue, a.btn.btn-gradient-red-to-blue {
+    color: white;
+    border: 1px solid $brand-darker-bg;
+    background: $brand-darker-bg !important;
+    transition: 0.25s;
+}
+
+button.btn.btn-gradient-red-to-blue:hover, a.btn.btn-gradient-red-to-blue:hover, button.btn.btn-gradient-white-to-blue:hover, a.btn.btn-gradient-white-to-blue:hover {
+    border-color: $home-page-header-blue;
+    background: $home-page-header-blue !important;
+    color: white !important;
+}
+
+button.btn.btn-gradient-white-to-blue, a.btn.btn-gradient-white-to-blue {
+    color: $home-page-header-blue;
+    border: 1px solid $home-page-border-grey;
+    background: white;
+    transition: 0.25s;
+}
+
+.callout {
+    flex-wrap: nowrap;
+    padding: 15px;
+    i.warning {
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      color: #B87A00;
+      padding-right: 10px;
+      width: fit-content;
+      padding-left: 0;
+    }
+    p {
+      font-family: Inter, sans-serif;
+      font-size: 13px;
+      font-weight: 400;
+      line-height: 15.73px;
+      text-align: left;
+      color: $home-page-header-blue;
+      margin: 0;
+      flex-shrink: 1;
+    }
+  }
+  .callout-warning {
+    border: 1px solid rgba(255, 171, 0, 0.30);
+    border-left: 2px solid $warning;
+    background: #FFF3CC;
+  }
