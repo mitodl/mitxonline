@@ -29,7 +29,7 @@ const TopBar = ({ currentUser }: Props) => {
   }, [])
 
   return (
-    <header className="site-header new-design d-flex d-flex flex-column">
+    <header className="site-header d-flex d-flex flex-column">
       {showComponent ? (
         <NotificationContainer id="notifications-container" />
       ) : null}
