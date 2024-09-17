@@ -31,7 +31,6 @@
 @import "home-page/featured-product-cards";
 @import "home-page/home-page-hero";
 @import "home-page/home-page-video-component";
-@import "product-page/user-menu";
 @import "product-page/product-details";
 @import "product-page/product-faculty-members";
 @import "home-page/home-page-contact-row";
@@ -40,7 +39,6 @@
 @import "banner";
 
 body {
-  font-family: "Montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
   margin: 0;
   color: #000000;
   background: $body-bg;
