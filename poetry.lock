@@ -1048,13 +1048,13 @@ Django = ">=2.2"
 
 [[package]]
 name = "django-fsm"
-version = "2.8.2"
+version = "3.0.0"
 description = "Django friendly finite state machine support."
 optional = false
 python-versions = "*"
 files = [
-    {file = "django-fsm-2.8.2.tar.gz", hash = "sha256:fe3be8fa916470360632b2a86aefcb342d67916fa4c5749caaa7760f88c0c49c"},
-    {file = "django_fsm-2.8.2-py2.py3-none-any.whl", hash = "sha256:0b4d346a8de1c2c30c2206ced649e25695f567c072358030544a604fc937d235"},
+    {file = "django-fsm-3.0.0.tar.gz", hash = "sha256:0112bcac573ad14051cf8ebe73bf296b6d5409f093e5f1677eb16e2196e263b3"},
+    {file = "django_fsm-3.0.0-py2.py3-none-any.whl", hash = "sha256:fa28f84f47eae7ce9247585ac6c1895e4ada08efff93fb243a59e9ff77b2d4ec"},
 ]
 
 [[package]]
@@ -4220,4 +4220,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "bcef460938d1ab6d8be34d5f5d159ef8d3d46900023593500c5a26f667aac5d7"
+content-hash = "4d52ccb31a12da5e9125b4a489586338af14b84485a2c2b869c8eded712b695e"
