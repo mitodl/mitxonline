@@ -23,7 +23,7 @@ django-anymail = {extras = ["mailgun"], version = "^11.1"}
 django-cors-headers = "^3.11.0"
 django-countries = "^7.2.1"
 django-filter = "^2.4.0"
-django-fsm = "^2.8.0"
+django-fsm = "^3.0.0"
 django-fsm-admin = "^1.2.4"
 django-hijack = "^3.0.0"
 django-ipware = "^4.0.0"
