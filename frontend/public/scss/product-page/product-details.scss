@@ -2,6 +2,7 @@
 
 body.new-design {
   font-family: Inter;
+  background: white;
 
   h2 {
     font-family: Poppins;
@@ -17,6 +18,18 @@ body.new-design {
   .product-page {
     margin-top: 1.5rem;
     background-color: white;
+
+     @include media-breakpoint-down(sm) {
+        h2 {
+          font-size: 20px;
+          line-height: 20px;
+        }
+
+        h3 {
+          font-size: 20px;
+          line-height: 26px;
+        }
+      }
 
     .row.align-center {
       @include media-breakpoint-down(md) {
@@ -448,10 +461,18 @@ body.new-design {
 
   .upgrade-enrollment-modal {
     max-width: 750px;
-
+    .cancel-link {
+      margin: 20px 0;
+    }
+    .cancel-link button {
+      text-align: left;
+    }
     .enroll-now-free {
       font-size: 16px;
       font-weight: 400;
+      text-decoration: underline;
+      box-shadow: none;
+      border: none;
     }
     .enroll-now-free:focus-visible {
       border-radius: 0;
@@ -491,6 +512,10 @@ body.new-design {
       padding-left: 33px;
       line-height: 24px;
     }
+    a {
+    text-decoration: underline;
+  }
+
   }
 
   div.date-selector-button-bar {
@@ -739,35 +764,37 @@ body.new-design {
   .financial-assistance-link {
     text-align: left;
     font-size: 16px;
+    height: 22px;
+    font-weight: bold;
+    letter-spacing: 0;
+    line-height: 20px;
+    text-decoration: underline;
+    margin-bottom: 0;
+
+    &:hover{
+      text-decoration: none !important;
+    }
 
     a {
+      color: black;
       font-weight: 400;
+
+      &:hover{
+        color: $brand-darker-bg;
+        text-decoration: none !important;
+      }
     }
   }
 }
 
-@media screen and (max-width: 768px) {
-  body.new-design {
-    div.certificate-pricing-row {
-      div.certificate-pricing {
-        margin-bottom: 15px !important;
-      }
+.popover-header {
+  text-align: center;
+  background: $white;
+}
 
-      div.enroll-and-pay {
-        padding-left: 0px;
-        padding-right: 0px;
-      }
-    }
-
-    div.upgrade-options-row {
-      div {
-        width: 100%;
-        text-align: center;
-        p {
-          text-align: center;
-        }
-        margin-bottom: 12px;
-      }
-    }
-  }
+.date-link {
+  color: $link-blue !important;
+  text-decoration: underline;
+  background-color: transparent;
+  border: none;
 }

@@ -1,24 +1,6 @@
 // sass-lint:disable mixins-before-declarations
 
 // old design
-header.site-header {
-  box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14);
-  background-color: $white;
-
-  .navbar {
-    display: flex;
-    justify-content: space-between;
-    padding: 0;
-
-    @include media-breakpoint-down(md) {
-      position: static;
-    }
-  }
-
-  .nowrap {
-    flex-wrap: unset;
-  }
-}
 
 .user-menu-overlay {
   display: none;
@@ -122,7 +104,7 @@ header.site-header {
   }
 }
 
-header.site-header.new-design {
+header.site-header {
   box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14);
   background-color: $white;
   font-family: Inter;

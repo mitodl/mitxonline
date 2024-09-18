@@ -21,7 +21,6 @@
 @import "expandable";
 @import "dashboard";
 @import "home";
-@import "product-details";
 @import "cart";
 @import "receipt";
 @import "certificates/certificate";
@@ -31,7 +30,6 @@
 @import "home-page/featured-product-cards";
 @import "home-page/home-page-hero";
 @import "home-page/home-page-video-component";
-@import "product-page/user-menu";
 @import "product-page/product-details";
 @import "product-page/product-faculty-members";
 @import "home-page/home-page-contact-row";
@@ -40,7 +38,6 @@
 @import "banner";
 
 body {
-  font-family: "Montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
   margin: 0;
   color: #000000;
   background: $body-bg;
@@ -71,9 +68,7 @@ body {
     padding-top: 50px;
     padding-bottom: 50px;
   }
-}
 
-body.new-design {
   select.form-control {
     background-image: url('data:image/svg+xml,<svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.41 3.8147e-06L6 4.58L10.59 3.8147e-06L12 1.41L6 7.41L0 1.41L1.41 3.8147e-06Z" fill="%23344055"/></svg>');
     background-repeat: no-repeat;
