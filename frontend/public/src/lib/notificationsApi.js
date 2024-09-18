@@ -4,6 +4,7 @@ import { isEmptyText } from "./util"
 import {
   ALERT_TYPE_DANGER,
   ALERT_TYPE_SUCCESS,
+  GOOGLE_ANALYTICS_EVENT_TYPE,
   USER_MSG_COOKIE_NAME,
   USER_MSG_TYPE_COMPLETED_AUTH,
   USER_MSG_TYPE_ENROLL_BLOCKED,
@@ -25,13 +26,33 @@ type UserMessage = {
   text: string
 }
 
-export function getStoredUserMessage(): UserMessage | null {
+function ingestUserMessage(): userJson | null {
   const userMsgValue = getCookie(USER_MSG_COOKIE_NAME)
   if (!userMsgValue || isEmptyText(userMsgValue)) {
     return null
   }
-  const userMsgObject = JSON.parse(decodeURIComponent(userMsgValue))
+  return JSON.parse(decodeURIComponent(userMsgValue))
+}
+
+export function getStoredUserMessage(): UserMessage | null {
+  const userMsgObject = ingestUserMessage()
+  if (!userMsgObject) {
+    return null
+  }
   return parseStoredUserMessage(userMsgObject)
+}
+
+export function determineUserActionForGoogleAnalytics() {
+  const userMsg = ingestUserMessage()
+  if (!userMsg) return null
+  const msgType = userMsg.type || null
+  if (!msgType) return null
+  if (msgType === USER_MSG_TYPE_PAYMENT_ACCEPTED) {
+    return {
+      action: GOOGLE_ANALYTICS_EVENT_TYPE["GA_PURCHASE"],
+      order:  userMsg.order
+    }
+  }
 }
 
 export function parseStoredUserMessage(

@@ -573,6 +573,7 @@ class CheckoutCallbackView(View):
                 {
                     "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
                     "run": order.lines.first().purchased_object.course.title,
+                    "order": order.reference_number,
                 },
             )
         else:
