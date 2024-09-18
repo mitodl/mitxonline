@@ -1,151 +1,151 @@
 // sass-lint:disable mixins-before-declarations
-body.new-design {
-    .badge.badge-dark {
-        font-weight: 400;
-        color: white;
-        background-color: black;
-    }
 
-    p.program-type-badge {
-        margin-bottom: 0;
-    }
+.badge.badge-dark {
+    font-weight: 400;
+    color: white;
+    background-color: black;
+}
 
-    .badge-program-type {
-        padding-left: 15px;
-        padding-right: 15px;
-    }
+p.program-type-badge {
+    margin-bottom: 0;
+}
 
-    .program-courses-container {
-        width: 100%;
+.badge-program-type {
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+.program-courses-container {
+    width: 100%;
+    margin: 0 0 35px;
+
+    h2 {
         margin: 0 0 35px;
 
-        h2 {
-            margin: 0 0 35px;
+        @include media-breakpoint-down(sm) {
+            margin: 0 0 27px;
+        }
+    }
 
-            @include media-breakpoint-down(sm) {
-                margin: 0 0 27px;
+    h2.electives-title {
+        margin-top: 35px;
+    }
+
+    ul {
+        display: flex;
+        margin: 0;
+        padding: 0;
+        flex-flow: row wrap;
+        justify-content: left;
+    }
+
+    li {
+        @include media-breakpoint-down(md) {
+            width: calc(100% - 44px);
+        }
+
+        width: 273px;
+        margin: 0 0 15px 0;
+        list-style: none;
+        display: inline;
+
+        .program-course-card {
+            padding: 0 0 15px 0;
+            overflow: hidden;
+            border-radius: 5px;
+            box-shadow: 0px 2px 3px 0px rgb(18, 38, 49, 0.15);
+            max-width: 243px;
+            max-height: 222px;
+            height: 222px;
+            width: 243px;
+            transition: .25s;
+            cursor: pointer;
+
+            .image {
+                position: relative;
+                display: flex;
+                img {
+                    max-width: 243px;
+                    max-height: 136px;
+                    height: 136px;
+                    width: 243px;
+                    object-fit: cover;
+                    object-position: center;
+                    @include media-breakpoint-down(sm) {
+                        display: block;
+                        float: none;
+                        margin: 0 auto 10px;
+                    }
+                }
+
+                .overlay {
+                    max-width: 243px;
+                    max-height: 136px;
+                    height: 136px;
+                    object-fit: cover;
+                    object-position: center;
+                    z-index: 101;
+                    background: black;
+                    transition: .25s;
+                    top: 0;
+                    left: 0;
+                    bottom: 0;
+                    right: 0;
+                    position: absolute;
+                    opacity: .5;
+                }
+
             }
-        }
 
-        h2.electives-title {
-            margin-top: 35px;
-        }
 
-        ul {
-            display: flex;
-            margin: 0;
-            padding: 0;
-            flex-flow: row wrap;
-            justify-content: left;
-        }
-
-        li {
-            @include media-breakpoint-down(md) {
-                width: calc(100% - 44px);
-            }
-
-            width: 273px;
-            margin: 0 0 15px 0;
-            list-style: none;
-            display: inline;
-
-            .program-course-card {
-                padding: 0 0 15px 0;
+            .program-course-card-info {
                 overflow: hidden;
-                border-radius: 5px;
-                box-shadow: 0px 2px 3px 0px rgb(18, 38, 49, 0.15);
-                max-width: 243px;
-                max-height: 222px;
-                height: 222px;
-                width: 243px;
-                transition: .25s;
-                cursor: pointer;
+                padding: 15px;
 
-                .image {
-                    position: relative;
-                    display: flex;
-                    img {
-                        max-width: 243px;
-                        max-height: 136px;
-                        height: 136px;
-                        width: 243px;
-                        object-fit: cover;
-                        object-position: center;
-                        @include media-breakpoint-down(sm) {
-                            display: block;
-                            float: none;
-                            margin: 0 auto 10px;
-                        }
-                    }
-
-                    .overlay {
-                        max-width: 243px;
-                        max-height: 136px;
-                        height: 136px;
-                        object-fit: cover;
-                        object-position: center;
-                        z-index: 101;
-                        background: black;
-                        transition: .25s;
-                        top: 0;
-                        left: 0;
-                        bottom: 0;
-                        right: 0;
-                        position: absolute;
-                        opacity: .5;
-                    }
-
+                .start-date {
+                    font-weight: 400;
+                    font-size: 12px;
+                    line-height: 14px;
+                    color: #58585A;
+                    margin-bottom: 0.5rem;
+                    transition: $product-page-hover-time;
                 }
 
+                h3 {
+                    font-size: 14px;
+                    font-weight: 600;
+                    line-height: 16px;
+                    color: #58585A;
+                    transition: $product-page-hover-time;
+                }
+            }
 
+            &:hover {
                 .program-course-card-info {
-                    overflow: hidden;
-                    padding: 15px;
-
-                    .start-date {
-                        font-weight: 400;
-                        font-size: 12px;
-                        line-height: 14px;
-                        color: #58585A;
-                        margin-bottom: 0.5rem;
-                        transition: $product-page-hover-time;
-                    }
-
-                    h3 {
-                        font-size: 14px;
-                        font-weight: 600;
-                        line-height: 16px;
-                        color: #58585A;
-                        transition: $product-page-hover-time;
-                    }
-                }
-
-                &:hover {
-                    .program-course-card-info {
-                        .start-date {
-                            color: #03152D;
-                        }
-                    }
                     .start-date {
                         color: #03152D;
                     }
+                }
+                .start-date {
+                    color: #03152D;
+                }
 
-                    h3 {
-                        color: #03152D;
-                    }
-                    .image {
-                        .overlay {
-                            opacity: 0;
-                        }
+                h3 {
+                    color: #03152D;
+                }
+                .image {
+                    .overlay {
+                        opacity: 0;
                     }
                 }
             }
+        }
 
-            .program-course-card-link {
-                text-decoration: none;
-                display: block;
-                width: fit-content;
-            }
+        .program-course-card-link {
+            text-decoration: none;
+            display: block;
+            width: fit-content;
         }
     }
 }
+

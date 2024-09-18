@@ -338,7 +338,7 @@ export class CourseProductDetailEnroll extends React.Component<
                       </>
                     </p>
                   </div>
-                  <div className="col-md-6 col-sm-12 pr-0 enroll-and-pay">
+                  <div className="col-md-6 col-sm-12 pr-0">
                     <form
                       action="/cart/add/"
                       method="get"

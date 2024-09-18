@@ -764,35 +764,37 @@ body.new-design {
   .financial-assistance-link {
     text-align: left;
     font-size: 16px;
+    height: 22px;
+    font-weight: bold;
+    letter-spacing: 0;
+    line-height: 20px;
+    text-decoration: underline;
+    margin-bottom: 0;
+
+    &:hover{
+      text-decoration: none !important;
+    }
 
     a {
+      color: black;
       font-weight: 400;
+
+      &:hover{
+        color: $brand-darker-bg;
+        text-decoration: none !important;
+      }
     }
   }
 }
 
-@media screen and (max-width: 768px) {
-  body.new-design {
-    div.certificate-pricing-row {
-      div.certificate-pricing {
-        margin-bottom: 15px !important;
-      }
+.popover-header {
+  text-align: center;
+  background: $white;
+}
 
-      div.enroll-and-pay {
-        padding-left: 0px;
-        padding-right: 0px;
-      }
-    }
-
-    div.upgrade-options-row {
-      div {
-        width: 100%;
-        text-align: center;
-        p {
-          text-align: center;
-        }
-        margin-bottom: 12px;
-      }
-    }
-  }
+.date-link {
+  color: $link-blue !important;
+  text-decoration: underline;
+  background-color: transparent;
+  border: none;
 }
