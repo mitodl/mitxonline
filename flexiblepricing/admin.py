@@ -19,6 +19,7 @@ class CurrencyExchangeRateAdmin(admin.ModelAdmin):
     model = CurrencyExchangeRate
 
 
+@admin.register(CountryIncomeThreshold)
 class CountryIncomeThresholdAdmin(admin.ModelAdmin):
     """Admin for CountryIncomeThreshold"""
 
@@ -51,6 +52,7 @@ class FlexiblePricingRequestSubmissionAdmin(admin.ModelAdmin):
     readonly_fields = ("form_data", "user", "page", "submit_time")
 
 
+@admin.register(FlexiblePriceTier)
 class FlexiblePriceTierAdmin(admin.ModelAdmin):
     """Admin for FlexiblePriceTier"""
 
@@ -64,7 +66,3 @@ class FlexiblePriceTierAdmin(admin.ModelAdmin):
         "current",
     )
     raw_id_fields = ("discount",)
-
-
-admin.site.register(CountryIncomeThreshold, CountryIncomeThresholdAdmin)
-admin.site.register(FlexiblePriceTier, FlexiblePriceTierAdmin)

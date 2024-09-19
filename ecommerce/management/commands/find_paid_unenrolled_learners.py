@@ -12,7 +12,7 @@ from django.db.models import Q
 from mitol.common.utils.datetime import now_in_utc
 
 from courses.models import CourseRun, CourseRunEnrollment
-from ecommerce.models import Line, Order
+from ecommerce.models import Line, OrderStatus
 
 
 class Command(BaseCommand):
@@ -42,7 +42,7 @@ class Command(BaseCommand):
         purchased_lines = Line.objects.filter(
             purchased_object_id__in=active_courseruns,
             purchased_content_type=content_type,
-            order__state=Order.STATE.FULFILLED,
+            order__state=OrderStatus.FULFILLED,
         ).all()
 
         for line in purchased_lines:

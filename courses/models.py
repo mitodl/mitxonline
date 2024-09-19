@@ -1196,12 +1196,12 @@ class CourseRunEnrollment(EnrollmentModel):
         we can change the payment to another run
         """
         # Due to circular dependancy importing locally
-        from ecommerce.models import Order
+        from ecommerce.models import OrderStatus
 
         paid_run = PaidCourseRun.objects.filter(
             user=self.user,
             course_run=self.run,
-            order__state=Order.STATE.FULFILLED,
+            order__state=OrderStatus.FULFILLED,
         ).first()
         if paid_run:
             paid_run.course_run = to_run
@@ -1372,13 +1372,13 @@ class PaidCourseRun(TimestampedModel):
         """
 
         # Due to circular dependancy importing locally
-        from ecommerce.models import Order
+        from ecommerce.models import OrderStatus
 
         # PaidCourseRun should only contain fulfilled orders
         return cls.objects.filter(
             user=user,
             course_run=run,
-            order__state=Order.STATE.FULFILLED,
+            order__state=OrderStatus.FULFILLED,
         ).exists()
 
 
@@ -1542,10 +1542,10 @@ class ProgramRequirement(MP_Node):
                 condition=Q(depth=1),
             ),
         )
-        index_together = (
-            ("program", "course"),
-            ("course", "program"),
-        )
+        indexes = [
+            models.Index(fields=("program", "course")),
+            models.Index(fields=("course", "program")),
+        ]
 
 
 class PartnerSchool(TimestampedModel):

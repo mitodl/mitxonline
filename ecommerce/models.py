@@ -14,13 +14,14 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models import TextChoices
 from django.utils.functional import cached_property
-from django_fsm import FSMField, transition
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
+from viewflow import this
+from viewflow.fsm import State
 
-from courses.api import create_run_enrollments
 from courses.models import CourseRun, PaidCourseRun
 from ecommerce.constants import (
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -305,7 +306,7 @@ class Discount(TimestampedModel):
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME
             and DiscountRedemption.objects.filter(
                 redeemed_discount=self,
-                redeemed_order__state=Order.STATE.FULFILLED,
+                redeemed_order__state=OrderStatus.FULFILLED,
             ).count()
             > 0
         ):
@@ -315,7 +316,7 @@ class Discount(TimestampedModel):
             self.redemption_type == REDEMPTION_TYPE_ONE_TIME_PER_USER
             and DiscountRedemption.objects.filter(
                 redeemed_discount=self,
-                redeemed_order__state=Order.STATE.FULFILLED,
+                redeemed_order__state=OrderStatus.FULFILLED,
                 redeemed_by=user,
             ).count()
             > 0
@@ -326,7 +327,7 @@ class Discount(TimestampedModel):
             self.max_redemptions > 0
             and DiscountRedemption.objects.filter(
                 redeemed_discount=self,
-                redeemed_order__state=Order.STATE.FULFILLED,
+                redeemed_order__state=OrderStatus.FULFILLED,
             ).count()
             >= self.max_redemptions
         ):
@@ -433,37 +434,167 @@ class UserDiscount(TimestampedModel):
         return f"{self.discount} {self.user}"
 
 
+class OrderStatus(TextChoices):
+    PENDING = "pending"
+    FULFILLED = "fulfilled"
+    CANCELED = "canceled"
+    DECLINED = "declined"
+    ERRORED = "errored"
+    REFUNDED = "refunded"
+    REVIEW = "review"
+    PARTIALLY_REFUNDED = "partially_refunded"
+
+
+class OrderFlow:
+    state = State(OrderStatus, default=OrderStatus.PENDING)
+
+    def __init__(self, order, user):
+        self.order = order
+        self.user = user
+
+    @state.setter()
+    def _set_order_state(self, value):
+        self.order.state = value
+
+    @state.getter()
+    def _get_order_state(self):
+        return self.order.state
+
+    @state.on_success()
+    def _on_transition_success(self, descriptor, source, target, **kwargs):  # noqa: ARG002
+        self.order.save()
+
+    @state.transition(source=State.ANY, target=OrderStatus.CANCELED)
+    def cancel(self):
+        """Cancel this order"""
+
+    def is_approver(self, user):
+        return user.is_staff
+
+    @state.transition(
+        source=OrderStatus.PENDING,
+        target=OrderStatus.DECLINED,
+        permission=this.is_approver,
+    )
+    def decline(self):
+        """
+        Decline this order. This additionally clears the discount redemptions
+        for the order so the discounts can be reused.
+        """
+        for redemption in self.order.discounts.all():
+            redemption.delete()
+
+        return self
+
+    @state.transition(source=State.ANY, target=OrderStatus.ERRORED)
+    def errored(self):
+        """Error this order"""
+
+    @state.transition(
+        source=OrderStatus.FULFILLED,
+        target=OrderStatus.REFUNDED,
+        permission=this.is_approver,
+    )
+    def refund(self, *, api_response_data: dict = None, **kwargs):  # noqa: RUF013
+        """
+        Records the refund, and optionally attempts to unenroll the learner from
+        the things they bought.
+
+        Args:
+            api_response_data (dict): In case of API response we will have the response data dictionary
+            kwargs: Ideally it should have named parameters such as
+            1- amount: that was refunded
+            2- reason: for refunding the order
+
+            at hand with enough details, So when the dict is passed we would save it as is,
+            otherwise fallback to default dict creation below
+        Returns:
+            Object (Transaction): return the refund transaction object for the refund.
+        """
+        amount = kwargs.get("amount")
+        reason = kwargs.get("reason")
+
+        transaction_id = api_response_data.get("id")
+        if transaction_id is None:
+            raise ValidationError(
+                "Failed to record transaction: Missing transaction id from refund API response"  # noqa: EM101
+            )
+
+        refund_transaction, created = self.order.transactions.get_or_create(
+            transaction_id=transaction_id,
+            data=api_response_data,
+            amount=amount,
+            transaction_type=TRANSACTION_TYPE_REFUND,
+            reason=reason,
+        )
+
+        send_order_refund_email.delay(self.order.id)
+
+        return refund_transaction
+
+    def create_transaction(self, payment_data):
+        log = logging.getLogger(__name__)  # noqa: F841
+        transaction_id = payment_data.get("transaction_id")
+        amount = payment_data.get("amount")
+        # There are two use cases:
+        # No payment required - no cybersource involved, so we need to generate UUID as transaction id
+        # Payment STATE_ACCEPTED - there should always be transaction_id in payment data, if not, throw ValidationError
+        if amount == 0 and transaction_id is None:
+            transaction_id = uuid.uuid1()
+        elif transaction_id is None:
+            raise ValidationError(
+                "Failed to record transaction: Missing transaction id from payment API response"  # noqa: EM101
+            )
+
+        self.order.transactions.get_or_create(
+            transaction_id=transaction_id,
+            data=payment_data,
+            amount=self.order.total_price_paid,
+        )
+
+    def create_paid_courseruns(self):
+        for run in self.order.purchased_runs:
+            PaidCourseRun.objects.get_or_create(
+                order=self.order, course_run=run, user=self.order.purchaser
+            )
+
+    def create_enrollments(self):
+        # create enrollments for what the learner has paid for
+        from courses.api import create_run_enrollments
+
+        create_run_enrollments(
+            self.order.purchaser,
+            self.order.purchased_runs,
+            mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            keep_failed_enrollments=True,
+        )
+
+    @state.transition(
+        source=OrderStatus.PENDING,
+        target=OrderStatus.FULFILLED,
+    )
+    def fulfill(self, payment_data, already_enrolled=False):  # noqa: FBT002
+        # record the transaction
+        self.create_transaction(payment_data)
+
+        # if user already enrolled from management command it'll not recreate
+        if not already_enrolled:
+            # create enrollments for what the learner has paid for
+            self.create_enrollments()
+
+        # record all the courseruns in the order
+        self.create_paid_courseruns()
+
+        # No email is required as this order is generated from management command
+        if not already_enrolled:
+            # send the receipt emails
+            transaction.on_commit(self.order.send_ecommerce_order_receipt)
+
+
 class Order(TimestampedModel):
     """An order containing information for a purchase."""
 
-    class STATE:
-        PENDING = "pending"
-        FULFILLED = "fulfilled"
-        CANCELED = "canceled"
-        DECLINED = "declined"
-        ERRORED = "errored"
-        REFUNDED = "refunded"
-        REVIEW = "review"
-        PARTIALLY_REFUNDED = "partially_refunded"
-
-        @classmethod
-        def choices(cls):
-            return (
-                (cls.PENDING, "Pending", "PendingOrder"),
-                (cls.FULFILLED, "Fulfilled", "FulfilledOrder"),
-                (cls.CANCELED, "Canceled", "CanceledOrder"),
-                (cls.REFUNDED, "Refunded", "RefundedOrder"),
-                (cls.DECLINED, "Declined", "DeclinedOrder"),
-                (cls.ERRORED, "Errored", "ErroredOrder"),
-                (cls.REVIEW, "Review", "ReviewOrder"),
-                (
-                    cls.PARTIALLY_REFUNDED,
-                    "Partially Refunded",
-                    "PartiallyRefundedOrder",
-                ),
-            )
-
-    state = FSMField(default=STATE.PENDING, state_choices=STATE.choices())
+    state = models.CharField(max_length=150, choices=OrderStatus.choices)
     purchaser = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -474,6 +605,10 @@ class Order(TimestampedModel):
         max_digits=20,
     )
     reference_number = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
+
+    def get_object_flow(self):
+        """Instantiate the flow without default constructor"""
+        return OrderFlow(self, user=self.purchaser)
 
     # override save method to auto-fill generated_rerefence_number
     def save(self, *args, **kwargs):
@@ -493,35 +628,11 @@ class Order(TimestampedModel):
     # accepted
     @property
     def is_review(self):
-        return self.state == Order.STATE.REVIEW
+        return self.state == OrderStatus.REVIEW
 
     @property
     def is_fulfilled(self):
-        return self.state == Order.STATE.FULFILLED
-
-    def fulfill(self, payment_data):
-        """Fulfill this order"""
-        raise NotImplementedError
-
-    def cancel(self):
-        """Cancel this order"""
-        raise NotImplementedError
-
-    def decline(self):
-        """Decline this order"""
-        raise NotImplementedError
-
-    def review(self):
-        """Place order in review"""
-        raise NotImplementedError
-
-    def errored(self):
-        """Error this order"""
-        raise NotImplementedError
-
-    def refund(self, *, api_response_data, **kwargs):
-        """Issue a refund"""
-        raise NotImplementedError
+        return self.state == OrderStatus.FULFILLED
 
     def _generate_reference_number(self):
         return f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-{self.id}"
@@ -544,72 +655,11 @@ class Order(TimestampedModel):
     def decode_reference_number(refno):
         return refno.replace(f"{REFERENCE_NUMBER_PREFIX}{settings.ENVIRONMENT}-", "")
 
-
-class FulfillableOrder:
-    """class to handle common logics like fulfill, enrollment etc"""
-
-    def create_transaction(self, payment_data):
-        log = logging.getLogger(__name__)  # noqa: F841
-        transaction_id = payment_data.get("transaction_id")
-        amount = payment_data.get("amount")
-        # There are two use cases:
-        # No payment required - no cybersource involved, so we need to generate UUID as transaction id
-        # Payment STATE_ACCEPTED - there should always be transaction_id in payment data, if not, throw ValidationError
-        if amount == 0 and transaction_id is None:
-            transaction_id = uuid.uuid1()
-        elif transaction_id is None:
-            raise ValidationError(
-                "Failed to record transaction: Missing transaction id from payment API response"  # noqa: EM101
-            )
-
-        self.transactions.get_or_create(
-            transaction_id=transaction_id,
-            data=payment_data,
-            amount=self.total_price_paid,
-        )
-
-    def create_paid_courseruns(self):
-        for run in self.purchased_runs:
-            PaidCourseRun.objects.get_or_create(
-                order=self, course_run=run, user=self.purchaser
-            )
-
-    def create_enrollments(self):
-        # create enrollments for what the learner has paid for
-        create_run_enrollments(
-            self.purchaser,
-            self.purchased_runs,
-            mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            keep_failed_enrollments=True,
-        )
-
     def send_ecommerce_order_receipt(self):
         send_ecommerce_order_receipt.delay(self.id)
 
-    @transition(
-        field="state",
-        source=Order.STATE.PENDING,
-        target=Order.STATE.FULFILLED,
-    )
-    def fulfill(self, payment_data, already_enrolled=False):  # noqa: FBT002
-        # record the transaction
-        self.create_transaction(payment_data)
 
-        # if user already enrolled from management command it'll not recreate
-        if not already_enrolled:
-            # create enrollments for what the learner has paid for
-            self.create_enrollments()
-
-        # record all the courseruns in the order
-        self.create_paid_courseruns()
-
-        # No email is required as this order is generated from management command
-        if not already_enrolled:
-            # send the receipt emails
-            transaction.on_commit(self.send_ecommerce_order_receipt)
-
-
-class PendingOrder(FulfillableOrder, Order):
+class PendingOrder(Order):
     """An order that is pending payment"""
 
     @transaction.atomic
@@ -651,7 +701,7 @@ class PendingOrder(FulfillableOrder, Order):
                 lines__purchased_object_id__in=product_object_ids,
                 lines__purchased_content_type_id__in=product_content_types,
                 lines__product_version__in=product_versions,
-                state=Order.STATE.PENDING,
+                state=OrderStatus.PENDING,
                 purchaser=user,
             )
         )
@@ -667,7 +717,7 @@ class PendingOrder(FulfillableOrder, Order):
             order.refresh_from_db()
         else:
             order = Order.objects.create(
-                state=Order.STATE.PENDING,
+                state=OrderStatus.PENDING,
                 purchaser=user,
                 total_price_paid=0,
             )
@@ -742,28 +792,6 @@ class PendingOrder(FulfillableOrder, Order):
 
         return order  # noqa: RET504
 
-    @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.CANCELED)
-    def cancel(self):
-        """Cancel this order"""
-
-    @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.DECLINED)
-    def decline(self):
-        """
-        Decline this order. This additionally clears the discount redemptions
-        for the order so the discounts can be reused.
-        """
-        for redemption in self.discounts.all():
-            redemption.delete()
-
-        self.state = Order.STATE.DECLINED
-        self.save()
-
-        return self
-
-    @transition(field="state", source=Order.STATE.PENDING, target=Order.STATE.ERRORED)
-    def error(self):
-        """Error this order"""
-
     class Meta:
         proxy = True
 
@@ -771,60 +799,11 @@ class PendingOrder(FulfillableOrder, Order):
 class FulfilledOrder(Order):
     """An order that has a fulfilled payment"""
 
-    @transition(field="state", source=Order.STATE.FULFILLED, target=Order.STATE.ERRORED)
-    def error(self):
-        """Error this order"""
-
-    @transition(
-        field="state",
-        source=Order.STATE.FULFILLED,
-        target=Order.STATE.REFUNDED,
-        custom=dict(admin=False),  # noqa: C408
-    )
-    def refund(self, *, api_response_data: dict = None, **kwargs):  # noqa: RUF013
-        """
-        Records the refund, and optionally attempts to unenroll the learner from
-        the things they bought.
-
-        Args:
-            api_response_data (dict): In case of API response we will have the response data dictionary
-            kwargs: Ideally it should have named parameters such as
-            1- amount: that was refunded
-            2- reason: for refunding the order
-
-            at hand with enough details, So when the dict is passed we would save it as is,
-            otherwise fallback to default dict creation below
-        Returns:
-            Object (Transaction): return the refund transaction object for the refund.
-        """
-        amount = kwargs.get("amount")
-        reason = kwargs.get("reason")
-
-        transaction_id = api_response_data.get("id")
-        if transaction_id is None:
-            raise ValidationError(
-                "Failed to record transaction: Missing transaction id from refund API response"  # noqa: EM101
-            )
-
-        refund_transaction, created = self.transactions.get_or_create(
-            transaction_id=transaction_id,
-            data=api_response_data,
-            amount=amount,
-            transaction_type=TRANSACTION_TYPE_REFUND,
-            reason=reason,
-        )
-        self.state = Order.STATE.REFUNDED
-        self.save()
-
-        send_order_refund_email.delay(self.id)
-
-        return refund_transaction
-
     class Meta:
         proxy = True
 
 
-class ReviewOrder(FulfillableOrder, Order):
+class ReviewOrder(Order):
     """An order that has been placed under review by the payment processor."""
 
     class Meta:
@@ -837,10 +816,6 @@ class CanceledOrder(Order):
 
     The state of this can't be altered further.
     """
-
-    @transition(field="state", source=Order.STATE.CANCELED, target=Order.STATE.ERRORED)
-    def error(self):
-        """Error this order"""
 
     class Meta:
         proxy = True
@@ -863,10 +838,6 @@ class DeclinedOrder(Order):
 
     The state of this can't be altered further.
     """
-
-    @transition(field="state", source=Order.STATE.DECLINED, target=Order.STATE.ERRORED)
-    def error(self):
-        """Error this order"""
 
     class Meta:
         proxy = True

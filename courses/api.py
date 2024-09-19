@@ -41,6 +41,7 @@ from courses.utils import (
     is_grade_valid,
     is_letter_grade_valid,
 )
+from ecommerce.models import OrderStatus
 from openedx.api import (
     enroll_in_edx_course_runs,
     get_edx_api_course_detail_client,
@@ -259,7 +260,7 @@ def deactivate_run_enrollment(
     Returns:
         CourseRunEnrollment: The deactivated enrollment
     """
-    from ecommerce.models import Line, Order
+    from ecommerce.models import Line
     from hubspot_sync.task_helpers import sync_hubspot_line_by_line_id
 
     try:
@@ -286,7 +287,7 @@ def deactivate_run_enrollment(
     line = Line.objects.filter(
         purchased_object_id=run_enrollment.run.id,
         purchased_content_type=content_type,
-        order__state__in=[Order.STATE.FULFILLED, Order.STATE.PENDING],
+        order__state__in=[OrderStatus.FULFILLED, OrderStatus.PENDING],
         order__purchaser=run_enrollment.user,
     )
     if line:

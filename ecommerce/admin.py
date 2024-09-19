@@ -8,9 +8,9 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.views.generic import TemplateView
-from fsm_admin.mixins import FSMTransitionMixin
 from mitol.common.admin import TimestampedModelAdmin
 from reversion.admin import VersionAdmin
+from viewflow import fsm
 
 from ecommerce.api import refund_order
 from ecommerce.forms import AdminRefundOrderForm
@@ -25,6 +25,8 @@ from ecommerce.models import (
     FulfilledOrder,
     Line,
     Order,
+    OrderFlow,
+    OrderStatus,
     PendingOrder,
     Product,
     RefundedOrder,
@@ -203,7 +205,7 @@ class OrderTransactionInline(admin.TabularInline):
     can_add = False
 
 
-class BaseOrderAdmin(FSMTransitionMixin, TimestampedModelAdmin):
+class BaseOrderAdmin(fsm.FlowAdminMixin, TimestampedModelAdmin):
     """Base admin for Order"""
 
     search_fields = [
@@ -217,6 +219,13 @@ class BaseOrderAdmin(FSMTransitionMixin, TimestampedModelAdmin):
     list_filter = ["state"]
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
     readonly_fields = ["reference_number"]
+    flow_state = OrderFlow.state
+
+    def get_transition_fields(self, request, obj, slug):  # noqa: ARG002
+        return ["state"]
+
+    def get_object_flow(self, request, obj):
+        return OrderFlow(obj, user=request.user)
 
     def has_change_permission(self, request, obj=None):  # noqa: ARG002
         return False
@@ -250,7 +259,7 @@ class PendingOrderAdmin(BaseOrderAdmin):
 
     def get_queryset(self, request):
         """Filter only to pending orders"""
-        return super().get_queryset(request).filter(state=Order.STATE.PENDING)
+        return super().get_queryset(request).filter(state=OrderStatus.PENDING)
 
 
 @admin.register(CanceledOrder)
@@ -261,7 +270,7 @@ class CanceledOrderAdmin(BaseOrderAdmin):
 
     def get_queryset(self, request):
         """Filter only to canceled orders"""
-        return super().get_queryset(request).filter(state=Order.STATE.CANCELED)
+        return super().get_queryset(request).filter(state=OrderStatus.CANCELED)
 
 
 @admin.register(FulfilledOrder)
@@ -294,7 +303,7 @@ class FulfilledOrderAdmin(TimestampedModelAdmin):
             super()
             .get_queryset(request)
             .prefetch_related("purchaser", "lines__product_version")
-            .filter(state=Order.STATE.FULFILLED)
+            .filter(state=OrderStatus.FULFILLED)
         )
 
     def response_change(self, request, obj):
@@ -314,7 +323,7 @@ class RefundedOrderAdmin(BaseOrderAdmin):
 
     def get_queryset(self, request):
         """Filter only to refunded orders"""
-        return super().get_queryset(request).filter(state=Order.STATE.REFUNDED)
+        return super().get_queryset(request).filter(state=OrderStatus.REFUNDED)
 
 
 class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
@@ -395,7 +404,7 @@ class AdminRefundOrderView(LoginRequiredMixin, PermissionRequiredMixin, Template
     def get(self, request):
         try:
             order = FulfilledOrder.objects.get(pk=request.GET["order"])
-            if order.state != Order.STATE.FULFILLED:
+            if order.state != OrderStatus.FULFILLED:
                 raise ObjectDoesNotExist()  # noqa: RSE102, TRY301
         except ObjectDoesNotExist:
             messages.error(

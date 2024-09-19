@@ -47,4 +47,4 @@ class OpenEdxApiAuth(TimestampedModel):
         return f"OpenEdxApiAuth for {self.user}"
 
     class Meta:
-        index_together = ("user", "access_token_expires_on")
+        indexes = [models.Index(fields=("user", "access_token_expires_on"))]

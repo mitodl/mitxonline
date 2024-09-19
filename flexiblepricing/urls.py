@@ -1,4 +1,4 @@
-from django.urls import include, re_path
+from django.urls import include, path
 from rest_framework.routers import SimpleRouter
 from rest_framework_extensions.routers import NestedRouterMixin
 
@@ -40,6 +40,6 @@ router.register(
 )
 
 urlpatterns = [
-    re_path(r"^api/v0/flexible_pricing/", include(router.urls)),
-    re_path(r"^api/flexible_pricing/", include(router.urls)),
+    path("api/v0/flexible_pricing/", include(router.urls)),
+    path("api/flexible_pricing/", include(router.urls)),
 ]

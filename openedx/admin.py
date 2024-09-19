@@ -7,6 +7,7 @@ from django.contrib import admin
 from openedx.models import OpenEdxApiAuth, OpenEdxUser
 
 
+@admin.register(OpenEdxUser)
 class OpenEdxUserAdmin(admin.ModelAdmin):
     """Admin for OpenEdxUser"""
 
@@ -21,6 +22,7 @@ class OpenEdxUserAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related("user")
 
 
+@admin.register(OpenEdxApiAuth)
 class OpenEdxApiAuthAdmin(admin.ModelAdmin):
     """Admin for OpenEdxApiAuth"""
 
@@ -32,7 +34,3 @@ class OpenEdxApiAuthAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         """Overrides base queryset"""
         return super().get_queryset(request).select_related("user")
-
-
-admin.site.register(OpenEdxUser, OpenEdxUserAdmin)
-admin.site.register(OpenEdxApiAuth, OpenEdxApiAuthAdmin)

@@ -109,6 +109,7 @@ class BasketItemFactory(DjangoModelFactory):
 class OrderFactory(DjangoModelFactory):
     total_price_paid = fuzzy.FuzzyDecimal(10.00, 10.00)
     purchaser = SubFactory(UserFactory)
+    state = models.OrderStatus.PENDING
 
     class Meta:
         model = models.Order

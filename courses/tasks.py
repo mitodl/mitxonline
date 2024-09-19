@@ -13,6 +13,7 @@ from courses.models import (
     LearnerProgramRecordShare,
     PaidCourseRun,
 )
+from ecommerce.models import OrderStatus
 from main.celery import app
 
 log = logging.getLogger(__name__)
@@ -80,7 +81,6 @@ def clear_unenrolled_paid_course_run(enrollment_id):
     these exist, the user won't be able to re-buy into the course later if they
     want to.
     """
-    from ecommerce.models import Order
 
     try:
         enrollment = CourseRunEnrollment.all_objects.filter(id=enrollment_id).get()
@@ -88,7 +88,7 @@ def clear_unenrolled_paid_course_run(enrollment_id):
         PaidCourseRun.objects.filter(
             user=enrollment.user,
             course_run=enrollment.run,
-            order__state=Order.STATE.FULFILLED,
+            order__state=OrderStatus.FULFILLED,
         ).delete()
     except Exception as e:  # noqa: BLE001
         log.error(  # noqa: TRY400

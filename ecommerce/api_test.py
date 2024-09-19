@@ -39,6 +39,7 @@ from ecommerce.models import (
     DiscountRedemption,
     FulfilledOrder,
     Order,
+    OrderStatus,
     Transaction,
 )
 from users.factories import UserFactory
@@ -49,7 +50,7 @@ pytestmark = [pytest.mark.django_db]
 @pytest.fixture
 def fulfilled_order():
     """Fixture for creating a fulfilled order"""
-    return OrderFactory.create(state=Order.STATE.FULFILLED)
+    return OrderFactory.create(state=OrderStatus.FULFILLED)
 
 
 @pytest.fixture
@@ -149,12 +150,12 @@ def create_basket(user, products):
 @pytest.mark.parametrize(
     "order_state",
     [
-        Order.STATE.REFUNDED,
-        Order.STATE.ERRORED,
-        Order.STATE.PENDING,
-        Order.STATE.DECLINED,
-        Order.STATE.CANCELED,
-        Order.STATE.REVIEW,
+        OrderStatus.REFUNDED,
+        OrderStatus.ERRORED,
+        OrderStatus.PENDING,
+        OrderStatus.DECLINED,
+        OrderStatus.CANCELED,
+        OrderStatus.REVIEW,
     ],
 )
 def test_cybersource_refund_no_fulfilled_order(order_state):
@@ -186,7 +187,7 @@ def test_cybersource_order_no_transaction(fulfilled_order):
     Ideally, there should be a payment type transaction for a fulfilled order
     """
 
-    fulfilled_order = OrderFactory.create(state=Order.STATE.FULFILLED)
+    fulfilled_order = OrderFactory.create(state=OrderStatus.FULFILLED)
     refund_response, message = refund_order(order_id=fulfilled_order.id)
     assert f"There is no associated transaction against order_id {fulfilled_order.id}."  # noqa: PLW0129
     assert refund_response is False
@@ -269,7 +270,7 @@ def test_order_refund_success(mocker, order_state, unenroll, fulfilled_transacti
 
     # The state of the order should be REFUNDED after a successful refund
     fulfilled_transaction.order.refresh_from_db()
-    assert fulfilled_transaction.order.state == Order.STATE.REFUNDED
+    assert fulfilled_transaction.order.state == OrderStatus.REFUNDED
 
 
 @pytest.mark.parametrize("unenroll", [True, False])
@@ -331,7 +332,7 @@ def test_order_refund_success_with_ref_num(mocker, unenroll, fulfilled_transacti
 
     # The state of the order should be REFUNDED after a successful refund
     fulfilled_transaction.order.refresh_from_db()
-    assert fulfilled_transaction.order.state == Order.STATE.REFUNDED
+    assert fulfilled_transaction.order.state == OrderStatus.REFUNDED
 
 
 def test_order_refund_failure(mocker, fulfilled_transaction):
@@ -439,7 +440,7 @@ def test_process_cybersource_payment_response(  # noqa: PLR0913
         "transaction_id": "12345",
     }
 
-    order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)
+    order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
 
     assert order.reference_number == payload["req_reference_number"]
 
@@ -448,9 +449,9 @@ def test_process_cybersource_payment_response(  # noqa: PLR0913
     # This is checked on the BackofficeCallbackView and CheckoutCallbackView POST endpoints
     # since we expect to receive a response to both from Cybersource.  If the current state is
     # PENDING, then we should process the response.
-    assert order.state == Order.STATE.PENDING
+    assert order.state == OrderStatus.PENDING
     result = process_cybersource_payment_response(request, order)
-    assert result == Order.STATE.FULFILLED
+    assert result == OrderStatus.FULFILLED
 
 
 @pytest.mark.parametrize("include_discount", [True, False])
@@ -475,7 +476,7 @@ def test_process_cybersource_payment_decline_response(  # noqa: PLR0913
         "transaction_id": "12345",
     }
 
-    order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)
+    order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
 
     assert order.reference_number == payload["req_reference_number"]
 
@@ -494,13 +495,13 @@ def test_process_cybersource_payment_decline_response(  # noqa: PLR0913
     # This is checked on the BackofficeCallbackView and CheckoutCallbackView POST endpoints
     # since we expect to receive a response to both from Cybersource.  If the current state is
     # PENDING, then we should process the response.
-    assert order.state == Order.STATE.PENDING
+    assert order.state == OrderStatus.PENDING
 
     if include_discount:
         assert order.discounts.count() > 0
 
     result = process_cybersource_payment_response(request, order)
-    assert result == Order.STATE.DECLINED
+    assert result == OrderStatus.DECLINED
     order.refresh_from_db()
     assert order.discounts.count() == 0
 
@@ -513,16 +514,12 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
     - fail - there's an order but the payment failed (failed status in CyberSource)
     - empty - order isn't pending
     """
-    order = OrderFactory.create(state=Order.STATE.PENDING)
+    order = OrderFactory.create(state=OrderStatus.PENDING)
 
     # mocking out the create_enrollment and create_paid_courserun calls
     # we don't really care that it hits edX for this
-    mocker.patch(
-        "ecommerce.models.FulfillableOrder.create_enrollments", return_value=True
-    )
-    mocker.patch(
-        "ecommerce.models.FulfillableOrder.create_paid_courseruns", return_value=True
-    )
+    mocker.patch("ecommerce.models.OrderFlow.create_enrollments", return_value=True)
+    mocker.patch("ecommerce.models.OrderFlow.create_paid_courseruns", return_value=True)
 
     test_payload = {
         "utf8": "",
@@ -584,7 +581,7 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
         test_payload["reason_code"] = "999"
 
     if test_type == "empty":
-        order.state = Order.STATE.CANCELED
+        order.state = OrderStatus.CANCELED
         order.save()
         order.refresh_from_db()
 
@@ -603,11 +600,11 @@ def test_check_and_process_pending_orders_for_resolution(mocker, test_type):
         assert (fulfilled, cancelled, errored) == (0, 0, 0)
     elif test_type == "fail":
         order.refresh_from_db()
-        assert order.state == Order.STATE.CANCELED
+        assert order.state == OrderStatus.CANCELED
         assert (fulfilled, cancelled, errored) == (0, 1, 0)
     else:
         order.refresh_from_db()
-        assert order.state == Order.STATE.FULFILLED
+        assert order.state == OrderStatus.FULFILLED
         assert (fulfilled, cancelled, errored) == (1, 0, 0)
 
 
@@ -620,7 +617,7 @@ def test_duplicate_redemption_check(peruser):
 
     def make_stuff(user, discount):
         """Helper function to DRY out the rest of the test"""
-        order = OrderFactory.create(purchaser=user, state=Order.STATE.FULFILLED)
+        order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
         redemption = DiscountRedemptionFactory.create(
             redeemed_by=user, redeemed_discount=discount, redeemed_order=order
         )

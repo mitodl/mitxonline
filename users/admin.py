@@ -51,6 +51,7 @@ _username_warning = """
 """
 
 
+@admin.register(User)
 class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
     """Admin views for user"""
 
@@ -97,6 +98,7 @@ class UserAdmin(ContribUserAdmin, HijackUserAdminMixin, TimestampedModelAdmin):
     inlines = [UserLegalAddressInline, UserProfileInline]
 
 
+@admin.register(BlockList)
 class BlockListAdmin(admin.ModelAdmin):
     """Admin for BlockList"""
 
@@ -105,7 +107,3 @@ class BlockListAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):  # noqa: ARG002
         return False
-
-
-admin.site.register(User, UserAdmin)
-admin.site.register(BlockList, BlockListAdmin)

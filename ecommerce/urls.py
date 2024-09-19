@@ -1,4 +1,4 @@
-from django.urls import include, re_path
+from django.urls import include, path, re_path
 from rest_framework.routers import SimpleRouter
 from rest_framework_extensions.routers import NestedRouterMixin
 
@@ -80,15 +80,15 @@ basketRouter.register(
 )
 
 urlpatterns = [
-    re_path(r"^api/v0/", include(router.urls)),
-    re_path(r"^api/", include(router.urls)),
+    path("api/v0/", include(router.urls)),
+    path("api/", include(router.urls)),
     re_path(
         "checkout/to_payment",
         CheckoutInterstitialView.as_view(),
         name="checkout_interstitial_page",
     ),
-    re_path(
-        r"^api/orders/receipt/(?P<pk>\d+)/$",
+    path(
+        "api/orders/receipt/<int:pk>/",
         OrderReceiptView.as_view(),
         name="order_receipt_api",
     ),

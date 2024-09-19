@@ -78,8 +78,8 @@ def test_mail_api_refund_email_generation(
 
     transaction_data = {"id": "refunded-transaction"}
     refund_amount = order.total_price_paid / 2
-
-    transaction = order.refund(  # noqa: F841
+    order_flow = order.get_object_flow()
+    transaction = order_flow.refund(  # noqa: F841
         api_response_data=transaction_data, amount=refund_amount, reason="testing"
     )
 

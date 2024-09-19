@@ -20,7 +20,7 @@ from django.core.management.base import CommandError
 
 from courses.api import deactivate_run_enrollment
 from courses.models import CourseRunEnrollment
-from ecommerce.models import Order
+from ecommerce.models import Order, OrderStatus
 from hubspot_sync.task_helpers import sync_hubspot_deal
 from openedx.api import enroll_in_edx_course_runs
 
@@ -55,12 +55,12 @@ class Command(BaseCommand):
 
         try:
             order = Order.objects.filter(
-                state=Order.STATE.FULFILLED, reference_number=kwargs["order"]
+                state=OrderStatus.FULFILLED, reference_number=kwargs["order"]
             ).get()
         except:  # noqa: E722
             raise CommandError("Couldn't find that order, or the order was ambiguous.")  # noqa: B904, EM101
 
-        order.state = Order.STATE.REFUNDED
+        order.state = OrderStatus.REFUNDED
         order.save()
         sync_hubspot_deal(order)
 

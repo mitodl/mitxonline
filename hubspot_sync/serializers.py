@@ -24,14 +24,14 @@ These IDs are specific to the prod & sandbox accounts for mitxonline
 48288390: Processed
 """
 ORDER_STATUS_MAPPING = {
-    models.Order.STATE.FULFILLED: "48288390",
-    models.Order.STATE.PENDING: "48288388",
-    models.Order.STATE.CANCELED: "48288379",
-    models.Order.STATE.DECLINED: "48288389",
-    models.Order.STATE.ERRORED: "48288389",
-    models.Order.STATE.REFUNDED: "48288389",
-    models.Order.STATE.PARTIALLY_REFUNDED: "48288389",
-    models.Order.STATE.REVIEW: "48288390",
+    models.OrderStatus.FULFILLED: "48288390",
+    models.OrderStatus.PENDING: "48288388",
+    models.OrderStatus.CANCELED: "48288379",
+    models.OrderStatus.DECLINED: "48288389",
+    models.OrderStatus.ERRORED: "48288389",
+    models.OrderStatus.REFUNDED: "48288389",
+    models.OrderStatus.PARTIALLY_REFUNDED: "48288389",
+    models.OrderStatus.REVIEW: "48288390",
 }
 
 
@@ -182,7 +182,7 @@ class OrderToDealSerializer(serializers.ModelSerializer):
 
     def get_closedate(self, instance):
         """Return the updated_on date (as a timestamp in milliseconds) if fulfilled"""
-        if instance.state == models.Order.STATE.FULFILLED:  # noqa: RET503
+        if instance.state == models.OrderStatus.FULFILLED:  # noqa: RET503
             return int(instance.updated_on.timestamp() * 1000)
 
     def get_discount_type(self, instance):

@@ -36,7 +36,7 @@ from courses.models import (
     limit_to_certificate_pages,
 )
 from ecommerce.factories import OrderFactory, ProductFactory
-from ecommerce.models import Order
+from ecommerce.models import OrderStatus
 from main.test_utils import format_as_iso8601
 from users.factories import UserFactory
 
@@ -272,7 +272,7 @@ def test_change_payment_to_run():
         user=user, active=True, change_status=None
     )
 
-    fulfilled_order = OrderFactory.create(purchaser=user, state=Order.STATE.FULFILLED)
+    fulfilled_order = OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED)
     paid_course_run = PaidCourseRun.objects.create(
         user=user,
         course_run=course_run_enrollment.run,

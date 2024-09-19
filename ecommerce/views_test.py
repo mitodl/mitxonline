@@ -34,6 +34,7 @@ from ecommerce.models import (
     Discount,
     DiscountProduct,
     Order,
+    OrderStatus,
     PendingOrder,
     UserDiscount,
 )
@@ -453,7 +454,7 @@ def test_start_checkout(user, user_drf_client, products):
 
     order = Order.objects.filter(purchaser=user).get()
 
-    assert order.state == Order.STATE.PENDING
+    assert order.state == OrderStatus.PENDING
 
 
 def test_start_checkout_with_discounts(user, user_drf_client, products, discounts):
@@ -470,7 +471,7 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
 
     order = Order.objects.filter(purchaser=user).get()
 
-    assert order.state == Order.STATE.PENDING
+    assert order.state == OrderStatus.PENDING
 
 
 def test_start_checkout_with_invalid_discounts(user, user_client, products, discounts):
@@ -503,11 +504,11 @@ def test_start_checkout_with_invalid_discounts(user, user_client, products, disc
 @pytest.mark.parametrize(
     "decision, expected_redirect_url, expected_state, basket_exists",  # noqa: PT006
     [
-        ("CANCEL", reverse("cart"), Order.STATE.CANCELED, True),
-        ("DECLINE", reverse("cart"), Order.STATE.DECLINED, True),
-        ("ERROR", reverse("cart"), Order.STATE.ERRORED, True),
-        ("REVIEW", reverse("cart"), Order.STATE.CANCELED, True),
-        ("ACCEPT", reverse("user-dashboard"), Order.STATE.FULFILLED, False),
+        ("CANCEL", reverse("cart"), OrderStatus.CANCELED, True),
+        ("DECLINE", reverse("cart"), OrderStatus.DECLINED, True),
+        ("ERROR", reverse("cart"), OrderStatus.ERRORED, True),
+        ("REVIEW", reverse("cart"), OrderStatus.CANCELED, True),
+        ("ACCEPT", reverse("user-dashboard"), OrderStatus.FULFILLED, False),
     ],
 )
 def test_checkout_result(  # noqa: PLR0913
@@ -546,7 +547,7 @@ def test_checkout_result(  # noqa: PLR0913
     # Load the pending order from the DB(factory) - should match the ref# in
     # the payload we get back
 
-    order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)
+    order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
 
     assert order.reference_number == payload["req_reference_number"]
 
@@ -849,8 +850,8 @@ def test_paid_and_unpaid_courserun_checkout(
     product = products[0]
     basket = create_basket_with_product(user, product)
     order = PendingOrder.create_from_basket(basket)
-    order.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
-    order.save()
+    order_flow = order.get_object_flow()
+    order_flow.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
 
     basket.delete()
 
@@ -876,11 +877,11 @@ def test_paid_and_unpaid_courserun_checkout(
 @pytest.mark.parametrize(
     "decision, expected_state, basket_exists",  # noqa: PT006
     [
-        ("CANCEL", Order.STATE.CANCELED, True),
-        ("DECLINE", Order.STATE.DECLINED, True),
-        ("ERROR", Order.STATE.ERRORED, True),
-        ("REVIEW", Order.STATE.CANCELED, True),
-        ("ACCEPT", Order.STATE.FULFILLED, False),
+        ("CANCEL", OrderStatus.CANCELED, True),
+        ("DECLINE", OrderStatus.DECLINED, True),
+        ("ERROR", OrderStatus.ERRORED, True),
+        ("REVIEW", OrderStatus.CANCELED, True),
+        ("ACCEPT", OrderStatus.FULFILLED, False),
     ],
 )
 def test_checkout_api_result(  # noqa: PLR0913
@@ -917,7 +918,7 @@ def test_checkout_api_result(  # noqa: PLR0913
     # Load the pending order from the DB(factory) - should match the ref# in
     # the payload we get back
 
-    order = Order.objects.get(state=Order.STATE.PENDING, purchaser=user)
+    order = Order.objects.get(state=OrderStatus.PENDING, purchaser=user)
 
     assert order.reference_number == payload["req_reference_number"]
 
@@ -974,7 +975,7 @@ def test_checkout_api_result_verification_failure(
     payload = resp.json()["payload"]
     payload = {
         **{f"req_{key}": value for key, value in payload.items()},
-        "decision": Order.STATE.PENDING,
+        "decision": OrderStatus.PENDING,
         "message": "payment processor message",
         "transaction_id": "12345",
     }

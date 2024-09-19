@@ -157,7 +157,6 @@ INSTALLED_APPS = (
     "django.contrib.sites",
     "django_user_agents",
     "social_django",
-    "server_status",
     "oauth2_provider",
     "rest_framework",
     "anymail",
@@ -180,8 +179,7 @@ INSTALLED_APPS = (
     "modelcluster",
     "taggit",
     # django-fsm-admin
-    "django_fsm",
-    "fsm_admin",
+    "viewflow",
     # django-robots
     "robots",
     # django-reversion
@@ -324,7 +322,6 @@ TIME_ZONE = "UTC"
 
 USE_I18N = True
 
-USE_L10N = True
 
 USE_TZ = True
 

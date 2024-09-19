@@ -15,10 +15,9 @@ Including another URLconf
 """
 
 from django.conf import settings
-from django.conf.urls import include
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path, re_path
+from django.urls import include, path, re_path
 from oauth2_provider.urls import base_urlpatterns, oidc_urlpatterns
 from wagtail import urls as wagtail_urls
 from wagtail.admin import urls as wagtailadmin_urls
@@ -40,7 +39,6 @@ urlpatterns = [
         ),
     ),
     path("admin/", admin.site.urls),
-    path("status/", include("server_status.urls")),
     path("hijack/", include("hijack.urls")),
     path("robots.txt", include("robots.urls")),
     path("", include("authentication.urls")),
@@ -57,7 +55,7 @@ urlpatterns = [
     re_path(r"^staff-dashboard/.*", refine, name="staff-dashboard"),
     path("signin/", index, name="login"),
     path("signin/password/", index, name="login-password"),
-    re_path(r"^signin/forgot-password/$", index, name="password-reset"),
+    path("signin/forgot-password/", index, name="password-reset"),
     re_path(
         r"^signin/forgot-password/confirm/(?P<uid>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,32})/$",
         index,
@@ -85,8 +83,8 @@ urlpatterns = [
     re_path(
         r"^cms/login", cms_signin_redirect_to_site_signin, name="wagtailadmin_login"
     ),
-    re_path(r"^cms/", include(wagtailadmin_urls)),
-    re_path(r"^documents/", include(wagtaildocs_urls)),
+    path("cms/", include(wagtailadmin_urls)),
+    path("documents/", include(wagtaildocs_urls)),
     path("", include(wagtail_urls)),
     path("", include("cms.urls")),
     # Example view

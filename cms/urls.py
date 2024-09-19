@@ -12,7 +12,7 @@ the "+" characters.
 The pattern(s) defined here serve the same Wagtail view that the library-defined pattern serves.
 """  # noqa: RUF002
 
-from django.conf.urls import url
+from django.urls import re_path
 from wagtail import views
 from wagtail.coreutils import WAGTAIL_APPEND_SLASH
 
@@ -36,6 +36,6 @@ else:
 
 
 urlpatterns = [
-    url(custom_serve_pattern, views.serve, name="wagtail_serve_custom"),
-    url(program_custom_serve_pattern, views.serve, name="wagtail_serve_custom"),
+    re_path(custom_serve_pattern, views.serve, name="wagtail_serve_custom"),
+    re_path(program_custom_serve_pattern, views.serve, name="wagtail_serve_custom"),
 ]
