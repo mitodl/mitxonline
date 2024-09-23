@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.102.0 (Released September 23, 2024)
+---------------
+
+- 5343 upgrade django in mitxonline (#2387)
+- Remove new-design styles | Cleaning up duplicated styles (#2394)
+- Update dependency express to v4.20.0 [SECURITY] (#2400)
+- Update dependency @pankod/refine-react-router-v6 to v3.40.0 (#2397)
+
 Version 0.101.0 (Released September 17, 2024)
 ---------------
 
