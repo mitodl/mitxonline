@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.102.0
+Version 0.102.0 (Released September 23, 2024)
 ---------------
 
 - 5343 upgrade django in mitxonline (#2387)
