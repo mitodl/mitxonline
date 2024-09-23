@@ -4,30 +4,29 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0055_rename_programrequirement_index'),
+        ("courses", "0055_rename_programrequirement_index"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='program',
-            name='end_date',
+            model_name="program",
+            name="end_date",
             field=models.DateField(blank=True, db_index=True, null=True),
         ),
         migrations.AddField(
-            model_name='program',
-            name='enrollment_end',
+            model_name="program",
+            name="enrollment_end",
             field=models.DateTimeField(blank=True, db_index=True, null=True),
         ),
         migrations.AddField(
-            model_name='program',
-            name='enrollment_start',
+            model_name="program",
+            name="enrollment_start",
             field=models.DateTimeField(blank=True, db_index=True, null=True),
         ),
         migrations.AddField(
-            model_name='program',
-            name='start_date',
+            model_name="program",
+            name="start_date",
             field=models.DateField(blank=True, db_index=True, null=True),
         ),
     ]
