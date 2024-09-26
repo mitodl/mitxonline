@@ -163,8 +163,8 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     )
     enrollment_start = models.DateTimeField(null=True, blank=True, db_index=True)
     enrollment_end = models.DateTimeField(null=True, blank=True, db_index=True)
-    start_date = models.DateField(null=True, blank=True, db_index=True)
-    end_date = models.DateField(null=True, blank=True, db_index=True)
+    start_date = models.DateTimeField(null=True, blank=True, db_index=True)
+    end_date = models.DateTimeField(null=True, blank=True, db_index=True)
 
     @cached_property
     def page(self):
