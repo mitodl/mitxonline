@@ -91,5 +91,9 @@ def test_serialize_program(
             "live": True,
             "topics": [{"name": topic.name} for topic in topics],
             "availability": "anytime",
+            "start_date": program_with_empty_requirements.start_date,
+            "end_date": program_with_empty_requirements.end_date,
+            "enrollment_start": program_with_empty_requirements.enrollment_start,
+            "enrollment_end": program_with_empty_requirements.enrollment_end,
         },
     )

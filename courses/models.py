@@ -161,6 +161,10 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
     availability = models.CharField(
         choices=AVAILABILITY_CHOICES, default=AVAILABILITY_ANYTIME, max_length=255
     )
+    enrollment_start = models.DateTimeField(null=True, blank=True, db_index=True)
+    enrollment_end = models.DateTimeField(null=True, blank=True, db_index=True)
+    start_date = models.DateField(null=True, blank=True, db_index=True)
+    end_date = models.DateField(null=True, blank=True, db_index=True)
 
     @cached_property
     def page(self):

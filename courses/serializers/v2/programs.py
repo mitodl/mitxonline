@@ -79,6 +79,10 @@ class ProgramSerializer(serializers.ModelSerializer):
             "live",
             "topics",
             "availability",
+            "start_date",
+            "end_date",
+            "enrollment_start",
+            "enrollment_end",
         ]
 
 
