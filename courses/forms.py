@@ -411,6 +411,10 @@ class ProgramAdminForm(ModelForm):
             "live",
             "requirements",
             "availability",
+            "start_date",
+            "end_date",
+            "enrollment_start",
+            "enrollment_end",
         ]
 
     class Media:
