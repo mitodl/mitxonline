@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.103.0
+---------------
+
+- Adding dates on Program model (#2404)
+- Revert "Temporarily don't run migrations (#2405)"
+- Temporarily don't run migrations (#2405)
+- Update dependency djangorestframework to v3.15.2 [SECURITY] (#2403)
+- Update dependency django to v4.2.15 [SECURITY] (#2402)
+
 Version 0.102.1 (Released September 23, 2024)
 ---------------
 
