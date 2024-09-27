@@ -864,7 +864,7 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
     """
     from hubspot_sync.task_helpers import sync_hubspot_user
 
-    existing_cert_queryset = ProgramCertificate.objects.filter(
+    existing_cert_queryset = ProgramCertificate.all_objects.filter(
         user=user, program=program
     )
     if existing_cert_queryset.exists():
