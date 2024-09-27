@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.103.0
+Version 0.103.0 (Released September 27, 2024)
 ---------------
 
 - Adding dates on Program model (#2404)
