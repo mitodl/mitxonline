@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.103.1 (Released October 02, 2024)
+---------------
+
+- Ignore revoked program certificates for now (#2412)
+- Start date should be DateTimeField (#2409)
+
 Version 0.103.0 (Released September 27, 2024)
 ---------------
 
