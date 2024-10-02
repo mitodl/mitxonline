@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.103.1
+Version 0.103.1 (Released October 02, 2024)
 ---------------
 
 - Ignore revoked program certificates for now (#2412)
