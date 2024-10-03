@@ -26,9 +26,6 @@ from wagtail.documents import urls as wagtaildocs_urls
 from cms.views import instructor_page
 from main.views import cms_signin_redirect_to_site_signin, index, refine
 
-handler500 = "main.views.handler500"
-handler404 = "main.views.handler404"
-
 urlpatterns = [
     # NOTE: we only bring in base_urlpatterns so applications can only be created via django-admin
     path(
@@ -93,6 +90,9 @@ urlpatterns = [
     static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 )
+
+handler500 = "main.views.handler500"
+handler404 = "main.views.handler404"
 
 if settings.DEBUG:
     import debug_toolbar  # pylint: disable=wrong-import-position, wrong-import-order
