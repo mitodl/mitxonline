@@ -3599,90 +3599,90 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@sentry-internal/browser-utils@npm:8.18.0":
-  version: 8.18.0
-  resolution: "@sentry-internal/browser-utils@npm:8.18.0"
+"@sentry-internal/browser-utils@npm:8.33.0":
+  version: 8.33.0
+  resolution: "@sentry-internal/browser-utils@npm:8.33.0"
   dependencies:
-    "@sentry/core": 8.18.0
-    "@sentry/types": 8.18.0
-    "@sentry/utils": 8.18.0
-  checksum: bd11ebfc03512b40a52c8ed1db1f6bee2130e0faaf65b03e5a663c813b225e03d56c8f2f191b3be8ee0e57cfd4954142d0c480b12866f55b54b27cc4160d1930
+    "@sentry/core": 8.33.0
+    "@sentry/types": 8.33.0
+    "@sentry/utils": 8.33.0
+  checksum: e816b42d391703496eeaf981afeaa11634260d07af780505a89b02bce53c92305d7305ee40cf559932d45368e2274d0c2559cde9efbde3cc0aa569b299000fd4
   languageName: node
   linkType: hard
 
-"@sentry-internal/feedback@npm:8.18.0":
-  version: 8.18.0
-  resolution: "@sentry-internal/feedback@npm:8.18.0"
+"@sentry-internal/feedback@npm:8.33.0":
+  version: 8.33.0
+  resolution: "@sentry-internal/feedback@npm:8.33.0"
   dependencies:
-    "@sentry/core": 8.18.0
-    "@sentry/types": 8.18.0
-    "@sentry/utils": 8.18.0
-  checksum: ec100eac89ce87a2ea869afc8f85a2768908851c3c81282dc8a4c6d5a5cc91e742b5359d75deac7669b7561a1686e23ff376ba9cb9af3f68ffc6ef4f3d4bf0ea
+    "@sentry/core": 8.33.0
+    "@sentry/types": 8.33.0
+    "@sentry/utils": 8.33.0
+  checksum: 63ebabcebef533fcf99747191d73996965a8f5c273f6cf67bbc448763404ed870748bcb49c7b2c66d41b4ab4ec72b26820bc660f64c26603c0ae34a52acb1b2d
   languageName: node
   linkType: hard
 
-"@sentry-internal/replay-canvas@npm:8.18.0":
-  version: 8.18.0
-  resolution: "@sentry-internal/replay-canvas@npm:8.18.0"
+"@sentry-internal/replay-canvas@npm:8.33.0":
+  version: 8.33.0
+  resolution: "@sentry-internal/replay-canvas@npm:8.33.0"
   dependencies:
-    "@sentry-internal/replay": 8.18.0
-    "@sentry/core": 8.18.0
-    "@sentry/types": 8.18.0
-    "@sentry/utils": 8.18.0
-  checksum: ef26456a1c7b03a008359e79ced77369586814bd537123ce4d2d6f17ef465b9b2c543426ab119a42f66273b4aed68fd82a717eeddea77b98d3e0c48d5ebd64fe
+    "@sentry-internal/replay": 8.33.0
+    "@sentry/core": 8.33.0
+    "@sentry/types": 8.33.0
+    "@sentry/utils": 8.33.0
+  checksum: b38e434e35fdc5a4f4e71c57b4a837d11c49352d80e4747b7456778e611dfeda2d8562f75ef8883edd6e89a55c4089aecdf44b45c9865e726795cbf9246635db
   languageName: node
   linkType: hard
 
-"@sentry-internal/replay@npm:8.18.0":
-  version: 8.18.0
-  resolution: "@sentry-internal/replay@npm:8.18.0"
+"@sentry-internal/replay@npm:8.33.0":
+  version: 8.33.0
+  resolution: "@sentry-internal/replay@npm:8.33.0"
   dependencies:
-    "@sentry-internal/browser-utils": 8.18.0
-    "@sentry/core": 8.18.0
-    "@sentry/types": 8.18.0
-    "@sentry/utils": 8.18.0
-  checksum: c69b78ea32d14135175a815f98a5b333c60f5745587006217bfcf473b274bb7b6ec2726c68308ab5298bed58c27ac0700f676b73c0a7a00f08ada0e4c5b23ac5
+    "@sentry-internal/browser-utils": 8.33.0
+    "@sentry/core": 8.33.0
+    "@sentry/types": 8.33.0
+    "@sentry/utils": 8.33.0
+  checksum: 833db03760d970f8b3b4151ed15525d1953232ea7cf621be5f4437d39a2ece714559fedc13b7edc1230a82ce5f0cd61a5f2d5b8bb2d7f3b672f1518c67018283
   languageName: node
   linkType: hard
 
-"@sentry/browser@npm:8.18.0":
-  version: 8.18.0
-  resolution: "@sentry/browser@npm:8.18.0"
+"@sentry/browser@npm:8.33.0":
+  version: 8.33.0
+  resolution: "@sentry/browser@npm:8.33.0"
   dependencies:
-    "@sentry-internal/browser-utils": 8.18.0
-    "@sentry-internal/feedback": 8.18.0
-    "@sentry-internal/replay": 8.18.0
-    "@sentry-internal/replay-canvas": 8.18.0
-    "@sentry/core": 8.18.0
-    "@sentry/types": 8.18.0
-    "@sentry/utils": 8.18.0
-  checksum: ccc1563c18845147cfe10785639d11de7e00ed157b464f7b700ef510711b41224f15205532ec286bee8ef4361c69a69535c63d27766ef0461b8978ee6b933658
+    "@sentry-internal/browser-utils": 8.33.0
+    "@sentry-internal/feedback": 8.33.0
+    "@sentry-internal/replay": 8.33.0
+    "@sentry-internal/replay-canvas": 8.33.0
+    "@sentry/core": 8.33.0
+    "@sentry/types": 8.33.0
+    "@sentry/utils": 8.33.0
+  checksum: f87acac6671c5cf6338e38b894639559f104d5e427a016299c69d66a6dc95119a420e4fefb4fb7b30148218e0d79c25faf6644e50a54143a488ef069e7d27288
   languageName: node
   linkType: hard
 
-"@sentry/core@npm:8.18.0":
-  version: 8.18.0
-  resolution: "@sentry/core@npm:8.18.0"
+"@sentry/core@npm:8.33.0":
+  version: 8.33.0
+  resolution: "@sentry/core@npm:8.33.0"
   dependencies:
-    "@sentry/types": 8.18.0
-    "@sentry/utils": 8.18.0
-  checksum: 9632d95585e25dffcf6b770a20e9ad2adb4f7f2aba4fc1b7f051eb869be8516eeafd0b64ab060230132bbef37fba69f1721233158656b380e10f4c61171cb983
+    "@sentry/types": 8.33.0
+    "@sentry/utils": 8.33.0
+  checksum: 53a7a0feb1ad568b3d3e7e9e43ef61537df79243aeb2e2b0c86dc2470501a4f6c3f21295dc60c1bcb90618d941d5191c197a4d609c63248bdedf761020347431
   languageName: node
   linkType: hard
 
-"@sentry/types@npm:8.18.0":
-  version: 8.18.0
-  resolution: "@sentry/types@npm:8.18.0"
-  checksum: 53d22c53b9006bad02cc05541dfd67e4b90dccdca7e4589c5cb4572a4f3616ca11260120a93508c9aaa9b4c743d4584fb890f5f87f23edb6b0f1c204fb049955
+"@sentry/types@npm:8.33.0":
+  version: 8.33.0
+  resolution: "@sentry/types@npm:8.33.0"
+  checksum: 938dfb44b00d0cb2c6689f8a1550fe8266eb0a8bff79b64b7bb46a2e19089189d2c2996a37ee3cd1054559d6fcdf0c47be2f742fb3fc73508153f3fad945b161
   languageName: node
   linkType: hard
 
-"@sentry/utils@npm:8.18.0":
-  version: 8.18.0
-  resolution: "@sentry/utils@npm:8.18.0"
+"@sentry/utils@npm:8.33.0":
+  version: 8.33.0
+  resolution: "@sentry/utils@npm:8.33.0"
   dependencies:
-    "@sentry/types": 8.18.0
-  checksum: f71fbcf59511b36362766be17265f4877fc1b79eb6664b2fbda56ff9136dd30c2867c5cbc39ce26b108ed47be230cf4bdf5fe4afdadce034dfe4f3ce572cfe44
+    "@sentry/types": 8.33.0
+  checksum: e0b22eea86461bfed1c486108677e2d43571a678041020d74dc48bb354b0dff11584b69e297272b39f180231cdffefb2157e13a0eeeae43b2fedac6b87d81728
   languageName: node
   linkType: hard
 
@@ -15026,7 +15026,7 @@ __metadata:
     "@json-editor/json-editor": 2.8.0
     "@material/layout-grid": 0.41.0
     "@material/top-app-bar": 1.1.1
-    "@sentry/browser": 8.18.0
+    "@sentry/browser": 8.33.0
     "@testing-library/jest-dom": 5.17.0
     "@testing-library/react": 11.2.7
     "@trust/webcrypto": 0.9.2
