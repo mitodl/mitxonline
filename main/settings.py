@@ -178,8 +178,6 @@ INSTALLED_APPS = (
     "wagtail",
     "modelcluster",
     "taggit",
-    # django-fsm-admin
-    "viewflow",
     # django-robots
     "robots",
     # django-reversion
@@ -215,6 +213,7 @@ INSTALLED_APPS = (
     "mitol.payment_gateway.apps.PaymentGatewayApp",
     "mitol.olposthog.apps.OlPosthog",
     # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
+    "viewflow",
 )
 # Only include the seed data app if this isn't running in prod
 # if ENVIRONMENT not in ("production", "prod"):
