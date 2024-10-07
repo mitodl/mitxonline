@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.103.2
+---------------
+
+- fix custom 404 template (#2414)
+- Update dependency @sentry/browser to v8.33.0 [SECURITY] (#2415)
+- Update dependency requests to v2.32.2 [SECURITY] (#2410)
+
 Version 0.103.1 (Released October 02, 2024)
 ---------------
 
