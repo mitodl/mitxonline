@@ -17,7 +17,7 @@ from hubspot_sync.task_helpers import sync_hubspot_user
 from mail import verification_api
 from main.constants import USER_REGISTRATION_FAILED_MSG
 from main.serializers import WriteableSerializerMethodField
-from openedx.api import validate_username_with_edx, validate_username_email_with_edx
+from openedx.api import validate_username_email_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.tasks import change_edx_user_email_async
 from users.models import ChangeEmailRequest, LegalAddress, User, UserProfile
