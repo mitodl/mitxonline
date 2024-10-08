@@ -67,8 +67,7 @@ def test_discount_factory_adjustment(discounts, products):
             if type(discount_logic) is DollarsOffDiscount:
                 discounted_price = product.price - discount.amount
 
-                if discounted_price < 0:
-                    discounted_price = 0
+                discounted_price = max(discounted_price, 0)
             elif type(discount_logic) is FixedPriceDiscount:
                 discounted_price = discount.amount
             elif type(discount_logic) is PercentDiscount:
