@@ -267,7 +267,7 @@ def test_username_validation_connection_exception(
     UserSerializer should raise a RequestsConnectionError or HTTPError if the connection to OpenEdx
     fails.  The serializer should raise a validation error.
     """
-    mocker.patch("openedx.api.validate_username_with_edx", side_effect=exception_raised)
+    mocker.patch("openedx.api.validate_username_email_with_edx", side_effect=exception_raised)
 
     serializer = UserSerializer(
         data={
