@@ -227,6 +227,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         request = self.context.get("request", None)
+        print("Validate Email and username")
         # Certain fields are required only if a new User is being created (i.e.: the request method is POST)
         if request is not None and request.method == "POST":
             if not data.get("password"):
@@ -237,11 +238,16 @@ class UserSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"username": "This field is required."}
                 )
+            if not data.get("email"):
+                raise serializers.ValidationError(
+                    {"email": "This field is required."}
+                )
 
         username = data.get("username")
+        email = data.get("email")
         if username:
             try:
-                openedx_validation_msg = validate_username_with_edx(username)
+                openedx_validation_msg = validate_username_with_edx(username, email)
                 openedx_validation_msg = OPENEDX_USERNAME_VALIDATION_MSGS_MAP.get(
                     openedx_validation_msg, openedx_validation_msg
                 )
