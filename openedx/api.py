@@ -886,7 +886,7 @@ def unsubscribe_from_edx_course_emails(user, course_run):
     return result
 
 
-def validate_username_with_edx(username, email):
+def validate_username_email_with_edx(username, email):
     """
     Returns validation message after validating it with edX.
 
