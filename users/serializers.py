@@ -41,11 +41,8 @@ USERNAME_ERROR_MSG = "Username can only contain letters, numbers, spaces, and th
 USERNAME_ALREADY_EXISTS_MSG = (
     "A user already exists with this username. Please try a different one."
 )
-EMAIL_CONFLICT_MSG = (
-    "This email is already associated with an existing account")
-RETIRED_EMAIL_MSG = (
-    "This email is associated to a retired account."
-)
+EMAIL_CONFLICT_MSG = "This email is already associated with an existing account"
+RETIRED_EMAIL_MSG = "This email is associated to a retired account."
 
 OPENEDX_VALIDATION_MSGS_MAP = {
     "It looks like this username is already taken": USERNAME_ALREADY_EXISTS_MSG,
@@ -245,9 +242,7 @@ class UserSerializer(serializers.ModelSerializer):
                     {"username": "This field is required."}
                 )
             if not data.get("email"):
-                raise serializers.ValidationError(
-                    {"email": "This field is required."}
-                )
+                raise serializers.ValidationError({"email": "This field is required."})
 
         username = data.get("username")
         email = data.get("email")
