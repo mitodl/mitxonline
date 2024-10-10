@@ -17,7 +17,7 @@ from hubspot_sync.task_helpers import sync_hubspot_user
 from mail import verification_api
 from main.constants import USER_REGISTRATION_FAILED_MSG
 from main.serializers import WriteableSerializerMethodField
-from openedx.api import validate_username_with_edx
+from openedx.api import validate_username_email_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.tasks import change_edx_user_email_async
 from users.models import ChangeEmailRequest, LegalAddress, User, UserProfile
@@ -41,9 +41,13 @@ USERNAME_ERROR_MSG = "Username can only contain letters, numbers, spaces, and th
 USERNAME_ALREADY_EXISTS_MSG = (
     "A user already exists with this username. Please try a different one."
 )
+EMAIL_CONFLICT_MSG = "This email is already associated with an existing account"
+RETIRED_EMAIL_MSG = "This email is associated to a retired account."
 
-OPENEDX_USERNAME_VALIDATION_MSGS_MAP = {
-    "It looks like this username is already taken": USERNAME_ALREADY_EXISTS_MSG
+OPENEDX_VALIDATION_MSGS_MAP = {
+    "It looks like this username is already taken": USERNAME_ALREADY_EXISTS_MSG,
+    "This email is already associated with an existing account": EMAIL_CONFLICT_MSG,
+    "This email is associated to a retired account.": RETIRED_EMAIL_MSG,
 }
 
 EMAIL_ERROR_MSG = "Email address already exists in the system."
@@ -237,12 +241,17 @@ class UserSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"username": "This field is required."}
                 )
+            if not data.get("email"):
+                raise serializers.ValidationError({"email": "This field is required."})
 
         username = data.get("username")
+        email = data.get("email")
         if username:
             try:
-                openedx_validation_msg = validate_username_with_edx(username)
-                openedx_validation_msg = OPENEDX_USERNAME_VALIDATION_MSGS_MAP.get(
+                openedx_validation_msg = validate_username_email_with_edx(
+                    username, email
+                )
+                openedx_validation_msg = OPENEDX_VALIDATION_MSGS_MAP.get(
                     openedx_validation_msg, openedx_validation_msg
                 )
             except (
@@ -254,7 +263,7 @@ class UserSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)  # noqa: B904
 
             if openedx_validation_msg:
-                raise serializers.ValidationError({"username": openedx_validation_msg})
+                raise serializers.ValidationError(openedx_validation_msg)
 
         return data
 
