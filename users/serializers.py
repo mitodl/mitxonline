@@ -248,7 +248,9 @@ class UserSerializer(serializers.ModelSerializer):
         email = data.get("email")
         if username:
             try:
-                openedx_validation_msg = validate_username_email_with_edx(username, email)
+                openedx_validation_msg = validate_username_email_with_edx(
+                    username, email
+                )
                 openedx_validation_msg = OPENEDX_VALIDATION_MSGS_MAP.get(
                     openedx_validation_msg, openedx_validation_msg
                 )
