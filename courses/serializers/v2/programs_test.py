@@ -11,6 +11,7 @@ from courses.factories import (  # noqa: F401
 )
 from courses.models import CoursesTopic, Department
 from courses.serializers.v1.departments import DepartmentSerializer
+from courses.serializers.v2.courses import CourseSerializer
 from courses.serializers.v2.programs import (
     ProgramRequirementTreeSerializer,
     ProgramSerializer,
@@ -95,5 +96,9 @@ def test_serialize_program(
             "end_date": program_with_empty_requirements.end_date,
             "enrollment_start": program_with_empty_requirements.enrollment_start,
             "enrollment_end": program_with_empty_requirements.enrollment_end,
+            "required_prerequisites": any(
+                CourseSerializer(course).required_prerequisites
+                for course in [course1, course2]
+            ),
         },
     )

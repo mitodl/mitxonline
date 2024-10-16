@@ -9,6 +9,7 @@ from courses.serializers.base import (
     get_thumbnail_url,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
+from courses.serializers.v2.courses import CourseSerializer
 from main.serializers import StrictFieldsSerializer
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     departments = DepartmentSerializer(many=True, read_only=True)
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
+    required_prerequisites = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         return [course[0].id for course in instance.courses if course[0].live]
@@ -33,6 +35,17 @@ class ProgramSerializer(serializers.ModelSerializer):
             "required": [course.id for course in instance.required_courses],
             "electives": [course.id for course in instance.elective_courses],
         }
+
+    def get_required_prerequisites(self, instance):
+        """
+        Check if any member course has required_prerequisites = True
+        Returns:
+            bool: True when any member course has required_prerequisites = True. False otherwise.
+        """
+        return any(
+            CourseSerializer(course).required_prerequisites
+            for course in instance.courses
+        )
 
     def get_req_tree(self, instance):
         req_root = instance.get_requirements_root()
@@ -83,6 +96,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "end_date",
             "enrollment_start",
             "enrollment_end",
+            "required_prerequisites",
         ]
 
 
