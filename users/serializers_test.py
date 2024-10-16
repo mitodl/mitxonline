@@ -96,7 +96,7 @@ def test_create_user_serializer(settings, valid_address_dict, test_case_dup):
     responses.add(
         responses.POST,
         settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
-        json={"validation_decisions": {"username": ""}},
+        json={"validation_decisions": {"username": "", "email": ""}},
         status=status.HTTP_200_OK,
     )
     serializer = UserSerializer(
@@ -202,7 +202,7 @@ def test_username_validation(
     responses.add(
         responses.POST,
         settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
-        json={"validation_decisions": {"username": ""}},
+        json={"validation_decisions": {"username": "", "email": ""}},
         status=status.HTTP_200_OK,
     )
     # Seed an initial user with a constant username
