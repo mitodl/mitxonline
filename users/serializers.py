@@ -41,14 +41,7 @@ USERNAME_ERROR_MSG = "Username can only contain letters, numbers, spaces, and th
 USERNAME_ALREADY_EXISTS_MSG = (
     "A user already exists with this username. Please try a different one."
 )
-EMAIL_CONFLICT_MSG = "This email is already associated with an existing account"
-RETIRED_EMAIL_MSG = "This email is associated to a retired account."
 
-OPENEDX_VALIDATION_MSGS_MAP = {
-    "It looks like this username is already taken": USERNAME_ALREADY_EXISTS_MSG,
-    "This email is already associated with an existing account": EMAIL_CONFLICT_MSG,
-    "This email is associated to a retired account.": RETIRED_EMAIL_MSG,
-}
 
 EMAIL_ERROR_MSG = "Email address already exists in the system."
 
@@ -248,10 +241,7 @@ class UserSerializer(serializers.ModelSerializer):
         email = data.get("email")
         if username:
             try:
-                openedx_validation_msg = validate_username_email_with_edx(username, email)
-                openedx_validation_msg = OPENEDX_VALIDATION_MSGS_MAP.get(
-                    openedx_validation_msg, openedx_validation_msg
-                )
+                openedx_validation_msg_dict = validate_username_email_with_edx(username, email)
             except (
                 HTTPError,
                 RequestsConnectionError,
@@ -260,8 +250,8 @@ class UserSerializer(serializers.ModelSerializer):
                 log.exception("Unable to create user account", exc)  # noqa: PLE1205, TRY401
                 raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)  # noqa: B904
 
-            if openedx_validation_msg:
-                raise serializers.ValidationError(openedx_validation_msg)
+            if openedx_validation_msg_dict:
+                raise serializers.ValidationError(openedx_validation_msg_dict)
 
         return data
 

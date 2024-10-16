@@ -912,7 +912,7 @@ def validate_username_email_with_edx(username, email):
     if resp.status_code != status.HTTP_200_OK:
         raise EdxApiRegistrationValidationException(username, resp)
     result = resp.json()
-    return result["validation_decisions"]["username"]
+    return result["validation_decisions"]
 
 
 def bulk_retire_edx_users(usernames):
