@@ -24,6 +24,7 @@ class ProgramSerializer(serializers.ModelSerializer):
     departments = DepartmentSerializer(many=True, read_only=True)
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
+    required_prerequisites = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         return [course[0].id for course in instance.courses if course[0].live]
@@ -33,6 +34,16 @@ class ProgramSerializer(serializers.ModelSerializer):
             "required": [course.id for course in instance.required_courses],
             "electives": [course.id for course in instance.elective_courses],
         }
+
+    def get_required_prerequisites(self, instance):
+        """
+        Check if the prerequisites field is populated in the program page CMS.
+        """
+        return bool(
+            hasattr(instance, "page")
+            and hasattr(instance.page, "prerequisites")
+            and instance.page.prerequisites != ""
+        )
 
     def get_req_tree(self, instance):
         req_root = instance.get_requirements_root()
@@ -83,6 +94,7 @@ class ProgramSerializer(serializers.ModelSerializer):
             "end_date",
             "enrollment_start",
             "enrollment_end",
+            "required_prerequisites",
         ]
 
 
