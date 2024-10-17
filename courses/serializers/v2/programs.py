@@ -9,7 +9,6 @@ from courses.serializers.base import (
     get_thumbnail_url,
 )
 from courses.serializers.v1.departments import DepartmentSerializer
-from courses.serializers.v2.courses import CourseSerializer
 from main.serializers import StrictFieldsSerializer
 
 logger = logging.getLogger(__name__)

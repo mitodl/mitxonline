@@ -11,7 +11,6 @@ from courses.factories import (  # noqa: F401
 )
 from courses.models import CoursesTopic, Department
 from courses.serializers.v1.departments import DepartmentSerializer
-from courses.serializers.v2.courses import CourseSerializer
 from courses.serializers.v2.programs import (
     ProgramRequirementTreeSerializer,
     ProgramSerializer,
@@ -25,9 +24,7 @@ pytestmark = [pytest.mark.django_db]
 @pytest.mark.parametrize(
     "certificate_type", ["MicroMasters Credential", "Certificate of Completion"]
 )
-@pytest.mark.parametrize(
-    "prerequisites", ["program prerequisites", None , '']
-)
+@pytest.mark.parametrize("prerequisites", ["program prerequisites", None, ""])
 def test_serialize_program(
     mock_context,
     remove_tree,
