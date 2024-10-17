@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.103.2
+Version 0.103.2 (Released October 17, 2024)
 ---------------
 
 - fix custom 404 template (#2414)
