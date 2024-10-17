@@ -43,8 +43,8 @@ class ProgramSerializer(serializers.ModelSerializer):
             bool: True when any member course has required_prerequisites = True. False otherwise.
         """
         return any(
-            CourseSerializer(course).required_prerequisites
-            for course in instance.courses
+            CourseSerializer(course).data.get('required_prerequisites')
+            for course in instance.required_courses + instance.elective_courses
         )
 
     def get_req_tree(self, instance):

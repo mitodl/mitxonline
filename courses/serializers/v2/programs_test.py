@@ -97,8 +97,8 @@ def test_serialize_program(
             "enrollment_start": program_with_empty_requirements.enrollment_start,
             "enrollment_end": program_with_empty_requirements.enrollment_end,
             "required_prerequisites": any(
-                CourseSerializer(course).required_prerequisites
+                CourseSerializer(course).data.get('required_prerequisites')
                 for course in [course1, course2]
-            ),
+            ) if not remove_tree else False,
         },
     )
