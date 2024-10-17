@@ -3362,27 +3362,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@pankod/refine-core@npm:3.22.1":
-  version: 3.22.1
-  resolution: "@pankod/refine-core@npm:3.22.1"
-  dependencies:
-    export-to-csv-fix-source-map: ^0.2.1
-    humanize-string: ^2.1.0
-    lodash: ^4.17.21
-    lodash-es: ^4.17.21
-    papaparse: ^5.3.0
-    pluralize: ^8.0.0
-    qs: ^6.10.1
-    react-query: ^3.19.2
-    tslib: ^2.3.1
-  peerDependencies:
-    react: ^17.0.0 || ^18.0.0
-    react-dom: ^17.0.0 || ^18.0.0
-  checksum: 11b2de7710178b8886c1074258d477571db9b39ee3961840a9ba0e867f393db9f59287b1fb051f8e6d396d196e9e4da55cb99c675e1091e490903248be533232
-  languageName: node
-  linkType: hard
-
-"@pankod/refine-core@npm:^3.22.1":
+"@pankod/refine-core@npm:3.103.0, @pankod/refine-core@npm:^3.22.1":
   version: 3.103.0
   resolution: "@pankod/refine-core@npm:3.103.0"
   dependencies:
@@ -8201,15 +8181,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"decamelize@npm:^2.0.0":
-  version: 2.0.0
-  resolution: "decamelize@npm:2.0.0"
-  dependencies:
-    xregexp: 4.0.0
-  checksum: e1d8274e6e6f80654fd5b96a6a3bef50f8979df10f1ab35fe2406f567df9588640a6f29e1414bec30983275e2041fb87e858df7cfd5661ea578196989d73de31
-  languageName: node
-  linkType: hard
-
 "decamelize@npm:^4.0.0":
   version: 4.0.0
   resolution: "decamelize@npm:4.0.0"
@@ -11540,15 +11511,6 @@ __metadata:
   version: 2.1.0
   resolution: "human-signals@npm:2.1.0"
   checksum: b87fd89fce72391625271454e70f67fe405277415b48bcc0117ca73d31fa23a4241787afdc8d67f5a116cf37258c052f59ea82daffa72364d61351423848e3b8
-  languageName: node
-  linkType: hard
-
-"humanize-string@npm:^2.1.0":
-  version: 2.1.0
-  resolution: "humanize-string@npm:2.1.0"
-  dependencies:
-    decamelize: ^2.0.0
-  checksum: 75d6b6a12b1284e41b736eef0f99ca77609895ca6074eb314a08f2d6aefc68858003f1c5ead2027a16cab650ecbe9b92bece80f5ca99af700962647ee5f6ab56
   languageName: node
   linkType: hard
 
@@ -15155,7 +15117,7 @@ __metadata:
     "@ant-design/icons": ^5.0.0
     "@craco/craco": 6.4.5
     "@pankod/refine-antd": 3.22.1
-    "@pankod/refine-core": 3.22.1
+    "@pankod/refine-core": 3.103.0
     "@pankod/refine-react-router-v6": 3.40.0
     "@pankod/refine-simple-rest": 3.22.1
     "@testing-library/jest-dom": 5.16.4
@@ -23541,13 +23503,6 @@ __metadata:
   version: 2.2.0
   resolution: "xmlchars@npm:2.2.0"
   checksum: 8c70ac94070ccca03f47a81fcce3b271bd1f37a591bf5424e787ae313fcb9c212f5f6786e1fa82076a2c632c0141552babcd85698c437506dfa6ae2d58723062
-  languageName: node
-  linkType: hard
-
-"xregexp@npm:4.0.0":
-  version: 4.0.0
-  resolution: "xregexp@npm:4.0.0"
-  checksum: ce644eb022fa3370dbf53e1b6f28d7a25dd6cca711ba463c129141429d11776a1239c604370bdcaf93c5028ff8d75cac2a10644377cb649b985c0094da5ef693
   languageName: node
   linkType: hard
 
