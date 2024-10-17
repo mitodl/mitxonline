@@ -38,13 +38,12 @@ class ProgramSerializer(serializers.ModelSerializer):
 
     def get_required_prerequisites(self, instance):
         """
-        Check if any member course has required_prerequisites = True
-        Returns:
-            bool: True when any member course has required_prerequisites = True. False otherwise.
+        Check if the prerequisites field is populated in the program page CMS.
         """
-        return any(
-            CourseSerializer(course).data.get("required_prerequisites")
-            for course in instance.required_courses + instance.elective_courses
+        return bool(
+            hasattr(instance, "page")
+            and hasattr(instance.page, "prerequisites")
+            and instance.page.prerequisites != ""
         )
 
     def get_req_tree(self, instance):
