@@ -158,7 +158,7 @@ class AuthStateMachine(RuleBasedStateMachine):
     )
     mock_edx_username_patcher = patch(
         "users.serializers.validate_username_email_with_edx",
-        return_value="",
+        return_value={"username": "", "email": ""},
     )
     openedx_api_patcher = patch("authentication.pipeline.user.openedx_api")
     openedx_tasks_patcher = patch("authentication.pipeline.user.openedx_tasks")
