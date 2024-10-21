@@ -432,7 +432,7 @@ class FlexiblePriceAPITests(FlexiblePriceBaseTestCase):
 
         return determine_courseware_flexible_price_discount(product, user)
 
-    def create_fp_and_compare_tiers(  # noqa: PLR0913
+    def create_fp_and_compare_tiers(
         self, courseware_object, income_usd, country_code, user, expected
     ):
         """
