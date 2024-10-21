@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.104.0
+Version 0.104.0 (Released October 21, 2024)
 ---------------
 
 - Add required_prerequisites to program API (#2419)
