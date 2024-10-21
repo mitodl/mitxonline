@@ -283,11 +283,13 @@ def test_product_managers():
     """Test that the default manager returns only active products and the 'all_objects' manager returns all the
     products
     """
-    in_active_products = ProductFactory.create_batch(3, is_active=False)
+    inactive_products = ProductFactory.create_batch(3, is_active=False)
+    inactive_products.sort(key=lambda obj: obj.id)
     active_products = ProductFactory.create_batch(2, is_active=True)
+    active_products.sort(key=lambda obj: obj.id)
 
-    assert list(Product.objects.all()) == active_products
-    assert list(Product.all_objects.all()) == in_active_products + active_products
+    assert list(Product.objects.all().order_by("id")) == active_products
+    assert list(Product.all_objects.all().order_by("id")) == inactive_products + active_products
 
 
 def test_product_multiple_active_for_single_purchasable_object():
