@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.104.0
+---------------
+
+- Add required_prerequisites to program API (#2419)
+- Update dependency django-cors-headers to v4 (#2372)
+- Update dependency django-ipware to v7 (#2375)
+- Update dependency django to v4.2.16 [SECURITY] (#2418)
+
 Version 0.103.2 (Released October 17, 2024)
 ---------------
 
