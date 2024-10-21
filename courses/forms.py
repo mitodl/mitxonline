@@ -187,7 +187,7 @@ class ProgramAdminForm(ModelForm):
 
     def __init__(self, *args, **kwargs):
         initial = kwargs.pop("initial", {})
-        instance = kwargs.get("instance", None)
+        instance = kwargs.get("instance")
 
         if instance is not None and instance.requirements_root is not None:
             initial["requirements"] = self._serialize_requirements(
