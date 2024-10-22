@@ -105,5 +105,7 @@ def test_serialize_program(
             "enrollment_start": program_with_empty_requirements.enrollment_start,
             "enrollment_end": program_with_empty_requirements.enrollment_end,
             "required_prerequisites": required_prerequisites,
+            "duration": program_with_empty_requirements.page.length,
+            "time_commitment": program_with_empty_requirements.page.effort,
         },
     )
