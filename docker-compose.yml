@@ -23,7 +23,7 @@ x-extra-hosts:
 
 services:
   db:
-    image: postgres:16.4
+    image: postgres:15.8
     ports:
       - "5432"
     environment:
@@ -67,8 +67,10 @@ services:
       << : *py-environment
       PORT: 8011
     env_file: .env
-    links:
+    depends_on:
       - db
+    links:
+      - db:db
       - redis
       # these are links instead of `depends_on`
       # because if we just want a shell for `web` we don't want to run these
