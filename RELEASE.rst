@@ -1,6 +1,14 @@
 Release Notes
 =============
 
+Version 0.104.1
+---------------
+
+- Update dependency wagtail-factories to v4 (#2298)
+- add duration and time_commitment to program API (#2422)
+- Update dependency django-webpack-loader to v3 (#2378)
+- Update postgres Docker tag to v16 (#2329)
+
 Version 0.104.0 (Released October 21, 2024)
 ---------------
 
