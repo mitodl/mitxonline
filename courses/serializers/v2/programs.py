@@ -25,6 +25,8 @@ class ProgramSerializer(serializers.ModelSerializer):
     topics = serializers.SerializerMethodField()
     certificate_type = serializers.SerializerMethodField()
     required_prerequisites = serializers.SerializerMethodField()
+    duration = serializers.SerializerMethodField()
+    time_commitment = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         return [course[0].id for course in instance.courses if course[0].live]
@@ -44,6 +46,24 @@ class ProgramSerializer(serializers.ModelSerializer):
             and hasattr(instance.page, "prerequisites")
             and instance.page.prerequisites != ""
         )
+
+    def get_duration(self, instance):
+        """
+        Get the length/duration field from the program page CMS.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "length"):
+            return instance.page.length
+
+        return None
+
+    def get_time_commitment(self, instance):
+        """
+        Get the effort/time_commitment field from the program page CMS.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "effort"):
+            return instance.page.effort
+
+        return None
 
     def get_req_tree(self, instance):
         req_root = instance.get_requirements_root()
@@ -95,6 +115,8 @@ class ProgramSerializer(serializers.ModelSerializer):
             "enrollment_start",
             "enrollment_end",
             "required_prerequisites",
+            "duration",
+            "time_commitment",
         ]
 
 
