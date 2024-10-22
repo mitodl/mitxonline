@@ -7,7 +7,6 @@ import logging
 from django.core.exceptions import ValidationError
 from mitol.mail.api import get_message_sender
 
-from courses.models import Course
 from flexiblepricing.constants import (
     FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE,
     FLEXIBLE_PRICE_EMAIL_APPROVAL_SUBJECT,
@@ -36,9 +35,7 @@ def generate_flexible_price_email(flexible_price):
     Returns:
         dict: {"subject": (str), "body": (str)}
     """
-    program_name = (
-        flexible_price.courseware_object.title
-    )
+    program_name = flexible_price.courseware_object.title
     if flexible_price.status == FlexiblePriceStatus.APPROVED:
         price = flexible_price.tier.discount.friendly_format()
         message = FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE.format(
@@ -53,12 +50,8 @@ def generate_flexible_price_email(flexible_price):
             program_name=program_name
         )
     elif flexible_price.status == FlexiblePriceStatus.RESET:
-        message = FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE.format(
-            program_name=program_name
-        )
-        subject = FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT.format(
-            program_name=program_name
-        )
+        message = FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE.format(program_name=program_name)
+        subject = FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT.format(program_name=program_name)
     else:
         raise ValidationError(
             "Invalid status on FlexiblePrice for generate_flexible_price_email()"  # noqa: EM101
