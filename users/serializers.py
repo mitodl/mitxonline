@@ -241,7 +241,9 @@ class UserSerializer(serializers.ModelSerializer):
         email = data.get("email")
         if username:
             try:
-                openedx_validation_msg_dict = validate_username_email_with_edx(username, email)
+                openedx_validation_msg_dict = validate_username_email_with_edx(
+                    username, email
+                )
             except (
                 HTTPError,
                 RequestsConnectionError,
@@ -249,7 +251,10 @@ class UserSerializer(serializers.ModelSerializer):
             ) as exc:
                 log.exception("Unable to create user account", exc)  # noqa: PLE1205, TRY401
                 raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)  # noqa: B904
-            if openedx_validation_msg_dict["username"] or openedx_validation_msg_dict["email"]:
+            if (
+                openedx_validation_msg_dict["username"]
+                or openedx_validation_msg_dict["email"]
+            ):
                 raise serializers.ValidationError(openedx_validation_msg_dict)
 
         return data
