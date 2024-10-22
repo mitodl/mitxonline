@@ -67,10 +67,8 @@ services:
       << : *py-environment
       PORT: 8011
     env_file: .env
-    depends_on:
-      - db
     links:
-      - db:db
+      - db
       - redis
       # these are links instead of `depends_on`
       # because if we just want a shell for `web` we don't want to run these
