@@ -7,7 +7,6 @@ import logging
 from django.core.exceptions import ValidationError
 from mitol.mail.api import get_message_sender
 
-from courses.models import Course
 from flexiblepricing.constants import (
     FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE,
     FLEXIBLE_PRICE_EMAIL_APPROVAL_SUBJECT,
@@ -36,34 +35,23 @@ def generate_flexible_price_email(flexible_price):
     Returns:
         dict: {"subject": (str), "body": (str)}
     """
-    courseware_readable_id_formatted = (
-        flexible_price.courseware_object.course_number
-        if isinstance(flexible_price.courseware_object, Course)
-        else flexible_price.courseware_object.readable_id
-    )
-    program_name_with_course_number = (
-        courseware_readable_id_formatted + " " + flexible_price.courseware_object.title
-    )
+    program_name = flexible_price.courseware_object.title
     if flexible_price.status == FlexiblePriceStatus.APPROVED:
         price = flexible_price.tier.discount.friendly_format()
         message = FLEXIBLE_PRICE_EMAIL_APPROVAL_MESSAGE.format(
-            program_name=program_name_with_course_number, price=price
+            program_name=program_name, price=price
         )
         subject = FLEXIBLE_PRICE_EMAIL_APPROVAL_SUBJECT.format(
-            program_name=program_name_with_course_number
+            program_name=program_name
         )
     elif flexible_price.status == FlexiblePriceStatus.PENDING_MANUAL_APPROVAL:
         message = FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_MESSAGE
         subject = FLEXIBLE_PRICE_EMAIL_DOCUMENTS_RECEIVED_SUBJECT.format(
-            program_name=program_name_with_course_number
+            program_name=program_name
         )
     elif flexible_price.status == FlexiblePriceStatus.RESET:
-        message = FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE.format(
-            program_name=program_name_with_course_number
-        )
-        subject = FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT.format(
-            program_name=program_name_with_course_number
-        )
+        message = FLEXIBLE_PRICE_EMAIL_RESET_MESSAGE.format(program_name=program_name)
+        subject = FLEXIBLE_PRICE_EMAIL_RESET_SUBJECT.format(program_name=program_name)
     else:
         raise ValidationError(
             "Invalid status on FlexiblePrice for generate_flexible_price_email()"  # noqa: EM101
@@ -76,7 +64,7 @@ def generate_flexible_price_email(flexible_price):
                     "subject": subject,
                     "first_name": flexible_price.user.legal_address.first_name,
                     "message": message,
-                    "program_name": program_name_with_course_number,
+                    "program_name": program_name,
                 },
             )
     except:  # noqa: E722
