@@ -57,7 +57,7 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
 
     const handleOk = () => {
         if (justification.length === 0 && status !== financialAssistanceRequestStatus.reset) {
-            displayToast({
+            displayToast?.({
                 message: "Please choose a justification.",
                 description: "Error",
                 key: "bad-justification-error",
@@ -69,7 +69,7 @@ export const FlexiblePricingStatusModal: React.FC<IFlexiblePriceStatusModalProps
         }
 
         if (status === financialAssistanceRequestStatus.denied && (emailBody.length === 0 || emailSubject.length === 0)) {
-            displayToast({
+            displayToast?.({
                 message: "Please add email subject and body.",
                 description: "Error",
                 key: "bad-email-content-error",
