@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.104.1
+---------------
+
+- revert postgres upgrade (#2424)
+- Update dependency @pankod/refine-antd to v3.70.4 (#2395)
+- Don't show course and program ids in financial assistance emails (#2421)
+- Update dependency @pankod/refine-core to v3.103.0 (#2396)
+- Update dependency wagtail-factories to v4 (#2298)
+- add duration and time_commitment to program API (#2422)
+- Update dependency django-webpack-loader to v3 (#2378)
+- Update postgres Docker tag to v16 (#2329)
+
 Version 0.104.0 (Released October 21, 2024)
 ---------------
 
