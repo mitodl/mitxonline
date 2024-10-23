@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.104.1
+Version 0.104.1 (Released October 23, 2024)
 ---------------
 
 - revert postgres upgrade (#2424)
