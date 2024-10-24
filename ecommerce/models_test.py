@@ -286,8 +286,8 @@ def test_product_managers():
     inactive_products = ProductFactory.create_batch(3, is_active=False)
     active_products = ProductFactory.create_batch(2, is_active=True)
 
-    assert set(Product.objects.all().order_by("id")) == set(active_products)
-    assert set(Product.all_objects.all().order_by("id")) == set(inactive_products + active_products)
+    assert list(Product.objects.all().order_by("id")) == list(active_products)
+    assert list(Product.all_objects.all().order_by("id")) == list(inactive_products + active_products)
 
 
 def test_product_multiple_active_for_single_purchasable_object():
