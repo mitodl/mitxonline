@@ -17,7 +17,7 @@ from hubspot_sync.task_helpers import sync_hubspot_user
 from mail import verification_api
 from main.constants import USER_REGISTRATION_FAILED_MSG
 from main.serializers import WriteableSerializerMethodField
-from openedx.api import validate_username_with_edx
+from openedx.api import validate_username_email_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.tasks import change_edx_user_email_async
 from users.models import ChangeEmailRequest, LegalAddress, User, UserProfile
@@ -42,9 +42,6 @@ USERNAME_ALREADY_EXISTS_MSG = (
     "A user already exists with this username. Please try a different one."
 )
 
-OPENEDX_USERNAME_VALIDATION_MSGS_MAP = {
-    "It looks like this username is already taken": USERNAME_ALREADY_EXISTS_MSG
-}
 
 EMAIL_ERROR_MSG = "Email address already exists in the system."
 
@@ -237,13 +234,15 @@ class UserSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"username": "This field is required."}
                 )
+            if not data.get("email"):
+                raise serializers.ValidationError({"email": "This field is required."})
 
         username = data.get("username")
+        email = data.get("email")
         if username:
             try:
-                openedx_validation_msg = validate_username_with_edx(username)
-                openedx_validation_msg = OPENEDX_USERNAME_VALIDATION_MSGS_MAP.get(
-                    openedx_validation_msg, openedx_validation_msg
+                openedx_validation_msg_dict = validate_username_email_with_edx(
+                    username, email
                 )
             except (
                 HTTPError,
@@ -252,9 +251,11 @@ class UserSerializer(serializers.ModelSerializer):
             ) as exc:
                 log.exception("Unable to create user account", exc)  # noqa: PLE1205, TRY401
                 raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)  # noqa: B904
-
-            if openedx_validation_msg:
-                raise serializers.ValidationError({"username": openedx_validation_msg})
+            if (
+                openedx_validation_msg_dict["username"]
+                or openedx_validation_msg_dict["email"]
+            ):
+                raise serializers.ValidationError(openedx_validation_msg_dict)
 
         return data
 
