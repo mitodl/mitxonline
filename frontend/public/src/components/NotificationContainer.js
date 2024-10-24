@@ -80,6 +80,7 @@ export class NotificationContainer extends React.Component<Props, State> {
         className="notifications order-2"
         id="notifications-container"
         ref={this.headingRef}
+        tabIndex="-1"
       >
         {Object.keys(userNotifications).map((notificationKey, i) => {
           const dismiss = partial(this.onDismiss, [notificationKey])
