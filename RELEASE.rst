@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.104.2
+Version 0.104.2 (Released October 24, 2024)
 ---------------
 
 - fix flaky test ordering (#2427)
