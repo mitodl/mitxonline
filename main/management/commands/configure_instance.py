@@ -130,7 +130,7 @@ class Command(BaseCommand):
         if kwargs["tutor"]:
             return ("local.edly.io", "")
         elif kwargs["tutordev"]:
-            return ("local.edly.io", ":8000")
+            return ("local.edly.io:8000", ":8000")
         else:
             return ("edx.odl.local:18000", ":18000")
 
@@ -165,19 +165,20 @@ class Command(BaseCommand):
                     )
                     exit(-1)  # noqa: PLR1722
 
-                redirects = "\n".join(  # noqa: F841
+                redirects = "\n".join(
                     [
                         f"http://{edx_host}/auth/complete/mitxpro-oauth2/",
                         f"http://{kwargs['gateway']}{edx_gateway_port}/auth/complete/mitxpro-oauth2/",
                     ]
                 )
 
-            (oauth2_app, created) = Application.objects.get_or_create(
+            (oauth2_app, _) = Application.objects.get_or_create(
                 name="edx-oauth-app",
                 defaults={
                     "client_type": "confidential",
                     "authorization_grant_type": "authorization-code",
                     "skip_authorization": True,
+                    "redirect_uris": redirects,
                 },
             )
 
