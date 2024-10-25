@@ -200,7 +200,7 @@ export const FlexiblePricingList: React.FC = () => {
                 <Col sm={24}>
                     <List
                         title="Flexible Pricing Requests"
-                        pageHeaderProps={{ subTitle: <RefreshTableButton isFetching={tableQueryResult.isFetching} refreshList={refreshList} /> }}
+                        headerProps={{ subTitle: <RefreshTableButton isFetching={tableQueryResult.isFetching} refreshList={refreshList} /> }}
                     >
                         <Table {...tableProps} rowKey="id">
                             <Table.Column
