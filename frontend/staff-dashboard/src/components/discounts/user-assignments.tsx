@@ -93,7 +93,7 @@ export const UserAssignments = (props: IUserAssignmentsTableProps) => {
     const customButtons = isManagement ? (<Button size="middle" onClick={() => setShowAddModal(true)}><PlusSquareOutlined /> Assign User</Button>) : null;
 
     return (<>
-        <List title="Assigned Users" resource="discounts/user" canCreate={false} pageHeaderProps={{ extra: (customButtons)}}>
+        <List title="Assigned Users" resource="discounts/user" canCreate={false} headerProps={{ extra: (customButtons)}}>
             <Table {...tableProps} rowKey="id">
                 <Table.Column dataIndex="id" title="ID"></Table.Column>
                 <Table.Column dataIndex="user" title="User" render={(value: any) => value.name}></Table.Column>

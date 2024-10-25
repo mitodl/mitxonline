@@ -88,7 +88,7 @@ export const Products = (props: IProductsTableProps) => {
 
   return (
       <>
-        <List title="Products" canCreate={false} pageHeaderProps={{ extra: (customButtons)}}>
+        <List title="Products" canCreate={false} headerProps={{ extra: (customButtons)}}>
             <Table {...tableProps} rowKey="id">
                 <Table.Column dataIndex="id" title="ID"></Table.Column>
                 <Table.Column
