@@ -81,7 +81,7 @@ class CourseFactory(DjangoModelFactory):
     page = factory.RelatedFactory("cms.factories.CoursePageFactory", "course")
 
     @factory.post_generation
-    def departments(self, create, extracted, **kwargs):  # noqa: ARG002
+    def departments(self, create, extracted, **kwargs):  # noqa: ARG002, F811
         if not create or not extracted:
             return
         self.departments.add(*extracted)
