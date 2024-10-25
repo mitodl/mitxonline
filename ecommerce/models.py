@@ -186,7 +186,7 @@ class Basket(TimestampedModel):
                     ):
                         all_discounts_found = False
 
-        if all_items_found is False or all_discounts_found is False:
+        if all_items_found is False or all_discounts_found is False:  # noqa: SIM103
             return False
 
         return True
@@ -359,7 +359,7 @@ class Discount(TimestampedModel):
         ):
             return False
 
-        if self.expiration_date is not None and self.expiration_date <= datetime.now(
+        if self.expiration_date is not None and self.expiration_date <= datetime.now(  # noqa: SIM103
             pytz.timezone(TIME_ZONE)
         ):
             return False
