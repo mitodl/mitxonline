@@ -1,6 +1,15 @@
 Release Notes
 =============
 
+Version 0.105.0
+---------------
+
+- Update dependency postcss to v8.4.47 (#2434)
+- add css to refine dashboard after refine-antd upgrades to v4 (#2431)
+- Update dependency @pankod/refine-antd to v4 (#2399)
+- [pre-commit.ci] pre-commit autoupdate (#2273)
+- Notifications set tab-index to -1 (#2426)
+
 Version 0.104.2 (Released October 24, 2024)
 ---------------
 
