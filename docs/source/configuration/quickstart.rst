@@ -30,9 +30,9 @@ Performing a Quick Start
 To quick-start your MITx Online instance:
 
 1. Run the ``migrate`` command.
-2. Run the ``createsuperuser`` command.
-3. Follow the steps in the :doc:`Configure Open edX<open_edx>` documentation
-4. Run ``configure_instance <platform>``, where ``platform`` is ``macos``, ``linux``, or ``none``. (If you don't want it to create OAuth2 records, set this to ``none`` or leave it blank. The default is ``none``.)
+2. Configure Open edX using:
+    1. `Tutor (Recommended) <https://github.com/mitodl/handbook/tree/master/openedx/MITx-edx-integration-tutor.md>`_
+    2. `Devstack (Deprecated) <https://github.com/mitodl/handbook/tree/master/openedx/MITx-edx-integration-devstack.md>`_
 
 ``configure_instance`` will prompt you to enter a password for the test learner account and will prompt you to enter account information for the superuser account. At the end, you'll see your edX OAuth2 application credentials, which can then be plugged into Open edX (if you haven't specified ``none`` for your platform).
 
@@ -78,4 +78,4 @@ Notes
 
 The steps that involve communication with edX may not work if your environment isn't set up properly. In these cases, the attempts will be queued to be run later.
 
-If you've set your platform to ``macos`` or ``linux``, the command will do the first part of the *Configure MITx Online as an OAuth provider for Open edX* section in the :doc:`Configure Open edX<open_edx>` documentation.
+If you've set your platform to ``macos`` or ``linux``, the command will do the first part of the *Configure MITx Online as an OAuth provider for Open edX* section in the `Configure Open edX <https://github.com/mitodl/handbook/tree/master/openedx/MITx-edx-integration-tutor.md>`_ documentation.
