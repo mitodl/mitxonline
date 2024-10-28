@@ -6,6 +6,27 @@
 
 @primary-color: #A31F34;
 
+.ant-btn-primary{
+  background-color: @primary-color;
+  &:hover {
+    background-color: @primary-color !important;
+    border-color: @primary-color !important;
+    opacity: 0.9
+  }
+}
+
+.ant-menu-item-selected {
+  color: @primary-color !important;
+  background-color: #e3d5d5 !important;
+}
+
+.ant-btn-default{
+   &:hover {
+     border-color: @primary-color !important;
+     color: @primary-color !important;
+   }
+}
+
 .income-usd {
   max-width: 150px;
   overflow-y: auto;
