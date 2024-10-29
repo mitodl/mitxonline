@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.105.0
+Version 0.105.0 (Released October 29, 2024)
 ---------------
 
 - Update dependency postcss to v8.4.47 (#2434)
