@@ -47,7 +47,7 @@ EMAIL_CONFLICT_MSG = (
 
 OPENEDX_ACCOUNT_CREATION_VALIDATION_MSGS_MAP = {
     "It looks like this username is already taken": USERNAME_ALREADY_EXISTS_MSG,
-    "This email is already associated with an existing account": EMAIL_CONFLICT_MSG
+    "This email is already associated with an existing account": EMAIL_CONFLICT_MSG,
 }
 
 EMAIL_ERROR_MSG = "Email address already exists in the system."
@@ -257,11 +257,16 @@ class UserSerializer(serializers.ModelSerializer):
                 log.exception("Unable to create user account", exc)  # noqa: PLE1205, TRY401
                 raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)  # noqa: B904
             if openedx_validation_msg_dict["username"]:
-                raise serializers.ValidationError({"username":
-                            OPENEDX_ACCOUNT_CREATION_VALIDATION_MSGS_MAP.get(openedx_validation_msg_dict['username'])})
+                raise serializers.ValidationError(
+                    {
+                        "username": OPENEDX_ACCOUNT_CREATION_VALIDATION_MSGS_MAP.get(
+                            openedx_validation_msg_dict["username"]
+                        )
+                    }
+                )
             if openedx_validation_msg_dict["email"]:
                 # there is no email form field at this point, but we are still validating the email address
-                raise serializers.ValidationError(openedx_validation_msg_dict['email'])
+                raise serializers.ValidationError(openedx_validation_msg_dict["email"])
         return data
 
     def create(self, validated_data):
