@@ -127,10 +127,13 @@ $blue: #355b6b;
       .degree-text {
         display: block;
         font-size: 38px;
-        font-size: 7vw;
         line-height: 45px;
         font-weight: 600;
         margin: 0 0 10px;
+
+        @media (max-width: 768px) {
+          font-size: 7vw;
+        }
       }
 
       .success-text {
