@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.105.1
+---------------
+
+- Adding code for debugging (#2440)
+- Update dependency yarn-upgrade-all to v0.7.4 (#2438)
+
 Version 0.105.0 (Released October 29, 2024)
 ---------------
 
