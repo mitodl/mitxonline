@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.105.1
+Version 0.105.1 (Released November 05, 2024)
 ---------------
 
 - Adding code for debugging (#2440)
