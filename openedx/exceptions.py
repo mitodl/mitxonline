@@ -110,17 +110,17 @@ class UnknownEdxApiEmailSettingsException(Exception):  # noqa: N818
 class EdxApiRegistrationValidationException(Exception):  # noqa: N818
     """An edX Registration Validation API call resulted in an error response"""
 
-    def __init__(self, username, response, msg=None):
+    def __init__(self, values, response, msg=None):
         """
         Sets exception properties and adds a default message
 
         Args:
-            username (str): The username being compared for uniqueness
+            values (str): The values being compared for uniqueness
             response (requests.Response): edX response for username validation
         """
-        self.username = username
+        self.values = values
         self.response = response
         if msg is None:
             # Set some default useful error message
-            msg = f"EdX API error validating registration username {self.username}.\n{get_error_response_summary(self.response)}"
+            msg = f"EdX API error validating registration username or email {self.values}.\n{get_error_response_summary(self.response)}"
         super().__init__(msg)

@@ -886,7 +886,7 @@ def unsubscribe_from_edx_course_emails(user, course_run):
     return result
 
 
-def validate_username_email_with_edx(username, email):
+def validate_username_email_with_edx(validation_dict):
     """
     Returns validation message after validating it with edX.
 
@@ -905,12 +905,11 @@ def validate_username_email_with_edx(username, email):
     resp = req_session.post(
         edx_url(OPENEDX_REGISTRATION_VALIDATION_PATH),
         data=dict(  # noqa: C408
-            username=username,
-            email=email,
+            **validation_dict
         ),
     )
     if resp.status_code != status.HTTP_200_OK:
-        raise EdxApiRegistrationValidationException(username, resp)
+        raise EdxApiRegistrationValidationException(validation_dict, resp)
     result = resp.json()
     return result["validation_decisions"]
 
