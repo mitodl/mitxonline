@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.105.3
+Version 0.105.3 (Released November 06, 2024)
 ---------------
 
 - Validate user email on account creation (#2417)
