@@ -96,7 +96,7 @@ def test_create_user_serializer(settings, valid_address_dict, test_case_dup):
     responses.add(
         responses.POST,
         settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
-        json={"validation_decisions": {"username": ""}},
+        json={"validation_decisions": {"username": "", "email": ""}},
         status=status.HTTP_200_OK,
     )
     serializer = UserSerializer(
@@ -202,7 +202,7 @@ def test_username_validation(
     responses.add(
         responses.POST,
         settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
-        json={"validation_decisions": {"username": ""}},
+        json={"validation_decisions": {"username": "", "email": ""}},
         status=status.HTTP_200_OK,
     )
     # Seed an initial user with a constant username
@@ -267,7 +267,9 @@ def test_username_validation_connection_exception(
     UserSerializer should raise a RequestsConnectionError or HTTPError if the connection to OpenEdx
     fails.  The serializer should raise a validation error.
     """
-    mocker.patch("openedx.api.validate_username_with_edx", side_effect=exception_raised)
+    mocker.patch(
+        "openedx.api.validate_username_email_with_edx", side_effect=exception_raised
+    )
 
     serializer = UserSerializer(
         data={

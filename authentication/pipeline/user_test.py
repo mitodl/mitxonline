@@ -289,7 +289,7 @@ def test_create_user_via_email(
     responses.add(
         responses.POST,
         settings.OPENEDX_API_BASE_URL + OPENEDX_REGISTRATION_VALIDATION_PATH,
-        json={"validation_decisions": {"username": ""}},
+        json={"validation_decisions": {"username": "", "email": ""}},
         status=status.HTTP_200_OK,
     )
     email = "user@example.com"
