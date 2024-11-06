@@ -12,18 +12,9 @@ Run through those steps **including the addition of `/etc/hosts` aliases and the
 
 ### Configure mitxonline and Open edX
 
-**Open edX Tutor** can be used with MITx Online instead of the traditional devstack release. See [Local Open edX Tutor and MITx Online Deployment](docs/source/configuration/tutor.rst) for details.
-
-See [MITx Online Quick Start](docs/source/configuration/quickstart.rst) and [Configure Open edX](docs/source/configuration/open_edx.rst)
-
-### Configuring the CMS
-
-There are a few changes that must be made to the CMS for the site
-to be usable. You can apply all of those changes by running a management command:
-
-```
-docker-compose run --rm web ./manage.py configure_wagtail
-```
+See MITx Online integration with edx:
+- [Using Tutor](https://github.com/mitodl/handbook/tree/master/openedx/MITx-edx-integration-tutor.md) (Recommended)
+- [Using Devstack](https://github.com/mitodl/handbook/tree/master/openedx/MITx-edx-integration-devstack.md) (Deprecated)
 
 # Running, testing, and administering the app
 

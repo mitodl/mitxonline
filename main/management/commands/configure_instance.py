@@ -31,7 +31,7 @@ The learner account will have these parameters:
 The product for the courses will both be $999 so they are under the limit
 for test CyberSource transactions.
 
-If the --tutor/-T option is passed, the command will use the local.edly.io
+If the --tutor/-T option is passed, the command will use the local.openedx.io
 address for links to edX rather than edx.odl.local:18000.
 
 This uses other management commands to complete these tasks. So, if you just
@@ -128,9 +128,9 @@ class Command(BaseCommand):
         """Returns a tuple of the edX host and port depending on what the user's passed in"""
 
         if kwargs["tutor"]:
-            return ("local.edly.io", "")
+            return ("local.openedx.io", "")
         elif kwargs["tutordev"]:
-            return ("local.edly.io", ":8000")
+            return ("local.openedx.io:8000", ":8000")
         else:
             return ("edx.odl.local:18000", ":18000")
 
@@ -165,19 +165,20 @@ class Command(BaseCommand):
                     )
                     exit(-1)  # noqa: PLR1722
 
-                redirects = "\n".join(  # noqa: F841
+                redirects = "\n".join(
                     [
                         f"http://{edx_host}/auth/complete/mitxpro-oauth2/",
                         f"http://{kwargs['gateway']}{edx_gateway_port}/auth/complete/mitxpro-oauth2/",
                     ]
                 )
 
-            (oauth2_app, created) = Application.objects.get_or_create(
+            (oauth2_app, _) = Application.objects.get_or_create(
                 name="edx-oauth-app",
                 defaults={
                     "client_type": "confidential",
                     "authorization_grant_type": "authorization-code",
                     "skip_authorization": True,
+                    "redirect_uris": redirects,
                 },
             )
 
