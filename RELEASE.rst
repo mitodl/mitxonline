@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.105.3
+---------------
+
+- Validate user email on account creation (#2417)
+- Fix font size of course name on Course certificate (#2439)
+
 Version 0.105.2 (Released November 06, 2024)
 ---------------
 
