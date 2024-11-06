@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.105.2
+---------------
+
+- fix: configure_instance command, (#2430)
+
 Version 0.105.1 (Released November 05, 2024)
 ---------------
 
