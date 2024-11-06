@@ -130,6 +130,10 @@ $blue: #355b6b;
         line-height: 45px;
         font-weight: 600;
         margin: 0 0 10px;
+
+        @media (max-width: 768px) {
+          font-size: 7vw;
+        }
       }
 
       .success-text {
