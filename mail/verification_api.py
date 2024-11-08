@@ -12,7 +12,7 @@ from mail.constants import EMAIL_CHANGE_EMAIL, EMAIL_VERIFICATION
 from main.constants import USER_REGISTRATION_FAILED_MSG
 from openedx.api import validate_username_email_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
-from users.serializers import OPENEDX_ACCOUNT_CREATION_VALIDATION_MSGS_MAP
+from users.constants import OPENEDX_ACCOUNT_CREATION_VALIDATION_MSGS_MAP
 
 log = logging.getLogger()
 
