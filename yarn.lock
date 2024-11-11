@@ -15230,7 +15230,7 @@ __metadata:
     "@testing-library/jest-dom": 5.17.0
     "@testing-library/react": 11.2.7
     "@trust/webcrypto": 0.9.2
-    "@types/react": 18.3.3
+    "@types/react": 18.3.12
     autoprefixer: 9.8.8
     babel-loader: 8.2.4
     babel-plugin-istanbul: 5.2.0
@@ -15363,7 +15363,7 @@ __metadata:
     "@testing-library/user-event": 14.1.0
     "@types/jest": 27.4.1
     "@types/node": 17.0.45
-    "@types/react": 17.0.80
+    "@types/react": 17.0.83
     "@types/react-dom": 17.0.25
     craco-less: 2.0.0
     dayjs: ^1.11.7
