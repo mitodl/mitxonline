@@ -4,7 +4,6 @@ import logging
 from urllib.parse import quote_plus
 
 from django.urls import reverse
-
 from rest_framework import serializers
 
 from mail import api
@@ -53,19 +52,19 @@ def validate_email_with_edx_api(email):
         email (str): the email to validate
     """
     try:
-        openedx_validation_msg_dict = validate_username_email_with_edx({'email': email})
-    except (
-        EdxApiRegistrationValidationException,
-    ) as exc:
+        openedx_validation_msg_dict = validate_username_email_with_edx({"email": email})
+    except EdxApiRegistrationValidationException as exc:
         log.exception("Unable to create user account", exc)  # noqa: PLE1205, TRY401
         raise serializers.ValidationError(USER_REGISTRATION_FAILED_MSG)  # noqa: B904
     if openedx_validation_msg_dict["email"]:
         # there is no email form field at this point, but we are still validating the email address
-        raise serializers.ValidationError({
+        raise serializers.ValidationError(
+            {
                 "email": OPENEDX_ACCOUNT_CREATION_VALIDATION_MSGS_MAP.get(
                     openedx_validation_msg_dict["email"]
                 )
-            })
+            }
+        )
 
 
 def send_verify_email_change_email(request, change_request):

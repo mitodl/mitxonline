@@ -232,7 +232,9 @@ def test_validate_edx_username_conflict(settings, user):
     """Test that validate_username_email_with_edx handles a username validation conflict"""
     edx_username_validation_response_mock(True, settings)  # noqa: FBT003
 
-    assert validate_username_email_with_edx({"username": user.username, "email": "example@mit.edu"})
+    assert validate_username_email_with_edx(
+        {"username": user.username, "email": "example@mit.edu"}
+    )
 
 
 @responses.activate
@@ -249,7 +251,9 @@ def test_validate_edx_username_conflict(settings, user):  # noqa: F811
         status=status.HTTP_400_BAD_REQUEST,
     )
     with pytest.raises(EdxApiRegistrationValidationException):
-        validate_username_email_with_edx({"username": user.username, "email": "example@mit.edu"})
+        validate_username_email_with_edx(
+            {"username": user.username, "email": "example@mit.edu"}
+        )
 
 
 @responses.activate

@@ -20,13 +20,17 @@ from main.serializers import WriteableSerializerMethodField
 from openedx.api import validate_username_email_with_edx
 from openedx.exceptions import EdxApiRegistrationValidationException
 from openedx.tasks import change_edx_user_email_async
-from users.constants import USER_GIVEN_NAME_RE, USERNAME_ALREADY_EXISTS_MSG, EMAIL_ERROR_MSG, USERNAME_RE, \
-    USERNAME_ERROR_MSG, OPENEDX_ACCOUNT_CREATION_VALIDATION_MSGS_MAP
+from users.constants import (
+    EMAIL_ERROR_MSG,
+    OPENEDX_ACCOUNT_CREATION_VALIDATION_MSGS_MAP,
+    USER_GIVEN_NAME_RE,
+    USERNAME_ALREADY_EXISTS_MSG,
+    USERNAME_ERROR_MSG,
+    USERNAME_RE,
+)
 from users.models import ChangeEmailRequest, LegalAddress, User, UserProfile
 
 log = logging.getLogger()
-
-
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -226,7 +230,7 @@ class UserSerializer(serializers.ModelSerializer):
                     {
                         "username": username,
                         "email": email,
-                     }
+                    }
                 )
             except (
                 HTTPError,

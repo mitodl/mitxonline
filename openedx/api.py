@@ -904,7 +904,7 @@ def validate_username_email_with_edx(validation_dict):
     )
     resp = req_session.post(
         edx_url(OPENEDX_REGISTRATION_VALIDATION_PATH),
-        data=dict(  # noqa: C408
+        data=dict(
             **validation_dict
         ),
     )
