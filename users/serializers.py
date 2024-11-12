@@ -223,7 +223,10 @@ class UserSerializer(serializers.ModelSerializer):
         if username:
             try:
                 openedx_validation_msg_dict = validate_username_email_with_edx(
-                    username, email
+                    {
+                        "username": username,
+                        "email": email,
+                     }
                 )
             except (
                 HTTPError,
