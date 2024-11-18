@@ -68,6 +68,8 @@ class CoursePageFactory(wagtail_factories.PageFactory):
     certificate_page = factory.RelatedFactory(
         "cms.factories.CertificatePageFactory", "parent"
     )
+    min_weekly_hours = fuzzy.FuzzyInteger(1,40)
+    max_weekly_hours = fuzzy.FuzzyInteger(1, 40)
 
     class Meta:
         model = CoursePage
@@ -87,6 +89,8 @@ class ProgramPageFactory(wagtail_factories.PageFactory):
     certificate_page = factory.RelatedFactory(
         "cms.factories.CertificatePageFactory", "parent"
     )
+    min_weekly_hours = fuzzy.FuzzyInteger(1,40)
+    max_weekly_hours = fuzzy.FuzzyInteger(1, 40)
 
     class Meta:
         model = ProgramPage

@@ -37,6 +37,8 @@ class CourseSerializer(BaseCourseSerializer):
     required_prerequisites = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
     time_commitment = serializers.SerializerMethodField()
+    min_weekly_hours = serializers.SerializerMethodField()
+    max_weekly_hours = serializers.SerializerMethodField()
 
     def get_required_prerequisites(self, instance):
         """
@@ -65,6 +67,24 @@ class CourseSerializer(BaseCourseSerializer):
         """
         if hasattr(instance, "page") and hasattr(instance.page, "effort"):
             return instance.page.effort
+
+        return None
+
+    def get_min_weekly_hours(self, instance):
+        """
+        Get the min weekly hours of the course from the course page CMS.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "min_weekly_hours"):
+            return instance.page.min_weekly_hours
+
+        return None
+
+    def get_max_weekly_hours(self, instance):
+        """
+        Get the max weekly hours of the course from the course page CMS.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "max_weekly_hours"):
+            return instance.page.max_weekly_hours
 
         return None
 
