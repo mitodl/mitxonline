@@ -140,6 +140,8 @@ class CourseSerializer(BaseCourseSerializer):
             "duration",
             "time_commitment",
             "availability",
+            "min_weekly_hours",
+            "max_weekly_hours",
         ]
 
 
