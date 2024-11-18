@@ -975,13 +975,13 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
     min_weekly_hours = models.CharField(
         max_length=5,
         default="",
-        help_text="A short description indicating the minimum number of hours per week required to complete the course.",
+        help_text="The minimum number of hours per week required to complete the course.",
     )
 
     max_weekly_hours = models.CharField(
         max_length=5,
         default="",
-        help_text="A short description indicating the maximum number of hours per week required to complete the course.",
+        help_text="The maximum number of hours per week required to complete the course.",
     )
 
     effort = models.CharField(  # noqa: DJ001
@@ -1078,6 +1078,8 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         FieldPanel("description"),
         FieldPanel("length"),
         FieldPanel("effort"),
+        FieldPanel("min_weekly_hours"),
+        FieldPanel("max_weekly_hours"),
         FieldPanel("price"),
         FieldPanel("prerequisites"),
         FieldPanel("faq_url"),
