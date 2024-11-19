@@ -1,6 +1,18 @@
 Release Notes
 =============
 
+Version 0.105.4 (Released November 19, 2024)
+---------------
+
+- 5999 provide standardized time commitment values in the mitx online api (#2451)
+- chore(deps): update akhileshns/heroku-deploy digest to 96f4455 (#2447)
+- chore(deps): update dependency pytest-env to ^0.8.0 (#2450)
+- chore(deps): update dependency pytest to v7.4.4 (#2449)
+- fix(deps): update dependency postcss to v8.4.49 (#2448)
+- fix(deps): update react monorepo (#2446)
+- chore(deps): update redis docker tag to v6.2.16 (#2445)
+- Update Yarn to v3.8.6 (#2433)
+
 Version 0.105.3 (Released November 06, 2024)
 ---------------
 
