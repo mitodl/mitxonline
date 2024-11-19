@@ -287,6 +287,8 @@ def create_default_courseware_page(
         "live": live,
         "length": "No Data",
         "slug": slugify(courseware.readable_id),
+        "max_weekly_hours": "Empty",
+        "min_weekly_hours": "Empty",
     }
 
     try:
