@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.105.5
+---------------
+
+- Adding data layer push for purchase events (#2455)
+- Bump setuptools from 69.5.1 to 70.0.0 (#2295)
+
 Version 0.105.4 (Released November 19, 2024)
 ---------------
 
