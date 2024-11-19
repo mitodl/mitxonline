@@ -18,7 +18,8 @@
                     {% if ga_purchase_flag %}
                         {{ ga_purchase_payload | json_script:"ga-purchase-payload" }}
                         <script type="text/javascript">
-                            gtag("event", "purchase", JSON.parse(document.getElementById('ga-purchase-payload').textContent));
+                            window.dataLayer = window.dataLayer || [];
+                            window.dataLayer.push({ event: 'purchase', ecommerce: JSON.parse(document.getElementById('ga-purchase-payload').textContent)})
                         </script>
                     {% endif %}
                         <script type="text/javascript">
