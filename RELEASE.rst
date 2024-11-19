@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.105.4
+Version 0.105.4 (Released November 19, 2024)
 ---------------
 
 - 5999 provide standardized time commitment values in the mitx online api (#2451)
