@@ -27,6 +27,8 @@ class ProgramSerializer(serializers.ModelSerializer):
     required_prerequisites = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
     time_commitment = serializers.SerializerMethodField()
+    min_weekly_hours = serializers.SerializerMethodField()
+    max_weekly_hours = serializers.SerializerMethodField()
 
     def get_courses(self, instance):
         return [course[0].id for course in instance.courses if course[0].live]
@@ -94,6 +96,24 @@ class ProgramSerializer(serializers.ModelSerializer):
             return "MicroMasters Credential"
         return "Certificate of Completion"
 
+    def get_min_weekly_hours(self, instance):
+        """
+        Get the min weekly hours of the course from the course page CMS.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "min_weekly_hours"):
+            return instance.page.min_weekly_hours
+
+        return None
+
+    def get_max_weekly_hours(self, instance):
+        """
+        Get the max weekly hours of the course from the course page CMS.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "max_weekly_hours"):
+            return instance.page.max_weekly_hours
+
+        return None
+
     class Meta:
         model = Program
         fields = [
@@ -117,6 +137,8 @@ class ProgramSerializer(serializers.ModelSerializer):
             "required_prerequisites",
             "duration",
             "time_commitment",
+            "min_weekly_hours",
+            "max_weekly_hours",
         ]
 
 
