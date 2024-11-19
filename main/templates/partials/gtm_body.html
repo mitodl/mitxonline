@@ -7,23 +7,4 @@
 {##}
 {#      gtag('config', '{{ APIKEYS.GTM_TRACKING_ID }}');#}
 {#    </script>#}
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({ event: 'purchase', ecommerce: {
-            transaction_id: 'abc123', // order or transaction id
-            value: 50.00, // total purchase value excluding discounts
-            tax: 0.00,
-            shipping: 0.00,
-            currency: 'USD',
-            coupon: '5off', // coupon code the user used. leave blank if none
-            items: [
-                {
-                item_id: 'MITxT+14.100x', // course ID
-                item_name: 'Microeconomics', //course name
-                affiliation: 'MITx Online', coupon: '5off', discount: 5.00, item_category: "MicroMasters", // course category if possible
-                price: 50.00, quantity: 1
-                }
-            ]
-        }});
-    </script>
 {% endif %}
