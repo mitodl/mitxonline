@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.105.5
+Version 0.105.5 (Released November 20, 2024)
 ---------------
 
 - Adding data layer push for purchase events (#2455)
