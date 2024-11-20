@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.105.6
+---------------
+
+- Set change status on deferal request (#2457)
+- Add weekly hours (#2454)
+
 Version 0.105.5 (Released November 20, 2024)
 ---------------
 
