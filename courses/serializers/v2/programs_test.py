@@ -107,5 +107,7 @@ def test_serialize_program(
             "required_prerequisites": required_prerequisites,
             "duration": program_with_empty_requirements.page.length,
             "time_commitment": program_with_empty_requirements.page.effort,
+            "max_weekly_hours": program_with_empty_requirements.page.max_weekly_hours,
+            "min_weekly_hours": program_with_empty_requirements.page.min_weekly_hours,
         },
     )
