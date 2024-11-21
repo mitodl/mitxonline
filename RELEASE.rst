@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.105.6
+Version 0.105.6 (Released November 21, 2024)
 ---------------
 
 - Set change status on deferal request (#2457)
