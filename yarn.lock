@@ -7236,18 +7236,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"babel-loader@npm:8.2.4":
-  version: 8.2.4
-  resolution: "babel-loader@npm:8.2.4"
+"babel-loader@npm:8.4.1":
+  version: 8.4.1
+  resolution: "babel-loader@npm:8.4.1"
   dependencies:
     find-cache-dir: ^3.3.1
-    loader-utils: ^2.0.0
+    loader-utils: ^2.0.4
     make-dir: ^3.1.0
     schema-utils: ^2.6.5
   peerDependencies:
     "@babel/core": ^7.0.0
     webpack: ">=2"
-  checksum: 4968251fc4af4279c8e44adba523ed4ad18942f04b37061298e81640d09a570f66e6d53948e39a7d3c3d24ca2b025f0a07c606fadd8e3fbffa8912fd789fd4f0
+  checksum: fa02db1a7d3ebb7b4aab83e926fb51e627a00427943c9dd1b3302c8099c67fa6a242a2adeed37d95abcd39ba619edf558a1dec369ce0849c5a87dc290c90fe2f
   languageName: node
   linkType: hard
 
@@ -16093,7 +16093,7 @@ __metadata:
     "@trust/webcrypto": 0.9.2
     "@types/react": 18.3.12
     autoprefixer: 9.8.8
-    babel-loader: 8.2.4
+    babel-loader: 8.4.1
     babel-plugin-istanbul: 5.2.0
     bootstrap: 5.2.3
     casual-browserify: 1.5.19-2
