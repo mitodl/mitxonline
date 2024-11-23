@@ -10431,16 +10431,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint-config-google@npm:0.9.1":
-  version: 0.9.1
-  resolution: "eslint-config-google@npm:0.9.1"
-  peerDependencies:
-    eslint: ">=4.1.1"
-  checksum: cfb6ef3c4acc2c164a67bc724ffec02ec7a0ca93a7f40c2a87939fcff7945cc7ef6607fc320af08cd496b27c80ccbae87a48d50344574a52849ee9754f4b9b58
-  languageName: node
-  linkType: hard
-
-"eslint-config-google@npm:^0.14.0":
+"eslint-config-google@npm:0.14.0, eslint-config-google@npm:^0.14.0":
   version: 0.14.0
   resolution: "eslint-config-google@npm:0.14.0"
   peerDependencies:
@@ -16105,7 +16096,7 @@ __metadata:
     enzyme: 3.11.0
     enzyme-adapter-react-16: 1.15.8
     eslint: ^8.x
-    eslint-config-google: 0.9.1
+    eslint-config-google: 0.14.0
     eslint-config-mitodl: ^2.1.0
     eslint-plugin-babel: 5.3.1
     eslint-plugin-flow-vars: 0.5.0
