@@ -29,7 +29,7 @@
     "@trust/webcrypto": "0.9.2",
     "@types/react": "18.3.12",
     "autoprefixer": "9.8.8",
-    "babel-loader": "8.2.4",
+    "babel-loader": "8.4.1",
     "babel-plugin-istanbul": "5.2.0",
     "bootstrap": "5.2.3",
     "casual-browserify": "1.5.19-2",
