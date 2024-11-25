@@ -26,6 +26,8 @@ class ProgramSerializer(serializers.ModelSerializer):
     certificate_type = serializers.SerializerMethodField()
     required_prerequisites = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
+    min_weeks = serializers.SerializerMethodField()
+    max_weeks = serializers.SerializerMethodField()
     time_commitment = serializers.SerializerMethodField()
     min_weekly_hours = serializers.SerializerMethodField()
     max_weekly_hours = serializers.SerializerMethodField()
@@ -114,6 +116,24 @@ class ProgramSerializer(serializers.ModelSerializer):
 
         return None
 
+    def get_min_weeks(self, instance):
+        """
+        Get the min weeks of the program from the CMS page.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "min_weeks"):
+            return instance.page.min_weeks
+
+        return None
+
+    def get_max_weeks(self, instance):
+        """
+        Get the max weeks of the program from the CMS page.
+        """
+        if hasattr(instance, "page") and hasattr(instance.page, "max_weeks"):
+            return instance.page.min_weeks
+
+        return None
+
     class Meta:
         model = Program
         fields = [
@@ -136,6 +156,8 @@ class ProgramSerializer(serializers.ModelSerializer):
             "enrollment_end",
             "required_prerequisites",
             "duration",
+            "min_weeks",
+            "max_weeks",
             "time_commitment",
             "min_weekly_hours",
             "max_weekly_hours",
