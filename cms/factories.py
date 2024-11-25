@@ -70,6 +70,9 @@ class CoursePageFactory(wagtail_factories.PageFactory):
     )
     min_weekly_hours = fuzzy.FuzzyInteger(1, 40)
     max_weekly_hours = fuzzy.FuzzyInteger(1, 40)
+    min_weeks = fuzzy.FuzzyInteger(1, 300)
+    max_weeks = fuzzy.FuzzyInteger(1, 300)
+
 
     class Meta:
         model = CoursePage
@@ -91,6 +94,8 @@ class ProgramPageFactory(wagtail_factories.PageFactory):
     )
     min_weekly_hours = fuzzy.FuzzyInteger(1, 40)
     max_weekly_hours = fuzzy.FuzzyInteger(1, 40)
+    min_weeks = fuzzy.FuzzyInteger(1, 300)
+    max_weeks = fuzzy.FuzzyInteger(1, 300)
 
     class Meta:
         model = ProgramPage

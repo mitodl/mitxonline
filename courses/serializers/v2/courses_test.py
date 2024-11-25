@@ -72,6 +72,8 @@ def test_serialize_course(
             "topics": [{"name": topic.name} for topic in topics],
             "required_prerequisites": True,
             "duration": course.page.length,
+            "max_weeks": course.page.max_weeks,
+            "min_weeks": course.page.min_weeks,
             "time_commitment": course.page.effort,
             "programs": BaseProgramSerializer(course.programs, many=True).data
             if all_runs
@@ -113,6 +115,8 @@ def test_serialize_course_required_prerequisites(
             "availability": "anytime",
             "required_prerequisites": expected_required_prerequisites,
             "duration": course.page.length,
+            "max_weeks": course.page.max_weeks,
+            "min_weeks": course.page.min_weeks,
             "time_commitment": course.page.effort,
             "programs": None,
         },
