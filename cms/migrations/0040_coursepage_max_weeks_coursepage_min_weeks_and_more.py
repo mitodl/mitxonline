@@ -4,30 +4,45 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('cms', '0039_coursepage_max_weekly_hours_and_more'),
+        ("cms", "0039_coursepage_max_weekly_hours_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='coursepage',
-            name='max_weeks',
-            field=models.SmallIntegerField(blank=True, help_text='The maximum number of weeks required to complete the course/program.', null=True),
+            model_name="coursepage",
+            name="max_weeks",
+            field=models.SmallIntegerField(
+                blank=True,
+                help_text="The maximum number of weeks required to complete the course/program.",
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='coursepage',
-            name='min_weeks',
-            field=models.SmallIntegerField(blank=True, help_text='The minimum number of weeks required to complete the course/program.', null=True),
+            model_name="coursepage",
+            name="min_weeks",
+            field=models.SmallIntegerField(
+                blank=True,
+                help_text="The minimum number of weeks required to complete the course/program.",
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='programpage',
-            name='max_weeks',
-            field=models.SmallIntegerField(blank=True, help_text='The maximum number of weeks required to complete the course/program.', null=True),
+            model_name="programpage",
+            name="max_weeks",
+            field=models.SmallIntegerField(
+                blank=True,
+                help_text="The maximum number of weeks required to complete the course/program.",
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='programpage',
-            name='min_weeks',
-            field=models.SmallIntegerField(blank=True, help_text='The minimum number of weeks required to complete the course/program.', null=True),
+            model_name="programpage",
+            name="min_weeks",
+            field=models.SmallIntegerField(
+                blank=True,
+                help_text="The minimum number of weeks required to complete the course/program.",
+                null=True,
+            ),
         ),
     ]

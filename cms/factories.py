@@ -73,7 +73,6 @@ class CoursePageFactory(wagtail_factories.PageFactory):
     min_weeks = fuzzy.FuzzyInteger(1, 300)
     max_weeks = fuzzy.FuzzyInteger(1, 300)
 
-
     class Meta:
         model = CoursePage
 
