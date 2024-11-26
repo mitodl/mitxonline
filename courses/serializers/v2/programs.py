@@ -130,7 +130,7 @@ class ProgramSerializer(serializers.ModelSerializer):
         Get the max weeks of the program from the CMS page.
         """
         if hasattr(instance, "page") and hasattr(instance.page, "max_weeks"):
-            return instance.page.min_weeks
+            return instance.page.max_weeks
 
         return None
 
