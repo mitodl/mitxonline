@@ -106,6 +106,8 @@ def test_serialize_program(
             "enrollment_end": program_with_empty_requirements.enrollment_end,
             "required_prerequisites": required_prerequisites,
             "duration": program_with_empty_requirements.page.length,
+            "max_weeks": program_with_empty_requirements.page.max_weeks,
+            "min_weeks": program_with_empty_requirements.page.min_weeks,
             "time_commitment": program_with_empty_requirements.page.effort,
             "max_weekly_hours": program_with_empty_requirements.page.max_weekly_hours,
             "min_weekly_hours": program_with_empty_requirements.page.min_weekly_hours,

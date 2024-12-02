@@ -984,6 +984,18 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         help_text="The maximum number of hours per week required to complete the course.",
     )
 
+    min_weeks = models.SmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="The minimum number of weeks required to complete the course/program.",
+    )
+
+    max_weeks = models.SmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="The maximum number of weeks required to complete the course/program.",
+    )
+
     effort = models.CharField(  # noqa: DJ001
         max_length=100,
         null=True,
@@ -1080,6 +1092,8 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         FieldPanel("effort"),
         FieldPanel("min_weekly_hours"),
         FieldPanel("max_weekly_hours"),
+        FieldPanel("min_weeks"),
+        FieldPanel("max_weeks"),
         FieldPanel("price"),
         FieldPanel("prerequisites"),
         FieldPanel("faq_url"),
