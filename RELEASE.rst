@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.106.0
+Version 0.106.0 (Released December 02, 2024)
 ---------------
 
 - Add min/max weeks for course and programs api (#2478)
