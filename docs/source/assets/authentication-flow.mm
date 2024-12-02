@@ -10,9 +10,9 @@ sequenceDiagram
     par Create Open edX Access Token
         Note right of MO: Create in-memory requests session
         par Establish an Open edX session
-            MO->>OE: GET /auth/login/mitxpro-oauth2/?auth_entry=login
+            MO->>OE: GET /auth/login/ol-oauth2/?auth_entry=login
             OE->>MO: Redirect to GET /oauth2/authorize
-            MO->>OE: Redirect to GET /auth/complete/mitxpro-oauth2/
+            MO->>OE: Redirect to GET /auth/complete/ol-oauth2/
         end
 
         par Link MITx Online account to Open edX Account
