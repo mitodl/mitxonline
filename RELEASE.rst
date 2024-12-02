@@ -1,6 +1,27 @@
 Release Notes
 =============
 
+Version 0.106.0
+---------------
+
+- Add min/max weeks for course and programs api (#2478)
+- fix(deps): update dependency mini-css-extract-plugin to v2.9.2 (#2476)
+- fix(deps): update dependency jquery to v3.7.1 (#2475)
+- fix(deps): update dependency flow-typed to v3.9.0 (#2473)
+- fix(deps): update dependency express to v4.21.1 (#2471)
+- fix(deps): update dependency eslint-config-google to v0.14.0 (#2470)
+- fix(deps): update dependency chai to v4.5.0 (#2469)
+- fix(deps): update dependency bootstrap to v5.3.3 (#2468)
+- fix(deps): update dependency babel-loader to v8.4.1 (#2467)
+- fix(deps): update dependency @types/jest to v27.5.2 (#2466)
+- fix(deps): update dependency @sentry/browser to v8.40.0 (#2465)
+- fix(deps): update dependency @json-editor/json-editor to v2.15.2 (#2464)
+- chore(deps): update postgres docker tag to v15.10 (#2462)
+- chore(deps): update nginx docker tag to v1.27 (#2461)
+- fix(deps): update babel monorepo (#2463)
+- chore(deps): update dependency ruff to ^0.8 (#2460)
+- chore(deps): update dependency responses to ^0.25.0 (#2459)
+
 Version 0.105.6 (Released November 21, 2024)
 ---------------
 
