@@ -6,8 +6,8 @@ import re
 def populate_max_min_weeks_fields(apps, schema_editor):
     CoursePage = apps.get_model("cms", "CoursePage")
     for course_page in CoursePage.objects.all():
-        if course_page.duration:
-            duration_nums = re.findall(r"\d+", course_page.duration)
+        if course_page.length:
+            duration_nums = re.findall(r"\d+", course_page.length)
             if len(duration_nums) > 0:
                 course_page.max_weeks = duration_nums[0]
                 course_page.min_weeks = duration_nums[0]
@@ -15,13 +15,13 @@ def populate_max_min_weeks_fields(apps, schema_editor):
 
     ProgramPage = apps.get_model("cms", "ProgramPage")
     for program_page in ProgramPage.objects.all():
-        if program_page.duration and program_page.max_weeks is None:
-            if "week" in program_page.duration.lower():
-                duration_string = re.findall(r"\d+[\s-]*[\d+\s]*week", duration.lower())
+        if program_page.length and program_page.max_weeks is None:
+            if "week" in program_page.length.lower():
+                duration_string = re.findall(r"\d+[\s-]*[\d+\s]*week", program_page.length.lower())
                 if duration_string:
                     duration_nums = re.findall(r"\d+", duration_string[0])
                 else:
-                    duration_string = re.findall(r"\d+[\s-]*[\d+\s]*month", duration.lower())
+                    duration_string = re.findall(r"\d+[\s-]*[\d+\s]*month", program_page.length.lower())
                     duration_nums_in_month = re.findall(r"\d+", duration_string[0])
                     duration_nums = [num * 4 for num in duration_nums_in_month]
                 program_page.min_weeks = duration_nums[0]
