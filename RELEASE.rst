@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.106.1
+---------------
+
+- Migrate existing (string) values to populate min_weeks and max_weeks (#2481)
+
 Version 0.106.0 (Released December 02, 2024)
 ---------------
 
