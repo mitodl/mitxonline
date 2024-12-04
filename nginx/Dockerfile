@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y ruby
 # this gets run automatically by the nginx container's entrypoint
 COPY 20-compile-nginx-conf-erb.sh /docker-entrypoint.d
 
+COPY --chmod=777 20-compile-nginx-conf-erb.sh /docker-entrypoint.d
+
 # NOTE: this removes the args "-g daemon off" because nginx is impolite
 #       and treats a cli flag and a config flag as duplicate:
 #
