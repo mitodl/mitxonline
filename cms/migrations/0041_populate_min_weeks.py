@@ -17,23 +17,30 @@ def populate_max_min_weeks_fields(apps, schema_editor):
 
     ProgramPage = apps.get_model("cms", "ProgramPage")
     for program_page in ProgramPage.objects.all():
-        if program_page.length and program_page.max_weeks is None:
-            duration_string = re.findall(
-                r"\d+[\s-]*[\d+\s]*week", program_page.length.lower()
-            )
-            if duration_string:
-                duration_nums = re.findall(r"\d+", duration_string[0])
-            else:
+        if program_page.length:
+            duration_nums = []
+            program_length = program_page.length.lower()
+
+            if "week" in program_length:
+                duration_string = re.findall(r"\d+[\s-]*[\d+\s]*week", program_length)
+                duration_nums = re.findall(
+                    r"\d+", duration_string[0] if duration_string else []
+                )
+            elif "month" in program_length:
                 duration_string = re.findall(
                     r"\d+[\s-]*[\d+\s]*month", program_page.length.lower()
                 )
-                duration_nums_in_month = re.findall(r"\d+", duration_string[0])
-                duration_nums = [num * 4 for num in duration_nums_in_month]
-            program_page.min_weeks = duration_nums[0]
-            program_page.max_weeks = (
-                duration_nums[1] if len(duration_nums) > 1 else duration_nums[0]
-            )
-            program_page.save()
+                duration_nums_in_month = re.findall(
+                    r"\d+", duration_string[0] if duration_string else []
+                )
+                duration_nums = [int(num) * 4 for num in duration_nums_in_month]
+
+            if len(duration_nums) > 0:
+                program_page.min_weeks = duration_nums[0]
+                program_page.max_weeks = (
+                    duration_nums[1] if len(duration_nums) > 1 else duration_nums[0]
+                )
+                program_page.save()
 
 
 class Migration(migrations.Migration):
