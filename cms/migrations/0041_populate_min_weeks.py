@@ -25,15 +25,13 @@ def populate_max_min_weeks_fields(apps, schema_editor):
                 duration_string = re.findall(
                     r"\d+[\s-]*[\d+\s]*week", program_length
                 )
-                if len(duration_string) > 0:
-                    duration_nums = re.findall(r"\d+", duration_string[0])
+                duration_nums = re.findall(r"\d+", duration_string[0] if duration_string else [])
             elif 'month' in program_length:
                 duration_string = re.findall(
                     r"\d+[\s-]*[\d+\s]*month", program_page.length.lower()
                 )
-                if len(duration_string) > 0:
-                    duration_nums_in_month = re.findall(r"\d+", duration_string[0])
-                    duration_nums = [int(num) * 4 for num in duration_nums_in_month]
+                duration_nums_in_month = re.findall(r"\d+", duration_string[0] if duration_string else [])
+                duration_nums = [int(num) * 4 for num in duration_nums_in_month]
 
             if len(duration_nums) > 0:
                 program_page.min_weeks = duration_nums[0]
