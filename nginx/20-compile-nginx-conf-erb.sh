@@ -9,7 +9,7 @@ auto_erb_build() {
 	template="/etc/nginx/templates/nginx.conf.erb"
 	output_path="/etc/nginx/nginx.conf"
 
-	echo >&3 "$ME: Running erb on $template to $output_path"
+	echo "$ME: Running erb on $template to $output_path"
 	erb "$template" >"$output_path"
 }
 
