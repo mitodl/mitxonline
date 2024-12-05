@@ -31,9 +31,8 @@ def populate_weekly_hours_fields(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('cms', '0041_populate_min_weeks'),
+        ("cms", "0041_populate_min_weeks"),
     ]
 
     operations = [
