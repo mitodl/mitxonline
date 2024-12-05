@@ -11,9 +11,6 @@ RUN mkdir -p /etc/nginx/logs && ln -sf /var/log/nginx /etc/nginx/logs/
 # erb unfortunately needs a whole ruby install
 RUN apt-get update && apt-get install -y ruby
 
-# this gets run automatically by the nginx container's entrypoint
-COPY 20-compile-nginx-conf-erb.sh /docker-entrypoint.d
-
 COPY --chmod=777 20-compile-nginx-conf-erb.sh /docker-entrypoint.d
 
 # NOTE: this removes the args "-g daemon off" because nginx is impolite
