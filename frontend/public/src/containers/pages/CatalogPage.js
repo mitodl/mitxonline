@@ -296,7 +296,9 @@ export class CatalogPage extends React.Component<Props> {
   toggleMobileFilterWindowExpanded = (expanded: boolean) => {
     this.setState({ mobileFilterWindowExpanded: expanded })
     const inputs = [...document.getElementsByTagName("a")]
-    inputs.forEach(input => input.setAttribute('tabindex', expanded ? "-1" : "0"))
+    inputs.forEach(input =>
+      input.setAttribute("tabindex", expanded ? "-1" : "0")
+    )
   }
 
   /**
@@ -774,10 +776,7 @@ export class CatalogPage extends React.Component<Props> {
       )
     )
     return (
-      <nav
-        id="department-sidebar"
-        aria-label="department filters"
-      >
+      <nav id="department-sidebar" aria-label="department filters">
         <ul id="department-sidebar-link-list">{departmentSideBarListItems}</ul>
       </nav>
     )
