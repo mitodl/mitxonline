@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.106.1 (Released December 09, 2024)
+---------------
+
+- Fix up a migration (#2485)
+- fix nginx docker error (#2486)
+- Migrate existing (string) values to populate min_weeks and max_weeks (#2481)
+
 Version 0.106.0 (Released December 02, 2024)
 ---------------
 
