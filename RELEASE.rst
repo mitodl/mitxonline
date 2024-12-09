@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.106.1
+Version 0.106.1 (Released December 09, 2024)
 ---------------
 
 - Fix up a migration (#2485)
