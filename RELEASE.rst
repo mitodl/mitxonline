@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.107.0 (Released December 10, 2024)
+---------------
+
+- fix(deps): update dependency django to v4.2.17 [security] (#2490)
+- Populate max min weekly hours (#2488)
+
 Version 0.106.1 (Released December 09, 2024)
 ---------------
 
