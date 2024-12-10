@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.107.0
+Version 0.107.0 (Released December 10, 2024)
 ---------------
 
 - fix(deps): update dependency django to v4.2.17 [security] (#2490)
