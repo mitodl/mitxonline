@@ -261,7 +261,7 @@ def test_create_edx_auth_token(settings, user):
     code = "ghi789"
     responses.add(
         responses.GET,
-        f"{settings.OPENEDX_API_BASE_URL}/auth/login/ol-oauth2/?auth_entry=login",
+        f"{settings.OPENEDX_API_BASE_URL}{settings.OPENEDX_SOCIAL_LOGIN_PATH}",
         status=status.HTTP_200_OK,
     )
     responses.add(
@@ -337,7 +337,7 @@ def test_update_edx_user_email(settings, user):
     code = "ghi789"
     responses.add(
         responses.GET,
-        f"{settings.OPENEDX_API_BASE_URL}/auth/login/ol-oauth2/?auth_entry=login",
+        f"{settings.OPENEDX_API_BASE_URL}{settings.OPENEDX_SOCIAL_LOGIN_PATH}",
         status=status.HTTP_200_OK,
     )
     responses.add(
