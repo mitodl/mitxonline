@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.107.1
+Version 0.107.1 (Released December 11, 2024)
 ---------------
 
 - Enable tabbing through the department menu on mobile view (#2489)
