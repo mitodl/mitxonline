@@ -14,7 +14,7 @@ def create_edx_oauth_application(apps, schema_editor):
         defaults=dict(  # noqa: C408
             redirect_uris=urljoin(
                 settings.OPENEDX_BASE_REDIRECT_URL,
-                f"/auth/complete/{settings.MITX_ONLINE_OAUTH_PROVIDER}/",
+                f"/auth/complete/{settings.OPENEDX_OAUTH_PROVIDER}/",
             ),
             client_type="confidential",
             authorization_grant_type="authorization-code",
