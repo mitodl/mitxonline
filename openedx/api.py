@@ -53,7 +53,7 @@ OPENEDX_REGISTRATION_VALIDATION_PATH = "/api/user/v1/validation/registration"
 OPENEDX_UPDATE_USER_PATH = "/api/user/v1/accounts/"
 OPENEDX_REQUEST_DEFAULTS = dict(honor_code=True)  # noqa: C408
 
-OPENEDX_SOCIAL_LOGIN_PATH = "/auth/login/ol-oauth2/?auth_entry=login"
+OPENEDX_SOCIAL_LOGIN_PATH = settings.OPENEDX_SOCIAL_LOGIN_PATH
 OPENEDX_OAUTH2_AUTHORIZE_PATH = "/oauth2/authorize"
 OPENEDX_OAUTH2_ACCESS_TOKEN_PATH = "/oauth2/access_token"  # noqa: S105
 OPENEDX_OAUTH2_SCOPES = ["read", "write"]
@@ -130,7 +130,7 @@ def create_edx_user(user):
                 level_of_education=user.user_profile.level_of_education
                 if user.user_profile
                 else None,
-                provider=settings.MITX_ONLINE_OAUTH_PROVIDER,
+                provider=settings.OPENEDX_OAUTH_PROVIDER,
                 access_token=access_token.token,
                 **OPENEDX_REQUEST_DEFAULTS,
             ),

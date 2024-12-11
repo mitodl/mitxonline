@@ -72,7 +72,7 @@ def application(settings):
     """Test data and settings needed for create_edx_user tests"""
     settings.OPENEDX_OAUTH_APP_NAME = "test_app_name"
     settings.OPENEDX_API_BASE_URL = "http://example.com"
-    settings.MITX_ONLINE_OAUTH_PROVIDER = "test_provider"
+    settings.OPENEDX_OAUTH_PROVIDER = "test_provider"
     settings.MITX_ONLINE_REGISTRATION_ACCESS_TOKEN = "access_token"  # noqa: S105
     return Application.objects.create(
         name=settings.OPENEDX_OAUTH_APP_NAME,
@@ -155,7 +155,7 @@ def test_create_edx_user(user, settings, application, access_token_count):
         "username": user.username,
         "email": user.email,
         "name": user.name,
-        "provider": settings.MITX_ONLINE_OAUTH_PROVIDER,
+        "provider": settings.OPENEDX_OAUTH_PROVIDER,
         "access_token": created_access_token.token,
         "country": user.legal_address.country if user.legal_address else None,
         "year_of_birth": str(user.user_profile.year_of_birth)
