@@ -32,6 +32,17 @@ class PriceBlock(blocks.StructBlock):
     )
 
 
+class CustomTabBlock(blocks.StructBlock):
+    """
+    A Custom tab on course page
+    """
+    title = blocks.CharBlock(
+        max_length=50,
+        help="Displayed as the tab name",
+    )
+    content = blocks.RichTextBlock()
+
+
 class CourseRunFieldBlock(blocks.FieldBlock):
     """
     Block class that allows selecting a course run

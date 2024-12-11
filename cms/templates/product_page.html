@@ -95,6 +95,9 @@
                       {% if page.prerequisites %}<li class="nav-item"><a class="nav-link dropdown-item" href="#prerequisites">Prerequisites</a></li>{% endif %}
                       {% if instructors %}<li class="nav-item"><a class="nav-link dropdown-item" href="#instructors">Instructors</a></li>{% endif %}
                       {% if page.faq_url %}<li class="nav-item"><a class="nav-link dropdown-item" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
+                    {%  for tab in page.custom_tab %}
+                        <li class="nav-item"><a class="nav-link dropdown-item" href="#{{ tab.title }}">{{ tab.title }}</a></li>
+                    {% endfor %}
                     </ul>
                   </div>
               </nav>

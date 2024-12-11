@@ -46,6 +46,7 @@ from cms.blocks import (
     CourseRunCertificateOverrides,
     PriceBlock,
     ResourceBlock,
+    CustomTabBlock,
     validate_unique_readable_ids,
 )
 from cms.constants import (
@@ -1167,6 +1168,13 @@ class CoursePage(ProductPage):
         help_text="The topics for this course page.",
     )
 
+    custom_tab = StreamField(
+        StreamBlock([("custom_tab", CustomTabBlock())], max_num=5),
+        blank=True,
+        help_text="This is the custom tab for this course.",
+        use_json_field=True,
+    )
+
     search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
             "course",
@@ -1238,6 +1246,7 @@ class CoursePage(ProductPage):
             if relevant_run
             else None
         )
+        custom_tabs = []
         return {
             **super().get_context(request, *args, **kwargs),
             **get_base_context(request),
@@ -1248,11 +1257,13 @@ class CoursePage(ProductPage):
             "can_access_edx_course": can_access_edx_course,
             "finaid_price": finaid_price,
             "product": product,
+            "custom_tabs": self.custom_tab,
         }
 
     content_panels = [  # noqa: RUF005
         FieldPanel("course"),
         FieldPanel("topics"),
+        FieldPanel("custom_tab"),
     ] + ProductPage.content_panels
 
 
