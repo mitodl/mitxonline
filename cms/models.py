@@ -1257,7 +1257,6 @@ class CoursePage(ProductPage):
             "can_access_edx_course": can_access_edx_course,
             "finaid_price": finaid_price,
             "product": product,
-            "custom_tabs": self.custom_tab,
         }
 
     content_panels = [  # noqa: RUF005
