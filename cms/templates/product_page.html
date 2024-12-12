@@ -82,11 +82,11 @@
                 {% if page.prerequisites %}<li class="nav-item"><a class="nav-link" href="#prerequisites">Prerequisites</a></li>{% endif %}
                 {% if instructors %}<li class="nav-item"><a class="nav-link" href="#instructors">Instructors</a></li>{% endif %}
                 {% if page.faq_url %}<li class="nav-item"><a class="nav-link" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
-              {%  if page.custom_tab %}
-                  {% for tab in page.custom_tab %}
-                        <li class="nav-item"><a class="nav-link dropdown-item" href="#">{{ tab }}</a></li>
+                {% if custom_tabs %}
+                  {% for tab in custom_tabs %}
+                        <li class="nav-item"><a class="nav-link" href="#">{{ tab.title }}</a></li>
                   {% endfor %}
-                    {% endif %}
+                {% endif %}
               </ul>
             </nav>
             {# Mobile only #}
@@ -100,6 +100,11 @@
                       {% if page.prerequisites %}<li class="nav-item"><a class="nav-link dropdown-item" href="#prerequisites">Prerequisites</a></li>{% endif %}
                       {% if instructors %}<li class="nav-item"><a class="nav-link dropdown-item" href="#instructors">Instructors</a></li>{% endif %}
                       {% if page.faq_url %}<li class="nav-item"><a class="nav-link dropdown-item" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
+                      {% if custom_tabs %}
+                        {% for tab in custom_tabs %}
+                          <li class="nav-item"><a class="nav-link dropdown-item" href="#">{{ tab.title }}</a></li>
+                        {% endfor %}
+                      {% endif %}
                     </ul>
                   </div>
               </nav>

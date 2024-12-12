@@ -1168,7 +1168,7 @@ class CoursePage(ProductPage):
         help_text="The topics for this course page.",
     )
 
-    custom_tab = StreamField(
+    custom_tabs = StreamField(
         StreamBlock([("custom_tab", CustomTabBlock())], max_num=5),
         blank=True,
         help_text="This is the custom tab for this course.",
@@ -1247,6 +1247,9 @@ class CoursePage(ProductPage):
             else None
         )
         custom_tabs = []
+        if self.custom_tab:
+            for tab in self.custom_tab:
+                custom_tabs.append({"title": tab.value["title"], "content": tab.value["content"]})
         return {
             **super().get_context(request, *args, **kwargs),
             **get_base_context(request),
@@ -1257,12 +1260,13 @@ class CoursePage(ProductPage):
             "can_access_edx_course": can_access_edx_course,
             "finaid_price": finaid_price,
             "product": product,
+            "custom_tabs": custom_tabs,
         }
 
     content_panels = [  # noqa: RUF005
         FieldPanel("course"),
         FieldPanel("topics"),
-        FieldPanel("custom_tab"),
+        FieldPanel("custom_tabs"),
     ] + ProductPage.content_panels
 
 

@@ -40,6 +40,9 @@ class CustomTabBlock(blocks.StructBlock):
         max_length=50,
         help="Displayed as the tab name",
     )
+    href_slug = blocks.CharBlock(
+        help="id of this element for scrolling on the page. One word or more connected with a dash."
+    )
     content = blocks.RichTextBlock()
 
 
