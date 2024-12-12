@@ -44,6 +44,7 @@ from wagtailmetadata.models import MetadataPageMixin
 
 from cms.blocks import (
     CourseRunCertificateOverrides,
+    CustomTabBlock,
     PriceBlock,
     ResourceBlock,
     validate_unique_readable_ids,
@@ -1167,6 +1168,13 @@ class CoursePage(ProductPage):
         help_text="The topics for this course page.",
     )
 
+    custom_tab = StreamField(
+        StreamBlock([("custom_tab", CustomTabBlock())], max_num=5),
+        blank=True,
+        help_text="This is the custom tab for this course.",
+        use_json_field=True,
+    )
+
     search_fields = Page.search_fields + [  # noqa: RUF005
         index.RelatedFields(
             "course",
@@ -1238,6 +1246,7 @@ class CoursePage(ProductPage):
             if relevant_run
             else None
         )
+        custom_tabs = []
         return {
             **super().get_context(request, *args, **kwargs),
             **get_base_context(request),
@@ -1253,6 +1262,7 @@ class CoursePage(ProductPage):
     content_panels = [  # noqa: RUF005
         FieldPanel("course"),
         FieldPanel("topics"),
+        FieldPanel("custom_tab"),
     ] + ProductPage.content_panels
 
 
