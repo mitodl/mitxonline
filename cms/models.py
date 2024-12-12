@@ -44,9 +44,9 @@ from wagtailmetadata.models import MetadataPageMixin
 
 from cms.blocks import (
     CourseRunCertificateOverrides,
+    CustomTabBlock,
     PriceBlock,
     ResourceBlock,
-    CustomTabBlock,
     validate_unique_readable_ids,
 )
 from cms.constants import (

@@ -36,6 +36,7 @@ class CustomTabBlock(blocks.StructBlock):
     """
     A Custom tab on course page
     """
+
     title = blocks.CharBlock(
         max_length=50,
         help="Displayed as the tab name",
