@@ -293,7 +293,7 @@ def create_enrollment_view(request):
         resp = respond(reverse("user-dashboard"))
         cookie_value = {
             "type": USER_MSG_TYPE_ENROLLED,
-            "run": run.title,
+            "run": run.course.title,
         }
 
         # Check for an existing fulfilled order prior, otherwise get or create a PendingOrder.
