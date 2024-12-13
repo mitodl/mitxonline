@@ -44,9 +44,9 @@ from wagtailmetadata.models import MetadataPageMixin
 
 from cms.blocks import (
     CourseRunCertificateOverrides,
+    CustomTabBlock,
     PriceBlock,
     ResourceBlock,
-    CustomTabBlock,
     validate_unique_readable_ids,
 )
 from cms.constants import (
@@ -1252,7 +1252,7 @@ class CoursePage(ProductPage):
                 {
                     "title": tab.value["title"],
                     "slug": tab.value["href_slug"],
-                    "content": tab.value["content"]
+                    "content": tab.value["content"],
                 }
             )
         return {
