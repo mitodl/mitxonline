@@ -1248,11 +1248,13 @@ class CoursePage(ProductPage):
         )
         custom_tabs = []
         for tab in self.custom_tabs:
-            custom_tabs.append({
-                "title": tab.value["title"],
-                "slug": tab.value["href_slug"],
-                "content": tab.value["content"]
-            })
+            custom_tabs.append(  # noqa: PERF401
+                {
+                    "title": tab.value["title"],
+                    "slug": tab.value["href_slug"],
+                    "content": tab.value["content"]
+                }
+            )
         return {
             **super().get_context(request, *args, **kwargs),
             **get_base_context(request),
