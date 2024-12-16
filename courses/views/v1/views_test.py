@@ -612,7 +612,7 @@ def test_create_enrollments(mocker, user_client, api_request, product_exists):
         assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
             {
                 "type": USER_MSG_TYPE_ENROLLED,
-                "run": run.title,
+                "run": run.course.title,
             }
         )
     patched_create_enrollments.assert_called_once()
