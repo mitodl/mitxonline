@@ -9,7 +9,7 @@ from main import features
 
 
 @pytest.fixture(autouse=True)
-def default_settings(monkeypatch, settings):  # noqa: PT004
+def default_settings(monkeypatch, settings):
     """Set default settings for all tests"""
     monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "main.settings")
 
@@ -18,7 +18,7 @@ def default_settings(monkeypatch, settings):  # noqa: PT004
 
 
 @pytest.fixture(autouse=True)
-def mocked_product_signal(mocker):  # noqa: PT004
+def mocked_product_signal(mocker):
     """Mock hubspot_sync signals"""
     mocker.patch("ecommerce.signals.sync_hubspot_product")
 
