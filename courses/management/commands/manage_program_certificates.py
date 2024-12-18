@@ -77,7 +77,7 @@ class Command(BaseCommand):
 
         super().add_arguments(parser)
 
-    def handle(self, *args, **options):  # pylint: disable=too-many-locals  # noqa: ARG002
+    def handle(self, *args, **options):  # pylint: disable=too-many-locals  # noqa: ARG002, C901
         """Handle command execution"""
 
         revoke = options.get("revoke")
@@ -109,7 +109,7 @@ class Command(BaseCommand):
         # Handle revoke/un-revoke of a certificate
         if revoke or unrevoke:
             if not user:
-                raise CommandError("If you want to revoke/unrevoke a user argument is required")
+                raise CommandError("If you want to revoke/unrevoke a user argument is required")  # noqa: EM101
             revoke_status = manage_program_certificate_access(
                 user=user,
                 program=program,
@@ -168,4 +168,4 @@ class Command(BaseCommand):
                     if created_cert:
                         cert_count += 1
 
-                self.stdout.write(f"Successfully created {cert_count} certificates for program {program.readable_id}")
+                self.stdout.write(self.style.SUCCESS(f"Successfully created {cert_count} certificates for program {program.readable_id}"))
