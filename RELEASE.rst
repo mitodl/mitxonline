@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.108.0
+Version 0.108.0 (Released December 18, 2024)
 ---------------
 
 - chore: change backend name (#2479)
