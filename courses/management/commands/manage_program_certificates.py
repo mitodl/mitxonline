@@ -109,7 +109,9 @@ class Command(BaseCommand):
         # Handle revoke/un-revoke of a certificate
         if revoke or unrevoke:
             if not user:
-                raise CommandError("If you want to revoke/unrevoke a user argument is required")  # noqa: EM101
+                raise CommandError(
+                    "If you want to revoke/unrevoke a user argument is required"  # noqa: EM101
+                )
             revoke_status = manage_program_certificate_access(
                 user=user,
                 program=program,
@@ -131,7 +133,6 @@ class Command(BaseCommand):
         # Handle the creation of the program certificate.
         elif create:
             if user:
-
                 # If -f or --force argument is provided, we'll forcefully generate the program certificate
                 certificate, created_cert = generate_program_certificate(
                     user=user, program=program, force_create=force_create
@@ -157,7 +158,6 @@ class Command(BaseCommand):
                     result_output = self.style.ERROR(result)
                 self.stdout.write(result_output)
             else:
-
                 # generate certificates for all enrolled users
                 enrollments = ProgramEnrollment.objects.filter(program=program)
                 cert_count = 0
@@ -168,4 +168,8 @@ class Command(BaseCommand):
                     if created_cert:
                         cert_count += 1
 
-                self.stdout.write(self.style.SUCCESS(f"Successfully created {cert_count} certificates for program {program.readable_id}"))
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Successfully created {cert_count} certificates for program {program.readable_id}"
+                    )
+                )
