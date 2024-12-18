@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.108.2
+---------------
+
+- add option to generate certificates for a program (#2497)
+
 Version 0.108.1 (Released December 18, 2024)
 ---------------
 
