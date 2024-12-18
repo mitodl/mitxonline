@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.108.1
+Version 0.108.1 (Released December 18, 2024)
 ---------------
 
 - Enrollment banner use the same name as dashboard (#2494)
