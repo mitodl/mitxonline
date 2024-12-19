@@ -82,6 +82,11 @@
                 {% if page.prerequisites %}<li class="nav-item"><a class="nav-link" href="#prerequisites">Prerequisites</a></li>{% endif %}
                 {% if instructors %}<li class="nav-item"><a class="nav-link" href="#instructors">Instructors</a></li>{% endif %}
                 {% if page.faq_url %}<li class="nav-item"><a class="nav-link" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
+                {% if custom_tabs %}
+                  {% for tab in custom_tabs %}
+                        <li class="nav-item"><a class="nav-link" href="#{{ tab.slug }}">{{ tab.title }}</a></li>
+                  {% endfor %}
+                {% endif %}
               </ul>
             </nav>
             {# Mobile only #}
@@ -95,6 +100,11 @@
                       {% if page.prerequisites %}<li class="nav-item"><a class="nav-link dropdown-item" href="#prerequisites">Prerequisites</a></li>{% endif %}
                       {% if instructors %}<li class="nav-item"><a class="nav-link dropdown-item" href="#instructors">Instructors</a></li>{% endif %}
                       {% if page.faq_url %}<li class="nav-item"><a class="nav-link dropdown-item" href="{{page.faq_url}}" target="_blank">FAQs</a></li>{% endif %}
+                      {% if custom_tabs %}
+                        {% for tab in custom_tabs %}
+                          <li class="nav-item"><a class="nav-link dropdown-item" href="#{{ tab.slug }}">{{ tab.title }}</a></li>
+                        {% endfor %}
+                      {% endif %}
                     </ul>
                   </div>
               </nav>
@@ -156,6 +166,16 @@
               </div>
             </section>
             {% endif %}
+          {% if custom_tabs %}
+            {% for tab in custom_tabs %}
+              <section class="about-richtext-container" id="{{ tab.slug }}">
+                <div class="container">
+                  <h2>{{ tab.title }}</h2>
+                  <p>{{ tab.content }}</p>
+                </div>
+              </section>
+            {% endfor %}
+          {% endif %}
           </div>
 
             <section class="ofac-message border">

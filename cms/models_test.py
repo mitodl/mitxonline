@@ -173,6 +173,7 @@ def test_course_page_context(  # noqa: PLR0913
             member.linked_instructor_page
             for member in course_page.linked_instructors.order_by("order").all()
         ],
+        "custom_tabs": [],
     }
 
     context = course_page.get_context(request=request)
