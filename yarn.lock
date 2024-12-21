@@ -11491,12 +11491,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"flow-bin@npm:0.95.1":
-  version: 0.95.1
-  resolution: "flow-bin@npm:0.95.1"
+"flow-bin@npm:0.257.1":
+  version: 0.257.1
+  resolution: "flow-bin@npm:0.257.1"
   bin:
     flow: cli.js
-  checksum: aa0c8853b6a32423d4ac3f9997edcf9789f6525978313a0522377c3205d2b91cd57efeaa5f3ea5b11d6bae0cfedefea6fe82bc2f7c4135981304773fb4f8a254
+  checksum: 175ea1c774fb7900f9ceed28f9f5ef36ee76961c15c4dd4be21da9cb8624a1fe469566f45f60cedd233d4ce9a7aac4c3ac73d17ce162e2b72278d753d52289b6
   languageName: node
   linkType: hard
 
@@ -16127,7 +16127,7 @@ __metadata:
     express: 4.21.1
     fetch-mock: 5.13.1
     flow: 0.2.3
-    flow-bin: 0.95.1
+    flow-bin: 0.257.1
     flow-typed: 3.9.0
     focus-formik-error: ^1.1.0
     formik: ^2.4.5
