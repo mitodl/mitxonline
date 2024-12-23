@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.109.0
+---------------
+
+- Remove pagination for departments (#2501)
+
 Version 0.108.2 (Released December 19, 2024)
 ---------------
 
