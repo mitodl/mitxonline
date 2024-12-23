@@ -49,7 +49,7 @@ def test_get_departments(
     ) as context:
         resp = user_drf_client.get(reverse("v2:departments_api-list"))
     duplicate_queries_check(context)
-    empty_departments_data = resp.json()["results"]
+    empty_departments_data = resp.json()
     assert_drf_json_equal(
         empty_departments_data, empty_departments_from_fixture, ignore_order=True
     )
@@ -64,7 +64,7 @@ def test_get_departments(
     ) as context:
         resp = user_drf_client.get(reverse("v2:departments_api-list"))
     duplicate_queries_check(context)
-    departments_data = resp.json()["results"]
+    departments_data = resp.json()
     departments_from_fixture = []
     for department in departments:
         departments_from_fixture.append(  # noqa: PERF401
