@@ -10,7 +10,7 @@ export const departmentsQuery = page => ({
   queryKey:  departmentsQueryKey,
   url:       `/api/v2/departments/?page=${page}`,
   transform: json => ({
-    departments: json.results
+    departments: json
   }),
   update: {
     departments: nextState
