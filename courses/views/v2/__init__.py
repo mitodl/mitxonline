@@ -108,7 +108,6 @@ class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
     """API view set for Departments"""
 
     serializer_class = DepartmentWithCoursesAndProgramsSerializer
-    pagination_class = Pagination
     permission_classes = []
 
     def get_queryset(self):
