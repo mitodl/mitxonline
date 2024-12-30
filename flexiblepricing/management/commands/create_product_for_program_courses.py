@@ -36,7 +36,7 @@ class Command(BaseCommand):
 
     def create_parser(self, prog_name, subcommand):  # pylint: disable=arguments-differ
         """
-        create parser to add new line in help text.
+        Create parser to add new line in help text.
         """
         parser = super().create_parser(prog_name, subcommand)
         parser.formatter_class = RawTextHelpFormatter
