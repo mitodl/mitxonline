@@ -669,10 +669,10 @@ export class CatalogPage extends React.Component<Props> {
               alt=""
             />
             <div className="catalog-item-description">
+              <div className="item-title">{course.title}</div>
               <div className="start-date-description">
                 {getStartDateText(course)}
               </div>
-              <div className="item-title">{course.title}</div>
             </div>
           </div>
         </a>

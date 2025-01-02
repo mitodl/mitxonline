@@ -416,6 +416,7 @@
                     }
 
                     .catalog-item-description {
+                        height: 85px;
                         display: flex;
                         padding: 15px;
                         flex-direction: column;
@@ -435,7 +436,6 @@
                         }
 
                         .item-title {
-                            height: 36px;
                             align-self: stretch;
                             color: rgba(3, 21, 45, 0.85);
                             /* Add elipses after 2 lines of title text */
