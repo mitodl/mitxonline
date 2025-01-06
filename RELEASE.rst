@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.110.0
+Version 0.110.0 (Released January 06, 2025)
 ---------------
 
 - Change menu title for enrolled program card (#2500)
