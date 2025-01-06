@@ -68,7 +68,7 @@ const TopBar = ({ currentUser }: Props) => {
                 <MixedLink
                   id="catalog"
                   dest={routes.catalog}
-                  className="top-nav-link"
+                  className="top-nav-link border-left-top-bar"
                   aria-label="Catalog"
                 >
                   Catalog
