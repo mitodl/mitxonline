@@ -65,6 +65,7 @@ const TopBar = ({ currentUser }: Props) => {
           <div className="full-screen-top-menu">
             {currentUser.is_authenticated ? (
               <>
+                <i className="ri-shopping-cart-line"></i>
                 <MixedLink
                   id="catalog"
                   dest={routes.catalog}
@@ -73,7 +74,7 @@ const TopBar = ({ currentUser }: Props) => {
                 >
                   Catalog
                 </MixedLink>
-                <UserMenu currentUser={currentUser} useScreenOverlay={false} />
+                <UserMenu currentUser={currentUser} useScreenOverlay={false}/>
               </>
             ) : (
               <AnonymousMenu mobileView={false} />
