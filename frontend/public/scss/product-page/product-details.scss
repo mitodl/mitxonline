@@ -468,11 +468,14 @@ body.new-design {
       text-align: left;
     }
     .enroll-now-free {
-      font-size: 16px;
+      padding: 10px 20px;
+      font-size: 15px;
       font-weight: 400;
-      text-decoration: underline;
+      text-decoration: none;
       box-shadow: none;
-      border: none;
+      border: 1px solid #DFE5EC;
+      background: rgba(3, 21, 45, 0.05);
+;
     }
     .enroll-now-free:focus-visible {
       border-radius: 0;
@@ -490,7 +493,7 @@ body.new-design {
         background-image: url('/static/images/arrow-line-right.png');
         background-position: 90% 50%;
         background-repeat: no-repeat;
-        padding: 11px 22px;
+        padding: 14px 22px;
       }
       .btn-upgrade:focus-visible {
           border-color: #82192a;
@@ -546,6 +549,10 @@ body.new-design {
     padding: 15px;
     margin: 0 1px;
 
+    div {
+      padding: 0;
+    }
+
     div.certificate-pricing-logo {
       img {
         width: 40px;
@@ -558,7 +565,9 @@ body.new-design {
       font-size: 18px;
       margin-bottom: 0;
       span.text-danger {
+        color: #A41E34 !important;
         font-size: 15px;
+        font-weight: 400;
       }
     }
 
@@ -580,11 +589,11 @@ body.new-design {
   }
 
   div.upgrade-options-row {
-    margin: 30px 1px 20px 1px;
+    margin: 30px 1px 5px 1px;
 
     display: flex;
     padding: 0px;
-    justify-content: space-between;
+    justify-content: space-evenly;
     align-items: center;
     align-self: stretch;
 
@@ -770,6 +779,29 @@ body.new-design {
     line-height: 20px;
     text-decoration: underline;
     margin-bottom: 0;
+
+    &:hover{
+      text-decoration: none !important;
+    }
+
+    a {
+      color: black;
+      font-weight: 400;
+
+      &:hover{
+        color: $brand-darker-bg;
+        text-decoration: none !important;
+      }
+    }
+  }
+  a.finaid-link {
+    display: block;
+    color: #03152D;
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 24px;
+    text-decoration: underline;
+
 
     &:hover{
       text-decoration: none !important;

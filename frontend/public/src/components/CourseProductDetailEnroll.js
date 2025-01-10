@@ -11,7 +11,7 @@ import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 import Loader from "./Loader"
 import { routes } from "../lib/urls"
-import { getFlexiblePriceForProduct, formatLocalePrice } from "../lib/util"
+import {getFlexiblePriceForProduct, formatLocalePrice, checkFeatureFlag} from "../lib/util"
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
   coursesSelector,
@@ -204,7 +204,7 @@ export class CourseProductDetailEnroll extends React.Component<
           className="btn enroll-now enroll-now-free"
           disabled={!run || !run.is_enrollable}
         >
-          <strong>Enroll for Free</strong> without a certificate
+          Enroll for <strong>Free without a certificate</strong>
         </button>
       </form>
     )
@@ -223,7 +223,7 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   renderUpgradeEnrollmentDialog() {
-    const { courses } = this.props
+    const { courses, currentUser } = this.props
     const courseRuns = courses && courses[0] ? courses[0].courseruns : null
     const enrollableCourseRuns = courseRuns ?
       courseRuns.filter(
@@ -244,18 +244,14 @@ export class CourseProductDetailEnroll extends React.Component<
       course.page &&
       course.page.financial_assistance_form_url &&
       !run.approved_flexible_price_exists ? (
-          <p className="financial-assistance-link">
-            <a
-              href={
-                course && course.page && course.page.financial_assistance_form_url
-              }
-            >
-            Need financial assistance?
-            </a>
-          </p>
+          <a href={course && course.page && course.page.financial_assistance_form_url}
+            className="finaid-link">
+          Need financial assistance?
+          </a>
         ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run && run.products ? run.products[0] : null
+    const newCartDesign = checkFeatureFlag("new-cart-design", currentUser)
     const canUpgrade = !!(run && run.is_upgradable && product)
     return upgradableCourseRuns.length > 0 ||
       enrollableCourseRuns.length > 1 ? (
@@ -317,19 +313,20 @@ export class CourseProductDetailEnroll extends React.Component<
                       <img src="/static/images/certificates/certificate-logo.svg" />
                     </div>
                     <p>
-                    Certificate track:{" "}
-                      <strong id="certificate-price-info">
-                        {product &&
+                      <strong> Certificate track:{" "} </strong>
+                      {product &&
                         run.is_upgradable &&
                         formatLocalePrice(getFlexiblePriceForProduct(product))}
-                      </strong>
                       <>
                         <br />
                         {canUpgrade ? (
-                          <span className="text-danger">
-                          Payment date:{" "}
-                            {formatPrettyDate(moment(run.upgrade_deadline))}
-                          </span>
+                          <>
+                            <span className="text-danger">
+                            Payment due:{" "}
+                              {formatPrettyDate(moment(run.upgrade_deadline))}
+                            </span>
+                            {needFinancialAssistanceLink}
+                          </>
                         ) : (
                           <strong id="certificate-price-info">
                           not available
@@ -364,7 +361,6 @@ export class CourseProductDetailEnroll extends React.Component<
               </>
             ) : null}
             <div className="row upgrade-options-row">
-              <div>{needFinancialAssistanceLink}</div>
               <div>{this.getEnrollmentForm(run)}</div>
             </div>
           </ModalBody>

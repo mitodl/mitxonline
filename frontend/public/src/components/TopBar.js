@@ -14,7 +14,7 @@ import { checkFeatureFlag } from "../lib/util"
 
 type Props = {
   currentUser: CurrentUser,
-  location: ?Location
+  location: ?Location,
 }
 
 const TopBar = ({ currentUser }: Props) => {
@@ -30,6 +30,7 @@ const TopBar = ({ currentUser }: Props) => {
   }, [])
 
   const newCartDesign = checkFeatureFlag("new-cart-design", currentUser)
+  const cartItemCount = 0
   return (
     <header className="site-header d-flex d-flex flex-column">
       {showComponent ? (
@@ -76,7 +77,7 @@ const TopBar = ({ currentUser }: Props) => {
                       )}
                       aria-label="Cart"
                     />
-                    {cartCount ? <span className='badge' id="cart-count">{cartCount}</span> : null}
+                    {cartItemCount ? <span className='badge' id="cart-count">{cartItemCount}</span> : null}
                     <MixedLink
                       id="catalog"
                       dest={routes.catalog}
