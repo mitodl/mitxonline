@@ -339,7 +339,7 @@ export class CourseProductDetailEnroll extends React.Component<
                     <form
                       action="/cart/add/"
                       method="get"
-                      className="text-center"
+                      className={`text-center ${newCartDesign ? "new-design" : ""}`}
                     >
                       <input
                         type="hidden"
@@ -351,9 +351,12 @@ export class CourseProductDetailEnroll extends React.Component<
                         className="btn btn-upgrade btn-gradient-red-to-blue"
                         disabled={!canUpgrade}
                       >
-                        <strong>Enroll and Pay</strong>
-                        <br />
-                        <span>for the certificate track</span>
+                        <i className="shopping-cart-line-icon"/>
+                        <div className="upgrade-btn-text">
+                          <strong>Add to Cart</strong>
+                          <br />
+                          <span>to get a Certificate</span>
+                        </div>
                       </button>
                     </form>
                   </div>

@@ -481,6 +481,40 @@ body.new-design {
       outline: 2px #28977e solid;
     }
 
+    form.new-design {
+      text-align: right !important;
+
+      .btn-upgrade {
+        width: 86%;
+        padding: 15px 30px;
+        background-image: none !important;
+
+        div.upgrade-btn-text {
+            display: inline-block;
+            margin-left: 16px;
+        }
+
+        strong {
+          font-size: 20px;
+          line-height: 24.2px;
+        }
+
+        span {
+          font-size: 18px;
+          line-height: 21.78px;
+        }
+
+        i.shopping-cart-line-icon {
+          background-image: url("/static/images/shopping-cart-line.svg");
+          display: inline-block;
+          filter: invert(100%) sepia(95%) saturate(0%) hue-rotate(19deg) brightness(103%) contrast(100%);
+          vertical-align: super;
+          width: 24px;
+          height: 24px;
+        }
+      }
+    }
+
     form {
       margin-bottom: 0;
 
@@ -493,12 +527,14 @@ body.new-design {
         background-position: 90% 50% !important;
         background-repeat: no-repeat !important;
         padding: 14px 22px;
+
+
       }
       .btn-upgrade:focus-visible {
           border-color: #82192a;
           outline: 0;
           box-shadow: 0 0 0 0.25rem rgba(177, 65, 82, .5);
-        }
+      }
     }
 
     ul {
