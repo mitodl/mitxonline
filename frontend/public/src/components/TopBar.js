@@ -29,7 +29,7 @@ const TopBar = ({ currentUser }: Props) => {
     return () => clearTimeout(timeout)
   }, [])
 
-  const newCartDesign = checkFeatureFlag("new-cart-design", currentUser)
+  const newCartDesign = checkFeatureFlag("new-cart-design", currentUser && currentUser.is_authenticated && currentUser.id ? currentUser.id : "anonymousUser")
   const cartItemCount = 0
   return (
     <header className="site-header d-flex d-flex flex-column">
