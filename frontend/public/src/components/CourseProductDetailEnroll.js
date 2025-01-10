@@ -201,7 +201,7 @@ export class CourseProductDetailEnroll extends React.Component<
         <input type="hidden" name="run" value={run ? run.id : ""} />
         <button
           type="submit"
-          className="btn enroll-now enroll-now-free"
+          className="btn enroll-now enroll-now-free btn-gradient-white-to-blue"
           disabled={!run || !run.is_enrollable}
         >
           Enroll for <strong>Free without a certificate</strong>
@@ -348,7 +348,7 @@ export class CourseProductDetailEnroll extends React.Component<
                       />
                       <button
                         type="submit"
-                        className="btn btn-upgrade"
+                        className="btn btn-upgrade btn-gradient-red-to-blue"
                         disabled={!canUpgrade}
                       >
                         <strong>Enroll and Pay</strong>

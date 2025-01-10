@@ -354,6 +354,7 @@ button.btn.btn-gradient-red-to-blue:hover, a.btn.btn-gradient-red-to-blue:hover,
     border-color: $home-page-header-blue;
     background: $home-page-header-blue !important;
     color: white !important;
+    transition: 0.25s;
 }
 
 button.btn.btn-gradient-white-to-blue, a.btn.btn-gradient-white-to-blue {
