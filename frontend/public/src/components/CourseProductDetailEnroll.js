@@ -259,7 +259,10 @@ export class CourseProductDetailEnroll extends React.Component<
         ) : null
     const { upgradeEnrollmentDialogVisibility } = this.state
     const product = run && run.products ? run.products[0] : null
-    const newCartDesign = checkFeatureFlag("new-cart-design", currentUser && currentUser.id ? currentUser.id : "anonymousUser")
+    const newCartDesign = checkFeatureFlag(
+      "new-cart-design",
+      currentUser && currentUser.id ? currentUser.id : "anonymousUser"
+    )
     const canUpgrade = !!(run && run.is_upgradable && product)
     return upgradableCourseRuns.length > 0 ||
       enrollableCourseRuns.length > 1 ? (
