@@ -14,7 +14,7 @@ import { checkFeatureFlag } from "../lib/util"
 
 type Props = {
   currentUser: CurrentUser,
-  location: ?Location,
+  location: ?Location
 }
 
 const TopBar = ({ currentUser }: Props) => {
@@ -68,36 +68,38 @@ const TopBar = ({ currentUser }: Props) => {
           <div className="full-screen-top-menu">
             {currentUser.is_authenticated ? (
               <>
-                {newCartDesign ?
-                  (<>
+                {newCartDesign ? (
+                  <>
                     <button
                       className="shopping-cart-line"
-                      onClick={() => (
-                        window.location = routes.cart
-                      )}
+                      onClick={() => (window.location = routes.cart)}
                       aria-label="Cart"
                     />
-                    {cartItemCount ? <span className='badge' id="cart-count">{cartItemCount}</span> : null}
+                    {cartItemCount ? (
+                      <span className="badge" id="cart-count">
+                        {cartItemCount}
+                      </span>
+                    ) : null}
                     <MixedLink
                       id="catalog"
                       dest={routes.catalog}
                       className="top-nav-link border-left-top-bar"
                       aria-label="Catalog"
                     >
-                        Catalog
-                    </MixedLink></>
-                  ) : (
-                    <MixedLink
-                      id="catalog"
-                      dest={routes.catalog}
-                      className="top-nav-link"
-                      aria-label="Catalog"
-                    >
-                    Catalog
+                      Catalog
                     </MixedLink>
-                  )
-                }
-                <UserMenu currentUser={currentUser} useScreenOverlay={false}/>
+                  </>
+                ) : (
+                  <MixedLink
+                    id="catalog"
+                    dest={routes.catalog}
+                    className="top-nav-link"
+                    aria-label="Catalog"
+                  >
+                    Catalog
+                  </MixedLink>
+                )}
+                <UserMenu currentUser={currentUser} useScreenOverlay={false} />
               </>
             ) : (
               <AnonymousMenu mobileView={false} />

@@ -11,7 +11,11 @@ import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
 import Loader from "./Loader"
 import { routes } from "../lib/urls"
-import {getFlexiblePriceForProduct, formatLocalePrice, checkFeatureFlag} from "../lib/util"
+import {
+  getFlexiblePriceForProduct,
+  formatLocalePrice,
+  checkFeatureFlag
+} from "../lib/util"
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
   coursesSelector,
@@ -244,8 +248,12 @@ export class CourseProductDetailEnroll extends React.Component<
       course.page &&
       course.page.financial_assistance_form_url &&
       !run.approved_flexible_price_exists ? (
-          <a href={course && course.page && course.page.financial_assistance_form_url}
-            className="finaid-link">
+          <a
+            href={
+              course && course.page && course.page.financial_assistance_form_url
+            }
+            className="finaid-link"
+          >
           Need financial assistance?
           </a>
         ) : null
@@ -313,10 +321,10 @@ export class CourseProductDetailEnroll extends React.Component<
                       <img src="/static/images/certificates/certificate-logo.svg" />
                     </div>
                     <p>
-                      <strong> Certificate track:{" "} </strong>
+                      <strong> Certificate track: </strong>
                       {product &&
-                        run.is_upgradable &&
-                        formatLocalePrice(getFlexiblePriceForProduct(product))}
+                      run.is_upgradable &&
+                      formatLocalePrice(getFlexiblePriceForProduct(product))}
                       <>
                         <br />
                         {canUpgrade ? (
@@ -339,7 +347,9 @@ export class CourseProductDetailEnroll extends React.Component<
                     <form
                       action="/cart/add/"
                       method="get"
-                      className={`text-center ${newCartDesign ? "new-design" : ""}`}
+                      className={`text-center ${
+                        newCartDesign ? "new-design" : ""
+                      }`}
                     >
                       <input
                         type="hidden"
@@ -351,7 +361,7 @@ export class CourseProductDetailEnroll extends React.Component<
                         className="btn btn-upgrade btn-gradient-red-to-blue"
                         disabled={!canUpgrade}
                       >
-                        <i className="shopping-cart-line-icon"/>
+                        <i className="shopping-cart-line-icon" />
                         <div className="upgrade-btn-text">
                           <strong>Add to Cart</strong>
                           <br />

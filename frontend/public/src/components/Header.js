@@ -10,7 +10,7 @@ import TopBar from "./TopBar"
 
 type Props = {
   currentUser: CurrentUser,
-  location: ?Location,
+  location: ?Location
 }
 
 const Header = ({ currentUser, location }: Props) => {
