@@ -252,7 +252,7 @@ export class CourseProductDetailEnroll extends React.Component<
             href={
               course && course.page && course.page.financial_assistance_form_url
             }
-            className="finaid-link"
+            className="finaid-link financial-assistance-link"
           >
           Need financial assistance?
           </a>
@@ -325,9 +325,11 @@ export class CourseProductDetailEnroll extends React.Component<
                     </div>
                     <p>
                       <strong> Certificate track: </strong>
-                      {product &&
-                      run.is_upgradable &&
-                      formatLocalePrice(getFlexiblePriceForProduct(product))}
+                      <span id="certificate-price-info">
+                        {product &&
+                        run.is_upgradable &&
+                        formatLocalePrice(getFlexiblePriceForProduct(product))}
+                      </span>
                       <>
                         <br />
                         {canUpgrade ? (
