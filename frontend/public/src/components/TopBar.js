@@ -10,6 +10,7 @@ import NotificationContainer from "./NotificationContainer"
 
 import type { CurrentUser } from "../flow/authTypes"
 import MixedLink from "./MixedLink"
+import { checkFeatureFlag } from "../lib/util"
 
 type Props = {
   currentUser: CurrentUser,
@@ -28,6 +29,13 @@ const TopBar = ({ currentUser }: Props) => {
     return () => clearTimeout(timeout)
   }, [])
 
+  const newCartDesign = checkFeatureFlag(
+    "new-cart-design",
+    currentUser && currentUser.is_authenticated && currentUser.id ?
+      currentUser.id :
+      "anonymousUser"
+  )
+  const cartItemCount = 0
   return (
     <header className="site-header d-flex d-flex flex-column">
       {showComponent ? (
@@ -65,14 +73,37 @@ const TopBar = ({ currentUser }: Props) => {
           <div className="full-screen-top-menu">
             {currentUser.is_authenticated ? (
               <>
-                <MixedLink
-                  id="catalog"
-                  dest={routes.catalog}
-                  className="top-nav-link"
-                  aria-label="Catalog"
-                >
-                  Catalog
-                </MixedLink>
+                {newCartDesign ? (
+                  <>
+                    <button
+                      className="shopping-cart-line"
+                      onClick={() => (window.location = routes.cart)}
+                      aria-label="Cart"
+                    />
+                    {cartItemCount ? (
+                      <span className="badge" id="cart-count">
+                        {cartItemCount}
+                      </span>
+                    ) : null}
+                    <MixedLink
+                      id="catalog"
+                      dest={routes.catalog}
+                      className="top-nav-link border-left-top-bar"
+                      aria-label="Catalog"
+                    >
+                      Catalog
+                    </MixedLink>
+                  </>
+                ) : (
+                  <MixedLink
+                    id="catalog"
+                    dest={routes.catalog}
+                    className="top-nav-link"
+                    aria-label="Catalog"
+                  >
+                    Catalog
+                  </MixedLink>
+                )}
                 <UserMenu currentUser={currentUser} useScreenOverlay={false} />
               </>
             ) : (
