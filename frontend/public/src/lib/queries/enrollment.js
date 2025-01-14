@@ -187,3 +187,16 @@ export const enrollmentMutation = (runId: number) => ({
   },
   update: {}
 })
+
+export const cartMutation = (productId: number) => ({
+  url:  `/cart/add/`,
+  body: {
+    product_id:   `${productId}`,
+    isapi:         true
+  },
+  options: {
+    ...getCsrfOptions(),
+    method: "POST"
+  },
+  update: {}
+})

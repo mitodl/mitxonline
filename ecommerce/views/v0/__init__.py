@@ -11,7 +11,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count, Q
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -661,13 +661,50 @@ class BackofficeCallbackView(APIView):
             return Response(status=status.HTTP_200_OK)
 
 
-class CheckoutProductView(LoginRequiredMixin, RedirectView):
-    """View to add products to the cart and proceed to the checkout page"""
+class AddProductToCartView(APIView):
+    """View to add products to the cart"""
 
-    pattern_name = "cart"
+    def post(self, request, *args, **kwargs):
+        """Add product to the cart"""
+        with transaction.atomic():
+            basket, _ = Basket.objects.select_for_update().get_or_create(
+                user=self.request.user
+            )
+            basket.basket_items.all().delete()
+            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
-    def get_redirect_url(self, *args, **kwargs):
-        """Populate the basket before redirecting"""
+            # Incoming product ids from internal checkout
+            all_product_ids = self.request.POST.getlist("product_id")
+
+            # If the request is from an external source we would have course_id as query param
+            # Note that course_id passed in param corresponds to course run's courseware_id on mitxonline
+            course_run_ids = self.request.POST.getlist("course_run_id")
+            course_ids = self.request.POST.getlist("course_id")
+            program_ids = self.request.POST.getlist("program_id")
+
+            all_product_ids.extend(
+                list(
+                    CourseRun.objects.filter(
+                        Q(courseware_id__in=course_run_ids)
+                        | Q(courseware_id__in=course_ids)
+                    ).values_list("products__id", flat=True)
+                )
+            )
+            all_product_ids.extend(
+                list(
+                    ProgramRun.objects.filter(program__id__in=program_ids).values_list(
+                        "products__id", flat=True
+                    )
+                )
+            )
+            for product in Product.objects.filter(id__in=all_product_ids):
+                BasketItem.objects.create(basket=basket, product=product)
+
+        return HttpResponseRedirect(request.headers["Referer"])
+
+
+    def get(self, request, *args, **kwargs):
+        """Add product to the cart"""
         with transaction.atomic():
             basket, _ = Basket.objects.select_for_update().get_or_create(
                 user=self.request.user
@@ -702,7 +739,7 @@ class CheckoutProductView(LoginRequiredMixin, RedirectView):
             for product in Product.objects.filter(id__in=all_product_ids):
                 BasketItem.objects.create(basket=basket, product=product)
 
-        return super().get_redirect_url(*args, **kwargs)
+        return HttpResponseRedirect(request.headers["Referer"])
 
 
 class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
