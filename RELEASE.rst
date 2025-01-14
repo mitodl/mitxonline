@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.111.0
+---------------
+
+- Adding new cart designs (#2505)
+- chore(deps): update yarn to v3.8.7 (#2506)
+- Re-orders the title and start time of the course to be read in the proper order by the reader (#2503)
+
 Version 0.110.0 (Released January 06, 2025)
 ---------------
 
