@@ -703,8 +703,8 @@ class AddProductToCartView(APIView):
         return HttpResponseRedirect(request.headers["Referer"])
 
 
-    def get(self, request, *args, **kwargs):
-        """Add product to the cart"""
+    def get_redirect_url(self, *args, **kwargs):
+        """Populate the basket before redirecting"""
         with transaction.atomic():
             basket, _ = Basket.objects.select_for_update().get_or_create(
                 user=self.request.user
@@ -739,7 +739,7 @@ class AddProductToCartView(APIView):
             for product in Product.objects.filter(id__in=all_product_ids):
                 BasketItem.objects.create(basket=basket, product=product)
 
-        return HttpResponseRedirect(request.headers["Referer"])
+        return super().get_redirect_url(*args, **kwargs)
 
 
 class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
