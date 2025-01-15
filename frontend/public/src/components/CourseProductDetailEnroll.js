@@ -14,7 +14,8 @@ import { routes } from "../lib/urls"
 import {
   getFlexiblePriceForProduct,
   formatLocalePrice,
-  checkFeatureFlag
+  checkFeatureFlag,
+  isSuccessResponse
 } from "../lib/util"
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
@@ -49,7 +50,7 @@ type Props = {
   addProductToBasket: (user: number, productId: number) => Promise<any>,
   currentUser: User,
   createEnrollment: (runId: number) => Promise<any>,
-  addToCart: (product: Product) => Promise<any>,
+  addToCart: (productId: number) => Promise<any>,
   deactivateEnrollment: (runId: number) => Promise<any>,
   updateAddlFields: (currentUser: User) => Promise<any>,
   forceRequest: () => any
@@ -95,6 +96,18 @@ export class CourseProductDetailEnroll extends React.Component<
       addedToCartDialogVisibility: !this.state.addedToCartDialogVisibility
     })
   }
+
+  async onAddToCartClick(productId: number) {
+    const {addToCart} = this.props
+
+    const addToCartResponse = await addToCart(productId)
+    if (isSuccessResponse(addToCartResponse)) {
+      this.setState({
+        addedToCartDialogVisibility: true
+      })
+    }
+  }
+
 
   redirectToCourseHomepage(url: string, ev: any) {
     /*
@@ -264,7 +277,7 @@ export class CourseProductDetailEnroll extends React.Component<
   }
 
   renderUpgradeEnrollmentDialog() {
-    const {courses, currentUser} = this.props
+    const {courses, currentUser } = this.props
     const courseRuns = courses && courses[0] ? courses[0].courseruns : null
     const csrfToken = getCookie("csrftoken")
     const enrollableCourseRuns = courseRuns ?
@@ -387,22 +400,12 @@ export class CourseProductDetailEnroll extends React.Component<
                     </p>
                   </div>
                   <div className="col-md-6 col-sm-12 pr-0">
-                    <form
-                      action="/cart/add/"
-                      method="post"
-                      onSubmit={this.toggleCartConfirmationDialogVisibility}
-                      className={`text-center ${
-                        newCartDesign ? "new-design" : ""
-                      }`}
-                    >
-                      <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken}/>
-                      <input
-                        type="hidden"
-                        name="product_id"
-                        value={(product && product.id) || ""}
-                      />
+                    <div className={`text-center ${newCartDesign ? "new-design" : ""}`}>
                       <button
-                        type="submit"
+                        onClick={() => {
+                          this.onAddToCartClick((product && product.id) || "")
+                        }}
+                        type="button"
                         className="btn btn-upgrade btn-gradient-red-to-blue"
                         disabled={!canUpgrade}
                       >
@@ -413,7 +416,7 @@ export class CourseProductDetailEnroll extends React.Component<
                           <span>to get a Certificate</span>
                         </div>
                       </button>
-                    </form>
+                    </div>
                   </div>
                 </div>
               </>
@@ -598,8 +601,11 @@ export class CourseProductDetailEnroll extends React.Component<
 const createEnrollment = (run: EnrollmentFlaggedCourseRun) =>
   mutateAsync(enrollmentMutation(run.id))
 
-const addToCart = (product: Product) =>
-  mutateAsync(cartMutation(product.id))
+
+const addToCart = (productId: number) => {
+  mutateAsync(cartMutation(productId))
+  console.log("Hello")
+}
 
 const deactivateEnrollment = (run: number) =>
   mutateAsync(deactivateEnrollmentMutation(run))
