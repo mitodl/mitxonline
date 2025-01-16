@@ -688,8 +688,10 @@ class BackofficeCallbackView(APIView):
             return Response(status=status.HTTP_200_OK)
 
 
-class CheckoutProductView(APIView):
-    """View to add products to the cart"""
+class CheckoutProductView(LoginRequiredMixin, RedirectView):
+    """View to add products to the cart and proceed to the checkout page"""
+
+    pattern_name = "cart"
 
     def get_redirect_url(self, *args, **kwargs):
         """Populate the basket before redirecting"""
