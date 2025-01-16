@@ -494,6 +494,54 @@ class CheckoutApiViewSet(ViewSet):
         )
 
     @action(
+        detail=False,
+        methods=["post"],
+        name="Add To Cart",
+        url_name="add_to_cart",
+    )
+    def add_to_cart(self, request):
+        """Add product to the cart"""
+        with transaction.atomic():
+            basket, _ = Basket.objects.select_for_update().get_or_create(
+                user=self.request.user
+            )
+            basket.basket_items.all().delete()
+            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+
+            # Incoming product ids from internal checkout
+            all_product_ids = self.request.POST.getlist("product_id")
+
+            # If the request is from an external source we would have course_id as query param
+            # Note that course_id passed in param corresponds to course run's courseware_id on mitxonline
+            course_run_ids = self.request.POST.getlist("course_run_id")
+            course_ids = self.request.POST.getlist("course_id")
+            program_ids = self.request.POST.getlist("program_id")
+
+            all_product_ids.extend(
+                list(
+                    CourseRun.objects.filter(
+                        Q(courseware_id__in=course_run_ids)
+                        | Q(courseware_id__in=course_ids)
+                    ).values_list("products__id", flat=True)
+                )
+            )
+            all_product_ids.extend(
+                list(
+                    ProgramRun.objects.filter(program__id__in=program_ids).values_list(
+                        "products__id", flat=True
+                    )
+                )
+            )
+            for product in Product.objects.filter(id__in=all_product_ids):
+                BasketItem.objects.create(basket=basket, product=product)
+
+        return Response(
+            {
+                "message": "Product added to cart",
+            }
+        )
+
+    @action(
         detail=False, methods=["post"], name="Start Checkout", url_name="start_checkout"
     )
     def start_checkout(self, request):
@@ -661,47 +709,8 @@ class BackofficeCallbackView(APIView):
             return Response(status=status.HTTP_200_OK)
 
 
-class AddProductToCartView(APIView):
+class CheckoutProductView(APIView):
     """View to add products to the cart"""
-
-    def post(self, request, *args, **kwargs):
-        """Add product to the cart"""
-        with transaction.atomic():
-            basket, _ = Basket.objects.select_for_update().get_or_create(
-                user=self.request.user
-            )
-            basket.basket_items.all().delete()
-            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
-
-            # Incoming product ids from internal checkout
-            all_product_ids = self.request.POST.getlist("product_id")
-
-            # If the request is from an external source we would have course_id as query param
-            # Note that course_id passed in param corresponds to course run's courseware_id on mitxonline
-            course_run_ids = self.request.POST.getlist("course_run_id")
-            course_ids = self.request.POST.getlist("course_id")
-            program_ids = self.request.POST.getlist("program_id")
-
-            all_product_ids.extend(
-                list(
-                    CourseRun.objects.filter(
-                        Q(courseware_id__in=course_run_ids)
-                        | Q(courseware_id__in=course_ids)
-                    ).values_list("products__id", flat=True)
-                )
-            )
-            all_product_ids.extend(
-                list(
-                    ProgramRun.objects.filter(program__id__in=program_ids).values_list(
-                        "products__id", flat=True
-                    )
-                )
-            )
-            for product in Product.objects.filter(id__in=all_product_ids):
-                BasketItem.objects.create(basket=basket, product=product)
-
-        return HttpResponseRedirect(request.headers["Referer"])
-
 
     def get_redirect_url(self, *args, **kwargs):
         """Populate the basket before redirecting"""

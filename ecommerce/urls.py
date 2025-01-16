@@ -13,7 +13,7 @@ from ecommerce.views.v0 import (  # noqa: E402
     CheckoutApiViewSet,
     CheckoutCallbackView,
     CheckoutInterstitialView,
-    AddProductToCartView,
+    CheckoutProductView,
     DiscountViewSet,
     NestedDiscountProductViewSet,
     NestedDiscountRedemptionViewSet,
@@ -102,6 +102,6 @@ urlpatterns = [
         CheckoutCallbackView.as_view(),
         name="checkout-result-callback",
     ),
-    re_path(r"^cart/add", AddProductToCartView.as_view(), name="checkout-product"),
+    re_path(r"^cart/add", CheckoutProductView.as_view(), name="checkout-product"),
     re_path(r"^int_admin/refund", AdminRefundOrderView.as_view(), name="refund-order"),
 ]
