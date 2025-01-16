@@ -31,7 +31,7 @@ import { getCookie } from "../lib/api"
 import users, { currentUserSelector } from "../lib/queries/users"
 import {
   enrollmentMutation,
-  deactivateEnrollmentMutation,
+  deactivateEnrollmentMutation
 } from "../lib/queries/enrollment"
 import AddlProfileFieldsForm from "./forms/AddlProfileFieldsForm"
 import CourseInfoBox from "./CourseInfoBox"
@@ -110,7 +110,6 @@ export class CourseProductDetailEnroll extends React.Component<
       console.log(addToCartResponse)
     }
   }
-
 
   redirectToCourseHomepage(url: string, ev: any) {
     /*
@@ -254,33 +253,35 @@ export class CourseProductDetailEnroll extends React.Component<
     const { courses } = this.props
     const { addedToCartDialogVisibility } = this.state
     const course = courses && courses[0] ? courses[0] : null
-    return <Modal
-      id={`added-to-cart-dialog`}
-      className="added-to-cart-modal"
-      isOpen={addedToCartDialogVisibility}
-      toggle={() => this.cancelEnrollment()}
-      centered
-    >
-      <ModalHeader toggle={() => this.cancelEnrollment()}>
-        Added to Cart
-      </ModalHeader>
-      <ModalBody>
-        <strong>{course && course.title}</strong>
-        <button>Close</button>
-        <button
-          type="submit"
-          className="btn btn-upgrade btn-gradient-red-to-blue"
-        >
-          <div className="upgrade-btn-text">
-            <strong>Go to Cart</strong>
-          </div>
-        </button>
-      </ModalBody>
-    </Modal>
+    return (
+      <Modal
+        id={`added-to-cart-dialog`}
+        className="added-to-cart-modal"
+        isOpen={addedToCartDialogVisibility}
+        toggle={() => this.cancelEnrollment()}
+        centered
+      >
+        <ModalHeader toggle={() => this.cancelEnrollment()}>
+          Added to Cart
+        </ModalHeader>
+        <ModalBody>
+          <strong>{course && course.title}</strong>
+          <button>Close</button>
+          <button
+            type="submit"
+            className="btn btn-upgrade btn-gradient-red-to-blue"
+          >
+            <div className="upgrade-btn-text">
+              <strong>Go to Cart</strong>
+            </div>
+          </button>
+        </ModalBody>
+      </Modal>
+    )
   }
 
   renderUpgradeEnrollmentDialog() {
-    const {courses, currentUser } = this.props
+    const { courses, currentUser } = this.props
     const courseRuns = courses && courses[0] ? courses[0].courseruns : null
     const enrollableCourseRuns = courseRuns ?
       courseRuns.filter(
@@ -374,17 +375,17 @@ export class CourseProductDetailEnroll extends React.Component<
                     }`}
                   >
                     <div className="certificate-pricing-logo">
-                      <img src="/static/images/certificates/certificate-logo.svg"/>
+                      <img src="/static/images/certificates/certificate-logo.svg" />
                     </div>
                     <p>
                       <strong> Certificate track: </strong>
                       <span id="certificate-price-info">
                         {product &&
-                          run.is_upgradable &&
-                          formatLocalePrice(getFlexiblePriceForProduct(product))}
+                        run.is_upgradable &&
+                        formatLocalePrice(getFlexiblePriceForProduct(product))}
                       </span>
                       <>
-                        <br/>
+                        <br />
                         {canUpgrade ? (
                           <>
                             <span className="text-danger">
@@ -395,24 +396,28 @@ export class CourseProductDetailEnroll extends React.Component<
                           </>
                         ) : (
                           <strong id="certificate-price-info">
-                            not available
+                          not available
                           </strong>
                         )}
                       </>
                     </p>
                   </div>
                   <div className="col-md-6 col-sm-12 pr-0">
-                    <div className={`text-center ${newCartDesign ? "new-design" : ""}`}>
+                    <div
+                      className={`text-center ${
+                        newCartDesign ? "new-design" : ""
+                      }`}
+                    >
                       <button
                         onClick={this.onAddToCartClick}
                         type="button"
                         className="btn btn-upgrade btn-gradient-red-to-blue"
                         disabled={!canUpgrade}
                       >
-                        <i className="shopping-cart-line-icon"/>
+                        <i className="shopping-cart-line-icon" />
                         <div className="upgrade-btn-text">
                           <strong>Add to Cart</strong>
-                          <br/>
+                          <br />
                           <span>to get a Certificate</span>
                         </div>
                       </button>
@@ -600,7 +605,6 @@ export class CourseProductDetailEnroll extends React.Component<
 
 const createEnrollment = (run: EnrollmentFlaggedCourseRun) =>
   mutateAsync(enrollmentMutation(run.id))
-
 
 const addToCart = (productId: string) => {
   mutateAsync(applyCartMutation(productId))

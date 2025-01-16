@@ -107,11 +107,11 @@ export const orderReceiptQuery = (orderId: number) => ({
 export const applyCartMutation = (productId: string) => ({
   url:  `/api/checkout/add_to_cart/`,
   body: {
-    product_id: productId,
+    product_id: productId
   },
   options: {
     ...getCsrfOptions(),
     method: "POST"
   },
-  update: {},
+  update: {}
 })

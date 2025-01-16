@@ -11,12 +11,12 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count, Q
-from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from django.views.generic import RedirectView, TemplateView, View
+from django.views.generic import TemplateView, View
 from mitol.common.utils import now_in_utc
 from mitol.olposthog.features import is_enabled as is_posthog_enabled
 from mitol.payment_gateway.api import PaymentGateway
@@ -509,29 +509,8 @@ class CheckoutApiViewSet(ViewSet):
             BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
             # Incoming product ids from internal checkout
-            all_product_ids = self.request.POST.getlist("product_id")
+            all_product_ids = list(request.data["product_id"])
 
-            # If the request is from an external source we would have course_id as query param
-            # Note that course_id passed in param corresponds to course run's courseware_id on mitxonline
-            course_run_ids = self.request.POST.getlist("course_run_id")
-            course_ids = self.request.POST.getlist("course_id")
-            program_ids = self.request.POST.getlist("program_id")
-
-            all_product_ids.extend(
-                list(
-                    CourseRun.objects.filter(
-                        Q(courseware_id__in=course_run_ids)
-                        | Q(courseware_id__in=course_ids)
-                    ).values_list("products__id", flat=True)
-                )
-            )
-            all_product_ids.extend(
-                list(
-                    ProgramRun.objects.filter(program__id__in=program_ids).values_list(
-                        "products__id", flat=True
-                    )
-                )
-            )
             for product in Product.objects.filter(id__in=all_product_ids):
                 BasketItem.objects.create(basket=basket, product=product)
 
