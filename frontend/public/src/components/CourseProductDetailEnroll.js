@@ -101,13 +101,18 @@ export class CourseProductDetailEnroll extends React.Component<
 
   async onAddToCartClick() {
     const { addToCart } = this.props
-    const addToCartResponse = await addToCart("1")
+    const run = this.getCurrentCourseRun()
+    const product = run && run.products ? run.products[0] : null
+    const addToCartResponse = await addToCart(product.id)
+    this.setState({
+      upgradeEnrollmentDialogVisibility: false
+    })
     if (isSuccessResponse(addToCartResponse)) {
       this.setState({
         addedToCartDialogVisibility: true
       })
     } else {
-      console.log(addToCartResponse)
+      // set notification something went wrong
     }
   }
 
@@ -258,23 +263,27 @@ export class CourseProductDetailEnroll extends React.Component<
         id={`added-to-cart-dialog`}
         className="added-to-cart-modal"
         isOpen={addedToCartDialogVisibility}
-        toggle={() => this.cancelEnrollment()}
+        toggle={() => this.toggleCartConfirmationDialogVisibility()}
         centered
       >
-        <ModalHeader toggle={() => this.cancelEnrollment()}>
+        <ModalHeader toggle={() => this.toggleCartConfirmationDialogVisibility()}>
           Added to Cart
         </ModalHeader>
         <ModalBody>
-          <strong>{course && course.title}</strong>
-          <button>Close</button>
-          <button
-            type="submit"
-            className="btn btn-upgrade btn-gradient-red-to-blue"
-          >
-            <div className="upgrade-btn-text">
-              <strong>Go to Cart</strong>
-            </div>
-          </button>
+          <div className="green-label">
+            <span className="green-checked-icon"/>><strong>{course && course.title}</strong> added to your cart.
+          </div>
+          <div className="col-md-6 col-sm-12 pr-0">
+            <button className="close-dialog-btn">Close</button>
+            <button
+              type="submit"
+              className="btn btn-upgrade btn-gradient-red-to-blue"
+            >
+              <div className="go-to-cart-btn-text">
+                <strong>Go to Cart</strong>
+              </div>
+            </button>
+          </div>
         </ModalBody>
       </Modal>
     )
@@ -604,9 +613,9 @@ export class CourseProductDetailEnroll extends React.Component<
 const createEnrollment = (run: EnrollmentFlaggedCourseRun) =>
   mutateAsync(enrollmentMutation(run.id))
 
-const addToCart = (productId: string) => {
+const addToCart = (productId: string) =>
   mutateAsync(applyCartMutation(productId))
-}
+
 
 const deactivateEnrollment = (run: number) =>
   mutateAsync(deactivateEnrollmentMutation(run))

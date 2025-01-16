@@ -508,8 +508,7 @@ class CheckoutApiViewSet(ViewSet):
             basket.basket_items.all().delete()
             BasketDiscount.objects.filter(redeemed_basket=basket).delete()
 
-            # Incoming product ids from internal checkout
-            all_product_ids = list(request.data["product_id"])
+            all_product_ids = [request.data["product_id"]]
 
             for product in Product.objects.filter(id__in=all_product_ids):
                 BasketItem.objects.create(basket=basket, product=product)

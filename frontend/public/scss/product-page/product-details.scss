@@ -459,7 +459,7 @@ body.new-design {
     }
   }
 
-  .upgrade-enrollment-modal {
+  .upgrade-enrollment-modal, .added-to-cart-modal {
     max-width: 750px;
     .cancel-link {
       margin: 20px 0;
@@ -862,4 +862,34 @@ body.new-design {
   text-decoration: underline;
   background-color: transparent;
   border: none;
+}
+
+.added-to-cart-modal {
+  .close-dialog-btn {
+    border: none;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 24.2px;
+
+  }
+
+  .go-to-cart-btn-text {
+
+  }
+  .green-label {
+    background-color: rgba(0, 173, 0, 0.2);
+    width: 100%;
+    padding: 11px 16px 11px 16px;
+    border-radius: 4px 0px 0px 0px;
+    opacity: 90%;
+
+  }
+  .green-checked-icon {
+    background-image: url("/static/images/shopping-cart-line.svg");
+    display: inline-block;
+    filter: invert(100%) sepia(95%) saturate(0%) hue-rotate(19deg) brightness(103%) contrast(100%);
+    vertical-align: super;
+    width: 24px;
+    height: 24px;
+  }
 }
