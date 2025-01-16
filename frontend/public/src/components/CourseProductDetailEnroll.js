@@ -101,7 +101,7 @@ export class CourseProductDetailEnroll extends React.Component<
 
   async onAddToCartClick() {
     const { addToCart } = this.props
-    const addToCartResponse = await addToCart(1)
+    const addToCartResponse = await addToCart("1")
     if (isSuccessResponse(addToCartResponse)) {
       this.setState({
         addedToCartDialogVisibility: true
@@ -404,12 +404,10 @@ export class CourseProductDetailEnroll extends React.Component<
                   </div>
                   <div className="col-md-6 col-sm-12 pr-0">
                     <div
-                      className={`text-center ${
-                        newCartDesign ? "new-design" : ""
-                      }`}
+                      className={ newCartDesign ? "new-design" : ""}
                     >
                       <button
-                        onClick={this.onAddToCartClick}
+                        onClick={this.onAddToCartClick.bind(this)}
                         type="button"
                         className="btn btn-upgrade btn-gradient-red-to-blue"
                         disabled={!canUpgrade}

@@ -481,13 +481,14 @@ body.new-design {
       outline: 2px #28977e solid;
     }
 
-    form.new-design {
+    div.new-design {
       text-align: right !important;
 
       .btn-upgrade {
         width: 86%;
         padding: 15px 30px;
         background-image: none !important;
+        text-align: left;
 
         div.upgrade-btn-text {
             display: inline-block;
