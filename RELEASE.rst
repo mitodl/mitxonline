@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.111.0
+Version 0.111.0 (Released January 16, 2025)
 ---------------
 
 - Adding new cart designs (#2505)
