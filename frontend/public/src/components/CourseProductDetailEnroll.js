@@ -266,16 +266,24 @@ export class CourseProductDetailEnroll extends React.Component<
         toggle={() => this.toggleCartConfirmationDialogVisibility()}
         centered
       >
-        <ModalHeader toggle={() => this.toggleCartConfirmationDialogVisibility()}>
+        <ModalHeader
+          toggle={() => this.toggleCartConfirmationDialogVisibility()}
+        >
           Added to Cart
         </ModalHeader>
         <ModalBody>
           <div className="green-label">
-            <img className="green_check_circle" src="/static/images/check_circle.svg" alt="Check" /><strong>{course && course.title}</strong> added to your
-            cart.
+            <img
+              className="green_check_circle"
+              src="/static/images/check_circle.svg"
+              alt="Check"
+            />
+            <strong>{course && course.title}</strong> added to your cart.
           </div>
           <div className="float-container">
-            <button className="btn btn-gradient-white-to-blue btn-secondary close-dialog-btn">Close</button>
+            <button className="btn btn-gradient-white-to-blue btn-secondary close-dialog-btn">
+              Close
+            </button>
             <button
               type="submit"
               className="btn btn-upgrade btn-gradient-red-to-blue btn-secondary"
@@ -413,9 +421,7 @@ export class CourseProductDetailEnroll extends React.Component<
                     </p>
                   </div>
                   <div className="col-md-6 col-sm-12 pr-0">
-                    <div
-                      className={ newCartDesign ? "new-design" : ""}
-                    >
+                    <div className={newCartDesign ? "new-design" : ""}>
                       <button
                         onClick={this.onAddToCartClick.bind(this)}
                         type="button"
@@ -616,7 +622,6 @@ const createEnrollment = (run: EnrollmentFlaggedCourseRun) =>
 
 const addToCart = (productId: string) =>
   mutateAsync(applyCartMutation(productId))
-
 
 const deactivateEnrollment = (run: number) =>
   mutateAsync(deactivateEnrollmentMutation(run))
