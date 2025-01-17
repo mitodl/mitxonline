@@ -288,7 +288,7 @@ export class CourseProductDetailEnroll extends React.Component<
             </button>
             <button
               type="submit"
-              className="btn btn-upgrade btn-gradient-red-to-blue btn-secondary"
+              className="btn btn-gradient-red-to-blue btn-secondary"
             >
               <div className="go-to-cart-btn-text">
                 <strong>Go to Cart</strong>
