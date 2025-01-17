@@ -279,8 +279,10 @@ button.btn-secondary.unstyled {
 
 .modal-dialog {
   font-family: Inter;
+
   .modal-header {
     border-bottom: none;
+
     .btn-close {
       border-radius: 100px;
       color: $home-page-header-blue;
@@ -288,43 +290,51 @@ button.btn-secondary.unstyled {
       opacity: 0.7;
       font-size: 13px;
     }
+
     .btn-close:hover {
       color: $brand-darker-bg;
       opacity: 1;
     }
   }
+
   .modal-content {
-    padding: 5px 14px;
+    padding: 8px 14px;
     font-size: 15px;
-}
+  }
+
   .modal-title {
     font-family: Poppins, sans-serif;
     font-weight: 700;
+    font-size: 24px;
   }
 
-  }
   .modal-subheader {
     margin-top: -20px;
   }
+
   .float-container {
     float: right;
     margin-top: 30px;
 
     button {
       margin-left: 16px;
-      font-family: Poppins;
-      font-size: 14px;
-      font-weight: 600;
-      line-height: 21px;
       text-align: center;
       padding: 10px 25px;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 24.2px;
     }
 
     button.cancel {
       background-color: inherit;
       color: inherit;
     }
+
+    button.close-dialog-btn {
+      border: none;
+    }
   }
+}
   input[type=checkbox] {
     accent-color: $brand-darker-bg;
     width: 20px;
@@ -359,8 +369,8 @@ button.btn.btn-gradient-red-to-blue:hover, a.btn.btn-gradient-red-to-blue:hover,
 
 button.btn.btn-gradient-white-to-blue, a.btn.btn-gradient-white-to-blue {
     color: $home-page-header-blue;
-    border: 1px solid $home-page-border-grey;
-    background: white;
+    border: none;
+    background: $home-page-grey-lite;
     transition: 0.25s;
 }
 

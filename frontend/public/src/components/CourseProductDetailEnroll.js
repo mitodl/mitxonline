@@ -14,7 +14,8 @@ import { routes } from "../lib/urls"
 import {
   getFlexiblePriceForProduct,
   formatLocalePrice,
-  checkFeatureFlag
+  checkFeatureFlag,
+  isSuccessResponse
 } from "../lib/util"
 import { EnrollmentFlaggedCourseRun } from "../flow/courseTypes"
 import {
@@ -37,6 +38,8 @@ import CourseInfoBox from "./CourseInfoBox"
 
 import type { User } from "../flow/authTypes"
 import type { Product } from "../flow/cartTypes"
+import { addUserNotification } from "../actions"
+import { applyCartMutation } from "../lib/queries/cart"
 
 type Props = {
   courseId: ?string,
@@ -49,12 +52,14 @@ type Props = {
   addProductToBasket: (user: number, productId: number) => Promise<any>,
   currentUser: User,
   createEnrollment: (runId: number) => Promise<any>,
+  addToCart: (productId: string) => Promise<any>,
   deactivateEnrollment: (runId: number) => Promise<any>,
   updateAddlFields: (currentUser: User) => Promise<any>,
   forceRequest: () => any
 }
 type ProductDetailState = {
   upgradeEnrollmentDialogVisibility: boolean,
+  addedToCartDialogVisibility: boolean,
   showAddlProfileFieldsModal: boolean,
   currentCourseRun: ?EnrollmentFlaggedCourseRun,
   destinationUrl: string
@@ -66,6 +71,7 @@ export class CourseProductDetailEnroll extends React.Component<
 > {
   state = {
     upgradeEnrollmentDialogVisibility: false,
+    addedToCartDialogVisibility:       false,
     currentCourseRun:                  null,
     showAddlProfileFieldsModal:        false,
     destinationUrl:                    ""
@@ -85,6 +91,30 @@ export class CourseProductDetailEnroll extends React.Component<
         destinationUrl: ""
       })
       window.open(target, "_blank")
+    }
+  }
+  toggleCartConfirmationDialogVisibility() {
+    this.setState({
+      addedToCartDialogVisibility: !this.state.addedToCartDialogVisibility
+    })
+  }
+
+  async onAddToCartClick() {
+    const { addToCart } = this.props
+    const run = this.getCurrentCourseRun()
+    if (run && run.products) {
+      const product = run.products[0]
+      const addToCartResponse = await addToCart(product.id)
+      this.setState({
+        upgradeEnrollmentDialogVisibility: false
+      })
+      if (isSuccessResponse(addToCartResponse)) {
+        this.setState({
+          addedToCartDialogVisibility: true
+        })
+      } else {
+        // set notification something went wrong
+      }
     }
   }
 
@@ -226,6 +256,55 @@ export class CourseProductDetailEnroll extends React.Component<
     }
   }
 
+  renderAddToCartConfirmationDialog() {
+    const { courses } = this.props
+    const { addedToCartDialogVisibility } = this.state
+    const course = courses && courses[0] ? courses[0] : null
+    return (
+      <Modal
+        id={`added-to-cart-dialog`}
+        className="added-to-cart-modal"
+        isOpen={addedToCartDialogVisibility}
+        toggle={() => this.toggleCartConfirmationDialogVisibility()}
+        centered
+      >
+        <ModalHeader
+          toggle={() => this.toggleCartConfirmationDialogVisibility()}
+        >
+          Added to Cart
+        </ModalHeader>
+        <ModalBody>
+          <div className="green-label">
+            <img
+              className="green-check-circle-icon"
+              src="/static/images/check_circle.svg"
+              alt="Check"
+            />
+            <strong>{course && course.title}</strong> added to your cart.
+          </div>
+          <div className="float-container">
+            <button className="btn btn-gradient-white-to-blue btn-secondary close-dialog-btn">
+              Close
+            </button>
+            <button
+              type="submit"
+              onClick={() => (window.location = routes.cart)}
+              className="btn btn-gradient-red-to-blue btn-secondary"
+            >
+              <div className="go-to-cart-btn-text">
+                <strong>Go to Cart</strong>
+                <img
+                  className="right-arrow-icon"
+                  src="/static/images/arrow-right-line.svg"
+                />
+              </div>
+            </button>
+          </div>
+        </ModalBody>
+      </Modal>
+    )
+  }
+
   renderUpgradeEnrollmentDialog() {
     const { courses, currentUser } = this.props
     const courseRuns = courses && courses[0] ? courses[0].courseruns : null
@@ -348,33 +427,50 @@ export class CourseProductDetailEnroll extends React.Component<
                       </>
                     </p>
                   </div>
-                  <div className="col-md-6 col-sm-12 pr-0">
-                    <form
-                      action="/cart/add/"
-                      method="get"
-                      className={`text-center ${
-                        newCartDesign ? "new-design" : ""
-                      }`}
-                    >
-                      <input
-                        type="hidden"
-                        name="product_id"
-                        value={(product && product.id) || ""}
-                      />
-                      <button
-                        type="submit"
-                        className="btn btn-upgrade btn-gradient-red-to-blue"
-                        disabled={!canUpgrade}
+                  {newCartDesign ? (
+                    <div className="col-md-6 col-sm-12 pr-0">
+                      <div className="new-design">
+                        <button
+                          onClick={this.onAddToCartClick.bind(this)}
+                          type="button"
+                          className="btn btn-upgrade btn-gradient-red-to-blue"
+                          disabled={!canUpgrade}
+                        >
+                          <i className="shopping-cart-line-icon" />
+                          <div className="upgrade-btn-text">
+                            <strong>Add to Cart</strong>
+                            <br />
+                            <span>to get a Certificate</span>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="col-md-6 col-sm-12 pr-0">
+                      <form
+                        action="/cart/add/"
+                        method="get"
+                        className="text-center"
                       >
-                        <i className="shopping-cart-line-icon" />
-                        <div className="upgrade-btn-text">
-                          <strong>Add to Cart</strong>
-                          <br />
-                          <span>to get a Certificate</span>
-                        </div>
-                      </button>
-                    </form>
-                  </div>
+                        <input
+                          type="hidden"
+                          name="product_id"
+                          value={(product && product.id) || ""}
+                        />
+                        <button
+                          type="submit"
+                          className="btn btn-upgrade btn-gradient-red-to-blue"
+                          disabled={!canUpgrade}
+                        >
+                          <div className="upgrade-btn-text">
+                            <strong>Add to Cart</strong>
+                            <br />
+                            <span>to get a Certificate</span>
+                          </div>
+                        </button>
+                      </form>
+                    </div>
+                  )}
                 </div>
               </>
             ) : null}
@@ -533,6 +629,7 @@ export class CourseProductDetailEnroll extends React.Component<
 
               {run && currentUser ? this.renderAddlProfileFieldsModal() : null}
               {this.renderUpgradeEnrollmentDialog()}
+              {this.renderAddToCartConfirmationDialog()}
             </>
           </Loader>
         }
@@ -556,6 +653,9 @@ export class CourseProductDetailEnroll extends React.Component<
 
 const createEnrollment = (run: EnrollmentFlaggedCourseRun) =>
   mutateAsync(enrollmentMutation(run.id))
+
+const addToCart = (productId: string) =>
+  mutateAsync(applyCartMutation(productId))
 
 const deactivateEnrollment = (run: number) =>
   mutateAsync(deactivateEnrollmentMutation(run))
@@ -588,8 +688,10 @@ const mapPropsToConfig = props => [
 
 const mapDispatchToProps = {
   createEnrollment,
+  addToCart,
   deactivateEnrollment,
-  updateAddlFields
+  updateAddlFields,
+  addUserNotification
 }
 
 export default compose(

@@ -103,3 +103,15 @@ export const orderReceiptQuery = (orderId: number) => ({
     discounts:    nextState
   }
 })
+
+export const applyCartMutation = (productId: string) => ({
+  url:  `/api/checkout/add_to_cart/`,
+  body: {
+    product_id: productId
+  },
+  options: {
+    ...getCsrfOptions(),
+    method: "POST"
+  },
+  update: {}
+})

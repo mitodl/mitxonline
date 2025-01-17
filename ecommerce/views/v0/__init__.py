@@ -494,6 +494,32 @@ class CheckoutApiViewSet(ViewSet):
         )
 
     @action(
+        detail=False,
+        methods=["post"],
+        name="Add To Cart",
+        url_name="add_to_cart",
+    )
+    def add_to_cart(self, request):
+        """Add product to the cart"""
+        with transaction.atomic():
+            basket, _ = Basket.objects.select_for_update().get_or_create(
+                user=self.request.user
+            )
+            basket.basket_items.all().delete()
+            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+
+            all_product_ids = [request.data["product_id"]]
+
+            for product in Product.objects.filter(id__in=all_product_ids):
+                BasketItem.objects.create(basket=basket, product=product)
+
+        return Response(
+            {
+                "message": "Product added to cart",
+            }
+        )
+
+    @action(
         detail=False, methods=["post"], name="Start Checkout", url_name="start_checkout"
     )
     def start_checkout(self, request):
