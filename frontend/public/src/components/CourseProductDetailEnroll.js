@@ -271,18 +271,19 @@ export class CourseProductDetailEnroll extends React.Component<
         </ModalHeader>
         <ModalBody>
           <div className="green-label">
-            <span className="green-checked-icon"/>><strong>{course && course.title}</strong> added to your cart.
+            <img className="green_check_circle" src="/static/images/check_circle.svg" alt="Check" /><strong>{course && course.title}</strong> added to your
+            cart.
           </div>
-          <div className="col-md-6 col-sm-12 pr-0">
-            <button className="close-dialog-btn">Close</button>
-            <button
-              type="submit"
-              className="btn btn-upgrade btn-gradient-red-to-blue"
-            >
-              <div className="go-to-cart-btn-text">
-                <strong>Go to Cart</strong>
-              </div>
-            </button>
+          <div className="float-container">
+              <button className="btn btn-gradient-white-to-blue btn-secondary close-dialog-btn">Close</button>
+              <button
+                type="submit"
+                className="btn btn-upgrade btn-gradient-red-to-blue btn-secondary"
+              >
+                <div className="go-to-cart-btn-text">
+                  <strong>Go to Cart</strong>
+                </div>
+              </button>
           </div>
         </ModalBody>
       </Modal>

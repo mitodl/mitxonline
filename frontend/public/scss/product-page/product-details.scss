@@ -865,13 +865,6 @@ body.new-design {
 }
 
 .added-to-cart-modal {
-  .close-dialog-btn {
-    border: none;
-    font-size: 20px;
-    font-weight: 700;
-    line-height: 24.2px;
-
-  }
 
   .go-to-cart-btn-text {
 
@@ -882,14 +875,18 @@ body.new-design {
     padding: 11px 16px 11px 16px;
     border-radius: 4px 0px 0px 0px;
     opacity: 90%;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: left;
+
 
   }
-  .green-checked-icon {
-    background-image: url("/static/images/shopping-cart-line.svg");
+  .green_check_circle {
     display: inline-block;
-    filter: invert(100%) sepia(95%) saturate(0%) hue-rotate(19deg) brightness(103%) contrast(100%);
-    vertical-align: super;
-    width: 24px;
-    height: 24px;
+    vertical-align: middle;
+    width: 16px;
+    height: 16px;
+    margin-right: 10px
   }
 }
