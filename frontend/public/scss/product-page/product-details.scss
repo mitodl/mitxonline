@@ -867,26 +867,33 @@ body.new-design {
 .added-to-cart-modal {
 
   .go-to-cart-btn-text {
-
+    img {
+      margin-left: 10px;
+    }
   }
   .green-label {
     background-color: rgba(0, 173, 0, 0.2);
     width: 100%;
     padding: 11px 16px 11px 16px;
-    border-radius: 4px 0px 0px 0px;
+    border-radius: 4px 0 0 0;
     opacity: 90%;
     font-size: 14px;
     font-weight: 700;
     line-height: 18px;
     text-align: left;
-
-
   }
-  .green_check_circle {
+  .green-check-circle-icon {
     display: inline-block;
     vertical-align: middle;
     width: 16px;
     height: 16px;
     margin-right: 10px
   }
+
+  .right-arrow-icon {
+    width: 24px;
+    height: 24px;
+    filter: invert(100%) sepia(95%) saturate(0%) hue-rotate(19deg) brightness(103%) contrast(100%);
+  }
+
 }

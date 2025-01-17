@@ -276,7 +276,7 @@ export class CourseProductDetailEnroll extends React.Component<
         <ModalBody>
           <div className="green-label">
             <img
-              className="green_check_circle"
+              className="green-check-circle-icon"
               src="/static/images/check_circle.svg"
               alt="Check"
             />
@@ -288,10 +288,15 @@ export class CourseProductDetailEnroll extends React.Component<
             </button>
             <button
               type="submit"
+              onClick={() => (window.location = routes.cart)}
               className="btn btn-gradient-red-to-blue btn-secondary"
             >
               <div className="go-to-cart-btn-text">
                 <strong>Go to Cart</strong>
+                <img
+                  className="right-arrow-icon"
+                  src="/static/images/arrow-right-line.svg"
+                />
               </div>
             </button>
           </div>
