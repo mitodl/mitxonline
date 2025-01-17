@@ -422,23 +422,50 @@ export class CourseProductDetailEnroll extends React.Component<
                       </>
                     </p>
                   </div>
-                  <div className="col-md-6 col-sm-12 pr-0">
-                    <div className={newCartDesign ? "new-design" : ""}>
-                      <button
-                        onClick={this.onAddToCartClick.bind(this)}
-                        type="button"
-                        className="btn btn-upgrade btn-gradient-red-to-blue"
-                        disabled={!canUpgrade}
-                      >
-                        <i className="shopping-cart-line-icon" />
-                        <div className="upgrade-btn-text">
-                          <strong>Add to Cart</strong>
-                          <br />
-                          <span>to get a Certificate</span>
-                        </div>
-                      </button>
+                  {newCartDesign ? (
+                    <div className="col-md-6 col-sm-12 pr-0">
+                      <div className="new-design">
+                        <button
+                          onClick={this.onAddToCartClick.bind(this)}
+                          type="button"
+                          className="btn btn-upgrade btn-gradient-red-to-blue"
+                          disabled={!canUpgrade}
+                        >
+                          <i className="shopping-cart-line-icon" />
+                          <div className="upgrade-btn-text">
+                            <strong>Add to Cart</strong>
+                            <br />
+                            <span>to get a Certificate</span>
+                          </div>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="col-md-6 col-sm-12 pr-0">
+                      <form
+                        action="/cart/add/"
+                        method="get"
+                        className="text-center"
+                      >
+                        <input
+                          type="hidden"
+                          name="product_id"
+                          value={(product && product.id) || ""}
+                        />
+                        <button
+                          type="submit"
+                          className="btn btn-upgrade btn-gradient-red-to-blue"
+                          disabled={!canUpgrade}
+                        >
+                          <div className="upgrade-btn-text">
+                            <strong>Add to Cart</strong>
+                            <br />
+                            <span>to get a Certificate</span>
+                          </div>
+                        </button>
+                      </form>
+                    </div>
+                  )}
                 </div>
               </>
             ) : null}
