@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.111.1
+---------------
+
+- Added to Cart Confirmation Dialog (#2512)
+- fix(deps): update dependency django to v4.2.18 [security] (#2511)
+
 Version 0.111.0 (Released January 16, 2025)
 ---------------
 
