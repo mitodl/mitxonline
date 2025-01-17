@@ -275,15 +275,15 @@ export class CourseProductDetailEnroll extends React.Component<
             cart.
           </div>
           <div className="float-container">
-              <button className="btn btn-gradient-white-to-blue btn-secondary close-dialog-btn">Close</button>
-              <button
-                type="submit"
-                className="btn btn-upgrade btn-gradient-red-to-blue btn-secondary"
-              >
-                <div className="go-to-cart-btn-text">
-                  <strong>Go to Cart</strong>
-                </div>
-              </button>
+            <button className="btn btn-gradient-white-to-blue btn-secondary close-dialog-btn">Close</button>
+            <button
+              type="submit"
+              className="btn btn-upgrade btn-gradient-red-to-blue btn-secondary"
+            >
+              <div className="go-to-cart-btn-text">
+                <strong>Go to Cart</strong>
+              </div>
+            </button>
           </div>
         </ModalBody>
       </Modal>
