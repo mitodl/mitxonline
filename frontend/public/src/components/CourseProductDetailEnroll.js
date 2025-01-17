@@ -102,17 +102,19 @@ export class CourseProductDetailEnroll extends React.Component<
   async onAddToCartClick() {
     const { addToCart } = this.props
     const run = this.getCurrentCourseRun()
-    const product = run && run.products ? run.products[0] : null
-    const addToCartResponse = await addToCart(product.id)
-    this.setState({
-      upgradeEnrollmentDialogVisibility: false
-    })
-    if (isSuccessResponse(addToCartResponse)) {
+    if (run && run.products) {
+      const product = run.products[0]
+      const addToCartResponse = await addToCart(product.id)
       this.setState({
-        addedToCartDialogVisibility: true
+        upgradeEnrollmentDialogVisibility: false
       })
-    } else {
-      // set notification something went wrong
+      if (isSuccessResponse(addToCartResponse)) {
+        this.setState({
+          addedToCartDialogVisibility: true
+        })
+      } else {
+        // set notification something went wrong
+      }
     }
   }
 
