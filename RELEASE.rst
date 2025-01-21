@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.111.1
+Version 0.111.1 (Released January 21, 2025)
 ---------------
 
 - Added to Cart Confirmation Dialog (#2512)
