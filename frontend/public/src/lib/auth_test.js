@@ -57,7 +57,7 @@ describe("auth lib function", () => {
           state:        "success",
           redirect_url: "/"
         })
-        const handlers = []
+        const handlers = {}
         global.SETTINGS = {
           unified_ecommerce_url: "http://ecommerce"
         }
