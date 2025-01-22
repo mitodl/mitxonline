@@ -81,7 +81,10 @@ export const handleAuthResponse = (
   const { state, redirect_url, partial_token, errors, field_errors } = response
   // This is pre-login so we won't be able to flag this out for individual users.
   // The use of "anonymousUser" is historical - see usage in PR #2064 for instance
-  const sendThruEcommerce = checkFeatureFlag("enable_unified_ecommerce", "anonymousUser");
+  const sendThruEcommerce = checkFeatureFlag(
+    "enable_unified_ecommerce",
+    "anonymousUser"
+  )
 
   // If a specific handler function was passed in for this response state, invoke it
   if (has(state, handlers)) {
