@@ -612,6 +612,10 @@
       "description": "Token to access the status API.",
       "required": false
     },
+    "UNIFIED_ECOMMERCE_URL": {
+      "description": "The base URL for Unified Ecommerce.",
+      "required": false
+    },
     "USE_X_FORWARDED_HOST": {
       "description": "Set HOST header to original domain accessed by user",
       "required": false
