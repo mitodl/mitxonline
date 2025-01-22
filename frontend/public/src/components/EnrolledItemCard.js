@@ -424,9 +424,6 @@ export class EnrolledItemCard extends React.Component<
   renderCourseEnrollment() {
     const { enrollment, currentUser, isProgramCard, redirectToCourseHomepage } =
       this.props
-
-    const { menuVisibility } = this.state
-
     const financialAssistanceLink =
       isFinancialAssistanceAvailable(enrollment.run) &&
       !enrollment.approved_flexible_price_exists ? (
