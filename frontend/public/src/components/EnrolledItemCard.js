@@ -553,7 +553,7 @@ export class EnrolledItemCard extends React.Component<
                 )}
               </div>
               <button
-                className="dropdown-toggle user-menu-button"
+                className="dropdown-toggle menu-button"
                 data-bs-toggle="dropdown"
                 aria-haspopup="true"
                 aria-expanded="false"
