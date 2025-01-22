@@ -1199,3 +1199,11 @@ HUBSPOT_PORTAL_ID = get_string(
     default="",
     description="Hubspot Portal ID",
 )
+
+# Unified Ecommerce integration
+
+UNIFIED_ECOMMERCE_URL = get_string(
+    name="UNIFIED_ECOMMERCE_URL",
+    default="http://ue.odl.local:9080/",
+    description="The base URL for Unified Ecommerce.",
+)

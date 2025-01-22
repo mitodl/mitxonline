@@ -52,6 +52,7 @@ def get_js_settings(request: HttpRequest):  # noqa: ARG001
         "features": {},
         "posthog_api_token": settings.POSTHOG_PROJECT_API_KEY,
         "posthog_api_host": settings.POSTHOG_API_HOST,
+        "unified_ecommerce_url": settings.UNIFIED_ECOMMERCE_URL,
     }
 
 
