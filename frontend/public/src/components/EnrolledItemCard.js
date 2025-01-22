@@ -564,7 +564,7 @@ export class EnrolledItemCard extends React.Component<
               <ul className="dropdown-menu dropdown-menu-end">
                 <li className="dropdown-item">
                   <button
-                    className="unstyled d-block"
+                    className="unenroll-btn unstyled d-block"
                     onClick={onUnenrollClick}
                   >
                     Unenroll
