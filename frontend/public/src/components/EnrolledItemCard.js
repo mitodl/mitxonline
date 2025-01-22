@@ -8,10 +8,6 @@ import {
 } from "../lib/util"
 import { Formik, Form, Field } from "formik"
 import {
-  Dropdown,
-  DropdownToggle,
-  DropdownMenu,
-  DropdownItem,
   Button,
   Modal,
   ModalHeader,
