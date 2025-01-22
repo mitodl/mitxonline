@@ -7,12 +7,7 @@ import {
   formatPrettyMonthDate
 } from "../lib/util"
 import { Formik, Form, Field } from "formik"
-import {
-  Button,
-  Modal,
-  ModalHeader,
-  ModalBody
-} from "reactstrap"
+import { Button, Modal, ModalHeader, ModalBody } from "reactstrap"
 import { partial, pathOr } from "ramda"
 import { createStructuredSelector } from "reselect"
 import { compose } from "redux"
