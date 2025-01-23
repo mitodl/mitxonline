@@ -35,7 +35,7 @@ const TopBar = ({ currentUser }: Props) => {
       currentUser.id :
       "anonymousUser"
   )
-  const cartItemCount = 0
+  const cartItemCount = 1
   return (
     <header className="site-header d-flex d-flex flex-column">
       {showComponent ? (

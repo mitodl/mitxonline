@@ -32,11 +32,19 @@ import CatalogPage from "./pages/CatalogPage"
 
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
+import {pathOr} from "ramda"
+import {
+  cartItemsCountQuery,
+  cartItemsCountQueryKey,
+  cartItemsCountSelector,
+  coursesQuery
+} from "../lib/queries/courseRuns"
 
 type Props = {
   match: Match,
   location: Location,
   currentUser: ?CurrentUser,
+  cartItemsCount: number,
   addUserNotification: Function
 }
 
@@ -135,15 +143,18 @@ export class App extends React.Component<Props, void> {
 }
 
 const mapStateToProps = createStructuredSelector({
-  currentUser: currentUserSelector
+  currentUser:    currentUserSelector,
+  cartItemsCount: cartItemsCountSelector,
 })
 
 const mapDispatchToProps = {
   addUserNotification
 }
 
-const mapPropsToConfig = () => [users.currentUserQuery()]
-
+const mapPropsToConfig = props => [
+  cartItemsCountQuery(props.courseId),
+  users.currentUserQuery()
+]
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),
   connectRequest(mapPropsToConfig)

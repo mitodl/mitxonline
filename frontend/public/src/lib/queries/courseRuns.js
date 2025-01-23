@@ -4,6 +4,7 @@ import { nextState } from "./util"
 
 export const courseRunsSelector = pathOr(null, ["entities", "courseRuns"])
 export const coursesSelector = pathOr(null, ["entities", "courses"])
+export const cartItemsCountSelector = pathOr(null, ["entities", "cartItemsCount"])
 export const programsSelector = pathOr(null, ["entities", "programs"])
 
 export const courseRunsQueryKey = "courseRuns"
@@ -31,6 +32,18 @@ export const coursesQuery = (courseKey: string = "") => ({
     courses: nextState
   }
 })
+
+export const cartItemsCountQuery = () => ({
+  queryKey:  "cartItemsCount",
+  url:       `/api/baskets/basket_items_count/`,
+  transform: json => ({
+    cartItemsCount: json
+  }),
+  update: {
+    cartItemsCount: nextState
+  }
+})
+
 
 // This will need to be updated to v2 once we get the courses endpoint to allow for multiple ID query
 export const programsQuery = (programKey: string = "") => ({
