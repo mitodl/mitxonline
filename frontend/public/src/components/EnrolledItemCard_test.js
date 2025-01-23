@@ -236,7 +236,7 @@ describe("EnrolledItemCard", () => {
     )} activate the unenrollment verification modal if the enrollment type is ${enrollmentType}`, async () => {
       enrollmentCardProps.enrollment.enrollment_mode = enrollmentType
       const inner = await renderedCard()
-      const unenrollButton = inner.find("Dropdown DropdownItem").at(0)
+      const unenrollButton = inner.find(".unenroll-btn").at(0)
 
       assert.isTrue(unenrollButton.exists())
       await unenrollButton.prop("onClick")()

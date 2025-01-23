@@ -138,6 +138,20 @@ $enrolled-passed-fg: #ffffff;
     }
   }
 
+  .dropdown-toggle.menu-button {
+    height: fit-content;
+    border-color: transparent;
+    background-color: inherit;
+
+    span {
+      vertical-align: -webkit-baseline-middle;
+    }
+  }
+
+  .dropdown-toggle.menu-button::after {
+    display: none;
+  }
+
   .no-enrollments h2 {
     font-size: 25px !important;
     margin-bottom: 30px !important;
