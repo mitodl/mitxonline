@@ -31,7 +31,11 @@ const Header = ({ currentUser, cartItemsCount, location }: Props) => {
   }
   return (
     <React.Fragment>
-      <TopBar currentUser={currentUser} cartItemsCount={cartItemsCount} location={location} />
+      <TopBar
+        currentUser={currentUser}
+        cartItemsCount={cartItemsCount}
+        location={location}
+      />
     </React.Fragment>
   )
 }

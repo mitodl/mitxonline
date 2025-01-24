@@ -18,7 +18,7 @@ type Props = {
   location: ?Location
 }
 
-const TopBar = ({ currentUser, cartItemsCount  }: Props) => {
+const TopBar = ({ currentUser, cartItemsCount }: Props) => {
   // Delay any alert displayed on page-load by 500ms in order to
   // ensure the alert is read by screen readers.
   const [showComponent, setShowComponent] = useState(false)
@@ -36,7 +36,6 @@ const TopBar = ({ currentUser, cartItemsCount  }: Props) => {
       currentUser.id :
       "anonymousUser"
   )
-  console.log(cartItemsCount)
   return (
     <header className="site-header d-flex d-flex flex-column">
       {showComponent ? (

@@ -34,7 +34,7 @@ import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
 import {
   cartItemsCountQuery,
-  cartItemsCountSelector,
+  cartItemsCountSelector
 } from "../lib/queries/cart"
 
 type Props = {
@@ -72,7 +72,11 @@ export class App extends React.Component<Props, void> {
 
     return (
       <div className="app" aria-flowto="notifications-container">
-        <Header currentUser={currentUser} cartItemsCount={cartItemsCount} location={location} />
+        <Header
+          currentUser={currentUser}
+          cartItemsCount={cartItemsCount}
+          location={location}
+        />
         <div id="main" className="main-page-content">
           <Switch>
             <Route
@@ -141,17 +145,14 @@ export class App extends React.Component<Props, void> {
 
 const mapStateToProps = createStructuredSelector({
   currentUser:    currentUserSelector,
-  cartItemsCount: cartItemsCountSelector,
+  cartItemsCount: cartItemsCountSelector
 })
 
 const mapDispatchToProps = {
   addUserNotification
 }
 
-const mapPropsToConfig = () => [
-  cartItemsCountQuery(),
-  users.currentUserQuery()
-]
+const mapPropsToConfig = () => [cartItemsCountQuery(), users.currentUserQuery()]
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),
   connectRequest(mapPropsToConfig)

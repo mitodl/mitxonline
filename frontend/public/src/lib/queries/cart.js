@@ -5,8 +5,10 @@ import { getCsrfOptions, nextState } from "./util"
 export const cartSelector = pathOr(null, ["entities", "cartItems"])
 export const totalPriceSelector = pathOr(null, ["entities", "totalPrice"])
 export const orderHistorySelector = pathOr(null, ["entities", "orderHistory"])
-export const cartItemsCountSelector = pathOr(null, ["entities", "cartItemsCount"])
-
+export const cartItemsCountSelector = pathOr(null, [
+  "entities",
+  "cartItemsCount"
+])
 
 export const discountedPriceSelector = pathOr(null, [
   "entities",
