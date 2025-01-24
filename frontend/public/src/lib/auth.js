@@ -1,8 +1,10 @@
 // @flow
+/* global SETTINGS: false */
 import qs from "query-string"
 import { isEmpty, includes, has } from "ramda"
 
 import { routes } from "../lib/urls"
+import { checkFeatureFlag } from "../lib/util"
 
 import type { RouterHistory } from "react-router"
 import type { AuthResponse, AuthStates } from "../flow/authTypes"
@@ -77,6 +79,12 @@ export const handleAuthResponse = (
 ) => {
   /* eslint-disable camelcase */
   const { state, redirect_url, partial_token, errors, field_errors } = response
+  // This is pre-login so we won't be able to flag this out for individual users.
+  // The use of "anonymousUser" is historical - see usage in PR #2064 for instance
+  const sendThruEcommerce = checkFeatureFlag(
+    "enable_unified_ecommerce",
+    "anonymousUser"
+  )
 
   // If a specific handler function was passed in for this response state, invoke it
   if (has(state, handlers)) {
@@ -84,7 +92,18 @@ export const handleAuthResponse = (
   }
 
   if (state === STATE_SUCCESS) {
-    window.location = redirect_url || routes.dashboard
+    const end_location = redirect_url || routes.dashboard
+    if (SETTINGS.unified_ecommerce_url && sendThruEcommerce) {
+      const ecommerce = new URL(`${SETTINGS.unified_ecommerce_url}`)
+
+      ecommerce.pathname = "establish_session/"
+      ecommerce.searchParams.set("next", end_location)
+      ecommerce.searchParams.set("system", "mitxonline")
+
+      window.location = ecommerce.href
+    } else {
+      window.location = end_location
+    }
   } else if (state === STATE_LOGIN_PASSWORD) {
     history.push(routes.login.password)
   } else if (state === STATE_REGISTER_DETAILS) {
