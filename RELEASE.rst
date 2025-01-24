@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.111.2
+Version 0.111.2 (Released January 24, 2025)
 ---------------
 
 - Enrolled Course Item dropdown menu accessibility  (#2514)
