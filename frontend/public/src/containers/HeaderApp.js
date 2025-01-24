@@ -15,7 +15,10 @@ import {
 
 import type { Store } from "redux"
 import type { CurrentUser } from "../flow/authTypes"
-import {cartItemsCountQuery, cartItemsCountSelector} from "../lib/queries/cart";
+import {
+  cartItemsCountQuery,
+  cartItemsCountSelector
+} from "../lib/queries/cart"
 
 type Props = {
   currentUser: ?CurrentUser,
@@ -50,7 +53,13 @@ export class HeaderApp extends React.Component<Props, void> {
       return <div />
     }
 
-    return <Header currentUser={currentUser} cartItemsCount={cartItemsCount} location={null} />
+    return (
+      <Header
+        currentUser={currentUser}
+        cartItemsCount={cartItemsCount}
+        location={null}
+      />
+    )
   }
 }
 

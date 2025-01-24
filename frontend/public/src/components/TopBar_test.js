@@ -13,7 +13,13 @@ describe("TopBar component", () => {
 
     it("has an AnonymousMenu component", () => {
       assert.isOk(
-        shallow(<TopBar currentUser={user} cartItemsCount={cartItemsCount} location={null} />)
+        shallow(
+          <TopBar
+            currentUser={user}
+            cartItemsCount={cartItemsCount}
+            location={null}
+          />
+        )
           .find("AnonymousMenu")
           .exists()
       )
@@ -25,7 +31,13 @@ describe("TopBar component", () => {
     const cartItemsCount = 3
     it("has a UserMenu component", () => {
       assert.isOk(
-        shallow(<TopBar currentUser={user} cartItemsCount={cartItemsCount} location={null} />)
+        shallow(
+          <TopBar
+            currentUser={user}
+            cartItemsCount={cartItemsCount}
+            location={null}
+          />
+        )
           .find("UserMenu")
           .exists()
       )
