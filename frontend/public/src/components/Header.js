@@ -10,10 +10,11 @@ import TopBar from "./TopBar"
 
 type Props = {
   currentUser: CurrentUser,
+  cartItemsCount: number,
   location: ?Location
 }
 
-const Header = ({ currentUser, location }: Props) => {
+const Header = ({ currentUser, cartItemsCount, location }: Props) => {
   if (currentUser && currentUser.is_authenticated) {
     Sentry.getCurrentScope().setUser({
       id:       currentUser.id,
@@ -30,7 +31,7 @@ const Header = ({ currentUser, location }: Props) => {
   }
   return (
     <React.Fragment>
-      <TopBar currentUser={currentUser} location={location} />
+      <TopBar currentUser={currentUser} cartItemsCount={cartItemsCount} location={location} />
     </React.Fragment>
   )
 }

@@ -14,10 +14,11 @@ import { checkFeatureFlag } from "../lib/util"
 
 type Props = {
   currentUser: CurrentUser,
+  cartItemsCount: number,
   location: ?Location
 }
 
-const TopBar = ({ currentUser }: Props) => {
+const TopBar = ({ currentUser, cartItemsCount  }: Props) => {
   // Delay any alert displayed on page-load by 500ms in order to
   // ensure the alert is read by screen readers.
   const [showComponent, setShowComponent] = useState(false)
@@ -35,7 +36,7 @@ const TopBar = ({ currentUser }: Props) => {
       currentUser.id :
       "anonymousUser"
   )
-  const cartItemCount = 1
+  console.log(cartItemsCount)
   return (
     <header className="site-header d-flex d-flex flex-column">
       {showComponent ? (
@@ -80,9 +81,9 @@ const TopBar = ({ currentUser }: Props) => {
                       onClick={() => (window.location = routes.cart)}
                       aria-label="Cart"
                     />
-                    {cartItemCount ? (
+                    {cartItemsCount ? (
                       <span className="badge" id="cart-count">
-                        {cartItemCount}
+                        {cartItemsCount}
                       </span>
                     ) : null}
                     <MixedLink

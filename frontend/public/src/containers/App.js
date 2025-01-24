@@ -32,13 +32,10 @@ import CatalogPage from "./pages/CatalogPage"
 
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
-import {pathOr} from "ramda"
 import {
   cartItemsCountQuery,
-  cartItemsCountQueryKey,
   cartItemsCountSelector,
-  coursesQuery
-} from "../lib/queries/courseRuns"
+} from "../lib/queries/cart"
 
 type Props = {
   match: Match,
@@ -67,7 +64,7 @@ export class App extends React.Component<Props, void> {
   }
 
   render() {
-    const { match, currentUser, location } = this.props
+    const { match, currentUser, cartItemsCount, location } = this.props
     if (!currentUser) {
       // application is still loading
       return <div className="app" />
@@ -75,7 +72,7 @@ export class App extends React.Component<Props, void> {
 
     return (
       <div className="app" aria-flowto="notifications-container">
-        <Header currentUser={currentUser} location={location} />
+        <Header currentUser={currentUser} cartItemsCount={cartItemsCount} location={location} />
         <div id="main" className="main-page-content">
           <Switch>
             <Route
@@ -151,8 +148,8 @@ const mapDispatchToProps = {
   addUserNotification
 }
 
-const mapPropsToConfig = props => [
-  cartItemsCountQuery(props.courseId),
+const mapPropsToConfig = () => [
+  cartItemsCountQuery(),
   users.currentUserQuery()
 ]
 export default compose(

@@ -205,27 +205,6 @@ class BasketViewSet(
     def get_queryset(self):
         return Basket.objects.filter(user=self.request.user).all()
 
-    @action(
-        detail=False,
-        methods=["get"],
-        name="Basket Items Count",
-        url_name="basket_items_count",
-    )
-    def get_items_in_basket(self):
-        basket, _ = Basket.objects.get_or_create(user=self.request.user)
-        print(basket.get_products())
-        print(basket.get_products().count())
-
-        print(basket.get_basket_items())
-        print(basket.products.all())
-        return Response(
-            {
-                "message": "Discount applied",
-                "cartItemsCount": 5,
-            }
-        )
-
-
 
 class BasketItemViewSet(
     NestedViewSetMixin, ListCreateAPIView, mixins.DestroyModelMixin, GenericViewSet
@@ -579,6 +558,17 @@ class CheckoutApiViewSet(ViewSet):
         api.apply_user_discounts(request)
 
         return Response(BasketWithProductSerializer(basket).data)
+
+    @action(
+        detail=False,
+        methods=["get"],
+        name="Basket Items Count",
+        url_name="basket_items_count",
+    )
+    def basket_items_count(self, request):
+        basket, _ = Basket.objects.get_or_create(user=self.request.user)
+
+        return Response(basket.basket_items.count())
 
 
 @method_decorator(csrf_exempt, name="dispatch")
