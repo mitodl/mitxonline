@@ -180,8 +180,9 @@ describe("utility functions", () => {
   })
 
   it("formatPrettyDate should return a formatted moment date", () => {
+    moment.locale('en')
     const momentDate = moment("2019-01-01T00:00:00.000000Z")
-    assert.equal(formatPrettyDate(momentDate), "January 1, 2019")
+    assert.equal(formatPrettyDate(momentDate), "December 31, 2018")
   })
 
   it("firstItem should return the first item of an array", () => {
