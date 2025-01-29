@@ -637,7 +637,9 @@ class InstructorPageLink(models.Model):  # noqa: DJ008
     )
     order = models.SmallIntegerField(default=1, null=True, blank=True)
 
+    readonly_fields= ("order",)
     panels = [
+        FieldPanel('order'),
         PageChooserPanel("linked_instructor_page", "cms.InstructorPage"),
     ]
 
@@ -1102,7 +1104,10 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         FieldPanel("feature_image"),
         FieldPanel("video_url"),
         FieldPanel("faculty_section_title"),
-        InlinePanel("linked_instructors", label="Faculty Members"),
+        InlinePanel(
+            "linked_instructors",
+            label="Faculty Members",
+            help_text="If you need to change the order of faculty members, please delete and add them in the correct order, instead of re-choosing"),
     ]
 
     subpage_types = ["FlexiblePricingRequestForm", "CertificatePage"]
