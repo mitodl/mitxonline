@@ -14,7 +14,7 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.forms import ChoiceField, DecimalField, TextInput
+from django.forms import ChoiceField, DecimalField
 from django.http import Http404
 from django.template.response import TemplateResponse
 from django.urls import reverse
