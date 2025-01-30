@@ -14,7 +14,7 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.forms import ChoiceField, DecimalField
+from django.forms import ChoiceField, DecimalField, TextInput
 from django.http import Http404
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -637,9 +637,7 @@ class InstructorPageLink(models.Model):  # noqa: DJ008
     )
     order = models.SmallIntegerField(default=1, null=True, blank=True)
 
-    readonly_fields= ("order",)
     panels = [
-        FieldPanel('order'),
         PageChooserPanel("linked_instructor_page", "cms.InstructorPage"),
     ]
 
@@ -1145,7 +1143,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
     def get_context(self, request, *args, **kwargs):  # noqa: ARG002
         instructors = [
             member.linked_instructor_page
-            for member in self.linked_instructors.order_by("order").all()
+            for member in self.linked_instructors.all()
         ]
 
         return {
