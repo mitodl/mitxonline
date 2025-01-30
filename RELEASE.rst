@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.111.3
+Version 0.111.3 (Released January 30, 2025)
 ---------------
 
 - fix(deps): update dependency moment to v2.30.1 (#2477)
