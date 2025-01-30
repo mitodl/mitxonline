@@ -1105,7 +1105,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         InlinePanel(
             "linked_instructors",
             label="Faculty Members",
-            help_text="If you need to change the order of faculty members, please delete and add them in the correct order, instead of re-choosing"),
+        )
     ]
 
     subpage_types = ["FlexiblePricingRequestForm", "CertificatePage"]
