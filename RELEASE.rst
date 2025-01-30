@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+Version 0.111.3 (Released January 30, 2025)
+---------------
+
+- fix(deps): update dependency moment to v2.30.1 (#2477)
+- chore(deps): update redis docker tag to v6.2.17 (#2507)
+- Add support for round-tripping the user through Unified Ecommerce on login (#2515)
+
 Version 0.111.2 (Released January 24, 2025)
 ---------------
 
