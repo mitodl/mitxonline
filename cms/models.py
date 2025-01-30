@@ -1105,7 +1105,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         InlinePanel(
             "linked_instructors",
             label="Faculty Members",
-        )
+        ),
     ]
 
     subpage_types = ["FlexiblePricingRequestForm", "CertificatePage"]
@@ -1142,8 +1142,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
 
     def get_context(self, request, *args, **kwargs):  # noqa: ARG002
         instructors = [
-            member.linked_instructor_page
-            for member in self.linked_instructors.all()
+            member.linked_instructor_page for member in self.linked_instructors.all()
         ]
 
         return {
