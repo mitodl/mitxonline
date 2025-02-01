@@ -227,13 +227,13 @@ crt = ["awscrt (==0.20.9)"]
 
 [[package]]
 name = "bpython"
-version = "0.24"
+version = "0.25"
 description = ""
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.9"
 files = [
-    {file = "bpython-0.24-py3-none-any.whl", hash = "sha256:0d196ae3d1ce3dcd559a3fb89ed2c468dfbd1504af0d680b906dd65a9c7a32eb"},
-    {file = "bpython-0.24.tar.gz", hash = "sha256:98736ffd7a8c48fd2bfb53d898a475f4241bde0b672125706af04d9d08fd3dbd"},
+    {file = "bpython-0.25-py3-none-any.whl", hash = "sha256:28fd86008ca5ef6100ead407c9743aa60c51293a18ba5b18fcacea7f5b7f2257"},
+    {file = "bpython-0.25.tar.gz", hash = "sha256:c246fc909ef6dcc26e9d8cb4615b0e6b1613f3543d12269b19ffd0782166c65b"},
 ]
 
 [package.dependencies]
@@ -243,6 +243,7 @@ greenlet = "*"
 pygments = "*"
 pyxdg = "*"
 requests = "*"
+typing_extensions = {version = "*", markers = "python_version < \"3.11\""}
 
 [package.extras]
 clipboard = ["pyperclip"]
@@ -4063,4 +4064,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.18"
-content-hash = "d8f0326d96042dee52818300d0ead7262b1fb5aefb9ec0b742823de8c16e8b3b"
+content-hash = "579fe9d87021d7c6369d851c58a980bec4ee5f3cc161316542ced6696c2d0a9c"
