@@ -8843,7 +8843,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"crypto-js@npm:^4.1.1":
+"crypto-js@npm:^4.2.0":
   version: 4.2.0
   resolution: "crypto-js@npm:4.2.0"
   checksum: f051666dbc077c8324777f44fbd3aaea2986f198fe85092535130d17026c7c2ccf2d23ee5b29b36f7a4a07312db2fae23c9094b644cc35f7858b1b4fcaf27774
@@ -16292,7 +16292,7 @@ __metadata:
     dayjs: ^1.11.7
     eslint-config-react: 1.1.7
     js-file-download: ^0.4.12
-    oidc-client-ts: 2.0.3
+    oidc-client-ts: 2.4.1
     papaparse: ^5.4.1
     react: 17.0.2
     react-dom: 17.0.2
@@ -16955,13 +16955,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"oidc-client-ts@npm:2.0.3":
-  version: 2.0.3
-  resolution: "oidc-client-ts@npm:2.0.3"
+"oidc-client-ts@npm:2.4.1":
+  version: 2.4.1
+  resolution: "oidc-client-ts@npm:2.4.1"
   dependencies:
-    crypto-js: ^4.1.1
+    crypto-js: ^4.2.0
     jwt-decode: ^3.1.2
-  checksum: 84becba2400fcfadf83b445d1b54d9f48df9669f46c5f7209180040d54dd8c31bb45bf99100bb19fe5648d6eb32a9ad6dcd86974d81916be3d89ea4c026095d8
+  checksum: 1da7de123d259b28e97af7090695319137430d9c6648f510a6da63ce5157ac0a857bb13c7471e664d6455bb09067dfc5c27f8fac5b1aa8f172e25a5c477e1826
   languageName: node
   linkType: hard
 
