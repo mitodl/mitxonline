@@ -17,7 +17,6 @@ from reversion.models import Version
 from courses.api import (
     create_program_enrollments,
     create_run_enrollments,
-    deactivate_program_enrollment,
     deactivate_run_enrollment,
     defer_enrollment,
     generate_course_run_certificates,
@@ -505,60 +504,6 @@ class TestDeactivateEnrollments:
         enrollment.refresh_from_db()
         assert enrollment.active is not keep_failed_enrollments
 
-    def test_deactivate_program_enrollment(
-        self,
-        user,
-        patches,
-        program_with_empty_requirements,  # noqa: F811
-    ):
-        """
-        deactivate_program_enrollment set the local program enrollment record to inactive as well as all
-        associated course run enrollments
-        """
-        program_enrollment = ProgramEnrollmentFactory.create(
-            user=user, program=program_with_empty_requirements
-        )
-        course = CourseFactory.create()
-        program_with_empty_requirements.add_requirement(course)
-        course_run_enrollments = CourseRunEnrollmentFactory.create_batch(
-            3,
-            user=user,
-            run__course=course,
-            active=True,
-        )
-        for course_run_enrollment in course_run_enrollments:
-            run = course_run_enrollment.run
-            with reversion.create_revision():
-                product = ProductFactory.create(purchasable_object=run)
-            version = Version.objects.get_for_object(product).first()
-            order = OrderFactory.create(state=OrderStatus.PENDING, purchaser=user)
-            LineFactory.create(
-                order=order, purchased_object=run, product_version=version
-            )
-
-        (
-            returned_program_enrollment,
-            returned_run_enrollments,
-        ) = deactivate_program_enrollment(
-            program_enrollment, change_status=ENROLL_CHANGE_STATUS_REFUNDED
-        )
-        program_enrollment.refresh_from_db()
-        assert program_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
-        assert program_enrollment.active is False
-        assert returned_program_enrollment == program_enrollment
-        assert {e.id for e in returned_run_enrollments} == {
-            e.id for e in course_run_enrollments
-        }
-        assert patches.edx_unenroll.call_count == len(course_run_enrollments)
-        assert patches.send_unenrollment_email.call_count == len(course_run_enrollments)
-        assert patches.sync_hubspot_line_by_line_id.call_count == len(
-            course_run_enrollments
-        )
-        for run_enrollment in course_run_enrollments:
-            run_enrollment.refresh_from_db()
-            assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
-            assert run_enrollment.active is False
-            assert run_enrollment.edx_emails_subscription is False
 
     def test_deactivate_run_enrollment_line_does_not_exist(
         self,
