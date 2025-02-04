@@ -504,7 +504,6 @@ class TestDeactivateEnrollments:
         enrollment.refresh_from_db()
         assert enrollment.active is not keep_failed_enrollments
 
-
     def test_deactivate_run_enrollment_line_does_not_exist(
         self,
         patches,
