@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.111.4 (Released February 04, 2025)
+---------------
+
+- removing order from InstructorPageLink (#2520)
+
 Version 0.111.3 (Released January 30, 2025)
 ---------------
 
