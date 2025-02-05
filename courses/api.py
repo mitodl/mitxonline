@@ -299,42 +299,6 @@ def deactivate_run_enrollment(
     return run_enrollment
 
 
-def deactivate_program_enrollment(
-    program_enrollment,
-    change_status,
-    keep_failed_enrollments=False,  # noqa: FBT002
-):
-    """
-    Helper method to deactivate a ProgramEnrollment
-
-    Args:
-        program_enrollment (ProgramEnrollment): The program enrollment to deactivate
-        change_status (str): The change status to set on the enrollment when deactivating
-        keep_failed_enrollments: (boolean): If True, keeps the local enrollment record
-            in the database even if the enrollment fails in edX.
-
-    Returns:
-        tuple of ProgramEnrollment, list(CourseRunEnrollment): The deactivated enrollments
-    """
-    program_run_enrollments = program_enrollment.get_run_enrollments()
-
-    deactivated_course_runs = []
-    for run_enrollment in program_run_enrollments:
-        if deactivate_run_enrollment(
-            run_enrollment,
-            change_status=change_status,
-            keep_failed_enrollments=keep_failed_enrollments,
-        ):
-            deactivated_course_runs.append(run_enrollment)  # noqa: PERF401
-
-    if deactivated_course_runs:
-        program_enrollment.deactivate_and_save(change_status, no_user=True)
-    else:
-        return None, None
-
-    return program_enrollment, deactivated_course_runs
-
-
 def defer_enrollment(  # noqa: C901
     user,
     from_courseware_id,
