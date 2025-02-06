@@ -1253,7 +1253,7 @@ class CoursePage(ProductPage):
         }
 
     content_panels = [  # noqa: RUF005
-        FieldPanel("course"),
+        InlinePanel("course"),
         FieldPanel("topics"),
     ] + ProductPage.content_panels
 
