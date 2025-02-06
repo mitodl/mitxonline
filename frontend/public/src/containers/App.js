@@ -32,11 +32,16 @@ import CatalogPage from "./pages/CatalogPage"
 
 import type { Match, Location } from "react-router"
 import type { CurrentUser } from "../flow/authTypes"
+import {
+  cartItemsCountQuery,
+  cartItemsCountSelector
+} from "../lib/queries/cart"
 
 type Props = {
   match: Match,
   location: Location,
   currentUser: ?CurrentUser,
+  cartItemsCount: number,
   addUserNotification: Function
 }
 
@@ -59,7 +64,7 @@ export class App extends React.Component<Props, void> {
   }
 
   render() {
-    const { match, currentUser, location } = this.props
+    const { match, currentUser, cartItemsCount, location } = this.props
     if (!currentUser) {
       // application is still loading
       return <div className="app" />
@@ -67,7 +72,11 @@ export class App extends React.Component<Props, void> {
 
     return (
       <div className="app" aria-flowto="notifications-container">
-        <Header currentUser={currentUser} location={location} />
+        <Header
+          currentUser={currentUser}
+          cartItemsCount={cartItemsCount}
+          location={location}
+        />
         <div id="main" className="main-page-content">
           <Switch>
             <Route
@@ -135,15 +144,15 @@ export class App extends React.Component<Props, void> {
 }
 
 const mapStateToProps = createStructuredSelector({
-  currentUser: currentUserSelector
+  currentUser:    currentUserSelector,
+  cartItemsCount: cartItemsCountSelector
 })
 
 const mapDispatchToProps = {
   addUserNotification
 }
 
-const mapPropsToConfig = () => [users.currentUserQuery()]
-
+const mapPropsToConfig = () => [cartItemsCountQuery(), users.currentUserQuery()]
 export default compose(
   connect(mapStateToProps, mapDispatchToProps),
   connectRequest(mapPropsToConfig)

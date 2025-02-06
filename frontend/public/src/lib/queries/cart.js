@@ -5,6 +5,10 @@ import { getCsrfOptions, nextState } from "./util"
 export const cartSelector = pathOr(null, ["entities", "cartItems"])
 export const totalPriceSelector = pathOr(null, ["entities", "totalPrice"])
 export const orderHistorySelector = pathOr(null, ["entities", "orderHistory"])
+export const cartItemsCountSelector = pathOr(null, [
+  "entities",
+  "cartItemsCount"
+])
 
 export const discountedPriceSelector = pathOr(null, [
   "entities",
@@ -114,4 +118,15 @@ export const applyCartMutation = (productId: string) => ({
     method: "POST"
   },
   update: {}
+})
+
+export const cartItemsCountQuery = () => ({
+  queryKey:  "cartItemsCount",
+  url:       `/api/checkout/basket_items_count/`,
+  transform: json => ({
+    cartItemsCount: json
+  }),
+  update: {
+    cartItemsCount: nextState
+  }
 })

@@ -559,6 +559,17 @@ class CheckoutApiViewSet(ViewSet):
 
         return Response(BasketWithProductSerializer(basket).data)
 
+    @action(
+        detail=False,
+        methods=["get"],
+        name="Basket Items Count",
+        url_name="basket_items_count",
+    )
+    def basket_items_count(self, request):
+        basket, _ = Basket.objects.get_or_create(user=request.user)
+
+        return Response(basket.basket_items.count())
+
 
 @method_decorator(csrf_exempt, name="dispatch")
 class CheckoutCallbackView(View):
