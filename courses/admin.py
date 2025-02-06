@@ -61,6 +61,7 @@ class CourseAdmin(admin.ModelAdmin):
 
     model = Course
     search_fields = ["title", "departments__name", "readable_id"]
+    ordering = ("id", )
     list_display = (
         "id",
         "title",
