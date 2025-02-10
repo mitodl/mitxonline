@@ -1,6 +1,19 @@
 Release Notes
 =============
 
+Version 0.111.5 (Released February 10, 2025)
+---------------
+
+- Removing deactivate enrollment and tranfer enrollment (#2533)
+- fix(deps): update dependency postcss to v8.5.1 (#2530)
+- fix(deps): update dependency oidc-client-ts to v2.4.1 (#2529)
+- fix(deps): update dependency @sentry/browser to v8.53.0 (#2527)
+- fix(deps): update babel monorepo (#2526)
+- chore(deps): update dependency ruff to ^0.9 (#2525)
+- chore(deps): update dependency bpython to ^0.25 (#2524)
+- fix(deps): update react monorepo (#2523)
+- fix(deps): update dependency express to v4.21.2 (#2522)
+
 Version 0.111.4 (Released February 04, 2025)
 ---------------
 
