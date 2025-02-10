@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.111.5
+Version 0.111.5 (Released February 10, 2025)
 ---------------
 
 - Removing deactivate enrollment and tranfer enrollment (#2533)
