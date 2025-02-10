@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.111.6
+---------------
+
+- Order courses for selection in cms CoursePage (#2535)
+- Adding cart items info to the header (#2517)
+
 Version 0.111.5 (Released February 10, 2025)
 ---------------
 
