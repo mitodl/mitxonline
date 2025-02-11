@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.111.6
+Version 0.111.6 (Released February 11, 2025)
 ---------------
 
 - Order courses for selection in cms CoursePage (#2535)
