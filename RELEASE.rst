@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.111.7
+---------------
+
+- Match email with iexact filter for a change request (#2537)
+
 Version 0.111.6 (Released February 11, 2025)
 ---------------
 
