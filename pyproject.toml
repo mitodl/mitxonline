@@ -65,7 +65,7 @@ django-hijack = "^3.6.0"
 django-viewflow = "^2.2.7"
 django-reversion = "^5.1.0"
 django-filter = "^24.3"
-wagtail = "^6.2.1"
+wagtail = "6.3"
 
 
 [tool.poetry.group.dev.dependencies]
