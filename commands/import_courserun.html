@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>import_courserun &#8212; MITx Online  documentation</title>
+    <link rel="stylesheet" href="../_static/basic.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="../_static/insipid.css?v=b2d00be7" />
+
+    <script src="../_static/documentation_options.js?v=8a448e45"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script defer src="../_static/insipid.js"></script>
+    <script defer src="../_static/insipid-sidebar.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="generate_discount_code" href="generate_discount_code.html" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+  </head><body>
+    <script type="text/javascript">
+        document.body.classList.add('js');
+    </script>
+    <input type="checkbox" id="sidebar-checkbox" style="display: none;">
+    <label id="overlay" for="sidebar-checkbox"></label>
+    <div class="sidebar-resize-handle"></div>
+    <script type="text/javascript">
+        try {
+            let sidebar = localStorage.getItem('sphinx-sidebar');
+            const sidebar_width = localStorage.getItem('sphinx-sidebar-width');
+            if (sidebar_width) {
+                document.documentElement.style.setProperty('--sidebar-width', sidebar_width);
+            }
+            // show sidebar on wide screen
+            if (!sidebar && window.matchMedia('(min-width: 100rem)').matches) {
+                sidebar = 'visible';
+                // NB: We don't store the value in localStorage!
+            }
+            if (sidebar === 'visible') {
+                document.getElementById('sidebar-checkbox').checked = true;
+            }
+        } catch(e) {
+            console.info(e);
+        }
+    </script>
+    <header id="topbar-placeholder">
+      <div id="topbar">
+        <div id="titlebar">
+          <div class="buttons">
+            <label for="sidebar-checkbox" id="sidebar-button" role="button" tabindex="0" aria-controls="sphinxsidebar" accesskey="M">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M16 132h416c8.837 0 16-7.163 16-16V76c0-8.837-7.163-16-16-16H16C7.163 60 0 67.163 0 76v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16z"/></svg>
+            </label>
+            <button id="search-button" type="button" title="Search" aria-label="Search" aria-expanded="false" aria-controls="search-form" accesskey="S">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z"/></svg>
+            </button>
+          </div>
+          <div class="title">
+            <a class="parent" href="index.html" accesskey="U">MITx Online Commands</a>
+            <a class="top" href="#"><code class="docutils literal notranslate"><span class="pre">import_courserun</span></code></a>
+          </div>
+          <div class="buttons">
+            <button id="fullscreen-button" type="button" aria-hidden="true">
+              <span class="enable">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M212.686 315.314L120 408l32.922 31.029c15.12 15.12 4.412 40.971-16.97 40.971h-112C10.697 480 0 469.255 0 456V344c0-21.382 25.803-32.09 40.922-16.971L72 360l92.686-92.686c6.248-6.248 16.379-6.248 22.627 0l25.373 25.373c6.249 6.248 6.249 16.378 0 22.627zm22.628-118.628L328 104l-32.922-31.029C279.958 57.851 290.666 32 312.048 32h112C437.303 32 448 42.745 448 56v112c0 21.382-25.803 32.09-40.922 16.971L376 152l-92.686 92.686c-6.248 6.248-16.379 6.248-22.627 0l-25.373-25.373c-6.249-6.248-6.249-16.378 0-22.627z"/></svg>
+              </span>
+              <span class="disable">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M4.686 427.314L104 328l-32.922-31.029C55.958 281.851 66.666 256 88.048 256h112C213.303 256 224 266.745 224 280v112c0 21.382-25.803 32.09-40.922 16.971L152 376l-99.314 99.314c-6.248 6.248-16.379 6.248-22.627 0L4.686 449.941c-6.248-6.248-6.248-16.379 0-22.627zM443.314 84.686L344 184l32.922 31.029c15.12 15.12 4.412 40.971-16.97 40.971h-112C234.697 256 224 245.255 224 232V120c0-21.382 25.803-32.09 40.922-16.971L296 136l99.314-99.314c6.248-6.248 16.379-6.248 22.627 0l25.373 25.373c6.248 6.248 6.248 16.379 0 22.627z"/></svg>
+              </span>
+            </button>
+          </div>
+        </div>
+        <div id="searchbox" role="search">
+          <form id="search-form" class="search" style="display: none" action="../search.html" method="get">
+            <input type="search" name="q" placeholder="Search ..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+            <button>Go</button>
+          </form>
+        </div>
+      </div>
+    </header>
+    <nav>
+      <a href="generate_discount_code.html" class="nav-icon previous" title="previous:&#13;generate_discount_code" aria-label="Previous topic" accesskey="P" tabindex="-1">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M31.7 239l136-136c9.4-9.4 24.6-9.4 33.9 0l22.6 22.6c9.4 9.4 9.4 24.6 0 33.9L127.9 256l96.4 96.4c9.4 9.4 9.4 24.6 0 33.9L201.7 409c-9.4 9.4-24.6 9.4-33.9 0l-136-136c-9.5-9.4-9.5-24.6-.1-34z"/></svg>
+      </a>
+    </nav>
+
+    <nav class="relbar">
+      <a class="previous" href="generate_discount_code.html" aria-label="Previous topic" >
+        <div class="icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M257.5 445.1l-22.2 22.2c-9.4 9.4-24.6 9.4-33.9 0L7 273c-9.4-9.4-9.4-24.6 0-33.9L201.4 44.7c9.4-9.4 24.6-9.4 33.9 0l22.2 22.2c9.5 9.5 9.3 25-.4 34.3L136.6 216H424c13.3 0 24 10.7 24 24v32c0 13.3-10.7 24-24 24H136.6l120.5 114.8c9.8 9.3 10 24.8.4 34.3z"/></svg>
+        </div>
+        <div class="title">
+          <span class="text">
+            <span class="direction">previous</span>
+            <code class="docutils literal notranslate"><span class="pre">generate_discount_code</span></code>
+          </span>
+        </div>
+      </a>
+    </nav>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+<section id="import-courserun">
+<h1><code class="docutils literal notranslate"><span class="pre">import_courserun</span></code><a class="headerlink" href="#import-courserun" title="Link to this heading">§</a></h1>
+<p>Creates courserun(s) in the system based on edX course data.</p>
+<p>You can specify either a specific courserun to create, or you can specify a run tag (e.g. <code class="docutils literal notranslate"><span class="pre">1T2023</span></code>) and a program (e.g. <code class="docutils literal notranslate"><span class="pre">program-v1:MITx+DEDP</span></code>), and the command will create courseruns for the courses that it finds in edX.</p>
+<p>You can also optionally have it create a CMS page for the course, if one doesn’t already exist.</p>
+<p>Furthermore, you can specify a price, and it will create (or update) product(s) for the courserun(s) with the specified price. Created products will use the readable ID for the courserun as the product description and will be made active depending on the courserun. This command will not update existing courseruns; only new ones that it creates will get products.</p>
+<p>If the course does not exist, it will be created with the same data as the edX course. Any specified courserun that doesn’t exist in edX will be skipped - it won’t make empty course runs for you (use Django Admin or <code class="docutils literal notranslate"><span class="pre">create_courseware</span></code> if you want to do that, since you’ll need to specify a few things that you can’t here.) Similarly, any courserun that already exists will be skipped - <code class="docutils literal notranslate"><span class="pre">sync_courserun</span></code>, which runs on a regular basis, will handle syncing the pertinent data for it.</p>
+<p>New courseruns will be created with the following data synced from the edX course_details API call:
+* Start and end dates
+* Enrollment start and end dates
+* Title
+* Pacing (self-paced or instructor-led)
+* Courseware URL (depends on the <code class="docutils literal notranslate"><span class="pre">OPENEDX_API_BASE_URL</span></code> configuration setting)</p>
+<p>You may want to adjust these after they’re created.</p>
+<section id="syntax">
+<h2>Syntax<a class="headerlink" href="#syntax" title="Link to this heading">§</a></h2>
+<p>To create an individual courserun:</p>
+<p><code class="docutils literal notranslate"><span class="pre">import_courserun</span> <span class="pre">[--courserun</span> <span class="pre">&lt;courserun&gt;]</span> <span class="pre">[--program</span> <span class="pre">&lt;program&gt;]</span> <span class="pre">[--live]</span> <span class="pre">[--create-cms-page]</span> <span class="pre">[--price</span> <span class="pre">&lt;price&gt;]</span></code></p>
+<p>To walk a program:</p>
+<p><code class="docutils literal notranslate"><span class="pre">import_courserun</span> <span class="pre">[--program</span> <span class="pre">&lt;program&gt;]</span> <span class="pre">[--run-tag</span> <span class="pre">&lt;run</span> <span class="pre">tag&gt;]</span> <span class="pre">[--live]</span> <span class="pre">[--create-cms-page]</span> <span class="pre">[--price</span> <span class="pre">&lt;price&gt;]</span></code></p>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Link to this heading">§</a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--courserun</span> <span class="pre">&lt;courserun&gt;</span></code> - The courserun to check for. Takes precedence over <code class="docutils literal notranslate"><span class="pre">--program</span></code>.</p></li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">--program</span> <span class="pre">&lt;program&gt;</span></code></dt><dd><ul>
+<li><p>_If walking a program:_ The program to walk through. Requires <code class="docutils literal notranslate"><span class="pre">--run_tag</span></code>. Specify either the numeric database ID or the readable ID for the program.</p></li>
+<li><p>_If creating a single courserun:_ The program the course should belong to, if any.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--run-tag</span> <span class="pre">&lt;run</span> <span class="pre">tag&gt;</span></code> - The run tag to use for the new courseruns. Required for <code class="docutils literal notranslate"><span class="pre">--program</span></code>; don’t use otherwise.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--live</span></code> - Make the course live. (Default is to set the flag to false.)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--create-cms-page</span></code> - Attempt to create a basic CMS page for the course, in a similar fashion to <code class="docutils literal notranslate"><span class="pre">create_courseware_page</span></code>. If this fails (for instance, if the course already has a CMS page), this step will be skipped.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--price</span> <span class="pre">&lt;price&gt;</span></code> - Create (or update) a product for the courserun with the specified price. If the command creates multiple courseruns, this will create a product for each.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--dept</span> <span class="pre">&lt;department_name&gt;</span></code> - Specify department(s) assigned to the course object.  If program is specified, all courses associated with the program and imported will have the same department.</p></li>
+</ul>
+</section>
+<section id="example">
+<h2>Example<a class="headerlink" href="#example" title="Link to this heading">§</a></h2>
+<p>The use case for this was creating a batch of course runs for an upcoming semester of DEDP courses; these courses existed in edX but not in MITx Online. Since in that case the semester was 1T2023, this command would have created all the applicable courseruns all at once:</p>
+<p><code class="docutils literal notranslate"><span class="pre">manage.py</span> <span class="pre">import_courserun</span> <span class="pre">--program</span> <span class="pre">program-v1:MITx+DEDP</span> <span class="pre">--run-tag</span> <span class="pre">1T2023</span> <span class="pre">--live</span> <span class="pre">--dept</span> <span class="pre">Economics</span></code></p>
+<p>Or, the same but with the standard DEDP pricing applied:</p>
+<p><code class="docutils literal notranslate"><span class="pre">manage.py</span> <span class="pre">import_courserun</span> <span class="pre">--program</span> <span class="pre">program-v1:MITx+DEDP</span> <span class="pre">--run-tag</span> <span class="pre">1T2023</span> <span class="pre">--live</span> <span class="pre">--price</span> <span class="pre">1000</span></code></p>
+</section>
+</section>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+
+          <div class="sidebar-resize-handle"></div>
+
+<h3><a href="../index.html">Table of Contents</a></h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../authentication.html">Authentication</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration/index.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ecommerce/index.html">Ecommerce</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">MITx Online Commands</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="check_program_requirements.html"><code class="docutils literal notranslate"><span class="pre">check_program_requirements</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="configure_instance.html"><code class="docutils literal notranslate"><span class="pre">configure_instance</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="configure_tiers.html"><code class="docutils literal notranslate"><span class="pre">configure_tiers</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="create_courseware.html"><code class="docutils literal notranslate"><span class="pre">create_courseware</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="create_courseware_page.html"><code class="docutils literal notranslate"><span class="pre">create_courseware_page</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="create_product.html"><code class="docutils literal notranslate"><span class="pre">create_product</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="create_user.html"><code class="docutils literal notranslate"><span class="pre">create_user</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="generate_discount_code.html"><code class="docutils literal notranslate"><span class="pre">generate_discount_code</span></code></a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#"><code class="docutils literal notranslate"><span class="pre">import_courserun</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="index.html#indices-and-tables">Indices and tables</a></li>
+</ul>
+
+<div><hr class="docutils"></div>
+<ul>
+  <li class="toctree-l1"><a class="reference internal" href="../genindex.html" accesskey="I">General Index</a></li>
+</ul>
+<div id="ethical-ad-placement"></div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+    <nav class="relbar">
+      <a class="previous" href="generate_discount_code.html" aria-label="Previous topic" >
+        <div class="icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M257.5 445.1l-22.2 22.2c-9.4 9.4-24.6 9.4-33.9 0L7 273c-9.4-9.4-9.4-24.6 0-33.9L201.4 44.7c9.4-9.4 24.6-9.4 33.9 0l22.2 22.2c9.5 9.5 9.3 25-.4 34.3L136.6 216H424c13.3 0 24 10.7 24 24v32c0 13.3-10.7 24-24 24H136.6l120.5 114.8c9.8 9.3 10 24.8.4 34.3z"/></svg>
+        </div>
+        <div class="title">
+          <span class="text">
+            <span class="direction">previous</span>
+            <code class="docutils literal notranslate"><span class="pre">generate_discount_code</span></code>
+          </span>
+        </div>
+      </a>
+    </nav>
+
+    <footer role="contentinfo">
+      &#169; Copyright 2023, OL Engineering.
+      Created using <a class="reference external" href="https://www.sphinx-doc.org/">Sphinx</a> 7.4.7.
+      <a class="reference external" href="https://insipid-sphinx-theme.readthedocs.io/">Insipid Theme</a>.
+<a class="reference internal" href="../_sources/commands/import_courserun.rst.txt" rel="nofollow">Show Source</a>.
+    </footer>
+  </body>
+</html>

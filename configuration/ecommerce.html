@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Configure eCommerce &#8212; MITx Online  documentation</title>
+    <link rel="stylesheet" href="../_static/basic.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="../_static/insipid.css?v=b2d00be7" />
+
+    <script src="../_static/documentation_options.js?v=8a448e45"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script defer src="../_static/insipid.js"></script>
+    <script defer src="../_static/insipid-sidebar.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="MITx Online Quick Start" href="quickstart.html" />
+    <link rel="prev" title="Configuration" href="index.html" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+  </head><body>
+    <script type="text/javascript">
+        document.body.classList.add('js');
+    </script>
+    <input type="checkbox" id="sidebar-checkbox" style="display: none;">
+    <label id="overlay" for="sidebar-checkbox"></label>
+    <div class="sidebar-resize-handle"></div>
+    <script type="text/javascript">
+        try {
+            let sidebar = localStorage.getItem('sphinx-sidebar');
+            const sidebar_width = localStorage.getItem('sphinx-sidebar-width');
+            if (sidebar_width) {
+                document.documentElement.style.setProperty('--sidebar-width', sidebar_width);
+            }
+            // show sidebar on wide screen
+            if (!sidebar && window.matchMedia('(min-width: 100rem)').matches) {
+                sidebar = 'visible';
+                // NB: We don't store the value in localStorage!
+            }
+            if (sidebar === 'visible') {
+                document.getElementById('sidebar-checkbox').checked = true;
+            }
+        } catch(e) {
+            console.info(e);
+        }
+    </script>
+    <header id="topbar-placeholder">
+      <div id="topbar">
+        <div id="titlebar">
+          <div class="buttons">
+            <label for="sidebar-checkbox" id="sidebar-button" role="button" tabindex="0" aria-controls="sphinxsidebar" accesskey="M">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M16 132h416c8.837 0 16-7.163 16-16V76c0-8.837-7.163-16-16-16H16C7.163 60 0 67.163 0 76v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16z"/></svg>
+            </label>
+            <button id="search-button" type="button" title="Search" aria-label="Search" aria-expanded="false" aria-controls="search-form" accesskey="S">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z"/></svg>
+            </button>
+          </div>
+          <div class="title">
+            <a class="parent" href="index.html" accesskey="U">Configuration</a>
+            <a class="top" href="#">Configure eCommerce</a>
+          </div>
+          <div class="buttons">
+            <button id="fullscreen-button" type="button" aria-hidden="true">
+              <span class="enable">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M212.686 315.314L120 408l32.922 31.029c15.12 15.12 4.412 40.971-16.97 40.971h-112C10.697 480 0 469.255 0 456V344c0-21.382 25.803-32.09 40.922-16.971L72 360l92.686-92.686c6.248-6.248 16.379-6.248 22.627 0l25.373 25.373c6.249 6.248 6.249 16.378 0 22.627zm22.628-118.628L328 104l-32.922-31.029C279.958 57.851 290.666 32 312.048 32h112C437.303 32 448 42.745 448 56v112c0 21.382-25.803 32.09-40.922 16.971L376 152l-92.686 92.686c-6.248 6.248-16.379 6.248-22.627 0l-25.373-25.373c-6.249-6.248-6.249-16.378 0-22.627z"/></svg>
+              </span>
+              <span class="disable">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M4.686 427.314L104 328l-32.922-31.029C55.958 281.851 66.666 256 88.048 256h112C213.303 256 224 266.745 224 280v112c0 21.382-25.803 32.09-40.922 16.971L152 376l-99.314 99.314c-6.248 6.248-16.379 6.248-22.627 0L4.686 449.941c-6.248-6.248-6.248-16.379 0-22.627zM443.314 84.686L344 184l32.922 31.029c15.12 15.12 4.412 40.971-16.97 40.971h-112C234.697 256 224 245.255 224 232V120c0-21.382 25.803-32.09 40.922-16.971L296 136l99.314-99.314c6.248-6.248 16.379-6.248 22.627 0l25.373 25.373c6.248 6.248 6.248 16.379 0 22.627z"/></svg>
+              </span>
+            </button>
+          </div>
+        </div>
+        <div id="searchbox" role="search">
+          <form id="search-form" class="search" style="display: none" action="../search.html" method="get">
+            <input type="search" name="q" placeholder="Search ..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+            <button>Go</button>
+          </form>
+        </div>
+      </div>
+    </header>
+    <nav>
+      <a href="index.html" class="nav-icon previous" title="previous:&#13;Configuration" aria-label="Previous topic" accesskey="P" tabindex="-1">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M31.7 239l136-136c9.4-9.4 24.6-9.4 33.9 0l22.6 22.6c9.4 9.4 9.4 24.6 0 33.9L127.9 256l96.4 96.4c9.4 9.4 9.4 24.6 0 33.9L201.7 409c-9.4 9.4-24.6 9.4-33.9 0l-136-136c-9.5-9.4-9.5-24.6-.1-34z"/></svg>
+      </a>
+      <a href="quickstart.html" class="nav-icon next" title="next:&#13;MITx Online Quick Start" aria-label="Next topic" accesskey="N" tabindex="-1">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M224.3 273l-136 136c-9.4 9.4-24.6 9.4-33.9 0l-22.6-22.6c-9.4-9.4-9.4-24.6 0-33.9l96.4-96.4-96.4-96.4c-9.4-9.4-9.4-24.6 0-33.9L54.3 103c9.4-9.4 24.6-9.4 33.9 0l136 136c9.5 9.4 9.5 24.6.1 34z"/></svg>
+      </a>
+    </nav>
+
+    <nav class="relbar">
+      <a class="previous" href="index.html" aria-label="Previous topic" >
+        <div class="icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M257.5 445.1l-22.2 22.2c-9.4 9.4-24.6 9.4-33.9 0L7 273c-9.4-9.4-9.4-24.6 0-33.9L201.4 44.7c9.4-9.4 24.6-9.4 33.9 0l22.2 22.2c9.5 9.5 9.3 25-.4 34.3L136.6 216H424c13.3 0 24 10.7 24 24v32c0 13.3-10.7 24-24 24H136.6l120.5 114.8c9.8 9.3 10 24.8.4 34.3z"/></svg>
+        </div>
+        <div class="title">
+          <span class="text">
+            <span class="direction">previous</span>
+            Configuration
+          </span>
+        </div>
+      </a>
+      <a class="next" href="quickstart.html" aria-label="Next topic" >
+        <div class="title">
+          <span class="text">
+            <span class="direction">next</span>
+            MITx Online Quick Start
+          </span>
+        </div>
+        <div class="icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M190.5 66.9l22.2-22.2c9.4-9.4 24.6-9.4 33.9 0L441 239c9.4 9.4 9.4 24.6 0 33.9L246.6 467.3c-9.4 9.4-24.6 9.4-33.9 0l-22.2-22.2c-9.5-9.5-9.3-25 .4-34.3L311.4 296H24c-13.3 0-24-10.7-24-24v-32c0-13.3 10.7-24 24-24h287.4L190.9 101.2c-9.8-9.3-10-24.8-.4-34.3z"/></svg>
+        </div>
+      </a>
+    </nav>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+<section id="configure-ecommerce">
+<h1>Configure eCommerce<a class="headerlink" href="#configure-ecommerce" title="Link to this heading">§</a></h1>
+<p>To use the eCommerce subsystem, some configuration is required. These instructions will also set up a course in your MITx Online environment that you can use for enrollment.</p>
+<p>You’ll need a working MITx Online setup and a working devstack setup to begin, and superuser accounts for each.</p>
+<section id="set-up-mitx-online-ecommerce-config">
+<h2>Set Up MITx Online eCommerce Config<a class="headerlink" href="#set-up-mitx-online-ecommerce-config" title="Link to this heading">§</a></h2>
+<p>The CyberSource configuration for the app can be lifted out of Heroku. <strong>Make sure you use values from RC - otherwise, you will actually be charged for purchases (and test credit card numbers will fail).</strong> For best results, you should also have an account for the test Enterprise Business Center (<code class="docutils literal notranslate"><span class="pre">https://ebc2test.cybersource.com/ebc2/</span></code>).</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">.env</span></code> settings you need to copy over are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">MITOL_PAYMENT_GATEWAY_CYBERSOURCE_ACCESS_KEY</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL</span></code></p></li>
+</ul>
+<p>Alternatively, you can set up your own CyberSource developer account and generate a set of API keys there: <a class="reference external" href="https://ebc2.cybersource.com/ebc2/registration/external">Evaluation Account Setup</a> If you set up your own developer account, you will need to properly configure it for Secure Acceptance with the credit card types you wish to test, and you will need to generate your own API keys and supply them in the <code class="docutils literal notranslate"><span class="pre">.env</span></code> file.</p>
+<p>You may also set <code class="docutils literal notranslate"><span class="pre">ECOMMERCE_DEFAULT_PAYMENT_GATEWAY</span></code> to <code class="docutils literal notranslate"><span class="pre">CyberSource</span></code> - this sets it to the default value, but setting it now will prevent issues if the Payment Gateway ol-django library adds in new payment gateways.</p>
+</section>
+<section id="set-up-a-course">
+<h2>Set Up a Course<a class="headerlink" href="#set-up-a-course" title="Link to this heading">§</a></h2>
+<p>The devstack environment comes with a couple of test courses set up. If you want a different course, you will need to set that up in Open edX before starting here. Bootstrapping a course in edX is beyond the scope of this document.</p>
+<section id="in-open-edx">
+<h3>In Open edX<a class="headerlink" href="#in-open-edx" title="Link to this heading">§</a></h3>
+<ol class="arabic simple">
+<li><p>Log in to the Django Admin interface.</p></li>
+<li><p>Find a course from the <a class="reference external" href="http://edx.odl.local:18000/admin/course_overviews/courseoverview/">Course Overviews</a> page.</p></li>
+<li><p>Note the <em>Display name</em> and <em>Id</em> fields.</p></li>
+</ol>
+</section>
+<section id="in-mitx-online">
+<h3>In MITx Online<a class="headerlink" href="#in-mitx-online" title="Link to this heading">§</a></h3>
+<ol class="arabic simple">
+<li><p>Log into the Django Admin interface.</p></li>
+<li><p>Under Courses, open Programs and add a Program. (The specifics here aren’t important - there just needs to be a Program.)</p></li>
+<li><p>Under Courses, open Courses and add a Course. The <em>Title</em> and <em>Readable Id</em> fields should be set to the <em>Display name</em> and <em>Id</em> fields from the edX course you plan to use. Make sure Live is set and the Program is set to the program you created in step 2.</p></li>
+<li><p>Under Course Runs, add a Course Run. The <em>Title</em> and <em>Courseware Id</em> fields should be set to the Id and Display Name fields from the edX course. The Courseware url path should be set to the URL where the course lives in edX (ex. <code class="docutils literal notranslate"><span class="pre">https://courses-qa.mitxonline.mit.edu/learn/course/course-v1:MITx+14.750x+3T2022/home</span></code>). The dates will be overwritten when the system is synced with Open edX, but for testing it’s good to put Start Date, End Date, Enrollment Start, and Enrollment End. A good starting point for these is today plus/minus one year for each.</p></li>
+<li><p>You now need to add the course to the CMS. Navigate to the Wagtail CMS admin, at /cms.</p></li>
+<li><p>Open the Courses folder under Home Page.</p></li>
+<li><p>Select Add Child Page.</p></li>
+<li><p>Fill out the form. The course you added in steps 1-4 should appear. (If not, double-check your settings in Django Admin.) Publish the page when ready.</p></li>
+<li><p>Open the Home Page, and select Edit.</p></li>
+<li><p>Under the Featured Products section, select Add. You will be given a button to choose a page, and the page chooser there should list the page you created.</p></li>
+<li><p>Publish the Home Page when ready.</p></li>
+</ol>
+<p>You should now be able to see the course under the hero image on the MITx Online homepage, and navigating into the course should give you the option to Enroll. (At this point, you won’t have a Product set up, so enrolling now should just enroll you in the course.)</p>
+</section>
+</section>
+<section id="setting-up-a-product">
+<h2>Setting Up a Product<a class="headerlink" href="#setting-up-a-product" title="Link to this heading">§</a></h2>
+<ol class="arabic simple">
+<li><p>Log into MITx Online Django Admin.</p></li>
+<li><p>Under Ecommerce, open Products and create a new Product. Set <em>Content type</em> to Course Run and <em>Object Id</em> to the ID of the course run you created earlier (it’s probably 1 if you’re working from a new install). Price should ideally be set to a non-zero value, that is less than $999, in RC/Sandbox environments. Description needs to be filled in but can be anything - for clarity, it’s recommended to use the course name. Make sure Is active is checked.</p></li>
+</ol>
+<p>You should now be able to enroll in the upgraded course.</p>
+<ul class="simple">
+<li><p>If you’ve enrolled in the course already, you should now see the upsell card on the course listing page.</p></li>
+<li><p>If you haven’t enrolled, enrolling should pop the upgrade modal.</p></li>
+<li><p>In either case, enrolling in the paid version of the course should bring you to the cart, and you should then be able to check out.</p></li>
+</ul>
+<section id="testing-checkout">
+<h3>Testing Checkout<a class="headerlink" href="#testing-checkout" title="Link to this heading">§</a></h3>
+<p>The test CyberSource credentials won’t actually process a charge that has been run through the system. However, you should avoid using a valid credit card number when testing. Any card number that is both invalid but passes the checks should work. Here are some examples:</p>
+<ul class="simple">
+<li><p>Visa: 4111111111111111</p></li>
+<li><p>Visa: 4242424242424242</p></li>
+<li><p>MasterCard: 5555555555554444</p></li>
+<li><p>MasterCard: 5105105105105100</p></li>
+<li><p>American Express: 378282246310005</p></li>
+<li><p>Discover: 6011111111111117</p></li>
+</ul>
+<p>Supply any expiration date in the future. The CVN code should be any three-digit (not AmEx) or 4 digit (AmEx) number that is fairly unique (not like 123, 111). What card types are allowed and whether or not the CVN code is required depends on the settings in the CyberSource account - currently, the MIT test account does require an expiration date and CVN code and supports the four card types listed above. Transactions are logged and can be found in the test EBC. You can additionally adjust the settings in the EBC to email the payment data to you while you’re testing - but you should ask around before doing this in case someone else is testing eCommerce elsewhere.</p>
+</section>
+</section>
+</section>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+
+          <div class="sidebar-resize-handle"></div>
+
+<h3><a href="../index.html">Table of Contents</a></h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../authentication.html">Authentication</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Configuration</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Configure eCommerce</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html">MITx Online Quick Start</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#configure-open-edx-external-links">Configure Open edX (External Links)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../ecommerce/index.html">Ecommerce</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../commands/index.html">MITx Online Commands</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../commands/index.html#indices-and-tables">Indices and tables</a></li>
+</ul>
+
+<div><hr class="docutils"></div>
+<ul>
+  <li class="toctree-l1"><a class="reference internal" href="../genindex.html" accesskey="I">General Index</a></li>
+</ul>
+<div id="ethical-ad-placement"></div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+    <nav class="relbar">
+      <a class="previous" href="index.html" aria-label="Previous topic" >
+        <div class="icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M257.5 445.1l-22.2 22.2c-9.4 9.4-24.6 9.4-33.9 0L7 273c-9.4-9.4-9.4-24.6 0-33.9L201.4 44.7c9.4-9.4 24.6-9.4 33.9 0l22.2 22.2c9.5 9.5 9.3 25-.4 34.3L136.6 216H424c13.3 0 24 10.7 24 24v32c0 13.3-10.7 24-24 24H136.6l120.5 114.8c9.8 9.3 10 24.8.4 34.3z"/></svg>
+        </div>
+        <div class="title">
+          <span class="text">
+            <span class="direction">previous</span>
+            Configuration
+          </span>
+        </div>
+      </a>
+      <a class="next" href="quickstart.html" aria-label="Next topic" >
+        <div class="title">
+          <span class="text">
+            <span class="direction">next</span>
+            MITx Online Quick Start
+          </span>
+        </div>
+        <div class="icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!-- Font Awesome Free 5.15.4 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M190.5 66.9l22.2-22.2c9.4-9.4 24.6-9.4 33.9 0L441 239c9.4 9.4 9.4 24.6 0 33.9L246.6 467.3c-9.4 9.4-24.6 9.4-33.9 0l-22.2-22.2c-9.5-9.5-9.3-25 .4-34.3L311.4 296H24c-13.3 0-24-10.7-24-24v-32c0-13.3 10.7-24 24-24h287.4L190.9 101.2c-9.8-9.3-10-24.8-.4-34.3z"/></svg>
+        </div>
+      </a>
+    </nav>
+
+    <footer role="contentinfo">
+      &#169; Copyright 2023, OL Engineering.
+      Created using <a class="reference external" href="https://www.sphinx-doc.org/">Sphinx</a> 7.4.7.
+      <a class="reference external" href="https://insipid-sphinx-theme.readthedocs.io/">Insipid Theme</a>.
+<a class="reference internal" href="../_sources/configuration/ecommerce.rst.txt" rel="nofollow">Show Source</a>.
+    </footer>
+  </body>
+</html>
