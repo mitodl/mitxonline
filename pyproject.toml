@@ -66,6 +66,7 @@ django-viewflow = "^2.2.7"
 django-reversion = "^5.1.0"
 django-filter = "^24.3"
 wagtail = "^6.2.1"
+drf-spectacular = "^0.28.0"
 
 
 [tool.poetry.group.dev.dependencies]

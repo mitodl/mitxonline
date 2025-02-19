@@ -2,6 +2,7 @@
 
 import logging
 from typing import Optional, Tuple, Union  # noqa: UP035
+from drf_spectacular.utils import extend_schema
 
 import django_filters
 from django.contrib.auth.models import User
@@ -165,8 +166,9 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_context(self):
         added_context = {}
-        if self.request.query_params.get("readable_id", None):
-            added_context["all_runs"] = True
+        if self.request and self.request.query_params:
+            if self.request.query_params.get("readable_id", None):
+                added_context["all_runs"] = True
 
         return {**super().get_serializer_context(), **added_context}
 
@@ -210,7 +212,7 @@ class CourseRunViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_context(self):
         added_context = {}
-        if self.request.query_params.get("relevant_to", None):
+        if self.request and self.request.query_params and self.request.query_params.get("relevant_to", None):
             added_context["include_enrolled_flag"] = True
         return {**super().get_serializer_context(), **added_context}
 
@@ -335,6 +337,10 @@ def create_enrollment_view(request):
     return resp
 
 
+@extend_schema(
+    request=CourseRunEnrollmentSerializer,
+    responses={200: CourseRunEnrollmentSerializer},
+)
 class UserEnrollmentsApiViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,

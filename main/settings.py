@@ -25,6 +25,7 @@ from mitol.google_sheets.settings.google_sheets import *  # noqa: F403
 from mitol.google_sheets_deferrals.settings.google_sheets_deferrals import *  # noqa: F403
 from mitol.google_sheets_refunds.settings.google_sheets_refunds import *  # noqa: F403
 from redbeat import RedBeatScheduler
+from openapi.settings_spectacular import open_spectacular_settings
 
 from main.celery_utils import OffsettingSchedule
 from main.sentry import init_sentry
@@ -214,6 +215,8 @@ INSTALLED_APPS = (
     "mitol.olposthog.apps.OlPosthog",
     # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
     "viewflow",
+    "openapi",
+    "drf_spectacular",
 )
 # Only include the seed data app if this isn't running in prod
 # if ENVIRONMENT not in ("production", "prod"):
@@ -947,6 +950,10 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "main.exceptions.exception_handler",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
     "DEFAULT_VERSIONING": "rest_framework.versioning.NamespaceVersioning",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "ALLOWED_VERSIONS": [
+        "v1"
+    ],
 }
 
 # Relative URL to be used by Djoser for the link in the password reset email
@@ -1207,3 +1214,5 @@ UNIFIED_ECOMMERCE_URL = get_string(
     default="http://ue.odl.local:9080/",
     description="The base URL for Unified Ecommerce.",
 )
+
+SPECTACULAR_SETTINGS = open_spectacular_settings
