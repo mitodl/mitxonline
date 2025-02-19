@@ -18,6 +18,6 @@ jobs:
       - name: Install ghp-import
         run: pip install ghp-import
       - name: Build documentation
-        run: "./pants docs ::"
+        run: "pants docs ::"
       - name: Publish Documentation
         run: ghp-import --push --force --no-history --no-jekyll dist/sphinx/
