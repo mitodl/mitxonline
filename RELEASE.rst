@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+Version 0.112.0 (Released February 20, 2025)
+---------------
+
+- docs yml correct python version (#2541)
+- Upgrade Python 3.10.16 (#2540)
+
 Version 0.111.7 (Released February 14, 2025)
 ---------------
 
