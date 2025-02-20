@@ -1,7 +1,7 @@
 Release Notes
 =============
 
-Version 0.112.0
+Version 0.112.0 (Released February 20, 2025)
 ---------------
 
 - docs yml correct python version (#2541)
