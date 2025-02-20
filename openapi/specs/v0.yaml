@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: MITx Online API
-  version: 0.0.1 (v1)
+  version: 0.0.1 (v0)
   description: MIT public API
 paths:
   /.well-known/openid-configuration:
@@ -27,6 +27,13 @@ paths:
     get:
       operationId: api_baskets_list
       description: API view set for Basket
+      parameters:
+      - in: path
+        name: username
+        schema:
+          type: string
+        description: Username of the basket owner
+        required: true
       tags:
       - api
       responses:
@@ -44,9 +51,16 @@ paths:
       description: Applied basket discounts
       parameters:
       - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket discount
+        required: true
+      - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the basket
         required: true
       tags:
       - api
@@ -67,12 +81,14 @@ paths:
       - in: path
         name: id
         schema:
-          type: string
+          type: integer
+        description: ID of the basket discount
         required: true
       - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the basket
         required: true
       tags:
       - api
@@ -89,9 +105,16 @@ paths:
       description: API view set for BasketItem
       parameters:
       - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket item
+        required: true
+      - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the basket
         required: true
       tags:
       - api
@@ -109,9 +132,16 @@ paths:
       description: API view set for BasketItem
       parameters:
       - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket item
+        required: true
+      - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the basket
         required: true
       tags:
       - api
@@ -142,12 +172,14 @@ paths:
       - in: path
         name: id
         schema:
-          type: string
+          type: integer
+        description: ID of the basket item
         required: true
       - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the basket
         required: true
       tags:
       - api
@@ -163,6 +195,7 @@ paths:
         name: username
         schema:
           type: string
+        description: Username of the basket owner
         required: true
       tags:
       - api
@@ -210,9 +243,25 @@ paths:
         required: true
       tags:
       - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeEmailRequestUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChangeEmailRequestUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChangeEmailRequestUpdateRequest'
+        required: true
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeEmailRequestUpdate'
+          description: ''
     patch:
       operationId: api_change_emails_partial_update
       description: Viewset for creating and updating email change requests
@@ -2951,6 +3000,13 @@ paths:
     get:
       operationId: baskets_list
       description: API view set for Basket
+      parameters:
+      - in: path
+        name: username
+        schema:
+          type: string
+        description: Username of the basket owner
+        required: true
       tags:
       - baskets
       responses:
@@ -2968,9 +3024,16 @@ paths:
       description: Applied basket discounts
       parameters:
       - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket discount
+        required: true
+      - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the basket
         required: true
       tags:
       - baskets
@@ -2991,12 +3054,14 @@ paths:
       - in: path
         name: id
         schema:
-          type: string
+          type: integer
+        description: ID of the basket discount
         required: true
       - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the basket
         required: true
       tags:
       - baskets
@@ -3013,9 +3078,16 @@ paths:
       description: API view set for BasketItem
       parameters:
       - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket item
+        required: true
+      - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the basket
         required: true
       tags:
       - baskets
@@ -3033,9 +3105,16 @@ paths:
       description: API view set for BasketItem
       parameters:
       - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the basket item
+        required: true
+      - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the basket
         required: true
       tags:
       - baskets
@@ -3066,12 +3145,14 @@ paths:
       - in: path
         name: id
         schema:
-          type: string
+          type: integer
+        description: ID of the basket item
         required: true
       - in: path
         name: parent_lookup_basket
         schema:
-          type: string
+          type: integer
+        description: ID of the basket
         required: true
       tags:
       - baskets
@@ -3087,6 +3168,7 @@ paths:
         name: username
         schema:
           type: string
+        description: Username of the basket owner
         required: true
       tags:
       - baskets
@@ -5735,7 +5817,9 @@ components:
         user:
           type: integer
         basket_items:
-          type: string
+          type: array
+          items:
+            $ref: '#/components/schemas/BasketItem'
           readOnly: true
       required:
       - basket_items
@@ -5810,6 +5894,14 @@ components:
       - new_email
       - password
     ChangeEmailRequestUpdate:
+      type: object
+      description: Serializer for confirming a user email change
+      properties:
+        confirmed:
+          type: boolean
+      required:
+      - confirmed
+    ChangeEmailRequestUpdateRequest:
       type: object
       description: Serializer for confirming a user email change
       properties:

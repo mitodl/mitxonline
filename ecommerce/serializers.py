@@ -6,6 +6,8 @@ from decimal import Decimal
 
 import pytz
 from rest_framework import serializers
+from typing import List
+from drf_spectacular.utils import extend_schema_field
 
 from cms.serializers import CoursePageSerializer
 from courses.models import Course, CourseRun, ProgramRun
@@ -147,6 +149,7 @@ class BasketSerializer(serializers.ModelSerializer):
 
     basket_items = serializers.SerializerMethodField()
 
+    @extend_schema_field(BasketItemSerializer(many=True))
     def get_basket_items(self, instance):
         """Get items in the basket"""
         return [

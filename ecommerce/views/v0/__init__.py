@@ -35,6 +35,7 @@ from rest_framework.viewsets import (
     ViewSet,
 )
 from rest_framework_extensions.mixins import NestedViewSetMixin
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from courses.models import Course, CourseRun, Program, ProgramRun
 from ecommerce import api
@@ -187,7 +188,17 @@ class ProductViewSet(ReadOnlyModelViewSet):
             .prefetch_related("purchasable_object")
         )
 
-
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="username",
+            type=str,
+            location=OpenApiParameter.PATH,
+            description="Username of the basket owner",
+            required=True
+        )
+    ]
+)
 class BasketViewSet(
     NestedViewSetMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, GenericViewSet
 ):
@@ -205,7 +216,24 @@ class BasketViewSet(
     def get_queryset(self):
         return Basket.objects.filter(user=self.request.user).all()
 
-
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_basket",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the basket",
+            required=True
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the basket item",
+            required=True
+        )
+    ]
+)
 class BasketItemViewSet(
     NestedViewSetMixin, ListCreateAPIView, mixins.DestroyModelMixin, GenericViewSet
 ):
@@ -230,7 +258,24 @@ class BasketItemViewSet(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
 
-
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_basket",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the basket",
+            required=True
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the basket discount",
+            required=True
+        )
+    ]
+)
 class BasketDiscountViewSet(ReadOnlyModelViewSet):
     """Applied basket discounts"""
 

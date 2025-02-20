@@ -80,10 +80,15 @@ class ChangeEmailRequestViewSet(
         )
 
     def get_serializer_class(self):
-        if self.action == "create":  # noqa: RET503
+        """
+        Return the appropriate serializer class based on the action
+        """
+        if self.action == "create":
             return ChangeEmailRequestCreateSerializer
-        elif self.action == "partial_update":
+        elif self.action in ["update", "partial_update"]:
             return ChangeEmailRequestUpdateSerializer
+        # Default case
+        return ChangeEmailRequestCreateSerializer
 
 
 class CountriesStatesViewSet(viewsets.ViewSet):
