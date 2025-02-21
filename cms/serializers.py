@@ -3,6 +3,7 @@
 import bleach
 from django.templatetags.static import static
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
 
 from cms import models
 from cms.api import get_wagtail_img_src
@@ -19,6 +20,7 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
     effort = serializers.SerializerMethodField()
     length = serializers.SerializerMethodField()
 
+    @extend_schema_field(str)
     def get_feature_image_src(self, instance):
         """Serializes the source of the feature_image"""
         feature_img_src = None
@@ -27,12 +29,15 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
 
         return feature_img_src or static(DEFAULT_COURSE_IMG_PATH)
 
+    @extend_schema_field(serializers.URLField)
     def get_page_url(self, instance):
         return instance.get_url()
 
+    @extend_schema_field(str)
     def get_description(self, instance):
         return bleach.clean(instance.description, tags=[], strip=True)
 
+    @extend_schema_field(str)
     def get_effort(self, instance):
         return (
             bleach.clean(instance.effort, tags=[], strip=True)
@@ -40,6 +45,7 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
             else None
         )
 
+    @extend_schema_field(str)
     def get_length(self, instance):
         return (
             bleach.clean(instance.length, tags=[], strip=True)
@@ -66,6 +72,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
     instructors = serializers.SerializerMethodField()
     current_price = serializers.SerializerMethodField()
 
+    @extend_schema_field(serializers.URLField)
     def get_financial_assistance_form_url(self, instance):
         """
         Returns URL of the Financial Assistance Form.
@@ -116,6 +123,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
             else ""
         )
 
+    @extend_schema_field(int)
     def get_current_price(self, instance):
         relevant_product = (
             instance.product.active_products.filter().order_by("-price").first()
@@ -124,6 +132,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         )
         return relevant_product.price if relevant_product else None
 
+    @extend_schema_field(list)
     def get_instructors(self, instance):
         members = [
             member.linked_instructor_page
@@ -160,6 +169,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
     price = serializers.SerializerMethodField()
     financial_assistance_form_url = serializers.SerializerMethodField()
 
+    @extend_schema_field(str)
     def get_feature_image_src(self, instance):
         """Serializes the source of the feature_image"""
         feature_img_src = None
@@ -168,12 +178,15 @@ class ProgramPageSerializer(serializers.ModelSerializer):
 
         return feature_img_src or static(DEFAULT_COURSE_IMG_PATH)
 
+    @extend_schema_field(serializers.URLField)
     def get_page_url(self, instance):
         return instance.get_url()
 
+    @extend_schema_field(str)
     def get_price(self, instance):
         return instance.price[0].value["text"] if len(instance.price) > 0 else None
 
+    @extend_schema_field(serializers.URLField)
     def get_financial_assistance_form_url(self, instance):
         """
         Returns URL of the Financial Assistance Form.
@@ -235,6 +248,7 @@ class InstructorPageSerializer(serializers.ModelSerializer):
 
     feature_image_src = serializers.SerializerMethodField()
 
+    @extend_schema_field(str)
     def get_feature_image_src(self, instance):
         """Serializes the source of the feature_image"""
         feature_img_src = None

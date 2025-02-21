@@ -28,6 +28,7 @@ class CourseSerializer(BaseCourseSerializer):
     page = CoursePageSerializer(read_only=True)
     programs = serializers.SerializerMethodField()
 
+    @extend_schema_field(int)
     def get_next_run_id(self, instance):
         """Get next run id"""
         run = instance.first_unexpired_run
@@ -85,6 +86,7 @@ class CourseRunSerializer(BaseCourseRunSerializer):
             }
         return data
 
+    @extend_schema_field(bool)
     def get_approved_flexible_price_exists(self, instance):
         # Get the User object if it exists.
         user = self.context["request"].user if "request" in self.context else None
@@ -159,6 +161,7 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
         """Get the course number"""
         return instance.course_number
 
+    @extend_schema_field(ProductRelatedField)
     def get_products(self, instance) -> List[dict]:
         """Get products associated with this course run"""
         return super().get_products(instance)

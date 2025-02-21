@@ -6082,7 +6082,8 @@ components:
           pattern: ^[\w\-+:\.]+$
           maxLength: 255
         next_run_id:
-          type: string
+          type: integer
+          description: Get next run id
           readOnly: true
         departments:
           type: array
@@ -6110,9 +6111,11 @@ components:
       properties:
         feature_image_src:
           type: string
+          description: Serializes the source of the feature_image
           readOnly: true
         page_url:
           type: string
+          format: uri
           readOnly: true
         description:
           type: string
@@ -6128,12 +6131,14 @@ components:
           readOnly: true
         financial_assistance_form_url:
           type: string
+          format: uri
           readOnly: true
         current_price:
-          type: string
+          type: integer
           readOnly: true
         instructors:
-          type: string
+          type: array
+          items: {}
           readOnly: true
       required:
       - current_price
@@ -6248,7 +6253,7 @@ components:
             type: string
           readOnly: true
         approved_flexible_price_exists:
-          type: string
+          type: boolean
           readOnly: true
       required:
       - approved_flexible_price_exists
@@ -6399,7 +6404,7 @@ components:
           readOnly: true
           description: List of products associated with this course run
         approved_flexible_price_exists:
-          type: string
+          type: boolean
           readOnly: true
         course:
           allOf:
@@ -6503,7 +6508,8 @@ components:
           pattern: ^[\w\-+:\.]+$
           maxLength: 255
         next_run_id:
-          type: string
+          type: integer
+          description: Get next run id
           readOnly: true
         departments:
           type: array
