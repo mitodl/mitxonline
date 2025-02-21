@@ -9,7 +9,6 @@ from social_core.exceptions import AuthException
 from social_core.pipeline.partial import partial
 from social_django.models import UserSocialAuth
 
-
 from authentication.exceptions import (
     EmailBlockedException,
     InvalidPasswordException,
@@ -82,7 +81,10 @@ def limit_one_auth_per_backend(strategy, backend, user, uid, **kwargs):  # pylin
     # if there's at least one social auth and any of them don't match the incoming uid
     # we have or are trying to add multiple accounts
     if social_auths and any(auth.uid != uid for auth in social_auths):
-        raise AuthException(backend.name, "Another account is already linked to your MITxOnline account.")
+        raise AuthException(
+            backend.name,
+            "Another account is already linked to your MITxOnline account.",
+        )
 
     return {}
 
