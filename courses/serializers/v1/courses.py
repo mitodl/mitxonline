@@ -1,6 +1,7 @@
 from mitol.olposthog.features import is_enabled
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from drf_spectacular.utils import extend_schema
 
 from cms.serializers import CoursePageSerializer
 from courses import models
@@ -15,6 +16,8 @@ from courses.serializers.v1.departments import DepartmentSerializer
 from flexiblepricing.api import is_courseware_flexible_price_approved
 from main import features
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from typing import Optional, List
+from drf_spectacular.utils import extend_schema_field, inline_serializer
 
 
 class CourseSerializer(BaseCourseSerializer):
@@ -110,18 +113,66 @@ class CourseWithCourseRunsSerializer(CourseSerializer):
             "courseruns",
         ]
 
-
 class CourseRunWithCourseSerializer(CourseRunSerializer):
     """
     CourseRun model serializer - also serializes the parent Course.
     """
 
     course = CourseSerializer(read_only=True, context={"include_page_fields": True})
+    courseware_url = serializers.SerializerMethodField()
+    is_upgradable = serializers.SerializerMethodField()
+    is_enrollable = serializers.SerializerMethodField()
+    is_archived = serializers.SerializerMethodField()
+    course_number = serializers.SerializerMethodField()
+    products = ProductRelatedField(
+        many=True,
+        read_only=True,
+        help_text="List of products associated with this course run"
+    )
+
+    @extend_schema_field(serializers.URLField)
+    def get_courseware_url(self, instance) -> Optional[str]:
+        """Get the full URL for this CourseRun in the courseware"""
+        return (
+            edx_redirect_url(instance.courseware_url_path)
+            if instance.courseware_url_path
+            else None
+        )
+
+    @extend_schema_field(bool)
+    def get_is_upgradable(self, instance) -> bool:
+        """Check if the course run is upgradable"""
+        return instance.is_upgradable
+
+    @extend_schema_field(bool)
+    def get_is_enrollable(self, instance) -> bool:
+        """Check if the course run is enrollable"""
+        return instance.is_enrollable
+
+    @extend_schema_field(bool)
+    def get_is_archived(self, instance) -> bool:
+        """Check if the course run is archived"""
+        return instance.is_enrollable and instance.is_past
+
+    @extend_schema_field(str)
+    def get_course_number(self, instance) -> str:
+        """Get the course number"""
+        return instance.course_number
+
+    def get_products(self, instance) -> List[dict]:
+        """Get products associated with this course run"""
+        return super().get_products(instance)
 
     class Meta:
         model = models.CourseRun
-        fields = CourseRunSerializer.Meta.fields + [  # noqa: RUF005
+        fields = CourseRunSerializer.Meta.fields + [
             "course",
+            "courseware_url",
+            "is_upgradable",
+            "is_enrollable",
+            "is_archived",
+            "course_number",
+            "products"
         ]
 
 

@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytz
 from rest_framework import serializers
-from typing import List
+from typing import Dict, List
 from drf_spectacular.utils import extend_schema_field
 
 from cms.serializers import CoursePageSerializer
@@ -20,7 +20,7 @@ from ecommerce.constants import (
     PAYMENT_TYPES,
     TRANSACTION_TYPE_REFUND,
 )
-from ecommerce.models import Basket, BasketItem, Order, Product
+from ecommerce.models import Basket, BasketItem, Order, Product, BasketDiscount
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from main.settings import TIME_ZONE
 from users.serializers import ExtendedLegalAddressSerializer
@@ -197,35 +197,74 @@ class BasketItemWithProductSerializer(serializers.ModelSerializer):
 
 
 class BasketWithProductSerializer(serializers.ModelSerializer):
+    """Serializer for Basket model with product details"""
     basket_items = serializers.SerializerMethodField()
     total_price = serializers.SerializerMethodField()
     discounted_price = serializers.SerializerMethodField()
     discounts = serializers.SerializerMethodField()
 
-    def get_basket_items(self, instance):
+    @extend_schema_field({
+        'type': 'array',
+        'items': {
+            'type': 'object',
+            'properties': {
+                'basket': {'type': 'integer'},
+                'product': {
+                    'type': 'object',
+                    'properties': {
+                        'id': {'type': 'integer'},
+                        'price': {'type': 'number'},
+                        'description': {'type': 'string'},
+                        'is_active': {'type': 'boolean'},
+                        'purchasable_object': {'type': 'object'}
+                    }
+                },
+                'id': {'type': 'integer'}
+            }
+        }
+    })
+    def get_basket_items(self, instance) -> List[Dict[str, any]]:
+        """
+        Get items in the basket with their associated product details
+        
+        Args:
+            instance: Basket model instance
+            
+        Returns:
+            List of serialized basket items with product details
+        """
         return [
             BasketItemWithProductSerializer(instance=basket, context=self.context).data
             for basket in instance.basket_items.all()
         ]
 
-    def get_total_price(self, instance):
+    @extend_schema_field(Decimal)
+    def get_total_price(self, instance) -> Decimal:
+        """Get total price of all items in basket before discounts"""
         return sum(
             basket_item.base_price for basket_item in instance.basket_items.all()
         )
 
-    def get_discounted_price(self, instance):
+    @extend_schema_field(Decimal)
+    def get_discounted_price(self, instance) -> Decimal:
+        """Get total price after any discounts are applied"""
         discounts = instance.discounts.all()
-
         if discounts.count() == 0:
             return self.get_total_price(instance)
-
         return sum(
             basket_item.discounted_price for basket_item in instance.basket_items.all()
         )
 
-    def get_discounts(self, instance):
+    @extend_schema_field(List[BasketDiscountSerializer])
+    def get_discounts(self, instance) -> List[Dict[str, any]]:
         """
         Exclude zero value discounts and return applicable discounts on the basket.
+        
+        Args:
+            instance: Basket instance
+            
+        Returns:
+            List of serialized basket discount records
         """
         discounts = []
         for discount_record in instance.discounts.all():
@@ -243,15 +282,15 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
         return discounts
 
     class Meta:
+        model = models.Basket
         fields = [
             "id",
-            "user",
+            "user", 
             "basket_items",
             "total_price",
-            "discounted_price",
-            "discounts",
+            "discounted_price", 
+            "discounts"
         ]
-        model = models.Basket
 
 
 class LineSerializer(serializers.ModelSerializer):

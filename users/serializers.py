@@ -10,6 +10,8 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from social_django.models import UserSocialAuth
+from typing import List
+from drf_spectacular.utils import extend_schema_field
 
 from hubspot_sync.task_helpers import sync_hubspot_user
 
@@ -483,21 +485,24 @@ class CountrySerializer(serializers.Serializer):
     name = serializers.SerializerMethodField()
     states = serializers.SerializerMethodField()
 
-    def get_code(self, instance):
+    @extend_schema_field(str)
+    def get_code(self, instance) -> str:
         """Get the country alpha_2 code"""
         return instance.alpha_2
 
-    def get_name(self, instance):
+    @extend_schema_field(str)
+    def get_name(self, instance) -> str:
         """Get the country name (common name preferred if available)"""
         if hasattr(instance, "common_name"):
             return instance.common_name
         return instance.name
 
-    def get_states(self, instance):
+    @extend_schema_field(List[StateProvinceSerializer])
+    def get_states(self, instance) -> List[dict]:
         """Get a list of states/provinces if USA or Canada"""
         if instance.alpha_2 in ("US", "CA"):
             return StateProvinceSerializer(
-                instance=sorted(  # noqa: C414
+                instance=sorted(
                     list(pycountry.subdivisions.get(country_code=instance.alpha_2)),
                     key=lambda state: state.name,
                 ),

@@ -294,90 +294,102 @@ paths:
   /api/checkout/add_to_cart/:
     post:
       operationId: api_checkout_add_to_cart_create
-      description: Add product to the cart
+      description: Add a product to the shopping cart
       tags:
       - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddToCartRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AddToCartRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AddToCartRequestRequest'
+        required: true
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddToCartResponse'
+          description: ''
   /api/checkout/cart/:
     get:
       operationId: api_checkout_cart_retrieve
-      description: Returns the current cart, with the product info embedded.
+      description: Get current cart contents
       tags:
       - api
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketWithProduct'
+          description: ''
   /api/checkout/redeem_discount/:
     post:
       operationId: api_checkout_redeem_discount_create
-      description: |-
-        API call to redeem a discount. Discounts are attached to the basket so
-        they can be attached at any time in the checkout process. Later on,
-        they'll be converted to attach to the resulting Order (as Baskets are
-        ephemeral).
-
-        Discount application is subject to these rules:
-        - The discount can't be flagged for use with flexible pricing.
-        - If the discount is tied to a product, the product must already be in
-          the basket.
-
-        POST Args:
-            - discount (str): Discount Code to apply
-
-        Returns:
-            - Success message on success
-            - HTTP 406 if there's no basket yet
-            - HTTP 404 if the discount isn't found
+      description: Apply a discount code to the current basket
       tags:
       - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedeemDiscountRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RedeemDiscountRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RedeemDiscountRequestRequest'
+        required: true
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedeemDiscountResponse'
+          description: ''
   /api/checkout/result/:
     post:
       operationId: api_checkout_result_create
-      description: |-
-        This endpoint is called by Cybersource as a server-to-server call
-        in order to respond with the payment details.
-
-        Returns:
-            - HTTP_200_OK if the Order is found.
-
-        Raises:
-            - Http404 if the Order is not found.
+      description: Endpoint for Cybersource server-to-server payment callbacks
       tags:
       - api
-      responses:
-        '200':
-          description: No response body
-  /api/checkout/start_checkout/:
-    post:
-      operationId: api_checkout_start_checkout_create
-      description: |-
-        API call to start the checkout process. This assembles the basket items
-        into an Order with Lines for each item, applies the attached basket
-        discounts, and then calls the payment gateway to prepare for payment.
-
-        Returns:
-            - JSON payload from the ol-django payment gateway app. The payment
-              gateway returns data necessary to construct a form that will
-              ultimately POST to the actual payment processor.
-      tags:
-      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CybersourcePaymentResponseRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CybersourcePaymentResponseRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CybersourcePaymentResponseRequest'
+        required: true
       responses:
         '200':
           description: No response body
   /api/countries/:
     get:
-      operationId: api_countries_retrieve
+      operationId: api_countries_list
       description: Get generator for countries/states list
       tags:
       - api
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Country'
+          description: ''
   /api/course_runs/:
     get:
       operationId: api_course_runs_list
@@ -3182,64 +3194,66 @@ paths:
   /api/v0/checkout/add_to_cart/:
     post:
       operationId: checkout_add_to_cart_create
-      description: Add product to the cart
+      description: Add a product to the shopping cart
       tags:
       - checkout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddToCartRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AddToCartRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AddToCartRequestRequest'
+        required: true
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddToCartResponse'
+          description: ''
   /api/v0/checkout/cart/:
     get:
       operationId: checkout_cart_retrieve
-      description: Returns the current cart, with the product info embedded.
+      description: Get current cart contents
       tags:
       - checkout
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketWithProduct'
+          description: ''
   /api/v0/checkout/redeem_discount/:
     post:
       operationId: checkout_redeem_discount_create
-      description: |-
-        API call to redeem a discount. Discounts are attached to the basket so
-        they can be attached at any time in the checkout process. Later on,
-        they'll be converted to attach to the resulting Order (as Baskets are
-        ephemeral).
-
-        Discount application is subject to these rules:
-        - The discount can't be flagged for use with flexible pricing.
-        - If the discount is tied to a product, the product must already be in
-          the basket.
-
-        POST Args:
-            - discount (str): Discount Code to apply
-
-        Returns:
-            - Success message on success
-            - HTTP 406 if there's no basket yet
-            - HTTP 404 if the discount isn't found
+      description: Apply a discount code to the current basket
       tags:
       - checkout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedeemDiscountRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RedeemDiscountRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RedeemDiscountRequestRequest'
+        required: true
       responses:
         '200':
-          description: No response body
-  /api/v0/checkout/start_checkout/:
-    post:
-      operationId: checkout_start_checkout_create
-      description: |-
-        API call to start the checkout process. This assembles the basket items
-        into an Order with Lines for each item, applies the attached basket
-        discounts, and then calls the payment gateway to prepare for payment.
-
-        Returns:
-            - JSON payload from the ol-django payment gateway app. The payment
-              gateway returns data necessary to construct a form that will
-              ultimately POST to the actual payment processor.
-      tags:
-      - checkout
-      responses:
-        '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedeemDiscountResponse'
+          description: ''
   /api/v0/discounts/:
     get:
       operationId: discounts_list
@@ -5807,6 +5821,22 @@ paths:
           description: No response body
 components:
   schemas:
+    AddToCartRequestRequest:
+      type: object
+      description: Serializer for add to cart requests
+      properties:
+        product_id:
+          type: integer
+      required:
+      - product_id
+    AddToCartResponse:
+      type: object
+      description: Serializer for add to cart responses
+      properties:
+        message:
+          type: string
+      required:
+      - message
     Basket:
       type: object
       description: Basket model serializer
@@ -5866,6 +5896,58 @@ components:
       required:
       - basket
       - product
+    BasketWithProduct:
+      type: object
+      description: Serializer for Basket model with product details
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+        basket_items:
+          type: array
+          items:
+            type: object
+            properties:
+              basket:
+                type: integer
+              product:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  price:
+                    type: number
+                  description:
+                    type: string
+                  is_active:
+                    type: boolean
+                  purchasable_object:
+                    type: object
+              id:
+                type: integer
+          readOnly: true
+        total_price:
+          type: number
+          format: double
+          description: Get total price of all items in basket before discounts
+          readOnly: true
+        discounted_price:
+          type: number
+          format: double
+          description: Get total price after any discounts are applied
+          readOnly: true
+        discounts:
+          type: string
+          readOnly: true
+      required:
+      - basket_items
+      - discounted_price
+      - discounts
+      - id
+      - total_price
+      - user
     BlankEnum:
       enum:
       - ''
@@ -5935,6 +6017,25 @@ components:
       - Medium-sized (1000-9999 employees)
       - Large Enterprise (10,000+ employees)
       - Other (N/A or Don't know)
+    Country:
+      type: object
+      description: Serializer for pycountry countries, with states for US/CA
+      properties:
+        code:
+          type: string
+          description: Get the country alpha_2 code
+          readOnly: true
+        name:
+          type: string
+          description: Get the country name (common name preferred if available)
+          readOnly: true
+        states:
+          type: string
+          readOnly: true
+      required:
+      - code
+      - name
+      - states
     CountryIncomeThreshold:
       type: object
       properties:
@@ -6246,6 +6347,7 @@ components:
             course run on their dashboard.
         courseware_url:
           type: string
+          format: uri
           readOnly: true
         courseware_id:
           type: string
@@ -6263,13 +6365,16 @@ components:
           description: The date beyond which the learner can not enroll in paid course
             mode.
         is_upgradable:
-          type: string
+          type: boolean
+          description: Check if the course run is upgradable
           readOnly: true
         is_enrollable:
-          type: string
+          type: boolean
+          description: Check if the course run is enrollable
           readOnly: true
         is_archived:
-          type: string
+          type: boolean
+          description: Check if the course run is archived
           readOnly: true
         is_self_paced:
           type: boolean
@@ -6285,12 +6390,14 @@ components:
           type: boolean
         course_number:
           type: string
+          description: Get the course number
           readOnly: true
         products:
           type: array
           items:
             type: string
           readOnly: true
+          description: List of products associated with this course run
         approved_flexible_price_exists:
           type: string
           readOnly: true
@@ -6470,6 +6577,31 @@ components:
           minLength: 1
       required:
       - email
+    CybersourcePaymentResponseRequest:
+      type: object
+      description: Serializer for Cybersource payment callback responses
+      properties:
+        req_reference_number:
+          type: string
+          minLength: 1
+        decision:
+          type: string
+          minLength: 1
+        message:
+          type: string
+          minLength: 1
+        reason_code:
+          type: string
+          minLength: 1
+        transaction_id:
+          type: string
+          minLength: 1
+      required:
+      - decision
+      - message
+      - reason_code
+      - req_reference_number
+      - transaction_id
     Department:
       type: object
       description: Department model serializer
@@ -7942,6 +8074,26 @@ components:
       - id
       - updated_on
       - username
+    RedeemDiscountRequestRequest:
+      type: object
+      description: Serializer for discount redemption requests
+      properties:
+        discount:
+          type: string
+          minLength: 1
+      required:
+      - discount
+    RedeemDiscountResponse:
+      type: object
+      description: Serializer for discount redemption responses
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+      required:
+      - code
+      - message
     RedemptionTypeEnum:
       enum:
       - one-time

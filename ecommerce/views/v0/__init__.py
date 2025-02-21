@@ -453,16 +453,38 @@ class UserDiscountViewSet(ModelViewSet):
     pagination_class = RefinePagination
 
 
+from rest_framework import serializers
+from drf_spectacular.utils import extend_schema
+
+# Add serializers for request/response schemas
+class RedeemDiscountRequestSerializer(serializers.Serializer):
+    """Serializer for discount redemption requests"""
+    discount = serializers.CharField(required=True)
+
+class RedeemDiscountResponseSerializer(serializers.Serializer):
+    """Serializer for discount redemption responses"""
+    message = serializers.CharField()
+    code = serializers.CharField()
+
+class AddToCartRequestSerializer(serializers.Serializer):
+    """Serializer for add to cart requests"""
+    product_id = serializers.IntegerField(required=True)
+
+class AddToCartResponseSerializer(serializers.Serializer):
+    """Serializer for add to cart responses"""
+    message = serializers.CharField()
+
 class CheckoutApiViewSet(ViewSet):
+    """API viewset for checkout operations"""
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated,)
 
-    @action(
-        detail=False,
-        methods=["post"],
-        name="Redeem Discount",
-        url_name="redeem_discount",
+    @extend_schema(
+        request=RedeemDiscountRequestSerializer,
+        responses={200: RedeemDiscountResponseSerializer},
+        description="Apply a discount code to the current basket"
     )
+    @action(detail=False, methods=["post"], name="Redeem Discount", url_name="redeem_discount")
     def redeem_discount(self, request):
         """
         API call to redeem a discount. Discounts are attached to the basket so
@@ -538,6 +560,11 @@ class CheckoutApiViewSet(ViewSet):
             }
         )
 
+    @extend_schema(
+        request=AddToCartRequestSerializer,
+        responses={200: AddToCartResponseSerializer},
+        description="Add a product to the shopping cart"
+    )
     @action(
         detail=False,
         methods=["post"],
@@ -564,28 +591,13 @@ class CheckoutApiViewSet(ViewSet):
             }
         )
 
-    @action(
-        detail=False, methods=["post"], name="Start Checkout", url_name="start_checkout"
+    @extend_schema(
+        responses={200: BasketWithProductSerializer},
+        description="Get current cart contents"
     )
-    def start_checkout(self, request):
-        """
-        API call to start the checkout process. This assembles the basket items
-        into an Order with Lines for each item, applies the attached basket
-        discounts, and then calls the payment gateway to prepare for payment.
-
-        Returns:
-            - JSON payload from the ol-django payment gateway app. The payment
-              gateway returns data necessary to construct a form that will
-              ultimately POST to the actual payment processor.
-        """
-        try:
-            payload = api.generate_checkout_payload(request)
-        except ObjectDoesNotExist:
-            return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
-
-        return Response(payload)
-
-    @action(detail=False, methods=["get"], name="Cart Info", url_name="cart")
+    @action(
+        detail=False, methods=["get"], name="Cart Info", url_name="cart"
+    )
     def cart(self, request):
         """
         Returns the current cart, with the product info embedded.
@@ -702,28 +714,37 @@ class CheckoutCallbackView(View):
                 return self.post_checkout_redirect(order.state, order, request)
 
 
+from rest_framework import serializers
+
+# Add a serializer for the cybersource payment response
+class CybersourcePaymentResponseSerializer(serializers.Serializer):
+    """Serializer for Cybersource payment callback responses"""
+    req_reference_number = serializers.CharField(required=True)
+    decision = serializers.CharField(required=True)
+    message = serializers.CharField(required=True)
+    reason_code = serializers.CharField(required=True)
+    transaction_id = serializers.CharField(required=True)
+
+@extend_schema(
+    request=CybersourcePaymentResponseSerializer,
+    responses={200: None},
+    description="Endpoint for Cybersource server-to-server payment callbacks"
+)
 @method_decorator(csrf_exempt, name="dispatch")
 class BackofficeCallbackView(APIView):
+    """API view for processing Cybersource payment callbacks"""
     authentication_classes = []  # disables authentication
     permission_classes = []  # disables permission
+    serializer_class = CybersourcePaymentResponseSerializer
 
-    def post(self, request, *args, **kwargs):  # noqa: ARG002
+    def post(self, request, *args, **kwargs):
         """
         This endpoint is called by Cybersource as a server-to-server call
-        in order to respond with the payment details.
-
-        Returns:
-            - HTTP_200_OK if the Order is found.
-
-        Raises:
-            - Http404 if the Order is not found.
+        to respond with the payment details.
         """
         with transaction.atomic():
             order = api.get_order_from_cybersource_payment_response(request)
 
-            # We only want to process responses related to orders which are PENDING
-            # otherwise we can conclude that we already received a response through
-            # the user's browser.
             if order is None:
                 raise Http404
             elif order.state == OrderStatus.PENDING:

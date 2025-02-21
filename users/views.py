@@ -9,6 +9,7 @@ from rest_framework.authentication import SessionAuthentication
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.generics import GenericAPIView
 
 from hubspot_sync.task_helpers import sync_hubspot_user
 from main.permissions import UserIsOwnerPermission
@@ -91,15 +92,20 @@ class ChangeEmailRequestViewSet(
         return ChangeEmailRequestCreateSerializer
 
 
-class CountriesStatesViewSet(viewsets.ViewSet):
+class CountriesStatesViewSet(viewsets.GenericViewSet, GenericAPIView):
     """Retrieve viewset of countries, with states/provinces for US and Canada"""
 
     permission_classes = []
+    serializer_class = CountrySerializer
+
+    def get_queryset(self):
+        """Get list of countries ordered by name"""
+        return sorted(list(pycountry.countries), key=lambda country: country.name)
 
     def list(self, request):  # pylint:disable=unused-argument  # noqa: ARG002
         """Get generator for countries/states list"""
-        queryset = sorted(list(pycountry.countries), key=lambda country: country.name)  # noqa: C414
-        serializer = CountrySerializer(queryset, many=True)
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
 
