@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+Version 0.112.1
+---------------
+
+- Fix deferral error (#2544)
+
 Version 0.112.0 (Released February 20, 2025)
 ---------------
 
