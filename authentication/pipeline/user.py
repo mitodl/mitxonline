@@ -61,6 +61,22 @@ def get_username(strategy, backend, user=None, *args, **kwargs):  # pylint: disa
     return {"username": None if not user else strategy.storage.user.get_username(user)}
 
 
+def limit_one_auth_per_backend(strategy, backend, user, uid, **kwargs):  # pylint: disable=unused-argument
+    """Limit the user to one social auth account per backend"""
+    if not user:
+        return {}
+
+    user_storage = strategy.storage.user
+    social_auths = user_storage.get_social_auth_for_user(user, backend.name)
+
+    # if there's at least one social auth and any of them don't match the incoming uid
+    # we have or are trying to add mutltiple accounts
+    if social_auths and any(auth.uid != uid for auth in social_auths):
+        raise AuthException(backend.name, "Another edX account is already linked to your MITxOnline account.")
+
+    return {}
+
+
 @partial
 def create_user_via_email(
     strategy,
