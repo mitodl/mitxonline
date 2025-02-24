@@ -493,6 +493,9 @@ class PartnerSchoolViewSet(viewsets.ReadOnlyModelViewSet):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+@extend_schema(
+    responses={200: LearnerRecordSerializer},
+)
 def get_learner_record(request, pk):
     program = Program.objects.get(pk=pk)
 
@@ -501,6 +504,10 @@ def get_learner_record(request, pk):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@extend_schema(
+    request=PartnerSchoolSerializer,
+    responses={200: LearnerRecordSerializer},
+)
 def get_learner_record_share(request, pk):
     """
     Sets up a sharing link for the learner's record. Returns back the entire

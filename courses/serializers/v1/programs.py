@@ -3,6 +3,7 @@ from django.db.models import Q
 from mitol.common.utils import now_in_utc
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from drf_spectacular.utils import extend_schema_serializer
 
 from cms.serializers import ProgramPageSerializer
 from courses import models
@@ -23,7 +24,9 @@ from main.serializers import StrictFieldsSerializer
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import User
 
-
+@extend_schema_serializer(
+    component_name="V1ProgramSerializer"  # Give it a unique name
+)
 class ProgramSerializer(serializers.ModelSerializer):
     """Program model serializer"""
 

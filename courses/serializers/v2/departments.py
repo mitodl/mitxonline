@@ -2,6 +2,7 @@ from django.db.models import Q
 from rest_framework import serializers
 
 from courses.models import CourseRun, Department
+from drf_spectacular.utils import extend_schema_field
 from courses.utils import get_enrollable_course_run_filter
 
 
@@ -19,6 +20,7 @@ class DepartmentWithCoursesAndProgramsSerializer(DepartmentSerializer):
     course_ids = serializers.SerializerMethodField()
     program_ids = serializers.SerializerMethodField()
 
+    @extend_schema_field(serializers.ListField)
     def get_course_ids(self, instance):
         """
         Returns a list of course IDs associated with courses which are live and
@@ -42,6 +44,7 @@ class DepartmentWithCoursesAndProgramsSerializer(DepartmentSerializer):
             .values_list("id", flat=True)
         )
 
+    @extend_schema_field(serializers.ListField)
     def get_program_ids(self, instance):
         """
         Returns a list of program IDs associated with the department

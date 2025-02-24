@@ -343,6 +343,24 @@ class DiscountViewSet(ModelViewSet):
         raise ParseError(f"Batch creation failed: {otherSerializer.errors}")  # noqa: EM102
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_discount",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the parent discount",
+            required=True
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH, 
+            description="ID of the discount product",
+            required=True
+        )
+    ]
+)
 class NestedDiscountProductViewSet(NestedViewSetMixin, ModelViewSet):
     """API view set for Discounts"""
 
@@ -390,7 +408,24 @@ class NestedDiscountRedemptionViewSet(NestedViewSetMixin, ModelViewSet):
     permission_classes = (IsAuthenticated, IsAdminUser)
     pagination_class = RefinePagination
 
-
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="parent_lookup_discount",
+            type=int, 
+            location=OpenApiParameter.PATH,
+            description="ID of the parent discount",
+            required=True
+        ),
+        OpenApiParameter(
+            name="id",
+            type=int,
+            location=OpenApiParameter.PATH,
+            description="ID of the user discount",
+            required=True
+        )
+    ]
+)
 class NestedUserDiscountViewSet(NestedViewSetMixin, ModelViewSet):
     """
     API view set for User Discounts. This one is for use within a Discount.

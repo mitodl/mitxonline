@@ -34,6 +34,16 @@ class CourseSerializer(BaseCourseSerializer):
         run = instance.first_unexpired_run
         return run.id if run is not None else None
 
+    @extend_schema_field(
+        inline_serializer(
+            name="ProgramSerializer",
+            fields={
+                "id": serializers.IntegerField(),
+                "title": serializers.CharField(),
+                "readable_id": serializers.CharField(),
+            },
+        )
+    )
     def get_programs(self, instance):
         if self.context.get("all_runs", False):
             from courses.serializers.v1.base import BaseProgramSerializer
@@ -161,8 +171,8 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
         """Get the course number"""
         return instance.course_number
 
-    @extend_schema_field(ProductRelatedField)
-    def get_products(self, instance) -> List[dict]:
+    @extend_schema_field(list[dict])
+    def get_products(self, instance) -> list[dict]:
         """Get products associated with this course run"""
         return super().get_products(instance)
 

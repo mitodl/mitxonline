@@ -209,28 +209,14 @@ class CourseRunSerializer(BaseCourseRunSerializer):
         )
         return flexible_price_exists  # noqa: RET504
 
-
 class CourseWithCourseRunsSerializer(CourseSerializer):
     """Course model serializer - also serializes child course runs"""
 
-    courseruns = serializers.SerializerMethodField(read_only=True)
-
-    def get_courseruns(self, instance):
-        context = {
-            "include_approved_financial_aid": self.context.get(
-                "include_approved_financial_aid", False
-            )
-        }
-
-        return CourseRunSerializer(
-            instance.courseruns.all(), many=True, read_only=True, context=context
-        ).data
+    courseruns = CourseRunSerializer(many=True, read_only=True)
 
     class Meta:
         model = models.Course
-        fields = CourseSerializer.Meta.fields + [  # noqa: RUF005
-            "courseruns",
-        ]
+        fields = CourseSerializer.Meta.fields + ["courseruns"]
 
 
 class CourseRunWithCourseSerializer(CourseRunSerializer):

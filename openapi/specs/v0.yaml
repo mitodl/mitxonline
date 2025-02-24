@@ -636,6 +636,12 @@ paths:
       operationId: api_discounts_assignees_list
       description: API view set for User Discounts. This one is for use within a Discount.
       parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
       - name: l
         required: false
         in: query
@@ -651,7 +657,8 @@ paths:
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - api
@@ -667,9 +674,16 @@ paths:
       description: API view set for User Discounts. This one is for use within a Discount.
       parameters:
       - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - api
@@ -689,12 +703,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this user discount.
+        description: ID of the user discount
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - api
@@ -713,12 +728,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this user discount.
+        description: ID of the user discount
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - api
@@ -737,12 +753,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this user discount.
+        description: ID of the user discount
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - api
@@ -761,12 +778,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this user discount.
+        description: ID of the user discount
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - api
@@ -778,6 +796,12 @@ paths:
       operationId: api_discounts_products_list
       description: API view set for Discounts
       parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the discount product
+        required: true
       - name: l
         required: false
         in: query
@@ -793,7 +817,8 @@ paths:
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - api
@@ -809,9 +834,16 @@ paths:
       description: API view set for Discounts
       parameters:
       - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the discount product
+        required: true
+      - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - api
@@ -843,12 +875,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this discount product.
+        description: ID of the discount product
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - api
@@ -867,12 +900,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this discount product.
+        description: ID of the discount product
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - api
@@ -903,12 +937,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this discount product.
+        description: ID of the discount product
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - api
@@ -938,12 +973,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this discount product.
+        description: ID of the discount product
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - api
@@ -2744,7 +2780,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedProgramList'
+                $ref: '#/components/schemas/PaginatedV1ProgramList'
           description: ''
   /api/programs/{id}/:
     get:
@@ -2764,7 +2800,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Program'
+                $ref: '#/components/schemas/V1Program'
           description: ''
   /api/records/program/{id}/:
     get:
@@ -2835,12 +2871,28 @@ paths:
   /api/register/confirm/:
     post:
       operationId: api_register_confirm_create
-      description: Processes a request
+      description: Handle POST requests to confirm email registration
       tags:
       - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterConfirmRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterConfirmRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterConfirmRequest'
+        required: true
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterConfirm'
+          description: ''
   /api/register/details/:
     post:
       operationId: api_register_details_create
@@ -3355,6 +3407,12 @@ paths:
       operationId: discounts_assignees_list
       description: API view set for User Discounts. This one is for use within a Discount.
       parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
       - name: l
         required: false
         in: query
@@ -3370,7 +3428,8 @@ paths:
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - discounts
@@ -3386,9 +3445,16 @@ paths:
       description: API view set for User Discounts. This one is for use within a Discount.
       parameters:
       - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the user discount
+        required: true
+      - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - discounts
@@ -3408,12 +3474,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this user discount.
+        description: ID of the user discount
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - discounts
@@ -3432,12 +3499,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this user discount.
+        description: ID of the user discount
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - discounts
@@ -3456,12 +3524,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this user discount.
+        description: ID of the user discount
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - discounts
@@ -3480,12 +3549,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this user discount.
+        description: ID of the user discount
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - discounts
@@ -3497,6 +3567,12 @@ paths:
       operationId: discounts_products_list
       description: API view set for Discounts
       parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the discount product
+        required: true
       - name: l
         required: false
         in: query
@@ -3512,7 +3588,8 @@ paths:
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - discounts
@@ -3528,9 +3605,16 @@ paths:
       description: API view set for Discounts
       parameters:
       - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID of the discount product
+        required: true
+      - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - discounts
@@ -3562,12 +3646,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this discount product.
+        description: ID of the discount product
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - discounts
@@ -3586,12 +3671,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this discount product.
+        description: ID of the discount product
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - discounts
@@ -3622,12 +3708,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this discount product.
+        description: ID of the discount product
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - discounts
@@ -3657,12 +3744,13 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this discount product.
+        description: ID of the discount product
         required: true
       - in: path
         name: parent_lookup_discount
         schema:
-          type: string
+          type: integer
+        description: ID of the parent discount
         required: true
       tags:
       - discounts
@@ -5502,7 +5590,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedProgramList'
+                $ref: '#/components/schemas/PaginatedV1ProgramList'
           description: ''
   /api/v1/programs/{id}/:
     get:
@@ -5522,7 +5610,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Program'
+                $ref: '#/components/schemas/V1Program'
           description: ''
   /api/v2/courses/:
     get:
@@ -6030,7 +6118,11 @@ components:
           description: Get the country name (common name preferred if available)
           readOnly: true
         states:
-          type: string
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: Get a list of states/provinces if USA or Canada
           readOnly: true
       required:
       - code
@@ -6095,7 +6187,8 @@ components:
           - $ref: '#/components/schemas/CoursePage'
           readOnly: true
         programs:
-          type: string
+          allOf:
+          - $ref: '#/components/schemas/Program'
           readOnly: true
       required:
       - departments
@@ -6172,81 +6265,49 @@ components:
       properties:
         title:
           type: string
-          description: The title of the course. This value is synced automatically
-            with edX studio.
-          maxLength: 255
         start_date:
           type: string
           format: date-time
-          nullable: true
-          description: The day the course begins. This value is synced automatically
-            with edX studio.
         end_date:
           type: string
           format: date-time
-          nullable: true
-          description: The last day the course is active. This value is synced automatically
-            with edX studio.
         enrollment_start:
           type: string
           format: date-time
-          nullable: true
-          description: The first day students can enroll. This value is synced automatically
-            with edX studio.
         enrollment_end:
           type: string
           format: date-time
-          nullable: true
-          description: The last day students can enroll. This value is synced automatically
-            with edX studio.
         expiration_date:
           type: string
           format: date-time
-          nullable: true
-          description: The date beyond which the learner should not see link to this
-            course run on their dashboard.
         courseware_url:
           type: string
-          readOnly: true
+          format: uri
         courseware_id:
           type: string
-          maxLength: 255
         certificate_available_date:
           type: string
           format: date-time
-          nullable: true
-          description: The day certificates should be available to users. This value
-            is synced automatically with edX studio.
         upgrade_deadline:
           type: string
           format: date-time
-          nullable: true
-          description: The date beyond which the learner can not enroll in paid course
-            mode.
         is_upgradable:
-          type: string
-          readOnly: true
+          type: boolean
         is_enrollable:
-          type: string
-          readOnly: true
+          type: boolean
         is_archived:
-          type: string
+          type: boolean
           readOnly: true
         is_self_paced:
           type: boolean
         run_tag:
           type: string
-          description: 'A string that identifies the set of runs that this run belongs
-            to (example: ''R2'')'
-          maxLength: 100
         id:
           type: integer
-          readOnly: true
         live:
           type: boolean
         course_number:
           type: string
-          readOnly: true
         products:
           type: array
           items:
@@ -6257,16 +6318,39 @@ components:
           readOnly: true
       required:
       - approved_flexible_price_exists
+      - certificate_available_date
       - course_number
       - courseware_id
       - courseware_url
+      - end_date
+      - enrollment_end
+      - enrollment_start
+      - expiration_date
       - id
       - is_archived
       - is_enrollable
+      - is_self_paced
       - is_upgradable
+      - live
       - products
       - run_tag
+      - start_date
       - title
+      - upgrade_deadline
+    CourseRunCertificate:
+      type: object
+      description: CourseRunCertificate model serializer
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        link:
+          type: string
+          readOnly: true
+      required:
+      - link
+      - uuid
     CourseRunEnrollment:
       type: object
       description: CourseRunEnrollment model serializer
@@ -6281,7 +6365,8 @@ components:
         edx_emails_subscription:
           type: boolean
         certificate:
-          type: string
+          allOf:
+          - $ref: '#/components/schemas/CourseRunCertificate'
           readOnly: true
         enrollment_mode:
           allOf:
@@ -6317,58 +6402,33 @@ components:
       properties:
         title:
           type: string
-          description: The title of the course. This value is synced automatically
-            with edX studio.
-          maxLength: 255
         start_date:
           type: string
           format: date-time
-          nullable: true
-          description: The day the course begins. This value is synced automatically
-            with edX studio.
         end_date:
           type: string
           format: date-time
-          nullable: true
-          description: The last day the course is active. This value is synced automatically
-            with edX studio.
         enrollment_start:
           type: string
           format: date-time
-          nullable: true
-          description: The first day students can enroll. This value is synced automatically
-            with edX studio.
         enrollment_end:
           type: string
           format: date-time
-          nullable: true
-          description: The last day students can enroll. This value is synced automatically
-            with edX studio.
         expiration_date:
           type: string
           format: date-time
-          nullable: true
-          description: The date beyond which the learner should not see link to this
-            course run on their dashboard.
         courseware_url:
           type: string
           format: uri
           readOnly: true
         courseware_id:
           type: string
-          maxLength: 255
         certificate_available_date:
           type: string
           format: date-time
-          nullable: true
-          description: The day certificates should be available to users. This value
-            is synced automatically with edX studio.
         upgrade_deadline:
           type: string
           format: date-time
-          nullable: true
-          description: The date beyond which the learner can not enroll in paid course
-            mode.
         is_upgradable:
           type: boolean
           description: Check if the course run is upgradable
@@ -6385,12 +6445,8 @@ components:
           type: boolean
         run_tag:
           type: string
-          description: 'A string that identifies the set of runs that this run belongs
-            to (example: ''R2'')'
-          maxLength: 100
         id:
           type: integer
-          readOnly: true
         live:
           type: boolean
         course_number:
@@ -6412,17 +6468,26 @@ components:
           readOnly: true
       required:
       - approved_flexible_price_exists
+      - certificate_available_date
       - course
       - course_number
       - courseware_id
       - courseware_url
+      - end_date
+      - enrollment_end
+      - enrollment_start
+      - expiration_date
       - id
       - is_archived
       - is_enrollable
+      - is_self_paced
       - is_upgradable
+      - live
       - products
       - run_tag
+      - start_date
       - title
+      - upgrade_deadline
     CourseRunWithCourseRequest:
       type: object
       description: CourseRun model serializer - also serializes the parent Course.
@@ -6430,69 +6495,53 @@ components:
         title:
           type: string
           minLength: 1
-          description: The title of the course. This value is synced automatically
-            with edX studio.
-          maxLength: 255
         start_date:
           type: string
           format: date-time
-          nullable: true
-          description: The day the course begins. This value is synced automatically
-            with edX studio.
         end_date:
           type: string
           format: date-time
-          nullable: true
-          description: The last day the course is active. This value is synced automatically
-            with edX studio.
         enrollment_start:
           type: string
           format: date-time
-          nullable: true
-          description: The first day students can enroll. This value is synced automatically
-            with edX studio.
         enrollment_end:
           type: string
           format: date-time
-          nullable: true
-          description: The last day students can enroll. This value is synced automatically
-            with edX studio.
         expiration_date:
           type: string
           format: date-time
-          nullable: true
-          description: The date beyond which the learner should not see link to this
-            course run on their dashboard.
         courseware_id:
           type: string
           minLength: 1
-          maxLength: 255
         certificate_available_date:
           type: string
           format: date-time
-          nullable: true
-          description: The day certificates should be available to users. This value
-            is synced automatically with edX studio.
         upgrade_deadline:
           type: string
           format: date-time
-          nullable: true
-          description: The date beyond which the learner can not enroll in paid course
-            mode.
         is_self_paced:
           type: boolean
         run_tag:
           type: string
           minLength: 1
-          description: 'A string that identifies the set of runs that this run belongs
-            to (example: ''R2'')'
-          maxLength: 100
+        id:
+          type: integer
         live:
           type: boolean
       required:
+      - certificate_available_date
       - courseware_id
+      - end_date
+      - enrollment_end
+      - enrollment_start
+      - expiration_date
+      - id
+      - is_self_paced
+      - live
       - run_tag
+      - start_date
       - title
+      - upgrade_deadline
     CourseWithCourseRuns:
       type: object
       description: Course model serializer - also serializes child course runs
@@ -6521,7 +6570,8 @@ components:
           - $ref: '#/components/schemas/CoursePage'
           readOnly: true
         programs:
-          type: string
+          allOf:
+          - $ref: '#/components/schemas/Program'
           readOnly: true
         courseruns:
           type: array
@@ -6659,10 +6709,12 @@ components:
           maxLength: 128
           pattern: ^[-a-zA-Z0-9_]+$
         course_ids:
-          type: string
+          type: array
+          items: {}
           readOnly: true
         program_ids:
-          type: string
+          type: array
+          items: {}
           readOnly: true
       required:
       - course_ids
@@ -6675,51 +6727,41 @@ components:
       properties:
         id:
           type: integer
-          readOnly: true
         amount:
           type: string
           format: decimal
-          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+          pattern: ^-?\d{0,7}(?:\.\d{0,2})?$
         automatic:
           type: boolean
         discount_type:
           $ref: '#/components/schemas/DiscountTypeEnum'
         redemption_type:
-          $ref: '#/components/schemas/RedemptionTypeEnum'
+          $ref: '#/components/schemas/RedemptionTypeF58Enum'
         max_redemptions:
           type: integer
-          maximum: 2147483647
-          minimum: 0
-          nullable: true
         discount_code:
           type: string
-          maxLength: 100
         payment_type:
-          nullable: true
-          oneOf:
-          - $ref: '#/components/schemas/PaymentTypeEnum'
-          - $ref: '#/components/schemas/NullEnum'
+          $ref: '#/components/schemas/PaymentTypeEnum'
         is_redeemed:
-          type: string
-          readOnly: true
+          type: boolean
         activation_date:
           type: string
           format: date-time
-          nullable: true
-          description: If set, this discount code will not be redeemable before this
-            date.
         expiration_date:
           type: string
           format: date-time
-          nullable: true
-          description: If set, this discount code will not be redeemable after this
-            date.
       required:
+      - activation_date
       - amount
+      - automatic
       - discount_code
       - discount_type
+      - expiration_date
       - id
       - is_redeemed
+      - max_redemptions
+      - payment_type
       - redemption_type
     DiscountProduct:
       type: object
@@ -6776,46 +6818,44 @@ components:
     DiscountRequest:
       type: object
       properties:
+        id:
+          type: integer
         amount:
           type: string
           format: decimal
-          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+          pattern: ^-?\d{0,7}(?:\.\d{0,2})?$
         automatic:
           type: boolean
         discount_type:
           $ref: '#/components/schemas/DiscountTypeEnum'
         redemption_type:
-          $ref: '#/components/schemas/RedemptionTypeEnum'
+          $ref: '#/components/schemas/RedemptionTypeF58Enum'
         max_redemptions:
           type: integer
-          maximum: 2147483647
-          minimum: 0
-          nullable: true
         discount_code:
           type: string
           minLength: 1
-          maxLength: 100
         payment_type:
-          nullable: true
-          oneOf:
-          - $ref: '#/components/schemas/PaymentTypeEnum'
-          - $ref: '#/components/schemas/NullEnum'
+          $ref: '#/components/schemas/PaymentTypeEnum'
+        is_redeemed:
+          type: boolean
         activation_date:
           type: string
           format: date-time
-          nullable: true
-          description: If set, this discount code will not be redeemable before this
-            date.
         expiration_date:
           type: string
           format: date-time
-          nullable: true
-          description: If set, this discount code will not be redeemable after this
-            date.
       required:
+      - activation_date
       - amount
+      - automatic
       - discount_code
       - discount_type
+      - expiration_date
+      - id
+      - is_redeemed
+      - max_redemptions
+      - payment_type
       - redemption_type
     DiscountTypeEnum:
       enum:
@@ -7052,6 +7092,17 @@ components:
       required:
       - discount
       - income_threshold_usd
+    FlowEnum:
+      enum:
+      - login
+      - register
+      type: string
+      description: |-
+        * `login` - Login
+        * `register` - Register
+      x-enum-descriptions:
+      - Login
+      - Register
     GenderEnum:
       enum:
       - m
@@ -7205,7 +7256,7 @@ components:
         discount_type:
           $ref: '#/components/schemas/DiscountTypeEnum'
         redemption_type:
-          $ref: '#/components/schemas/RedemptionTypeEnum'
+          $ref: '#/components/schemas/NestedRedemptionTypeEnum'
         payment_type:
           nullable: true
           oneOf:
@@ -7241,6 +7292,20 @@ components:
       - id
       - redemption_type
       - updated_on
+    NestedRedemptionTypeEnum:
+      enum:
+      - one-time
+      - one-time-per-user
+      - unlimited
+      type: string
+      description: |-
+        * `one-time` - one-time
+        * `one-time-per-user` - one-time-per-user
+        * `unlimited` - unlimited
+      x-enum-descriptions:
+      - one-time
+      - one-time-per-user
+      - unlimited
     NestedRequest:
       type: object
       properties:
@@ -7253,7 +7318,7 @@ components:
         discount_type:
           $ref: '#/components/schemas/DiscountTypeEnum'
         redemption_type:
-          $ref: '#/components/schemas/RedemptionTypeEnum'
+          $ref: '#/components/schemas/NestedRedemptionTypeEnum'
         payment_type:
           nullable: true
           oneOf:
@@ -7682,6 +7747,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserDiscountMeta'
+    PaginatedV1ProgramList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/V1Program'
     PartnerSchool:
       type: object
       properties:
@@ -7789,42 +7877,33 @@ components:
     PatchedDiscountRequest:
       type: object
       properties:
+        id:
+          type: integer
         amount:
           type: string
           format: decimal
-          pattern: ^-?\d{0,15}(?:\.\d{0,5})?$
+          pattern: ^-?\d{0,7}(?:\.\d{0,2})?$
         automatic:
           type: boolean
         discount_type:
           $ref: '#/components/schemas/DiscountTypeEnum'
         redemption_type:
-          $ref: '#/components/schemas/RedemptionTypeEnum'
+          $ref: '#/components/schemas/RedemptionTypeF58Enum'
         max_redemptions:
           type: integer
-          maximum: 2147483647
-          minimum: 0
-          nullable: true
         discount_code:
           type: string
           minLength: 1
-          maxLength: 100
         payment_type:
-          nullable: true
-          oneOf:
-          - $ref: '#/components/schemas/PaymentTypeEnum'
-          - $ref: '#/components/schemas/NullEnum'
+          $ref: '#/components/schemas/PaymentTypeEnum'
+        is_redeemed:
+          type: boolean
         activation_date:
           type: string
           format: date-time
-          nullable: true
-          description: If set, this discount code will not be redeemable before this
-            date.
         expiration_date:
           type: string
           format: date-time
-          nullable: true
-          description: If set, this discount code will not be redeemable after this
-            date.
     PatchedFlexiblePriceAdminRequest:
       type: object
       description: Serializer for Financial Assistance Requests
@@ -7929,6 +8008,7 @@ components:
           maxLength: 255
         email:
           type: string
+          description: Returns the email or None in the case of AnonymousUser
         password:
           type: string
           writeOnly: true
@@ -8010,49 +8090,16 @@ components:
       - price
     Program:
       type: object
-      description: Program model serializer
       properties:
-        title:
-          type: string
-          maxLength: 255
-        readable_id:
-          type: string
-          pattern: ^[\w\-+:\.]+$
-          maxLength: 255
         id:
           type: integer
-          readOnly: true
-        courses:
+        title:
           type: string
-          readOnly: true
-        requirements:
+        readable_id:
           type: string
-          readOnly: true
-        req_tree:
-          type: string
-          readOnly: true
-        page:
-          type: string
-          readOnly: true
-        program_type:
-          type: string
-          nullable: true
-          maxLength: 255
-        departments:
-          type: array
-          items:
-            $ref: '#/components/schemas/Department'
-          readOnly: true
-        live:
-          type: boolean
       required:
-      - courses
-      - departments
       - id
-      - page
       - readable_id
-      - req_tree
-      - requirements
       - title
     PublicUser:
       type: object
@@ -8100,20 +8147,83 @@ components:
       required:
       - code
       - message
-    RedemptionTypeEnum:
+    RedemptionTypeF58Enum:
       enum:
-      - one-time
-      - one-time-per-user
-      - unlimited
+      - marketing
+      - sales
+      - financial-assistance
+      - customer-support
+      - staff
+      - legacy
       type: string
       description: |-
-        * `one-time` - one-time
-        * `one-time-per-user` - one-time-per-user
-        * `unlimited` - unlimited
+        * `marketing` - marketing
+        * `sales` - sales
+        * `financial-assistance` - financial-assistance
+        * `customer-support` - customer-support
+        * `staff` - staff
+        * `legacy` - legacy
       x-enum-descriptions:
-      - one-time
-      - one-time-per-user
-      - unlimited
+      - marketing
+      - sales
+      - financial-assistance
+      - customer-support
+      - staff
+      - legacy
+    RegisterConfirm:
+      type: object
+      description: Serializer for email confirmation
+      properties:
+        partial_token:
+          type: string
+        flow:
+          $ref: '#/components/schemas/FlowEnum'
+        provider:
+          type: string
+          readOnly: true
+        state:
+          type: string
+          readOnly: true
+        errors:
+          type: array
+          items: {}
+          readOnly: true
+        field_errors:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        redirect_url:
+          type: string
+          readOnly: true
+        extra_data:
+          type: string
+          readOnly: true
+      required:
+      - errors
+      - extra_data
+      - field_errors
+      - flow
+      - partial_token
+      - provider
+      - redirect_url
+      - state
+    RegisterConfirmRequest:
+      type: object
+      description: Serializer for email confirmation
+      properties:
+        partial_token:
+          type: string
+          minLength: 1
+        flow:
+          $ref: '#/components/schemas/FlowEnum'
+        verification_code:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - flow
+      - partial_token
+      - verification_code
     SetPassword:
       type: object
       properties:
@@ -8236,6 +8346,7 @@ components:
           maxLength: 255
         email:
           type: string
+          description: Returns the email or None in the case of AnonymousUser
         legal_address:
           allOf:
           - $ref: '#/components/schemas/LegalAddress'
@@ -8273,7 +8384,9 @@ components:
           format: date-time
           readOnly: true
         grants:
-          type: string
+          type: array
+          items:
+            type: string
           readOnly: true
         is_active:
           type: boolean
@@ -8485,6 +8598,7 @@ components:
           maxLength: 255
         email:
           type: string
+          description: Returns the email or None in the case of AnonymousUser
         password:
           type: string
           writeOnly: true
@@ -8502,6 +8616,52 @@ components:
           default: true
       required:
       - legal_address
+    V1Program:
+      type: object
+      description: Program model serializer
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        readable_id:
+          type: string
+          pattern: ^[\w\-+:\.]+$
+          maxLength: 255
+        id:
+          type: integer
+          readOnly: true
+        courses:
+          type: string
+          readOnly: true
+        requirements:
+          type: string
+          readOnly: true
+        req_tree:
+          type: string
+          readOnly: true
+        page:
+          type: string
+          readOnly: true
+        program_type:
+          type: string
+          nullable: true
+          maxLength: 255
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+          readOnly: true
+        live:
+          type: boolean
+      required:
+      - courses
+      - departments
+      - id
+      - page
+      - readable_id
+      - req_tree
+      - requirements
+      - title
     YearsExperienceEnum:
       enum:
       - '2'

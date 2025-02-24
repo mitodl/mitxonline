@@ -476,6 +476,18 @@ class OrderHistorySerializer(serializers.ModelSerializer):
 
 
 class DiscountSerializer(serializers.ModelSerializer):
+    
+    id = serializers.IntegerField()
+    amount = serializers.DecimalField(max_digits=9, decimal_places=2)
+    automatic = serializers.BooleanField()
+    discount_type = serializers.ChoiceField(choices=DISCOUNT_TYPES)
+    redemption_type = serializers.ChoiceField(choices=PAYMENT_TYPES)
+    max_redemptions = serializers.IntegerField()
+    discount_code = serializers.CharField()
+    payment_type = serializers.ChoiceField(choices=PAYMENT_TYPES)
+    is_redeemed = serializers.BooleanField()
+    activation_date = serializers.DateTimeField()
+    expiration_date = serializers.DateTimeField()
     class Meta:
         model = models.Discount
         fields = [
