@@ -3,6 +3,7 @@
 import json
 
 from django import template
+from django.urls import reverse
 from django.utils.safestring import mark_safe
 
 from main.utils import (
@@ -19,10 +20,11 @@ def js_settings(context):
     """Renders the JS settings object to a script tag"""
     request = context["request"]
     js_settings_json = json.dumps(get_js_settings(request))
+    oidc_login_url = reverse("social:begin", kwargs={"backend": "ol-oidc"})
 
     return mark_safe(  # noqa: S308
         f"""<script type="text/javascript">
-var SETTINGS = {js_settings_json};
+var SETTINGS = {js_settings_json};var OIDC_LOGIN_URL = "{oidc_login_url}";
 </script>"""
     )
 

@@ -7,6 +7,7 @@ from mitol.common.utils import dict_without_keys
 from social_core.backends.email import EmailAuth
 from social_core.exceptions import AuthException
 from social_core.pipeline.partial import partial
+from social_core.pipeline.user import create_user
 
 from authentication.exceptions import (
     EmailBlockedException,
@@ -30,6 +31,16 @@ NAME_MIN_LENGTH = 2
 # pylint: disable=keyword-arg-before-vararg
 
 
+def create_ol_oidc_user(strategy, details, backend, user=None, *args, **kwargs):
+    """Create the user, only if we're using the ol-oidc backend."""
+
+    if backend.name != "ol-oidc":
+        log.error("not using the right backend, so not doing anything")
+        return {}
+
+    return create_user(strategy, details, backend, user, *args, **kwargs)
+
+
 def validate_email_auth_request(strategy, backend, user=None, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
     """
     Validates an auth request for email
@@ -40,6 +51,7 @@ def validate_email_auth_request(strategy, backend, user=None, *args, **kwargs): 
         user (User): the current user
     """
     if backend.name != EmailAuth.name:
+        log.error("skipping over whatever function this is because it's not email!")
         return {}
 
     # if there's a user, force this to be a login
@@ -85,6 +97,7 @@ def create_user_via_email(
         RequirePasswordAndPersonalInfoException: if the user hasn't set password or name
     """
     if backend.name != EmailAuth.name or flow != SocialAuthState.FLOW_REGISTER:
+        log.error("skipping over whatever function this is because it's not email!")
         return {}
 
     if user is not None:
@@ -192,6 +205,7 @@ def validate_password(
         InvalidPasswordException: if the password does not match the user, or the user is not active.
     """
     if backend.name != EmailAuth.name or flow != SocialAuthState.FLOW_LOGIN:
+        log.error("skipping over whatever function this is because it's not email!")
         return {}
 
     data = strategy.request_data()

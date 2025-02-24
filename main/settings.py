@@ -335,6 +335,15 @@ ROBOTS_CACHE_TIMEOUT = get_int(
     description="How long the robots.txt file should be cached",
 )
 
+# Social Auth Configuration
+
+AUTHENTICATION_BACKENDS = (
+    "authentication.backends.ol_open_id_connect.OlOpenIdConnectAuth",
+    "social_core.backends.email.EmailAuth",
+    "oauth2_provider.backends.OAuth2Backend",
+    "django.contrib.auth.backends.ModelBackend",
+)
+
 SOCIAL_AUTH_LOGIN_ERROR_URL = "login"
 SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = [urlparse(SITE_BASE_URL).netloc]
 
@@ -370,6 +379,8 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.social_auth.social_user",
     # Associates the current social details with another user account with the same email address.
     "social_core.pipeline.social_auth.associate_by_email",
+    # create OIDC user only
+    "authentication.pipeline.user.create_ol_oidc_user",
     # validate an incoming email auth request
     "authentication.pipeline.user.validate_email_auth_request",
     # validate the user's email either it is blocked or not.
@@ -378,7 +389,7 @@ SOCIAL_AUTH_PIPELINE = (
     "authentication.pipeline.user.validate_password",
     # Send a validation email to the user to verify its email address.
     # Disabled by default.
-    "social_core.pipeline.mail.mail_validation",
+    # "social_core.pipeline.mail.mail_validation",
     # Send the email address and hubspot cookie if it exists to hubspot.
     # "authentication.pipeline.user.send_user_to_hubspot",
     # Generate a username for the user
@@ -391,7 +402,7 @@ SOCIAL_AUTH_PIPELINE = (
     # Create the record that associates the social account with the user.
     "social_core.pipeline.social_auth.associate_user",
     # create the user's edx user and auth
-    "authentication.pipeline.user.create_openedx_user",
+    # "authentication.pipeline.user.create_openedx_user",
     # Populate the extra_data field in the social record with the values
     # specified by settings (and the default ones like access_token, etc).
     "social_core.pipeline.social_auth.load_extra_data",
@@ -399,11 +410,35 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.user.user_details",
 )
 
+# Social Auth OIDC configuration
+
+SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT = get_string(
+    name="SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT",
+    default=None,
+    description="The configuration endpoint for the OIDC provider",
+)
+
+SOCIAL_AUTH_OL_OIDC_KEY = get_string(
+    name="SOCIAL_AUTH_OL_OIDC_KEY",
+    default="some available client id",
+    description="The client id for the OIDC provider",
+)
+
+SOCIAL_AUTH_OL_OIDC_SECRET = get_string(
+    name="SOCIAL_AUTH_OL_OIDC_SECRET",
+    default="some super secret key",
+    description="The client secret for the OIDC provider",
+)
+
+SOCIAL_AUTH_OL_OIDC_SCOPE = ["ol-profile"]
+
 AUTH_CHANGE_EMAIL_TTL_IN_MINUTES = get_int(
     name="AUTH_CHANGE_EMAIL_TTL_IN_MINUTES",
     default=60 * 24,
     description="Expiry time for a change email request, default is 1440 minutes(1 day)",
 )
+
+# Social Auth Configuration end
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.8/howto/static-files/
@@ -900,13 +935,6 @@ CACHES = {
         "LOCATION": "durable_cache",
     },
 }
-
-AUTHENTICATION_BACKENDS = (
-    "social_core.backends.email.EmailAuth",
-    "oauth2_provider.backends.OAuth2Backend",
-    "django.contrib.auth.backends.ModelBackend",
-)
-
 
 # required for migrations
 OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = "oauth2_provider.AccessToken"  # noqa: S105
