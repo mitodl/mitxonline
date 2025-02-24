@@ -249,6 +249,18 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
         default=False, help_text="The user account is active"
     )
 
+    # global_id points to the SSO ID for the user (so, usually the Keycloak ID,
+    # which is a UUID). We store it as a string in case the SSO source changes.
+    # We allow a blank value so we can have out-of-band users - we may want a
+    # Django user that's not connected to an SSO user, for instance.
+    global_id = models.CharField(
+        unique=True,
+        max_length=255,
+        blank=True,
+        default=uuid.uuid4,
+        help_text="The SSO ID (usually a Keycloak UUID) for the user.",
+    )
+
     hubspot_sync_datetime = DateTimeField(null=True)
 
     objects = UserManager()
