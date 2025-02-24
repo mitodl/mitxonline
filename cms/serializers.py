@@ -4,9 +4,7 @@ import bleach
 from django.templatetags.static import static
 from rest_framework import serializers
 
-from cms import models
 from cms.api import get_wagtail_img_src
-from cms.models import FlexiblePricingRequestForm, ProgramPage
 from courses.constants import DEFAULT_COURSE_IMG_PATH
 
 
@@ -48,7 +46,7 @@ class BaseCoursePageSerializer(serializers.ModelSerializer):
         )
 
     class Meta:
-        model = models.CoursePage
+        model = "cms.CoursePage"
         fields = [
             "feature_image_src",
             "page_url",
@@ -70,6 +68,8 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         """
         Returns URL of the Financial Assistance Form.
         """
+        from cms.models import FlexiblePricingRequestForm, ProgramPage
+
         financial_assistance_page = None
         if instance.product.programs:
             valid_program_objs = [program for program in instance.product.programs]  # noqa: C416
@@ -144,7 +144,7 @@ class CoursePageSerializer(BaseCoursePageSerializer):
         return returnable_members
 
     class Meta:
-        model = models.CoursePage
+        model = "cms.CoursePage"
         fields = BaseCoursePageSerializer.Meta.fields + [  # noqa: RUF005
             "financial_assistance_form_url",
             "current_price",
@@ -178,6 +178,9 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         """
         Returns URL of the Financial Assistance Form.
         """
+
+        from cms.models import FlexiblePricingRequestForm, ProgramPage
+
         financial_assistance_page = (
             FlexiblePricingRequestForm.objects.filter(
                 selected_program_id=instance.program.id
@@ -217,7 +220,7 @@ class ProgramPageSerializer(serializers.ModelSerializer):
         )
 
     class Meta:
-        model = models.ProgramPage
+        model = "cms.ProgramPage"
         fields = [
             "feature_image_src",
             "page_url",
@@ -244,7 +247,7 @@ class InstructorPageSerializer(serializers.ModelSerializer):
         return feature_img_src or static(DEFAULT_COURSE_IMG_PATH)
 
     class Meta:
-        model = models.InstructorPage
+        model = "cms.InstructorPage"
         fields = [
             "id",
             "instructor_name",

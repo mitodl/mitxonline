@@ -178,6 +178,7 @@ INSTALLED_APPS = (
     "wagtail",
     "modelcluster",
     "taggit",
+    "wagtail.api.v2",
     # django-robots
     "robots",
     # django-reversion

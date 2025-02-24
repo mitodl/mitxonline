@@ -64,7 +64,7 @@ def get_home_page(raise_if_missing=True, check_specific=False) -> Page:  # noqa:
     return home_page
 
 
-def _create_resource_page(title: str) -> cms_models.ResourcePage:
+def _create_resource_page(title: str) -> "cms_models.ResourcePage":
     """Creates a resource page with the given title under the parent page"""
     page = cms_models.ResourcePage(
         slug=slugify(title),

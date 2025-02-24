@@ -41,6 +41,7 @@ from wagtail.models import Page
 from wagtail.search import index
 from wagtail.snippets.models import register_snippet
 from wagtailmetadata.models import MetadataPageMixin
+from wagtail.api import APIField
 
 from cms.blocks import (
     CourseRunCertificateOverrides,
@@ -80,6 +81,7 @@ from flexiblepricing.models import (
 )
 from main import features
 from main.views import get_base_context
+from .wagtail_api_serializers import ProductChildPageSerializer
 
 log = logging.getLogger()
 
@@ -1071,6 +1073,15 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
         child = self.get_children().type(cls).live().first()
         return child.specific if child else None
 
+    # def get_api_fields():
+    #     from courses.serializers.v1.courses import CourseSerializer
+    #     return [
+    #         APIField("product", serializer=CourseSerializer()),
+    #         APIField("child_pages", serializer=ProductChildPageSerializer()),
+    #     ]
+
+    # api_fields = get_api_fields()
+
     @property
     def certificate_page(self):
         """Gets the certificate child page"""
@@ -1177,6 +1188,17 @@ class CoursePage(ProductPage):
             ],
         )
     ]
+
+    from courses.serializers.v1.courses import CourseSerializer
+
+    api_fields = [
+        APIField("product", serializer=CourseSerializer()),
+        APIField("child_pages", serializer=ProductChildPageSerializer()),
+    ]
+
+    @property
+    def child_pages(self):
+        return self.get_children().public().live()
 
     @cached_property
     def product(self):

@@ -14,10 +14,21 @@ class BaseCourseSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField(read_only=True)
 
     def to_representation(self, instance):
+        print(f"We here - instance type: {type(instance)}, value: {instance}")
+        if instance is None:
+            raise ValueError("Instance is None, check where it's being set")
+
         data = super().to_representation(instance)
+        print(f"Serialized data (type: {type(data)}): {data}")
+
         if not self.context.get("include_page_fields") or not hasattr(instance, "page"):
             return data
-        return {**data, **CoursePageSerializer(instance=instance.page).data}
+
+        page_data = CoursePageSerializer(instance=instance.page).data
+        print(f"Page data: {page_data}")
+
+        return {**data, **page_data}
+
 
     @staticmethod
     def get_type(obj):  # noqa: ARG004
