@@ -141,15 +141,11 @@ class CourseRunWithCourseSerializer(CourseRunSerializer):
         read_only=True,
         help_text="List of products associated with this course run"
     )
-
-    @extend_schema_field(serializers.URLField)
+    
+    @extend_schema_field(str)
     def get_courseware_url(self, instance) -> Optional[str]:
-        """Get the full URL for this CourseRun in the courseware"""
-        return (
-            edx_redirect_url(instance.courseware_url_path)
-            if instance.courseware_url_path
-            else None
-        )
+        """Get the courseware URL"""
+        return instance.courseware_url
 
     @extend_schema_field(bool)
     def get_is_upgradable(self, instance) -> bool:

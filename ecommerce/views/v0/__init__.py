@@ -514,6 +514,24 @@ class CheckoutApiViewSet(ViewSet):
     authentication_classes = (SessionAuthentication, TokenAuthentication)
     permission_classes = (IsAuthenticated,)
 
+    @action(detail=False, methods=["post"], name="Start Checkout", url_name="start_checkout")
+    def start_checkout(self, request):
+        """
+        API call to start the checkout process. This assembles the basket items
+        into an Order with Lines for each item, applies the attached basket
+        discounts, and then calls the payment gateway to prepare for payment.
+        Returns:
+            - JSON payload from the ol-django payment gateway app. The payment
+              gateway returns data necessary to construct a form that will
+              ultimately POST to the actual payment processor.
+        """
+        try:
+            payload = api.generate_checkout_payload(request)
+        except ObjectDoesNotExist:
+            return Response("No basket", status=status.HTTP_406_NOT_ACCEPTABLE)
+
+        return Response(payload)
+
     @extend_schema(
         request=RedeemDiscountRequestSerializer,
         responses={200: RedeemDiscountResponseSerializer},
