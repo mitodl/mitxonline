@@ -98,7 +98,7 @@ _If you're running Keycloak alongside MITx Online on the same machine,_ you will
 
 If you're using MITx Online with Keycloak, you can technically skip creating a superuser. Instead, you can log in with the account you want to use as a superuser account (e.g. `admin@odl.local`) and then use the `promote_user` command to add privileges:
 
-`promote_user --promote --superuser admin@odl.local` 
+`promote_user --promote --superuser admin@odl.local`
 
 This can also be used to demote users or promote only to staff; see its help for more info. The account must exist first so the user must have logged in before you can run the command.
 
