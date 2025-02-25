@@ -9,9 +9,11 @@ from social_core.exceptions import AuthException
 from social_core.pipeline.partial import partial
 from social_core.pipeline.user import create_user
 
+from authentication.backends.ol_open_id_connect import OlOpenIdConnectAuth
 from authentication.exceptions import (
     EmailBlockedException,
     InvalidPasswordException,
+    RequireEmailException,
     RequirePasswordAndPersonalInfoException,
     RequirePasswordException,
     RequireRegistrationException,
@@ -31,14 +33,56 @@ NAME_MIN_LENGTH = 2
 # pylint: disable=keyword-arg-before-vararg
 
 
-def create_ol_oidc_user(strategy, details, backend, user=None, *args, **kwargs):
-    """Create the user, only if we're using the ol-oidc backend."""
+def forbid_hijack(strategy, backend, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
+    """
+    Forbid an admin user from trying to login/register while hijacking another user
 
-    if backend.name != "ol-oidc":
-        log.error("not using the right backend, so not doing anything")
+    Args:
+        strategy (social_django.strategy.DjangoStrategy): the strategy used to authenticate
+        backend (social_core.backends.base.BaseAuth): the backend being used to authenticate
+    """
+    # As first step in pipeline, stop a hijacking admin from going any further
+    if bool(strategy.session_get("hijack_history")):
+        raise AuthException("You are hijacking another user, don't try to login again")  # noqa: EM101
+    return {}
+
+
+# Pipeline steps for OIDC logins
+
+
+def create_ol_oidc_user(strategy, details, backend, user=None, *args, **kwargs):
+    """
+    Create the user if we're using the ol-oidc backend.
+
+    This also does a blocked user check and makes sure there's an email address.
+    If the created user is new, we make sure they're set active. (If the user is
+    inactive, they'll get knocked out of the pipeline elsewhere.)
+    """
+
+    if backend.name != OlOpenIdConnectAuth.name:
         return {}
 
-    return create_user(strategy, details, backend, user, *args, **kwargs)
+    if "email" not in details:
+        raise RequireEmailException(backend, None)
+
+    if "email" in details and is_user_email_blocked(details["email"]):
+        raise EmailBlockedException(backend, None)
+
+    retval = create_user(strategy, details, backend, user, *args, **kwargs)
+
+    if retval.get("is_new"):
+        # the backend should be setting the is_active flag to True (and it seems
+        # to be doing that!) but it isn't so we need to set it to active here.
+        user = retval["user"]
+        user.is_active = True
+        user.save()
+
+        retval["user"] = user
+
+    return retval
+
+
+# Pipeline steps for email logins
 
 
 def validate_email_auth_request(strategy, backend, user=None, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
@@ -61,7 +105,7 @@ def validate_email_auth_request(strategy, backend, user=None, *args, **kwargs): 
     return {}
 
 
-def get_username(strategy, backend, user=None, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
+def get_username(strategy, backend, user=None, details=None, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
     """
     Gets the username for a user
 
@@ -70,6 +114,10 @@ def get_username(strategy, backend, user=None, *args, **kwargs):  # pylint: disa
         backend (social_core.backends.base.BaseAuth): the backend being used to authenticate
         user (User): the current user
     """
+
+    if backend.name == OlOpenIdConnectAuth.name:
+        return {"username": details["username"] if not user else user.username}
+
     return {"username": None if not user else strategy.storage.user.get_username(user)}
 
 
@@ -220,20 +268,6 @@ def validate_password(
     if not user or not user.check_password(password) or not user.is_active:
         raise InvalidPasswordException(backend, current_partial)
 
-    return {}
-
-
-def forbid_hijack(strategy, backend, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG001
-    """
-    Forbid an admin user from trying to login/register while hijacking another user
-
-    Args:
-        strategy (social_django.strategy.DjangoStrategy): the strategy used to authenticate
-        backend (social_core.backends.base.BaseAuth): the backend being used to authenticate
-    """
-    # As first step in pipeline, stop a hijacking admin from going any further
-    if bool(strategy.session_get("hijack_history")):
-        raise AuthException("You are hijacking another user, don't try to login again")  # noqa: EM101
     return {}
 
 
