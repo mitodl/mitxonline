@@ -19,6 +19,10 @@ type Props = {
 
 export class LoginChoicePage extends React.Component<Props> {
   render() {
+    if (!SETTINGS.oidc_login_url) {
+      this.props.history.push(routes.login.email)
+    }
+
     return (
       <DocumentTitle
         title={`${SETTINGS.site_name} | ${LOGIN_EMAIL_PAGE_TITLE}`}
@@ -28,22 +32,21 @@ export class LoginChoicePage extends React.Component<Props> {
             <div className="std-card-body">
               <h1>Sign in</h1>
 
-              <div className="form-group">
+              <div>
                 <Link
                   to={routes.login.email}
-                  className="btn btn-primary btn-gradient-red-to-blue large"
+                  className="btn btn-primary btn-gradient-red-to-blue large w-100"
                 >
                   Sign In with Email
                 </Link>
               </div>
-
-              <div className="form-group">
-                <Link
-                  to={routes.login.email}
-                  className="btn btn-primary btn-gradient-red-to-blue large"
+              <div>
+                <a
+                  href={SETTINGS.oidc_login_url}
+                  className="btn btn-secondary btn-gradient-red-to-blue large w-100"
                 >
                   Sign In with Keycloak
-                </Link>
+                </a>
               </div>
             </div>
           </div>

@@ -202,7 +202,7 @@ INSTALLED_APPS = (
     "ecommerce",
     "flexiblepricing",
     "micromasters_import",
-    # ol-dango apps, must be after this project's apps for template precedence
+    # ol-django apps, must be after this project's apps for template precedence
     "mitol.common.apps.CommonApp",
     "mitol.google_sheets.apps.GoogleSheetsApp",
     "mitol.google_sheets_refunds.apps.GoogleSheetsRefundsApp",
@@ -248,7 +248,6 @@ SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
 LOGIN_REDIRECT_URL = "/"
 LOGIN_URL = "/signin"
-LOGIN_ERROR_URL = "/signin"
 LOGOUT_REDIRECT_URL = get_string(
     name="LOGOUT_REDIRECT_URL",
     default="/",
@@ -346,8 +345,12 @@ AUTHENTICATION_BACKENDS = (
 
 SOCIAL_AUTH_LOGIN_ERROR_URL = "login"
 SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = [urlparse(SITE_BASE_URL).netloc]
+SOCIAL_AUTH_IMMUTABLE_USER_FIELDS = [
+    "global_id",
+]
 
 # Email backend settings
+
 SOCIAL_AUTH_EMAIL_FORM_URL = "login"
 SOCIAL_AUTH_EMAIL_FORM_HTML = "login.html"
 
@@ -379,8 +382,6 @@ SOCIAL_AUTH_PIPELINE = (
     "social_core.pipeline.social_auth.social_user",
     # Associates the current social details with another user account with the same email address.
     "social_core.pipeline.social_auth.associate_by_email",
-    # create OIDC user only
-    "authentication.pipeline.user.create_ol_oidc_user",
     # validate an incoming email auth request
     "authentication.pipeline.user.validate_email_auth_request",
     # validate the user's email either it is blocked or not.
@@ -389,7 +390,7 @@ SOCIAL_AUTH_PIPELINE = (
     "authentication.pipeline.user.validate_password",
     # Send a validation email to the user to verify its email address.
     # Disabled by default.
-    # "social_core.pipeline.mail.mail_validation",
+    "social_core.pipeline.mail.mail_validation",
     # Send the email address and hubspot cookie if it exists to hubspot.
     # "authentication.pipeline.user.send_user_to_hubspot",
     # Generate a username for the user
@@ -397,18 +398,21 @@ SOCIAL_AUTH_PIPELINE = (
     "authentication.pipeline.user.get_username",
     # Create a user if one doesn't exist, and require a password and name
     "authentication.pipeline.user.create_user_via_email",
+    # If we're using the OIDC backend, create the user from the OIDC response
+    "authentication.pipeline.user.create_ol_oidc_user",
     # verify the user against export compliance
     # "authentication.pipeline.compliance.verify_exports_compliance",
     # Create the record that associates the social account with the user.
     "social_core.pipeline.social_auth.associate_user",
     # create the user's edx user and auth
-    # "authentication.pipeline.user.create_openedx_user",
+    "authentication.pipeline.user.create_openedx_user",
     # Populate the extra_data field in the social record with the values
     # specified by settings (and the default ones like access_token, etc).
     "social_core.pipeline.social_auth.load_extra_data",
     # Update the user record with any changed info from the auth service.
     "social_core.pipeline.user.user_details",
 )
+
 
 # Social Auth OIDC configuration
 
@@ -437,6 +441,29 @@ AUTH_CHANGE_EMAIL_TTL_IN_MINUTES = get_int(
     default=60 * 24,
     description="Expiry time for a change email request, default is 1440 minutes(1 day)",
 )
+
+# Disable the OIDC button on the signin screen.
+# Doesn't actually disable OIDC login - you can still go to /login/ol-oidc/
+# (assuming OIDC is set up).
+EXPOSE_OIDC_LOGIN = get_bool(
+    name="EXPOSE_OIDC_LOGIN",
+    default=False,
+    description="Expose the OIDC login functionality.",
+)
+
+# These are used for logout.
+KEYCLOAK_BASE_URL = get_string(
+    name="KEYCLOAK_BASE_URL",
+    default="http://mit-keycloak-base-url.edu",
+    description="Base URL for the Keycloak instance.",
+)
+
+KEYCLOAK_REALM_NAME = get_string(
+    name="KEYCLOAK_REALM_NAME",
+    default="olapps",
+    description="Name of the realm the app uses in Keycloak.",
+)
+
 
 # Social Auth Configuration end
 

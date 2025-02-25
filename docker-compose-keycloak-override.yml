@@ -1,0 +1,9 @@
+# Rename to docker-compose.override.yml (or merge these settings in with your
+# existing file).
+# This won't overwrite the aliases that are configured in the docker-compose.yml.
+# It will just add to it. You can check with `docker compose config web`.
+
+services:
+  web:
+    extra_hosts:
+    - "kc.odl.local:host-gateway"

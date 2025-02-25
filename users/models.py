@@ -181,7 +181,11 @@ class UserManager(BaseUserManager):
     def _create_user(self, username, email, password, **extra_fields):
         """Create and save a user with the given email and password"""
         email = self.normalize_email(email)
-        fields = {**extra_fields, "email": email}
+        fields = {
+            **extra_fields,
+            "email": email,
+            "global_id": extra_fields.get("global_id", uuid.uuid4()),
+        }
         if username is not None:
             fields["username"] = username
         user = self.model(**fields)
@@ -257,7 +261,7 @@ class User(AbstractBaseUser, TimestampedModel, PermissionsMixin):
         unique=True,
         max_length=255,
         blank=True,
-        default=uuid.uuid4,
+        default="",
         help_text="The SSO ID (usually a Keycloak UUID) for the user.",
     )
 
