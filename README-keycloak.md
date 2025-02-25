@@ -2,7 +2,7 @@
 
 The Compose file includes a Keycloak instance that you can use for authentication instead of spinning up a separate one or using one of the deployed instances. It's not enabled by default, but you can run it if you prefer not to run your own Keycloak instance.
 
-_If you're running the pack-in Keycloak with other apps (Unified Ecommerce, Learn), you might just want to use its instance instead._
+_If you're running the pack-in Keycloak with other apps (Unified Ecommerce, Learn), you might just want to use its instance instead._ There's instructions below on doing that. Start at "Configuring MITx Online" below.
 
 ## Default Settings
 
@@ -92,7 +92,15 @@ The key and secret are available under `Clients`. The key is the client name (so
 
 You can use MITx Online with Keycloak instances that aren't the pack-in one - the provided one is just for convenience. Just set the same settings above, but get them from whatever Keycloak instance you already have running.
 
-_If you're running Keycloak alongside MITx Online on the same machine,_ you will need to perform some additional configuration to make it visible to MITx Online. Docker containers and Compose projects can't generally see each other, and local-only hostnames (e.g. hosts file entries) don't apply inside containers. You can get around this by setting up a composer override file that adds an alias for the hostname you're using for the Keycloak instance to `host-gateway`. There's a sample override file called `docker-compose.override-keycloak.yml` you can use for this.
+_If you're running Keycloak alongside MITx Online on the same machine,_ you will need to perform some additional configuration to make it visible to MITx Online. Docker containers and Compose projects can't generally see each other, and local-only hostnames (e.g. hosts file entries) don't apply inside containers. You can get around this by setting up a composer override file that adds an alias for the hostname you're using for the Keycloak instance to `host-gateway`. There's a sample override file called `docker-compose-keycloak-override.yml` you can use for this.
+
+### SSO Admins
+
+If you're using MITx Online with Keycloak, you can technically skip creating a superuser. Instead, you can log in with the account you want to use as a superuser account (e.g. `admin@odl.local`) and then use the `promote_user` command to add privileges:
+
+`promote_user --promote --superuser admin@odl.local` 
+
+This can also be used to demote users or promote only to staff; see its help for more info. The account must exist first so the user must have logged in before you can run the command.
 
 ## Troubleshooting
 
